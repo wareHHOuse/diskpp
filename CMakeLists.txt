@@ -33,6 +33,11 @@ configure_file (
   "${PROJECT_BINARY_DIR}/_config_/config.h"
   )
 
+
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+    set(LINK_LIBS "${LINK_LIBS}" pthread)
+endif()
+
 include_directories(core contrib "${PROJECT_BINARY_DIR}/_config_/")
 
 add_subdirectory(contrib)
