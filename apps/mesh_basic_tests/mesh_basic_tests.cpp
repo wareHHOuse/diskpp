@@ -84,21 +84,21 @@ int main(void)
     loader_g.read_mesh("../../../meshes/mesh2_1.typ1");
     //loader_g.read_mesh("./data/pi6_tiltedhexagonal_1.typ1");
     loader_g.populate_mesh(msh_g);
-    msh_g.transform(my_transformer);
-    mesh_to_postscript(msh_g, "mesh2_1.ps");
+    //msh_g.transform(my_transformer);
+    //mesh_to_postscript(msh_g, "mesh2_1.ps");
 
-//    hho::simplicial_mesh<T, DIM_s> msh_s;
-//    hho::netgen_mesh_loader<T, DIM_s> loader_s;
-//    loader_s.read_mesh("../../hho/tests/data/simplecube.mesh");
-//    loader_s.populate_mesh(msh_s);
+    disk::simplicial_mesh<T, DIM_s> msh_s;
+    disk::netgen_mesh_loader<T, DIM_s> loader_s;
+    loader_s.read_mesh("../../../meshes/cubecube.mesh");
+    loader_s.populate_mesh(msh_s);
 
-//    hho::generic_mesh<T, 1> msh_u;
-//    hho::uniform_mesh_loader<T, 1> loader_u;
-//    loader_u.populate_mesh(msh_u);
+    disk::generic_mesh<T, 1> msh_u;
+    disk::uniform_mesh_loader<T, 1> loader_u;
+    loader_u.populate_mesh(msh_u);
 
     test_mesh(msh_g);
-//    test_mesh(msh_s);
-//    test_mesh(msh_u);
+    test_mesh(msh_s);
+    test_mesh(msh_u);
 
     return 0;
 }
