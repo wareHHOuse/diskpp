@@ -48,13 +48,13 @@
 
 class mapped_file
 {
-    const char *    _start;
-    const char *    _end;
-    std::string     _name;
-    int             _fd;
-    size_t          _length;
-    const char *    _addr;
-    bool            _is_open;
+    const char *    m_start;
+    const char *    m_end;
+    std::string     m_name;
+    int             m_fd;
+    size_t          m_length;
+    const char *    m_addr;
+    bool            m_is_open;
 
     bool            map(const std::string&);
     bool            unmap(void);

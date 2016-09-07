@@ -73,36 +73,36 @@ test_new_diffusion(MeshType& msh, const Function& load, const Solution& solution
 
     std::map<std::string, double> timings;
 
-    scalar_type proj_err = 0.0;
+    //scalar_type proj_err = 0.0;
     //std::ofstream ofsd("debug.dat");
     for (auto& cl : msh)
     {
-        timecounter tc;
+        timecounter tc_detail;
 
-        tc.tic();
+        tc_detail.tic();
         dld.compute(cl, load);
-        tc.toc();
+        tc_detail.toc();
         timings["pre"] += tc.to_double();
 
-        tc.tic();
+        tc_detail.tic();
         gradrec.compute(dld);
-        tc.toc();
+        tc_detail.toc();
         timings["gr"] += tc.to_double();
 
-        tc.tic();
+        tc_detail.tic();
         stab.compute(dld, gradrec.oper);
-        tc.toc();
+        tc_detail.toc();
         timings["stab"] += tc.to_double();
 
-        tc.tic();
+        tc_detail.tic();
         dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
         auto sc = statcond.compute(dld, loc);
-        tc.toc();
+        tc_detail.toc();
         timings["sc"] += tc.to_double();
 
-        tc.tic();
+        tc_detail.tic();
         assembler.assemble(dld, sc);
-        tc.toc();
+        tc_detail.toc();
         timings["asm"] += tc.to_double();
 
 #if 0

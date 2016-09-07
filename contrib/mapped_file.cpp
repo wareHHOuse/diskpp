@@ -58,11 +58,11 @@
 #include "mapped_file.h"
 
 mapped_file::mapped_file()
-    : _is_open(false)
+    : m_is_open(false)
 {}
 
 mapped_file::mapped_file(const std::string& name)
-    : _is_open(false)
+    : m_is_open(false)
 {
     open(name);
 }
@@ -75,7 +75,7 @@ mapped_file::~mapped_file()
 void
 mapped_file::open(const std::string& name)
 {
-    _is_open = map(name);
+    m_is_open = map(name);
 }
 
 void
@@ -93,7 +93,7 @@ mapped_file::map(const std::string& name)
         perror("open");
         return false;
     }
-    _fd = fd;
+    m_fd = fd;
 
     struct stat sb;
     if (fstat(fd, &sb) == -1)
@@ -102,24 +102,24 @@ mapped_file::map(const std::string& name)
         ::close(fd);
         return false;
     }
-    _length = sb.st_size;
+    m_length = sb.st_size;
 
-    const char* _addr = static_cast<const char*>(
-                         mmap(NULL, _length, PROT_READ, MAP_PRIVATE, fd, 0u)
+    m_addr = static_cast<const char*>(
+                         mmap(NULL, m_length, PROT_READ, MAP_PRIVATE, fd, 0u)
                        );
-    if (_addr == MAP_FAILED)
+    if (m_addr == MAP_FAILED)
     {
         perror("mmap");
         ::close(fd);
         return false;
     }
 
-    madvise((void*)_addr, sb.st_size, MADV_SEQUENTIAL);
+    madvise((void*)m_addr, sb.st_size, MADV_SEQUENTIAL);
 
-    _name = name;
+    m_name = name;
 
-    _start = _addr;
-    _end = _addr + _length;
+    m_start = m_addr;
+    m_end = m_addr + m_length;
 
     return true;
 
@@ -128,57 +128,38 @@ mapped_file::map(const std::string& name)
 bool
 mapped_file::unmap(void)
 {
-    munmap((void *)_addr, _length);
-    ::close(_fd);
+    munmap((void *)m_addr, m_length);
+    ::close(m_fd);
     return true;
 }
 
 bool
 mapped_file::is_open(void) const
 {
-    return _is_open;
+    return m_is_open;
 }
 
 bool
 mapped_file::end(void) const
 {
-    return _start && _start != _end;
+    return m_start && m_start != m_end;
 }
 
 std::string
 mapped_file::get_line(void)
 {
-    auto old = _start;
-    _start = static_cast<const char *>(memchr(_start, '\n', _end - _start));
-    if (!_start)
+    auto old = m_start;
+    m_start = static_cast<const char *>(memchr(m_start, '\n', m_end - m_start));
+    if (!m_start)
         throw std::out_of_range("");
 
-    _start++;
+    m_start++;
 
-    return std::string(old, _start-1);
+    return std::string(old, m_start-1);
 }
 
 const char *
 mapped_file::mem()
 {
-    return _start;
+    return m_start;
 }
-
-
-
-/*
-
-int main(void)
-{
-    mapped_file mf("b104.mesh");
-
-    std::cout << mf.get_line() << std::endl;
-    std::cout << mf.get_line() << std::endl;
-    std::cout << mf.get_line() << std::endl;
-    std::cout << mf.get_line() << std::endl;
-
-    mf.close();
-
-    return 0;
-}
-*/

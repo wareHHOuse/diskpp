@@ -108,9 +108,6 @@ public:
     compute(const precomputed_basis_a_type& pba,
             const precomputed_basis_b_type& pbb)
     {
-        typedef decltype(pba.data_begin()) itor_a_type;
-        typedef decltype(pbb.data_begin()) itor_b_type;
-
         auto tp = [](const a_prebasis_value_type& a,
                      const b_prebasis_value_type& b) -> auto {
             return mm_prod(a, b);
@@ -125,9 +122,6 @@ public:
             const precomputed_basis_b_type& pbb,
             const dof_range& b_range)
     {
-        typedef decltype(pba.data_begin()) itor_a_type;
-        typedef decltype(pbb.data_begin()) itor_b_type;
-
         auto tp = [](const a_prebasis_value_type& a,
                      const b_prebasis_value_type& b) -> auto {
             return mm_prod(a, b);
@@ -142,9 +136,6 @@ public:
             const precomputed_basis_b_type& pbb,
             const NormalVec& n)
     {
-        typedef decltype(pba.data_begin()) itor_a_type;
-        typedef decltype(pbb.data_begin()) itor_b_type;
-
         auto tp = [&](const a_prebasis_value_type& a,
                       const b_prebasis_value_type& b) -> auto {
             auto t = mm_prod(b, n);
@@ -162,9 +153,6 @@ public:
             const dof_range& b_range,
             const NormalVec& n)
     {
-        typedef decltype(pba.data_begin()) itor_a_type;
-        typedef decltype(pbb.data_begin()) itor_b_type;
-
         auto tp = [&](const a_prebasis_value_type& a,
                       const b_prebasis_value_type& b) -> auto {
             auto t = mm_prod(b, n);

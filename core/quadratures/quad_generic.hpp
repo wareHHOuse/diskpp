@@ -162,7 +162,6 @@ public:
     integrate(const mesh_type& msh, const cell_type& cl) const
     {
         auto pts        = points(msh, cl);
-        auto c_center   = barycenter(msh, cl);
         auto meas       = measure(msh, cl);
 
         assert(pts.size() == 2);
