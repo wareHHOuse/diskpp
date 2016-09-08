@@ -26,19 +26,26 @@ endif()
 find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
+set (SOLVER_WRAPPERS_SOURCE_DIR "${PROJECT_SOURCE_DIR}/contrib/solver_wrappers/")
+
+if ( EXISTS "${SOLVER_WRAPPERS_SOURCE_DIR}/CMakeLists.txt" )
+    add_subdirectory(${SOLVER_WRAPPERS_SOURCE_DIR})
+    include_directories("${SOLVER_WRAPPERS_SOURCE_DIR}")
+    set(LINK_LIBS "${LINK_LIBS}" ${SOLVER_WRAPPERS_LIBS})
+    set (HAVE_SOLVER_WRAPPERS TRUE)
+endif ()
+
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 
 configure_file (
   "${PROJECT_SOURCE_DIR}/config.h.in"
-  "${PROJECT_BINARY_DIR}/_config_/config.h"
+  "${PROJECT_SOURCE_DIR}/config.h"
   )
-
+include_directories(core contrib "${PROJECT_BINARY_DIR}/_config_/")
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     set(LINK_LIBS "${LINK_LIBS}" pthread)
 endif()
-
-include_directories(core contrib "${PROJECT_BINARY_DIR}/_config_/")
 
 add_subdirectory(contrib)
 add_subdirectory(core)

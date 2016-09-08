@@ -1,0 +1,3 @@
+[submodule "contrib/solver_wrappers"]
+	path = contrib/solver_wrappers
+	url = https://github.com/datafl4sh/solver_wrappers.git

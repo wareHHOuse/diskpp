@@ -20,6 +20,12 @@
 
 #include <map>
 
+#include "config.h"
+
+#ifdef HAVE_SOLVER_WRAPPERS
+    #include "agmg/agmg.hpp"
+#endif
+
 #include "diffusion.hpp"
 
 #include "loaders/loader.hpp"
@@ -159,6 +165,11 @@ test_new_diffusion(MeshType& msh, const Function& load, const Solution& solution
     /* SOLVE */
     tc.tic();
 
+#ifdef HAVE_SOLVER_WRAPPERS
+    agmg_solver<scalar_type> solver;
+    dynamic_vector<scalar_type> X = solver.solve(assembler.matrix, assembler.rhs);
+#else
+
 #ifdef HAVE_INTEL_MKL
     Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
 #else
@@ -167,6 +178,7 @@ test_new_diffusion(MeshType& msh, const Function& load, const Solution& solution
     solver.analyzePattern(assembler.matrix);
     solver.factorize(assembler.matrix);
     dynamic_vector<scalar_type> X = solver.solve(assembler.rhs);
+#endif
 
     tc.toc();
     std::cout << "Solver time: " << tc << " seconds." << std::endl;
