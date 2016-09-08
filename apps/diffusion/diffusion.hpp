@@ -27,9 +27,6 @@
 
 namespace disk {
 
-
-
-
 template<typename Mesh, typename CellQuadrature, typename CellBasis,
          typename FaceQuadrature, typename FaceBasis>
 class diffusion_local_data
