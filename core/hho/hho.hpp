@@ -298,6 +298,54 @@ project(LocalData& ld, const typename LocalData::cell_type& cl, const Function& 
     return projection;
 }
 
+template<typename Mesh, typename CellBasisType, typename CellQuadType,
+                        typename FaceBasisType, typename FaceQuadType>
+class projector_nopre
+{
+    typedef Mesh                                mesh_type;
+    typedef typename mesh_type::scalar_type     scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
+
+    typedef CellBasisType                       cell_basis_type;
+    typedef CellQuadType                        cell_quadrature_type;
+    typedef FaceBasisType                       face_basis_type;
+    typedef FaceQuadType                        face_quadrature_type;
+
+    typedef dynamic_matrix<scalar_type>         matrix_type;
+    typedef dynamic_vector<scalar_type>         vector_type;
+
+    cell_basis_type                             cell_basis;
+    cell_quadrature_type                        cell_quadrature;
+
+    face_basis_type                             face_basis;
+    face_quadrature_type                        face_quadrature;
+
+    size_t                                      m_degree;
+
+public:
+    projector_nopre()
+        : m_degree(1)
+    {
+        cell_basis          = cell_basis_type(m_degree+1);
+        cell_quadrature     = cell_quadrature_type(2*(m_degree+1));
+        face_basis          = face_basis_type(m_degree);
+        face_quadrature     = face_quadrature_type(2*m_degree);
+    }
+
+    projector_nopre(size_t degree)
+        : m_degree(degree)
+    {
+        cell_basis          = cell_basis_type(m_degree+1);
+        cell_quadrature     = cell_quadrature_type(2*(m_degree+1));
+        face_basis          = face_basis_type(m_degree);
+        face_quadrature     = face_quadrature_type(2*m_degree);
+    }
+
+    void compute(const mesh_type& msh, const cell_type& cl)
+    {}
+};
+
 template<typename LocalData>
 class gradient_reconstruction
 {
@@ -383,26 +431,26 @@ template<typename Mesh, typename CellBasisType, typename CellQuadType,
                         typename FaceBasisType, typename FaceQuadType>
 class gradient_reconstruction_nopre
 {
-    typedef Mesh                            mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
-    typedef typename mesh_type::cell        cell_type;
-    typedef typename mesh_type::face        face_type;
+    typedef Mesh                                mesh_type;
+    typedef typename mesh_type::scalar_type     scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
 
-    typedef CellBasisType                   cell_basis_type;
-    typedef CellQuadType                    cell_quadrature_type;
-    typedef FaceBasisType                   face_basis_type;
-    typedef FaceQuadType                    face_quadrature_type;
+    typedef CellBasisType                       cell_basis_type;
+    typedef CellQuadType                        cell_quadrature_type;
+    typedef FaceBasisType                       face_basis_type;
+    typedef FaceQuadType                        face_quadrature_type;
 
     typedef dynamic_matrix<scalar_type>         matrix_type;
     typedef dynamic_vector<scalar_type>         vector_type;
 
-    cell_basis_type                         cell_basis;
-    cell_quadrature_type                    cell_quadrature;
+    cell_basis_type                             cell_basis;
+    cell_quadrature_type                        cell_quadrature;
 
-    face_basis_type                         face_basis;
-    face_quadrature_type                    face_quadrature;
+    face_basis_type                             face_basis;
+    face_quadrature_type                        face_quadrature;
 
-    size_t                                  m_degree;
+    size_t                                      m_degree;
 
 public:
     matrix_type     oper;
@@ -503,35 +551,65 @@ public:
     }
 };
 
-template<typename LocalData>
-class divergence_reconstruction
+template<typename Mesh, typename CellBasisType, typename CellQuadType,
+                        typename FaceBasisType, typename FaceQuadType>
+class divergence_reconstruction_nopre
 {
-    typedef typename LocalData::cpbf_type       cpbf_type;
-    typedef typename LocalData::cpbg_type       cpbg_type;
-    typedef typename LocalData::fpbf_type       fpbf_type;
+    typedef Mesh                                mesh_type;
+    typedef typename mesh_type::scalar_type     scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
 
-    typedef typename LocalData::scalar_type     scalar_type;
+    typedef CellBasisType                       cell_basis_type;
+    typedef CellQuadType                        cell_quadrature_type;
+    typedef FaceBasisType                       face_basis_type;
+    typedef FaceQuadType                        face_quadrature_type;
+
     typedef dynamic_matrix<scalar_type>         matrix_type;
     typedef dynamic_vector<scalar_type>         vector_type;
 
-    typedef typename LocalData::mesh_type       mesh_type;
+    cell_basis_type                             cell_basis;
+    cell_quadrature_type                        cell_quadrature;
+
+    face_basis_type                             face_basis;
+    face_quadrature_type                        face_quadrature;
+
+    size_t                                      m_degree;
 
 public:
     matrix_type     oper;
     matrix_type     data;
 
-    divergence_reconstruction()
-    {}
-
-    void
-    compute(LocalData& ld)
+    divergence_reconstruction_nopre()
+        : m_degree(1)
     {
-        auto msh            = ld.get_mesh();
-        auto cl             = ld.get_cell();
-        auto degree         = ld.get_degree();
+        cell_basis          = cell_basis_type(m_degree);
+        cell_quadrature     = cell_quadrature_type(2*m_degree);
+        face_basis          = face_basis_type(m_degree);
+        face_quadrature     = face_quadrature_type(2*m_degree);
+    }
 
-        auto dr_stuff       = ld.get_dr_stuff();
-        auto dr_matrix      = std::get<0>(dr_stuff);    //div mass matrix
+    divergence_reconstruction_nopre(size_t degree)
+        : m_degree(degree)
+    {
+        cell_basis          = cell_basis_type(m_degree);
+        cell_quadrature     = cell_quadrature_type(2*m_degree);
+        face_basis          = face_basis_type(m_degree);
+        face_quadrature     = face_quadrature_type(2*m_degree);
+    }
+
+    void compute(const mesh_type& msh, const cell_type& cl)
+    {
+        matrix_type mass_mat = matrix_type::Zero(cell_basis.size(), cell_basis.size());
+
+        auto cell_quadpoints = cell_quadrature.integrate(msh, cl);
+        for (auto& qp : cell_quadpoints)
+        {
+            auto c_phi = cell_basis.eval_functions(msh, cl, qp.point());
+            for (size_t i = 0; i < cell_basis.size(); i++)
+                for (size_t j = 0; j < cell_basis.size(); j++)
+                    mass_mat(i,j) += qp.weight() * mm_prod(c_phi[i], c_phi[j]);
+        }
     }
 };
 
@@ -614,7 +692,6 @@ template<typename Mesh, typename CellBasisType, typename CellQuadType,
                         typename FaceBasisType, typename FaceQuadType>
 class diffusion_like_stabilization_nopre
 {
-
     typedef Mesh                            mesh_type;
     typedef typename mesh_type::scalar_type scalar_type;
     typedef typename mesh_type::cell        cell_type;
@@ -736,7 +813,7 @@ public:
             matrix_type proj3 = piKF.solve(MR2*proj1);
 
             matrix_type BRF = proj2 + proj3;
-            
+
             data += BRF.transpose() * face_mass_matrix * BRF / h;
         }
     }
@@ -805,6 +882,120 @@ public:
         matrix_type K_TF = local_mat.topRightCorner(cell_size, all_faces_size);
 
         vector_type solT = K_TT.llt().solve(rhs.get().block(0, 0, cell_size, 1) - K_TF*solF);
+
+        ret.head(cell_size)         = solT;
+        ret.tail(all_faces_size)    = solF;
+
+        return ret;
+    }
+
+};
+
+template<typename Mesh, typename CellBasisType, typename CellQuadType,
+                        typename FaceBasisType, typename FaceQuadType>
+class diffusion_like_static_condensation_nopre
+{
+    typedef Mesh                            mesh_type;
+    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::cell        cell_type;
+    typedef typename mesh_type::face        face_type;
+
+    typedef CellBasisType                   cell_basis_type;
+    typedef CellQuadType                    cell_quadrature_type;
+    typedef FaceBasisType                   face_basis_type;
+    typedef FaceQuadType                    face_quadrature_type;
+
+    typedef dynamic_matrix<scalar_type>     matrix_type;
+    typedef dynamic_vector<scalar_type>     vector_type;
+
+    cell_basis_type                         cell_basis;
+    cell_quadrature_type                    cell_quadrature;
+
+    face_basis_type                         face_basis;
+    face_quadrature_type                    face_quadrature;
+
+    size_t                                  m_degree;
+
+public:
+    diffusion_like_static_condensation_nopre()
+        : m_degree(1)
+    {
+        cell_basis          = cell_basis_type(m_degree);
+        cell_quadrature     = cell_quadrature_type(2*m_degree);
+        face_basis          = face_basis_type(m_degree);
+        face_quadrature     = face_quadrature_type(2*m_degree);
+    }
+
+    diffusion_like_static_condensation_nopre(size_t degree)
+        : m_degree(degree)
+    {
+        cell_basis          = cell_basis_type(m_degree);
+        cell_quadrature     = cell_quadrature_type(2*m_degree);
+        face_basis          = face_basis_type(m_degree);
+        face_quadrature     = face_quadrature_type(2*m_degree);
+    }
+
+    auto
+    compute(const mesh_type& msh, const cell_type& cl,
+            const matrix_type& local_mat,
+            const vector_type& cell_rhs)
+    {
+        auto fcs = faces(msh, cl);
+        auto num_faces = fcs.size();
+
+        auto num_cell_dofs = cell_basis.size();
+        auto num_face_dofs = face_basis.size();
+
+        dofspace_ranges dsr(num_cell_dofs, num_face_dofs, num_faces);
+
+        size_t cell_size = dsr.cell_range().size();
+        size_t face_size = dsr.all_faces_range().size();
+        assert(cell_size == ld.num_cell_dofs());
+
+        matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
+        matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
+        matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
+        matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
+
+        assert(K_TT.cols() == cell_size);
+        assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
+        assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
+        assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
+        assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
+
+        auto K_TT_ldlt = K_TT.llt();
+        matrix_type AL = K_TT_ldlt.solve(K_TF);
+        vector_type bL = K_TT_ldlt.solve(cell_rhs);
+
+        matrix_type AC = K_FF - K_FT * AL;
+        vector_type bC = - K_FT * bL;
+
+        return std::make_pair(AC, bC);
+    }
+
+    vector_type
+    recover(const mesh_type& msh, const cell_type& cl,
+            const matrix_type& local_mat,
+            const vector_type& cell_rhs,
+            const vector_type& solF)
+    {
+        auto fcs = faces(msh, cl);
+        auto num_faces = fcs.size();
+
+        auto num_cell_dofs = cell_basis.size();
+        auto num_face_dofs = face_basis.size();
+
+        dofspace_ranges dsr(num_cell_dofs, num_face_dofs, num_faces);
+
+        size_t cell_size        = dsr.cell_range().size();
+        size_t all_faces_size   = dsr.all_faces_range().size();
+
+        vector_type ret( dsr.total_size() );
+
+        matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
+        matrix_type K_TF = local_mat.topRightCorner(cell_size, all_faces_size);
+
+        vector_type solT = K_TT.llt().solve(cell_rhs - K_TF*solF);
 
         ret.head(cell_size)         = solT;
         ret.tail(all_faces_size)    = solF;
