@@ -42,7 +42,7 @@ public:
 
     typedef CellQuadrature                                  cell_quadrature_type;
     typedef CellBasis                                       cell_basis_type;
-    typedef CellDivBasis        divergence_cell_basis_type; // not sure about this
+    typedef CellDivBasis                                    divergence_cell_basis_type; // not sure about this
 
     typedef FaceQuadrature                                  face_quadrature_type;
     typedef FaceBasis                                       face_basis_type;
@@ -60,6 +60,7 @@ public:
     /* MANDATORY PUBLIC TYPES BEGIN */
     typedef local_matrix<cpbf_type, cpbf_type>              cell_mass_matrix_type;
     typedef local_matrix<cpbg_type, cpbg_type>              cell_stif_matrix_type;
+    typedef local_matrix<div_cpbf_type, div_cpbf_type>      cell_div_matrix_type;
     typedef local_rhs<cpbf_type>                            cell_rhs_type;
     typedef local_matrix<fpbf_type, fpbf_type>              face_mass_matrix_type;
     typedef local_matrix<cpbf_type, fpbf_type>              face_trace_matrix_type;
@@ -80,6 +81,7 @@ private:
 
     cell_mass_matrix_type                           cell_mass_matrix;
     cell_stif_matrix_type                           cell_stif_matrix;
+    cell_div_matrix_type                            cell_div_matrix;
     cell_rhs_type                                   cell_rhs;
 
     std::vector<fpbf_type>                          fpbf_faces;
@@ -205,6 +207,10 @@ public:
                                cpbg_faces);
     }
 
+    auto get_dr_stuff() {
+        return std::make_tuple(cell_div_matrix);
+    }
+
     auto get_stab_stuff() {
         return std::make_tuple(cell_mass_matrix,
                                cpbf_cell,
@@ -240,7 +246,7 @@ class elasticity_template
     typedef scaled_monomial_vector_sg_basis<mesh_type, face_type>   face_basis_type;
     typedef scaled_monomial_scalar_basis<mesh_type, cell_type>      divergence_cell_basis_type;
 
-    typedef  std::vector<typename cell_quadrature_type::quadpoint_type>    cell_quaddata_type;
+    typedef std::vector<typename cell_quadrature_type::quadpoint_type>    cell_quaddata_type;
     typedef std::vector<typename face_quadrature_type::quadpoint_type>    face_quaddata_type;
 
     typedef dynamic_matrix<scalar_type>                     matrix_type;
@@ -549,7 +555,7 @@ class elasticity_template
             S += BRF.transpose() * face_mass_matrix_vec[i] * BRF / h;
         }
 
-        std::cout << S << std::endl;
+        //std::cout << S << std::endl;
     }
 
     std::pair<matrix_type, vector_type>

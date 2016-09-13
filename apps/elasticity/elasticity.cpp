@@ -46,8 +46,9 @@ void test_new_elasticity(MeshType& msh, const Function& load, const Solution& so
                                        face_quadrature_type,
                                        face_basis_type>                 localdata_type;
 
-    localdata_type                          dld(msh, degree);
+    localdata_type                                               dld(msh, degree);
     disk::gradient_reconstruction<localdata_type>                gradrec;
+    disk::divergence_reconstruction<localdata_type>              divrec;
     disk::diffusion_like_stabilization<localdata_type>           stab;
     disk::diffusion_like_static_condensation<localdata_type>     statcond;
     disk::assembler<localdata_type>                              assembler(dld);
@@ -56,9 +57,10 @@ void test_new_elasticity(MeshType& msh, const Function& load, const Solution& so
     {
         dld.compute(cl, load);
         gradrec.compute(dld);
+        divrec.compute(dld);
         stab.compute(dld, gradrec.oper);
-        std::cout << "NEW" << std::endl;
-        std::cout << stab.data << std::endl;
+        //std::cout << "NEW" << std::endl;
+        //std::cout << stab.data << std::endl;
         break;
         //dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
         //auto sc = statcond.compute(dld, loc);
@@ -126,9 +128,7 @@ void test_elasticity(MeshType& msh)
 
     for (auto& cl : msh)
     {
-        std::cout << "OLD" << std::endl;
         auto LC = elast.build_local_contrib(msh, cl, f);
-        return;
 
         /* PROBLEM ASSEMBLY */
         auto fcs = faces(msh, cl);
@@ -300,7 +300,7 @@ int main(void)
 
     mesh_type msh;
     disk::netgen_mesh_loader<RealType, 3> loader;
-    if (!loader.read_mesh("/Users/matteo/mroot/matteo/workingcopies/git-mine/hho/hho/hho3d/tests/data/convt01.mesh"))
+    if (!loader.read_mesh("/Users/matteo/mroot/matteo/workingcopies/git-mine/hho/hho/hho3d/tests/data/convt02.mesh"))
     {
         std::cout << "Problem loading mesh." << std::endl;
         return 1;
@@ -331,53 +331,7 @@ int main(void)
         return result_type{fx,fy,fz};
     };
 
-    test_new_elasticity(msh, f, sf, 0);
+    test_elasticity(msh);
+    //test_new_elasticity(msh, f, sf, 0);
 
-/*
-    bool success;
-
-    std::cout << "Scalar problem" << std::endl;
-    auto f = [](const point<RealType,3>& p) -> auto {
-        return p.x() * p.y() * p.z();
-    };
-
-    auto df = [](const point<RealType,3>& p) -> static_vector<RealType,3> {
-        return static_vector<RealType,3>({p.y()*p.z(), p.x()*p.z(), p.x()*p.y()});
-    };
-
-    success = test_projections<problem_type_scalar>(msh, 3, f, df);
-    if (success)
-        std::cout << "  - Projections: OK" << std::endl;
-
-    test_gr<problem_type_scalar>(msh, 3, f, df);
-    if (success)
-        std::cout << "  - Gradient reconstruction: OK" << std::endl;
-
-    //test_gr<problem_type_scalar>(msh, 1, f, df);
-
-
-    std::cout << "Vector problem" << std::endl;
-    auto fv = [](const point<RealType,3>& p) -> static_vector<RealType,3> {
-        return static_vector<RealType,3>({p.x()*p.x(), p.y()*p.y(), p.z()*p.z()});
-    };
-
-    auto dfv = [](const point<RealType,3>& p) -> static_matrix<RealType,3,3> {
-        static_matrix<RealType,3,3> ret = static_matrix<RealType,3,3>::Zero();
-        ret(0,0) = 2*p.x();
-        ret(1,1) = 2*p.y();
-        ret(2,2) = 2*p.z();
-        return ret;
-    };
-
-    //test_gr<problem_type_vector_sg>(msh, 1, fv, dfv);
-    success = test_projections<problem_type_vector_sg>(msh, 2, fv, dfv);
-    if (success)
-        std::cout << "  - Projections: OK" << std::endl;
-
-    //hho::generic_mesh<RealType, 1> msh_u;
-    //hho::uniform_mesh_loader<RealType, 1> loader_u;
-    //loader_u.populate_mesh(msh_u);
-
-    //test_hho(msh_u, 3, f);
-*/
 }

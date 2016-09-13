@@ -61,8 +61,14 @@ test_new_diffusion(MeshType& msh, const Function& load, const Solution& solution
 
 
     localdata_type                                              dld(msh, degree);
-    disk::gradient_reconstruction<localdata_type>                gradrec;
-    disk::diffusion_like_stabilization<localdata_type>           stab;
+    //disk::gradient_reconstruction<localdata_type>                gradrec;
+
+    disk::gradient_reconstruction_nopre<mesh_type, cell_basis_type, cell_quadrature_type, face_basis_type, face_quadrature_type> gradrec_nopre(degree);
+
+    //disk::diffusion_like_stabilization<localdata_type>           stab;
+
+    disk::diffusion_like_stabilization_nopre<mesh_type, cell_basis_type, cell_quadrature_type, face_basis_type, face_quadrature_type> stab_nopre(degree);
+
     disk::diffusion_like_static_condensation<localdata_type>     statcond;
     disk::assembler<localdata_type>                              assembler(dld);
 
@@ -88,28 +94,51 @@ test_new_diffusion(MeshType& msh, const Function& load, const Solution& solution
         tc_detail.tic();
         dld.compute(cl, load);
         tc_detail.toc();
-        timings["pre"] += tc.to_double();
+        timings["pre"] += tc_detail.to_double();
+
+        //tc_detail.tic();
+        //gradrec.compute(dld);
+        //tc_detail.toc();
+        //timings["gr"] += tc_detail.to_double();
 
         tc_detail.tic();
-        gradrec.compute(dld);
+        gradrec_nopre.compute(msh, cl);
         tc_detail.toc();
-        timings["gr"] += tc.to_double();
+        timings["gr_np"] += tc_detail.to_double();
+
+        //std::cout << "one" << std::endl;
+        //std::cout << gradrec.oper << std::endl;
+
+        //std::cout << "two" << std::endl;
+        //std::cout << gradrec_nopre.oper << std::endl;
+
+        //tc_detail.tic();
+        //stab.compute(dld, gradrec_nopre.oper);
+        //tc_detail.toc();
+        //timings["stab"] += tc_detail.to_double();
 
         tc_detail.tic();
-        stab.compute(dld, gradrec.oper);
+        stab_nopre.compute(msh, cl, gradrec_nopre.oper);
         tc_detail.toc();
-        timings["stab"] += tc.to_double();
+        timings["stab_np"] += tc_detail.to_double();
+
+        //std::cout << "one" << std::endl;
+        //std::cout << stab.data << std::endl;
+
+        //std::cout << "two" << std::endl;
+        //std::cout << stab_nopre.data << std::endl;
+
 
         tc_detail.tic();
-        dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
+        dynamic_matrix<scalar_type> loc = gradrec_nopre.data + stab_nopre.data;
         auto sc = statcond.compute(dld, loc);
         tc_detail.toc();
-        timings["sc"] += tc.to_double();
+        timings["sc"] += tc_detail.to_double();
 
         tc_detail.tic();
         assembler.assemble(dld, sc);
         tc_detail.toc();
-        timings["asm"] += tc.to_double();
+        timings["asm"] += tc_detail.to_double();
 
 #if 0
         auto proj = project(dld, cl, load);
@@ -215,13 +244,13 @@ test_new_diffusion(MeshType& msh, const Function& load, const Solution& solution
         }
 
         dld.compute(cl, load);
-        gradrec.compute(dld);
-        stab.compute(dld, gradrec.oper);
-        dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
+        gradrec_nopre.compute(msh, cl);
+        stab_nopre.compute(msh, cl, gradrec_nopre.oper);
+        dynamic_matrix<scalar_type> loc = gradrec_nopre.data + stab_nopre.data;
         dynamic_vector<scalar_type> x = statcond.recover(dld, loc, xFs);
 
         dynamic_vector<scalar_type> rec(cb.size());
-        rec.tail(cb.size()-1) = gradrec.oper * x;
+        rec.tail(cb.size()-1) = gradrec_nopre.oper * x;
         rec(0) = x(0);
 
         auto test_points = make_test_points(msh, cl);
