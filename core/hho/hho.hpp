@@ -298,6 +298,31 @@ project(LocalData& ld, const typename LocalData::cell_type& cl, const Function& 
     return projection;
 }
 
+template<typename CellBasisType, typename CellQuadType, typename Mesh,
+         typename Function>
+dynamic_vector<typename Mesh::scalar_type>
+compute_rhs(const Mesh& msh, const typename Mesh::cell& cl,
+            const Function& f, size_t degree)
+{
+    typedef dynamic_vector<typename Mesh::scalar_type> vector_type;
+
+    auto cell_basis     = CellBasisType(degree);
+    auto cell_quad      = CellQuadType(2*degree);
+
+    vector_type ret = vector_type::Zero(cell_basis.size());
+
+    auto cell_quadpoints = cell_quad.integrate(msh, cl);
+    for (auto& qp : cell_quadpoints)
+    {
+        auto phi = cell_basis.eval_functions(msh, cl, qp.point());
+        auto fval = f(qp.point());
+        for (size_t i = 0; i < cell_basis.size(); i++)
+            ret(i) += qp.weight() * mm_prod(fval, phi[i]);
+    }
+
+    return ret;
+}
+
 template<typename Mesh, typename CellBasisType, typename CellQuadType,
                         typename FaceBasisType, typename FaceQuadType>
 class projector_nopre
@@ -342,8 +367,11 @@ public:
         face_quadrature     = face_quadrature_type(2*m_degree);
     }
 
-    void compute(const mesh_type& msh, const cell_type& cl)
-    {}
+    vector_type
+    compute(const mesh_type& msh, const cell_type& cl)
+    {
+
+    }
 };
 
 template<typename LocalData>
@@ -950,7 +978,6 @@ public:
 
         size_t cell_size = dsr.cell_range().size();
         size_t face_size = dsr.all_faces_range().size();
-        assert(cell_size == ld.num_cell_dofs());
 
         matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
         matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
@@ -968,7 +995,7 @@ public:
         vector_type bL = K_TT_ldlt.solve(cell_rhs);
 
         matrix_type AC = K_FF - K_FT * AL;
-        vector_type bC = - K_FT * bL;
+        vector_type bC = /* no projection on faces, eqn. 26*/ - K_FT * bL;
 
         return std::make_pair(AC, bC);
     }
@@ -1140,6 +1167,158 @@ public:
         m_triplets.clear();
     }
 };
+
+
+template<typename Mesh, //typename CellBasisType, typename CellQuadType,
+                        typename FaceBasisType, typename FaceQuadType>
+class assembler_nopre
+{
+    typedef Mesh                                mesh_type;
+    typedef typename mesh_type::scalar_type     scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
+
+    //typedef CellBasisType                       cell_basis_type;
+    //typedef CellQuadType                        cell_quadrature_type;
+    typedef FaceBasisType                       face_basis_type;
+    typedef FaceQuadType                        face_quadrature_type;
+
+    typedef dynamic_matrix<scalar_type>         matrix_type;
+    typedef dynamic_vector<scalar_type>         vector_type;
+
+    //cell_basis_type                             cell_basis;
+    //cell_quadrature_type                        cell_quadrature;
+
+    face_basis_type                             face_basis;
+    face_quadrature_type                        face_quadrature;
+
+    size_t                                      m_degree;
+
+    typedef Eigen::SparseMatrix<scalar_type>    sparse_matrix_type;
+    typedef Eigen::Triplet<scalar_type>         triplet_type;
+
+    std::vector<triplet_type>                   m_triplets;
+    size_t                                      m_num_unknowns;
+
+public:
+
+    sparse_matrix_type      matrix;
+    vector_type             rhs;
+
+    assembler_nopre()                 = delete;
+    assembler_nopre(const assembler_nopre&) = delete;
+    assembler_nopre(assembler_nopre&&)      = delete;
+
+    assembler_nopre(const mesh_type& msh, size_t degree)
+        : m_degree(degree)
+    {
+        face_basis          = face_basis_type(m_degree);
+        face_quadrature     = face_quadrature_type(2*m_degree);
+
+        m_num_unknowns = face_basis.size() * (msh.faces_size() + msh.boundary_faces_size());
+        matrix = sparse_matrix_type(m_num_unknowns, m_num_unknowns);
+        rhs = vector_type::Zero(m_num_unknowns);
+    }
+
+    template<typename LocalContrib>
+    void
+    assemble(const mesh_type& msh, const cell_type& cl, const LocalContrib& lc)
+    {
+        auto fcs = faces(msh, cl);
+        std::vector<size_t> l2g(fcs.size() * face_basis.size());
+        for (size_t face_i = 0; face_i < fcs.size(); face_i++)
+        {
+            auto fc = fcs[face_i];
+            auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+            if (!eid.first)
+                throw std::invalid_argument("This is a bug: face not found");
+
+            auto face_id = eid.second;
+
+            auto face_offset = face_id * face_basis.size();
+
+            auto pos = face_i * face_basis.size();
+
+            for (size_t i = 0; i < face_basis.size(); i++)
+                l2g[pos+i] = face_offset+i;
+        }
+
+        assert(lc.first.rows() == lc.first.cols());
+        assert(lc.first.rows() == lc.second.size());
+        assert(lc.second.size() == l2g.size());
+
+        //std::cout << lc.second.size() << " " << l2g.size() << std::endl;
+
+        for (size_t i = 0; i < lc.first.rows(); i++)
+        {
+            for (size_t j = 0; j < lc.first.cols(); j++)
+                m_triplets.push_back( triplet_type( l2g.at(i), l2g.at(j), lc.first(i,j) ) );
+
+            rhs(l2g.at(i)) += lc.second(i);
+        }
+    }
+
+    template<typename Function>
+    void
+    impose_boundary_conditions(mesh_type& msh, const Function& bc)
+    {
+        size_t fbs = face_basis.size();
+        size_t face_i = 0;
+        for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++)
+        {
+            auto bfc = *itor;
+
+            auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), bfc);
+            if (!eid.first)
+                throw std::invalid_argument("This is a bug: face not found");
+
+            auto face_id = eid.second;
+
+            auto face_offset = face_id * fbs;
+            auto face_offset_lagrange = (msh.faces_size() + face_i) * fbs;
+
+            auto fqd = face_quadrature.integrate(msh, bfc);
+
+            matrix_type MFF     = matrix_type::Zero(fbs, fbs);
+            vector_type rhs_f   = vector_type::Zero(fbs);
+
+            for (auto& qp : fqd)
+            {
+                auto f_phi = face_basis.eval_functions(msh, bfc, qp.point());
+
+                for (size_t i = 0; i < f_phi.size(); i++)
+                {
+                    for (size_t j = 0; j < f_phi.size(); j++)
+                        MFF(i,j) += qp.weight() * mm_prod(f_phi[i], f_phi[j]);
+
+                    rhs_f(i) += qp.weight() * mm_prod(f_phi[i], bc(qp.point()));
+                }
+            }
+
+
+            for (size_t i = 0; i < MFF.rows(); i++)
+            {
+                for (size_t j = 0; j < MFF.cols(); j++)
+                {
+                    m_triplets.push_back( triplet_type(face_offset + i, face_offset_lagrange + j, MFF(i,j)) );
+                    m_triplets.push_back( triplet_type(face_offset_lagrange + j, face_offset + i, MFF(i,j)) );
+                }
+                rhs(face_offset_lagrange+i) = rhs_f(i);
+            }
+
+            face_i++;
+        }
+    }
+
+    void
+    finalize()
+    {
+        matrix.setFromTriplets(m_triplets.begin(), m_triplets.end());
+        m_triplets.clear();
+    }
+};
+
+
 
 template<typename LocalData, typename GR>
 auto

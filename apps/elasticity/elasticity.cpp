@@ -48,7 +48,7 @@ void test_new_elasticity(MeshType& msh, const Function& load, const Solution& so
 
     localdata_type                                               dld(msh, degree);
     disk::gradient_reconstruction<localdata_type>                gradrec;
-    disk::divergence_reconstruction<localdata_type>              divrec;
+    //disk::divergence_reconstruction<localdata_type>              divrec;
     disk::diffusion_like_stabilization<localdata_type>           stab;
     disk::diffusion_like_static_condensation<localdata_type>     statcond;
     disk::assembler<localdata_type>                              assembler(dld);
@@ -57,7 +57,7 @@ void test_new_elasticity(MeshType& msh, const Function& load, const Solution& so
     {
         dld.compute(cl, load);
         gradrec.compute(dld);
-        divrec.compute(dld);
+        //divrec.compute(dld);
         stab.compute(dld, gradrec.oper);
         //std::cout << "NEW" << std::endl;
         //std::cout << stab.data << std::endl;
