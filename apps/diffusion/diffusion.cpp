@@ -38,20 +38,21 @@
 
 template<typename MeshType, typename Function, typename Solution>
 void
-test_new_diffusion(MeshType& msh, const Function& load, const Solution& solution, size_t degree)
+test_diffusion(MeshType& msh,               /* handle to the mesh */
+               const Function& load,        /* rhs */
+               const Solution& solution,    /* solution of the problem */
+               size_t degree)               /* degree of the method */
 {
-    typedef MeshType                                                    mesh_type;
+    typedef MeshType                                   mesh_type;
+    typedef typename mesh_type::scalar_type            scalar_type;
+    typedef typename mesh_type::cell                   cell_type;
+    typedef typename mesh_type::face                   face_type;
 
-    typedef typename mesh_type::scalar_type                             scalar_type;
+    typedef disk::quadrature<mesh_type, cell_type>      cell_quadrature_type;
+    typedef disk::quadrature<mesh_type, face_type>      face_quadrature_type;
 
-    typedef typename mesh_type::cell                                    cell_type;
-    typedef typename mesh_type::face                                    face_type;
-
-    typedef disk::quadrature<mesh_type, cell_type>                       cell_quadrature_type;
-    typedef disk::quadrature<mesh_type, face_type>                       face_quadrature_type;
-
-    typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>     cell_basis_type;
-    typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>     face_basis_type;
+    typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
+    typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
 
 
     disk::gradient_reconstruction_nopre<mesh_type,
@@ -219,8 +220,6 @@ test_new_diffusion(MeshType& msh, const Function& load, const Solution& solution
 
             auto potr = solution(qp.point());
 
-            //std::cout << potk << " " << potkp << " " << potr << std::endl;
-
             scalar_type diffk = 0.0;
             scalar_type diffkp = 0.0;
             diffk = (potk - potr) * (potk - potr) * qp.weight();
@@ -308,14 +307,14 @@ int main(int argc, char **argv)
         };
 
         //test_diffusion(msh, f, sf, degree);
-        test_new_diffusion(msh, f, sf, degree);
+        test_diffusion(msh, f, sf, degree);
 
         return 0;
     }
 
     filename = argv[0];
 
-    if (std::regex_match (filename, std::regex(".*\\.typ1$") ))
+    if (std::regex_match(filename, std::regex(".*\\.typ1$") ))
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
 
@@ -341,10 +340,10 @@ int main(int argc, char **argv)
         };
 
         //test_diffusion(msh, f, sf, degree);
-        test_new_diffusion(msh, f, sf, degree);
+        test_diffusion(msh, f, sf, degree);
     }
 
-    if (std::regex_match (filename, std::regex(".*\\.mesh$") ))
+    if (std::regex_match(filename, std::regex(".*\\.mesh$") ))
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
 
@@ -370,7 +369,7 @@ int main(int argc, char **argv)
         };
 
         //test_diffusion(msh, f, sf, degree);
-        test_new_diffusion(msh, f, sf, degree);
+        test_diffusion(msh, f, sf, degree);
     }
 
     return 0;

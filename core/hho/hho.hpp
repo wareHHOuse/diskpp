@@ -580,7 +580,8 @@ public:
 };
 
 template<typename Mesh, typename CellBasisType, typename CellQuadType,
-                        typename FaceBasisType, typename FaceQuadType>
+                        typename FaceBasisType, typename FaceQuadType,
+                        typename DivCellBasisType, typename DivCellQuadType>
 class divergence_reconstruction_nopre
 {
     typedef Mesh                                mesh_type;
@@ -592,6 +593,8 @@ class divergence_reconstruction_nopre
     typedef CellQuadType                        cell_quadrature_type;
     typedef FaceBasisType                       face_basis_type;
     typedef FaceQuadType                        face_quadrature_type;
+    typedef DivCellBasisType                    div_cell_basis_type;
+    typedef DivCellQuadType                     div_cell_quadrature_type;
 
     typedef dynamic_matrix<scalar_type>         matrix_type;
     typedef dynamic_vector<scalar_type>         vector_type;
@@ -602,6 +605,9 @@ class divergence_reconstruction_nopre
     face_basis_type                             face_basis;
     face_quadrature_type                        face_quadrature;
 
+    div_cell_basis_type                         div_cell_basis;
+    div_cell_quadrature_type                    div_cell_quadrature;
+
     size_t                                      m_degree;
 
 public:
@@ -611,33 +617,86 @@ public:
     divergence_reconstruction_nopre()
         : m_degree(1)
     {
-        cell_basis          = cell_basis_type(m_degree);
-        cell_quadrature     = cell_quadrature_type(2*m_degree);
+        cell_basis          = cell_basis_type(m_degree+1);
+        cell_quadrature     = cell_quadrature_type(2*(m_degree+1));
         face_basis          = face_basis_type(m_degree);
         face_quadrature     = face_quadrature_type(2*m_degree);
+        div_cell_basis      = div_cell_basis_type(m_degree);
+        div_cell_quadrature = div_cell_quadrature_type(2*m_degree);
     }
 
     divergence_reconstruction_nopre(size_t degree)
         : m_degree(degree)
     {
-        cell_basis          = cell_basis_type(m_degree);
-        cell_quadrature     = cell_quadrature_type(2*m_degree);
+        cell_basis          = cell_basis_type(m_degree+1);
+        cell_quadrature     = cell_quadrature_type(2*(m_degree+1));
         face_basis          = face_basis_type(m_degree);
         face_quadrature     = face_quadrature_type(2*m_degree);
+        div_cell_basis      = div_cell_basis_type(m_degree);
+        div_cell_quadrature = div_cell_quadrature_type(2*m_degree);
     }
 
     void compute(const mesh_type& msh, const cell_type& cl)
     {
-        matrix_type mass_mat = matrix_type::Zero(cell_basis.size(), cell_basis.size());
+        auto dcbs = div_cell_basis.size();
+        matrix_type MD = matrix_type::Zero(dcbs, dcbs);
 
         auto cell_quadpoints = cell_quadrature.integrate(msh, cl);
         for (auto& qp : cell_quadpoints)
         {
-            auto c_phi = cell_basis.eval_functions(msh, cl, qp.point());
-            for (size_t i = 0; i < cell_basis.size(); i++)
-                for (size_t j = 0; j < cell_basis.size(); j++)
-                    mass_mat(i,j) += qp.weight() * mm_prod(c_phi[i], c_phi[j]);
+            auto phi_d = div_cell_basis.eval_functions(msh, cl, qp.point());
+            for (size_t i = 0; i < dcbs; i++)
+                for (size_t j = 0; j < dcbs; j++)
+                    MD(i,j) += qp.weight() * mm_prod(phi_d[i], phi_d[j]);
         }
+
+        /* RHS, volumetric part. */
+        auto fcs = faces(msh, cl);
+        auto num_cell_dofs = cell_basis.range(0, m_degree).size();
+        auto num_face_dofs = face_basis.size();
+        auto num_faces = fcs.size();
+
+        dofspace_ranges dsr(num_cell_dofs, num_face_dofs, num_faces);
+
+        matrix_type BD = matrix_type::Zero(dcbs, dsr.total_size());
+        for (auto& qp : cell_quadpoints)
+        {
+            auto phi = cell_basis.eval_functions(msh, cl, qp.point());
+            auto dphi_d = div_cell_basis.eval_gradients(msh, cl, qp.point());
+
+            for (size_t i = 0; i < dphi_d.size(); i++)
+                for (size_t j = 0; j < num_cell_dofs; j++)
+                    BD(i,j) -= qp.weight() * mm_prod(dphi_d[i], phi[j]);
+        }
+
+        size_t face_offset = num_cell_dofs;
+
+        for (size_t face_i = 0; face_i < num_faces; face_i++)
+        {
+            auto fc = fcs[face_i];
+            auto n = normal(msh, cl, fc);
+            auto face_quadpoints = face_quadrature.integrate(msh, fc);
+
+            for (auto& qp : face_quadpoints)
+            {
+                auto phi_d = div_cell_basis.eval_functions(msh, cl, qp.point());
+                auto phi = face_basis.eval_functions(msh, fc, qp.point());
+                for (size_t i = 0; i < phi_d.size(); i++)
+                {
+                    for (size_t j = 0; j < face_basis.size(); j++)
+                    {
+                        auto p1 = mm_prod(phi[j], n);
+                        scalar_type p2 = mm_prod(p1, phi_d[i]);
+                        BD(i,face_offset+j) += qp.weight() * p2;
+                    }
+                }
+            }
+
+            face_offset += face_basis.size();
+        }
+
+        oper = MD.partialPivLu().solve(BD);
+        data = BD.transpose() * oper;
     }
 };
 

@@ -39,33 +39,88 @@ void test_new_elasticity(MeshType& msh, const Function& load, const Solution& so
     typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>     div_cell_basis_type;
     typedef disk::scaled_monomial_vector_sg_basis<mesh_type, face_type>  face_basis_type;
 
-    typedef disk::elasticity_local_data<mesh_type,
-                                       cell_quadrature_type,
-                                       cell_basis_type,
-                                       div_cell_basis_type,
-                                       face_quadrature_type,
-                                       face_basis_type>                 localdata_type;
 
-    localdata_type                                               dld(msh, degree);
-    disk::gradient_reconstruction<localdata_type>                gradrec;
-    //disk::divergence_reconstruction<localdata_type>              divrec;
-    disk::diffusion_like_stabilization<localdata_type>           stab;
-    disk::diffusion_like_static_condensation<localdata_type>     statcond;
-    disk::assembler<localdata_type>                              assembler(dld);
+    if (degree < 1)
+    {
+        std::cout << "Only K > 0 for this problem" << std::endl;
+        return;
+    }
 
+
+    disk::gradient_reconstruction_nopre<mesh_type,
+                                        cell_basis_type,
+                                        cell_quadrature_type,
+                                        face_basis_type,
+                                        face_quadrature_type> gradrec(degree);
+
+    disk::divergence_reconstruction_nopre<mesh_type,
+                                          cell_basis_type,
+                                          cell_quadrature_type,
+                                          face_basis_type,
+                                          face_quadrature_type,
+                                          div_cell_basis_type,
+                                          cell_quadrature_type> divrec(degree);
+
+
+    disk::diffusion_like_stabilization_nopre<mesh_type,
+                                             cell_basis_type,
+                                             cell_quadrature_type,
+                                             face_basis_type,
+                                             face_quadrature_type> stab(degree);
+
+    disk::diffusion_like_static_condensation_nopre<mesh_type,
+                                                   cell_basis_type,
+                                                   cell_quadrature_type,
+                                                   face_basis_type,
+                                                   face_quadrature_type> statcond(degree);
+
+    disk::assembler_nopre<mesh_type,
+                          face_basis_type,
+                          face_quadrature_type> assembler(msh, degree);
+
+
+    scalar_type mu      = 1.0;
+    scalar_type lambda  = 1.0;
+
+    timecounter tc;
+
+    tc.tic();
     for (auto& cl : msh)
     {
-        dld.compute(cl, load);
-        gradrec.compute(dld);
-        //divrec.compute(dld);
-        stab.compute(dld, gradrec.oper);
-        //std::cout << "NEW" << std::endl;
-        //std::cout << stab.data << std::endl;
-        break;
-        //dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
-        //auto sc = statcond.compute(dld, loc);
-        //assembler.assemble(dld, sc);
+        gradrec.compute(msh, cl);
+        divrec.compute(msh, cl);
+        stab.compute(msh, cl, gradrec.oper);
+        auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, degree);
+        dynamic_matrix<scalar_type> loc = 2*mu*gradrec.data + lambda*divrec.data + 2*mu*stab.data;
+        auto sc = statcond.compute(msh, cl, loc, cell_rhs);
+        assembler.assemble(msh, cl, sc);
     }
+
+    assembler.impose_boundary_conditions(msh, solution);
+    assembler.finalize();
+    tc.toc();
+
+    std::cout << "Assembly time: " << tc << " seconds." << std::endl;
+
+    tc.tic();
+
+#ifdef HAVE_SOLVER_WRAPPERS
+    agmg_solver<scalar_type> solver;
+    dynamic_vector<scalar_type> X = solver.solve(assembler.matrix, assembler.rhs);
+#else
+
+#ifdef HAVE_INTEL_MKL
+    Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
+#else
+    Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
+#endif
+    solver.analyzePattern(assembler.matrix);
+    solver.factorize(assembler.matrix);
+    dynamic_vector<scalar_type> X = solver.solve(assembler.rhs);
+#endif
+
+    tc.toc();
+    std::cout << "Solver time: " << tc << " seconds." << std::endl;
 
 }
 
@@ -85,7 +140,7 @@ void test_elasticity(MeshType& msh)
     typedef disk::scaled_monomial_vector_sg_basis<mesh_type, cell_type>  cell_basis_type;
     typedef disk::scaled_monomial_vector_sg_basis<mesh_type, face_type>  face_basis_type;
 
-    size_t degree = 0;
+    size_t degree = 1;
 
     typedef disk::elasticity_template<mesh_type> elasticity;
 
@@ -129,7 +184,7 @@ void test_elasticity(MeshType& msh)
     for (auto& cl : msh)
     {
         auto LC = elast.build_local_contrib(msh, cl, f);
-
+        return;
         /* PROBLEM ASSEMBLY */
         auto fcs = faces(msh, cl);
         auto num_faces = fcs.size();
@@ -307,7 +362,7 @@ int main(void)
     }
     loader.populate_mesh(msh);
 
-    test_elasticity(msh);
+    //test_elasticity(msh);
 
     typedef typename mesh_type::scalar_type     scalar_type;
 
@@ -332,6 +387,6 @@ int main(void)
     };
 
     test_elasticity(msh);
-    //test_new_elasticity(msh, f, sf, 0);
+    test_new_elasticity(msh, f, sf, 1);
 
 }

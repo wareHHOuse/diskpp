@@ -505,6 +505,8 @@ class elasticity_template
 
         DT = MD.partialPivLu().solve(BD);
         A_dr = BD.transpose() * DT;
+
+        //std::cout << A_dr << std::endl;
     }
 
     void
