@@ -510,8 +510,7 @@ public:
     /* Returns the numerial ID of a cell. */
     typename cell::id_type lookup(const cell& cl) const
     {
-        auto ci =
-        (this->cells_begin(), this->cells_end(), cl);
+        auto ci = find_element_id(this->cells_begin(), this->cells_end(), cl);
         if (!ci.first)
             throw std::invalid_argument("Cell not present in mesh");
 

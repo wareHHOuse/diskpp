@@ -91,7 +91,9 @@ void test_new_elasticity(MeshType& msh, const Function& load, const Solution& so
         divrec.compute(msh, cl);
         stab.compute(msh, cl, gradrec.oper);
         auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, degree);
-        dynamic_matrix<scalar_type> loc = 2*mu*gradrec.data + lambda*divrec.data + 2*mu*stab.data;
+        dynamic_matrix<scalar_type> loc = 2 * mu * gradrec.data +
+                                          lambda * divrec.data +
+                                          2 * mu * stab.data;
         auto sc = statcond.compute(msh, cl, loc, cell_rhs);
         assembler.assemble(msh, cl, sc);
     }
@@ -121,6 +123,44 @@ void test_new_elasticity(MeshType& msh, const Function& load, const Solution& so
 
     tc.toc();
     std::cout << "Solver time: " << tc << " seconds." << std::endl;
+
+    face_basis_type face_basis(degree);
+    auto fbs = face_basis.size();
+
+    scalar_type diam = 0.0;
+
+    for (auto& cl : msh)
+    {
+        diam = std::max(diameter(msh, cl), diam);
+        auto fcs = faces(msh, cl);
+        auto num_faces = fcs.size();
+
+        dynamic_vector<scalar_type> xFs = dynamic_vector<scalar_type>::Zero(num_faces*fbs);
+
+        for (size_t face_i = 0; face_i < num_faces; face_i++)
+        {
+            auto fc = fcs[face_i];
+            auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+            if (!eid.first)
+                throw std::invalid_argument("This is a bug: face not found");
+
+            auto face_id = eid.second;
+
+            dynamic_vector<scalar_type> xF = dynamic_vector<scalar_type>::Zero(fbs);
+            xF = X.block(face_id * fbs, 0, fbs, 1);
+            xFs.block(face_i * fbs, 0, fbs, 1) = xF;
+        }
+
+        gradrec.compute(msh, cl);
+        divrec.compute(msh, cl);
+        stab.compute(msh, cl, gradrec.oper);
+        auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, degree);
+        dynamic_matrix<scalar_type> loc = 2 * mu * gradrec.data +
+                                          lambda * divrec.data +
+                                          2 * mu * stab.data;
+
+        dynamic_vector<scalar_type> x = statcond.recover(msh, cl, loc, cell_rhs, xFs);
+    }
 
 }
 

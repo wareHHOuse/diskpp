@@ -26,8 +26,6 @@
     #include "agmg/agmg.hpp"
 #endif
 
-#include "diffusion.hpp"
-
 #include "loaders/loader.hpp"
 #include "hho/hho.hpp"
 
