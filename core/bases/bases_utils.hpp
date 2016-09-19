@@ -17,6 +17,8 @@
 #pragma once
 
 #include "common/eigen.hpp"
+#include "quadratures/quadratures.hpp"
+#include "bases/bases.hpp"
 
 namespace disk {
 
