@@ -45,7 +45,7 @@ configure_file (
   "${PROJECT_SOURCE_DIR}/config.h.in"
   "${PROJECT_SOURCE_DIR}/config.h"
   )
-include_directories(core contrib "${PROJECT_BINARY_DIR}/_config_/")
+include_directories(core contrib "${PROJECT_SOURCE_DIR}")
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     set(LINK_LIBS "${LINK_LIBS}" pthread)
