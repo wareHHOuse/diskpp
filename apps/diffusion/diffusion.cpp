@@ -76,10 +76,6 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
                           face_basis_type,
                           face_quadrature_type> assembler_nopre(msh, degree);
 
-
-    cell_basis_type         cb(degree+1);
-    cell_quadrature_type    cq(2*degree+2);
-
     timecounter tc;
     std::map<std::string, double> timings;
 
@@ -143,15 +139,23 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     tc.toc();
     std::cout << "Solver time: " << tc << " seconds." << std::endl;
 
-    face_basis_type face_basis(degree);
+    scalar_type diam = 0.0;
+    scalar_type err_dof = 0.0;
+    scalar_type err_fun = 0.0;
+
+    std::ofstream ofs("plotnew.dat");
+
+    disk::projector_nopre<mesh_type,
+                    cell_basis_type,
+                    cell_quadrature_type,
+                    face_basis_type,
+                    face_quadrature_type> projk(degree);
+
+    cell_basis_type         cell_basis(degree);
+    cell_quadrature_type    cell_quadrature(2*degree);
+    face_basis_type         face_basis(degree);
     size_t fbs = face_basis.size();
 
-    scalar_type diam = 0.0;
-    scalar_type err_dof_k = 0.0;
-    scalar_type err_fun_k = 0.0;
-    scalar_type err_dof_kp = 0.0;
-    scalar_type err_fun_kp = 0.0;
-    std::ofstream ofs("plotnew.dat");
     for (auto& cl : msh)
     {
         diam = std::max(diameter(msh, cl), diam);
@@ -180,65 +184,62 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
         auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, degree);
         dynamic_vector<scalar_type> x = statcond_nopre.recover(msh, cl, loc, cell_rhs, xFs);
 
-        dynamic_vector<scalar_type> rec(cb.size());
-        rec.tail(cb.size()-1) = gradrec_nopre.oper * x;
-        rec(0) = x(0);
+        //dynamic_vector<scalar_type> rec(cb.size());
+        //rec.tail(cb.size()-1) = gradrec_nopre.oper * x;
+        //rec(0) = x(0);
 
+/*
         auto test_points = make_test_points(msh, cl);
         for (size_t itp = 0; itp < test_points.size(); itp++)
-        //for (auto& qp : qps)
         {
             auto tp = test_points[itp];
-            //auto tp = qp.point();
+
             auto pot = 0.;
+            auto phi = cell_basis.eval_functions(msh, cl, tp);
 
-            auto phi = cb.eval_functions(msh, cl, tp);
-
-            for (size_t i = 0; i < cb.size(); i++)
-                pot += phi[i] * rec(i);
+            for (size_t i = 0; i < cell_basis.size(); i++)
+                pot += phi[i] * x(i);
 
             for (size_t i = 0; i < MeshType::dimension; i++)
                 ofs << tp[i] << " ";
             ofs << pot << " " << std::abs(pot - solution(tp)) << std::endl;
         }
+*/
 
-        auto qps = cq.integrate(msh, cl);
-
+        auto qps = cell_quadrature.integrate(msh, cl);
         for (auto& qp : qps)
         {
-            auto phi = cb.eval_functions(msh, cl, qp.point());
+            auto phi = cell_basis.eval_functions(msh, cl, qp.point());
 
-            scalar_type potk = 0.0;
-            for (size_t i = 0; i < cb.range(0,degree).size(); i++)
-                potk += phi[i] * rec(i);
-
-            scalar_type potkp = potk;
-            for (size_t i = cb.range(0,degree).size(); i < cb.size(); i++)
-                potkp += phi[i] * rec(i);
+            scalar_type pot = 0.0;
+            for (size_t i = 0; i < cell_basis.size(); i++)
+                pot += phi[i] * x(i);
 
             auto potr = solution(qp.point());
 
-            scalar_type diffk = 0.0;
-            scalar_type diffkp = 0.0;
-            diffk = (potk - potr) * (potk - potr) * qp.weight();
-            diffkp = (potkp - potr) * (potkp - potr) * qp.weight();
+            scalar_type diff = 0.0;
+            diff = (pot - potr) * (pot - potr) * qp.weight();
+            //std::cout << pot << " " << potr << " " << qp.weight() << " " << diff << std::endl;
 
-            err_fun_k += diffk;
-            err_fun_kp += diffkp;
+            err_fun += diff;
+
+            auto tp = qp.point();
+            for (size_t i = 0; i < MeshType::dimension; i++)
+                ofs << tp[i] << " ";
+            ofs << pot << " " << std::abs(pot - solution(tp)) << std::endl;
         }
 
-        //err_dof_k += compute_L2_error(dld, degree, solution, x);
-        //err_dof_kp += compute_L2_error(dld, degree+1, solution, x);
-
+        dynamic_vector<scalar_type> true_dof = projk.compute_cell(msh, cl, solution);
+        dynamic_vector<scalar_type> comp_dof = x.block(0,0,true_dof.size(), 1);
+        dynamic_vector<scalar_type> diff_dof = (true_dof - comp_dof);
+        err_dof += diff_dof.dot(projk.cell_mm * diff_dof);
     }
 
     ofs.close();
 
     std::cout << "Mesh diameter: " << diam << std::endl;
-    std::cout << "L2-norm error, dof, K:   " << std::sqrt(err_dof_k) << std::endl;
-    std::cout << "L2-norm error, fun, K:   " << std::sqrt(err_fun_k) << std::endl;
-    std::cout << "L2-norm error, dof, K+1: " << std::sqrt(err_dof_kp) << std::endl;
-    std::cout << "L2-norm error, fun, K+1: " << std::sqrt(err_fun_kp) << std::endl;
+    std::cout << "L2-norm error, dof:   " << std::sqrt(err_dof) << std::endl;
+    std::cout << "L2-norm error, fun:   " << std::sqrt(err_fun) << std::endl;
 }
 
 int main(int argc, char **argv)

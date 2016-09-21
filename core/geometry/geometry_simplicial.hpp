@@ -172,4 +172,33 @@ diameter(const simplicial_mesh<T, DIM>& msh, const typename simplicial_mesh<T, D
     return c_meas/af_meas;
 }
 */
+
+template<typename Mesh>
+class submesher;
+
+template<typename T>
+class submesher<simplicial_mesh<T,2>>
+{
+
+};
+
+template<typename T>
+void
+submesh(const simplicial_mesh<T,2>& msh,
+        const typename simplicial_mesh<T,2>::cell& cl,
+        const T& max_h)
+{
+    //simplicial_mesh<T,2> submesh;
+    //auto storage = submesh.backend_storage();
+
+    auto pts = points(msh, cl);
+
+    auto b0 = (pts[0] + pts[1]) / T(2);
+    auto b1 = (pts[1] + pts[2]) / T(2);
+    auto b2 = (pts[0] + pts[2]) / T(2);
+}
+
+
+
+
 } // namespace disk

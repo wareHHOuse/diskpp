@@ -50,7 +50,7 @@ public:
     eval_functions(const mesh_type& msh, const cell_type& cl, const point<T,3>& pt) const
     {
         auto bar = barycenter(msh, cl);
-        auto h = measure(msh, cl);
+        auto h = diameter(msh, cl);
 
         auto ep = (pt - bar)/h;
 
@@ -73,7 +73,7 @@ public:
     eval_gradients(const mesh_type& msh, const cell_type& cl, const point<T,3>& pt) const
     {
         auto bar = barycenter(msh, cl);
-        auto h = measure(msh, cl);
+        auto h = diameter(msh, cl);
 
         auto ep = (pt - bar)/h;
 

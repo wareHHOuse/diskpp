@@ -52,7 +52,7 @@ public:
     eval_functions(const mesh_type& msh, const cell_type& cl, const point_type& pt) const
     {
         auto bar = barycenter(msh, cl);
-        auto h = measure(msh, cl);
+        auto h = diameter(msh, cl);
 
         auto ep = (pt - bar)/h;
 
@@ -74,7 +74,7 @@ public:
     eval_gradients(const mesh_type& msh, const cell_type& cl, const point_type& pt) const
     {
         auto bar = barycenter(msh, cl);
-        auto h = measure(msh, cl);
+        auto h = diameter(msh, cl);
 
         auto ep = (pt - bar)/h;
 
@@ -127,7 +127,7 @@ public:
     {
         auto pts = points(msh, fc);
         auto bar = barycenter(msh, fc);
-        auto h = measure(msh, fc);
+        auto h = diameter(msh, fc);
         auto v = (pts[1] - pts[0]).to_vector();
         auto t = (pt - bar).to_vector();
         //v = v/v.norm();
@@ -173,7 +173,7 @@ public:
     eval_functions(const mesh_type& msh, const cell_type& cl, const point_type& pt) const
     {
         auto bar = barycenter(msh, cl);
-        auto h = measure(msh, cl);
+        auto h = diameter(msh, cl);
 
         auto ep = (pt - bar)/h;
 
@@ -194,7 +194,7 @@ public:
     eval_gradients(const mesh_type& msh, const cell_type& cl, const point_type& pt) const
     {
         auto bar = barycenter(msh, cl);
-        auto h = measure(msh, cl);
+        auto h = diameter(msh, cl);
 
         auto ep = (pt - bar)/h;
 

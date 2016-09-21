@@ -20,8 +20,15 @@
 #include <utility>
 
 #include "mesh/point.hpp"
-#include "jburkardt/simplex_gm_rule.hpp"
 #include "jburkardt/triangle_dunavant_rule.hpp"
+
+#define USE_ARBQ
+
+#ifdef USE_ARBQ
+    #include "jburkardt/tetrahedron_arbq_rule.hpp"
+#else
+    #include "jburkardt/simplex_gm_rule.hpp"  /* Has negative weights */
+#endif
 
 namespace disk {
 
@@ -29,21 +36,58 @@ std::vector<std::pair<point<double,3>, double>>
 tetrahedron_quadrature(size_t degree)
 {
     int dimension = 3;
+
+#ifdef USE_ARBQ
+    int rule = degree+1;
+    if (rule == 0)
+        rule = 1;
+#else
     int rule = degree/2;
+#endif
     int point_num;
 
+#ifdef USE_ARBQ
+    point_num = tetrahedron_arbq_size(rule);
+#else
     point_num = gm_rule_size(rule, dimension);
+#endif
     std::vector<double> ws(point_num);
     std::vector<double> pts(3*point_num);
 
-    gm_rule_set (rule, dimension, point_num, &ws[0], &pts[0]);
+#ifdef USE_ARBQ
+    tetrahedron_arbq(rule, point_num, &pts[0], &ws[0]);
+#else
+    gm_rule_set(rule, dimension, point_num, &ws[0], &pts[0]);
+#endif
 
     std::vector<std::pair<point<double,3>, double>> ret;
     ret.reserve(point_num);
 
+#ifdef USE_ARBQ
+    static_matrix<double,3,3> invA;
+    invA(0,0) = 1./2.;
+    invA(0,1) = -1./(2.*std::sqrt(3.));
+    invA(0,2) = -1./(2.*std::sqrt(6.));
+    invA(1,0) = 0.;
+    invA(1,1) = 1./std::sqrt(3.);
+    invA(1,2) = -1./(2.*std::sqrt(6.));
+    invA(2,0) = 0.;
+    invA(2,1) = 0.;
+    invA(2,2) = 3./(2.*std::sqrt(6.));
+
+    static_vector<double,3> b;
+    b(0) = -1.;
+    b(1) = -1./std::sqrt(3.);
+    b(2) = -1./std::sqrt(6.);
+#endif
+
     for (size_t i = 0; i < point_num; i++)
     {
-        double w = ws[i];;
+#ifdef USE_ARBQ
+        double w = ws[i] / ( std::sqrt(8.) / 3. );
+#else
+        double w = ws[i];
+#endif
 
         auto r = pts[3*i];
         auto s = pts[3*i+1];
@@ -51,7 +95,13 @@ tetrahedron_quadrature(size_t degree)
 
         auto p = point<double, 3>{r,s,t};
 
+#ifdef USE_ARBQ
+        static_vector<double,3> q = invA*(p.to_vector() - b);
+        auto qq = point<double, 3>{q(0), q(1), q(2)};
+        ret.push_back( std::make_pair(qq, w) );
+#else
         ret.push_back( std::make_pair(p, w) );
+#endif
     }
 
     return ret;
