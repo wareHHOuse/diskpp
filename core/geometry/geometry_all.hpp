@@ -91,5 +91,28 @@ diameter(const Mesh& msh, const Element& elem)
     return diam;
 }
 
+template<template<typename, size_t, typename> class Mesh,
+         typename T, typename Storage>
+static_vector<T, 2>
+normal(const Mesh<T,2,Storage>& msh,
+       const typename Mesh<T,2,Storage>::cell& cl,
+       const typename Mesh<T,2,Storage>::face& fc)
+{
+    auto pts = points(msh, fc);
+    assert(pts.size() == 2);
+
+    auto v = pts[1] - pts[0];
+    auto n = (point<T,2>({-v.y(), v.x()})).to_vector();
+
+    auto cell_bar = barycenter(msh, cl);
+    auto face_bar = barycenter(msh, fc);
+    auto outward_vector = (face_bar - cell_bar).to_vector();
+
+    if ( n.dot(outward_vector) < T(0) )
+        return -n/n.norm();
+
+    return n/n.norm();
+}
+
 
 } // namespace disk

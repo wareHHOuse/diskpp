@@ -342,6 +342,35 @@ int main(int argc, char **argv)
         test_diffusion(msh, f, sf, degree);
     }
 
+    if (std::regex_match(filename, std::regex(".*\\.mesh2d$") ))
+    {
+        std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
+
+        typedef disk::simplicial_mesh<RealType, 2>  mesh_type;
+
+        mesh_type msh;
+        disk::netgen_mesh_loader<RealType, 2> loader;
+        if (!loader.read_mesh(filename))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            return 1;
+        }
+        loader.populate_mesh(msh);
+
+        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return M_PI * M_PI * sin(p.x() * M_PI);
+            //return 6. * p.x();
+        };
+
+        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return sin(p.x() * M_PI);
+            //return - p.x() * p.x() * p.x();
+        };
+
+        //test_diffusion(msh, f, sf, degree);
+        test_diffusion(msh, f, sf, degree);
+    }
+
     if (std::regex_match(filename, std::regex(".*\\.mesh$") ))
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;

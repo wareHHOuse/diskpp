@@ -444,14 +444,26 @@ public:
 template<typename T, size_t N>
 class netgen_mesh_loader
 {
-    static_assert(N == 3, "netgen is a 3D-only mesh format");
+    static_assert(N == 2 || N == 3, "Netgen supports only 2D or 3D");
 };
 
 namespace priv {
 
 template<typename T>
-std::tuple<T, T, T>
-read_point_line(const char *str, char **endptr, T scalefactor)
+point<T,2>
+read_2d_point_line(const char *str, char **endptr, T scalefactor)
+{
+    T t1, t2, t3;
+
+    t1 = strtot<T>(str, endptr);
+    t2 = strtot<T>(*endptr, endptr);
+
+    return point<T,2>{t1*scalefactor, t2*scalefactor};
+}
+
+template<typename T>
+point<T,3>
+read_3d_point_line(const char *str, char **endptr, T scalefactor)
 {
     T t1, t2, t3;
 
@@ -459,7 +471,7 @@ read_point_line(const char *str, char **endptr, T scalefactor)
     t2 = strtot<T>(*endptr, endptr);
     t3 = strtot<T>(*endptr, endptr);
 
-    return std::make_tuple(t1*scalefactor, t2*scalefactor, t3*scalefactor);
+    return point<T,3>{t1*scalefactor, t2*scalefactor, t3*scalefactor};
 }
 
 template<typename T>
@@ -492,6 +504,19 @@ read_triangle_line(const char *str, char **endptr)
 }
 
 template<typename T>
+std::tuple<T, T, T>
+read_edge_line(const char *str, char **endptr)
+{
+    T t1, t2, t3;
+
+    t1 = strtot<T>(str, endptr);
+    t2 = strtot<T>(*endptr, endptr);
+    t3 = strtot<T>(*endptr, endptr);
+
+    return std::make_tuple(t1, t2-1, t3-1);
+}
+
+template<typename T>
 void
 sort_uniq(std::vector<T>& v)
 {
@@ -510,6 +535,203 @@ sort_uniq(std::vector<T>& v)
     #define THREAD(name, body) {body}
     #define WAIT_THREAD(name)
 #endif
+
+template<typename T>
+class netgen_mesh_loader<T,2> : public mesh_loader<simplicial_mesh<T,2>>
+{
+    typedef simplicial_mesh<T,2>                    mesh_type;
+    typedef typename mesh_type::point_type          point_type;
+    typedef typename mesh_type::node_type           node_type;
+    typedef typename mesh_type::edge_type           edge_type;
+    typedef typename mesh_type::surface_type        surface_type;
+
+    std::vector<point_type>                         points;
+    std::vector<node_type>                          nodes;
+    std::vector<edge_type>                          edges, boundary_edges;
+    std::vector<surface_type>                       surfaces;
+
+    bool netgen_read(const std::string& filename)
+    {
+        /* Open file */
+        if (filename.size() == 0)
+        {
+            std::cout << "Invalid mesh file name" << std::endl;
+            return false;
+        }
+
+        size_t lines, linecount;
+
+        mapped_file mf(filename);
+
+        //std::cout << green << " * * * Reading NETGEN format mesh * * * ";
+        //std::cout << nocolor << std::endl;
+
+        /************************ Read points ************************/
+        linecount = 0;
+
+        const char *data = mf.mem();
+        char *endptr;
+
+        lines = strtot<size_t>(data, &endptr);
+
+        points.reserve(lines);
+        nodes.reserve(lines);
+
+        while (linecount < lines)
+        {
+            if ( (linecount%100000) == 0 )
+            {
+                std::cout << "Reading points: " << linecount;
+                std::cout << "/" << lines << "\r";
+                std::cout.flush();
+            }
+
+            auto point = priv::read_2d_point_line<T>(endptr, &endptr, 1.0);
+
+            points.push_back( point );
+
+            auto point_id = point_identifier<2>( linecount );
+            auto node = node_type( { point_id } );
+
+            nodes.push_back(node);
+
+            linecount++;
+        }
+
+        std::cout << "Reading points: " << linecount;
+        std::cout << "/" << lines << std::endl;
+
+        /************************ Read triangles ************************/
+        linecount = 0;
+
+        lines = strtot<size_t>(endptr, &endptr);
+
+        edges.reserve(lines*3);
+        surfaces.reserve(lines);
+
+        while (linecount < lines)
+        {
+            if ( (linecount%100000) == 0 )
+            {
+                std::cout << "Reading triangles: " << linecount;
+                std::cout << "/" << lines << "\r";
+                std::cout.flush();
+            }
+
+            auto t = priv::read_triangle_line<size_t>(endptr, &endptr);
+
+            point_identifier<2>     p0(std::get<1>(t));
+            point_identifier<2>     p1(std::get<2>(t));
+            point_identifier<2>     p2(std::get<3>(t));
+            //domain_id_type      d(std::get<0>(t));
+
+            edges.push_back( edge_type( { p0, p1 } ) );
+            edges.push_back( edge_type( { p1, p2 } ) );
+            edges.push_back( edge_type( { p0, p2 } ) );
+
+            surfaces.push_back( surface_type( { p0, p1, p2 } ) );
+
+            linecount++;
+        }
+
+        std::cout << "Reading triangles: " << linecount;
+        std::cout << "/" << lines << std::endl;
+
+        /************************ Read boundary edges ************************/
+        linecount = 0;
+
+        lines = strtot<size_t>(endptr, &endptr);
+
+        boundary_edges.reserve(lines);
+
+        while (linecount < lines)
+        {
+            if ( (linecount%50000) == 0 )
+            {
+                std::cout << "Reading edges: " << linecount;
+                std::cout << "/" << lines << "\r";
+                std::cout.flush();
+            }
+
+            auto t = priv::read_edge_line<size_t>(endptr, &endptr);
+
+            point_identifier<2>     p0(std::get<1>(t));
+            point_identifier<2>     p1(std::get<2>(t));
+
+            edge_type   edge( { p0, p1 } );
+
+            boundary_edges.push_back( edge );
+
+            linecount++;
+        }
+
+        std::cout << "Reading edges: " << linecount;
+        std::cout << "/" << lines << std::endl;
+
+        return true;
+    }
+
+public:
+    netgen_mesh_loader() = default;
+
+    bool read_mesh(const std::string& s)
+    {
+        std::cout << " *** READING NETGEN 2D MESH ***" << std::endl;
+        return netgen_read(s);
+    }
+
+    bool populate_mesh(mesh_type& msh)
+    {
+        auto storage = msh.backend_storage();
+
+        std::cout << "Sorting data...";
+        std::cout.flush();
+
+        storage->points = std::move(points);
+        storage->nodes = std::move(nodes);
+
+        /* sort edges, make unique and move them in geometry */
+        THREAD(edge_thread,
+            priv::sort_uniq(edges);
+            storage->edges = std::move(edges);
+        );
+
+        /* sort triangles, make unique and move them in geometry */
+        THREAD(tri_thread,
+            priv::sort_uniq(surfaces);
+            storage->surfaces = std::move(surfaces);
+        );
+
+        /* wait for the threads */
+        WAIT_THREAD(edge_thread);
+        WAIT_THREAD(tri_thread);
+
+        storage->boundary_edges.resize(storage->edges.size());
+        for (auto& be : boundary_edges)
+        {
+            auto position = find_element_id(storage->edges.begin(),
+                                            storage->edges.end(), be);
+            if (position.first == false)
+            {
+                std::cout << "Bad bug at " << __FILE__ << "("
+                          << __LINE__ << ")" << std::endl;
+                return false;
+            }
+
+            storage->boundary_edges[position.second] = true;
+        }
+
+        std::cout << "done." << std::endl;
+
+        std::cout << "Nodes: " << storage->nodes.size() << std::endl;
+        std::cout << "Edges: " << storage->edges.size() << std::endl;
+        std::cout << "Faces: " << storage->surfaces.size() << std::endl;
+
+        boundary_edges.clear();
+
+        return true;
+    }
+};
 
 template<typename T>
 class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
@@ -564,12 +786,12 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
                 std::cout.flush();
             }
 
-            auto t = priv::read_point_line<T>(endptr, &endptr, 1.0);
+            auto point = priv::read_3d_point_line<T>(endptr, &endptr, 1.0);
 
-            auto point = point_type( { std::get<0>(t),
+            /*auto point = point_type( { std::get<0>(t),
                                        std::get<1>(t),
                                        std::get<2>(t) } );
-
+*/
             points.push_back( point );
 
             auto point_id = point_identifier<3>( linecount );
@@ -673,7 +895,7 @@ public:
 
     bool read_mesh(const std::string& s)
     {
-        std::cout << " *** READING NETGEN MESH ***" << std::endl;
+        std::cout << " *** READING NETGEN 3D MESH ***" << std::endl;
         return netgen_read(s);
     }
 

@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <list>
+
 #include "mesh/mesh.hpp"
 #include "geometry/geometry_all.hpp"
 #include "geometry/element_simplicial.hpp"
@@ -74,28 +76,50 @@ number_of_faces(const simplicial_mesh<T,DIM>& msh, const typename simplicial_mes
     /* NOTREACHED */
 }
 
-template<typename T, size_t DIM>
-std::array<simplicial_element<3,1>, 4>
-faces(const simplicial_mesh<T, DIM>&, const simplicial_element<3,0>& vol)
+template<typename T>
+std::array<typename simplicial_mesh<T, 3>::face, 4>
+faces(const simplicial_mesh<T, 3>&,
+      const typename simplicial_mesh<T, 3>::cell& cl)
 {
-    std::array<simplicial_element<3,1>, 4> ret;
+    typedef typename simplicial_mesh<T, 3>::face    face_type;
+    std::array<face_type, 4> ret;
 
-    auto ptids = vol.point_ids();
+    auto ptids = cl.point_ids();
     assert(ptids.size() == 4);
 
-    ret[0] = simplicial_element<3,1>( { ptids[1], ptids[2], ptids[3] } );
-    ret[1] = simplicial_element<3,1>( { ptids[0], ptids[2], ptids[3] } );
-    ret[2] = simplicial_element<3,1>( { ptids[0], ptids[1], ptids[3] } );
-    ret[3] = simplicial_element<3,1>( { ptids[0], ptids[1], ptids[2] } );
+    ret[0] = face_type( { ptids[1], ptids[2], ptids[3] } );
+    ret[1] = face_type( { ptids[0], ptids[2], ptids[3] } );
+    ret[2] = face_type( { ptids[0], ptids[1], ptids[3] } );
+    ret[3] = face_type( { ptids[0], ptids[1], ptids[2] } );
 
     return ret;
 }
 
-template<typename T, size_t DIM>
-T
-measure(const simplicial_mesh<T, DIM>& msh, const simplicial_element<3,0>& vol, bool signed_volume = false)
+template<typename T>
+std::array<typename simplicial_mesh<T, 2>::face, 3>
+faces(const simplicial_mesh<T, 2>&,
+      const typename simplicial_mesh<T, 2>::cell& cl)
 {
-    auto pts = points(msh, vol);
+    typedef typename simplicial_mesh<T, 2>::face    face_type;
+    std::array<face_type, 3> ret;
+
+    auto ptids = cl.point_ids();
+    assert(ptids.size() == 3);
+
+    ret[0] = face_type( { ptids[0], ptids[1] } );
+    ret[1] = face_type( { ptids[1], ptids[2] } );
+    ret[2] = face_type( { ptids[0], ptids[2] } );
+
+    return ret;
+}
+
+template<typename T>
+T
+measure(const simplicial_mesh<T, 3>& msh,
+        const typename simplicial_mesh<T, 3>::cell& cl,
+        bool signed_volume = false)
+{
+    auto pts = points(msh, cl);
     assert(pts.size() == 4);
 
     auto v0 = (pts[1] - pts[0]).to_vector();
@@ -108,17 +132,43 @@ measure(const simplicial_mesh<T, DIM>& msh, const simplicial_element<3,0>& vol, 
     return std::abs( v0.dot(v1.cross(v2))/T(6) );
 }
 
-template<typename T, size_t DIM>
+template<typename T>
 T
-measure(const simplicial_mesh<T, DIM>& msh, const simplicial_element<3,1>& surf)
+measure(const simplicial_mesh<T, 3>& msh,
+        const typename simplicial_mesh<T, 3>::face& fc)
 {
-    auto pts = points(msh, surf);
+    auto pts = points(msh, fc);
     assert(pts.size() == 3);
 
     auto v0 = (pts[1] - pts[0]).to_vector();
     auto v1 = (pts[2] - pts[0]).to_vector();
 
     return v0.cross(v1).norm()/T(2);
+}
+
+template<typename T>
+T
+measure(const simplicial_mesh<T, 2>& msh,
+        const typename simplicial_mesh<T, 2>::cell& cl)
+{
+    auto pts = points(msh, cl);
+    assert(pts.size() == 3);
+
+    auto v0 = (pts[1] - pts[0]).to_vector();
+    auto v1 = (pts[2] - pts[0]).to_vector();
+
+    return v0.cross(v1).norm()/T(2);
+}
+
+template<typename T>
+T
+measure(const simplicial_mesh<T, 2>& msh,
+        const typename simplicial_mesh<T, 2>::face& fc)
+{
+    auto pts = points(msh, fc);
+    assert(pts.size() == 2);
+
+    return (pts[1] - pts[0]).to_vector().norm();
 }
 
 template<typename T>
@@ -175,8 +225,6 @@ diameter(const simplicial_mesh<T, DIM>& msh, const typename simplicial_mesh<T, D
 */
 #endif
 
-#if 0
-
 template<typename Mesh>
 class submesher;
 
@@ -196,7 +244,7 @@ class submesher<simplicial_mesh<T,2>>
     std::vector<point_type>     m_points;
     std::list<triangle>         m_triangles;
 
-    typedef std::list<triangle>::iterator   triangle_iterator;
+    typedef typename std::list<triangle>::iterator   triangle_iterator;
 
     void refine(const triangle_iterator ti)
     {
@@ -248,22 +296,6 @@ public:
     }
 };
 
-template<typename T>
-void
-submesh(const simplicial_mesh<T,2>& msh,
-        const typename simplicial_mesh<T,2>::cell& cl,
-        const T& max_h)
-{
-    //simplicial_mesh<T,2> submesh;
-    //auto storage = submesh.backend_storage();
-
-    auto pts = points(msh, cl);
-
-    auto b0 = (pts[0] + pts[1]) / T(2);
-    auto b1 = (pts[1] + pts[2]) / T(2);
-    auto b2 = (pts[0] + pts[2]) / T(2);
-}
-#endif
 
 
 
