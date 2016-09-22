@@ -13,7 +13,7 @@
  * If you use this code for scientific publications, you are required to
  * cite it.
  */
- 
+
 #pragma once
 
 #include <algorithm>
@@ -74,6 +74,21 @@ barycenter(const Mesh& msh, const Element& elm)
     auto pts = points(msh, elm);
     auto bar = std::accumulate(std::next(pts.begin()), pts.end(), pts.front());
     return bar / typename Mesh::value_type( pts.size() );
+}
+
+template<typename Mesh, typename Element>
+typename Mesh::scalar_type
+diameter(const Mesh& msh, const Element& elem)
+{
+    auto pts = points(msh, elem);
+
+    typename Mesh::scalar_type diam = 0.;
+
+    for (size_t i = 0; i < pts.size(); i++)
+        for (size_t j = i; j < pts.size(); j++)
+            diam = std::max((pts[i] - pts[j]).to_vector().norm(), diam);
+
+    return diam;
 }
 
 

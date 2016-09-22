@@ -22,7 +22,7 @@
 #include "mesh/point.hpp"
 #include "jburkardt/triangle_dunavant_rule.hpp"
 
-#define USE_ARBQ
+//#define USE_ARBQ
 
 #ifdef USE_ARBQ
     #include "jburkardt/tetrahedron_arbq_rule.hpp"

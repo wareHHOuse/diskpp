@@ -133,49 +133,6 @@ measure(const generic_mesh<T,1>& msh, const typename generic_mesh<T,1>::face& fc
 
 template<typename T>
 T
-diameter(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::cell& cl)
-{
-
-    T c_meas = measure(msh, cl);
-    T af_meas = T(0);
-    auto fcs = faces(msh, cl);
-    for (auto& f : fcs)
-        af_meas += measure(msh, f);
-
-    return c_meas/af_meas;
-
-    /*
-    auto bar = barycenter(msh, cl);
-    auto pts = points(msh, cl);
-
-    T diam = 0.;
-
-    for (auto& pt : pts)
-    {
-        auto d = (pt-bar).to_vector().norm();
-        diam = std::max(d, diam);
-    }
-
-    return diam;
-    */
-}
-
-template<typename T>
-T
-diameter(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::face& fc)
-{
-    return measure(msh, fc);
-}
-
-template<typename T>
-T
-diameter(const generic_mesh<T,1>& msh, const typename generic_mesh<T,1>::cell& cl)
-{
-    return measure(msh, cl);
-}
-
-template<typename T>
-T
 diameter(const generic_mesh<T,1>&, const typename generic_mesh<T,1>::face&)
 {
     return 1.;
