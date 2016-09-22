@@ -246,7 +246,7 @@ class submesher<simplicial_mesh<T,2>>
 
     typedef typename std::list<triangle>::iterator   triangle_iterator;
 
-    void refine(const triangle_iterator ti)
+    void refine_single(const triangle_iterator ti)
     {
         triangle t = *ti;
         m_triangles.erase(ti);
@@ -257,25 +257,25 @@ class submesher<simplicial_mesh<T,2>>
         auto bar1 = (m_points[t.p1] + m_points[t.p2])/2;
         auto bar2 = (m_points[t.p0] + m_points[t.p2])/2;
 
-        m_points.push_back(bar0);
-        m_points.push_back(bar1);
-        m_points.push_back(bar2);
+        m_points.push_back(bar0); auto bar0pos = new_point_pos;
+        m_points.push_back(bar1); auto bar1pos = new_point_pos+1;
+        m_points.push_back(bar2); auto bar2pos = new_point_pos+2;
 
         triangle t0, t1, t2, t3;
 
-        t0.p0 = t.p0; t0.p1 = bar0; t0.p2 = bar2;
+        t0.p0 = t.p0; t0.p1 = bar0pos; t0.p2 = bar2pos;
         t0.b0 = t.b0; t0.b1 = false; t0.b2 = t.b2;
         m_triangles.push_back(t0);
 
-        t1.p0 = bar0; t1.p1 = t.p1; t1.p2 = bar1;
+        t1.p0 = bar0pos; t1.p1 = t.p1; t1.p2 = bar1pos;
         t1.b0 = t.b0; t1.b1 = t.b1; t1.b2 = false;
         m_triangles.push_back(t1);
 
-        t2.p0 = bar2; t2.p1 = bar1; t2.p2 = t.p2;
+        t2.p0 = bar2pos; t2.p1 = bar1pos; t2.p2 = t.p2;
         t2.b0 = false; t2.b1 = t.b1; t2.b2 = t.b2;
         m_triangles.push_back(t2);
 
-        t3.p0 = bar0; t3.p1 = bar1; t3.p2 = bar2;
+        t3.p0 = bar0pos; t3.p1 = bar1pos; t3.p2 = bar2pos;
         t3.b0 = false; t3.b1 = false; t3.b2 = false;
         m_triangles.push_back(t3);
     }
@@ -286,13 +286,20 @@ public:
 
     void generate_mesh(const mesh_type& msh, const cell_type& cl)
     {
+        m_points.clear();
+        m_triangles.clear();
+        
         auto pts = points(msh, cl);
-
         m_points.insert(m_points.begin(), pts.begin(), pts.end());
 
         triangle t;
         t.p0 = 0; t.p1 = 1; t.p2 = 2;
         t.b0 = true; t.b1 = true; t.b2 = true;
+        m_triangles.push_back(t);
+
+        refine_single( m_triangles.begin() );
+
+        std::cout << m_triangles.size() << std::endl;
     }
 };
 
