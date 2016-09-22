@@ -51,6 +51,10 @@ if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     set(LINK_LIBS "${LINK_LIBS}" pthread)
 endif()
 
+if(${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
+    set(LINK_LIBS "${LINK_LIBS}" pthread)
+endif()
+
 add_subdirectory(contrib)
 add_subdirectory(core)
 
