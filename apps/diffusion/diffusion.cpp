@@ -20,7 +20,7 @@
 
 #include <map>
 
-#include "config.h"
+#include "../../config.h"
 
 #ifdef HAVE_SOLVER_WRAPPERS
     #include "agmg/agmg.hpp"
@@ -33,6 +33,66 @@
 
 #define _USE_MATH_DEFINES
 #include <cmath>
+
+template<typename MeshType>
+void
+test_gradrec(MeshType& msh, size_t degree)
+{
+    typedef MeshType                                   mesh_type;
+    typedef typename mesh_type::scalar_type            scalar_type;
+    typedef typename mesh_type::cell                   cell_type;
+    typedef typename mesh_type::face                   face_type;
+
+    typedef disk::quadrature<mesh_type, cell_type>      cell_quadrature_type;
+    typedef disk::quadrature<mesh_type, face_type>      face_quadrature_type;
+
+    typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
+    typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
+
+    auto f = [](const point<scalar_type, mesh_type::dimension>& p) -> auto {
+        return sin(p.x() * M_PI);
+        //return p.x();
+    };
+
+    disk::gradient_reconstruction_nopre<mesh_type,
+                                        cell_basis_type,
+                                        cell_quadrature_type,
+                                        face_basis_type,
+                                        face_quadrature_type> gradrec(degree);
+
+    disk::projector_nopre<mesh_type,
+                    cell_basis_type,
+                    cell_quadrature_type,
+                    face_basis_type,
+                    face_quadrature_type> projk(degree);
+
+    cell_basis_type cbk1(degree+1);
+
+    cell_quadrature_type cq(2*degree+2);
+
+    std::ofstream ofs("grad.dat");
+    for (auto& cl : msh)
+    {
+        gradrec.compute(msh, cl);
+        dynamic_vector<scalar_type> pk = projk.compute_whole(msh, cl, f);
+        dynamic_vector<scalar_type> pk1 = gradrec.oper * pk;
+
+        auto qps = cq.integrate(msh, cl);
+        for (auto& qp : qps)
+        {
+            auto tp = qp.point();
+            auto phi = cbk1.eval_functions(msh, cl, tp);
+            scalar_type val = pk(0);
+            for (size_t i = 1; i < phi.size(); i++)
+                val += pk1(i-1) * phi[i];
+
+            for (size_t i = 0; i < MeshType::dimension; i++)
+                ofs << tp[i] << " ";
+            ofs << val << " " << std::abs(val - f(tp)) << std::endl;
+        }
+    }
+    ofs.close();
+}
 
 template<typename MeshType, typename Function, typename Solution>
 void
@@ -121,12 +181,8 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     /* SOLVE */
     tc.tic();
 
-#ifdef HAVE_SOLVER_WRAPPERS
-    agmg_solver<scalar_type> solver;
-    dynamic_vector<scalar_type> X = solver.solve(assembler_nopre.matrix, assembler_nopre.rhs);
-#else
-
 #ifdef HAVE_INTEL_MKL
+    std::cout << "Using Intel MKL solver" << std::endl;
     Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
 #else
     Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
@@ -134,7 +190,6 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     solver.analyzePattern(assembler_nopre.matrix);
     solver.factorize(assembler_nopre.matrix);
     dynamic_vector<scalar_type> X = solver.solve(assembler_nopre.rhs);
-#endif
 
     tc.toc();
     std::cout << "Solver time: " << tc << " seconds." << std::endl;
@@ -183,28 +238,6 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
         dynamic_matrix<scalar_type> loc = gradrec_nopre.data + stab_nopre.data;
         auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, degree);
         dynamic_vector<scalar_type> x = statcond_nopre.recover(msh, cl, loc, cell_rhs, xFs);
-
-        //dynamic_vector<scalar_type> rec(cb.size());
-        //rec.tail(cb.size()-1) = gradrec_nopre.oper * x;
-        //rec(0) = x(0);
-
-/*
-        auto test_points = make_test_points(msh, cl);
-        for (size_t itp = 0; itp < test_points.size(); itp++)
-        {
-            auto tp = test_points[itp];
-
-            auto pot = 0.;
-            auto phi = cell_basis.eval_functions(msh, cl, tp);
-
-            for (size_t i = 0; i < cell_basis.size(); i++)
-                pot += phi[i] * x(i);
-
-            for (size_t i = 0; i < MeshType::dimension; i++)
-                ofs << tp[i] << " ";
-            ofs << pot << " " << std::abs(pot - solution(tp)) << std::endl;
-        }
-*/
 
         auto qps = cell_quadrature.integrate(msh, cl);
         for (auto& qp : qps)
@@ -339,7 +372,7 @@ int main(int argc, char **argv)
         };
 
         //test_diffusion(msh, f, sf, degree);
-        test_diffusion(msh, f, sf, degree);
+        //test_gradrec(msh, degree);
     }
 
     if (std::regex_match(filename, std::regex(".*\\.mesh2d$") ))
@@ -388,16 +421,17 @@ int main(int argc, char **argv)
 
         auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
             return M_PI * M_PI * sin(p.x() * M_PI);
-            //return 12*p.y()*p.y();
+            //return 1.0;
         };
 
         auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
             return sin(p.x() * M_PI);
-            //return -p.y() * p.y() * p.y() * p.y();
+            //return -p.x() * p.x() * 0.5;
         };
 
         //test_diffusion(msh, f, sf, degree);
         test_diffusion(msh, f, sf, degree);
+        //test_gradrec(msh, degree);
     }
 
     return 0;

@@ -13,7 +13,7 @@
  * If you use this code for scientific publications, you are required to
  * cite it.
  */
- 
+
 #pragma once
 
 #include <vector>
@@ -36,6 +36,17 @@ class monomial_generator
         {
             auto sum_a = std::accumulate(std::next(a.begin()), a.end(), a.front());
             auto sum_b = std::accumulate(std::next(b.begin()), b.end(), b.front());
+
+            size_t val_a = 0, val_b = 0;
+            for (size_t i = 0, pow_i = 1; i < DIM; i++, pow_i *= 10)
+            {
+                val_a += a[i]*pow_i;
+                val_b += b[i]*pow_i;
+            }
+
+            if (sum_a == sum_b)
+                return val_a < val_b;
+
             return (sum_a < sum_b);
         }
     };
@@ -74,6 +85,7 @@ class monomial_generator
             m_degree_indices.push_back(i);
         }
         m_degree_indices.push_back(m_monomials.size());
+        assert(m_monomials.size() == max_degree+1);
     }
 
     template<size_t BDIM = DIM>
@@ -94,6 +106,7 @@ class monomial_generator
         }
 
         std::sort(m_monomials.begin(), m_monomials.end(), monomial_comparator{});
+        assert( m_monomials.size() == binomial(max_degree+2,2) );
         make_index_table();
     }
 
@@ -134,6 +147,7 @@ class monomial_generator
         }
 
         std::sort(m_monomials.begin(), m_monomials.end(), monomial_comparator{});
+        assert( m_monomials.size() == binomial(max_degree+3,3) );
         make_index_table();
     }
 

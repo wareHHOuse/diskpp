@@ -22,7 +22,7 @@
 #include "mesh/point.hpp"
 #include "jburkardt/triangle_dunavant_rule.hpp"
 
-//#define USE_ARBQ
+#define USE_ARBQ
 
 #ifdef USE_ARBQ
     #include "jburkardt/tetrahedron_arbq_rule.hpp"
@@ -38,7 +38,7 @@ tetrahedron_quadrature(size_t degree)
     int dimension = 3;
 
 #ifdef USE_ARBQ
-    int rule = degree+1;
+    int rule = degree;
     if (rule == 0)
         rule = 1;
 #else

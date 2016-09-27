@@ -402,7 +402,7 @@ public:
         auto fcs = faces(msh, cl);
         vector_type ret(cell_basis.size() + fcs.size()*face_basis.size());
 
-        ret.block(0, 0, cell_basis.size(), 1) = compute_cell(msh, cl);
+        ret.block(0, 0, cell_basis.size(), 1) = compute_cell(msh, cl, f);
 
         size_t face_offset = cell_basis.size();
         for (auto& fc : fcs)
@@ -410,10 +410,10 @@ public:
             matrix_type mm = matrix_type::Zero(face_basis.size(), face_basis.size());
             vector_type rhs = vector_type::Zero(face_basis.size());
 
-            auto face_quadpoints = face_quadrature.integrate(msh, cl);
+            auto face_quadpoints = face_quadrature.integrate(msh, fc);
             for (auto& qp : face_quadpoints)
             {
-                auto phi = face_basis.eval_functions(msh, cl, qp.point());
+                auto phi = face_basis.eval_functions(msh, fc, qp.point());
                 auto fval = f(qp.point());
                 for (size_t i = 0; i < phi.size(); i++)
                 {

@@ -30,7 +30,7 @@ template<typename T>
 class scaled_monomial_scalar_basis<simplicial_mesh<T,3>, typename simplicial_mesh<T,3>::cell>
     : public priv::scaled_monomial_basis_base<3>
 {
-    typedef disk::simplicial_mesh<T, 3>              mesh_type;
+    typedef disk::simplicial_mesh<T, 3>             mesh_type;
     typedef typename mesh_type::cell                cell_type;
     typedef priv::scaled_monomial_basis_base<3>     base;
 
