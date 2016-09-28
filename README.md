@@ -39,15 +39,15 @@ If you want to just run the examples, in Mac OS X is very easy. You just need to
 
 You will end up with an executable named `diffusion` and some meshes in `/usr/local/share/meshes`. The problem the demo program solves is the classical diffusion problem
 
-![equation](http://www.sciweavers.org/tex2img.php?eq=%5Cbegin%7Bcases%7D%0D%0A%5CDelta+u+%3D+f+%26+%5Ctext%7Bin%5C%3B%5C%3B%7D+%5COmega%5C%5C%0D%0Au+%3D+0+%26+%5Ctext%7Bon%5C%3B%5C%3B%7D+%5Cpartial%5COmega%0D%0A%5Cend%7Bcases%7D&bc=White&fc=Black&im=jpg&fs=12&ff=arev&edit=)
+
 
 with the forcing term
 
-![equation2](http://www.sciweavers.org/tex2img.php?eq=f%3D%5Cpi%5E2+sin%28%5Cpi+x%29&bc=White&fc=Black&im=jpg&fs=12&ff=arev&edit=)
+![equation](http://www.sciweavers.org/tex2img.php?eq=f%3D%5Cpi%5E2+sin%28%5Cpi+x%29&bc=White&fc=Black&im=jpg&fs=12&ff=arev&edit=)
 
 The solution is of course
 
-![equation3](http://www.sciweavers.org/tex2img.php?eq=sin%28%5Cpi+x%29&bc=White&fc=Black&im=jpg&fs=12&ff=arev&edit=)
+![equation](http://www.sciweavers.org/tex2img.php?eq=sin%28%5Cpi+x%29&bc=White&fc=Black&im=jpg&fs=12&ff=arev&edit=)
 
 #### Running a 1D simulation
 To run an 1D simulation it is sufficient to call the program without arguments. If you want, you can change the polynomial degree with `-k` and the number of mesh elements with `-n`
