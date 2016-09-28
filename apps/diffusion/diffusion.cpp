@@ -198,7 +198,7 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     scalar_type err_dof = 0.0;
     scalar_type err_fun = 0.0;
 
-    std::ofstream ofs("plotnew.dat");
+    std::ofstream ofs("plot.dat");
 
     disk::projector_nopre<mesh_type,
                     cell_basis_type,
