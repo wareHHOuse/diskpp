@@ -5,10 +5,6 @@ if ( WIN32 )
     message(FATAL_ERROR "Sorry, Windows is not supported.")
 endif()
 
-#set(CMAKE_CXX_FLAGS_DEBUG "-std=c++14 -g -fpermissive -Wall -Wshadow -Wno-unused-variable -Wno-unused-local-typedef")
-#set(CMAKE_CXX_FLAGS_RELEASE "-std=c++14 -O3 -mavx -g -fpermissive -DNDEBUG -Wall -Wshadow")
-#set(CMAKE_CXX_FLAGS_RELEASEASSERT "-std=c++14 -O3 -mavx -g -fpermissive -Wall -Wshadow")
-
 set(CMAKE_CXX_FLAGS_DEBUG "-std=c++14 -g -fpermissive")
 set(CMAKE_CXX_FLAGS_RELEASE "-std=c++14 -O3 -mavx -g -fpermissive -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASEASSERT "-std=c++14 -O3 -mavx -g -fpermissive")
@@ -60,5 +56,8 @@ add_subdirectory(core)
 
 add_library(diskpp SHARED ${diskpp_source})
 set(LINK_LIBS "${LINK_LIBS}" diskpp)
+install(TARGETS diskpp LIBRARY DESTINATION lib)
+
+install(DIRECTORY meshes DESTINATION share)
 
 add_subdirectory(apps)

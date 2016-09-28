@@ -7,3 +7,4 @@ set(quadratures_source
 
 add_library(quadratures SHARED ${quadratures_source})
 set(LINK_LIBS "${LINK_LIBS}" quadratures PARENT_SCOPE)
+install(TARGETS quadratures LIBRARY DESTINATION lib)
