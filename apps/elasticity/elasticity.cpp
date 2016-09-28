@@ -106,10 +106,10 @@ void test_new_elasticity(MeshType& msh, const Function& load, const Solution& so
 
     tc.tic();
 
-#ifdef HAVE_SOLVER_WRAPPERS
-    agmg_solver<scalar_type> solver;
-    dynamic_vector<scalar_type> X = solver.solve(assembler.matrix, assembler.rhs);
-#else
+//#ifdef HAVE_SOLVER_WRAPPERS
+//    agmg_solver<scalar_type> solver;
+//    dynamic_vector<scalar_type> X = solver.solve(assembler.matrix, assembler.rhs);
+//#else
 
 #ifdef HAVE_INTEL_MKL
     Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
@@ -119,7 +119,7 @@ void test_new_elasticity(MeshType& msh, const Function& load, const Solution& so
     solver.analyzePattern(assembler.matrix);
     solver.factorize(assembler.matrix);
     dynamic_vector<scalar_type> X = solver.solve(assembler.rhs);
-#endif
+//#endif
 
     tc.toc();
     std::cout << "Solver time: " << tc << " seconds." << std::endl;
