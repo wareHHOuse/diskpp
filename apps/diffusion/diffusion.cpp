@@ -338,7 +338,6 @@ int main(int argc, char **argv)
             return sin(p.x() * M_PI);
         };
 
-        //test_diffusion(msh, f, sf, degree);
         test_diffusion(msh, f, sf, degree);
 
         return 0;
@@ -371,7 +370,7 @@ int main(int argc, char **argv)
             //return - p.x() * p.x() * p.x();
         };
 
-        //test_diffusion(msh, f, sf, degree);
+        test_diffusion(msh, f, sf, degree);
         //test_gradrec(msh, degree);
     }
 

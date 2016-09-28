@@ -38,11 +38,11 @@ tetrahedron_quadrature(size_t degree)
     int dimension = 3;
 
 #ifdef USE_ARBQ
-    int rule = degree;
+    int rule = degree+1;
     if (rule == 0)
         rule = 1;
 #else
-    int rule = degree/2;
+    int rule = degree/2 + 1;
 #endif
     int point_num;
 

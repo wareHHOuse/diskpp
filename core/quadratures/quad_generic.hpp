@@ -34,27 +34,56 @@ public:
     typedef typename mesh_type::point_type          point_type;
     typedef T                                       weight_type;
 
-    quadrature()
-        : m_order(1)
-    {
-        m_quadrature_data = triangle_quadrature(1);
-    }
+private:
 
-    quadrature(size_t order)
-        : m_order(order)
-    {
-        m_quadrature_data = triangle_quadrature(m_order);
-    }
-
+    template<typename PtA>
     std::vector<quadpoint_type>
-    integrate(const mesh_type& msh, const cell_type& cl) const
+    integrate_triangle(const mesh_type& msh, const cell_type& cl,
+                       const PtA& pts) const
     {
-        auto pts        = points(msh, cl);
+        std::vector<quadpoint_type> ret;
+
+        ret.resize( m_quadrature_data.size() );
+
+        auto col1 = pts[1] - pts[0];
+        auto col2 = pts[2] - pts[0];
+
+        /* Compute the area of the sub-triangle */
+        auto tm = (col1.x()*col2.y() - col2.x()*col1.y())/2.;
+
+        auto tr = [&](const std::pair<point<T,2>, T>& qd) -> auto {
+            auto point = col1*qd.first.x() + col2*qd.first.y() + pts[0];
+            auto weight = qd.second * std::abs(tm);
+            return make_qp(point, weight);
+        };
+
+        auto retbegin = ret.begin();
+
+        std::transform(m_quadrature_data.begin(), m_quadrature_data.end(),
+                       retbegin, tr);
+
+        return ret;
+    }
+
+    /*
+    template<typename PtA>
+    std::vector<quadpoint_type>
+    integrate_quad(const mesh_type& msh, const cell_type& cl,
+                       const PtA& pts) const
+    {
+        // Break in two triangles and then integrate on them
+        // Maybe not a good idea because of bad aspect ratios? Should be smart?
+    }
+    */
+
+    template<typename PtA>
+    std::vector<quadpoint_type>
+    integrate_other(const mesh_type& msh, const cell_type& cl,
+                    const PtA& pts) const
+    {
         auto c_center   = barycenter(msh, cl);
 
         std::vector<quadpoint_type> ret;;
-
-        /* OPTIMIZE THE TRIANGULAR CASE!! */
 
         /* Break the cell in triangles, compute the transformation matrix and
          * map quadrature data in the physical space. Edges of the triangle as
@@ -83,9 +112,40 @@ public:
                            retbegin, tr);
         }
 
-
-
         return ret;
+    }
+
+public:
+    quadrature()
+        : m_order(1)
+    {
+        m_quadrature_data = triangle_quadrature(1);
+    }
+
+    quadrature(size_t order)
+        : m_order(order)
+    {
+        m_quadrature_data = triangle_quadrature(m_order);
+    }
+
+    std::vector<quadpoint_type>
+    integrate(const mesh_type& msh, const cell_type& cl) const
+    {
+        auto pts        = points(msh, cl);
+
+        switch(pts.size())
+        {
+            case 3:
+                return integrate_triangle(msh, cl, pts);
+
+            //case 4:
+            //    return integrate_quad(msh, cl, pts);
+
+            default:
+                return integrate_other(msh, cl, pts);
+        }
+
+        throw std::logic_error("Shouldn't have arrived here");
     }
 };
 
