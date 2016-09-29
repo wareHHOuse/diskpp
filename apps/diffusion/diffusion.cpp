@@ -140,7 +140,7 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     std::map<std::string, double> timings;
 
     /* ASSEMBLE PROBLEM */
-    std::cout << "Assembling" << std::endl;
+    std::cout << "Assembling..." << std::endl;
     tc.tic();
     for (auto& cl : msh)
     {
@@ -149,44 +149,47 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
         tc_detail.tic();
         gradrec_nopre.compute(msh, cl);
         tc_detail.toc();
-        timings["gr_np"] += tc_detail.to_double();
+        timings["Gradient reconstruction"] += tc_detail.to_double();
 
         tc_detail.tic();
         stab_nopre.compute(msh, cl, gradrec_nopre.oper);
         tc_detail.toc();
-        timings["stab_np"] += tc_detail.to_double();
+        timings["Stabilization"] += tc_detail.to_double();
 
         tc_detail.tic();
         auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, degree);
         dynamic_matrix<scalar_type> loc = gradrec_nopre.data + stab_nopre.data;
         auto scnp = statcond_nopre.compute(msh, cl, loc, cell_rhs);
         tc_detail.toc();
-        timings["sc_np"] += tc_detail.to_double();
+        timings["Static condensation"] += tc_detail.to_double();
 
-        tc_detail.tic();
         assembler_nopre.assemble(msh, cl, scnp);
-        tc_detail.toc();
-        timings["asm_np"] += tc_detail.to_double();
-
     }
-
-    for (auto& t : timings)
-        std::cout << t.first << ": " << t.second << std::endl;
 
     assembler_nopre.impose_boundary_conditions(msh, solution);
     assembler_nopre.finalize();
     tc.toc();
-    std::cout << "Assembly time: " << tc << " seconds." << std::endl;
+    std::cout << "Assembly total time: " << tc << " seconds." << std::endl;
+
+    for (auto& t : timings)
+        std::cout << " * " << t.first << ": " << t.second << " seconds." << std::endl;
 
     /* SOLVE */
     tc.tic();
 
 #ifdef HAVE_INTEL_MKL
-    std::cout << "Using Intel MKL solver" << std::endl;
     Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
 #else
     Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
 #endif
+
+    size_t systsz = assembler_nopre.matrix.rows();
+    size_t nnz = assembler_nopre.matrix.nonZeros();
+
+    std::cout << "Starting linear solver..." << std::endl;
+    std::cout << " * Solving for " << systsz << " unknowns." << std::endl;
+    std::cout << " * Matrix fill: " << 100.0*double(nnz)/(systsz*systsz) << "%" << std::endl;
+
     solver.analyzePattern(assembler_nopre.matrix);
     solver.factorize(assembler_nopre.matrix);
     dynamic_vector<scalar_type> X = solver.solve(assembler_nopre.rhs);

@@ -1,6 +1,6 @@
 ### DiSk++
 
-This is __DiSk++__, a C++template library for Discontinuous Skeletal methods like discontinuous Galerkin and Hybrid-High Order.
+This is __DiSk++__, a C++ template library for Discontinuous Skeletal methods like discontinuous Galerkin (dG) and Hybrid-High Order (HHO).
 
 In mathematical literature, discontinuous skeletal methods are always presented and studied in a dimension-indipendent and element-indipendent fashon. That is, the dimension of the space (1D, 2D, 3D) and the shape of the elements in which the space is discretized are just ininfluent details for the mathematical discussion of these methods. The software implementing them, however, does not always take the same approach: it is common to see codes capable to run only on few very specific kinds of mesh, or only in 1D or 2D or 3D.
 
@@ -37,17 +37,7 @@ If you want to just run the examples, in Mac OS X is very easy. You just need to
     brew tap datafl4sh/code
     brew install --HEAD datafl4sh/code/diskpp
 
-You will end up with an executable named `diffusion` and some meshes in `/usr/local/share/meshes`. The problem the demo program solves is the classical diffusion problem
-
-![equation](http://www.sciweavers.org/tex2img.php?eq=%5Cbegin%7Bcases%7D%0A%5CDelta%20u%20%3D%20f%20%26%20%5Ctext%7Bin%5C%3B%5C%3B%7D%20%5COmega%5C%5C%0Au%20%3D%200%20%26%20%5Ctext%7Bon%5C%3B%5C%3B%7D%20%5Cpartial%5COmega%5C%5C%0A%5Cend%7Bcases%7D&bc=White&fc=Black&im=png&fs=12&ff=arev&edit=0)
-
-with the forcing term
-
-![equation](http://www.sciweavers.org/tex2img.php?eq=f%20%3D%20%5Cpi%5E2%20sin%28%5Cpi%20x%29&bc=White&fc=Black&im=png&fs=12&ff=arev&edit=0)
-
-The solution is of course
-
-![equation](http://www.sciweavers.org/tex2img.php?eq=sin%28%5Cpi%20x%29&bc=White&fc=Black&im=png&fs=12&ff=arev&edit=0)
+You will end up with an executable named `diffusion` and some meshes in `/usr/local/share/meshes`. The problem the demo program solves is a classical diffusion problem.
 
 #### Running a 1D simulation
 To run an 1D simulation it is sufficient to call the program without arguments. If you want, you can change the polynomial degree with `-k` and the number of mesh elements with `-n`
