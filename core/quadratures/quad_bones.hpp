@@ -119,7 +119,7 @@ triangle_quadrature(size_t order)
     for(rule = 1; rule <= rule_num; rule++)
     {
         degree = dunavant_degree(rule);
-        if(degree >= order)
+        if(degree > order)
             break;
     }
     assert(rule != rule_num or degree >= order);
