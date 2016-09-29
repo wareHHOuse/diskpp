@@ -382,12 +382,13 @@ public:
         {
             auto phi = cell_basis.eval_functions(msh, cl, qp.point());
             auto fval = f(qp.point());
-            for (size_t i = 0; i < phi.size(); i++)
+
+            for (size_t j = 0; j < phi.size(); j++)
             {
-                for (size_t j = 0; j < phi.size(); j++)
+                for (size_t i = 0; i < phi.size(); i++)
                     mm(i,j) += qp.weight() * mm_prod(phi[i], phi[j]);
 
-                rhs(i) += qp.weight() * mm_prod(fval, phi[i]);
+                rhs(j) += qp.weight() * mm_prod(fval, phi[j]);
             }
         }
 
@@ -415,12 +416,13 @@ public:
             {
                 auto phi = face_basis.eval_functions(msh, fc, qp.point());
                 auto fval = f(qp.point());
-                for (size_t i = 0; i < phi.size(); i++)
+
+                for (size_t j = 0; j < phi.size(); j++)
                 {
-                    for (size_t j = 0; j < phi.size(); j++)
+                    for (size_t i = 0; i < phi.size(); i++)
                         mm(i,j) += qp.weight() * mm_prod(phi[i], phi[j]);
 
-                    rhs(i) += qp.weight() * mm_prod(fval, phi[i]);
+                    rhs(j) += qp.weight() * mm_prod(fval, phi[j]);
                 }
             }
 
@@ -568,8 +570,8 @@ public:
         for (auto& qp : cell_quadpoints)
         {
             auto c_dphi = cell_basis.eval_gradients(msh, cl, qp.point());
-            for (size_t i = 0; i < cell_basis.size(); i++)
-                for (size_t j = 0; j < cell_basis.size(); j++)
+            for (size_t j = 0; j < cell_basis.size(); j++)
+                for (size_t i = 0; i < cell_basis.size(); i++)
                     stiff_mat(i,j) += qp.weight() * mm_prod(c_dphi[i], c_dphi[j]);
         }
 
@@ -606,9 +608,10 @@ public:
             {
                 auto c_phi = cell_basis.eval_functions(msh, cl, qp.point());
                 auto c_dphi = cell_basis.eval_gradients(msh, cl, qp.point());
-                for (size_t i = BG_row_range.min(), ii = 0; i < BG_row_range.max(); i++, ii++)
+
+                for (size_t j = BG_col_range.min(), jj = 0; j < BG_col_range.max(); j++, jj++)
                 {
-                    for (size_t j = BG_col_range.min(), jj = 0; j < BG_col_range.max(); j++, jj++)
+                    for (size_t i = BG_row_range.min(), ii = 0; i < BG_row_range.max(); i++, ii++)
                     {
                         auto p1 = mm_prod(c_dphi[i], n);
                         auto p2 = mm_prod(c_phi[j], p1);
@@ -618,11 +621,11 @@ public:
 
                 auto f_phi = face_basis.eval_functions(msh, fc, qp.point());
 
-                for (size_t i = BG_row_range.min(), ii = 0; i < BG_row_range.max(); i++, ii++)
+                for (size_t j = 0, jj = current_face_range.min();
+                            j < current_face_range.size();
+                            j++, jj++)
                 {
-                    for (size_t j = 0, jj = current_face_range.min();
-                                j < current_face_range.size();
-                                j++, jj++)
+                    for (size_t i = BG_row_range.min(), ii = 0; i < BG_row_range.max(); i++, ii++)
                     {
                         auto p1 = mm_prod(c_dphi[i], n);
                         auto p2 = mm_prod(f_phi[j], p1);
@@ -887,8 +890,8 @@ public:
         for (auto& qp : cell_quadpoints)
         {
             auto c_phi = cell_basis.eval_functions(msh, cl, qp.point());
-            for (size_t i = 0; i < cell_basis.size(); i++)
-                for (size_t j = 0; j < cell_basis.size(); j++)
+            for (size_t j = 0; j < cell_basis.size(); j++)
+                for (size_t i = 0; i < cell_basis.size(); i++)
                     mass_mat(i,j) += qp.weight() * mm_prod(c_phi[i], c_phi[j]);
         }
 
@@ -933,12 +936,12 @@ public:
                 auto f_phi = face_basis.eval_functions(msh, fc, qp.point());
                 auto c_phi = cell_basis.eval_functions(msh, cl, qp.point());
 
-                for (size_t i = 0; i < face_basis.size(); i++)
-                    for (size_t j = 0; j < face_basis.size(); j++)
+                for (size_t j = 0; j < face_basis.size(); j++)
+                    for (size_t i = 0; i < face_basis.size(); i++)
                         face_mass_matrix(i,j) += qp.weight() * mm_prod(f_phi[i], f_phi[j]);
 
-                for (size_t i = 0; i < face_basis.size(); i++)
-                    for (size_t j = 0; j < cell_basis.size(); j++)
+                for (size_t j = 0; j < cell_basis.size(); j++)
+                    for (size_t i = 0; i < face_basis.size(); i++)
                         face_trace_matrix(i,j) += qp.weight() * mm_prod(f_phi[i], c_phi[j]);
             }
 
@@ -1210,12 +1213,12 @@ public:
         assert(lc.first.rows() == lc.second.size());
         assert(lc.second.size() == l2g.size());
 
-        for (size_t i = 0; i < lc.first.rows(); i++)
+        for (size_t j = 0; j < lc.first.cols(); j++)
         {
-            for (size_t j = 0; j < lc.first.cols(); j++)
+            for (size_t i = 0; i < lc.first.rows(); i++)
                 m_triplets.push_back( triplet_type( l2g.at(i), l2g.at(j), lc.first(i,j) ) );
 
-            rhs(l2g.at(i)) += lc.second(i);
+            rhs(l2g.at(j)) += lc.second(j);
         }
     }
 
@@ -1366,12 +1369,12 @@ public:
 
         //std::cout << lc.second.size() << " " << l2g.size() << std::endl;
 
-        for (size_t i = 0; i < lc.first.rows(); i++)
+        for (size_t j = 0; j < lc.first.cols(); j++)
         {
-            for (size_t j = 0; j < lc.first.cols(); j++)
+            for (size_t i = 0; i < lc.first.rows(); i++)
                 m_triplets.push_back( triplet_type( l2g.at(i), l2g.at(j), lc.first(i,j) ) );
 
-            rhs(l2g.at(i)) += lc.second(i);
+            rhs(l2g.at(j)) += lc.second(j);
         }
     }
 
@@ -1403,24 +1406,26 @@ public:
             {
                 auto f_phi = face_basis.eval_functions(msh, bfc, qp.point());
 
-                for (size_t i = 0; i < f_phi.size(); i++)
+                auto bc_val = bc(qp.point());
+
+                for (size_t j = 0; j < f_phi.size(); j++)
                 {
-                    for (size_t j = 0; j < f_phi.size(); j++)
+                    for (size_t i = 0; i < f_phi.size(); i++)
                         MFF(i,j) += qp.weight() * mm_prod(f_phi[i], f_phi[j]);
 
-                    rhs_f(i) += qp.weight() * mm_prod(f_phi[i], bc(qp.point()));
+                    rhs_f(j) += qp.weight() * mm_prod(f_phi[j], bc_val);
                 }
             }
 
 
-            for (size_t i = 0; i < MFF.rows(); i++)
+            for (size_t j = 0; j < MFF.cols(); j++)
             {
-                for (size_t j = 0; j < MFF.cols(); j++)
+                for (size_t i = 0; i < MFF.rows(); i++)
                 {
                     m_triplets.push_back( triplet_type(face_offset + i, face_offset_lagrange + j, MFF(i,j)) );
                     m_triplets.push_back( triplet_type(face_offset_lagrange + j, face_offset + i, MFF(i,j)) );
                 }
-                rhs(face_offset_lagrange+i) = rhs_f(i);
+                rhs(face_offset_lagrange+j) = rhs_f(j);
             }
 
             face_i++;
