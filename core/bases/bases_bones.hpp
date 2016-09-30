@@ -65,6 +65,10 @@ public:
         return MULT * m_monomials.size();
     }
 
+    size_t max_degree() const {
+        return m_monomials.max_degree();
+    }
+
     dof_range range(size_t min_degree, size_t max_degree) const
     {
         if (min_degree > m_degree || max_degree > m_degree)

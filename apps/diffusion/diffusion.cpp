@@ -402,7 +402,6 @@ int main(int argc, char **argv)
             //return - p.x() * p.x() * p.x();
         };
 
-        //test_diffusion(msh, f, sf, degree);
         test_diffusion(msh, f, sf, degree);
     }
 
@@ -431,7 +430,6 @@ int main(int argc, char **argv)
             //return -p.x() * p.x() * 0.5;
         };
 
-        //test_diffusion(msh, f, sf, degree);
         test_diffusion(msh, f, sf, degree);
         //test_gradrec(msh, degree);
     }

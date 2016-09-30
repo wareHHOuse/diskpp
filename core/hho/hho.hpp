@@ -21,6 +21,9 @@
 #include "bases/bases_ranges.hpp"
 #include "timecounter.h"
 
+//#define USE_BLAS
+//#define FILL_COLMAJOR
+
 namespace disk {
 
 /* Build a matrix starting from the two specified precomputed bases. */
@@ -383,6 +386,16 @@ public:
             auto phi = cell_basis.eval_functions(msh, cl, qp.point());
             auto fval = f(qp.point());
 
+#ifdef USE_BLAS
+            int sz = phi.size();
+            double w = qp.weight();
+            int one = 1;
+            dger(&sz, &sz, &w, phi.data(), &one, phi.data(), &one, mm.data(), &sz);
+            w *= fval;
+            daxpy(&sz, &w, phi.data(), &one, rhs.data(), &one);
+#else
+
+#ifdef FILL_COLMAJOR
             for (size_t j = 0; j < phi.size(); j++)
             {
                 for (size_t i = 0; i < phi.size(); i++)
@@ -390,6 +403,16 @@ public:
 
                 rhs(j) += qp.weight() * mm_prod(fval, phi[j]);
             }
+#else
+            for (size_t i = 0; i < phi.size(); i++)
+            {
+                for (size_t j = 0; j < phi.size(); j++)
+                    mm(i,j) += qp.weight() * mm_prod(phi[i], phi[j]);
+
+                rhs(i) += qp.weight() * mm_prod(fval, phi[i]);
+            }
+#endif
+#endif
         }
 
         cell_mm = mm;
@@ -417,6 +440,7 @@ public:
                 auto phi = face_basis.eval_functions(msh, fc, qp.point());
                 auto fval = f(qp.point());
 
+#ifdef FILL_COLMAJOR
                 for (size_t j = 0; j < phi.size(); j++)
                 {
                     for (size_t i = 0; i < phi.size(); i++)
@@ -424,6 +448,15 @@ public:
 
                     rhs(j) += qp.weight() * mm_prod(fval, phi[j]);
                 }
+#else
+                for (size_t i = 0; i < phi.size(); i++)
+                {
+                    for (size_t j = 0; j < phi.size(); j++)
+                        mm(i,j) += qp.weight() * mm_prod(phi[i], phi[j]);
+
+                    rhs(i) += qp.weight() * mm_prod(fval, phi[i]);
+                }
+#endif
             }
 
             ret.block(face_offset, 0, face_basis.size(), 1) = mm.llt().solve(rhs);
@@ -570,8 +603,14 @@ public:
         for (auto& qp : cell_quadpoints)
         {
             auto c_dphi = cell_basis.eval_gradients(msh, cl, qp.point());
+
+#ifdef FILL_COLMAJOR
             for (size_t j = 0; j < cell_basis.size(); j++)
                 for (size_t i = 0; i < cell_basis.size(); i++)
+#else
+            for (size_t i = 0; i < cell_basis.size(); i++)
+                for (size_t j = 0; j < cell_basis.size(); j++)
+#endif
                     stiff_mat(i,j) += qp.weight() * mm_prod(c_dphi[i], c_dphi[j]);
         }
 
@@ -609,9 +648,17 @@ public:
                 auto c_phi = cell_basis.eval_functions(msh, cl, qp.point());
                 auto c_dphi = cell_basis.eval_gradients(msh, cl, qp.point());
 
+#ifdef FILL_COLMAJOR
                 for (size_t j = BG_col_range.min(), jj = 0; j < BG_col_range.max(); j++, jj++)
+#else
+                for (size_t i = BG_row_range.min(), ii = 0; i < BG_row_range.max(); i++, ii++)
+#endif
                 {
+#ifdef FILL_COLMAJOR
                     for (size_t i = BG_row_range.min(), ii = 0; i < BG_row_range.max(); i++, ii++)
+#else
+                    for (size_t j = BG_col_range.min(), jj = 0; j < BG_col_range.max(); j++, jj++)
+#endif
                     {
                         auto p1 = mm_prod(c_dphi[i], n);
                         auto p2 = mm_prod(c_phi[j], p1);
@@ -621,11 +668,22 @@ public:
 
                 auto f_phi = face_basis.eval_functions(msh, fc, qp.point());
 
+#ifdef FILL_COLMAJOR
                 for (size_t j = 0, jj = current_face_range.min();
                             j < current_face_range.size();
                             j++, jj++)
+#else
+                for (size_t i = BG_row_range.min(), ii = 0; i < BG_row_range.max(); i++, ii++)
+#endif
                 {
+#ifdef FILL_COLMAJOR
                     for (size_t i = BG_row_range.min(), ii = 0; i < BG_row_range.max(); i++, ii++)
+#else
+                    for (size_t j = 0, jj = current_face_range.min();
+                                j < current_face_range.size();
+                                j++, jj++)
+#endif
+
                     {
                         auto p1 = mm_prod(c_dphi[i], n);
                         auto p2 = mm_prod(f_phi[j], p1);
@@ -890,9 +948,25 @@ public:
         for (auto& qp : cell_quadpoints)
         {
             auto c_phi = cell_basis.eval_functions(msh, cl, qp.point());
+
+//#define USE_BLAS
+
+#ifdef USE_BLAS
+            int sz = c_phi.size();
+            double w = qp.weight();
+            int one = 1;
+            dger(&sz, &sz, &w, c_phi.data(), &one, c_phi.data(), &one, mass_mat.data(), &sz);
+#else
+
+#ifdef FILL_COLMAJOR
             for (size_t j = 0; j < cell_basis.size(); j++)
                 for (size_t i = 0; i < cell_basis.size(); i++)
+#else
+            for (size_t i = 0; i < cell_basis.size(); i++)
+                for (size_t j = 0; j < cell_basis.size(); j++)
+#endif
                     mass_mat(i,j) += qp.weight() * mm_prod(c_phi[i], c_phi[j]);
+#endif
         }
 
         auto zero_range         = cell_basis.range(0, m_degree);
@@ -936,13 +1010,38 @@ public:
                 auto f_phi = face_basis.eval_functions(msh, fc, qp.point());
                 auto c_phi = cell_basis.eval_functions(msh, cl, qp.point());
 
+#ifdef USE_BLAS
+                int sz = f_phi.size();
+                double w = qp.weight();
+                int one = 1;
+                dger(&sz, &sz, &w, f_phi.data(), &one, f_phi.data(), &one, face_mass_matrix.data(), &sz);
+#else
+
+#ifdef FILL_COLMAJOR
                 for (size_t j = 0; j < face_basis.size(); j++)
                     for (size_t i = 0; i < face_basis.size(); i++)
+#else
+                for (size_t i = 0; i < face_basis.size(); i++)
+                    for (size_t j = 0; j < face_basis.size(); j++)
+#endif
                         face_mass_matrix(i,j) += qp.weight() * mm_prod(f_phi[i], f_phi[j]);
 
+#endif
+
+#ifdef USE_BLAS
+                int sz2 = c_phi.size();
+                dger(&sz, &sz2, &w, f_phi.data(), &one, c_phi.data(), &one, face_trace_matrix.data(), &sz);
+#else
+
+#ifdef FILL_COLMAJOR
                 for (size_t j = 0; j < cell_basis.size(); j++)
                     for (size_t i = 0; i < face_basis.size(); i++)
+#else
+                for (size_t i = 0; i < face_basis.size(); i++)
+                    for (size_t j = 0; j < cell_basis.size(); j++)
+#endif
                         face_trace_matrix(i,j) += qp.weight() * mm_prod(f_phi[i], c_phi[j]);
+#endif
             }
 
             Eigen::LLT<matrix_type> piKF;
@@ -1213,6 +1312,7 @@ public:
         assert(lc.first.rows() == lc.second.size());
         assert(lc.second.size() == l2g.size());
 
+#ifdef FILL_COLMAJOR
         for (size_t j = 0; j < lc.first.cols(); j++)
         {
             for (size_t i = 0; i < lc.first.rows(); i++)
@@ -1220,6 +1320,16 @@ public:
 
             rhs(l2g.at(j)) += lc.second(j);
         }
+#else
+        for (size_t i = 0; i < lc.first.rows(); i++)
+        {
+            for (size_t j = 0; j < lc.first.cols(); j++)
+                m_triplets.push_back( triplet_type( l2g.at(i), l2g.at(j), lc.first(i,j) ) );
+
+            rhs(l2g.at(i)) += lc.second(i);
+        }
+#endif
+
     }
 
     template<typename Function>
@@ -1369,6 +1479,7 @@ public:
 
         //std::cout << lc.second.size() << " " << l2g.size() << std::endl;
 
+#ifdef FILL_COLMAJOR
         for (size_t j = 0; j < lc.first.cols(); j++)
         {
             for (size_t i = 0; i < lc.first.rows(); i++)
@@ -1376,6 +1487,15 @@ public:
 
             rhs(l2g.at(j)) += lc.second(j);
         }
+#else
+        for (size_t i = 0; i < lc.first.rows(); i++)
+        {
+            for (size_t j = 0; j < lc.first.cols(); j++)
+                m_triplets.push_back( triplet_type( l2g.at(i), l2g.at(j), lc.first(i,j) ) );
+
+            rhs(l2g.at(i)) += lc.second(i);
+        }
+#endif
     }
 
     template<typename Function>
@@ -1408,6 +1528,7 @@ public:
 
                 auto bc_val = bc(qp.point());
 
+#ifdef FILL_COLMAJOR
                 for (size_t j = 0; j < f_phi.size(); j++)
                 {
                     for (size_t i = 0; i < f_phi.size(); i++)
@@ -1415,9 +1536,18 @@ public:
 
                     rhs_f(j) += qp.weight() * mm_prod(f_phi[j], bc_val);
                 }
+#else
+                for (size_t i = 0; i < f_phi.size(); i++)
+                {
+                    for (size_t j = 0; j < f_phi.size(); j++)
+                        MFF(i,j) += qp.weight() * mm_prod(f_phi[i], f_phi[j]);
+
+                    rhs_f(i) += qp.weight() * mm_prod(f_phi[i], bc_val);
+                }
+#endif
             }
 
-
+#ifdef FILL_COLMAJOR
             for (size_t j = 0; j < MFF.cols(); j++)
             {
                 for (size_t i = 0; i < MFF.rows(); i++)
@@ -1427,6 +1557,17 @@ public:
                 }
                 rhs(face_offset_lagrange+j) = rhs_f(j);
             }
+#else
+            for (size_t i = 0; i < MFF.rows(); i++)
+            {
+                for (size_t j = 0; j < MFF.cols(); j++)
+                {
+                    m_triplets.push_back( triplet_type(face_offset + i, face_offset_lagrange + j, MFF(i,j)) );
+                    m_triplets.push_back( triplet_type(face_offset_lagrange + j, face_offset + i, MFF(i,j)) );
+                }
+                rhs(face_offset_lagrange+i) = rhs_f(i);
+            }
+#endif
 
             face_i++;
         }

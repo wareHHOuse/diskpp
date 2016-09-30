@@ -179,6 +179,10 @@ public:
     size_t degree_position(size_t degree) const {
         return m_degree_indices.at(degree);
     }
+
+    size_t max_degree() const {
+        return m_max_degree;
+    }
 };
 
 } // namespace disk
