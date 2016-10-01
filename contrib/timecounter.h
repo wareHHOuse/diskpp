@@ -35,6 +35,8 @@
 #include <string>
 #include <map>
 
+#include <sys/resource.h>
+
 using namespace std::chrono;
 
 class timecounter
@@ -51,6 +53,56 @@ public:
     bool                                is_running() const;
     double                              to_double() const;
 };
+
+
+class timecounter_new
+{
+    struct rusage m_start, m_stop;
+
+public:
+    timecounter_new()
+    {}
+
+    void tic()
+    {
+        getrusage(RUSAGE_SELF, &m_start);
+    }
+
+    void toc()
+    {
+        getrusage(RUSAGE_SELF, &m_stop);
+    }
+
+    double get_usertime() const
+    {
+        double start, stop;
+        start = m_start.ru_utime.tv_sec + double(m_start.ru_utime.tv_usec)/1e6;
+        stop = m_stop.ru_utime.tv_sec + double(m_stop.ru_utime.tv_usec)/1e6;
+        return stop - start;
+    }
+
+    double get_systime() const
+    {
+        double start, stop;
+        start = m_start.ru_stime.tv_sec + double(m_start.ru_stime.tv_usec)/1e6;
+        stop = m_stop.ru_stime.tv_sec + double(m_stop.ru_stime.tv_usec)/1e6;
+        return stop - start;
+    }
+
+    double to_double() const
+    {
+        return get_systime() + get_usertime();
+    }
+};
+
+std::ostream&
+operator<<(std::ostream& os, const timecounter_new& tc)
+{
+    os << tc.to_double();
+
+    return os;
+}
+
 
 class time_profiler
 {
