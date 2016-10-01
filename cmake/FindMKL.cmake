@@ -49,7 +49,7 @@ find_library(MKL_iomp5_LIBRARY
     NAMES   iomp5
     PATHS	/opt/intel/lib
     			/opt/intel/lib/intel64
-    		/opt/intel/lib/intel64_lin
+    		    /opt/intel/lib/intel64_lin
             "${INTEL_MKL_LIB_SEARCH_DIRS}"
 )
 endif()
