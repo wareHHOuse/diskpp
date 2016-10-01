@@ -23,6 +23,7 @@
 #pragma clang diagnostic ignored "-Wshadow"
 
 #ifdef HAVE_INTEL_MKL
+    /* Don't use MKL! It makes everything slower! */
     //#define EIGEN_USE_MKL_ALL
     #include <Eigen/PardisoSupport>
 #endif

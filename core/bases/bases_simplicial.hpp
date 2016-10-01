@@ -26,7 +26,7 @@
 #include "bases/monomial_generator.hpp"
 
 
-#define POWER_CACHE
+//#define POWER_CACHE
 
 namespace disk {
 
