@@ -22,7 +22,7 @@
 #include "timecounter.h"
 
 //#define USE_BLAS
-//#define FILL_COLMAJOR
+#define FILL_COLMAJOR
 
 namespace disk {
 

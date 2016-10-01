@@ -23,7 +23,7 @@
 #pragma clang diagnostic ignored "-Wshadow"
 
 #ifdef HAVE_INTEL_MKL
-    #define EIGEN_USE_MKL_ALL
+    //#define EIGEN_USE_MKL_ALL
     #include <Eigen/PardisoSupport>
 #endif
 

@@ -24,6 +24,7 @@
 #include "bases/bases_templates.hpp"
 #include "bases/monomial_generator.hpp"
 
+//#define POWER_CACHE
 
 namespace disk {
 
@@ -59,11 +60,29 @@ public:
         std::vector<function_value_type> ret;
         ret.reserve( this->size() );
 
+#ifdef POWER_CACHE
+        std::array<double, 8> px;
+        std::array<double, 8> py;
+        px[0] = 1;
+        py[0] = 1;
+
+        for (size_t i = 1; i < this->max_degree()+1; i++)
+        {
+            px[i] = px[i-1]*ep.x();
+            py[i] = py[i-1]*ep.y();
+        }
+#endif
+
         for (auto itor = this->monomials_begin(); itor != this->monomials_end(); itor++)
         {
             auto m = *itor;
+#ifdef POWER_CACHE
+            auto vx = px[m[0]];
+            auto vy = py[m[1]];
+#else
             auto vx = iexp_pow(ep.x(), m[0]);
             auto vy = iexp_pow(ep.y(), m[1]);
+#endif
             ret.push_back( vx * vy );
         }
 
@@ -78,20 +97,45 @@ public:
 
         auto ep = (pt - bar)/h;
 
+#ifdef POWER_CACHE
+        auto ih = 1./h;
+#endif
+
         std::vector<gradient_value_type> ret;
         ret.reserve( this->size() );
+
+#ifdef POWER_CACHE
+        std::array<double, 8> zx;
+        std::array<double, 8> zy;
+        zx[0] = 1;
+        zy[0] = 1;
+
+        for (size_t i = 1; i < this->max_degree()+1; i++)
+        {
+            zx[i] = zx[i-1]*ep.x();
+            zy[i] = zy[i-1]*ep.y();
+        }
+#endif
 
         for (auto itor = this->monomials_begin(); itor != this->monomials_end(); itor++)
         {
             auto m = *itor;
             gradient_value_type grad;
 
+#ifdef POWER_CACHE
+            auto px = zx[m[0]];
+            auto py = zy[m[1]];
+
+            auto dx = (m[0] == 0) ? 0 : m[0]*ih*zx[m[0]-1];
+            auto dy = (m[1] == 0) ? 0 : m[1]*ih*zy[m[1]-1];
+#else
+
             auto px = iexp_pow(ep.x(), m[0]);
             auto py = iexp_pow(ep.y(), m[1]);
 
             auto dx = (m[0] == 0) ? 0 : (m[0]/h)*iexp_pow(ep.x(), m[0]-1);
             auto dy = (m[1] == 0) ? 0 : (m[1]/h)*iexp_pow(ep.y(), m[1]-1);
-
+#endif
             grad(0) = dx * py;
             grad(1) = dy * px;
 

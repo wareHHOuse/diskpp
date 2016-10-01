@@ -18,13 +18,15 @@
 
 #include <vector>
 
+#include "geometry/geometry_simplicial.hpp"
 #include "common/eigen.hpp"
 #include "bases/bases_bones.hpp"
 #include "bases/bases_utils.hpp"
 #include "bases/bases_templates.hpp"
 #include "bases/monomial_generator.hpp"
 
-//#define POWER_CACHE
+
+#define POWER_CACHE
 
 namespace disk {
 
@@ -102,6 +104,10 @@ public:
 
         auto ep = (pt - bar)/h;
 
+#ifdef POWER_CACHE
+        auto ih = 1./h;
+#endif
+
         std::vector<gradient_value_type> ret;
         ret.reserve( this->size() );
 
@@ -131,9 +137,9 @@ public:
             auto py = zy[m[1]];
             auto pz = zz[m[2]];
 
-            auto dx = (m[0] == 0) ? 0 : (m[0]/h)*zx[m[0]-1];
-            auto dy = (m[1] == 0) ? 0 : (m[1]/h)*zy[m[1]-1];
-            auto dz = (m[2] == 0) ? 0 : (m[2]/h)*zz[m[2]-1];
+            auto dx = (m[0] == 0) ? 0 : m[0]*ih*zx[m[0]-1];
+            auto dy = (m[1] == 0) ? 0 : m[1]*ih*zy[m[1]-1];
+            auto dz = (m[2] == 0) ? 0 : m[2]*ih*zz[m[2]-1];
 #else
             auto px = iexp_pow(ep.x(), m[0]);
             auto py = iexp_pow(ep.y(), m[1]);

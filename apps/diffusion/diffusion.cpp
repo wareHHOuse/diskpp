@@ -177,6 +177,8 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     /* SOLVE */
     tc.tic();
 
+#if 0
+
 #ifdef HAVE_INTEL_MKL
     Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
 #else
@@ -193,6 +195,39 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     solver.analyzePattern(assembler_nopre.matrix);
     solver.factorize(assembler_nopre.matrix);
     dynamic_vector<scalar_type> X = solver.solve(assembler_nopre.rhs);
+#endif
+
+    dynamic_vector<scalar_type> X;
+    if (mesh_type::dimension < 3)
+    {
+        Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
+
+        size_t systsz = assembler_nopre.matrix.rows();
+        size_t nnz = assembler_nopre.matrix.nonZeros();
+
+        std::cout << "Starting linear solver..." << std::endl;
+        std::cout << " * Solving for " << systsz << " unknowns." << std::endl;
+        std::cout << " * Matrix fill: " << 100.0*double(nnz)/(systsz*systsz) << "%" << std::endl;
+
+        solver.analyzePattern(assembler_nopre.matrix);
+        solver.factorize(assembler_nopre.matrix);
+        X = solver.solve(assembler_nopre.rhs);
+    }
+    else
+    {
+        Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
+
+        size_t systsz = assembler_nopre.matrix.rows();
+        size_t nnz = assembler_nopre.matrix.nonZeros();
+
+        std::cout << "Starting linear solver..." << std::endl;
+        std::cout << " * Solving for " << systsz << " unknowns." << std::endl;
+        std::cout << " * Matrix fill: " << 100.0*double(nnz)/(systsz*systsz) << "%" << std::endl;
+
+        solver.analyzePattern(assembler_nopre.matrix);
+        solver.factorize(assembler_nopre.matrix);
+        X = solver.solve(assembler_nopre.rhs);
+    }
 
     tc.toc();
     std::cout << "Solver time: " << tc << " seconds." << std::endl;

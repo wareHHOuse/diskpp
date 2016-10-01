@@ -61,6 +61,45 @@ using simplicial_mesh_storage = mesh_storage<T, DIM, simplicial_priv::element_ty
 template<typename T, size_t DIM>
 using simplicial_mesh = mesh<T, DIM, simplicial_mesh_storage<T, DIM>>;
 
+
+template<typename T, size_t DIM, size_t CODIM>
+std::array<typename simplicial_mesh<T,DIM>::point_type, priv::howmany<DIM, CODIM>::nodes>
+points(const simplicial_mesh<T,DIM>& msh, const simplicial_element<DIM, CODIM>& elem)
+{
+    auto ptids = elem.point_ids();
+
+    auto ptid_to_point = [&](const point_identifier<DIM>& pi) -> auto {
+        auto itor = msh.points_begin();
+        std::advance(itor, pi);
+        return *itor;
+    };
+
+    typedef point_identifier<DIM>       point_id_type;
+
+    std::array<typename simplicial_mesh<T,DIM>::point_type, priv::howmany<DIM, CODIM>::nodes> pts;
+    std::transform(ptids.begin(), ptids.end(), pts.begin(), ptid_to_point);
+
+    return pts;
+}
+
+/*
+template<typename T, size_t DIM, typename Element>
+T
+diameter(const simplicial_mesh<T,DIM>& msh, const Element& elem)
+{
+    auto pts = points(msh, elem);
+
+    T diam = 0.;
+
+    for (size_t i = 0; i < pts.size(); i++)
+        for (size_t j = i; j < pts.size(); j++)
+            diam = std::max((pts[i] - pts[j]).to_vector().norm(), diam);
+
+    return diam;
+}
+*/
+
+
 /* Return the number of elements of the specified cell */
 template<typename T, size_t DIM>
 size_t
@@ -288,7 +327,7 @@ public:
     {
         m_points.clear();
         m_triangles.clear();
-        
+
         auto pts = points(msh, cl);
         m_points.insert(m_points.begin(), pts.begin(), pts.end());
 

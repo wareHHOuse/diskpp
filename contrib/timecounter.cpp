@@ -52,6 +52,7 @@ timecounter::toc()
     return m_stop;
 }
 
+[[deprecated]]
 duration<double>
 timecounter::elapsed() const
 {
