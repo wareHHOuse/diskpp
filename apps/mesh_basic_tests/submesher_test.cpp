@@ -17,9 +17,8 @@
 #include <iostream>
 #include <list>
 
-#include "geometry/geometry_generic.hpp"
-#include "geometry/geometry_simplicial.hpp"
 #include "geometry/geometry.hpp"
+
 #include "loaders/loader.hpp"
 
 int main(void)

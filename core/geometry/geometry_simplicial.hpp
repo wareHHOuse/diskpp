@@ -16,47 +16,47 @@
 
 #pragma once
 
+#ifndef _GEOMETRY_HPP_WAS_INCLUDED_
+    #error "You must NOT include this file directly. Include geometry.hpp."
+#endif
+
 #include <list>
 
 #include "mesh/mesh.hpp"
-#include "geometry/geometry_all.hpp"
 #include "geometry/element_simplicial.hpp"
 
 namespace disk {
 
-namespace simplicial_priv {
+struct storage_class_simplicial;
+
 template<size_t DIM>
-struct element_types
-{
+struct storage_class_trait<storage_class_simplicial, DIM> {
     static_assert(DIM > 0 && DIM <= 3, "element_types: CODIM must be less than DIM");
 };
 
 template<>
-struct element_types<3> {
+struct storage_class_trait<storage_class_simplicial, 1> {
+    typedef simplicial_element<1,0>    edge_type;
+    typedef simplicial_element<1,1>    node_type;
+};
+
+template<>
+struct storage_class_trait<storage_class_simplicial, 2> {
+    typedef simplicial_element<2,0>    surface_type;
+    typedef simplicial_element<2,1>    edge_type;
+    typedef simplicial_element<2,2>    node_type;
+};
+
+template<>
+struct storage_class_trait<storage_class_simplicial, 3> {
         typedef simplicial_element<3,0>    volume_type;
         typedef simplicial_element<3,1>    surface_type;
         typedef simplicial_element<3,2>    edge_type;
         typedef simplicial_element<3,3>    node_type;
 };
 
-template<>
-struct element_types<2> {
-        typedef simplicial_element<2,0>    surface_type;
-        typedef simplicial_element<2,1>    edge_type;
-        typedef simplicial_element<2,2>    node_type;
-};
-
-template<>
-struct element_types<1> {
-        typedef simplicial_element<1,0>    edge_type;
-        typedef simplicial_element<1,1>    node_type;
-};
-
-
-} // namespace priv
-
 template<typename T, size_t DIM>
-using simplicial_mesh_storage = mesh_storage<T, DIM, simplicial_priv::element_types<DIM>>;
+using simplicial_mesh_storage = mesh_storage<T, DIM, storage_class_simplicial>;
 
 template<typename T, size_t DIM>
 using simplicial_mesh = mesh<T, DIM, simplicial_mesh_storage<T, DIM>>;
@@ -81,24 +81,6 @@ points(const simplicial_mesh<T,DIM>& msh, const simplicial_element<DIM, CODIM>& 
 
     return pts;
 }
-
-/*
-template<typename T, size_t DIM, typename Element>
-T
-diameter(const simplicial_mesh<T,DIM>& msh, const Element& elem)
-{
-    auto pts = points(msh, elem);
-
-    T diam = 0.;
-
-    for (size_t i = 0; i < pts.size(); i++)
-        for (size_t j = i; j < pts.size(); j++)
-            diam = std::max((pts[i] - pts[j]).to_vector().norm(), diam);
-
-    return diam;
-}
-*/
-
 
 /* Return the number of elements of the specified cell */
 template<typename T, size_t DIM>
@@ -232,37 +214,6 @@ normal(const simplicial_mesh<T,3>& msh,
 
     return n/n.norm();
 }
-
-#if 0
-template<typename T, size_t DIM, typename Elem>
-T
-diameter(const simplicial_mesh<T, DIM>& msh, const Elem& vol)
-{
-    auto pts = points(msh, vol);
-
-    T diam = 0.;
-
-    for (size_t i = 0; i < pts.size(); i++)
-        for (size_t j = i; j < pts.size(); j++)
-            diam = std::max((pts[i] - pts[j]).to_vector().norm(), diam);
-
-    return diam;
-}
-/*
-template<typename T, size_t DIM>
-T
-diameter(const simplicial_mesh<T, DIM>& msh, const typename simplicial_mesh<T, DIM>::cell& cl)
-{
-    T c_meas = measure(msh, cl);
-    T af_meas = T(0);
-    auto fcs = faces(msh, cl);
-    for (auto& f : fcs)
-        af_meas += measure(msh, f);
-
-    return c_meas/af_meas;
-}
-*/
-#endif
 
 template<typename Mesh>
 class submesher;

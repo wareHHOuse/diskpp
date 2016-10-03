@@ -16,6 +16,19 @@
 
 #pragma once
 
+/*
+ * Here we have all the queries that don't depend on the particular mesh
+ * type. For example 'barycenter()' is computed in the same way for all the
+ * elements, so it goes here. It can happen that there are queries that are
+ * applicable to all kinds of elements, but for only some classes of elements
+ * more efficient ways to do the computation exist. Put the general one here
+ * and put the specialization in the right geometry_<whatever>.hpp file.
+ */
+
+#ifndef _GEOMETRY_HPP_WAS_INCLUDED_
+    #error "You must NOT include this file directly. Include geometry.hpp."
+#endif
+
 #include <algorithm>
 #include <vector>
 

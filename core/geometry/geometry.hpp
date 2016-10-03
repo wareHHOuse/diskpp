@@ -16,5 +16,20 @@
 
 #pragma once
 
+namespace disk {
+
+template<typename T, size_t DIM>
+struct storage_class_trait
+{
+    static_assert(sizeof(T) == -1, "Undefined storage class");
+};
+
+}
+
+#define _GEOMETRY_HPP_WAS_INCLUDED_
+
+#include "geometry_all.hpp"
 #include "geometry_generic.hpp"
 #include "geometry_simplicial.hpp"
+
+#undef _GEOMETRY_HPP_WAS_INCLUDED_

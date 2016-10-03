@@ -201,7 +201,7 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     scalar_type err_dof = 0.0;
     scalar_type err_fun = 0.0;
 
-    //std::ofstream ofs("plot.dat");
+    std::ofstream ofs("plot.dat");
 
     disk::projector_nopre<mesh_type,
                     cell_basis_type,
@@ -260,9 +260,9 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
             err_fun += diff;
 
             auto tp = qp.point();
-            //for (size_t i = 0; i < MeshType::dimension; i++)
-            //    ofs << tp[i] << " ";
-            //ofs << pot << " " << std::abs(pot - solution(tp)) << std::endl;
+            for (size_t i = 0; i < MeshType::dimension; i++)
+                ofs << tp[i] << " ";
+            ofs << pot << " " << std::abs(pot - solution(tp)) << std::endl;
         }
 
         dynamic_vector<scalar_type> true_dof = projk.compute_cell(msh, cl, solution);
@@ -271,7 +271,7 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
         err_dof += diff_dof.dot(projk.cell_mm * diff_dof);
     }
 
-    //ofs.close();
+    ofs.close();
 
     std::cout << "Mesh diameter: " << diam << std::endl;
     std::cout << "L2-norm error, dof:   " << std::sqrt(err_dof) << std::endl;

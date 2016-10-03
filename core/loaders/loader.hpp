@@ -50,8 +50,7 @@
 #include <cassert>
 #include <thread>
 
-#include "geometry/geometry_generic.hpp"
-#include "geometry/geometry_simplicial.hpp"
+#include "geometry/geometry.hpp"
 
 #include "mapped_file.h"
 #include "strtot.hpp"
@@ -952,7 +951,7 @@ public:
         std::cout << "Nodes: " << storage->nodes.size() << std::endl;
         std::cout << "Edges: " << storage->edges.size() << std::endl;
         std::cout << "Faces: " << storage->surfaces.size() << std::endl;
-        std::cout << "Volumes: " << storage->nodes.size() << std::endl;
+        std::cout << "Volumes: " << storage->volumes.size() << std::endl;
 
         boundary_surfaces.clear();
 

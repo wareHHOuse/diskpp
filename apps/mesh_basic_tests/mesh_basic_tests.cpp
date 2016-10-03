@@ -17,8 +17,6 @@
 #include <iostream>
 #include <fstream>
 
-#include "geometry/geometry_generic.hpp"
-#include "geometry/geometry_simplicial.hpp"
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
 #include "mesh_debug.hpp"

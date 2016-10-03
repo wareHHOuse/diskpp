@@ -16,44 +16,44 @@
 
 #pragma once
 
-#include "geometry/geometry_all.hpp"
+#ifndef _GEOMETRY_HPP_WAS_INCLUDED_
+    #error "You must NOT include this file directly. Include geometry.hpp."
+#endif
+
 #include "geometry/element_generic.hpp"
 
 namespace disk {
 
-namespace generic_priv {
+struct storage_class_generic;
 
 template<size_t DIM>
-struct element_types
-{
+struct storage_class_trait<storage_class_generic, DIM> {
     static_assert(DIM > 0 && DIM <= 3, "element_types: CODIM must be less than DIM");
 };
 
 template<>
-struct element_types<3> {
+struct storage_class_trait<storage_class_generic, 1> {
+    typedef generic_element<1,0>    edge_type;
+    typedef generic_element<1,1>    node_type;
+};
+
+template<>
+struct storage_class_trait<storage_class_generic, 2> {
+    typedef generic_element<2,0>    surface_type;
+    typedef generic_element<2,1>    edge_type;
+    typedef generic_element<2,2>    node_type;
+};
+
+template<>
+struct storage_class_trait<storage_class_generic, 3> {
         typedef generic_element<3,0>    volume_type;
         typedef generic_element<3,1>    surface_type;
         typedef generic_element<3,2>    edge_type;
         typedef generic_element<3,3>    node_type;
 };
 
-template<>
-struct element_types<2> {
-        typedef generic_element<2,0>    surface_type;
-        typedef generic_element<2,1>    edge_type;
-        typedef generic_element<2,2>    node_type;
-};
-
-template<>
-struct element_types<1> {
-        typedef generic_element<1,0>    edge_type;
-        typedef generic_element<1,1>    node_type;
-};
-
-} // namespace priv
-
 template<typename T, size_t DIM>
-using generic_mesh_storage = mesh_storage<T, DIM, generic_priv::element_types<DIM>>;
+using generic_mesh_storage = mesh_storage<T, DIM, storage_class_generic>;
 
 template<typename T, size_t DIM>
 using generic_mesh = mesh<T, DIM, generic_mesh_storage<T, DIM>>;
@@ -61,7 +61,8 @@ using generic_mesh = mesh<T, DIM, generic_mesh_storage<T, DIM>>;
 /* Return the number of elements of the specified cell */
 template<typename T, size_t DIM>
 size_t
-number_of_faces(const generic_mesh<T,DIM>& msh, const typename generic_mesh<T,DIM>::cell& cl)
+number_of_faces(const generic_mesh<T,DIM>& msh,
+                const typename generic_mesh<T,DIM>::cell& cl)
 {
     return cl.subelement_size();
 }
@@ -69,7 +70,8 @@ number_of_faces(const generic_mesh<T,DIM>& msh, const typename generic_mesh<T,DI
 /* Return the actual faces of the specified element */
 template<typename T, size_t DIM>
 std::vector<typename generic_mesh<T, DIM>::face>
-faces(const generic_mesh<T, DIM>& msh, const typename generic_mesh<T, DIM>::cell& cl)
+faces(const generic_mesh<T, DIM>& msh,
+      const typename generic_mesh<T, DIM>::cell& cl)
 {
     auto id_to_face = [&](const typename generic_mesh<T, DIM>::face::id_type& id) -> auto {
         return *(msh.faces_begin() + size_t(id));
@@ -188,8 +190,5 @@ normal(const generic_mesh<T,1>& msh,
 
     throw std::logic_error("shouldn't have arrived here");
 }
-
-
-
 
 } // namespace disk
