@@ -2,3 +2,7 @@
 	path = contrib/solver_wrappers
 	url = https://github.com/datafl4sh/solver_wrappers.git
 	branch = master
+[submodule "meshes"]
+	path = meshes
+	url = https://github.com/datafl4sh/meshes.git
+    branch = master
