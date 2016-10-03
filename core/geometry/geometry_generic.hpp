@@ -14,11 +14,12 @@
  * cite it.
  */
 
-#pragma once
-
 #ifndef _GEOMETRY_HPP_WAS_INCLUDED_
     #error "You must NOT include this file directly. Include geometry.hpp."
 #endif
+
+#ifndef _GEOMETRY_GENERIC_HPP_
+#define _GEOMETRY_GENERIC_HPP_
 
 #include "geometry/element_generic.hpp"
 
@@ -192,3 +193,5 @@ normal(const generic_mesh<T,1>& msh,
 }
 
 } // namespace disk
+
+#endif

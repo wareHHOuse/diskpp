@@ -14,17 +14,21 @@
  * cite it.
  */
 
-#pragma once
+#ifndef _BASES_HPP_WAS_INCLUDED_
+    #error "You must NOT include this file directly. Include bases.hpp"
+#endif
+
+#ifndef _BASES_BONES_HPP_
+#define _BASES_BONES_HPP_
 
 #include "bases/monomial_generator.hpp"
-#include "bases/bases_ranges.hpp"
 
 namespace disk {
 
 namespace priv {
 
 template<size_t DIM, size_t MULT = 1>
-class scaled_monomial_basis_base
+class monomial_basis_bones
 {
     monomial_generator<DIM>     m_monomials;
     size_t                      m_degree;
@@ -43,13 +47,13 @@ protected:
 public:
     static const size_t         multiplicity = MULT;
 
-    scaled_monomial_basis_base()
+    monomial_basis_bones()
         : m_degree(1)
     {
         m_monomials = monomial_generator<DIM>(1);
     }
 
-    scaled_monomial_basis_base(size_t degree)
+    monomial_basis_bones(size_t degree)
         : m_degree(degree)
     {
         m_monomials = monomial_generator<DIM>(m_degree);
@@ -86,13 +90,13 @@ public:
 };
 
 template<>
-class scaled_monomial_basis_base<0, 1>
+class monomial_basis_bones<0, 1>
 {
 public:
     static const size_t         multiplicity = 1;
 
-    scaled_monomial_basis_base(){}
-    scaled_monomial_basis_base(size_t){}
+    monomial_basis_bones(){}
+    monomial_basis_bones(size_t){}
     size_t degree_index(size_t degree) const { return 0; }
     size_t size() const { return 1; }
     dof_range range(size_t, size_t) const { return dof_range(0,1); }
@@ -102,3 +106,5 @@ public:
 
 } //namespace priv
 } //namespace disk
+
+#endif /* _BASES_BONES_HPP_ */

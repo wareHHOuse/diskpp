@@ -18,25 +18,18 @@
 
 #include <vector>
 
-#include "geometry/geometry_simplicial.hpp"
+
 #include "common/eigen.hpp"
-#include "bases/bases_bones.hpp"
-#include "bases/bases_utils.hpp"
-#include "bases/bases_templates.hpp"
-#include "bases/monomial_generator.hpp"
-
-
-//#define POWER_CACHE
 
 namespace disk {
 
 template<typename T>
 class scaled_monomial_scalar_basis<simplicial_mesh<T,3>, typename simplicial_mesh<T,3>::cell>
-    : public priv::scaled_monomial_basis_base<3>
+    : public priv::monomial_basis_bones<3>
 {
     typedef disk::simplicial_mesh<T, 3>             mesh_type;
     typedef typename mesh_type::cell                cell_type;
-    typedef priv::scaled_monomial_basis_base<3>     base;
+    typedef priv::monomial_basis_bones<3>           base;
 
 public:
     typedef T                                       function_value_type;
@@ -163,12 +156,12 @@ public:
 
 template<typename T>
 class scaled_monomial_scalar_basis<simplicial_mesh<T,3>, typename simplicial_mesh<T,3>::face>
-    : public priv::scaled_monomial_basis_base<2>
+    : public priv::monomial_basis_bones<2>
 {
-    typedef disk::simplicial_mesh<T, 3>      mesh_type;
+    typedef disk::simplicial_mesh<T, 3>     mesh_type;
     typedef typename mesh_type::face        face_type;
 
-    typedef priv::scaled_monomial_basis_base<2> base;
+    typedef priv::monomial_basis_bones<2>   base;
 
 public:
     typedef T                               function_value_type;
@@ -224,11 +217,11 @@ public:
 
 template<typename T>
 class scaled_monomial_vector_sg_basis<simplicial_mesh<T,3>, typename simplicial_mesh<T,3>::cell>
-    : public priv::scaled_monomial_basis_base<3,3>
+    : public priv::monomial_basis_bones<3,3>
 {
-    typedef disk::simplicial_mesh<T, 3>              mesh_type;
+    typedef disk::simplicial_mesh<T, 3>             mesh_type;
     typedef typename mesh_type::cell                cell_type;
-    typedef priv::scaled_monomial_basis_base<3,3>   base;
+    typedef priv::monomial_basis_bones<3,3>         base;
 
 public:
     typedef static_vector<T,3>              function_value_type;
@@ -328,12 +321,12 @@ map_to_physical(const simplicial_mesh<T,3>& msh,
 
 template<typename T>
 class scaled_monomial_vector_sg_basis<simplicial_mesh<T,3>, typename simplicial_mesh<T,3>::face>
-    : public priv::scaled_monomial_basis_base<2,3>
+    : public priv::monomial_basis_bones<2,3>
 
 {
-    typedef disk::simplicial_mesh<T, 3>              mesh_type;
-    typedef typename mesh_type::face                face_type;
-    typedef priv::scaled_monomial_basis_base<2,3>   base;
+    typedef disk::simplicial_mesh<T, 3>         mesh_type;
+    typedef typename mesh_type::face            face_type;
+    typedef priv::monomial_basis_bones<2,3>     base;
 
 public:
     typedef static_vector<T,3>                      function_value_type;

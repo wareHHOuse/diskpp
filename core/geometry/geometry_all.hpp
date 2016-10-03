@@ -14,7 +14,12 @@
  * cite it.
  */
 
-#pragma once
+ #ifndef _GEOMETRY_HPP_WAS_INCLUDED_
+     #error "You must NOT include this file directly. Include geometry.hpp."
+ #endif
+
+ #ifndef _GEOMETRY_ALL_HPP_
+ #define _GEOMETRY_ALL_HPP_
 
 /*
  * Here we have all the queries that don't depend on the particular mesh
@@ -25,14 +30,9 @@
  * and put the specialization in the right geometry_<whatever>.hpp file.
  */
 
-#ifndef _GEOMETRY_HPP_WAS_INCLUDED_
-    #error "You must NOT include this file directly. Include geometry.hpp."
-#endif
-
 #include <algorithm>
 #include <vector>
 
-#include "mesh/mesh.hpp"
 #include "common/util.h"
 
 namespace disk {
@@ -129,3 +129,5 @@ normal(const Mesh<T,2,Storage>& msh,
 
 
 } // namespace disk
+
+#endif /* _GEOMETRY_ALL_HPP_ */

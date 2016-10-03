@@ -16,9 +16,6 @@
 
 #pragma once
 
-#include "quadratures/quad_bones.hpp"
-#include "geometry/geometry_generic.hpp"
-
 namespace disk {
 
 template<typename T>

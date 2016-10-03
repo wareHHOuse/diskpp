@@ -16,5 +16,37 @@
 
 #pragma once
 
+#define _BASES_HPP_WAS_INCLUDED_
+
+namespace disk {
+
+template<typename MeshType, typename Element>
+class scaled_monomial_scalar_basis
+{
+    static_assert(sizeof(MeshType) == -1, "scaled_monomial_scalar_basis: not suitable for the requested kind of mesh");
+    static_assert(sizeof(Element) == -1, "scaled_monomial_scalar_basis: not suitable for the requested kind of element");
+};
+
+template<typename MeshType, typename Element>
+class scaled_monomial_vector_sg_basis
+{
+    static_assert(sizeof(MeshType) == -1, "scaled_monomial_vector_sg_basis: not suitable for the requested kind of mesh");
+    static_assert(sizeof(Element) == -1, "scaled_monomial_vector_sg_basis: not suitable for the requested kind of element");
+};
+
+} //namespace disk
+
+//#define POWER_CACHE
+
+#include "geometry/geometry.hpp"
+#include "bases/bases_ranges.hpp"
+#include "bases/bases_bones.hpp"
+#include "bases/bases_utils.hpp"
+
 #include "bases/bases_all.hpp"
 #include "bases/bases_simplicial.hpp"
+
+
+
+
+#undef _BASES_HPP_WAS_INCLUDED_

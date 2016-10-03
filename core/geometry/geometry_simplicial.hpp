@@ -14,15 +14,15 @@
  * cite it.
  */
 
-#pragma once
+ #ifndef _GEOMETRY_HPP_WAS_INCLUDED_
+     #error "You must NOT include this file directly. Include geometry.hpp."
+ #endif
 
-#ifndef _GEOMETRY_HPP_WAS_INCLUDED_
-    #error "You must NOT include this file directly. Include geometry.hpp."
-#endif
+#ifndef _GEOMETRY_SIMPLICIAL_HPP_
+#define _GEOMETRY_SIMPLICIAL_HPP_
 
 #include <list>
 
-#include "mesh/mesh.hpp"
 #include "geometry/element_simplicial.hpp"
 
 namespace disk {
@@ -293,7 +293,6 @@ public:
     }
 };
 
-
-
-
 } // namespace disk
+
+#endif /* _GEOMETRY_SIMPLICIAL_HPP_ */

@@ -16,5 +16,8 @@
 
 #pragma once
 
+#include "geometry/geometry.hpp"
+#include "quadratures/quad_bones.hpp"
+
 #include "quadratures/quad_simplicial.hpp"
 #include "quadratures/quad_generic.hpp"

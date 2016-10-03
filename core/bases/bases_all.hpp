@@ -14,28 +14,27 @@
  * cite it.
  */
 
-#pragma once
+#ifndef _BASES_HPP_WAS_INCLUDED_
+    #error "You must NOT include this file directly. Include bases.hpp"
+#endif
+
+#ifndef _BASES_ALL_HPP_
+#define _BASES_ALL_HPP_
 
 #include <vector>
 
-#include "geometry/geometry.hpp"
 #include "common/eigen.hpp"
-#include "bases/bases_bones.hpp"
-#include "bases/bases_templates.hpp"
-#include "bases/monomial_generator.hpp"
-
-//#define POWER_CACHE
 
 namespace disk {
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class scaled_monomial_scalar_basis<Mesh<T,2,Storage>, typename Mesh<T,2,Storage>::cell>
-    : public priv::scaled_monomial_basis_base<2>
+    : public priv::monomial_basis_bones<2>
 {
     typedef Mesh<T,2,Storage>                       mesh_type;
     typedef typename mesh_type::cell                cell_type;
     typedef typename mesh_type::point_type          point_type;
-    typedef priv::scaled_monomial_basis_base<2>     base;
+    typedef priv::monomial_basis_bones<2>           base;
 
 public:
     typedef T                                       function_value_type;
@@ -148,12 +147,12 @@ public:
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class scaled_monomial_scalar_basis<Mesh<T,2,Storage>, typename Mesh<T,2,Storage>::face>
-    : public priv::scaled_monomial_basis_base<1>
+    : public priv::monomial_basis_bones<1>
 {
     typedef Mesh<T,2,Storage>                           mesh_type;
     typedef typename mesh_type::point_type              point_type;
     typedef typename mesh_type::face                    face_type;
-    typedef priv::scaled_monomial_basis_base<1>         base;
+    typedef priv::monomial_basis_bones<1>               base;
 
 public:
     typedef T                                           function_value_type;
@@ -194,12 +193,12 @@ public:
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class scaled_monomial_scalar_basis<Mesh<T,1,Storage>, typename Mesh<T,1,Storage>::cell>
-    : public priv::scaled_monomial_basis_base<1>
+    : public priv::monomial_basis_bones<1>
 {
     typedef Mesh<T,1,Storage>                       mesh_type;
     typedef typename mesh_type::cell                cell_type;
     typedef typename mesh_type::point_type          point_type;
-    typedef priv::scaled_monomial_basis_base<1>     base;
+    typedef priv::monomial_basis_bones<1>           base;
 
 public:
     typedef T                                       function_value_type;
@@ -260,12 +259,12 @@ public:
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class scaled_monomial_scalar_basis<Mesh<T,1,Storage>, typename Mesh<T,1,Storage>::face>
-    : public priv::scaled_monomial_basis_base<0>
+    : public priv::monomial_basis_bones<0>
 {
     typedef Mesh<T,1,Storage>                           mesh_type;
     typedef typename mesh_type::point_type              point_type;
     typedef typename mesh_type::face                    face_type;
-    typedef priv::scaled_monomial_basis_base<0>         base;
+    typedef priv::monomial_basis_bones<0>               base;
 
 public:
     typedef T                                           function_value_type;
@@ -345,3 +344,6 @@ make_test_points(const Mesh<T,1,Storage>& msh,
 }
 
 } // namespace disk
+
+
+#endif /* _BASES_ALL_HPP_ */
