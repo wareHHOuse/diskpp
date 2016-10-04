@@ -49,6 +49,7 @@
 #include <fstream>
 #include <cassert>
 #include <thread>
+#include <set>
 
 #include "geometry/geometry.hpp"
 
@@ -148,28 +149,26 @@ class fvca5_mesh_loader
 template<typename T>
 class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
 {
-    //const char* keywords[] = {"triangles", "quadrangles", "pentagons", "hexagons",
-    //                     "ennagons", "ettagons", "nonecagons" };
-
     typedef generic_mesh<T,2>                       mesh_type;
     typedef typename mesh_type::point_type          point_type;
     typedef typename mesh_type::node_type           node_type;
     typedef typename mesh_type::edge_type           edge_type;
     typedef typename mesh_type::surface_type        surface_type;
 
-    template<size_t N> using polygon = std::array<ident_impl_t, N>;
+    struct fvca5_poly
+    {
+        std::vector<size_t>                 nodes;
+        std::set<std::array<size_t, 2>>     attached_edges;
+
+        bool operator<(const fvca5_poly& other) {
+            return nodes < other.nodes;
+        }
+    };
 
     std::vector<point_type>                         m_points;
-    std::vector<polygon<3>>                         m_triangles;
-    std::vector<polygon<4>>                         m_quadrangles;
-    std::vector<polygon<5>>                         m_pentagons;
-    std::vector<polygon<6>>                         m_hexagons;
-    std::vector<polygon<7>>                         m_ennagons;
-
+    std::vector<fvca5_poly>                         m_polys;
     std::vector<std::array<ident_impl_t, 2>>        m_boundary_edges;
     std::vector<std::array<ident_impl_t, 4>>        m_edges;
-
-    //std::vector<std::set<typename edge_type::id_type>>      m_edge_node_connectivity;
 
     bool fvca5_read_points(std::ifstream& ifs)
     {
@@ -189,28 +188,81 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
         return true;
     }
 
-    template<typename U, size_t N>
-    bool fvca5_read_tuples(std::ifstream& ifs,
-                           std::vector<std::array<U, N>>& tuples)
+    bool fvca5_read_polygons(std::ifstream& ifs, size_t polynum)
     {
         size_t      elements_to_read;
 
         ifs >> elements_to_read;
-        std::cout << "Attempting to read " << elements_to_read << " " << N << "-ples " << std::endl;
-
-        tuples.reserve(elements_to_read);
+        std::cout << "Reading " << elements_to_read << " " << polynum << "-angles" << std::endl;
 
         for (size_t i = 0; i < elements_to_read; i++)
         {
-            std::array<U, N> tuple;
-            for (size_t j = 0; j < N; j++)
+            fvca5_poly p;
+
+            for (size_t j = 0; j < polynum; j++)
             {
-                U val;
+                ident_impl_t val;
                 ifs >> val;
-                tuple[j] = val-1;
+                p.nodes.push_back(val-1);
             }
 
-            tuples.push_back(tuple);
+            m_polys.push_back(p);
+        }
+
+        return true;
+    }
+
+    bool fvca5_read_boundary_edges(std::ifstream& ifs)
+    {
+        size_t      elements_to_read;
+
+        ifs >> elements_to_read;
+        std::cout << "Reading " << elements_to_read << " boundary edges" << std::endl;
+
+        m_boundary_edges.reserve(elements_to_read);
+
+        for (size_t i = 0; i < elements_to_read; i++)
+        {
+            std::array<ident_impl_t, 2> b_edge;
+            ifs >> b_edge[0]; b_edge[0] -= 1;
+            ifs >> b_edge[1]; b_edge[1] -= 1;
+
+            if (b_edge[0] < b_edge[1])
+                std::swap(b_edge[0], b_edge[1]);
+
+            m_boundary_edges.push_back({b_edge[0], b_edge[1]});
+        }
+
+        return true;
+    }
+
+    bool fvca5_read_edges(std::ifstream& ifs)
+    {
+        size_t      elements_to_read;
+
+        ifs >> elements_to_read;
+        std::cout << "Reading " << elements_to_read << " edges" << std::endl;
+
+        m_edges.reserve(elements_to_read);
+
+        for (size_t i = 0; i < elements_to_read; i++)
+        {
+            std::array<ident_impl_t, 4> edge;
+            ifs >> edge[0]; edge[0] -= 1;
+            ifs >> edge[1]; edge[1] -= 1;
+            ifs >> edge[2];
+            ifs >> edge[3];
+
+            if (edge[0] < edge[1])
+                std::swap(edge[0], edge[1]);
+
+            if (edge[2] != 0)
+                m_polys.at(edge[2]-1).attached_edges.insert({edge[0], edge[1]});
+
+            if (edge[3] != 0)
+                m_polys.at(edge[3]-1).attached_edges.insert({edge[0], edge[1]});
+
+            m_edges.push_back(edge);
         }
 
         return true;
@@ -239,36 +291,37 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
         ifs >> keyword;
         if ( keyword == "triangles" )
         {
-            m_triangles.clear();
-            fvca5_read_tuples(ifs, m_triangles);
+            fvca5_read_polygons(ifs, 3);
             ifs >> keyword;
         }
 
         if ( keyword == "quadrangles" )
         {
-            m_quadrangles.clear();
-            fvca5_read_tuples(ifs, m_quadrangles);
+            fvca5_read_polygons(ifs, 4);
             ifs >> keyword;
         }
 
         if ( keyword == "pentagons" )
         {
-            m_pentagons.clear();
-            fvca5_read_tuples(ifs, m_pentagons);
+            fvca5_read_polygons(ifs, 5);
             ifs >> keyword;
         }
 
         if ( keyword == "hexagons" )
         {
-            m_hexagons.clear();
-            fvca5_read_tuples(ifs, m_hexagons);
+            fvca5_read_polygons(ifs, 6);
             ifs >> keyword;
         }
 
         if ( keyword == "ennagons" )
         {
-            m_ennagons.clear();
-            fvca5_read_tuples(ifs, m_ennagons);
+            fvca5_read_polygons(ifs, 7);
+            ifs >> keyword;
+        }
+
+        if ( keyword == "ettagons" )
+        {
+            fvca5_read_polygons(ifs, 8);
             ifs >> keyword;
         }
 
@@ -276,7 +329,7 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
         {
             std::getline(ifs, keyword); //drop the rest of the line
             m_boundary_edges.clear();
-            fvca5_read_tuples(ifs, m_boundary_edges);
+            fvca5_read_boundary_edges(ifs);
             ifs >> keyword;
         }
         else
@@ -289,7 +342,7 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
         {
             std::getline(ifs, keyword); //drop the rest of the line
             m_edges.clear();
-            fvca5_read_tuples(ifs, m_edges);
+            fvca5_read_edges(ifs);
         }
         else
         {
@@ -299,39 +352,6 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
 
         ifs.close();
         return true;
-    }
-
-    template<size_t N>
-    void put_polygons(mesh_type& msh,
-                      const std::vector<polygon<N>>& polys,
-                      std::vector<surface_type>& surfedg)
-    {
-        auto storage = msh.backend_storage();
-
-        for (auto& p : polys)
-        {
-            std::vector<typename edge_type::id_type> surface_edges(N);
-            for (size_t i = 0; i < N; i++)
-            {
-                auto pt1 = typename node_type::id_type(p[i]);
-                auto pt2 = typename node_type::id_type(p[(i+1) % N]);
-
-                if (pt2 < pt1)
-                    std::swap(pt1, pt2);
-
-                edge_type edge{{pt1, pt2}};
-                auto edge_id = find_element_id(storage->edges.begin(),
-                                               storage->edges.end(), edge);
-                if (!edge_id.first)
-                    throw std::invalid_argument("Edge not found (hanging nodes?)");
-
-                surface_edges[i] = edge_id.second;
-            }
-            auto surface = surface_type(surface_edges);
-            surface.set_point_ids(p.begin(), p.end()); /* XXX: crap */
-            surfedg.push_back( surface );
-        }
-
     }
 
 public:
@@ -368,9 +388,6 @@ public:
             auto node1 = typename node_type::id_type(m_edges[i][0]);
             auto node2 = typename node_type::id_type(m_edges[i][1]);
 
-            if (node2 < node1)
-                std::swap(node1, node2);
-
             auto e = edge_type{{node1, node2}};
 
             e.set_point_ids(m_edges[i].begin(), m_edges[i].begin()+2); /* XXX: crap */
@@ -385,9 +402,6 @@ public:
         {
             auto node1 = typename node_type::id_type(m_boundary_edges[i][0]);
             auto node2 = typename node_type::id_type(m_boundary_edges[i][1]);
-
-            if (node2 < node1)
-                std::swap(node1, node2);
 
             auto e = edge_type{{node1, node2}};
 
@@ -407,26 +421,33 @@ public:
 
         /* Surfaces */
         std::vector<surface_type> surfaces;
-        surfaces.reserve( m_triangles.size() +
-                          m_quadrangles.size() +
-                          m_pentagons.size() +
-                          m_hexagons.size() +
-                          m_ennagons.size() );
+        surfaces.reserve( m_polys.size() );
 
-        put_polygons(msh, m_triangles, surfaces);
-        m_triangles.clear();
+        for (auto& p : m_polys)
+        {
+            std::vector<typename edge_type::id_type> surface_edges;
+            for (auto& e : p.attached_edges)
+            {
 
-        put_polygons(msh, m_quadrangles, surfaces);
-        m_quadrangles.clear();
+                auto n1 = typename node_type::id_type(e[0]);
+                auto n2 = typename node_type::id_type(e[1]);
 
-        put_polygons(msh, m_pentagons, surfaces);
-        m_pentagons.clear();
+                edge_type edge{{n1, n2}};
+                auto edge_id = find_element_id(storage->edges.begin(),
+                                               storage->edges.end(), edge);
+                if (!edge_id.first)
+                {
+                    std::cout << "Bad bug at " << __FILE__ << "("
+                              << __LINE__ << ")" << std::endl;
+                    return false;
+                }
 
-        put_polygons(msh, m_hexagons, surfaces);
-        m_hexagons.clear();
-
-        put_polygons(msh, m_ennagons, surfaces);
-        m_ennagons.clear();
+                surface_edges.push_back(edge_id.second);
+            }
+            auto surface = surface_type(surface_edges);
+            surface.set_point_ids(p.nodes.begin(), p.nodes.end()); /* XXX: crap */
+            surfaces.push_back( surface );
+        }
 
         std::sort(surfaces.begin(), surfaces.end());
         storage->surfaces = std::move(surfaces);
