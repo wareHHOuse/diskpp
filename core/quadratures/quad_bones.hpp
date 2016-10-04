@@ -225,20 +225,6 @@ operator<<(std::ostream& os, const quadrature_point<T,DIM>& qp)
     return os;
 }
 
-template<typename MeshType, typename Element>
-class quadrature
-{
-    typedef MeshType                            mesh_type;
-    typedef Element                             element_type;
-    typedef typename mesh_type::point_type      point_type;
-    typedef typename mesh_type::scalar_type     scalar_type;
-
-    static_assert(sizeof(MeshType) == -1, "quadrature: not suitable for the requested kind of mesh");
-    static_assert(sizeof(Element) == -1, "quadrature: not suitable for the requested kind of element");
-};
-
-
-
 
 } // namespace disk
 

@@ -14,7 +14,13 @@
  * cite it.
  */
 
-#pragma once
+ #ifndef _QUADRATURES_HPP_WAS_INCLUDED_
+     #error "You must NOT include this file. Include quadratures.hpp"
+ #endif
+
+ #ifndef _QUAD_SIMPLICIAL_HPP_
+ #define _QUAD_SIMPLICIAL_HPP_
+
 
 namespace disk {
 
@@ -262,3 +268,5 @@ public:
 
 
 } // namespace disk
+
+#endif /* _QUAD_SIMPLICIAL_HPP_ */

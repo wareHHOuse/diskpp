@@ -14,7 +14,12 @@
  * cite it.
  */
 
-#pragma once
+#ifndef _QUADRATURES_HPP_WAS_INCLUDED_
+    #error "You must NOT include this file. Include quadratures.hpp"
+#endif
+
+#ifndef _QUAD_GENERIC_HPP_
+#define _QUAD_GENERIC_HPP_
 
 namespace disk {
 
@@ -62,17 +67,88 @@ private:
         return ret;
     }
 
-    /*
+
     template<typename PtA>
     std::vector<quadpoint_type>
     integrate_quad(const mesh_type& msh, const cell_type& cl,
                        const PtA& pts) const
     {
-        // Break in two triangles and then integrate on them
-        // Maybe not a good idea because of bad aspect ratios? Should be smart?
-    }
-    */
+        std::vector<quadpoint_type> ret;
 
+        ret.resize( m_quadrature_data.size() * 2 );
+        for (size_t i = 1; i < 3; i++)
+        {
+            auto pt1 = pts[i];
+            auto pt2 = pts[i+1];
+            auto col1 = pt1 - pts[0];
+            auto col2 = pt2 - pts[0];
+
+            /* Compute the area of the sub-triangle */
+            auto tm = (col1.x()*col2.y() - col2.x()*col1.y())/2.;
+
+            auto tr = [&](const std::pair<point<T,2>, T>& qd) -> auto {
+                auto point = col1*qd.first.x() + col2*qd.first.y() + pts[0];
+                auto weight = qd.second * std::abs(tm);
+                return make_qp(point, weight);
+            };
+
+            auto retbegin = ret.begin();
+            std::advance(retbegin, m_quadrature_data.size()*(i-1));
+
+            std::transform(m_quadrature_data.begin(), m_quadrature_data.end(),
+                           retbegin, tr);
+        }
+
+        return ret;
+    }
+
+
+//#define OPTIMAL_TRIANGLE_NUMBER
+
+    /* The 'optimal triangle number' version gives almost the same results
+     * of the other version. In bigger meshes there are some advantages in
+     * assembly time. The problem with this version is that it could generate
+     * triangles with a very bad aspect ratio and at the moment I don't know
+     * if and how this can affect computations, so I leave it turned off.
+     */
+#ifdef OPTIMAL_TRIANGLE_NUMBER
+    template<typename PtA>
+    std::vector<quadpoint_type>
+    integrate_other(const mesh_type& msh, const cell_type& cl,
+                    const PtA& pts) const
+    {
+        std::vector<quadpoint_type> ret;
+
+        /* Break the cell in triangles, compute the transformation matrix and
+         * map quadrature data in the physical space. Edges of the triangle as
+         * column vectors in the transformation matrix. */
+        ret.resize( m_quadrature_data.size() * pts.size()-2 );
+        for (size_t i = 1; i < pts.size()-1; i++)
+        {
+            auto pt1 = pts[i];
+            auto pt2 = pts[i+1];
+            auto col1 = pt1 - pts[0];
+            auto col2 = pt2 - pts[0];
+
+            /* Compute the area of the sub-triangle */
+            auto tm = (col1.x()*col2.y() - col2.x()*col1.y())/2.;
+
+            auto tr = [&](const std::pair<point<T,2>, T>& qd) -> auto {
+                auto point = col1*qd.first.x() + col2*qd.first.y() + pts[0];
+                auto weight = qd.second * std::abs(tm);
+                return make_qp(point, weight);
+            };
+
+            auto retbegin = ret.begin();
+            std::advance(retbegin, m_quadrature_data.size()*(i-1));
+
+            std::transform(m_quadrature_data.begin(), m_quadrature_data.end(),
+                           retbegin, tr);
+        }
+
+        return ret;
+    }
+#else
     template<typename PtA>
     std::vector<quadpoint_type>
     integrate_other(const mesh_type& msh, const cell_type& cl,
@@ -111,6 +187,7 @@ private:
 
         return ret;
     }
+#endif
 
 public:
     quadrature()
@@ -135,8 +212,8 @@ public:
             case 3:
                 return integrate_triangle(msh, cl, pts);
 
-            //case 4:
-            //    return integrate_quad(msh, cl, pts);
+            case 4:
+                return integrate_quad(msh, cl, pts);
 
             default:
                 return integrate_other(msh, cl, pts);
@@ -267,3 +344,5 @@ public:
 };
 
 } // namespace disk
+
+#endif /* _QUAD_GENERIC_HPP_ */

@@ -49,10 +49,10 @@ struct storage_class_trait<storage_class_simplicial, 2> {
 
 template<>
 struct storage_class_trait<storage_class_simplicial, 3> {
-        typedef simplicial_element<3,0>    volume_type;
-        typedef simplicial_element<3,1>    surface_type;
-        typedef simplicial_element<3,2>    edge_type;
-        typedef simplicial_element<3,3>    node_type;
+    typedef simplicial_element<3,0>    volume_type;
+    typedef simplicial_element<3,1>    surface_type;
+    typedef simplicial_element<3,2>    edge_type;
+    typedef simplicial_element<3,3>    node_type;
 };
 
 template<typename T, size_t DIM>
@@ -60,6 +60,12 @@ using simplicial_mesh_storage = mesh_storage<T, DIM, storage_class_simplicial>;
 
 template<typename T, size_t DIM>
 using simplicial_mesh = mesh<T, DIM, simplicial_mesh_storage<T, DIM>>;
+
+template<typename T>
+using tetrahedral_mesh = simplicial_mesh<T, 3>;
+
+template<typename T>
+using triangular_mesh = simplicial_mesh<T, 2>;
 
 
 template<typename T, size_t DIM, size_t CODIM>
