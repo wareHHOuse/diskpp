@@ -30,6 +30,8 @@ class point
     static_vector<T, DIM>     m_coords;
 
 public:
+    typedef T                                   value_type;
+    const static size_t                         dimension = DIM;
     typedef identifier<point, ident_impl_t, 0>  id_type;
 
     point()

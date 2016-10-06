@@ -570,4 +570,56 @@ end(const mesh<T, DIM, Storage>& msh)
     return msh.cells_end();
 }
 
+template<typename Mesh>
+class bounding_box
+{
+    typedef Mesh                                mesh_type;
+    typedef typename mesh_type::point_type      point_type;
+
+    point_type                                  m_bb_min, m_bb_max;
+
+public:
+    bounding_box()
+    {}
+
+    bounding_box(const Mesh& msh)
+    {
+        compute(msh);
+    }
+
+    void compute(const Mesh& msh)
+    {
+        m_bb_min = *msh.points_begin();
+        m_bb_max = *msh.points_begin();
+
+        for (auto itor = std::next(msh.points_begin());
+                  itor != msh.points_end();
+                  itor++)
+        {
+            bool lt = false, gt = false;
+            auto curpt = *itor;
+
+            for (size_t i = 0; i < point_type::dimension; i++)
+            {
+                lt = lt or (curpt[i] < m_bb_min[i]);
+                gt = gt or (curpt[i] > m_bb_min[i]);
+            }
+            assert(lt != gt); //lt xor gt
+            if (lt) m_bb_min = curpt;
+            if (gt) m_bb_max = curpt;
+        }
+    }
+
+    point_type min() const
+    {
+        return m_bb_min;
+    }
+
+    point_type max() const
+    {
+        return m_bb_max;
+    }
+};
+
+
 } // namespace disk

@@ -385,6 +385,7 @@ public:
         edges.reserve(m_edges.size());
         for (size_t i = 0; i < m_edges.size(); i++)
         {
+            assert(m_edges[i][0] < m_edges[i][1]);
             auto node1 = typename node_type::id_type(m_edges[i][0]);
             auto node2 = typename node_type::id_type(m_edges[i][1]);
 
@@ -400,6 +401,7 @@ public:
         storage->boundary_edges.resize(m_edges.size());
         for (size_t i = 0; i < m_boundary_edges.size(); i++)
         {
+            assert(m_boundary_edges[i][0] < m_boundary_edges[i][1]);
             auto node1 = typename node_type::id_type(m_boundary_edges[i][0]);
             auto node2 = typename node_type::id_type(m_boundary_edges[i][1]);
 
@@ -428,7 +430,7 @@ public:
             std::vector<typename edge_type::id_type> surface_edges;
             for (auto& e : p.attached_edges)
             {
-
+                assert(e[0] < e[1]);
                 auto n1 = typename node_type::id_type(e[0]);
                 auto n2 = typename node_type::id_type(e[1]);
 
