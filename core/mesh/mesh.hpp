@@ -602,7 +602,7 @@ public:
             for (size_t i = 0; i < point_type::dimension; i++)
             {
                 lt = lt or (curpt[i] < m_bb_min[i]);
-                gt = gt or (curpt[i] > m_bb_min[i]);
+                gt = gt or (curpt[i] > m_bb_max[i]);
             }
             assert(lt != gt); //lt xor gt
             if (lt) m_bb_min = curpt;
@@ -621,5 +621,11 @@ public:
     }
 };
 
+template<typename Mesh>
+std::ostream& operator<<(std::ostream& os, const bounding_box<Mesh>& bb)
+{
+    os << "[" << bb.min() << ", " << bb.max() << "]";
+    return os;
+}
 
 } // namespace disk

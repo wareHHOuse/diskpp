@@ -23,8 +23,8 @@ class MeshWidget : public QWidget
         auto pos = pt + m_bbox.min();
         auto dist = m_bbox.max() - m_bbox.min();
 
-        int xs = int((pos.x()*(size_x/4))/dist.x());
-        int ys = int((pos.y()*(size_y/4))/dist.y());
+        int xs = int((pos.x()*(size_x/2))/dist.x())+10;
+        int ys = size_x - int((pos.y()*(size_y/2))/dist.y())-10;
 
         return QPoint(xs, ys);
     }
@@ -43,6 +43,7 @@ public:
     {
         m_msh = msh;
         m_bbox = disk::bounding_box<mesh_type>(m_msh);
+        std::cout << m_bbox << std::endl;
     }
 
     virtual void

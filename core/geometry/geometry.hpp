@@ -33,6 +33,7 @@ struct storage_class_trait
 #include "geometry_all.hpp"
 #include "geometry_generic.hpp"
 #include "geometry_simplicial.hpp"
+#include "geometry_hexahedral.hpp"
 
 
 
