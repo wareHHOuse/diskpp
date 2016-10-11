@@ -35,7 +35,6 @@
 
 #pragma clang diagnostic pop
 
-
 template<typename T>
 using dynamic_matrix = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 

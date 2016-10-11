@@ -386,33 +386,8 @@ public:
             auto phi = cell_basis.eval_functions(msh, cl, qp.point());
             auto fval = f(qp.point());
 
-#ifdef USE_BLAS
-            int sz = phi.size();
-            double w = qp.weight();
-            int one = 1;
-            dger(&sz, &sz, &w, phi.data(), &one, phi.data(), &one, mm.data(), &sz);
-            w *= fval;
-            daxpy(&sz, &w, phi.data(), &one, rhs.data(), &one);
-#else
-
-#ifdef FILL_COLMAJOR
-            for (size_t j = 0; j < phi.size(); j++)
-            {
-                for (size_t i = 0; i < phi.size(); i++)
-                    mm(i,j) += qp.weight() * mm_prod(phi[i], phi[j]);
-
-                rhs(j) += qp.weight() * mm_prod(fval, phi[j]);
-            }
-#else
-            for (size_t i = 0; i < phi.size(); i++)
-            {
-                for (size_t j = 0; j < phi.size(); j++)
-                    mm(i,j) += qp.weight() * mm_prod(phi[i], phi[j]);
-
-                rhs(i) += qp.weight() * mm_prod(fval, phi[i]);
-            }
-#endif
-#endif
+            mm  += qp.weight() * phi * phi.transpose();
+            rhs += qp.weight() * fval * phi;
         }
 
         cell_mm = mm;
@@ -440,23 +415,8 @@ public:
                 auto phi = face_basis.eval_functions(msh, fc, qp.point());
                 auto fval = f(qp.point());
 
-#ifdef FILL_COLMAJOR
-                for (size_t j = 0; j < phi.size(); j++)
-                {
-                    for (size_t i = 0; i < phi.size(); i++)
-                        mm(i,j) += qp.weight() * mm_prod(phi[i], phi[j]);
-
-                    rhs(j) += qp.weight() * mm_prod(fval, phi[j]);
-                }
-#else
-                for (size_t i = 0; i < phi.size(); i++)
-                {
-                    for (size_t j = 0; j < phi.size(); j++)
-                        mm(i,j) += qp.weight() * mm_prod(phi[i], phi[j]);
-
-                    rhs(i) += qp.weight() * mm_prod(fval, phi[i]);
-                }
-#endif
+                mm  += qp.weight() * phi * phi.transpose();
+                rhs += qp.weight() * fval * phi;
             }
 
             ret.block(face_offset, 0, face_basis.size(), 1) = mm.llt().solve(rhs);
@@ -602,16 +562,8 @@ public:
         auto cell_quadpoints = cell_quadrature.integrate(msh, cl);
         for (auto& qp : cell_quadpoints)
         {
-            auto c_dphi = cell_basis.eval_gradients(msh, cl, qp.point());
-
-#ifdef FILL_COLMAJOR
-            for (size_t j = 0; j < cell_basis.size(); j++)
-                for (size_t i = 0; i < cell_basis.size(); i++)
-#else
-            for (size_t i = 0; i < cell_basis.size(); i++)
-                for (size_t j = 0; j < cell_basis.size(); j++)
-#endif
-                    stiff_mat(i,j) += qp.weight() * mm_prod(c_dphi[i], c_dphi[j]);
+            auto dphi = cell_basis.eval_gradients(msh, cl, qp.point());
+            stiff_mat += qp.weight() * dphi * dphi.transpose();
         }
 
         /* LHS: take basis functions derivatives from degree 1 to K+1 */
@@ -642,54 +594,34 @@ public:
             auto n = normal(msh, cl, fc);
             auto face_quadpoints = face_quadrature.integrate(msh, fc);
 
-            //matrix_type m1 = matrix_type::Zeros(BG_row_range.size(), BG_col_range.size());
             for (auto& qp : face_quadpoints)
             {
-                auto c_phi = cell_basis.eval_functions(msh, cl, qp.point());
-                auto c_dphi = cell_basis.eval_gradients(msh, cl, qp.point());
+                matrix_type c_phi =
+                    cell_basis.eval_functions(msh, cl, qp.point(), 0, m_degree);
+                matrix_type c_dphi =
+                    cell_basis.eval_gradients(msh, cl, qp.point(), 1, m_degree+1);
 
-#ifdef FILL_COLMAJOR
-                for (size_t j = BG_col_range.min(), jj = 0; j < BG_col_range.max(); j++, jj++)
-#else
-                for (size_t i = BG_row_range.min(), ii = 0; i < BG_row_range.max(); i++, ii++)
-#endif
-                {
-#ifdef FILL_COLMAJOR
-                    for (size_t i = BG_row_range.min(), ii = 0; i < BG_row_range.max(); i++, ii++)
-#else
-                    for (size_t j = BG_col_range.min(), jj = 0; j < BG_col_range.max(); j++, jj++)
-#endif
-                    {
-                        auto p1 = mm_prod(c_dphi[i], n);
-                        auto p2 = mm_prod(c_phi[j], p1);
-                        BG(ii,jj) -= qp.weight() * p2;
-                    }
-                }
+                //std::cout << c_phi.rows() << " " << c_phi.cols() << std::endl;
+                //std::cout << c_dphi.rows() << " " << c_dphi.cols() << std::endl;
 
-                auto f_phi = face_basis.eval_functions(msh, fc, qp.point());
+                matrix_type c_dphi_n = c_dphi * n;
+                matrix_type T = c_phi * c_dphi_n.transpose();
+                BG.block(0, 0, BG.rows(), BG_col_range.size()) -= T;
 
-#ifdef FILL_COLMAJOR
-                for (size_t j = 0, jj = current_face_range.min();
-                            j < current_face_range.size();
-                            j++, jj++)
-#else
-                for (size_t i = BG_row_range.min(), ii = 0; i < BG_row_range.max(); i++, ii++)
-#endif
-                {
-#ifdef FILL_COLMAJOR
-                    for (size_t i = BG_row_range.min(), ii = 0; i < BG_row_range.max(); i++, ii++)
-#else
-                    for (size_t j = 0, jj = current_face_range.min();
-                                j < current_face_range.size();
-                                j++, jj++)
-#endif
+                matrix_type f_phi = face_basis.eval_functions(msh, fc, qp.point());
+                matrix_type F = f_phi * c_dphi_n.transpose();
 
-                    {
-                        auto p1 = mm_prod(c_dphi[i], n);
-                        auto p2 = mm_prod(f_phi[j], p1);
-                        BG(ii,jj) += qp.weight() * p2;
-                    }
-                }
+                std::cout << "fphi " << f_phi.size() << std::endl;
+                std::cout << "cdphi " << c_dphi.size() << std::endl;
+                std::cout << F.rows() << " " << F.cols() << std::endl;
+
+                matrix_type L = BG.block(0, current_face_range.min(),
+                         BG.rows(), current_face_range.size());
+
+                         std::cout << L.rows() << " " << L.cols() << std::endl;
+
+                BG.block(0, current_face_range.min(),
+                         BG.rows(), current_face_range.size()) += F;
             }
         }
 

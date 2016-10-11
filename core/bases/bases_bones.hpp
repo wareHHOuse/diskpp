@@ -21,6 +21,8 @@
 #ifndef _BASES_BONES_HPP_
 #define _BASES_BONES_HPP_
 
+#define VERY_HIGH_DEGREE 42424242   // this is shit in it's purest form
+
 #include "bases/monomial_generator.hpp"
 
 namespace disk {
