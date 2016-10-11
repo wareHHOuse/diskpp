@@ -227,7 +227,9 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
             ifs >> b_edge[0]; b_edge[0] -= 1;
             ifs >> b_edge[1]; b_edge[1] -= 1;
 
-            if (b_edge[0] < b_edge[1])
+            assert(b_edge[0] != b_edge[1]);
+
+            if (b_edge[0] > b_edge[1])
                 std::swap(b_edge[0], b_edge[1]);
 
             m_boundary_edges.push_back({b_edge[0], b_edge[1]});
@@ -253,7 +255,9 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
             ifs >> edge[2];
             ifs >> edge[3];
 
-            if (edge[0] < edge[1])
+            assert(edge[0] != edge[1]);
+
+            if (edge[0] > edge[1])
                 std::swap(edge[0], edge[1]);
 
             if (edge[2] != 0)
