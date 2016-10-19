@@ -22,7 +22,7 @@
 #define _BASES_BONES_HPP_
 
 #define POWER_CACHE
-#define VERY_HIGH_DEGREE 42424242   // this is shit in it's purest form
+#define VERY_HIGH_DEGREE 42424242   // this is shit in its purest form
 
 #include "bases/monomial_generator.hpp"
 
@@ -108,6 +108,62 @@ public:
 };
 
 } //namespace priv
+
+#define POWER_CACHE_MAX_POWER 7
+
+template<typename T, size_t DIM, size_t MAX_POWER = POWER_CACHE_MAX_POWER>
+class power_cache
+{
+    std::array<T, DIM*(MAX_POWER+1)>    m_powers;
+    size_t                              m_max_computed_power;
+
+public:
+    power_cache()
+    {
+        std::fill(m_powers.begin(), m_powers.end(), T(1));
+        m_max_computed_power = 0;
+    }
+
+    power_cache(const point<T, DIM>& pt, size_t max_degree)
+    {
+        if (max_degree > MAX_POWER)
+            throw std::invalid_argument("Power cache not sufficiently large. Recompile with the desired MAX_POWER or without power cache.");
+
+        m_max_computed_power = max_degree;
+
+        for (size_t i = 0; i < DIM; i++)
+        {
+            m_powers[i*(MAX_POWER+1)] = T(1);
+            for (size_t j = 1; j < m_max_computed_power; j++)
+                m_powers[i*(MAX_POWER+1)+j] = m_powers[i*(MAX_POWER+1)+j-1]*pt[i];
+        }
+    }
+
+    template<typename U = T>
+    typename std::enable_if<DIM == 1 || DIM == 2 || DIM == 3, U>::type
+    x(size_t power) const
+    {
+        assert(power <= max_computed_power && "power too large");
+        return m_powers[power];
+    }
+
+    template<typename U = T>
+    typename std::enable_if<DIM == 2 || DIM == 3, U>::type
+    y(size_t power) const
+    {
+        assert(power <= max_computed_power && "power too large");
+        return m_powers[(MAX_POWER+1) + power];
+    }
+
+    template<typename U = T>
+    typename std::enable_if<DIM == 3, U>::type
+    z(size_t power) const
+    {
+        assert(power <= max_computed_power && "power too large");
+        return m_powers[2*(MAX_POWER+1) + power];
+    }
+};
+
 } //namespace disk
 
 #endif /* _BASES_BONES_HPP_ */

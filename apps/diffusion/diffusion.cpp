@@ -54,13 +54,13 @@ test_gradrec(MeshType& msh, size_t degree)
         //return p.x();
     };
 
-    disk::gradient_reconstruction_nopre<mesh_type,
+    disk::gradient_reconstruction<mesh_type,
                                         cell_basis_type,
                                         cell_quadrature_type,
                                         face_basis_type,
                                         face_quadrature_type> gradrec(degree);
 
-    disk::projector_nopre<mesh_type,
+    disk::projector<mesh_type,
                     cell_basis_type,
                     cell_quadrature_type,
                     face_basis_type,
@@ -113,28 +113,28 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
 
 
-    disk::gradient_reconstruction_nopre<mesh_type,
+    disk::gradient_reconstruction<mesh_type,
                                         cell_basis_type,
                                         cell_quadrature_type,
                                         face_basis_type,
-                                        face_quadrature_type> gradrec_nopre(degree);
+                                        face_quadrature_type> gradrec(degree);
 
 
-    disk::diffusion_like_stabilization_nopre<mesh_type,
+    disk::diffusion_like_stabilization<mesh_type,
                                              cell_basis_type,
                                              cell_quadrature_type,
                                              face_basis_type,
-                                             face_quadrature_type> stab_nopre(degree);
+                                             face_quadrature_type> stab(degree);
 
-    disk::diffusion_like_static_condensation_nopre<mesh_type,
+    disk::diffusion_like_static_condensation<mesh_type,
                                                    cell_basis_type,
                                                    cell_quadrature_type,
                                                    face_basis_type,
-                                                   face_quadrature_type> statcond_nopre(degree);
+                                                   face_quadrature_type> statcond(degree);
 
-    disk::assembler_nopre<mesh_type,
+    disk::assembler<mesh_type,
                           face_basis_type,
-                          face_quadrature_type> assembler_nopre(msh, degree);
+                          face_quadrature_type> assembler(msh, degree);
 
     timecounter_new tc;
     std::map<std::string, double> timings;
@@ -147,27 +147,27 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
         timecounter_new tc_detail;
 
         tc_detail.tic();
-        gradrec_nopre.compute(msh, cl);
+        gradrec.compute(msh, cl);
         tc_detail.toc();
         timings["Gradient reconstruction"] += tc_detail.to_double();
 
         tc_detail.tic();
-        stab_nopre.compute(msh, cl, gradrec_nopre.oper);
+        stab.compute(msh, cl, gradrec.oper);
         tc_detail.toc();
         timings["Stabilization"] += tc_detail.to_double();
 
         tc_detail.tic();
         auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, degree);
-        dynamic_matrix<scalar_type> loc = gradrec_nopre.data + stab_nopre.data;
-        auto scnp = statcond_nopre.compute(msh, cl, loc, cell_rhs);
+        dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
+        auto scnp = statcond.compute(msh, cl, loc, cell_rhs);
         tc_detail.toc();
         timings["Static condensation"] += tc_detail.to_double();
 
-        assembler_nopre.assemble(msh, cl, scnp);
+        assembler.assemble(msh, cl, scnp);
     }
 
-    assembler_nopre.impose_boundary_conditions(msh, solution);
-    assembler_nopre.finalize();
+    assembler.impose_boundary_conditions(msh, solution);
+    assembler.finalize();
     tc.toc();
     std::cout << "Assembly total time: " << tc << " seconds." << std::endl;
 
@@ -183,16 +183,16 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
 #endif
 
-    size_t systsz = assembler_nopre.matrix.rows();
-    size_t nnz = assembler_nopre.matrix.nonZeros();
+    size_t systsz = assembler.matrix.rows();
+    size_t nnz = assembler.matrix.nonZeros();
 
     std::cout << "Starting linear solver..." << std::endl;
     std::cout << " * Solving for " << systsz << " unknowns." << std::endl;
     std::cout << " * Matrix fill: " << 100.0*double(nnz)/(systsz*systsz) << "%" << std::endl;
 
-    solver.analyzePattern(assembler_nopre.matrix);
-    solver.factorize(assembler_nopre.matrix);
-    dynamic_vector<scalar_type> X = solver.solve(assembler_nopre.rhs);
+    solver.analyzePattern(assembler.matrix);
+    solver.factorize(assembler.matrix);
+    dynamic_vector<scalar_type> X = solver.solve(assembler.rhs);
 
     tc.toc();
     std::cout << "Solver time: " << tc << " seconds." << std::endl;
@@ -203,7 +203,7 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
 
     std::ofstream ofs("plot.dat");
 
-    disk::projector_nopre<mesh_type,
+    disk::projector<mesh_type,
                     cell_basis_type,
                     cell_quadrature_type,
                     face_basis_type,
@@ -236,11 +236,11 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
             xFs.block(face_i * fbs, 0, fbs, 1) = xF;
         }
 
-        gradrec_nopre.compute(msh, cl);
-        stab_nopre.compute(msh, cl, gradrec_nopre.oper);
-        dynamic_matrix<scalar_type> loc = gradrec_nopre.data + stab_nopre.data;
+        gradrec.compute(msh, cl);
+        stab.compute(msh, cl, gradrec.oper);
+        dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
         auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, degree);
-        dynamic_vector<scalar_type> x = statcond_nopre.recover(msh, cl, loc, cell_rhs, xFs);
+        dynamic_vector<scalar_type> x = statcond.recover(msh, cl, loc, cell_rhs, xFs);
 
         auto qps = cell_quadrature.integrate(msh, cl);
         for (auto& qp : qps)

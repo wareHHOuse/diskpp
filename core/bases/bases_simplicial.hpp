@@ -61,19 +61,7 @@ public:
         ret.resize( eval_range.size(), 1 );
 
 #ifdef POWER_CACHE
-        std::array<double, 8> px;
-        std::array<double, 8> py;
-        std::array<double, 8> pz;
-        px[0] = 1;
-        py[0] = 1;
-        pz[0] = 1;
-
-        for (size_t i = 1; i < this->max_degree()+1; i++)
-        {
-            px[i] = px[i-1]*ep.x();
-            py[i] = py[i-1]*ep.y();
-            pz[i] = pz[i-1]*ep.z();
-        }
+        power_cache<scalar_type, 3> pow(ep, this->max_degree()+1);
 #endif
         size_t i = 0;
         auto begin = this->monomials_begin();
@@ -85,9 +73,9 @@ public:
             auto m = *itor;
 
 #ifdef POWER_CACHE
-            auto vx = px[m[0]];
-            auto vy = py[m[1]];
-            auto vz = pz[m[2]];
+            auto vx = pow.x(m[0]);
+            auto vy = pow.y(m[1]);
+            auto vz = pow.z(m[2]);
 #else
             auto vx = iexp_pow(ep.x(), m[0]);
             auto vy = iexp_pow(ep.y(), m[1]);
@@ -110,30 +98,15 @@ public:
 
         auto bar = barycenter(msh, cl);
         auto h = diameter(msh, cl);
+        auto ih = 1./h;
 
         auto ep = (pt - bar)/h;
-
-#ifdef POWER_CACHE
-        auto ih = 1./h;
-#endif
 
         Eigen::Matrix<scalar_type, Eigen::Dynamic, 3> ret;
         ret.resize( eval_range.size(), 3 );
 
 #ifdef POWER_CACHE
-        std::array<double, 8> zx;
-        std::array<double, 8> zy;
-        std::array<double, 8> zz;
-        zx[0] = 1;
-        zy[0] = 1;
-        zz[0] = 1;
-
-        for (size_t i = 1; i < this->max_degree()+1; i++)
-        {
-            zx[i] = zx[i-1]*ep.x();
-            zy[i] = zy[i-1]*ep.y();
-            zz[i] = zz[i-1]*ep.z();
-        }
+        power_cache<scalar_type, 3> pow(ep, this->max_degree()+1);
 #endif
 
         size_t i = 0;
@@ -147,21 +120,21 @@ public:
             gradient_value_type grad;
 
 #ifdef POWER_CACHE
-            auto px = zx[m[0]];
-            auto py = zy[m[1]];
-            auto pz = zz[m[2]];
+            auto px = pow.x(m[0]);
+            auto py = pow.y(m[1]);
+            auto pz = pow.z(m[2]);
 
-            auto dx = (m[0] == 0) ? 0 : m[0]*ih*zx[m[0]-1];
-            auto dy = (m[1] == 0) ? 0 : m[1]*ih*zy[m[1]-1];
-            auto dz = (m[2] == 0) ? 0 : m[2]*ih*zz[m[2]-1];
+            auto dx = (m[0] == 0) ? 0 : m[0]*ih*pow.x(m[0]-1);
+            auto dy = (m[1] == 0) ? 0 : m[1]*ih*pow.y(m[1]-1);
+            auto dz = (m[2] == 0) ? 0 : m[2]*ih*pow.z(m[2]-1);
 #else
             auto px = iexp_pow(ep.x(), m[0]);
             auto py = iexp_pow(ep.y(), m[1]);
             auto pz = iexp_pow(ep.z(), m[2]);
 
-            auto dx = (m[0] == 0) ? 0 : (m[0]/h)*iexp_pow(ep.x(), m[0]-1);
-            auto dy = (m[1] == 0) ? 0 : (m[1]/h)*iexp_pow(ep.y(), m[1]-1);
-            auto dz = (m[2] == 0) ? 0 : (m[2]/h)*iexp_pow(ep.z(), m[2]-1);
+            auto dx = (m[0] == 0) ? 0 : m[0]*ih*iexp_pow(ep.x(), m[0]-1);
+            auto dy = (m[1] == 0) ? 0 : m[1]*ih*iexp_pow(ep.y(), m[1]-1);
+            auto dz = (m[2] == 0) ? 0 : m[2]*ih*iexp_pow(ep.z(), m[2]-1);
 #endif
 
             ret(i,0) = dx * py * pz;
@@ -205,16 +178,7 @@ public:
         ret.resize( this->size(), 1 );
 
 #ifdef POWER_CACHE
-        std::array<double, 8> px;
-        std::array<double, 8> py;
-        px[0] = 1;
-        py[0] = 1;
-
-        for (size_t i = 1; i < this->max_degree()+1; i++)
-        {
-            px[i] = px[i-1]*ep.x();
-            py[i] = py[i-1]*ep.y();
-        }
+        power_cache<scalar_type, 2> pow(ep, this->max_degree()+1);
 #endif
 
         size_t i = 0;
@@ -223,8 +187,8 @@ public:
             auto m = *itor;
 
 #ifdef POWER_CACHE
-            auto vx = px[m[0]];
-            auto vy = py[m[1]];
+            auto vx = pow.x(m[0]);
+            auto vy = pow.y(m[1]);
 #else
             auto vx = iexp_pow(ep.x(), m[0]);
             auto vy = iexp_pow(ep.y(), m[1]);

@@ -66,16 +66,7 @@ public:
         ret.resize( eval_range.size(), 1 );
 
 #ifdef POWER_CACHE
-        std::array<double, 8> px;
-        std::array<double, 8> py;
-        px[0] = 1;
-        py[0] = 1;
-
-        for (size_t i = 1; i < this->max_degree()+1; i++)
-        {
-            px[i] = px[i-1]*ep.x();
-            py[i] = py[i-1]*ep.y();
-        }
+        power_cache<scalar_type, 2> pow(ep, this->max_degree()+1);
 #endif
 
         size_t i = 0;
@@ -87,8 +78,8 @@ public:
         {
             auto m = *itor;
 #ifdef POWER_CACHE
-            auto vx = px[m[0]];
-            auto vy = py[m[1]];
+            auto vx = pow.x(m[0]);
+            auto vy = pow.y(m[1]);
 #else
             auto vx = iexp_pow(ep.x(), m[0]);
             auto vy = iexp_pow(ep.y(), m[1]);
@@ -109,27 +100,15 @@ public:
 
         auto bar = barycenter(msh, cl);
         auto h = diameter(msh, cl);
+        auto ih = 1./h;
 
         auto ep = (pt - bar)/h;
-
-#ifdef POWER_CACHE
-        auto ih = 1./h;
-#endif
 
         Eigen::Matrix<scalar_type, Eigen::Dynamic, 2> ret;
         ret.resize( eval_range.size(), 2 );
 
 #ifdef POWER_CACHE
-        std::array<double, 8> zx;
-        std::array<double, 8> zy;
-        zx[0] = 1;
-        zy[0] = 1;
-
-        for (size_t i = 1; i < this->max_degree()+1; i++)
-        {
-            zx[i] = zx[i-1]*ep.x();
-            zy[i] = zy[i-1]*ep.y();
-        }
+        power_cache<scalar_type, 2> pow(ep, this->max_degree()+1);
 #endif
         size_t i = 0;
         auto begin = this->monomials_begin();
@@ -142,18 +121,17 @@ public:
             gradient_value_type grad;
 
 #ifdef POWER_CACHE
-            auto px = zx[m[0]];
-            auto py = zy[m[1]];
+            auto px = pow.x(m[0]);
+            auto py = pow.y(m[1]);
 
-            auto dx = (m[0] == 0) ? 0 : m[0]*ih*zx[m[0]-1];
-            auto dy = (m[1] == 0) ? 0 : m[1]*ih*zy[m[1]-1];
+            auto dx = (m[0] == 0) ? 0 : m[0]*ih*pow.x(m[0]-1);
+            auto dy = (m[1] == 0) ? 0 : m[1]*ih*pow.y(m[1]-1);
 #else
-
             auto px = iexp_pow(ep.x(), m[0]);
             auto py = iexp_pow(ep.y(), m[1]);
 
-            auto dx = (m[0] == 0) ? 0 : (m[0]/h)*iexp_pow(ep.x(), m[0]-1);
-            auto dy = (m[1] == 0) ? 0 : (m[1]/h)*iexp_pow(ep.y(), m[1]-1);
+            auto dx = (m[0] == 0) ? 0 : m[0]*ih*iexp_pow(ep.x(), m[0]-1);
+            auto dy = (m[1] == 0) ? 0 : m[1]*ih*iexp_pow(ep.y(), m[1]-1);
 #endif
             ret(i,0) = dx * py;
             ret(i,1) = dy * px;
@@ -193,7 +171,6 @@ public:
         auto h = diameter(msh, fc);
         auto v = (pts[1] - pts[0]).to_vector();
         auto t = (pt - bar).to_vector();
-        //v = v/v.norm();
         T dot = v.dot(t);
         auto ep = point<T, 1>({dot/(h*h)});
 
