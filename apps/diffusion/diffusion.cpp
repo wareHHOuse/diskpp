@@ -341,6 +341,7 @@ int main(int argc, char **argv)
             return sin(p.x() * M_PI);
         };
 
+        //test_gradrec(msh, degree);
         test_diffusion(msh, f, sf, degree);
 
         return 0;
@@ -403,6 +404,7 @@ int main(int argc, char **argv)
         };
 
         test_diffusion(msh, f, sf, degree);
+        //test_gradrec(msh, degree);
     }
 
     if (std::regex_match(filename, std::regex(".*\\.mesh$") ))

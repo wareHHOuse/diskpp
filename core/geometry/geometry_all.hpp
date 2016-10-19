@@ -98,7 +98,7 @@ diameter(const Mesh& msh, const Element& elem)
     typename Mesh::scalar_type diam = 0.;
 
     for (size_t i = 0; i < pts.size(); i++)
-        for (size_t j = i; j < pts.size(); j++)
+        for (size_t j = i+1; j < pts.size(); j++)
             diam = std::max((pts[i] - pts[j]).to_vector().norm(), diam);
 
     return diam;

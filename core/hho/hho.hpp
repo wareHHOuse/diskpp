@@ -384,10 +384,9 @@ public:
         for (auto& qp : cell_quadpoints)
         {
             auto phi = cell_basis.eval_functions(msh, cl, qp.point());
-            auto fval = f(qp.point());
 
             mm  += qp.weight() * phi * phi.transpose();
-            rhs += qp.weight() * fval * phi;
+            rhs += qp.weight() * f(qp.point()) * phi;
         }
 
         cell_mm = mm;
@@ -413,10 +412,9 @@ public:
             for (auto& qp : face_quadpoints)
             {
                 auto phi = face_basis.eval_functions(msh, fc, qp.point());
-                auto fval = f(qp.point());
 
                 mm  += qp.weight() * phi * phi.transpose();
-                rhs += qp.weight() * fval * phi;
+                rhs += qp.weight() * f(qp.point()) * phi;
             }
 
             ret.block(face_offset, 0, face_basis.size(), 1) = mm.llt().solve(rhs);
@@ -506,6 +504,57 @@ public:
         oper  = MG.llt().solve(BG);    // GT
         data  = BG.transpose() * oper;  // A
     }
+};
+
+template<typename Mesh, typename CellBasisType, typename CellQuadType,
+                        typename FaceBasisType, typename FaceQuadType>
+class local_info
+{
+    typedef Mesh                                mesh_type;
+    typedef typename mesh_type::scalar_type     scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
+
+    typedef CellBasisType                       cell_basis_type;
+    typedef CellQuadType                        cell_quadrature_type;
+    typedef FaceBasisType                       face_basis_type;
+    typedef FaceQuadType                        face_quadrature_type;
+
+    cell_basis_type                             cell_basis;
+    cell_quadrature_type                        cell_quadrature;
+
+    face_basis_type                             face_basis;
+    face_quadrature_type                        face_quadrature;
+
+    size_t                                      m_degree;
+
+    void init(void)
+    {
+        cell_basis          = cell_basis_type(m_degree+1);
+        cell_quadrature     = cell_quadrature_type(2*(m_degree+1));
+        face_basis          = face_basis_type(m_degree);
+        face_quadrature     = face_quadrature_type(2*m_degree);
+    }
+
+public:
+    local_info()
+        : m_degree(0)
+    {
+        init();
+    }
+
+    local_info(size_t degree)
+        : m_degree(degree)
+    {
+        init();
+    }
+
+    void
+    compute(const mesh_type& msh, const cell_type& cl)
+    {
+        auto cell_quadpoints = cell_quadrature.integrate(msh, cl);
+    }
+
 };
 
 template<typename Mesh, typename CellBasisType, typename CellQuadType,
@@ -601,24 +650,13 @@ public:
                 matrix_type c_dphi =
                     cell_basis.eval_gradients(msh, cl, qp.point(), 1, m_degree+1);
 
-                //std::cout << c_phi.rows() << " " << c_phi.cols() << std::endl;
-                //std::cout << c_dphi.rows() << " " << c_dphi.cols() << std::endl;
-
                 matrix_type c_dphi_n = c_dphi * n;
-                matrix_type T = c_phi * c_dphi_n.transpose();
+                matrix_type T = qp.weight() * c_dphi_n * c_phi.transpose();
+
                 BG.block(0, 0, BG.rows(), BG_col_range.size()) -= T;
 
                 matrix_type f_phi = face_basis.eval_functions(msh, fc, qp.point());
-                matrix_type F = f_phi * c_dphi_n.transpose();
-
-                std::cout << "fphi " << f_phi.size() << std::endl;
-                std::cout << "cdphi " << c_dphi.size() << std::endl;
-                std::cout << F.rows() << " " << F.cols() << std::endl;
-
-                matrix_type L = BG.block(0, current_face_range.min(),
-                         BG.rows(), current_face_range.size());
-
-                         std::cout << L.rows() << " " << L.cols() << std::endl;
+                matrix_type F = qp.weight() * c_dphi_n * f_phi.transpose();
 
                 BG.block(0, current_face_range.min(),
                          BG.rows(), current_face_range.size()) += F;
@@ -880,25 +918,7 @@ public:
         for (auto& qp : cell_quadpoints)
         {
             auto c_phi = cell_basis.eval_functions(msh, cl, qp.point());
-
-//#define USE_BLAS
-
-#ifdef USE_BLAS
-            int sz = c_phi.size();
-            double w = qp.weight();
-            int one = 1;
-            dger(&sz, &sz, &w, c_phi.data(), &one, c_phi.data(), &one, mass_mat.data(), &sz);
-#else
-
-#ifdef FILL_COLMAJOR
-            for (size_t j = 0; j < cell_basis.size(); j++)
-                for (size_t i = 0; i < cell_basis.size(); i++)
-#else
-            for (size_t i = 0; i < cell_basis.size(); i++)
-                for (size_t j = 0; j < cell_basis.size(); j++)
-#endif
-                    mass_mat(i,j) += qp.weight() * mm_prod(c_phi[i], c_phi[j]);
-#endif
+            mass_mat += qp.weight() * c_phi * c_phi.transpose();
         }
 
         auto zero_range         = cell_basis.range(0, m_degree);
@@ -941,39 +961,8 @@ public:
             {
                 auto f_phi = face_basis.eval_functions(msh, fc, qp.point());
                 auto c_phi = cell_basis.eval_functions(msh, cl, qp.point());
-
-#ifdef USE_BLAS
-                int sz = f_phi.size();
-                double w = qp.weight();
-                int one = 1;
-                dger(&sz, &sz, &w, f_phi.data(), &one, f_phi.data(), &one, face_mass_matrix.data(), &sz);
-#else
-
-#ifdef FILL_COLMAJOR
-                for (size_t j = 0; j < face_basis.size(); j++)
-                    for (size_t i = 0; i < face_basis.size(); i++)
-#else
-                for (size_t i = 0; i < face_basis.size(); i++)
-                    for (size_t j = 0; j < face_basis.size(); j++)
-#endif
-                        face_mass_matrix(i,j) += qp.weight() * mm_prod(f_phi[i], f_phi[j]);
-
-#endif
-
-#ifdef USE_BLAS
-                int sz2 = c_phi.size();
-                dger(&sz, &sz2, &w, f_phi.data(), &one, c_phi.data(), &one, face_trace_matrix.data(), &sz);
-#else
-
-#ifdef FILL_COLMAJOR
-                for (size_t j = 0; j < cell_basis.size(); j++)
-                    for (size_t i = 0; i < face_basis.size(); i++)
-#else
-                for (size_t i = 0; i < face_basis.size(); i++)
-                    for (size_t j = 0; j < cell_basis.size(); j++)
-#endif
-                        face_trace_matrix(i,j) += qp.weight() * mm_prod(f_phi[i], c_phi[j]);
-#endif
+                face_mass_matrix += qp.weight() * f_phi * f_phi.transpose();
+                face_trace_matrix += qp.weight() * f_phi * c_phi.transpose();
             }
 
             Eigen::LLT<matrix_type> piKF;
@@ -1297,14 +1286,8 @@ public:
             for (auto& qp : fqd)
             {
                 auto f_phi = fb.eval_functions(msh, bfc, qp.point());
-
-                for (size_t i = 0; i < f_phi.size(); i++)
-                {
-                    for (size_t j = 0; j < f_phi.size(); j++)
-                        MFF(i,j) += qp.weight() * f_phi[i] * f_phi[j];
-
-                    rhs_f(i) += qp.weight() * f_phi[i] * bc(qp.point());
-                }
+                MFF += qp.weight() * f_phi * f_phi.transpose();
+                rhs_f += qp.weight() * f_phi * bc(qp.point());
             }
 
 
@@ -1457,26 +1440,8 @@ public:
             for (auto& qp : fqd)
             {
                 auto f_phi = face_basis.eval_functions(msh, bfc, qp.point());
-
-                auto bc_val = bc(qp.point());
-
-#ifdef FILL_COLMAJOR
-                for (size_t j = 0; j < f_phi.size(); j++)
-                {
-                    for (size_t i = 0; i < f_phi.size(); i++)
-                        MFF(i,j) += qp.weight() * mm_prod(f_phi[i], f_phi[j]);
-
-                    rhs_f(j) += qp.weight() * mm_prod(f_phi[j], bc_val);
-                }
-#else
-                for (size_t i = 0; i < f_phi.size(); i++)
-                {
-                    for (size_t j = 0; j < f_phi.size(); j++)
-                        MFF(i,j) += qp.weight() * mm_prod(f_phi[i], f_phi[j]);
-
-                    rhs_f(i) += qp.weight() * mm_prod(f_phi[i], bc_val);
-                }
-#endif
+                MFF += qp.weight() * f_phi * f_phi.transpose();
+                rhs_f += qp.weight() * f_phi * bc(qp.point());
             }
 
 #ifdef FILL_COLMAJOR
