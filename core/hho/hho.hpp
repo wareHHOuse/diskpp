@@ -501,8 +501,9 @@ public:
             {
                 auto f_phi = face_basis.eval_functions(msh, fc, qp.point());
                 auto c_phi = cell_basis.eval_functions(msh, cl, qp.point());
-                face_mass_matrix += qp.weight() * f_phi * f_phi.transpose();
-                face_trace_matrix += qp.weight() * f_phi * c_phi.transpose();
+                auto q_f_phi = qp.weight() * f_phi;
+                face_mass_matrix += q_f_phi * f_phi.transpose();
+                face_trace_matrix += q_f_phi * c_phi.transpose();
             }
 
             Eigen::LLT<matrix_type> piKF;
