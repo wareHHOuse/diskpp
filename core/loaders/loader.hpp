@@ -52,6 +52,7 @@
 #include <set>
 
 #include "geometry/geometry.hpp"
+#include "loader_utils.hpp"
 
 #include "mapped_file.h"
 #include "strtot.hpp"
@@ -542,25 +543,7 @@ read_edge_line(const char *str, char **endptr)
     return std::make_tuple(t1, t2-1, t3-1);
 }
 
-template<typename T>
-void
-sort_uniq(std::vector<T>& v)
-{
-    std::sort(v.begin(), v.end());
-    auto uniq_iter = std::unique(v.begin(), v.end());
-    v.erase(uniq_iter, v.end());
-}
-
 } //namespace priv
-
-#define THREADED
-#ifdef THREADED
-    #define THREAD(name, body) std::thread name([&]{body})
-    #define WAIT_THREAD(name) name.join()
-#else
-    #define THREAD(name, body) {body}
-    #define WAIT_THREAD(name)
-#endif
 
 template<typename T>
 class netgen_mesh_loader<T,2> : public mesh_loader<simplicial_mesh<T,2>>

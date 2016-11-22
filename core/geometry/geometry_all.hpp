@@ -81,12 +81,12 @@ points(const Mesh& msh, const Element& elem)
 
 /* Compute the barycenter of a cell */
 template<typename Mesh, typename Element>
-point<typename Mesh::value_type, Mesh::dimension>
+point<typename Mesh::coordinate_type, Mesh::dimension>
 barycenter(const Mesh& msh, const Element& elm)
 {
     auto pts = points(msh, elm);
     auto bar = std::accumulate(std::next(pts.begin()), pts.end(), pts.front());
-    return bar / typename Mesh::value_type( pts.size() );
+    return bar / typename Mesh::coordinate_type( pts.size() );
 }
 
 template<typename Mesh, typename Element>

@@ -74,6 +74,8 @@ struct mesh_storage<T, 3, StorageClass>
         std::cout << "Edges: " << edges.size() << std::endl;
         std::cout << "Surfaces: " << surfaces.size() << std::endl;
         std::cout << "Volumes: " << volumes.size() << std::endl;
+        auto bs = std::count(boundary_surfaces.begin(), boundary_surfaces.end(), true);
+        std::cout << "Boundary surfaces: " << bs << std::endl;
     }
 };
 
@@ -105,6 +107,8 @@ struct mesh_storage<T, 2, StorageClass>
         std::cout << "Nodes: " << nodes.size() << std::endl;
         std::cout << "Edges: " << edges.size() << std::endl;
         std::cout << "Surfaces: " << surfaces.size() << std::endl;
+        auto be = std::count(boundary_edges.begin(), boundary_edges.end(), true);
+        std::cout << "Boundary edges: " << be << std::endl;
     }
 };
 

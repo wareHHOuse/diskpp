@@ -63,16 +63,16 @@ namespace priv {
     template<typename Iterator, typename Predicate>
     class filter_iterator
     {
-        Predicate       predicate_;
-        Iterator        itor_{}, end_{};
+        Predicate       m_predicate;
+        Iterator        m_itor{}, m_end{};
 
-        void advance(void) { itor_++; }
+        void advance(void) { m_itor++; }
 
         void find_next(void)
         {
-            while ( itor_ != end_ )
+            while ( m_itor != m_end )
             {
-                if ( predicate_(*itor_) )
+                if ( m_predicate(*m_itor) )
                     return;
                 advance();
             }
@@ -85,17 +85,17 @@ namespace priv {
         filter_iterator() = default;
 
         filter_iterator(Predicate pred, Iterator itor, Iterator end)
-            : predicate_(pred), itor_(itor), end_(end)
+            : m_predicate(pred), m_itor(itor), m_end(end)
         {
             if (itor != end)
                 find_next();
         }
 
-        reference operator*() { return *itor_; }
-        value_type *operator->() const { return &(*itor_); }
+        reference operator*() { return *m_itor; }
+        value_type *operator->() const { return &(*m_itor); }
 
         filter_iterator& operator++() {
-            if ( itor_ != end_ )
+            if ( m_itor != m_end )
                 advance();
             find_next();
             return *this;
@@ -107,8 +107,8 @@ namespace priv {
             return it;
         }
 
-        bool operator==(const filter_iterator& other) { return (itor_ == other.itor_); }
-        bool operator!=(const filter_iterator& other) { return (itor_ != other.itor_); }
+        bool operator==(const filter_iterator& other) { return (m_itor == other.m_itor); }
+        bool operator!=(const filter_iterator& other) { return (m_itor != other.m_itor); }
     };
 
     template<typename mesh_type>
@@ -232,7 +232,6 @@ public:
     typedef typename Storage::surface_type                      surface_type;
     typedef typename Storage::edge_type                         edge_type;
     typedef typename Storage::node_type                         node_type;
-    typedef T                                                   value_type;
     typedef typename Storage::point_type                        point_type;
 
     typedef volume_type                                         cell;
@@ -308,7 +307,6 @@ public:
     typedef typename Storage::surface_type                      surface_type;
     typedef typename Storage::edge_type                         edge_type;
     typedef typename Storage::node_type                         node_type;
-    typedef T                                                   value_type;
     typedef typename Storage::point_type                        point_type;
 
     typedef surface_type                                        cell;
@@ -378,7 +376,6 @@ class mesh_base<T,1,Storage> : public mesh_bones<T,1,Storage>
 public:
     typedef typename Storage::edge_type                     edge_type;
     typedef typename Storage::node_type                     node_type;
-    typedef T                                               value_type;
     typedef typename Storage::point_type                    point_type;
 
     typedef edge_type                                       cell;
@@ -448,7 +445,10 @@ class mesh : public priv::mesh_base<T,DIM,Storage>
 {
 public:
     static const size_t dimension = DIM;
-    typedef T scalar_type;
+
+    [[deprecated("Use 'coordinate_type'")]] typedef T scalar_type;
+
+    typedef T coordinate_type;
 
     typedef typename priv::mesh_base<T, DIM, Storage>::point_type   point_type;
     typedef typename priv::mesh_base<T, DIM, Storage>::cell         cell;
@@ -569,6 +569,39 @@ end(const mesh<T, DIM, Storage>& msh)
 {
     return msh.cells_end();
 }
+
+
+template<template<typename, size_t, typename> class Mesh,
+         typename T, typename Storage>
+void
+dump_to_matlab(const Mesh<T, 2, Storage>& msh, const std::string& filename)
+{
+    std::ofstream ofs(filename);
+
+    for (auto cl : msh)
+    {
+        auto fcs = faces(msh, cl);
+        for (auto fc : fcs)
+        {
+            auto pts = points(msh, fc);
+            if ( msh.is_boundary(fc) )
+            {
+                ofs << "line([" << pts[0].x() << " " << pts[1].x() << "], [";
+                ofs << pts[0].y() << " " << pts[1].y() << "], 'Color', 'r');";
+                ofs << std::endl;
+            }
+            else
+            {
+                ofs << "line([" << pts[0].x() << " " << pts[1].x() << "], [";
+                ofs << pts[0].y() << " " << pts[1].y() << "], 'Color', 'k');";
+                ofs << std::endl;
+            }
+        }
+    }
+
+    ofs.close();
+}
+
 
 template<typename Mesh>
 class bounding_box

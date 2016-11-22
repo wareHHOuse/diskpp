@@ -143,7 +143,7 @@ public:
     typename std::enable_if<DIM == 1 || DIM == 2 || DIM == 3, U>::type
     x(size_t power) const
     {
-        assert(power <= max_computed_power && "power too large");
+        assert(power <= m_max_computed_power && "power too large");
         return m_powers[power];
     }
 
@@ -151,7 +151,7 @@ public:
     typename std::enable_if<DIM == 2 || DIM == 3, U>::type
     y(size_t power) const
     {
-        assert(power <= max_computed_power && "power too large");
+        assert(power <= m_max_computed_power && "power too large");
         return m_powers[(MAX_POWER+1) + power];
     }
 
@@ -159,10 +159,33 @@ public:
     typename std::enable_if<DIM == 3, U>::type
     z(size_t power) const
     {
-        assert(power <= max_computed_power && "power too large");
+        assert(power <= m_max_computed_power && "power too large");
         return m_powers[2*(MAX_POWER+1) + power];
     }
 };
+
+/*
+template<typename T, size_t M, size_t N>
+class evaluated_basis
+{
+    std::vector<static_matrix<T, M, N>>     m_basis_data;
+
+public:
+    evaluated_basis() {}
+
+};
+
+template<typename T, size_t M>
+class evaluated_basis<T,M,1>
+{
+    Eigen::Matrix<T, Eigen::Dynamic, M>     m_basis_data;
+
+public:
+    evaluated_basis() {}
+};
+*/
+
+
 
 } //namespace disk
 
