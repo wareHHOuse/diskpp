@@ -189,6 +189,9 @@ class gradient_reconstruction
     typedef dynamic_matrix<scalar_type>         matrix_type;
     typedef dynamic_vector<scalar_type>         vector_type;
 
+    typedef material_tensor<scalar_type, mesh_type::dimension, mesh_type::dimension>
+                                                material_tensor_type;
+
     cell_basis_type                             cell_basis;
     cell_quadrature_type                        cell_quadrature;
 
@@ -221,13 +224,21 @@ public:
 
     void compute(const mesh_type& msh, const cell_type& cl)
     {
+        material_tensor_type id_tens;
+        id_tens = material_tensor_type::Identity();
+        compute(msh, cl, id_tens);
+    }
+
+    void compute(const mesh_type& msh, const cell_type& cl,
+                 const material_tensor_type& mtens)
+    {
         matrix_type stiff_mat = matrix_type::Zero(cell_basis.size(), cell_basis.size());
 
         auto cell_quadpoints = cell_quadrature.integrate(msh, cl);
         for (auto& qp : cell_quadpoints)
         {
-            auto dphi = cell_basis.eval_gradients(msh, cl, qp.point());
-            stiff_mat += qp.weight() * dphi * dphi.transpose();
+            matrix_type dphi = cell_basis.eval_gradients(msh, cl, qp.point());
+            stiff_mat += qp.weight() * dphi * (/*mtens **/ dphi.transpose());
         }
 
         /* LHS: take basis functions derivatives from degree 1 to K+1 */
@@ -265,7 +276,7 @@ public:
                 matrix_type c_dphi =
                     cell_basis.eval_gradients(msh, cl, qp.point(), 1, m_degree+1);
 
-                matrix_type c_dphi_n = c_dphi * n;
+                matrix_type c_dphi_n = (c_dphi /** mtens*/) * n;
                 matrix_type T = qp.weight() * c_dphi_n * c_phi.transpose();
 
                 BG.block(0, 0, BG.rows(), BG_col_range.size()) -= T;

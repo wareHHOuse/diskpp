@@ -21,6 +21,7 @@
 #ifndef _GEOMETRY_SIMPLICIAL_HPP_
 #define _GEOMETRY_SIMPLICIAL_HPP_
 
+#include <set>
 #include <list>
 
 #include "geometry/element_simplicial.hpp"
@@ -232,57 +233,114 @@ class submesher<simplicial_mesh<T,2>>
     typedef typename mesh_type::point_type      point_type;
     typedef typename mesh_type::cell            cell_type;
 
+    struct edge
+    {
+        edge(){}
+
+        edge(size_t ap0, size_t ap1, bool bnd = false)
+        {
+            p0                  = ap0;
+            p1                  = ap1;
+            is_boundary         = bnd;
+            is_broken           = false;
+        }
+
+        friend bool operator<(const edge& a, const edge& b) {
+            return ( a.p1 < b.p1 or (a.p1 == b.p1 and a.p0 < b.p0) );
+        }
+
+        friend bool operator==(const edge& a, const edge& b) {
+            return ( a.p0 == b.p0 and a.p1 == b.p0 );
+        }
+
+        size_t  p0, p1, pb;
+        bool    is_boundary, is_broken;
+    };
+
+
     struct triangle
     {
+        triangle() {}
+        triangle(size_t ap0, size_t ap1, size_t ap2) : p0(ap0), p1(ap1), p2(ap2) {}
+
         size_t p0, p1, p2;
-        bool   b0, b1, b2;
     };
 
     std::vector<point_type>     m_points;
+    std::vector<edge>           m_edges;
     std::list<triangle>         m_triangles;
+
 
     void refine(size_t steps)
     {
         if (steps == 0)
             return;
 
-        size_t triangles_to_process = m_triangles.size();
+        /* break all the edges */
+        for (auto& e : m_edges)
+        {
+            assert(!e.is_broken);
+            auto bar = (m_points[e.p0] + m_points[e.p1])*0.5;
+            e.pb = m_points.size();
+            m_points.push_back(bar);
+            e.is_broken = true;
+        }
 
+        /* refine the triangles */
+        size_t triangles_to_process = m_triangles.size();
         for (size_t i = 0; i < triangles_to_process; i++)
         {
+            /* remove the original triangle */
             triangle t = m_triangles.front();
             m_triangles.pop_front();
 
-            auto new_point_pos = m_points.size();
+            /* find the edges of the triangle */
+            auto t_e0 = *std::lower_bound(m_edges.begin(), m_edges.end(), edge(t.p0, t.p1));
+            assert(t_e0.is_broken);
+            auto t_e1 = *std::lower_bound(m_edges.begin(), m_edges.end(), edge(t.p1, t.p2));
+            assert(t_e1.is_broken);
+            auto t_e2 = *std::lower_bound(m_edges.begin(), m_edges.end(), edge(t.p0, t.p2));
+            assert(t_e2.is_broken);
 
-            auto bar0 = (m_points[t.p0] + m_points[t.p1])/2;
-            auto bar1 = (m_points[t.p1] + m_points[t.p2])/2;
-            auto bar2 = (m_points[t.p0] + m_points[t.p2])/2;
+            assert(t_e0.p1 == t_e1.p0);
+            assert(t_e1.p1 == t_e2.p1);
+            assert(t_e0.p0 == t_e2.p0);
 
-            m_points.push_back(bar0); auto bar0pos = new_point_pos;
-            m_points.push_back(bar1); auto bar1pos = new_point_pos+1;
-            m_points.push_back(bar2); auto bar2pos = new_point_pos+2;
-
-            triangle t0, t1, t2, t3;
-
-            t0.p0 = t.p0; t0.p1 = bar0pos; t0.p2 = bar2pos;
-            t0.b0 = t.b0; t0.b1 = false; t0.b2 = t.b2;
+            /* compute the edges of the new four triangles */
+            /* first triangle */
+            m_edges.push_back( edge(t_e0.p0, t_e0.pb, t_e0.is_boundary) );
+            m_edges.push_back( edge(t_e0.pb, t_e2.pb, false) );
+            m_edges.push_back( edge(t_e0.p0, t_e2.pb, t_e2.is_boundary) );
+            triangle t0(t_e0.p0, t_e0.pb, t_e2.pb);
             m_triangles.push_back(t0);
 
-            t1.p0 = bar0pos; t1.p1 = t.p1; t1.p2 = bar1pos;
-            t1.b0 = t.b0; t1.b1 = t.b1; t1.b2 = false;
+            /* second triangle */
+            m_edges.push_back( edge(t_e0.p1, t_e0.pb, t_e0.is_boundary) );
+            m_edges.push_back( edge(t_e0.pb, t_e1.pb, false) );
+            m_edges.push_back( edge(t_e1.p0, t_e1.pb, t_e1.is_boundary) );
+            triangle t1(t_e0.p1, t_e0.pb, t_e1.pb);
             m_triangles.push_back(t1);
 
-            t2.p0 = bar2pos; t2.p1 = bar1pos; t2.p2 = t.p2;
-            t2.b0 = false; t2.b1 = t.b1; t2.b2 = t.b2;
+            /* third triangle */
+            m_edges.push_back( edge(t_e1.p1, t_e1.pb, t_e1.is_boundary) );
+            m_edges.push_back( edge(t_e1.pb, t_e2.pb, false) );
+            m_edges.push_back( edge(t_e2.p1, t_e2.pb, t_e2.is_boundary) );
+            triangle t2(t_e1.p1, t_e1.pb, t_e2.pb);
             m_triangles.push_back(t2);
 
-            t3.p0 = bar0pos; t3.p1 = bar1pos; t3.p2 = bar2pos;
-            t3.b0 = false; t3.b1 = false; t3.b2 = false;
+            /* fourth triangle */
+            triangle t3(t_e0.pb, t_e1.pb, t_e2.pb);
             m_triangles.push_back(t3);
         }
 
-        refine(steps-1);
+        /* we don't need the broken edges anymore, discard them */
+        auto edge_is_broken = [](const edge& e) -> bool { return e.is_broken; };
+        std::remove_if(m_edges.begin(), m_edges.end(), edge_is_broken);
+
+        /* sort the edges to allow lookups */
+        priv::sort_uniq(m_edges);
+
+        refine(steps - 1);
     }
 
 public:
@@ -290,20 +348,24 @@ public:
     {}
 
     mesh_type
-    generate_mesh(const mesh_type& msh, const cell_type& cl)
+    generate_mesh(const mesh_type& msh, const cell_type& cl, size_t refinement_steps = 3)
     {
         m_points.clear();
+        m_edges.clear();
         m_triangles.clear();
 
+        /* Transform the triangle in internal representation */
         auto pts = points(msh, cl);
         m_points.insert(m_points.begin(), pts.begin(), pts.end());
 
-        triangle t;
-        t.p0 = 0; t.p1 = 1; t.p2 = 2;
-        t.b0 = true; t.b1 = true; t.b2 = true;
+        edge e0(0, 1, true); m_edges.push_back(e0);
+        edge e1(0, 2, true); m_edges.push_back(e1);
+        edge e2(1, 2, true); m_edges.push_back(e2);
+
+        triangle t(0,1,2);
         m_triangles.push_back(t);
 
-        refine( 3 );
+        refine( refinement_steps );
 
         mesh_type refined_element_submesh;
         auto storage = refined_element_submesh.backend_storage();
@@ -336,9 +398,16 @@ public:
             storage->edges.push_back( e2 );
             storage->surfaces.push_back( typename mesh_type::surface_type({pi0, pi1, pi2}) );
 
-            if (t.b0) be.push_back(e0);
-            if (t.b1) be.push_back(e1);
-            if (t.b2) be.push_back(e2);
+            auto t_e0 = *std::lower_bound(m_edges.begin(), m_edges.end(), edge(t.p0, t.p1));
+            assert(!t_e0.is_broken);
+            auto t_e1 = *std::lower_bound(m_edges.begin(), m_edges.end(), edge(t.p1, t.p2));
+            assert(!t_e1.is_broken);
+            auto t_e2 = *std::lower_bound(m_edges.begin(), m_edges.end(), edge(t.p0, t.p2));
+            assert(!t_e2.is_broken);
+
+            if (t_e0.is_boundary) be.push_back(e0);
+            if (t_e1.is_boundary) be.push_back(e1);
+            if (t_e2.is_boundary) be.push_back(e2);
         }
 
         THREAD(edge_thread,

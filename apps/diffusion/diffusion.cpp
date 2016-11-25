@@ -94,12 +94,99 @@ test_gradrec(MeshType& msh, size_t degree)
     ofs.close();
 }
 
+#if 0
+template<typename MeshType>
+class diffusion_solver
+{
+    typedef MeshType                            mesh_type;
+    typedef typename mesh_type::scalar_type     scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
+
+    typedef quadrature<mesh_type, cell_type>    cell_quadrature_type;
+    typedef quadrature<mesh_type, face_type>    face_quadrature_type;
+
+    typedef scaled_monomial_scalar_basis<mesh_type, cell_type>  cell_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, face_type>  face_basis_type;
+
+    typedef gradient_reconstruction<mesh_type, cell_basis_type,
+                                    cell_quadrature_type, face_basis_type,
+                                    face_quadrature_type> gradrec_type;
+
+    typedef diffusion_like_stabilization<mesh_type, cell_basis_type,
+                                         cell_quadrature_type, face_basis_type,
+                                         face_quadrature_type> stab_type;
+
+    typedef diffusion_like_static_condensation<mesh_type, cell_basis_type,
+                                               cell_quadrature_type,
+                                               face_basis_type,
+                                               face_quadrature_type> statcond_type;
+
+    typedef assembler<mesh_type, face_basis_type, face_quadrature_type> assembler_type;
+
+
+    gradrec_type        m_gradrec;
+    stab_type           m_stab;
+    statcond_type       m_statcond;
+    assembler_type      m_assembler;
+
+    size_t              m_degree;
+
+    template<typename Function, typename BoundaryConditions, typename MaterialParamFunction>
+    void assemble_problem(const Function& load,
+                          const BoundaryConditions& bcs,
+                          const MaterialParamFunction& mpf)
+    {
+        timecounter_new tc;
+
+        /* ASSEMBLE PROBLEM */
+        std::cout << "Assembling..." << std::endl;
+        tc.tic();
+        for (auto& cl : msh)
+        {
+            auto mp = mpf(barycenter(msh, cl));
+
+            gradrec.compute(msh, cl, mp);
+            stab.compute(msh, cl, gradrec.oper);
+            auto cell_rhs = compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, degree);
+            dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
+            auto scnp = statcond.compute(msh, cl, loc, cell_rhs);
+            assembler.assemble(msh, cl, scnp);
+        }
+
+        std::cout << "  Imposing boundary conditions" << std::endl;
+        assembler.impose_boundary_conditions(msh, solution);
+        std::cout << "  Finalizing" << std::endl;
+        assembler.finalize();
+        tc.toc();
+        std::cout << "Assembly total time: " << tc << " seconds." << std::endl;
+    }
+
+public:
+    diffusion_solver() : m_degree(1)
+    {}
+
+    diffusion_solver(size_t degree) : m_degree(degree)
+    {
+        m_gradrec   = gradrec_type(m_degree);
+        m_stab      = stab_type(m_degree);
+        m_statcond  = statcond_type(m_degree);
+        m_assembler = assembler_type(m_degree);
+    }
+
+};
+
+#endif
+
+
+
 template<typename MeshType, typename Function, typename Solution>
 void
 test_diffusion(MeshType& msh,               /* handle to the mesh */
                const Function& load,        /* rhs */
                const Solution& solution,    /* solution of the problem */
-               size_t degree)               /* degree of the method */
+               size_t degree,               /* degree of the method */
+               const std::string& outfile)  /* output file name */
 {
     typedef MeshType                                   mesh_type;
     typedef typename mesh_type::scalar_type            scalar_type;
@@ -114,27 +201,27 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
 
 
     disk::gradient_reconstruction<mesh_type,
-                                        cell_basis_type,
-                                        cell_quadrature_type,
-                                        face_basis_type,
-                                        face_quadrature_type> gradrec(degree);
+                                  cell_basis_type,
+                                  cell_quadrature_type,
+                                  face_basis_type,
+                                  face_quadrature_type> gradrec(degree);
 
 
     disk::diffusion_like_stabilization<mesh_type,
+                                       cell_basis_type,
+                                       cell_quadrature_type,
+                                       face_basis_type,
+                                       face_quadrature_type> stab(degree);
+
+    disk::diffusion_like_static_condensation<mesh_type,
                                              cell_basis_type,
                                              cell_quadrature_type,
                                              face_basis_type,
-                                             face_quadrature_type> stab(degree);
-
-    disk::diffusion_like_static_condensation<mesh_type,
-                                                   cell_basis_type,
-                                                   cell_quadrature_type,
-                                                   face_basis_type,
-                                                   face_quadrature_type> statcond(degree);
+                                             face_quadrature_type> statcond(degree);
 
     disk::assembler<mesh_type,
-                          face_basis_type,
-                          face_quadrature_type> assembler(msh, degree);
+                    face_basis_type,
+                    face_quadrature_type> assembler(msh, degree);
 
     timecounter_new tc;
     std::map<std::string, double> timings;
@@ -201,7 +288,7 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     scalar_type err_dof = 0.0;
     scalar_type err_fun = 0.0;
 
-    std::ofstream ofs("plot.dat");
+    std::ofstream ofs(outfile);
 
     disk::projector<mesh_type,
                     cell_basis_type,
@@ -282,12 +369,13 @@ int main(int argc, char **argv)
 {
     using RealType = double;
 
-    char    *filename   = nullptr;
-    int     degree      = 1;
-    int     elems_1d    = 8;
+    char    *filename       = nullptr;
+    int     degree          = 1;
+    int     elems_1d        = 8;
+    bool    submesh_flag    = false;
     int ch;
 
-    while ( (ch = getopt(argc, argv, "k:n:")) != -1 )
+    while ( (ch = getopt(argc, argv, "k:n:s")) != -1 )
     {
         switch(ch)
         {
@@ -307,6 +395,10 @@ int main(int argc, char **argv)
                     std::cout << "Num of elems must be positive. Falling back to 8." << std::endl;
                     elems_1d = 8;
                 }
+                break;
+
+            case 's':
+                submesh_flag = true;
                 break;
 
             case 'h':
@@ -342,7 +434,7 @@ int main(int argc, char **argv)
         };
 
         //test_gradrec(msh, degree);
-        test_diffusion(msh, f, sf, degree);
+        test_diffusion(msh, f, sf, degree, "plot.dat");
 
         return 0;
     }
@@ -374,7 +466,7 @@ int main(int argc, char **argv)
             //return - p.x() * p.x() * p.x();
         };
 
-        test_diffusion(msh, f, sf, degree);
+        test_diffusion(msh, f, sf, degree, "plot.dat");
         //test_gradrec(msh, degree);
     }
 
@@ -403,8 +495,30 @@ int main(int argc, char **argv)
             //return - p.x() * p.x() * p.x();
         };
 
-        test_diffusion(msh, f, sf, degree);
-        //test_gradrec(msh, degree);
+        if (submesh_flag)
+        {
+            disk::submesher<mesh_type> sm;
+
+            size_t count = 0;
+            for (auto& cl : msh)
+            {
+                std::cout << "Solving on element " << count << std::endl;
+                std::stringstream ss;
+                ss << "plot_element_" << count << ".dat";
+                auto submesh = sm.generate_mesh(msh, cl);
+                test_diffusion(submesh, f, sf, degree, ss.str());
+
+                ss.str("");
+                ss << "element_" << count << ".m";
+                dump_to_matlab(submesh, ss.str());
+
+                count++;
+            }
+        }
+        else
+        {
+            test_diffusion(msh, f, sf, degree, "plot.dat");
+        }
     }
 
     if (std::regex_match(filename, std::regex(".*\\.mesh$") ))
@@ -432,7 +546,7 @@ int main(int argc, char **argv)
             //return -p.x() * p.x() * 0.5;
         };
 
-        test_diffusion(msh, f, sf, degree);
+        test_diffusion(msh, f, sf, degree, "plot.dat");
         //test_gradrec(msh, degree);
     }
 
