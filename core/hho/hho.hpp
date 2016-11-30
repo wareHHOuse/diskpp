@@ -151,6 +151,90 @@ public:
     }
 };
 
+template<typename BQData>
+class projector_bq
+{
+    typedef typename BQData::mesh_type          mesh_type;
+    typedef typename mesh_type::scalar_type     scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
+    typedef typename BQData::cell_basis_type    cell_basis_type;
+    typedef typename BQData::face_basis_type    face_basis_type;
+    typedef typename BQData::cell_quad_type     cell_quadrature_type;
+    typedef typename BQData::face_quad_type     face_quadrature_type;
+    typedef dynamic_matrix<scalar_type>         matrix_type;
+    typedef dynamic_vector<scalar_type>         vector_type;
+
+    const BQData&                               m_bqd;
+
+public:
+
+    projector_bq(const BQData& bqd) : m_bqd(bqd)
+    {}
+
+    matrix_type cell_mm;
+
+    template<typename Function>
+    vector_type
+    compute_cell(const mesh_type& msh, const cell_type& cl, const Function& f)
+    {
+        auto cell_degree = m_bqd.cell_degree();
+        auto cell_basis_size = m_bqd.cell_basis.range(0, cell_degree).size();
+
+        matrix_type mm = matrix_type::Zero(cell_basis_size, cell_basis_size);
+        vector_type rhs = vector_type::Zero(cell_basis_size);
+
+        auto cell_quadpoints = m_bqd.cell_quadrature.integrate(msh, cl);
+        for (auto& qp : cell_quadpoints)
+        {
+            auto phi = m_bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, cell_degree);
+
+            mm  += qp.weight() * phi * phi.transpose();
+            rhs += qp.weight() * f(qp.point()) * phi;
+        }
+
+        cell_mm = mm;
+        return mm.llt().solve(rhs);
+    }
+
+    template<typename Function>
+    vector_type
+    compute_whole(const mesh_type& msh, const cell_type& cl, const Function& f)
+    {
+        auto cell_degree = m_bqd.cell_degree();
+        auto face_degree = m_bqd.face_degree();
+        auto cell_basis_size = m_bqd.cell_basis.range(0, cell_degree).size();
+        auto face_basis_size = m_bqd.face_basis.range(0, face_degree).size();
+
+
+        auto fcs = faces(msh, cl);
+        vector_type ret(cell_basis_size + fcs.size()*face_basis_size);
+
+        ret.block(0, 0, cell_basis_size, 1) = compute_cell(msh, cl, f);
+
+        size_t face_offset = cell_basis_size;
+        for (auto& fc : fcs)
+        {
+            matrix_type mm = matrix_type::Zero(face_basis_size, face_basis_size);
+            vector_type rhs = vector_type::Zero(face_basis_size);
+
+            auto face_quadpoints = m_bqd.face_quadrature.integrate(msh, fc);
+            for (auto& qp : face_quadpoints)
+            {
+                auto phi = m_bqd.face_basis.eval_functions(msh, fc, qp.point());
+
+                mm  += qp.weight() * phi * phi.transpose();
+                rhs += qp.weight() * f(qp.point()) * phi;
+            }
+
+            ret.block(face_offset, 0, face_basis_size, 1) = mm.llt().solve(rhs);
+            face_offset += face_basis_size;
+        }
+
+        return ret;
+    }
+};
+
 /*
 struct scalar_potential_gradient_reconstruction;
 
@@ -171,6 +255,161 @@ struct bases_quadratures_trait<Mesh, scalar_potential_gradient_reconstruction>
 };
 */
 
+template<typename Mesh,
+         template<typename, typename> class Basis,
+         template<typename, typename> class Quadrature>
+class basis_quadrature_data /* this name really sucks */
+{
+public:
+    typedef Mesh                            mesh_type;
+    typedef typename mesh_type::cell        cell_type;
+    typedef typename mesh_type::face        face_type;
+
+    typedef Basis<mesh_type, cell_type>         cell_basis_type;
+    typedef Basis<mesh_type, face_type>         face_basis_type;
+    typedef Quadrature<mesh_type, cell_type>    cell_quad_type;
+    typedef Quadrature<mesh_type, face_type>    face_quad_type;
+
+    cell_basis_type     cell_basis;
+    face_basis_type     face_basis;
+    cell_quad_type      cell_quadrature;
+    face_quad_type      face_quadrature;
+
+private:
+    size_t  m_cell_degree, m_face_degree;
+
+    void init(void)
+    {
+        cell_basis          = cell_basis_type(m_cell_degree+1);
+        face_basis          = face_basis_type(m_face_degree);
+        cell_quadrature     = cell_quad_type(2*(m_cell_degree+1));
+        face_quadrature     = face_quad_type(2*m_face_degree);
+    }
+
+public:
+    basis_quadrature_data() : m_cell_degree(1), m_face_degree(1)
+    {
+        init();
+    }
+
+    basis_quadrature_data(size_t cell_degree, size_t face_degree)
+    {
+        if (cell_degree + 1 < face_degree or cell_degree > face_degree + 1)
+            throw std::invalid_argument("Invalid cell degree");
+
+        m_cell_degree = cell_degree;
+        m_face_degree = face_degree;
+
+        init();
+    }
+
+    size_t cell_degree(void) const { return m_cell_degree; }
+    size_t face_degree(void) const { return m_face_degree; }
+};
+
+template<typename BQData>
+class gradient_reconstruction_bq
+{
+    typedef typename BQData::mesh_type          mesh_type;
+    typedef typename mesh_type::scalar_type     scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
+    typedef typename BQData::cell_basis_type    cell_basis_type;
+    typedef typename BQData::face_basis_type    face_basis_type;
+    typedef typename BQData::cell_quad_type     cell_quadrature_type;
+    typedef typename BQData::face_quad_type     face_quadrature_type;
+    typedef dynamic_matrix<scalar_type>         matrix_type;
+    typedef dynamic_vector<scalar_type>         vector_type;
+
+    typedef material_tensor<scalar_type, mesh_type::dimension, mesh_type::dimension>
+                                                material_tensor_type;
+
+    const BQData&                               m_bqd;
+
+public:
+    matrix_type     oper;
+    matrix_type     data;
+
+    gradient_reconstruction_bq(const BQData& bqd) : m_bqd(bqd)
+    {}
+
+    void compute(const mesh_type& msh, const cell_type& cl)
+    {
+        material_tensor_type id_tens;
+        id_tens = material_tensor_type::Identity();
+        compute(msh, cl, id_tens);
+    }
+
+    void compute(const mesh_type& msh, const cell_type& cl,
+                 const material_tensor_type& mtens)
+    {
+        auto cell_basis_size = m_bqd.cell_basis.size();
+        auto face_basis_size = m_bqd.face_basis.size();
+        auto cell_degree = m_bqd.cell_degree();
+        auto face_degree = m_bqd.face_degree();
+
+        matrix_type stiff_mat = matrix_type::Zero(cell_basis_size, cell_basis_size);
+
+        auto cell_quadpoints = m_bqd.cell_quadrature.integrate(msh, cl);
+        for (auto& qp : cell_quadpoints)
+        {
+            matrix_type dphi = m_bqd.cell_basis.eval_gradients(msh, cl, qp.point());
+            stiff_mat += qp.weight() * dphi * (/*mtens **/ dphi.transpose());
+        }
+
+        /* LHS: take basis functions derivatives from degree 1 to K+1 */
+        auto MG_rowcol_range = m_bqd.cell_basis.range(1, cell_degree+1);
+        matrix_type MG = take(stiff_mat, MG_rowcol_range, MG_rowcol_range);
+
+        /* RHS, volumetric part. */
+        auto BG_row_range = m_bqd.cell_basis.range(1, cell_degree+1);
+        auto BG_col_range = m_bqd.cell_basis.range(0, cell_degree);
+
+        auto fcs = faces(msh, cl);
+        auto num_faces = fcs.size();
+
+        auto num_cell_dofs = m_bqd.cell_basis.range(0, cell_degree).size();
+        auto num_face_dofs = face_basis_size;
+
+        dofspace_ranges dsr(num_cell_dofs, num_face_dofs, num_faces);
+
+        matrix_type BG = matrix_type::Zero(BG_row_range.size(), dsr.total_size());
+
+        BG.block(0, 0, BG_row_range.size(), BG_col_range.size()) =
+                                take(stiff_mat, BG_row_range, BG_col_range);
+
+        for (size_t face_i = 0; face_i < num_faces; face_i++)
+        {
+            auto current_face_range = dsr.face_range(face_i);
+            auto fc = fcs[face_i];
+            auto n = normal(msh, cl, fc);
+            auto face_quadpoints = m_bqd.face_quadrature.integrate(msh, fc);
+
+            for (auto& qp : face_quadpoints)
+            {
+                matrix_type c_phi =
+                    m_bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, cell_degree);
+                matrix_type c_dphi =
+                    m_bqd.cell_basis.eval_gradients(msh, cl, qp.point(), 1, cell_degree+1);
+
+                matrix_type c_dphi_n = (c_dphi /** mtens*/) * n;
+                matrix_type T = qp.weight() * c_dphi_n * c_phi.transpose();
+
+                BG.block(0, 0, BG.rows(), BG_col_range.size()) -= T;
+
+                matrix_type f_phi = m_bqd.face_basis.eval_functions(msh, fc, qp.point());
+                matrix_type F = qp.weight() * c_dphi_n * f_phi.transpose();
+
+                BG.block(0, current_face_range.min(),
+                         BG.rows(), current_face_range.size()) += F;
+            }
+        }
+
+        oper  = MG.llt().solve(BG);    // GT
+        data  = BG.transpose() * oper;  // A
+    }
+
+};
 
 template<typename Mesh, typename CellBasisType, typename CellQuadType,
                         typename FaceBasisType, typename FaceQuadType>
@@ -415,6 +654,118 @@ public:
     }
 };
 
+
+
+
+template<typename BQData>
+class diffusion_like_stabilization_bq
+{
+    typedef typename BQData::mesh_type          mesh_type;
+    typedef typename mesh_type::scalar_type     scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
+    typedef typename BQData::cell_basis_type    cell_basis_type;
+    typedef typename BQData::face_basis_type    face_basis_type;
+    typedef typename BQData::cell_quad_type     cell_quadrature_type;
+    typedef typename BQData::face_quad_type     face_quadrature_type;
+    typedef dynamic_matrix<scalar_type>         matrix_type;
+    typedef dynamic_vector<scalar_type>         vector_type;
+
+    const BQData&                               m_bqd;
+
+public:
+    matrix_type     data;
+
+    diffusion_like_stabilization_bq(const BQData& bqd) : m_bqd(bqd)
+    {}
+
+    void compute(const mesh_type& msh, const cell_type& cl, const matrix_type& gradrec_oper)
+    {
+        auto cell_basis_size = m_bqd.cell_basis.size();
+        auto face_basis_size = m_bqd.face_basis.size();
+        auto cell_degree = m_bqd.cell_degree();
+        auto face_degree = m_bqd.face_degree();
+
+        matrix_type mass_mat = matrix_type::Zero(cell_basis_size, cell_basis_size);
+
+        auto cell_quadpoints = m_bqd.cell_quadrature.integrate(msh, cl);
+        for (auto& qp : cell_quadpoints)
+        {
+            auto c_phi = m_bqd.cell_basis.eval_functions(msh, cl, qp.point());
+            mass_mat += qp.weight() * c_phi * c_phi.transpose();
+        }
+
+        auto zero_range         = m_bqd.cell_basis.range(0, cell_degree);
+        auto one_range          = m_bqd.cell_basis.range(1, cell_degree+1);
+
+        // Build \pi_F^k (v_F - P_T^K v) equations (21) and (22)
+
+        //Step 1: compute \pi_T^k p_T^k v (third term).
+        matrix_type M1 = take(mass_mat, zero_range, zero_range);
+        matrix_type M2 = take(mass_mat, zero_range, one_range);
+        matrix_type proj1 = -M1.llt().solve(M2*gradrec_oper);
+
+        //Step 2: v_T - \pi_T^k p_T^k v (first term minus third term)
+        matrix_type I_T = matrix_type::Identity(zero_range.size(), zero_range.size());
+        proj1.block(0, 0, zero_range.size(), zero_range.size()) += I_T;
+
+        auto fcs = faces(msh, cl);
+        auto num_faces = fcs.size();
+
+        auto num_cell_dofs = m_bqd.cell_basis.range(0, cell_degree).size();
+        auto num_face_dofs = face_basis_size;
+
+        dofspace_ranges dsr(num_cell_dofs, num_face_dofs, num_faces);
+
+        data = matrix_type::Zero(dsr.total_size(), dsr.total_size());
+
+        // Step 3: project on faces (eqn. 21)
+        for (size_t face_i = 0; face_i < num_faces; face_i++)
+        {
+            auto current_face_range = dsr.face_range(face_i);
+            auto fbs = current_face_range.size();
+            auto h = diameter(msh, /*fcs[face_i]*/cl);
+            auto fc = fcs[face_i];
+
+            matrix_type face_mass_matrix    = matrix_type::Zero(fbs, fbs);
+            matrix_type face_trace_matrix   = matrix_type::Zero(fbs, cell_basis_size);
+
+            auto face_quadpoints = m_bqd.face_quadrature.integrate(msh, fc);
+            for (auto& qp : face_quadpoints)
+            {
+                auto f_phi = m_bqd.face_basis.eval_functions(msh, fc, qp.point());
+                auto c_phi = m_bqd.cell_basis.eval_functions(msh, cl, qp.point());
+                auto q_f_phi = qp.weight() * f_phi;
+                face_mass_matrix += q_f_phi * f_phi.transpose();
+                face_trace_matrix += q_f_phi * c_phi.transpose();
+            }
+
+            Eigen::LLT<matrix_type> piKF;
+            piKF.compute(face_mass_matrix);
+
+            // Step 3a: \pi_F^k( v_F - p_T^k v )
+            auto face_range = current_face_range.remove_offset();
+            matrix_type MR1 = take(face_trace_matrix, face_range, one_range);
+            matrix_type proj2 = piKF.solve(MR1*gradrec_oper);
+            matrix_type I_F = matrix_type::Identity(fbs, fbs);
+            auto block_offset = current_face_range.min();
+            proj2.block(0, block_offset, fbs, fbs) -= I_F;
+
+            // Step 3b: \pi_F^k( v_T - \pi_T^k p_T^k v )
+            matrix_type MR2 = take(face_trace_matrix, face_range, zero_range);
+            matrix_type proj3 = piKF.solve(MR2*proj1);
+
+            matrix_type BRF = proj2 + proj3;
+
+            data += BRF.transpose() * face_mass_matrix * BRF / h;
+        }
+    }
+};
+
+
+
+
+
 template<typename Mesh, typename CellBasisType, typename CellQuadType,
                         typename FaceBasisType, typename FaceQuadType>
 class diffusion_like_stabilization
@@ -538,6 +889,100 @@ public:
         }
     }
 };
+
+template<typename BQData>
+class diffusion_like_static_condensation_bq
+{
+    typedef typename BQData::mesh_type          mesh_type;
+    typedef typename mesh_type::scalar_type     scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
+    typedef typename BQData::cell_basis_type    cell_basis_type;
+    typedef typename BQData::face_basis_type    face_basis_type;
+    typedef typename BQData::cell_quad_type     cell_quadrature_type;
+    typedef typename BQData::face_quad_type     face_quadrature_type;
+    typedef dynamic_matrix<scalar_type>         matrix_type;
+    typedef dynamic_vector<scalar_type>         vector_type;
+
+    const BQData&                               m_bqd;
+
+public:
+    diffusion_like_static_condensation_bq(const BQData& bqd) : m_bqd(bqd)
+    {}
+
+    auto
+    compute(const mesh_type& msh, const cell_type& cl,
+            const matrix_type& local_mat,
+            const vector_type& cell_rhs)
+    {
+        auto cell_degree = m_bqd.cell_degree();
+        auto face_degree = m_bqd.face_degree();
+        auto num_cell_dofs = m_bqd.cell_basis.range(0, cell_degree).size();
+        auto num_face_dofs = m_bqd.face_basis.range(0, face_degree).size();
+
+        auto fcs = faces(msh, cl);
+        auto num_faces = fcs.size();
+
+        dofspace_ranges dsr(num_cell_dofs, num_face_dofs, num_faces);
+
+        size_t cell_size = dsr.cell_range().size();
+        size_t face_size = dsr.all_faces_range().size();
+
+        matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
+        matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
+        matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
+        matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
+
+        assert(K_TT.cols() == cell_size);
+        assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
+        assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
+        assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
+        assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
+
+        auto K_TT_ldlt = K_TT.llt();
+        matrix_type AL = K_TT_ldlt.solve(K_TF);
+        vector_type bL = K_TT_ldlt.solve(cell_rhs);
+
+        matrix_type AC = K_FF - K_FT * AL;
+        vector_type bC = /* no projection on faces, eqn. 26*/ - K_FT * bL;
+
+        return std::make_pair(AC, bC);
+    }
+
+    vector_type
+    recover(const mesh_type& msh, const cell_type& cl,
+            const matrix_type& local_mat,
+            const vector_type& cell_rhs,
+            const vector_type& solF)
+    {
+        auto cell_degree = m_bqd.cell_degree();
+        auto face_degree = m_bqd.face_degree();
+        auto num_cell_dofs = m_bqd.cell_basis.range(0, cell_degree).size();
+        auto num_face_dofs = m_bqd.face_basis.range(0, face_degree).size();
+
+        auto fcs = faces(msh, cl);
+        auto num_faces = fcs.size();
+
+        dofspace_ranges dsr(num_cell_dofs, num_face_dofs, num_faces);
+
+        size_t cell_size        = dsr.cell_range().size();
+        size_t all_faces_size   = dsr.all_faces_range().size();
+
+        vector_type ret( dsr.total_size() );
+
+        matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
+        matrix_type K_TF = local_mat.topRightCorner(cell_size, all_faces_size);
+
+        vector_type solT = K_TT.llt().solve(cell_rhs - K_TF*solF);
+
+        ret.head(cell_size)         = solT;
+        ret.tail(all_faces_size)    = solF;
+
+        return ret;
+    }
+
+};
+
 
 template<typename Mesh, typename CellBasisType, typename CellQuadType,
                         typename FaceBasisType, typename FaceQuadType>

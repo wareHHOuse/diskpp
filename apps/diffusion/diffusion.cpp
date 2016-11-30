@@ -34,6 +34,7 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
+#if 0
 template<typename MeshType>
 void
 test_gradrec(MeshType& msh, size_t degree)
@@ -93,6 +94,7 @@ test_gradrec(MeshType& msh, size_t degree)
     }
     ofs.close();
 }
+#endif
 
 #if 0
 template<typename MeshType>
@@ -200,28 +202,55 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
 
 
+    /*
+
     disk::gradient_reconstruction<mesh_type,
                                   cell_basis_type,
                                   cell_quadrature_type,
                                   face_basis_type,
                                   face_quadrature_type> gradrec(degree);
 
+    */
 
+    typedef
+    disk::basis_quadrature_data<mesh_type,
+                                disk::scaled_monomial_scalar_basis,
+                                disk::quadrature> bqdata_type;
+
+    int l = 0;
+    size_t cell_degree = degree + l;
+    size_t face_degree = degree;
+
+    std::cout << "Running HHO with cell degree " << cell_degree << " and face degree ";
+    std::cout << face_degree << std::endl;
+
+    bqdata_type bqd(cell_degree, face_degree);
+
+    disk::gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
+
+    /*
     disk::diffusion_like_stabilization<mesh_type,
                                        cell_basis_type,
                                        cell_quadrature_type,
                                        face_basis_type,
                                        face_quadrature_type> stab(degree);
+    */
 
+    disk::diffusion_like_stabilization_bq<bqdata_type> stab(bqd);
+
+    /*
     disk::diffusion_like_static_condensation<mesh_type,
                                              cell_basis_type,
                                              cell_quadrature_type,
                                              face_basis_type,
                                              face_quadrature_type> statcond(degree);
+    */
+
+    disk::diffusion_like_static_condensation_bq<bqdata_type> statcond(bqd);
 
     disk::assembler<mesh_type,
                     face_basis_type,
-                    face_quadrature_type> assembler(msh, degree);
+                    face_quadrature_type> assembler(msh, face_degree);
 
     timecounter_new tc;
     std::map<std::string, double> timings;
@@ -244,7 +273,7 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
         timings["Stabilization"] += tc_detail.to_double();
 
         tc_detail.tic();
-        auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, degree);
+        auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, cell_degree);
         dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
         auto scnp = statcond.compute(msh, cl, loc, cell_rhs);
         tc_detail.toc();
@@ -290,16 +319,20 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
 
     std::ofstream ofs(outfile);
 
+    /*
     disk::projector<mesh_type,
                     cell_basis_type,
                     cell_quadrature_type,
                     face_basis_type,
                     face_quadrature_type> projk(degree);
 
-    cell_basis_type         cell_basis(degree);
-    cell_quadrature_type    cell_quadrature(2*degree);
-    face_basis_type         face_basis(degree);
-    size_t fbs = face_basis.size();
+    */
+    disk::projector_bq<bqdata_type> projk(bqd);
+
+    //cell_basis_type         cell_basis(degree);
+    //cell_quadrature_type    cell_quadrature(2*degree);
+    //face_basis_type         face_basis(degree);
+    size_t fbs = bqd.face_basis.size();
 
     for (auto& cl : msh)
     {
@@ -326,25 +359,25 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
         gradrec.compute(msh, cl);
         stab.compute(msh, cl, gradrec.oper);
         dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
-        auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, degree);
+        auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, cell_degree);
         dynamic_vector<scalar_type> x = statcond.recover(msh, cl, loc, cell_rhs, xFs);
 
-        auto qps = cell_quadrature.integrate(msh, cl);
+        auto qps = bqd.cell_quadrature.integrate(msh, cl);
         for (auto& qp : qps)
         {
-            auto phi = cell_basis.eval_functions(msh, cl, qp.point());
+            auto phi = bqd.cell_basis.eval_functions(msh, cl, qp.point());
 
             scalar_type pot = 0.0;
-            for (size_t i = 0; i < cell_basis.size(); i++)
+            for (size_t i = 0; i < bqd.cell_basis.range(0, cell_degree).size(); i++)
                 pot += phi[i] * x(i);
 
-            auto potr = solution(qp.point());
+            //auto potr = solution(qp.point());
 
-            scalar_type diff = 0.0;
-            diff = (pot - potr) * (pot - potr) * qp.weight();
+            //scalar_type diff = 0.0;
+            //diff = (pot - potr) * (pot - potr) * qp.weight();
             //std::cout << pot << " " << potr << " " << qp.weight() << " " << diff << std::endl;
 
-            err_fun += diff;
+            //err_fun += diff;
 
             auto tp = qp.point();
             for (size_t i = 0; i < MeshType::dimension; i++)
@@ -362,7 +395,7 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
 
     std::cout << "Mesh diameter: " << diam << std::endl;
     std::cout << "L2-norm error, dof:   " << std::sqrt(err_dof) << std::endl;
-    std::cout << "L2-norm error, fun:   " << std::sqrt(err_fun) << std::endl;
+    //std::cout << "L2-norm error, fun:   " << std::sqrt(err_fun) << std::endl;
 }
 
 int main(int argc, char **argv)
@@ -371,11 +404,12 @@ int main(int argc, char **argv)
 
     char    *filename       = nullptr;
     int     degree          = 1;
+    int     l               = 0;
     int     elems_1d        = 8;
     bool    submesh_flag    = false;
     int ch;
 
-    while ( (ch = getopt(argc, argv, "k:n:s")) != -1 )
+    while ( (ch = getopt(argc, argv, "k:n:sl:")) != -1 )
     {
         switch(ch)
         {
@@ -399,6 +433,15 @@ int main(int argc, char **argv)
 
             case 's':
                 submesh_flag = true;
+                break;
+
+            case 'l':
+                l = atoi(optarg);
+                if (l < -1 or l > 1)
+                {
+                    std::cout << "l can be -1, 0 or 1. Falling back to 0." << std::endl;
+                    l = 0;
+                }
                 break;
 
             case 'h':
