@@ -1097,6 +1097,129 @@ public:
 
 };
 
+template<typename Mesh>
+class multiscale_local_problem
+{
+    typedef Mesh                                mesh_type;
+    typedef typename mesh_type::scalar_type     scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
+    typedef dynamic_matrix<scalar_type>         matrix_type;
+    typedef dynamic_vector<scalar_type>         vector_type;
+    typedef Eigen::SparseMatrix<scalar_type>    sparse_matrix_type;
+    typedef Eigen::Triplet<scalar_type>         triplet_type;
+
+    typedef basis_quadrature_data<mesh_type,
+                                  scaled_monomial_scalar_basis,
+                                  quadrature>   bqdata_type;
+
+    size_t                        m_degree, m_cell_degree, m_face_degree;
+
+public:
+    sparse_matrix_type                          matrix;
+    vector_type                                 rhs;
+
+    multiscale_local_problem() : m_degree(1)
+    {}
+
+    multiscale_local_problem(size_t degree)
+    {
+        // TODO: add checks
+        m_degree = degree;
+        m_cell_degree = degree - 1;
+        m_face_degree = degree;
+    }
+
+    void assemble(const mesh_type& coarse_msh, const cell_type& coarse_cl,
+                  size_t problem_index)
+    {
+        assert(m_degree > 0);
+        submesher<Mesh>                             submesher;
+        bqdata_type                                 bqd(m_cell_degree, m_face_degree);
+        gradient_reconstruction_bq<bqdata_type>     gradrec(bqd);
+        diffusion_like_stabilization_bq<bqdata_type>   stab(bqd);
+
+        auto msh = submesher.generate_mesh(coarse_msh, coarse_cl);
+
+        auto num_cell_dofs = howmany_dofs(bqd.cell_basis, 0, m_cell_degree);
+        auto num_face_dofs = howmany_dofs(bqd.face_basis, 0, m_face_degree);
+
+        auto matrix_face_offset = num_cell_dofs * msh.cells_size();
+        auto matrix_mult_offset = matrix_face_offset + num_face_dofs * msh.faces_size();
+        auto system_size = num_cell_dofs * msh.cells_size() +
+                           2 * ( num_face_dofs * msh.faces_size() );
+
+        matrix = sparse_matrix_type(system_size, system_size);
+        rhs = vector_type::Zero(system_size);
+
+        std::vector<triplet_type> triplets;
+
+        /* Assemble standard HHO part */
+        size_t cell_idx = 0;
+        for (auto& cl : msh)
+        {
+            auto fcs = faces(msh, cl);
+            std::vector<size_t> l2g(num_cell_dofs + fcs.size() * num_face_dofs);
+
+            /* Build DOF offset table: cell */
+            for (size_t i = 0; i < num_cell_dofs; i++)
+                l2g[i] = cell_idx * num_cell_dofs + i;
+
+            /* Build DOF offset table: faces */
+            for (size_t i = 0; i < fcs.size(); i++)
+            {
+                auto fc = fcs[i];
+                auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+                if (!eid.first)
+                    throw std::invalid_argument("This is a bug: face not found");
+
+                auto face_id = eid.second;
+                /* global offset of current face */
+                auto face_offset = matrix_face_offset + face_id * num_face_dofs;
+
+                /* offset in the DOF table */
+                auto dt_ofs = num_cell_dofs + i * num_face_dofs;
+
+                for (size_t j = 0; j < num_face_dofs; j++)
+                    l2g[dt_ofs+j] = face_offset+j;
+
+                auto face_quadpoints = bqd.face_quadrature.integrate(msh, fc);
+                for (auto& qp : face_quadpoints)
+                {
+                    auto phi = bqd.eval_functions(msh, fc, qp.point());
+                }
+            }
+
+            /* Compute HHO element contribution */
+            gradrec.compute(msh, cl);
+            stab.compute(msh, cl, gradrec.oper);
+            dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
+            assert(loc.rows() == l2g.size());
+            assert(loc.cols() == l2g.size());
+
+            /* Assemble into the matrix */
+            for (size_t i = 0; i < l2g.size(); i++)
+                for (size_t j = 0; j < l2g.size(); j++)
+                    triplets.push_back( triplet_type(l2g[i], l2g[j], loc(i,j)) );
+
+            cell_idx++;
+        }
+
+        matrix.setFromTriplets(triplets.begin(), triplets.end());
+
+        std::stringstream ss;
+        ss << "matrix.mat";
+        std::ofstream ofs(ss.str());
+
+        for (int k=0; k<matrix.outerSize(); ++k)
+            for (Eigen::SparseMatrix<double>::InnerIterator it(matrix,k); it; ++it)
+                ofs << it.row() << " " << it.col() << " " << it.value() << std::endl;
+
+        ofs.close();
+        triplets.clear();
+    }
+};
+
 template<typename Mesh, //typename CellBasisType, typename CellQuadType,
                         typename FaceBasisType, typename FaceQuadType>
 class assembler

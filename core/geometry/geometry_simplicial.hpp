@@ -433,8 +433,6 @@ public:
             storage->boundary_edges.at(ei.second) = true;
         }
 
-        storage->statistics();
-
         return refined_element_submesh;
     }
 };

@@ -64,4 +64,10 @@ mm_prod(const static_matrix<T,N,N>& a, const static_matrix<T,N,N>& b)
     return a.cwiseProduct(b).sum();
 }
 
+template<typename T>
+size_t howmany_dofs(const T& basis, size_t min_degree, size_t max_degree)
+{
+    return basis.range(min_degree, max_degree).size();
+}
+
 } // namespace disk

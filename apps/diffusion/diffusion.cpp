@@ -540,6 +540,7 @@ int main(int argc, char **argv)
 
         if (submesh_flag)
         {
+            /*
             disk::submesher<mesh_type> sm;
 
             size_t count = 0;
@@ -557,6 +558,14 @@ int main(int argc, char **argv)
 
                 count++;
             }
+            */
+            disk::multiscale_local_problem<mesh_type> mlp(degree);
+
+            for (auto& cl : msh)
+            {
+                mlp.assemble(msh, cl, 0);
+            }
+
         }
         else
         {
