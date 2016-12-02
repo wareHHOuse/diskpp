@@ -563,7 +563,7 @@ int main(int argc, char **argv)
 
             for (auto& cl : msh)
             {
-                mlp.assemble(msh, cl, 0);
+                mlp.assemble(msh, cl);
             }
 
         }

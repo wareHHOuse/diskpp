@@ -1117,7 +1117,7 @@ class multiscale_local_problem
 
 public:
     sparse_matrix_type                          matrix;
-    vector_type                                 rhs;
+    matrix_type                                 rhs;
 
     multiscale_local_problem() : m_degree(1)
     {}
@@ -1130,14 +1130,13 @@ public:
         m_face_degree = degree;
     }
 
-    void assemble(const mesh_type& coarse_msh, const cell_type& coarse_cl,
-                  size_t problem_index)
+    void assemble(const mesh_type& coarse_msh, const cell_type& coarse_cl)
     {
         assert(m_degree > 0);
-        submesher<Mesh>                             submesher;
-        bqdata_type                                 bqd(m_cell_degree, m_face_degree);
-        gradient_reconstruction_bq<bqdata_type>     gradrec(bqd);
-        diffusion_like_stabilization_bq<bqdata_type>   stab(bqd);
+        submesher<Mesh>                                 submesher;
+        bqdata_type                                     bqd(m_cell_degree, m_face_degree);
+        gradient_reconstruction_bq<bqdata_type>         gradrec(bqd);
+        diffusion_like_stabilization_bq<bqdata_type>    stab(bqd);
 
         auto msh = submesher.generate_mesh(coarse_msh, coarse_cl);
 
@@ -1150,7 +1149,7 @@ public:
                            2 * ( num_face_dofs * msh.faces_size() );
 
         matrix = sparse_matrix_type(system_size, system_size);
-        rhs = vector_type::Zero(system_size);
+        rhs = matrix_type::Zero(system_size, num_cell_dofs);
 
         std::vector<triplet_type> triplets;
 
@@ -1183,10 +1182,27 @@ public:
                 for (size_t j = 0; j < num_face_dofs; j++)
                     l2g[dt_ofs+j] = face_offset+j;
 
+                matrix_type face_mass_matrix;
+                face_mass_matrix = matrix_type::Zero(num_face_dofs, num_face_dofs);
+
                 auto face_quadpoints = bqd.face_quadrature.integrate(msh, fc);
                 for (auto& qp : face_quadpoints)
                 {
-                    auto phi = bqd.eval_functions(msh, fc, qp.point());
+                    auto phi = bqd.face_basis.eval_functions(msh, fc, qp.point());
+                    face_mass_matrix += qp.weight() * phi * phi.transpose();
+                }
+
+                auto mult_offset = matrix_mult_offset + face_id * num_face_dofs;
+
+                for (size_t j = 0; j < num_face_dofs; j++)
+                {
+                    for (size_t k = 0; k < num_face_dofs; k++)
+                    {
+                        size_t row = mult_offset + j;
+                        size_t col = face_offset + k;
+                        triplets.push_back( triplet_type(row, col, face_mass_matrix(j,k)) );
+                        triplets.push_back( triplet_type(col, row, face_mass_matrix(k,j)) );
+                    }
                 }
             }
 
@@ -1202,10 +1218,27 @@ public:
                 for (size_t j = 0; j < l2g.size(); j++)
                     triplets.push_back( triplet_type(l2g[i], l2g[j], loc(i,j)) );
 
+            matrix.setFromTriplets(triplets.begin(), triplets.end());
+
+            matrix_type cell_mass_matrix;
+            cell_mass_matrix = matrix_type::Zero(num_cell_dofs, num_cell_dofs);
+
+            auto cell_quadpoints = bqd.cell_quadrature.integrate(msh, cl);
+            for (auto& qp : cell_quadpoints)
+            {
+                auto phi = bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, m_cell_degree);
+                cell_mass_matrix += qp.weight() * phi * phi.transpose();
+            }
+
+            for (size_t i = 0; i < num_cell_dofs; i++)
+            {
+                auto cell_offset = cell_idx * num_cell_dofs;
+                for (size_t j = 0; j < num_cell_dofs; j++)
+                    rhs(cell_offset+i, j) = cell_mass_matrix(i,j);
+            }
+
             cell_idx++;
         }
-
-        matrix.setFromTriplets(triplets.begin(), triplets.end());
 
         std::stringstream ss;
         ss << "matrix.mat";
@@ -1217,6 +1250,18 @@ public:
 
         ofs.close();
         triplets.clear();
+
+
+
+#ifdef HAVE_INTEL_MKL
+    Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
+#else
+    Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
+#endif
+
+    solver.analyzePattern(matrix);
+    solver.factorize(matrix);
+    dynamic_vector<scalar_type> X = solver.solve(rhs);
     }
 };
 
