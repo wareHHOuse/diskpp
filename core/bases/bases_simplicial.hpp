@@ -398,7 +398,34 @@ make_test_points(const simplicial_mesh<T,3>& msh,
     return test_points;
 }
 
+template<typename T>
+std::vector<point<T,2>>
+make_test_points(const simplicial_mesh<T,2>& msh,
+                 const typename simplicial_mesh<T,2>::cell& cl,
+                 size_t levels)
+{
+    std::vector<point<T,2>> test_points;
+    auto pts = points(msh, cl);
 
+    auto d0 = (pts[0] - pts[2]) / levels;
+    auto d1 = (pts[1] - pts[2]) / levels;
+
+    test_points.push_back( pts[2] );
+    for (size_t i = 1; i < levels; i++)
+    {
+        auto p0 = pts[2] + i * d0;
+        auto p1 = pts[2] + i * d1;
+
+        auto d2 = (p1 - p0) / i;
+
+        for (size_t j = 0; j <= i; j++)
+            test_points.push_back( p0 + j * d2 );
+    }
+
+    //std::cout << "Test points: " << test_points.size() << std::endl;
+
+    return test_points;
+}
 
 
 } // namespace disk

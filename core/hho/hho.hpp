@@ -1138,7 +1138,7 @@ public:
         gradient_reconstruction_bq<bqdata_type>         gradrec(bqd);
         diffusion_like_stabilization_bq<bqdata_type>    stab(bqd);
 
-        auto msh = submesher.generate_mesh(coarse_msh, coarse_cl);
+        auto msh = submesher.generate_mesh(coarse_msh, coarse_cl, 0);
 
         auto num_cell_dofs = howmany_dofs(bqd.cell_basis, 0, m_cell_degree);
         auto num_face_dofs = howmany_dofs(bqd.face_basis, 0, m_face_degree);
@@ -1254,14 +1254,40 @@ public:
 
 
 #ifdef HAVE_INTEL_MKL
-    Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
+        Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
 #else
-    Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
+        Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
 #endif
 
-    solver.analyzePattern(matrix);
-    solver.factorize(matrix);
-    dynamic_vector<scalar_type> X = solver.solve(rhs);
+        solver.analyzePattern(matrix);
+        solver.factorize(matrix);
+        matrix_type X = solver.solve(rhs);
+
+        std::ofstream ofs_sol("multiscale_plot.dat");
+        cell_idx = 0;
+        for (auto& cl : msh)
+        {
+            auto cell_sol = X.block(num_cell_dofs * cell_idx, 1, num_cell_dofs, 1);
+            //auto qps = bqd.cell_quadrature.integrate(msh, cl);
+            auto qps = make_test_points(msh, cl, 20);
+            for (auto& qp : qps)
+            {
+                auto phi = bqd.cell_basis.eval_functions(msh, cl, qp);
+
+                scalar_type pot = 0.0;
+                for (size_t i = 0; i < bqd.cell_basis.range(0, m_cell_degree).size(); i++)
+                    pot += phi[i] * cell_sol(i,0);
+
+                auto tp = qp;
+                for (size_t i = 0; i < mesh_type::dimension; i++)
+                    ofs_sol << tp[i] << " ";
+                ofs_sol << pot << std::endl;
+            }
+
+            cell_idx++;
+        }
+        ofs_sol.close();
+
     }
 };
 
