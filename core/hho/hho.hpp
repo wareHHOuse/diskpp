@@ -20,6 +20,7 @@
 #include "bases/bases_utils.hpp"
 #include "bases/bases_ranges.hpp"
 #include "timecounter.h"
+#include "contrib/sol2/sol.hpp"
 
 //#define USE_BLAS
 #define FILL_COLMAJOR
@@ -1114,20 +1115,33 @@ class multiscale_local_problem
                                   quadrature>   bqdata_type;
 
     size_t                        m_degree, m_cell_degree, m_face_degree;
+    size_t                        funcnum, ptlevels, reflevels;
 
 public:
     sparse_matrix_type                          matrix;
     matrix_type                                 rhs;
 
     multiscale_local_problem() : m_degree(1)
-    {}
+    {
+        load_params();
+    }
 
     multiscale_local_problem(size_t degree)
     {
         // TODO: add checks
         m_degree = degree;
-        m_cell_degree = degree - 1;
+        m_cell_degree = degree;
         m_face_degree = degree;
+        load_params();
+    }
+
+    void load_params(void)
+    {
+        sol::state lua;
+        lua.script_file("params.lua");
+        funcnum = lua.get<size_t>("funcnum");
+        ptlevels = lua.get<size_t>("ptlevels");
+        reflevels = lua.get<size_t>("reflevels");
     }
 
     void assemble(const mesh_type& coarse_msh, const cell_type& coarse_cl)
@@ -1138,7 +1152,7 @@ public:
         gradient_reconstruction_bq<bqdata_type>         gradrec(bqd);
         diffusion_like_stabilization_bq<bqdata_type>    stab(bqd);
 
-        auto msh = submesher.generate_mesh(coarse_msh, coarse_cl, 0);
+        auto msh = submesher.generate_mesh(coarse_msh, coarse_cl, reflevels);
 
         auto num_cell_dofs = howmany_dofs(bqd.cell_basis, 0, m_cell_degree);
         auto num_face_dofs = howmany_dofs(bqd.face_basis, 0, m_face_degree);
@@ -1146,7 +1160,8 @@ public:
         auto matrix_face_offset = num_cell_dofs * msh.cells_size();
         auto matrix_mult_offset = matrix_face_offset + num_face_dofs * msh.faces_size();
         auto system_size = num_cell_dofs * msh.cells_size() +
-                           2 * ( num_face_dofs * msh.faces_size() );
+                           num_face_dofs * msh.faces_size() +
+                           num_face_dofs * 3;
 
         matrix = sparse_matrix_type(system_size, system_size);
         rhs = matrix_type::Zero(system_size, num_cell_dofs);
@@ -1157,6 +1172,9 @@ public:
         size_t cell_idx = 0;
         for (auto& cl : msh)
         {
+            std::cout << "***********************" << std::endl;
+            std::cout << cl << std::endl;
+
             auto fcs = faces(msh, cl);
             std::vector<size_t> l2g(num_cell_dofs + fcs.size() * num_face_dofs);
 
@@ -1168,6 +1186,7 @@ public:
             for (size_t i = 0; i < fcs.size(); i++)
             {
                 auto fc = fcs[i];
+                //std::cout << msh.boundary_id(fc) << std::endl;
                 auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
                 if (!eid.first)
                     throw std::invalid_argument("This is a bug: face not found");
@@ -1181,7 +1200,7 @@ public:
 
                 for (size_t j = 0; j < num_face_dofs; j++)
                     l2g[dt_ofs+j] = face_offset+j;
-
+                /*
                 matrix_type face_mass_matrix;
                 face_mass_matrix = matrix_type::Zero(num_face_dofs, num_face_dofs);
 
@@ -1204,6 +1223,7 @@ public:
                         triplets.push_back( triplet_type(col, row, face_mass_matrix(k,j)) );
                     }
                 }
+                */
             }
 
             /* Compute HHO element contribution */
@@ -1218,8 +1238,6 @@ public:
                 for (size_t j = 0; j < l2g.size(); j++)
                     triplets.push_back( triplet_type(l2g[i], l2g[j], loc(i,j)) );
 
-            matrix.setFromTriplets(triplets.begin(), triplets.end());
-
             matrix_type cell_mass_matrix;
             cell_mass_matrix = matrix_type::Zero(num_cell_dofs, num_cell_dofs);
 
@@ -1227,7 +1245,8 @@ public:
             for (auto& qp : cell_quadpoints)
             {
                 auto phi = bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, m_cell_degree);
-                cell_mass_matrix += qp.weight() * phi * phi.transpose();
+                auto phi_coarse = bqd.cell_basis.eval_functions(coarse_msh, coarse_cl, qp.point(), 0, m_cell_degree);
+                cell_mass_matrix += qp.weight() * phi * phi_coarse.transpose();
             }
 
             for (size_t i = 0; i < num_cell_dofs; i++)
@@ -1240,15 +1259,62 @@ public:
             cell_idx++;
         }
 
-        std::stringstream ss;
-        ss << "matrix.mat";
-        std::ofstream ofs(ss.str());
+        for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++)
+        {
+            auto fc = *itor;
+            auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+            if (!eid.first)
+                throw std::invalid_argument("This is a bug: face not found");
+
+            auto face_id = eid.second;
+
+            auto face_offset = matrix_face_offset + face_id * num_face_dofs;
+
+            auto bndid_pair = msh.boundary_id(fc);
+            size_t coarse_id = bndid_pair.first;
+            size_t fine_id = bndid_pair.second;
+
+            assert (fine_id < 3);
+
+            auto coarse_fc = *(coarse_msh.faces_begin() + coarse_id);
+
+            matrix_type face_mass_matrix;
+            face_mass_matrix = matrix_type::Zero(num_face_dofs, num_face_dofs);
+
+            auto face_quadpoints = bqd.face_quadrature.integrate(msh, fc);
+            for (auto& qp : face_quadpoints)
+            {
+                auto phi = bqd.face_basis.eval_functions(msh, fc, qp.point());
+                auto phi_coarse = bqd.face_basis.eval_functions(msh, coarse_fc, qp.point());
+                face_mass_matrix += qp.weight() * phi * phi_coarse.transpose();
+            }
+
+            auto mult_offset = matrix_mult_offset + fine_id * num_face_dofs;
+
+            for (size_t j = 0; j < num_face_dofs; j++)
+            {
+                for (size_t k = 0; k < num_face_dofs; k++)
+                {
+                    size_t row = mult_offset + j;
+                    size_t col = face_offset + k;
+                    triplets.push_back( triplet_type(row, col, -face_mass_matrix(j,k)) );
+                    triplets.push_back( triplet_type(col, row, -face_mass_matrix(k,j)) );
+                }
+            }
+        }
+
+        matrix.setFromTriplets(triplets.begin(), triplets.end());
+
+        std::stringstream ssw;
+        ssw << "matrix.mat";
+        std::ofstream ofs(ssw.str());
 
         for (int k=0; k<matrix.outerSize(); ++k)
             for (Eigen::SparseMatrix<double>::InnerIterator it(matrix,k); it; ++it)
                 ofs << it.row() << " " << it.col() << " " << it.value() << std::endl;
 
         ofs.close();
+
         triplets.clear();
 
 
@@ -1263,13 +1329,22 @@ public:
         solver.factorize(matrix);
         matrix_type X = solver.solve(rhs);
 
-        std::ofstream ofs_sol("multiscale_plot.dat");
+        auto eid = find_element_id(coarse_msh.cells_begin(), coarse_msh.cells_end(), coarse_cl);
+        if (!eid.first)
+            throw std::invalid_argument("This is a bug: cell not found");
+
+        auto cell_id = eid.second;
+
+        std::stringstream ss;
+        ss << "multiscale_plot_" << cell_id << ".dat";
+
+        std::ofstream ofs_sol(ss.str());
         cell_idx = 0;
         for (auto& cl : msh)
         {
-            auto cell_sol = X.block(num_cell_dofs * cell_idx, 1, num_cell_dofs, 1);
+            auto cell_sol = X.block(num_cell_dofs * cell_idx, funcnum, num_cell_dofs, 1);
             //auto qps = bqd.cell_quadrature.integrate(msh, cl);
-            auto qps = make_test_points(msh, cl, 20);
+            auto qps = make_test_points(msh, cl, ptlevels);
             for (auto& qp : qps)
             {
                 auto phi = bqd.cell_basis.eval_functions(msh, cl, qp);

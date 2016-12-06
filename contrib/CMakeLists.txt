@@ -7,3 +7,4 @@ set(diskpp_source ${diskpp_source}
 
 add_subdirectory(jburkardt)
 set(LINK_LIBS "${LINK_LIBS}" PARENT_SCOPE)
+

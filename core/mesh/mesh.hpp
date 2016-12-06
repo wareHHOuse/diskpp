@@ -123,6 +123,27 @@ namespace priv {
     };
 
     template<typename mesh_type>
+    class is_boundary_pred_with_id
+    {
+        const mesh_type&    msh_;
+        size_t              m_element_id;
+    public:
+        is_boundary_pred_with_id(const mesh_type& msh, size_t id)
+            : msh_(msh), m_element_id(id)
+        {}
+
+        template<typename T>
+        bool operator()(const T& elem)
+        {
+            auto e = find_element_id(msh_.faces_begin(), msh_.faces_end(), elem);
+            if (e.first == false)
+                throw std::invalid_argument("Face not found. This is likely a bad bug.");
+
+            return msh_.is_boundary(e.second) && msh_.boundary_id(e.second) == m_element_id;
+        }
+    };
+
+    template<typename mesh_type>
     class is_internal_pred
     {
         const mesh_type&    msh_;
@@ -470,6 +491,10 @@ public:
                                   boundary_face_iterator;
 
     typedef priv::filter_iterator<typename mesh::face_iterator,
+                                  priv::is_boundary_pred_with_id<mesh>>
+                                  boundary_face_with_id_iterator;
+
+    typedef priv::filter_iterator<typename mesh::face_iterator,
                                   priv::is_internal_pred<mesh>>
                                   internal_face_iterator;
 
@@ -485,6 +510,18 @@ public:
         return boundary_face_iterator(ibp(*this), this->faces_end(), this->faces_end());
     }
 
+    boundary_face_with_id_iterator  boundary_faces_begin(size_t id)
+    {
+        typedef priv::is_boundary_pred_with_id<mesh> ibp;
+        return boundary_face_with_id_iterator(ibp(*this, id), this->faces_begin(), this->faces_end());
+    }
+
+    boundary_face_with_id_iterator  boundary_faces_end(size_t id)
+    {
+        typedef priv::is_boundary_pred_with_id<mesh> ibp;
+        return boundary_face_with_id_iterator(ibp(*this, id), this->faces_end(), this->faces_end());
+    }
+
     internal_face_iterator  internal_faces_begin()
     {
         typedef priv::is_internal_pred<mesh> iip;
@@ -495,6 +532,26 @@ public:
     {
         typedef priv::is_internal_pred<mesh> iip;
         return internal_face_iterator(iip(*this), this->faces_end(), this->faces_end());
+    }
+
+    size_t boundary_id(const typename face::id_type& fid) const
+    {
+        if ( !is_boundary(fid) )
+            throw std::invalid_argument("Face is not a boundary.");
+
+        return this->backend_storage()->boundary_id.at(fid);
+    }
+
+    size_t boundary_id(const face& f) const
+    {
+        auto e = find_element_id(this->faces_begin(), this->faces_end(), f);
+        if (e.first == false)
+            throw std::logic_error("Face not found. This is likely a bad bug.");
+
+        if ( !this->is_boundary(typename face::id_type(e.second)) )
+            throw std::invalid_argument("Face is not a boundary.");
+
+        return this->backend_storage()->boundary_id.at(e.second);
     }
 
     /* Apply a transformation to the mesh. Transform should be a functor or

@@ -65,6 +65,7 @@ struct mesh_storage<T, 3, StorageClass>
     std::vector<point_type>                         points;
 
     std::vector<bool>                               boundary_surfaces;
+    std::vector<size_t>                             boundary_id;
 
     void statistics(void) const
     {
@@ -99,6 +100,7 @@ struct mesh_storage<T, 2, StorageClass>
     std::vector<point_type>                         points;
 
     std::vector<bool>                               boundary_edges;
+    std::vector<size_t>                             boundary_id;
 
     void statistics(void) const
     {
@@ -130,6 +132,7 @@ struct mesh_storage<T, 1, StorageClass>
     std::vector<point_type>                         points;
 
     std::vector<bool>                               boundary_nodes;
+    std::vector<size_t>                             boundary_id;
 
     void statistics(void) const
     {

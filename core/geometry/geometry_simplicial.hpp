@@ -245,6 +245,15 @@ class submesher<simplicial_mesh<T,2>>
             is_broken           = false;
         }
 
+        edge(size_t ap0, size_t ap1, size_t bid, bool bnd)
+        {
+            p0                  = ap0;
+            p1                  = ap1;
+            is_boundary         = bnd;
+            is_broken           = false;
+            boundary_id         = bid;
+        }
+
         friend bool operator<(const edge& a, const edge& b) {
             return ( a.p1 < b.p1 or (a.p1 == b.p1 and a.p0 < b.p0) );
         }
@@ -255,6 +264,7 @@ class submesher<simplicial_mesh<T,2>>
 
         size_t  p0, p1, pb;
         bool    is_boundary, is_broken;
+        size_t  boundary_id;
     };
 
 
@@ -269,7 +279,6 @@ class submesher<simplicial_mesh<T,2>>
     std::vector<point_type>     m_points;
     std::vector<edge>           m_edges;
     std::list<triangle>         m_triangles;
-
 
     void refine(size_t steps)
     {
@@ -308,23 +317,23 @@ class submesher<simplicial_mesh<T,2>>
 
             /* compute the edges of the new four triangles */
             /* first triangle */
-            m_edges.push_back( edge(t_e0.p0, t_e0.pb, t_e0.is_boundary) );
+            m_edges.push_back( edge(t_e0.p0, t_e0.pb, t_e0.boundary_id, t_e0.is_boundary) );
             m_edges.push_back( edge(t_e0.pb, t_e2.pb, false) );
-            m_edges.push_back( edge(t_e0.p0, t_e2.pb, t_e2.is_boundary) );
+            m_edges.push_back( edge(t_e0.p0, t_e2.pb, t_e2.boundary_id, t_e2.is_boundary) );
             triangle t0(t_e0.p0, t_e0.pb, t_e2.pb);
             m_triangles.push_back(t0);
 
             /* second triangle */
-            m_edges.push_back( edge(t_e0.p1, t_e0.pb, t_e0.is_boundary) );
+            m_edges.push_back( edge(t_e0.p1, t_e0.pb, t_e0.boundary_id, t_e0.is_boundary) );
             m_edges.push_back( edge(t_e0.pb, t_e1.pb, false) );
-            m_edges.push_back( edge(t_e1.p0, t_e1.pb, t_e1.is_boundary) );
+            m_edges.push_back( edge(t_e1.p0, t_e1.pb, t_e1.boundary_id, t_e1.is_boundary) );
             triangle t1(t_e0.p1, t_e0.pb, t_e1.pb);
             m_triangles.push_back(t1);
 
             /* third triangle */
-            m_edges.push_back( edge(t_e1.p1, t_e1.pb, t_e1.is_boundary) );
+            m_edges.push_back( edge(t_e1.p1, t_e1.pb, t_e1.boundary_id, t_e1.is_boundary) );
             m_edges.push_back( edge(t_e1.pb, t_e2.pb, false) );
-            m_edges.push_back( edge(t_e2.p1, t_e2.pb, t_e2.is_boundary) );
+            m_edges.push_back( edge(t_e2.p1, t_e2.pb, t_e2.boundary_id, t_e2.is_boundary) );
             triangle t2(t_e1.p1, t_e1.pb, t_e2.pb);
             m_triangles.push_back(t2);
 
@@ -337,7 +346,7 @@ class submesher<simplicial_mesh<T,2>>
         auto edge_is_broken = [](const edge& e) -> bool { return e.is_broken; };
         std::remove_if(m_edges.begin(), m_edges.end(), edge_is_broken);
 
-        /* sort the edges to allow lookups */
+        /* sort the edges to allow fast lookups */
         priv::sort_uniq(m_edges);
 
         refine(steps - 1);
@@ -347,9 +356,10 @@ public:
     submesher()
     {}
 
-    mesh_type
+    std::pair<mesh_type, std::array<size_t, 3>>
     generate_mesh(const mesh_type& msh, const cell_type& cl, size_t refinement_steps = 3)
     {
+        std::cout << "genmesh" << std::endl;
         m_points.clear();
         m_edges.clear();
         m_triangles.clear();
@@ -358,9 +368,25 @@ public:
         auto pts = points(msh, cl);
         m_points.insert(m_points.begin(), pts.begin(), pts.end());
 
-        edge e0(0, 1, true); m_edges.push_back(e0);
-        edge e1(0, 2, true); m_edges.push_back(e1);
-        edge e2(1, 2, true); m_edges.push_back(e2);
+        /* here the mapping between the local boundary number and the parent
+         * cell boundary number is established */
+        std::array<size_t, 3>   boundary_mapping;
+        auto fcs = faces(msh, cl);
+        assert(fcs.size() == 3);
+
+        for (size_t i = 0; i < fcs.size(); i++)
+        {
+            auto fc = fcs[i];
+            auto coarse_id = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+            boundary_mapping[i] = coarse_id;
+
+            auto ptids = fc.point_ids();
+            assert(ptids.size() == 2);
+            edge e(ptids[0], ptids[1], i, true);
+            m_edges.push_back(e);
+        }
+
+        std::sort(m_edges.begin(), m_edges.end());
 
         triangle t(0,1,2);
         m_triangles.push_back(t);
@@ -378,7 +404,7 @@ public:
             storage->nodes.push_back( typename mesh_type::node_type({point_id}));
         }
 
-        std::vector<typename mesh_type::edge_type> be;
+        std::vector<std::pair<typename mesh_type::edge_type, size_t>> be;
         be.reserve( 3 * m_triangles.size() );
 
         storage->edges.reserve( 3 * m_triangles.size() );
@@ -405,9 +431,9 @@ public:
             auto t_e2 = *std::lower_bound(m_edges.begin(), m_edges.end(), edge(t.p0, t.p2));
             assert(!t_e2.is_broken);
 
-            if (t_e0.is_boundary) be.push_back(e0);
-            if (t_e1.is_boundary) be.push_back(e1);
-            if (t_e2.is_boundary) be.push_back(e2);
+            if (t_e0.is_boundary) be.push_back( std::make_pair(e0, t_e0.boundary_id) );
+            if (t_e1.is_boundary) be.push_back( std::make_pair(e1, t_e1.boundary_id) );
+            if (t_e2.is_boundary) be.push_back( std::make_pair(e2, t_e2.boundary_id) );
         }
 
         THREAD(edge_thread,
@@ -422,15 +448,17 @@ public:
         WAIT_THREAD(tri_thread);
 
         storage->boundary_edges.resize( storage->edges.size() );
+        storage->boundary_id.resize( storage->edges.size() );
         for (auto& e : be)
         {
             auto ei = find_element_id(storage->edges.begin(),
-                                      storage->edges.end(), e);
+                                      storage->edges.end(), e.first);
 
             if (ei.first == false)
                 throw std::logic_error("Edge not found. This is a bug.");
 
             storage->boundary_edges.at(ei.second) = true;
+            storage->boundary_id.at(ei.second) = e.second;
         }
 
         return refined_element_submesh;
