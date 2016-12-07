@@ -133,9 +133,10 @@ public:
         for (size_t i = 0; i < num_nodes; i++)
             storage->nodes.at(i) = node_type(point_identifier<1>(i));
 
-        storage->boundary_nodes.resize(num_nodes);
-        storage->boundary_nodes.at(0) = true;
-        storage->boundary_nodes.at(num_nodes - 1) = true;
+        storage->boundary_info.resize(num_nodes);
+        bnd_info bi{0, true};
+        storage->boundary_info.at(0) = bi;
+        storage->boundary_info.at(num_nodes - 1) = bi;
 
         return true;
     }
@@ -403,7 +404,7 @@ public:
         std::sort(edges.begin(), edges.end());
 
         /* Detect which ones are boundary edges */
-        storage->boundary_edges.resize(m_edges.size());
+        storage->boundary_info.resize(m_edges.size());
         for (size_t i = 0; i < m_boundary_edges.size(); i++)
         {
             assert(m_boundary_edges[i][0] < m_boundary_edges[i][1]);
@@ -421,7 +422,8 @@ public:
                 return false;
             }
 
-            storage->boundary_edges.at(position.second) = true;
+            bnd_info bi{0, true};
+            storage->boundary_info.at(position.second) = bi;
         }
 
         storage->edges = std::move(edges);
@@ -715,7 +717,7 @@ public:
         WAIT_THREAD(edge_thread);
         WAIT_THREAD(tri_thread);
 
-        storage->boundary_edges.resize(storage->edges.size());
+        storage->boundary_info.resize(storage->edges.size());
         for (auto& be : boundary_edges)
         {
             auto position = find_element_id(storage->edges.begin(),
@@ -726,8 +728,8 @@ public:
                           << __LINE__ << ")" << std::endl;
                 return false;
             }
-
-            storage->boundary_edges[position.second] = true;
+            bnd_info bi{0, true};
+            storage->boundary_info.at(position.second) = bi;
         }
 
         std::cout << "done." << std::endl;
@@ -941,7 +943,7 @@ public:
         WAIT_THREAD(tri_thread);
         WAIT_THREAD(tet_thread);
 
-        storage->boundary_surfaces.resize(storage->surfaces.size());
+        storage->boundary_info.resize(storage->surfaces.size());
         for (auto& bs : boundary_surfaces)
         {
             auto position = find_element_id(storage->surfaces.begin(),
@@ -953,7 +955,8 @@ public:
                 return false;
             }
 
-            storage->boundary_surfaces[position.second] = true;
+            bnd_info bi{0, true};
+            storage->boundary_info.at(position.second) = bi;
         }
 
         std::cout << "done." << std::endl;

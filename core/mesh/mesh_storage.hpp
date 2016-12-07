@@ -43,6 +43,12 @@ class mesh_storage
     static_assert(DIM > 0 && DIM <= 3, "mesh: Allowed dimensions are 1, 2 and 3");
 };
 
+struct bnd_info
+{
+    size_t  boundary_id;
+    bool    is_boundary;
+};
+
 /* Template specialization of mesh_storage for 3D meshes.
  *
  * @T       Type that the mesh uses to represent points.
@@ -64,8 +70,7 @@ struct mesh_storage<T, 3, StorageClass>
     std::vector<node_type>                          nodes;
     std::vector<point_type>                         points;
 
-    std::vector<bool>                               boundary_surfaces;
-    std::vector<size_t>                             boundary_id;
+    std::vector<bnd_info>                           boundary_info;
 
     void statistics(void) const
     {
@@ -75,8 +80,8 @@ struct mesh_storage<T, 3, StorageClass>
         std::cout << "Edges: " << edges.size() << std::endl;
         std::cout << "Surfaces: " << surfaces.size() << std::endl;
         std::cout << "Volumes: " << volumes.size() << std::endl;
-        auto bs = std::count(boundary_surfaces.begin(), boundary_surfaces.end(), true);
-        std::cout << "Boundary surfaces: " << bs << std::endl;
+        //auto bs = std::count(is_boundary.begin(), is_boundary.end(), true);
+        //std::cout << "Boundary surfaces: " << bs << std::endl;
     }
 };
 
@@ -99,8 +104,7 @@ struct mesh_storage<T, 2, StorageClass>
     std::vector<node_type>                          nodes;
     std::vector<point_type>                         points;
 
-    std::vector<bool>                               boundary_edges;
-    std::vector<size_t>                             boundary_id;
+    std::vector<bnd_info>                           boundary_info;
 
     void statistics(void) const
     {
@@ -109,8 +113,8 @@ struct mesh_storage<T, 2, StorageClass>
         std::cout << "Nodes: " << nodes.size() << std::endl;
         std::cout << "Edges: " << edges.size() << std::endl;
         std::cout << "Surfaces: " << surfaces.size() << std::endl;
-        auto be = std::count(boundary_edges.begin(), boundary_edges.end(), true);
-        std::cout << "Boundary edges: " << be << std::endl;
+        //auto be = std::count(is_boundary.begin(), is_boundary.end(), true);
+        //std::cout << "Boundary edges: " << be << std::endl;
     }
 };
 
@@ -131,8 +135,7 @@ struct mesh_storage<T, 1, StorageClass>
     std::vector<node_type>                          nodes;
     std::vector<point_type>                         points;
 
-    std::vector<bool>                               boundary_nodes;
-    std::vector<size_t>                             boundary_id;
+    std::vector<bnd_info>                           boundary_info;
 
     void statistics(void) const
     {

@@ -356,7 +356,7 @@ public:
     submesher()
     {}
 
-    std::pair<mesh_type, std::array<size_t, 3>>
+    mesh_type
     generate_mesh(const mesh_type& msh, const cell_type& cl, size_t refinement_steps = 3)
     {
         std::cout << "genmesh" << std::endl;
@@ -368,23 +368,19 @@ public:
         auto pts = points(msh, cl);
         m_points.insert(m_points.begin(), pts.begin(), pts.end());
 
-        /* here the mapping between the local boundary number and the parent
-         * cell boundary number is established */
-        std::array<size_t, 3>   boundary_mapping;
+        /* Here the mapping between the local boundary number and the parent
+         * cell boundary number is established. */
         auto fcs = faces(msh, cl);
         assert(fcs.size() == 3);
 
-        for (size_t i = 0; i < fcs.size(); i++)
-        {
-            auto fc = fcs[i];
-            auto coarse_id = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
-            boundary_mapping[i] = coarse_id;
+        edge e0(0, 1, msh.lookup(fcs[0]), true);
+        m_edges.push_back(e0);
 
-            auto ptids = fc.point_ids();
-            assert(ptids.size() == 2);
-            edge e(ptids[0], ptids[1], i, true);
-            m_edges.push_back(e);
-        }
+        edge e1(1, 2, msh.lookup(fcs[1]), true);
+        m_edges.push_back(e1);
+
+        edge e2(0, 2, msh.lookup(fcs[2]), true);
+        m_edges.push_back(e2);
 
         std::sort(m_edges.begin(), m_edges.end());
 
@@ -447,8 +443,7 @@ public:
         WAIT_THREAD(edge_thread);
         WAIT_THREAD(tri_thread);
 
-        storage->boundary_edges.resize( storage->edges.size() );
-        storage->boundary_id.resize( storage->edges.size() );
+        storage->boundary_info.resize( storage->edges.size() );
         for (auto& e : be)
         {
             auto ei = find_element_id(storage->edges.begin(),
@@ -457,8 +452,10 @@ public:
             if (ei.first == false)
                 throw std::logic_error("Edge not found. This is a bug.");
 
-            storage->boundary_edges.at(ei.second) = true;
-            storage->boundary_id.at(ei.second) = e.second;
+            bnd_info bi;
+            bi.boundary_id = e.second;
+            bi.is_boundary = true;
+            storage->boundary_info.at(ei.second) = bi;
         }
 
         return refined_element_submesh;

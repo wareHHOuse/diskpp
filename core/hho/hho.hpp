@@ -1144,7 +1144,11 @@ public:
         reflevels = lua.get<size_t>("reflevels");
     }
 
-    void assemble(const mesh_type& coarse_msh, const cell_type& coarse_cl)
+    //template<typename OuterCellBasis, OuterFaceBasis>
+    void assemble(const mesh_type& coarse_msh,
+                  const cell_type& coarse_cl/*,
+                  const OuterCellBasis& outer_cell_basis,
+                  const OuterFaceBasis& outer_face_basis*/)
     {
         assert(m_degree > 0);
         submesher<Mesh>                                 submesher;
@@ -1200,30 +1204,6 @@ public:
 
                 for (size_t j = 0; j < num_face_dofs; j++)
                     l2g[dt_ofs+j] = face_offset+j;
-                /*
-                matrix_type face_mass_matrix;
-                face_mass_matrix = matrix_type::Zero(num_face_dofs, num_face_dofs);
-
-                auto face_quadpoints = bqd.face_quadrature.integrate(msh, fc);
-                for (auto& qp : face_quadpoints)
-                {
-                    auto phi = bqd.face_basis.eval_functions(msh, fc, qp.point());
-                    face_mass_matrix += qp.weight() * phi * phi.transpose();
-                }
-
-                auto mult_offset = matrix_mult_offset + face_id * num_face_dofs;
-
-                for (size_t j = 0; j < num_face_dofs; j++)
-                {
-                    for (size_t k = 0; k < num_face_dofs; k++)
-                    {
-                        size_t row = mult_offset + j;
-                        size_t col = face_offset + k;
-                        triplets.push_back( triplet_type(row, col, face_mass_matrix(j,k)) );
-                        triplets.push_back( triplet_type(col, row, face_mass_matrix(k,j)) );
-                    }
-                }
-                */
             }
 
             /* Compute HHO element contribution */
@@ -1259,6 +1239,8 @@ public:
             cell_idx++;
         }
 
+        auto bid_list = msh.boundary_id_list();
+
         for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++)
         {
             auto fc = *itor;
@@ -1270,9 +1252,14 @@ public:
 
             auto face_offset = matrix_face_offset + face_id * num_face_dofs;
 
-            auto bndid_pair = msh.boundary_id(fc);
-            size_t coarse_id = bndid_pair.first;
-            size_t fine_id = bndid_pair.second;
+            size_t coarse_id = msh.boundary_id(fc);
+            size_t fine_id;
+            for (size_t i = 0; i < bid_list.size(); i++)
+                if (bid_list[i] == coarse_id)
+                {
+                    fine_id = i;
+                    break;
+                }
 
             assert (fine_id < 3);
 

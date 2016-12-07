@@ -57,6 +57,8 @@
 #include "ident.hpp"
 #include "point.hpp"
 
+#include "mesh_storage.hpp"
+
 namespace disk {
 
 namespace priv {
@@ -135,11 +137,9 @@ namespace priv {
         template<typename T>
         bool operator()(const T& elem)
         {
-            auto e = find_element_id(msh_.faces_begin(), msh_.faces_end(), elem);
-            if (e.first == false)
-                throw std::invalid_argument("Face not found. This is likely a bad bug.");
+            auto eid = msh_.lookup(elem);
 
-            return msh_.is_boundary(e.second) && msh_.boundary_id(e.second) == m_element_id;
+            return msh_.is_boundary(eid) and (msh_.boundary_id(eid) == m_element_id);
         }
     };
 
@@ -280,39 +280,6 @@ public:
     size_t  cells_size() const { return this->backend_storage()->volumes.size(); }
     size_t  faces_size() const { return this->backend_storage()->surfaces.size(); }
 
-    bool is_boundary(typename face::id_type id) const
-    {
-        return this->backend_storage()->boundary_surfaces.at(id);
-    }
-
-    bool is_boundary(const face& f) const
-    {
-        auto e = find_element_id(faces_begin(), faces_end(), f);
-        if (e.first == false)
-            throw std::invalid_argument("Cell not found");
-
-        return this->backend_storage()->boundary_surfaces.at(e.second);
-    }
-
-    bool is_boundary(const face_iterator& itor) const
-    {
-        auto ofs = std::distance(faces_begin(), itor);
-        return this->backend_storage()->boundary_surfaces.at(ofs);
-    }
-
-    size_t  boundary_faces_size() const
-    {
-        return std::count(this->backend_storage()->boundary_surfaces.begin(),
-                          this->backend_storage()->boundary_surfaces.end(),
-                          true);
-    }
-
-    size_t  internal_faces_size() const
-    {
-        return std::count(this->backend_storage()->boundary_surfaces.begin(),
-                          this->backend_storage()->boundary_surfaces.end(),
-                          false);
-    }
 };
 
 
@@ -354,40 +321,6 @@ public:
 
     size_t  cells_size() const { return this->backend_storage()->surfaces.size(); }
     size_t  faces_size() const { return this->backend_storage()->edges.size(); }
-
-    bool is_boundary(typename face::id_type id) const
-    {
-        return this->backend_storage()->boundary_edges.at(id);
-    }
-
-    bool is_boundary(const face& f) const
-    {
-        auto e = find_element_id(faces_begin(), faces_end(), f);
-        if (e.first == false)
-            throw std::invalid_argument("Cell not found");
-
-        return this->backend_storage()->boundary_edges.at(e.second);
-    }
-
-    bool is_boundary(const face_iterator& itor) const
-    {
-        auto ofs = std::distance(faces_begin(), itor);
-        return this->backend_storage()->boundary_edges.at(ofs);
-    }
-
-    size_t  boundary_faces_size() const
-    {
-        return std::count(this->backend_storage()->boundary_edges.begin(),
-                          this->backend_storage()->boundary_edges.end(),
-                          true);
-    }
-
-    size_t  internal_faces_size() const
-    {
-        return std::count(this->backend_storage()->boundary_edges.begin(),
-                          this->backend_storage()->boundary_edges.end(),
-                          false);
-    }
 };
 
 /* mesh base class defining the data arrays for the 1D case */
@@ -424,39 +357,6 @@ public:
     size_t  cells_size() const { return this->backend_storage()->edges.size(); }
     size_t  faces_size() const { return this->backend_storage()->nodes.size(); }
 
-    bool is_boundary(typename face::id_type id) const
-    {
-        return this->backend_storage()->boundary_nodes.at(id);
-    }
-
-    bool is_boundary(const face& f) const
-    {
-        auto e = find_element_id(faces_begin(), faces_end(), f);
-        if (e.first == false)
-            throw std::invalid_argument("Cell not found");
-
-        return this->backend_storage()->boundary_nodes.at(e.second);
-    }
-
-    bool is_boundary(const face_iterator& itor) const
-    {
-        auto ofs = std::distance(faces_begin(), itor);
-        return this->backend_storage()->boundary_nodes.at(ofs);
-    }
-
-    size_t  boundary_faces_size() const
-    {
-        return std::count(this->backend_storage()->boundary_nodes.begin(),
-                          this->backend_storage()->boundary_nodes.end(),
-                          true);
-    }
-
-    size_t  internal_faces_size() const
-    {
-        return std::count(this->backend_storage()->boundary_nodes.begin(),
-                          this->backend_storage()->boundary_nodes.end(),
-                          false);
-    }
 };
 
 } // namespace priv
@@ -464,6 +364,8 @@ public:
 template<typename T, size_t DIM, typename Storage>
 class mesh : public priv::mesh_base<T,DIM,Storage>
 {
+    typedef priv::mesh_base<T,DIM,Storage> base_type;
+
 public:
     static const size_t dimension = DIM;
 
@@ -498,60 +400,131 @@ public:
                                   priv::is_internal_pred<mesh>>
                                   internal_face_iterator;
 
-    boundary_face_iterator  boundary_faces_begin()
+    std::vector<size_t>
+    boundary_id_list(void) const
     {
-        typedef priv::is_boundary_pred<mesh> ibp;
-        return boundary_face_iterator(ibp(*this), this->faces_begin(), this->faces_end());
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+        std::set<size_t> boundary_ids;
+        for (auto& bi : this->backend_storage()->boundary_info)
+            if (bi.is_boundary)
+                boundary_ids.insert(bi.boundary_id);
+
+        return std::vector<size_t>(boundary_ids.begin(), boundary_ids.end());
     }
 
-    boundary_face_iterator  boundary_faces_end()
+    /* Determine if the specified face is a boundary (via face id) */
+    bool is_boundary(typename face::id_type id) const
     {
-        typedef priv::is_boundary_pred<mesh> ibp;
-        return boundary_face_iterator(ibp(*this), this->faces_end(), this->faces_end());
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+        return this->backend_storage()->boundary_info.at(id).is_boundary;
     }
 
-    boundary_face_with_id_iterator  boundary_faces_begin(size_t id)
+    /* Determine if the specified face is a boundary (via actual face) */
+    bool is_boundary(const face& f) const
     {
-        typedef priv::is_boundary_pred_with_id<mesh> ibp;
-        return boundary_face_with_id_iterator(ibp(*this, id), this->faces_begin(), this->faces_end());
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+        auto fid = lookup(f);
+        return this->backend_storage()->boundary_info.at(fid).is_boundary;
     }
 
-    boundary_face_with_id_iterator  boundary_faces_end(size_t id)
+    /* Determine if the specified face is a boundary (via iterator) */
+    bool is_boundary(const typename base_type::face_iterator& itor) const
     {
-        typedef priv::is_boundary_pred_with_id<mesh> ibp;
-        return boundary_face_with_id_iterator(ibp(*this, id), this->faces_end(), this->faces_end());
-    }
-
-    internal_face_iterator  internal_faces_begin()
-    {
-        typedef priv::is_internal_pred<mesh> iip;
-        return internal_face_iterator(iip(*this), this->faces_begin(), this->faces_end());
-    }
-
-    internal_face_iterator  internal_faces_end()
-    {
-        typedef priv::is_internal_pred<mesh> iip;
-        return internal_face_iterator(iip(*this), this->faces_end(), this->faces_end());
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+        auto ofs = std::distance(this->faces_begin(), itor);
+        return this->backend_storage()->boundary_info.at(ofs).is_boundary;
     }
 
     size_t boundary_id(const typename face::id_type& fid) const
     {
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
         if ( !is_boundary(fid) )
             throw std::invalid_argument("Face is not a boundary.");
 
-        return this->backend_storage()->boundary_id.at(fid);
+        return this->backend_storage()->boundary_info.at(fid).boundary_id;
     }
 
     size_t boundary_id(const face& f) const
     {
-        auto e = find_element_id(this->faces_begin(), this->faces_end(), f);
-        if (e.first == false)
-            throw std::logic_error("Face not found. This is likely a bad bug.");
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+        auto fid = lookup(f);
 
-        if ( !this->is_boundary(typename face::id_type(e.second)) )
+        if ( !is_boundary(fid) )
             throw std::invalid_argument("Face is not a boundary.");
 
-        return this->backend_storage()->boundary_id.at(e.second);
+        return this->backend_storage()->boundary_info.at(fid).boundary_id;
+    }
+
+    /* Get the total number of boundary faces */
+    size_t  boundary_faces_size() const
+    {
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+
+        auto count_lambda = [](const bnd_info& bi) -> bool { return bi.is_boundary; };
+
+        return std::count_if(this->backend_storage()->boundary_info.begin(),
+                             this->backend_storage()->boundary_info.end(),
+                             count_lambda);
+    }
+
+    /* Get the total number of internal faces */
+    size_t  internal_faces_size() const
+    {
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+
+        auto count_lambda = [](const bnd_info& bi) -> bool { return !bi.is_boundary; };
+
+        return std::count_if(this->backend_storage()->boundary_info.begin(),
+                             this->backend_storage()->boundary_info.end(),
+                             count_lambda);
+    }
+
+    /* Begin iterator to all the boundary faces */
+    boundary_face_iterator boundary_faces_begin()
+    {
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+        typedef priv::is_boundary_pred<mesh> ibp;
+        return boundary_face_iterator(ibp(*this), this->faces_begin(), this->faces_end());
+    }
+
+    /* End iterator to all the boundary faces */
+    boundary_face_iterator boundary_faces_end()
+    {
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+        typedef priv::is_boundary_pred<mesh> ibp;
+        return boundary_face_iterator(ibp(*this), this->faces_end(), this->faces_end());
+    }
+
+    /* Begin iterator to the boundary faces of boundary 'id' */
+    boundary_face_with_id_iterator boundary_faces_begin(size_t id)
+    {
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+        typedef priv::is_boundary_pred_with_id<mesh> ibp;
+        return boundary_face_with_id_iterator(ibp(*this, id), this->faces_begin(), this->faces_end());
+    }
+
+    /* End iterator to the boundary faces of boundary 'id' */
+    boundary_face_with_id_iterator  boundary_faces_end(size_t id)
+    {
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+        typedef priv::is_boundary_pred_with_id<mesh> ibp;
+        return boundary_face_with_id_iterator(ibp(*this, id), this->faces_end(), this->faces_end());
+    }
+
+    /* Begin iterator to the internal faces */
+    internal_face_iterator  internal_faces_begin()
+    {
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+        typedef priv::is_internal_pred<mesh> iip;
+        return internal_face_iterator(iip(*this), this->faces_begin(), this->faces_end());
+    }
+
+    /* End iterator to the internal faces */
+    internal_face_iterator  internal_faces_end()
+    {
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+        typedef priv::is_internal_pred<mesh> iip;
+        return internal_face_iterator(iip(*this), this->faces_end(), this->faces_end());
     }
 
     /* Apply a transformation to the mesh. Transform should be a functor or
