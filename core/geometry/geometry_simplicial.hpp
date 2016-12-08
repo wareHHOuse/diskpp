@@ -359,7 +359,6 @@ public:
     mesh_type
     generate_mesh(const mesh_type& msh, const cell_type& cl, size_t refinement_steps = 3)
     {
-        std::cout << "genmesh" << std::endl;
         m_points.clear();
         m_edges.clear();
         m_triangles.clear();

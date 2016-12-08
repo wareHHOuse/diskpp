@@ -1114,15 +1114,23 @@ class multiscale_local_problem
                                   scaled_monomial_scalar_basis,
                                   quadrature>   bqdata_type;
 
-    size_t                        m_degree, m_cell_degree, m_face_degree;
+    size_t                        m_degree,         /* degree requested by the user */
+                                  m_inner_degree,   /* fine scale method degree */
+                                  m_cf_degree,      /* cell function degree (\Phi_T) */
+                                  m_ff_degree;      /* face function degree (\Phi_F) */
+
     size_t                        funcnum, ptlevels, reflevels;
 
 public:
     sparse_matrix_type                          matrix;
     matrix_type                                 rhs;
 
-    multiscale_local_problem() : m_degree(1)
+    multiscale_local_problem()
     {
+        m_degree = 1;
+        m_inner_degree = 2;
+        m_cf_degree = 0;
+        m_ff_degree = 1;
         load_params();
     }
 
@@ -1130,8 +1138,9 @@ public:
     {
         // TODO: add checks
         m_degree = degree;
-        m_cell_degree = degree;
-        m_face_degree = degree;
+        m_inner_degree = degree+1;
+        m_cf_degree = degree-1;
+        m_ff_degree = degree;
         load_params();
     }
 
@@ -1152,23 +1161,29 @@ public:
     {
         assert(m_degree > 0);
         submesher<Mesh>                                 submesher;
-        bqdata_type                                     bqd(m_cell_degree, m_face_degree);
+        bqdata_type                                     bqd(m_inner_degree, m_inner_degree);
         gradient_reconstruction_bq<bqdata_type>         gradrec(bqd);
         diffusion_like_stabilization_bq<bqdata_type>    stab(bqd);
 
+        scaled_monomial_scalar_basis<mesh_type, cell_type> outer_cell_basis(m_cf_degree);
+        scaled_monomial_scalar_basis<mesh_type, face_type> outer_face_basis(m_ff_degree);
+
         auto msh = submesher.generate_mesh(coarse_msh, coarse_cl, reflevels);
 
-        auto num_cell_dofs = howmany_dofs(bqd.cell_basis, 0, m_cell_degree);
-        auto num_face_dofs = howmany_dofs(bqd.face_basis, 0, m_face_degree);
+        auto num_cell_dofs = howmany_dofs(bqd.cell_basis, 0, m_inner_degree);
+        auto num_face_dofs = howmany_dofs(bqd.face_basis, 0, m_inner_degree);
+
+        auto num_cell_funcs = howmany_dofs(outer_cell_basis, 0, m_cf_degree);
+        auto num_face_funcs = howmany_dofs(outer_face_basis, 0, m_ff_degree);
 
         auto matrix_face_offset = num_cell_dofs * msh.cells_size();
         auto matrix_mult_offset = matrix_face_offset + num_face_dofs * msh.faces_size();
         auto system_size = num_cell_dofs * msh.cells_size() +
                            num_face_dofs * msh.faces_size() +
-                           num_face_dofs * 3;
+                           num_face_funcs * 3;
 
         matrix = sparse_matrix_type(system_size, system_size);
-        rhs = matrix_type::Zero(system_size, num_cell_dofs);
+        rhs = matrix_type::Zero(system_size, num_cell_funcs);
 
         std::vector<triplet_type> triplets;
 
@@ -1176,9 +1191,6 @@ public:
         size_t cell_idx = 0;
         for (auto& cl : msh)
         {
-            std::cout << "***********************" << std::endl;
-            std::cout << cl << std::endl;
-
             auto fcs = faces(msh, cl);
             std::vector<size_t> l2g(num_cell_dofs + fcs.size() * num_face_dofs);
 
@@ -1218,22 +1230,23 @@ public:
                 for (size_t j = 0; j < l2g.size(); j++)
                     triplets.push_back( triplet_type(l2g[i], l2g[j], loc(i,j)) );
 
-            matrix_type cell_mass_matrix;
-            cell_mass_matrix = matrix_type::Zero(num_cell_dofs, num_cell_dofs);
+            /* Now compute the multiscale-specific stuff */
+            matrix_type cell_rhs;
+            cell_rhs = matrix_type::Zero(num_cell_dofs, num_cell_funcs);
 
             auto cell_quadpoints = bqd.cell_quadrature.integrate(msh, cl);
             for (auto& qp : cell_quadpoints)
             {
-                auto phi = bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, m_cell_degree);
-                auto phi_coarse = bqd.cell_basis.eval_functions(coarse_msh, coarse_cl, qp.point(), 0, m_cell_degree);
-                cell_mass_matrix += qp.weight() * phi * phi_coarse.transpose();
+                auto phi = bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, m_inner_degree);
+                auto phi_coarse = outer_cell_basis.eval_functions(coarse_msh, coarse_cl, qp.point(), 0, m_cf_degree);
+                cell_rhs += qp.weight() * phi * phi_coarse.transpose();
             }
 
             for (size_t i = 0; i < num_cell_dofs; i++)
             {
                 auto cell_offset = cell_idx * num_cell_dofs;
-                for (size_t j = 0; j < num_cell_dofs; j++)
-                    rhs(cell_offset+i, j) = cell_mass_matrix(i,j);
+                for (size_t j = 0; j < num_cell_funcs; j++)
+                    rhs(cell_offset+i, j) = cell_rhs(i,j);
             }
 
             cell_idx++;
@@ -1250,6 +1263,7 @@ public:
 
             auto face_id = eid.second;
 
+            /* row */
             auto face_offset = matrix_face_offset + face_id * num_face_dofs;
 
             size_t coarse_id = msh.boundary_id(fc);
@@ -1266,26 +1280,27 @@ public:
             auto coarse_fc = *(coarse_msh.faces_begin() + coarse_id);
 
             matrix_type face_mass_matrix;
-            face_mass_matrix = matrix_type::Zero(num_face_dofs, num_face_dofs);
+            face_mass_matrix = matrix_type::Zero(num_face_dofs, num_face_funcs);
 
             auto face_quadpoints = bqd.face_quadrature.integrate(msh, fc);
             for (auto& qp : face_quadpoints)
             {
                 auto phi = bqd.face_basis.eval_functions(msh, fc, qp.point());
-                auto phi_coarse = bqd.face_basis.eval_functions(msh, coarse_fc, qp.point());
+                auto phi_coarse = outer_face_basis.eval_functions(msh, coarse_fc, qp.point(), 0, m_ff_degree);
                 face_mass_matrix += qp.weight() * phi * phi_coarse.transpose();
             }
 
-            auto mult_offset = matrix_mult_offset + fine_id * num_face_dofs;
+            /* col */
+            auto mult_offset = matrix_mult_offset + fine_id * num_face_funcs;
 
             for (size_t j = 0; j < num_face_dofs; j++)
             {
-                for (size_t k = 0; k < num_face_dofs; k++)
+                for (size_t k = 0; k < num_face_funcs; k++)
                 {
-                    size_t row = mult_offset + j;
-                    size_t col = face_offset + k;
+                    size_t row = face_offset + j;
+                    size_t col = mult_offset + k;
                     triplets.push_back( triplet_type(row, col, -face_mass_matrix(j,k)) );
-                    triplets.push_back( triplet_type(col, row, -face_mass_matrix(k,j)) );
+                    triplets.push_back( triplet_type(col, row, -face_mass_matrix(j,k)) );
                 }
             }
         }
@@ -1337,7 +1352,7 @@ public:
                 auto phi = bqd.cell_basis.eval_functions(msh, cl, qp);
 
                 scalar_type pot = 0.0;
-                for (size_t i = 0; i < bqd.cell_basis.range(0, m_cell_degree).size(); i++)
+                for (size_t i = 0; i < bqd.cell_basis.range(0, m_inner_degree).size(); i++)
                     pot += phi[i] * cell_sol(i,0);
 
                 auto tp = qp;

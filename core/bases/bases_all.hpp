@@ -164,8 +164,13 @@ public:
     {}
 
     Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>
-    eval_functions(const mesh_type& msh, const face_type& fc, const point_type& pt) const
+    eval_functions(const mesh_type& msh, const face_type& fc,
+                   const point_type& pt,
+                   size_t mindeg = 0, size_t maxdeg = VERY_HIGH_DEGREE) const
     {
+        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? max_degree() : maxdeg;
+        auto eval_range = range(mindeg, maxdeg);
+
         auto pts = points(msh, fc);
         auto bar = barycenter(msh, fc);
         auto h = diameter(msh, fc);
@@ -175,10 +180,14 @@ public:
         auto ep = point<T, 1>({dot/(h*h)});
 
         Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> ret;
-        ret.resize( this->size(), 1 );
+        ret.resize( eval_range.size(), 1 );
 
         size_t i = 0;
-        for (auto itor = this->monomials_begin(); itor != this->monomials_end(); itor++)
+        auto begin = this->monomials_begin();
+        std::advance(begin, eval_range.min());
+        auto end = this->monomials_begin();
+        std::advance(end, eval_range.max());
+        for (auto itor = begin; itor != end; itor++)
         {
             auto m = *itor;
             auto vx = iexp_pow(ep.x(), m[0]);
