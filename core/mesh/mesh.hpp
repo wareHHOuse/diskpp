@@ -53,6 +53,7 @@
 #include <numeric>
 #include <cassert>
 #include <iterator>
+#include <set>
 
 #include "ident.hpp"
 #include "point.hpp"

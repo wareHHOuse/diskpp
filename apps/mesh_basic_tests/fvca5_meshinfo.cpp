@@ -2,10 +2,10 @@
 #include <fstream>
 #include <regex>
 
-#include "MeshWidget.h"
-
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
+
+#include "MeshWidget.h"
 
 using RealType = double;
 
