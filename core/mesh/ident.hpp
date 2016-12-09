@@ -19,7 +19,7 @@
 #include <iostream>
 #include <cstddef>
 
-template<typename T, class impl, impl default_value>
+template<typename T, typename impl, impl default_value>
 struct identifier
 {
     typedef impl    value_type;
@@ -62,6 +62,52 @@ private:
     bool    valid;  /* This could waste tons of memory. A specialization for
                      * size_t using the MSB of id_val as flag could be useful.
                      */
+
+    /* This *actually* wastes tons of memory. The specialization below must
+     * be used, but before there are some places where hardcoded size_t's had
+     * to be replaced with ident_raw_t */
+};
+
+template<typename T, uint32_t default_value>
+class identifier<T, uint32_t, default_value>
+{
+    uint32_t    id_val;
+
+public:
+    typedef uint32_t    value_type;
+
+    static identifier invalid() { return identifier(); }
+
+    identifier() : id_val(default_value & 0x7FFFFFFF)
+    {}
+
+    identifier(const identifier&) = default;
+
+    explicit identifier(uint32_t val) : id_val( (val & 0x7FFFFFFF) | 0x80000000 )
+    {}
+
+    operator uint32_t() const
+    {
+        if ( !(id_val & 0x80000000) )
+            throw std::logic_error("Invalid identifier used");
+
+        return id_val & 0x7FFFFFFF;
+    }
+
+    bool operator==(const identifier& other) const
+    {
+        return id_val == other.id_val;
+    }
+
+    bool operator!=(const identifier& other) const
+    {
+        return id_val != other.id_val;
+    }
+
+    bool operator<(const identifier& other) const
+    {
+        return (this->id_val & 0x7FFFFFFF) < (other.id_val & 0x7FFFFFFF);
+    }
 };
 
 template<typename T, class impl, impl default_value>
@@ -72,4 +118,5 @@ operator<<(std::ostream& os, const identifier<T, impl, default_value>& id)
     return os;
 }
 
-typedef size_t  ident_impl_t;
+typedef size_t          ident_impl_t;   /* deprecated */
+typedef ident_impl_t    ident_raw_t;    /* use this */

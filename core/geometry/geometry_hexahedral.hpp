@@ -97,12 +97,12 @@ faces(const hexahedral_mesh<T>&,
     auto ptids = cl.point_ids();
     assert(ptids.size() == 8);
 
-    ret[0] = face_type( { ptids[0], ptids[3], ptids[5], ptids[2] } );
-    ret[1] = face_type( { ptids[1], ptids[4], ptids[7], ptids[6] } );
-    ret[2] = face_type( { ptids[0], ptids[1], ptids[6], ptids[3] } );
-    ret[3] = face_type( { ptids[2], ptids[5], ptids[7], ptids[4] } );
-    ret[4] = face_type( { ptids[0], ptids[2], ptids[4], ptids[1] } );
-    ret[5] = face_type( { ptids[3], ptids[6], ptids[7], ptids[5] } );
+    ret[0] = face_type( { ptids[0], ptids[2], ptids[6], ptids[4] } );
+    ret[1] = face_type( { ptids[1], ptids[3], ptids[7], ptids[5] } );
+    ret[2] = face_type( { ptids[0], ptids[1], ptids[3], ptids[2] } );
+    ret[3] = face_type( { ptids[4], ptids[5], ptids[7], ptids[6] } );
+    ret[4] = face_type( { ptids[0], ptids[4], ptids[5], ptids[1] } );
+    ret[5] = face_type( { ptids[2], ptids[6], ptids[7], ptids[3] } );
 
     return ret;
 }
@@ -114,11 +114,11 @@ measure(const hexahedral_mesh<T>& msh,
         const typename hexahedral_mesh<T>::cell& cl)
 {
     auto pts = points(msh, cl);
-    assert(pts.size() == 6);
+    assert(pts.size() == 8);
 
     auto v0 = (pts[1] - pts[0]).to_vector().norm();
     auto v1 = (pts[2] - pts[0]).to_vector().norm();
-    auto v2 = (pts[3] - pts[0]).to_vector().norm();
+    auto v2 = (pts[4] - pts[0]).to_vector().norm();
 
     return v0 * v1 * v2;
 }
@@ -150,7 +150,7 @@ normal(const hexahedral_mesh<T>& msh,
        const typename hexahedral_mesh<T>::face& fc)
 {
     auto pts = points(msh, fc);
-    assert(pts.size() == 8);
+    assert(pts.size() == 4);
 
     auto v0 = (pts[1] - pts[0]).to_vector();
     auto v1 = (pts[2] - pts[1]).to_vector();
@@ -160,7 +160,7 @@ normal(const hexahedral_mesh<T>& msh,
     auto face_bar = barycenter(msh, fc);
     auto outward_vector = (face_bar - cell_bar).to_vector();
 
-    if ( n.dot(outward_vector) < T(0) ) /* should be always positive */
+    if ( n.dot(outward_vector) < T(0) )
         return -n/n.norm();
 
     return n/n.norm();

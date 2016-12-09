@@ -29,27 +29,23 @@
  *      <number of boundary faces>
  *      node1 node2 ... node4
  *
- * In the hexahedron the nodes are ordered as following:
- *
- *      [ O | x | y | z | xy | yz | xz | xyz ]
- *
- * The faces are the lists of nodes starting from "the smallest one" (the
- * one that appears first in the list above) and cycling in the direction
- * that gives the outward normal. Faces are ordered -x, +x, -y, +y, -z, +z.
+ * In the hexahedron the nodes are named using a 3-bit binary number: 0 if
+ * the coordinate is not present, 1 if it is (convert in binary numbers in
+ * figure and look at the name of the axis).
  *
  *
  *          ^ Y
- *          |                           Face 0: 0 3 5 2
- *        2 _____________ 4             Face 1: 1 4 7 6
- *         /            /|              Face 2: 0 1 6 3
- *      5 / |        7 / |              Face 3: 2 5 7 4
- *       /____________/  |              Face 4: 0 2 4 1
- *      |   |         |  |      X       Face 5: 3 6 7 5
+ *          |                           Face 0: 0 2 6 4
+ *        2 _____________ 3             Face 1: 1 3 7 5
+ *         /            /|              Face 2: 0 1 3 2
+ *      6 / |        7 / |              Face 3: 4 5 7 6
+ *       /____________/  |              Face 4: 0 4 5 1
+ *      |   |         |  |      X       Face 5: 2 6 7 3
  *      | 0 _ _ _ _ _ |_ |1 ---->
  *      |  /          |  /
  *      |             | /
  *      |/____________|/
- *     3              6
+ *     4              5
  *     /
  *    v Z
  *
@@ -80,7 +76,7 @@ output_mesh(const std::vector<std::array<T, 3>>& points,
             os << c << "\t";
         os << std::endl;
     }
-    
+
     os << volumes.size() << std::endl;
     for (auto& v : volumes)
     {
@@ -88,7 +84,7 @@ output_mesh(const std::vector<std::array<T, 3>>& points,
             os << c << " ";
         os << std::endl;
     }
-    
+
     os << boundary_faces.size() << std::endl;
     for (auto& bf : boundary_faces)
     {
@@ -134,17 +130,17 @@ usage(const char *progname)
 int main(int argc, char **argv)
 {
     using T = double;
-    
+
     size_t nx = 1;
     size_t ny = 1;
     size_t nz = 1;
-    
+
     T   min_x = 0.0, max_x = 1.0,
         min_y = 0.0, max_y = 1.0,
         min_z = 0.0, max_z = 1.0;
-    
+
     int ch;
-    
+
     while ( (ch = getopt(argc, argv, "x:X:y:Y:z:Z:m:n:p:")) != -1 )
     {
         switch(ch)
@@ -158,7 +154,7 @@ int main(int argc, char **argv)
             case 'Y':   max_y = strto<T>(optarg); break;
             case 'z':   min_z = strto<T>(optarg); break;
             case 'Z':   max_z = strto<T>(optarg); break;
-                
+
             case 'h':
             case '?':
             default:
@@ -166,34 +162,34 @@ int main(int argc, char **argv)
                 exit(1);
         }
     }
-    
+
     argc -= optind;
     argv += optind;
-    
+
     if ( max_x < min_x or max_y < min_y or max_z < min_z )
     {
         std::cout << "Invalid range" << std::endl;
         return 1;
     }
-    
+
     char *filename = argv[0];
-    
+
     std::vector<std::array<T, 3>>           points;
     std::vector<std::array<size_t, 8>>      volumes;
     std::vector<std::array<size_t, 4>>      boundary_faces;
-    
+
     double hx = (max_x - min_x)/nx;
     double hy = (max_y - min_y)/ny;
     double hz = (max_z - min_z)/nz;
-    
+
     auto num_points = (nx+1)*(ny+1)*(nz+1);
     auto num_vols = nx*ny*nz;
     auto num_bf = 2*nx*ny + 2*nx*nz + 2*ny*nz;
-    
+
     points.reserve(num_points);
     volumes.reserve(num_vols);
     boundary_faces.reserve(num_bf);
-    
+
     /* Generate points */
     for (size_t k = 0; k < nz+1; k++)
     {
@@ -205,16 +201,16 @@ int main(int argc, char **argv)
                 p[0] = min_x + i*hx;
                 p[1] = min_y + j*hy;
                 p[2] = min_z + k*hz;
-                
+
                 points.push_back(p);
             }
         }
     }
-    
+
     /* Generate volumes */
     size_t xy_offset = (nx+1)*(ny+1);
     size_t y_offset = ny+1;
-    
+
     for (size_t k = 0; k < nz; k++)
     {
         for (size_t j = 0; j < ny; j++)
@@ -225,17 +221,17 @@ int main(int argc, char **argv)
                 vol[0] =   k   * xy_offset +   j   * y_offset +   i;
                 vol[1] =   k   * xy_offset +   j   * y_offset + (i+1);
                 vol[2] =   k   * xy_offset + (j+1) * y_offset +   i;
-                vol[3] = (k+1) * xy_offset +   j   * y_offset +   i;
-                vol[4] =   k   * xy_offset + (j+1) * y_offset + (i+1);
-                vol[5] = (k+1) * xy_offset + (j+1) * y_offset +   i;
-                vol[6] = (k+1) * xy_offset +   j   * y_offset + (i+1);
+                vol[3] =   k   * xy_offset + (j+1) * y_offset + (i+1);
+                vol[4] = (k+1) * xy_offset +   j   * y_offset +   i;
+                vol[5] = (k+1) * xy_offset +   j   * y_offset + (i+1);
+                vol[6] = (k+1) * xy_offset + (j+1) * y_offset +   i;
                 vol[7] = (k+1) * xy_offset + (j+1) * y_offset + (i+1);
-                
+
                 volumes.push_back(vol);
             }
         }
     }
-    
+
     /* Generate boundary faces */
     for (size_t k = 0; k < nz; k++)
     {
@@ -247,12 +243,12 @@ int main(int argc, char **argv)
                 {
                     std::array<size_t, 4>   bf;
                     bf[0] =   k   * xy_offset +   j   * y_offset +   i;
-                    bf[1] = (k+1) * xy_offset +   j   * y_offset +   i;
+                    bf[1] =   k   * xy_offset + (j+1) * y_offset +   i;
                     bf[2] = (k+1) * xy_offset + (j+1) * y_offset +   i;
-                    bf[3] =   k   * xy_offset + (j+1) * y_offset +   i;
+                    bf[3] = (k+1) * xy_offset +   j   * y_offset +   i;
                     boundary_faces.push_back(bf);
                 }
-                
+
                 if (i == nx-1)
                 {
                     std::array<size_t, 4>   bf;
@@ -262,17 +258,17 @@ int main(int argc, char **argv)
                     bf[3] = (k+1) * xy_offset +   j   * y_offset + (i+1);
                     boundary_faces.push_back(bf);
                 }
-                
+
                 if (j == 0)
                 {
                     std::array<size_t, 4>   bf;
                     bf[0] =   k   * xy_offset +   j   * y_offset +   i;
-                    bf[1] =   k   * xy_offset +   j   * y_offset + (i+1);
+                    bf[1] = (k+1) * xy_offset +   j   * y_offset +   i;
                     bf[2] = (k+1) * xy_offset +   j   * y_offset + (i+1);
-                    bf[3] = (k+1) * xy_offset +   j   * y_offset +   i;
+                    bf[3] =   k   * xy_offset +   j   * y_offset + (i+1);
                     boundary_faces.push_back(bf);
                 }
-                
+
                 if (j == ny-1)
                 {
                     std::array<size_t, 4>   bf;
@@ -282,17 +278,17 @@ int main(int argc, char **argv)
                     bf[3] =   k   * xy_offset + (j+1) * y_offset + (i+1);
                     boundary_faces.push_back(bf);
                 }
-                
+
                 if (k == 0)
                 {
                     std::array<size_t, 4>   bf;
                     bf[0] =   k   * xy_offset +   j   * y_offset +   i;
-                    bf[1] =   k   * xy_offset + (j+1) * y_offset +   i;
+                    bf[1] =   k   * xy_offset +   j   * y_offset + (i+1);
                     bf[2] =   k   * xy_offset + (j+1) * y_offset + (i+1);
-                    bf[3] =   k   * xy_offset +   j   * y_offset + (i+1);
+                    bf[3] =   k   * xy_offset + (j+1) * y_offset +   i;
                     boundary_faces.push_back(bf);
                 }
-                
+
                 if (k == nz-1)
                 {
                     std::array<size_t, 4>   bf;
@@ -305,7 +301,7 @@ int main(int argc, char **argv)
             }
         }
     }
-    
+
     if (filename)
     {
         std::ofstream ofs(filename);
@@ -314,7 +310,7 @@ int main(int argc, char **argv)
             std::cout << "Unable to open " << filename << std::endl;
             exit(1);
         }
-        
+
         output_mesh(points, volumes, boundary_faces, ofs);
         ofs.close();
     }
@@ -322,7 +318,6 @@ int main(int argc, char **argv)
     {
         output_mesh(points, volumes, boundary_faces, std::cout);
     }
-    
+
     return 0;
 }
-

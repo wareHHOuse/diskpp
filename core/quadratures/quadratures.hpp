@@ -36,6 +36,7 @@ class quadrature
 } // namespace disk
 
 #include "quadratures/quad_simplicial.hpp"
+#include "quadratures/quad_hexahedral.hpp"
 #include "quadratures/quad_generic.hpp"
 
 #undef _QUADRATURES_HPP_WAS_INCLUDED_

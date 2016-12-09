@@ -573,6 +573,38 @@ int main(int argc, char **argv)
         }
     }
 
+    if (std::regex_match(filename, std::regex(".*\\.msh$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
+
+        typedef disk::generic_mesh<RealType, 3>   mesh_type;
+
+        mesh_type msh;
+        disk::fvca6_mesh_loader<RealType, 3> loader;
+
+        /*
+        if (!loader.read_mesh(filename))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            return 1;
+        }
+        loader.populate_mesh(msh);
+
+        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return M_PI * M_PI * sin(p.x() * M_PI);
+            //return 1.0;
+        };
+
+        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return sin(p.x() * M_PI);
+            //return -p.x() * p.x() * 0.5;
+        };
+        */
+
+        //test_diffusion(msh, f, sf, degree, "plot.dat");
+        //test_gradrec(msh, degree);
+    }
+
     if (std::regex_match(filename, std::regex(".*\\.mesh$") ))
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
@@ -581,6 +613,35 @@ int main(int argc, char **argv)
 
         mesh_type msh;
         disk::netgen_mesh_loader<RealType, 3> loader;
+        if (!loader.read_mesh(filename))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            return 1;
+        }
+        loader.populate_mesh(msh);
+
+        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return M_PI * M_PI * sin(p.x() * M_PI);
+            //return 1.0;
+        };
+
+        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return sin(p.x() * M_PI);
+            //return -p.x() * p.x() * 0.5;
+        };
+
+        test_diffusion(msh, f, sf, degree, "plot.dat");
+        //test_gradrec(msh, degree);
+    }
+
+    if (std::regex_match(filename, std::regex(".*\\.hex$") ))
+    {
+        std::cout << "Guessed mesh format: Hexahedral 3D" << std::endl;
+
+        typedef disk::hexahedral_mesh<RealType>   mesh_type;
+
+        mesh_type msh;
+        disk::hex_mesh_loader<RealType> loader;
         if (!loader.read_mesh(filename))
         {
             std::cout << "Problem loading mesh." << std::endl;

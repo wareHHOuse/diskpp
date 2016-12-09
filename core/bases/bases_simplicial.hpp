@@ -14,6 +14,12 @@
  * cite it.
  */
 
+
+/*
+ * /!\ This header will be soon deprecated. Thare are universal bases
+ *     in basis_all.hpp
+ */
+
 #pragma once
 
 #include <vector>
@@ -362,8 +368,6 @@ public:
         return ret;
     }
 };
-
-
 
 template<typename T>
 std::vector<point<T,3>>
