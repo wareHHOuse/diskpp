@@ -18,8 +18,8 @@
      #error "You must NOT include this file directly. Include geometry.hpp."
  #endif
 
-#ifndef _GEOMETRY_HEXAHEDRAL_HPP_
-#define _GEOMETRY_HEXAHEDRAL_HPP_
+#ifndef _GEOMETRY_CARTESIAN_HPP_
+#define _GEOMETRY_CARTESIAN_HPP_
 
 #include <list>
 
@@ -27,43 +27,50 @@
 
 namespace disk {
 
-struct storage_class_hexahedral;
+struct storage_class_cartesian;
 
 template<size_t DIM>
-struct storage_class_trait<storage_class_hexahedral, DIM> {
-    static_assert(DIM == 3, "Only DIM = 3 for hexahedra");
+struct storage_class_trait<storage_class_cartesian, DIM> {
+    static_assert(DIM == 2 or DIM == 3, "Only DIM = 2 or DIM = 3 for cartesian meshes");
 };
 
 template<>
-struct storage_class_trait<storage_class_hexahedral, 3> {
-    typedef hexahedral_element<3,0>    volume_type;
-    typedef hexahedral_element<3,1>    surface_type;
-    typedef hexahedral_element<3,2>    edge_type;
-    typedef hexahedral_element<3,3>    node_type;
+struct storage_class_trait<storage_class_cartesian, 3> {
+    typedef cartesian_element<3,0>  volume_type;
+    typedef cartesian_element<3,1>  surface_type;
+    typedef cartesian_element<3,2>  edge_type;
+    typedef cartesian_element<3,3>  node_type;
+};
+
+template<>
+struct storage_class_trait<storage_class_cartesian, 2> {
+    typedef cartesian_element<2,0>  surface_type;
+    typedef cartesian_element<2,1>  edge_type;
+    typedef cartesian_element<2,2>  node_type;
 };
 
 template<typename T, size_t DIM>
-using hexahedral_mesh_storage = mesh_storage<T, DIM, storage_class_hexahedral>;
+using cartesian_mesh_storage = mesh_storage<T, DIM, storage_class_cartesian>;
 
-template<typename T>
-using hexahedral_mesh = mesh<T, 3, hexahedral_mesh_storage<T, 3>>;
+template<typename T, size_t DIM>
+using cartesian_mesh = mesh<T, DIM, cartesian_mesh_storage<T, DIM>>;
 
 
-template<typename T, size_t CODIM>
-std::array<typename hexahedral_mesh<T>::point_type, hex_priv::howmany<3, CODIM>::nodes>
-points(const hexahedral_mesh<T>& msh, const hexahedral_element<3, CODIM>& elem)
+template<typename T, size_t DIM, size_t CODIM>
+std::array<typename cartesian_mesh<T,DIM>::point_type, cartesian_priv::howmany<DIM, CODIM>::nodes>
+points(const cartesian_mesh<T, DIM>& msh, const cartesian_element<DIM, CODIM>& elem)
 {
     auto ptids = elem.point_ids();
 
-    auto ptid_to_point = [&](const point_identifier<3>& pi) -> auto {
+    auto ptid_to_point = [&](const point_identifier<DIM>& pi) -> auto {
         auto itor = msh.points_begin();
         std::advance(itor, pi);
         return *itor;
     };
 
-    typedef point_identifier<3>       point_id_type;
+    typedef point_identifier<DIM>       point_id_type;
 
-    std::array<typename hexahedral_mesh<T>::point_type, hex_priv::howmany<3, CODIM>::nodes> pts;
+    std::array<typename cartesian_mesh<T, DIM>::point_type, cartesian_priv::howmany<DIM, CODIM>::nodes> pts;
     std::transform(ptids.begin(), ptids.end(), pts.begin(), ptid_to_point);
 
     return pts;
@@ -71,27 +78,60 @@ points(const hexahedral_mesh<T>& msh, const hexahedral_element<3, CODIM>& elem)
 
 
 /* Return the number of elements of the specified cell */
-template<typename T, size_t CODIM>
-size_t
-number_of_faces(const hexahedral_mesh<T>& msh, const hexahedral_element<3, CODIM>& e)
+template<typename T, size_t DIM, size_t CODIM>
+constexpr size_t
+number_of_faces(const cartesian_mesh<T, DIM>& msh, const cartesian_element<DIM, CODIM>& e)
 {
-    switch(CODIM)
+    static_assert(DIM == 2 or DIM == 3, "Wrong dimension for cartesian mesh");
+
+    if (DIM == 2)
     {
-        case 0: return 6;
-        case 1: return 4;
-        case 2: return 2;
-        case 3: return 0;
+        switch(CODIM)
+        {
+            case 0: return 4;
+            case 1: return 2;
+            case 2: return 0;
+        }
+    }
+
+    if (DIM == 3)
+    {
+        switch(CODIM)
+        {
+            case 0: return 6;
+            case 1: return 4;
+            case 2: return 2;
+            case 3: return 0;
+        }
     }
     /* NOTREACHED */
 }
 
+template<typename T>
+std::array<typename cartesian_mesh<T, 2>::face, 4>
+faces(const cartesian_mesh<T, 2>&,
+      const typename cartesian_mesh<T, 2>::cell& cl)
+{
+    typedef typename cartesian_mesh<T, 2>::face    face_type;
+    std::array<face_type, 4> ret;
+
+    auto ptids = cl.point_ids();
+    assert(ptids.size() == 4);
+
+    ret[0] = face_type( { ptids[0], ptids[1] } );
+    ret[1] = face_type( { ptids[0], ptids[2] } );
+    ret[2] = face_type( { ptids[1], ptids[3] } );
+    ret[3] = face_type( { ptids[2], ptids[3] } );
+
+    return ret;
+}
 
 template<typename T>
-std::array<typename hexahedral_mesh<T>::face, 6>
-faces(const hexahedral_mesh<T>&,
-      const typename hexahedral_mesh<T>::cell& cl)
+std::array<typename cartesian_mesh<T, 3>::face, 6>
+faces(const cartesian_mesh<T, 3>&,
+      const typename cartesian_mesh<T, 3>::cell& cl)
 {
-    typedef typename hexahedral_mesh<T>::face    face_type;
+    typedef typename cartesian_mesh<T, 3>::face    face_type;
     std::array<face_type, 6> ret;
 
     auto ptids = cl.point_ids();
@@ -107,47 +147,64 @@ faces(const hexahedral_mesh<T>&,
     return ret;
 }
 
-/* WARNING: ONLY CARTESIAN MESHES FOR NOW!! */
-template<typename T>
+template<typename T, size_t DIM>
 T
-measure(const hexahedral_mesh<T>& msh,
-        const typename hexahedral_mesh<T>::cell& cl)
+measure(const cartesian_mesh<T, DIM>& msh,
+        const typename cartesian_mesh<T, DIM>::cell& cl)
 {
+    static_assert(DIM == 2 or DIM == 3, "Wrong dimension for cartesian mesh");
+
     auto pts = points(msh, cl);
-    assert(pts.size() == 8);
 
-    auto v0 = (pts[1] - pts[0]).to_vector().norm();
-    auto v1 = (pts[2] - pts[0]).to_vector().norm();
-    auto v2 = (pts[4] - pts[0]).to_vector().norm();
+    if (DIM == 2)
+    {
+        auto v0 = (pts[1] - pts[0]).to_vector().norm();
+        auto v1 = (pts[2] - pts[0]).to_vector().norm();
 
-    return v0 * v1 * v2;
+        return v0 * v1;
+    }
+
+    if (DIM == 3)
+    {
+        auto v0 = (pts[1] - pts[0]).to_vector().norm();
+        auto v1 = (pts[2] - pts[0]).to_vector().norm();
+        auto v2 = (pts[4] - pts[0]).to_vector().norm();
+
+        return v0 * v1 * v2;
+    }
+
+    /* NOTREACHED */
 }
 
 
-template<typename T>
+template<typename T, size_t DIM>
 T
-measure(const hexahedral_mesh<T>& msh,
-        const typename hexahedral_mesh<T>::face& fc)
+measure(const cartesian_mesh<T, DIM>& msh,
+        const typename cartesian_mesh<T, DIM>::face& fc)
 {
+    static_assert(DIM == 2 or DIM == 3, "Wrong dimension for cartesian mesh");
+
     auto pts = points(msh, fc);
-    assert(pts.size() == 4);
 
-    auto v0 = (pts[1] - pts[0]).to_vector();
-    auto v1 = (pts[2] - pts[1]).to_vector();
-    auto a1 = v0.cross(v1).norm();
+    if (DIM == 2)
+        return (pts[1] - pts[0]).to_vector().norm();
 
-    auto v2 = (pts[3] - pts[2]).to_vector();
-    auto v3 = (pts[0] - pts[3]).to_vector();
-    auto a2 = v2.cross(v3).norm();
+    if (DIM == 3)
+    {
+        auto v0 = (pts[1] - pts[0]).to_vector().norm();
+        auto v1 = (pts[3] - pts[0]).to_vector().norm();
 
-    return (a1 + a2)*T(0.5);
+        return v0 * v1;
+    }
+
+    /* NOTREACHED */
 }
 
 template<typename T>
 static_vector<T, 3>
-normal(const hexahedral_mesh<T>& msh,
-       const typename hexahedral_mesh<T>::cell& cl,
-       const typename hexahedral_mesh<T>::face& fc)
+normal(const cartesian_mesh<T, 3>& msh,
+       const typename cartesian_mesh<T, 3>::cell& cl,
+       const typename cartesian_mesh<T, 3>::face& fc)
 {
     auto pts = points(msh, fc);
     assert(pts.size() == 4);
@@ -168,4 +225,4 @@ normal(const hexahedral_mesh<T>& msh,
 
 } // namespace disk
 
-#endif /* _GEOMETRY_HEXAHEDRAL_HPP_ */
+#endif /* _GEOMETRY_CARTESIAN_HPP_ */

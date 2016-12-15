@@ -27,7 +27,7 @@
 
 namespace disk {
 
-namespace hex_priv {
+namespace cartesian_priv {
 
 template<size_t DIM, size_t CODIM>
 struct howmany;
@@ -35,23 +35,23 @@ struct howmany;
 }
 
 template<size_t DIM, size_t CODIM>
-class hexahedral_element
+class cartesian_element
 {
-    static_assert(DIM == 3, "hexahedral elements must have DIM = 3");
+    static_assert(DIM == 2 or DIM == 3, "cartesian elements must be 2D or 3D");
 
     typedef point_identifier<DIM>       point_id_type;
 
-    typedef std::array<point_id_type, hex_priv::howmany<DIM, CODIM>::nodes>
+    typedef std::array<point_id_type, cartesian_priv::howmany<DIM, CODIM>::nodes>
         node_array_type;
 
     node_array_type     m_pts_ptrs;
 
 public:
-    typedef identifier<hexahedral_element, ident_impl_t, 0> id_type;
+    typedef identifier<cartesian_element, ident_impl_t, 0> id_type;
 
-    hexahedral_element() = default;
+    cartesian_element() = default;
 
-    hexahedral_element(std::initializer_list<point_id_type> l)
+    cartesian_element(std::initializer_list<point_id_type> l)
     {
         std::copy(l.begin(), l.end(), m_pts_ptrs.begin());
     }
@@ -61,23 +61,23 @@ public:
         return m_pts_ptrs;
     }
 
-    bool operator<(const hexahedral_element& other) const
+    bool operator<(const cartesian_element& other) const
     {
         return m_pts_ptrs < other.m_pts_ptrs;
     }
 
-    bool operator==(const hexahedral_element& other) const
+    bool operator==(const cartesian_element& other) const
     {
         return m_pts_ptrs == other.m_pts_ptrs;
     }
 
     size_t subelement_size() const
     {
-        return hex_priv::howmany<DIM, CODIM>::subelements;
+        return cartesian_priv::howmany<DIM, CODIM>::subelements;
     }
 };
 
-namespace hex_priv {
+namespace cartesian_priv {
     template<>
     struct howmany<3,0>
     {
@@ -116,14 +116,43 @@ namespace hex_priv {
         static const size_t surfaces = 0;
         static const size_t volumes = 0;
     };
+
+    template<>
+    struct howmany<2,0>
+    {
+        static const size_t nodes = 4;
+        static const size_t edges = 4;
+        static const size_t surfaces = 4;
+        static const size_t volumes = 0;
+        static const size_t subelements = edges;
+    };
+
+    template<>
+    struct howmany<2,1>
+    {
+        static const size_t nodes = 2;
+        static const size_t edges = 1;
+        static const size_t surfaces = 0;
+        static const size_t volumes = 0;
+        static const size_t subelements = nodes;
+    };
+
+    template<>
+    struct howmany<2,2>
+    {
+        static const size_t nodes = 1;
+        static const size_t edges = 0;
+        static const size_t surfaces = 0;
+        static const size_t volumes = 0;
+    };
 } // namespace priv
 
 /* Output streaming operator for elements */
 template<size_t DIM, size_t CODIM>
 std::ostream&
-operator<<(std::ostream& os, const hexahedral_element<DIM, CODIM>& e)
+operator<<(std::ostream& os, const cartesian_element<DIM, CODIM>& e)
 {
-    os << "hexahedral_element<" << DIM << "," << CODIM << ">: ";
+    os << "cartesian_element<" << DIM << "," << CODIM << ">: ";
     auto pts = e.point_ids();
     for (auto itor = pts.begin(); itor != pts.end(); itor++)
         os << *itor << " ";

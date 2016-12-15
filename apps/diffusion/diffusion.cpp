@@ -634,14 +634,43 @@ int main(int argc, char **argv)
         //test_gradrec(msh, degree);
     }
 
-    if (std::regex_match(filename, std::regex(".*\\.hex$") ))
+    if (std::regex_match(filename, std::regex(".*\\.quad$") ))
     {
-        std::cout << "Guessed mesh format: Hexahedral 3D" << std::endl;
+        std::cout << "Guessed mesh format: Cartesian 2D" << std::endl;
 
-        typedef disk::hexahedral_mesh<RealType>   mesh_type;
+        typedef disk::cartesian_mesh<RealType, 2>   mesh_type;
 
         mesh_type msh;
-        disk::hex_mesh_loader<RealType> loader;
+        disk::cartesian_mesh_loader<RealType, 2> loader;
+        if (!loader.read_mesh(filename))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            return 1;
+        }
+        loader.populate_mesh(msh);
+
+        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return M_PI * M_PI * sin(p.x() * M_PI);
+            //return 1.0;
+        };
+
+        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return sin(p.x() * M_PI);
+            //return -p.x() * p.x() * 0.5;
+        };
+
+        test_diffusion(msh, f, sf, degree, "plot.dat");
+        //test_gradrec(msh, degree);
+    }
+
+    if (std::regex_match(filename, std::regex(".*\\.hex$") ))
+    {
+        std::cout << "Guessed mesh format: Cartesian 3D" << std::endl;
+
+        typedef disk::cartesian_mesh<RealType, 3>   mesh_type;
+
+        mesh_type msh;
+        disk::cartesian_mesh_loader<RealType, 3> loader;
         if (!loader.read_mesh(filename))
         {
             std::cout << "Problem loading mesh." << std::endl;

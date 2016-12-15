@@ -28,7 +28,7 @@
 #include "common/eigen.hpp"
 
 namespace disk {
-
+#if 0
 template<typename T>
 class scaled_monomial_scalar_basis<simplicial_mesh<T,3>, typename simplicial_mesh<T,3>::cell>
     : public priv::monomial_basis_bones<3>
@@ -310,6 +310,7 @@ public:
     }
 };
 
+
 template<typename T>
 static_vector<T,3>
 map_to_physical(const simplicial_mesh<T,3>& msh,
@@ -368,6 +369,8 @@ public:
         return ret;
     }
 };
+
+#endif
 
 template<typename T>
 std::vector<point<T,3>>
