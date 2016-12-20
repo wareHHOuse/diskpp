@@ -486,12 +486,66 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
     typedef typename mesh_type::edge_type           edge_type;
     typedef typename mesh_type::surface_type        surface_type;
 
+    std::vector<point_type>                         m_points;
+    std::vector<node_type>                          m_nodes;
+
+    bool fvca6_read(const std::string& filename)
+    {
+        std::ifstream   ifs(filename);
+        std::string     keyword;
+        size_t          lines_to_read;
+        T               x, y, z;
+
+        if (!ifs.is_open())
+        {
+            std::cout << "Error opening " << filename << std::endl;
+            return false;
+        }
+
+        /* Apparently the first 16 lines of the file are comments or
+         * information repeated elsewhere: throw them away */
+
+        for (size_t i = 0; i < 16; i++)
+            std::getline(ifs, keyword);
+
+        ifs >> keyword;
+        if ( keyword != "Vertices" )
+        {
+            std::cout << "Expected keyword \"Vertices\"" << std::endl;
+            std::cout << "Found \"" << keyword << "\"" << std::endl;
+            return false;
+        }
+
+        ifs >> lines_to_read;
+        std::cout << "About to read " << lines_to_read << " points" << std::endl;
+        m_points.reserve(lines_to_read);
+        for (size_t i = 0; i < lines_to_read; i++)
+        {
+            ifs >> x >> y >> z;
+            m_points.push_back( point_type({x, y, z}) );
+        }
+
+        ifs >> keyword;
+        if ( keyword != "Volumes->faces" )
+        {
+            std::cout << "Expected keyword \"Volumes->faces\"" << std::endl;
+            std::cout << "Found \"" << keyword << "\"" << std::endl;
+            return false;
+        }
+
+        ifs >> lines_to_read;
+        std::cout << "About to read " << lines_to_read << " volumes" << std::endl;
+
+        return false;
+    }
+
 public:
     fvca6_mesh_loader() = default;
 
     bool read_mesh(const std::string& s)
     {
         std::cout << " *** READING FVCA6 3D MESH ***" << std::endl;
+        fvca6_read(s);
         return false;
     }
 

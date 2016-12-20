@@ -582,12 +582,13 @@ int main(int argc, char **argv)
         mesh_type msh;
         disk::fvca6_mesh_loader<RealType, 3> loader;
 
-        /*
+
         if (!loader.read_mesh(filename))
         {
             std::cout << "Problem loading mesh." << std::endl;
             return 1;
         }
+        /*
         loader.populate_mesh(msh);
 
         auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {

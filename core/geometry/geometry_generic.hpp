@@ -74,8 +74,9 @@ std::vector<typename generic_mesh<T, DIM>::face>
 faces(const generic_mesh<T, DIM>& msh,
       const typename generic_mesh<T, DIM>::cell& cl)
 {
+    auto faces_begin = msh.faces_begin();
     auto id_to_face = [&](const typename generic_mesh<T, DIM>::face::id_type& id) -> auto {
-        return *(msh.faces_begin() + size_t(id));
+        return *std::next(faces_begin, id);
     };
 
     std::vector<typename generic_mesh<T, DIM>::face> ret;

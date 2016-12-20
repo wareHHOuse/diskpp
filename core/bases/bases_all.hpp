@@ -164,6 +164,7 @@ map_point(const Mesh<T,3,Storage>& msh,
 {
     auto pts = points(msh, fc);
     auto diam = diameter(msh, fc);
+    auto bar = barycenter(msh, fc);
 
     auto v0 = (pts[1] - pts[0]).to_vector();
     auto v1 = (pts[pts.size()-1] - pts[0]).to_vector();
@@ -171,7 +172,7 @@ map_point(const Mesh<T,3,Storage>& msh,
     auto e0 = v0 / v0.norm();
     auto e1 = (v1 - (v1.dot(v0) * v0) / (v0.dot(v0))).norm();
 
-    auto v = pt.to_vector() / diam;
+    auto v = (pt-bar).to_vector() / diam;
 
     auto eta = v.dot(v0);
     auto xi = v.dot(v1);

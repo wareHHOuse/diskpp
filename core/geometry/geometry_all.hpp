@@ -67,10 +67,9 @@ points(const Mesh& msh, const Element& elem)
 {
     auto ptids = elem.point_ids();
 
+    auto points_begin = msh.points_begin();
     auto ptid_to_point = [&](const point_identifier<Mesh::dimension>& pi) -> auto {
-        auto itor = msh.points_begin();
-        std::advance(itor, pi);
-        return *itor;
+        return *std::next(points_begin, pi);
     };
 
     std::vector<typename Mesh::point_type> pts(ptids.size());

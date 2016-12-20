@@ -355,7 +355,7 @@ public:
         for (auto& qp : cell_quadpoints)
         {
             matrix_type dphi = m_bqd.cell_basis.eval_gradients(msh, cl, qp.point());
-            stiff_mat += qp.weight() * dphi * (/*mtens **/ dphi.transpose());
+            stiff_mat += qp.weight() * dphi * /*mtens **/ dphi.transpose();
         }
 
         /* LHS: take basis functions derivatives from degree 1 to K+1 */
@@ -393,7 +393,7 @@ public:
                 matrix_type c_dphi =
                     m_bqd.cell_basis.eval_gradients(msh, cl, qp.point(), 1, cell_degree+1);
 
-                matrix_type c_dphi_n = (c_dphi /** mtens*/) * n;
+                matrix_type c_dphi_n = (c_dphi /** mtens*/ * n);
                 matrix_type T = qp.weight() * c_dphi_n * c_phi.transpose();
 
                 BG.block(0, 0, BG.rows(), BG_col_range.size()) -= T;

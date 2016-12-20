@@ -27,8 +27,10 @@
 
 #include "common/eigen.hpp"
 
+#define ENABLE_SPECIALIZED_BASIS
+
 namespace disk {
-#if 0
+#ifdef ENABLE_SPECIALIZED_BASIS
 template<typename T>
 class scaled_monomial_scalar_basis<simplicial_mesh<T,3>, typename simplicial_mesh<T,3>::cell>
     : public priv::monomial_basis_bones<3>

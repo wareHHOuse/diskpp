@@ -76,10 +76,10 @@ points(const simplicial_mesh<T,DIM>& msh, const simplicial_element<DIM, CODIM>& 
 {
     auto ptids = elem.point_ids();
 
-    auto ptid_to_point = [&](const point_identifier<DIM>& pi) -> auto {
-        auto itor = msh.points_begin();
-        std::advance(itor, pi);
-        return *itor;
+    auto points_begin = msh.points_begin();
+    
+    auto ptid_to_point = [&](const point_identifier<DIM>& pi) -> typename simplicial_mesh<T,DIM>::point_type {
+        return *std::next(points_begin, pi);
     };
 
     typedef point_identifier<DIM>       point_id_type;
