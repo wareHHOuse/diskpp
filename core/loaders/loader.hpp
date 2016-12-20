@@ -469,6 +469,37 @@ public:
 };
 
 
+bool
+expect(std::ifstream& ifs, const std::string& str)
+{
+    std::string keyword;
+    ifs >> keyword;
+    if ( keyword != str )
+    {
+        std::cout << "Expected keyword \"" << str << "\"" << std::endl;
+        std::cout << "Found \"" << keyword << "\"" << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+std::vector<size_t>
+read_fvca6_line(std::ifstream& ifs)
+{
+    std::vector<size_t> ret;
+
+    size_t num_entries;
+    ifs >> num_entries;
+    for(size_t j = 0; j < num_entries; j++)
+    {
+        size_t temp;
+        ifs >> temp;
+        ret.push_back(temp-1); //convert indices to zero-based
+    }
+
+    return ret;
+}
 
 
 template<typename T, size_t N>
@@ -488,13 +519,18 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
 
     std::vector<point_type>                         m_points;
     std::vector<node_type>                          m_nodes;
+    std::vector<std::pair<size_t, edge_type>>       m_edges;
+
+    std::vector<std::vector<size_t>>                vol_to_faces;
+    std::vector<std::vector<size_t>>                vol_to_vts;
+    std::vector<std::vector<size_t>>                faces_to_edges;
+    std::vector<std::vector<size_t>>                faces_to_vts;
 
     bool fvca6_read(const std::string& filename)
     {
         std::ifstream   ifs(filename);
         std::string     keyword;
         size_t          lines_to_read;
-        T               x, y, z;
 
         if (!ifs.is_open())
         {
@@ -508,35 +544,110 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
         for (size_t i = 0; i < 16; i++)
             std::getline(ifs, keyword);
 
-        ifs >> keyword;
-        if ( keyword != "Vertices" )
-        {
-            std::cout << "Expected keyword \"Vertices\"" << std::endl;
-            std::cout << "Found \"" << keyword << "\"" << std::endl;
+        if ( !expect(ifs, "Vertices") )
             return false;
-        }
 
         ifs >> lines_to_read;
         std::cout << "About to read " << lines_to_read << " points" << std::endl;
         m_points.reserve(lines_to_read);
         for (size_t i = 0; i < lines_to_read; i++)
         {
+            T x, y, z;
             ifs >> x >> y >> z;
             m_points.push_back( point_type({x, y, z}) );
         }
 
-        ifs >> keyword;
-        if ( keyword != "Volumes->faces" )
-        {
-            std::cout << "Expected keyword \"Volumes->faces\"" << std::endl;
-            std::cout << "Found \"" << keyword << "\"" << std::endl;
+        /* Volume to face data */
+        if ( !expect(ifs, "Volumes->faces") )
             return false;
-        }
 
         ifs >> lines_to_read;
-        std::cout << "About to read " << lines_to_read << " volumes" << std::endl;
+        std::cout << "About to read " << lines_to_read << " entries" << std::endl;
 
-        return false;
+        for (size_t i = 0; i < lines_to_read; i++)
+        {
+            auto vol_faces = read_fvca6_line(ifs);
+            vol_to_faces.push_back( std::move(vol_faces) );
+        }
+
+        /* Volume to vertices data */
+        if ( !expect(ifs, "Volumes->Verticess") )
+            return false;
+
+        ifs >> lines_to_read;
+        std::cout << "About to read " << lines_to_read << " entries" << std::endl;
+
+        for (size_t i = 0; i < lines_to_read; i++)
+        {
+            auto vol_vts = read_fvca6_line(ifs);
+            vol_to_vts.push_back( std::move(vol_vts) );
+        }
+
+        /* Faces to edges data */
+        if ( !expect(ifs, "Faces->Edgess") )
+            return false;
+
+        ifs >> lines_to_read;
+        std::cout << "About to read " << lines_to_read << " entries" << std::endl;
+
+        for (size_t i = 0; i < lines_to_read; i++)
+        {
+            auto faces_edges = read_fvca6_line(ifs);
+            faces_to_edges.push_back( std::move(faces_edges) );
+        }
+
+        /* Faces to vertices data */
+        if ( !expect(ifs, "Faces->Vertices") )
+            return false;
+
+        ifs >> lines_to_read;
+        std::cout << "About to read " << lines_to_read << " entries" << std::endl;
+
+        for (size_t i = 0; i < lines_to_read; i++)
+        {
+            auto faces_vts = read_fvca6_line(ifs);
+            faces_to_vts.push_back( std::move(faces_vts) );
+        }
+
+        /* Faces to cv data */
+        if ( !expect(ifs, "Faces->Control") )
+            return false;
+
+        if ( !expect(ifs, "volumes") )
+            return false;
+
+        ifs >> lines_to_read;
+        std::cout << "About to read " << lines_to_read << " entries" << std::endl;
+
+        for (size_t i = 0; i < lines_to_read; i++)
+        {
+            size_t v1;
+            int  v2;
+            ifs >> v1 >> v2;
+        }
+
+        /* Edges data */
+        if ( !expect(ifs, "Edges") )
+            return false;
+
+        ifs >> lines_to_read;
+        std::cout << "About to read " << lines_to_read << " entries" << std::endl;
+
+        for (size_t i = 0; i < lines_to_read; i++)
+        {
+            size_t v1, v2;
+            ifs >> v1 >> v2;
+
+            if (v1 > v2)
+                std::swap(v1, v2);
+
+            auto e = edge_type({typename node_type::id_type(v1),
+                                typename node_type::id_type(v2)})
+
+            m_edges.push_back( std::make_pair(i, e) );
+        }
+
+        return true;
     }
 
 public:
@@ -545,12 +656,37 @@ public:
     bool read_mesh(const std::string& s)
     {
         std::cout << " *** READING FVCA6 3D MESH ***" << std::endl;
-        fvca6_read(s);
-        return false;
+        return fvca6_read(s);
     }
 
     bool populate_mesh(mesh_type& msh)
     {
+        auto storage = msh.backend_storage();
+
+        std::vector<size_t> conv_table;
+        /* sort edges in appropriate order */
+        auto comp_edges = [](const std::pair<size_t, edge_type>& e1,
+                             const std::pair<size_t, edge_type>& e2)
+        {
+            return e1.second < e2.second;
+        }
+        std::sort(m_edges.begin(), m_edges.end(), comp_edges);
+
+        std::vector<edge_type> edges;
+        edges.reserve( m_edges.size() );
+        conv_table.resize( m_edges.size() );
+        for (size_t i = 0; i < m_edges.size(); i++)
+        {
+            conv_table[m_edges[i].first] = i;
+            edges.push_back(m_edges[i].second);
+        }
+
+        storage->edges = std::move(edges);
+        /* Now the edges are in their place */
+
+
+
+
         return false;
     }
 };
