@@ -522,9 +522,9 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
     std::vector<std::pair<size_t, edge_type>>       m_edges;
 
     std::vector<std::pair<size_t, std::vector<size_t>>>     vol_to_faces;
-    std::vector<std::vector<size_t>>                vol_to_vts;
-    std::vector<std::vector<size_t>>                faces_to_edges;
-    std::vector<std::vector<size_t>>                faces_to_vts;
+    std::vector<std::vector<size_t>>                        vol_to_vts;
+    std::vector<std::pair<size_t, std::vector<size_t>>>     faces_to_edges;
+    std::vector<std::vector<size_t>>                        faces_to_vts;
 
     bool fvca6_read(const std::string& filename)
     {
@@ -593,7 +593,7 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
         for (size_t i = 0; i < lines_to_read; i++)
         {
             auto faces_edges = read_fvca6_line(ifs);
-            faces_to_edges.push_back( std::move(faces_edges) );
+            faces_to_edges.push_back( std::make_pair(i, std::move(faces_edges)) );
         }
 
         /* Faces to vertices data */
@@ -642,7 +642,7 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
                 std::swap(v1, v2);
 
             auto e = edge_type({typename node_type::id_type(v1),
-                                typename node_type::id_type(v2)})
+                                typename node_type::id_type(v2)});
 
             m_edges.push_back( std::make_pair(i, e) );
         }
@@ -666,10 +666,9 @@ public:
         std::vector<size_t> conv_table;
         /* sort edges in appropriate order */
         auto comp_edges = [](const std::pair<size_t, edge_type>& e1,
-                             const std::pair<size_t, edge_type>& e2)
-        {
+                             const std::pair<size_t, edge_type>& e2) {
             return e1.second < e2.second;
-        }
+        };
         std::sort(m_edges.begin(), m_edges.end(), comp_edges);
 
         std::vector<edge_type> edges;
@@ -685,7 +684,31 @@ public:
         /* Now the edges are in their place */
 
         //convert edge pointers
+        for (auto& fe : faces_to_edges)
+        {
+            for (auto& ptr : fe.second)
+                ptr = conv_table[ptr];
+        }
 
+        auto comp_vecs = [](const std::pair<size_t, std::vector<size_t>>& e1,
+                            const std::pair<size_t, std::vector<size_t>>& e2) {
+            return e1.second < e2.second;
+        };
+
+        std::sort(faces_to_edges.begin(), faces_to_edges.end(), comp_vecs);
+
+        std::vector<surface_type> faces;
+        faces.reserve( faces_to_edges.size() );
+
+        for (auto& fe : faces_to_edges)
+        {
+            surface_type s( convert_to<typename edge_type::id_type>(fe.second) );
+            s.set_point_ids( convert_to<point_identifier<3>>(faces_to_vts.at(fe.first)) );
+            faces.push_back(s);
+        }
+
+        for (auto& f : faces)
+            std::cout << f << std::endl;
 
 
         return false;

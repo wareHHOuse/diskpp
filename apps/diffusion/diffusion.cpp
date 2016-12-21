@@ -588,9 +588,9 @@ int main(int argc, char **argv)
             std::cout << "Problem loading mesh." << std::endl;
             return 1;
         }
-        /*
-        loader.populate_mesh(msh);
 
+        loader.populate_mesh(msh);
+        /*
         auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
             return M_PI * M_PI * sin(p.x() * M_PI);
             //return 1.0;
