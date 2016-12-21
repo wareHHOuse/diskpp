@@ -521,7 +521,7 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
     std::vector<node_type>                          m_nodes;
     std::vector<std::pair<size_t, edge_type>>       m_edges;
 
-    std::vector<std::vector<size_t>>                vol_to_faces;
+    std::vector<std::pair<size_t, std::vector<size_t>>>     vol_to_faces;
     std::vector<std::vector<size_t>>                vol_to_vts;
     std::vector<std::vector<size_t>>                faces_to_edges;
     std::vector<std::vector<size_t>>                faces_to_vts;
@@ -567,7 +567,7 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
         for (size_t i = 0; i < lines_to_read; i++)
         {
             auto vol_faces = read_fvca6_line(ifs);
-            vol_to_faces.push_back( std::move(vol_faces) );
+            vol_to_faces.push_back( std::make_pair(i, std::move(vol_faces)) );
         }
 
         /* Volume to vertices data */
@@ -684,6 +684,7 @@ public:
         storage->edges = std::move(edges);
         /* Now the edges are in their place */
 
+        //convert edge pointers
 
 
 
