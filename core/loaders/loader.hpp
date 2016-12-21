@@ -642,7 +642,7 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
                 std::swap(v1, v2);
 
             auto e = edge_type({typename node_type::id_type(v1),
-                                typename node_type::id_type(v2)})
+                                typename node_type::id_type(v2)});
 
             m_edges.push_back( std::make_pair(i, e) );
         }
@@ -666,10 +666,10 @@ public:
         std::vector<size_t> conv_table;
         /* sort edges in appropriate order */
         auto comp_edges = [](const std::pair<size_t, edge_type>& e1,
-                             const std::pair<size_t, edge_type>& e2)
-        {
+                             const std::pair<size_t, edge_type>& e2) {
             return e1.second < e2.second;
-        }
+        };
+
         std::sort(m_edges.begin(), m_edges.end(), comp_edges);
 
         std::vector<edge_type> edges;

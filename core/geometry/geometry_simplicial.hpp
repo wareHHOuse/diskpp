@@ -77,7 +77,7 @@ points(const simplicial_mesh<T,DIM>& msh, const simplicial_element<DIM, CODIM>& 
     auto ptids = elem.point_ids();
 
     auto points_begin = msh.points_begin();
-    
+
     auto ptid_to_point = [&](const point_identifier<DIM>& pi) -> typename simplicial_mesh<T,DIM>::point_type {
         return *std::next(points_begin, pi);
     };
@@ -186,7 +186,7 @@ measure(const simplicial_mesh<T, 2>& msh,
     auto v0 = (pts[1] - pts[0]).to_vector();
     auto v1 = (pts[2] - pts[0]).to_vector();
 
-    return v0.cross(v1).norm()/T(2);
+    return cross(v0, v1).norm()/T(2);
 }
 
 template<typename T>
