@@ -516,6 +516,7 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
     typedef typename mesh_type::node_type           node_type;
     typedef typename mesh_type::edge_type           edge_type;
     typedef typename mesh_type::surface_type        surface_type;
+    typedef typename mesh_type::volume_type         volume_type;
 
     std::vector<point_type>                         m_points;
     std::vector<node_type>                          m_nodes;
@@ -550,11 +551,13 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
         ifs >> lines_to_read;
         std::cout << "About to read " << lines_to_read << " points" << std::endl;
         m_points.reserve(lines_to_read);
+        m_nodes.reserve(lines_to_read);
         for (size_t i = 0; i < lines_to_read; i++)
         {
             T x, y, z;
             ifs >> x >> y >> z;
             m_points.push_back( point_type({x, y, z}) );
+            m_nodes.push_back( node_type( point_identifier<3>(i) ) );
         }
 
         /* Volume to face data */
@@ -664,7 +667,8 @@ public:
         auto storage = msh.backend_storage();
 
         std::vector<size_t> conv_table;
-        /* sort edges in appropriate order */
+        /* Sort the edges in lexicographical order, remember their original
+         * position to convert the pointers in the faces */
         auto comp_edges = [](const std::pair<size_t, edge_type>& e1,
                              const std::pair<size_t, edge_type>& e2) {
             return e1.second < e2.second;
@@ -676,40 +680,75 @@ public:
         conv_table.resize( m_edges.size() );
         for (size_t i = 0; i < m_edges.size(); i++)
         {
-            conv_table[m_edges[i].first] = i;
+            conv_table[m_edges[i].first] = i;   /* Make ptr conversion table */
             edges.push_back(m_edges[i].second);
         }
 
-        storage->edges = std::move(edges);
-        /* Now the edges are in their place */
-
-        //convert edge pointers
+        /* Convert the edge pointers in the face data */
         for (auto& fe : faces_to_edges)
         {
             for (auto& ptr : fe.second)
                 ptr = conv_table[ptr];
         }
 
+        /* Sort in lexicographical order and remember original position */
         auto comp_vecs = [](const std::pair<size_t, std::vector<size_t>>& e1,
                             const std::pair<size_t, std::vector<size_t>>& e2) {
             return e1.second < e2.second;
         };
-
         std::sort(faces_to_edges.begin(), faces_to_edges.end(), comp_vecs);
 
         std::vector<surface_type> faces;
         faces.reserve( faces_to_edges.size() );
+        conv_table.resize( faces_to_edges.size() );
 
-        for (auto& fe : faces_to_edges)
+        for (size_t i = 0; i < faces_to_edges.size(); i++)
         {
+            auto fe = faces_to_edges[i];
             surface_type s( convert_to<typename edge_type::id_type>(fe.second) );
             s.set_point_ids( convert_to<point_identifier<3>>(faces_to_vts.at(fe.first)) );
             faces.push_back(s);
+            conv_table[fe.first] = i;
+        }
+        /* Now the faces are in their place and have correct ptrs */
+
+        /* Convert the face pointers in the volume data */
+        for (auto& vf : vol_to_faces )
+        {
+            for (auto& ptr : vf.second)
+                ptr = conv_table[ptr];
         }
 
-        for (auto& f : faces)
-            std::cout << f << std::endl;
+        //for (auto& f : faces)
+        //    std::cout << f << std::endl;
 
+        /* Sort volume data */
+        std::sort(vol_to_faces.begin(), vol_to_faces.end(), comp_vecs);
+
+        std::vector<volume_type> volumes;
+        volumes.reserve( vol_to_faces.size() );
+
+        for (size_t i = 0; i < vol_to_faces.size(); i++)
+        {
+            auto vf = vol_to_faces[i];
+            volume_type v( convert_to<typename surface_type::id_type>(vf.second) );
+            v.set_point_ids( convert_to<point_identifier<3>>(vol_to_vts.at(vf.first)) );
+            volumes.push_back(v);
+        }
+
+        storage->points     = std::move(m_points);
+        storage->nodes      = std::move(m_nodes);
+        storage->edges      = std::move(edges);
+        storage->surfaces   = std::move(faces);
+        storage->volumes    = std::move(volumes);
+
+        //for (auto v : volumes)
+        //    std::cout << v << std::endl;
+
+        std::cout << "Nodes: " << storage->nodes.size() << std::endl;
+        std::cout << "Edges: " << storage->edges.size() << std::endl;
+        std::cout << "Faces: " << storage->surfaces.size() << std::endl;
+        std::cout << "Volumes: " << storage->volumes.size() << std::endl;
 
         return false;
     }

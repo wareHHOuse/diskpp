@@ -590,6 +590,22 @@ int main(int argc, char **argv)
         }
 
         loader.populate_mesh(msh);
+
+        RealType totvol = 0.0;
+        for (auto& cl : msh)
+        {
+            RealType vol = 0.0;
+            auto rss = split_in_raw_tetrahedra(msh, cl);
+            for (auto& rs : rss)
+                vol += measure(rs);
+
+            totvol += vol;
+
+            //std::cout << vol << std::endl;
+        }
+
+        std::cout << totvol << std::endl;
+
         /*
         auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
             return M_PI * M_PI * sin(p.x() * M_PI);

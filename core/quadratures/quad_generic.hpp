@@ -21,7 +21,68 @@
 #ifndef _QUAD_GENERIC_HPP_
 #define _QUAD_GENERIC_HPP_
 
+#include "raw_simplices.hpp"
+
 namespace disk {
+
+template<typename T>
+class quadrature<generic_mesh<T,3>, typename generic_mesh<T,3>::cell>
+{
+    size_t                                          m_order;
+    std::vector<std::pair<point<T,3>, T>>           m_quadrature_data;
+
+public:
+    typedef generic_mesh<T,3>                       mesh_type;
+    typedef typename mesh_type::cell                cell_type;
+    typedef quadrature_point<T,3>                   quadpoint_type;
+    typedef typename mesh_type::point_type          point_type;
+    typedef T                                       weight_type;
+
+    quadrature()
+        : m_order(1)
+    {
+        m_quadrature_data = tetrahedron_quadrature(1);
+    }
+
+    quadrature(size_t order)
+        : m_order(order)
+    {
+        m_quadrature_data = tetrahedron_quadrature(m_order);
+    }
+
+    std::vector<quadpoint_type>
+    integrate_triangular_pyramid(const std::vector<point_type>& pts, const point_type& bar)
+    {
+        assert(pts.size() == 3);
+
+    }
+
+    std::vector<quadpoint_type>
+    integrate(const mesh_type& msh, const cell_type& cl) const
+    {
+        auto meas   = measure(msh, cl);
+        auto bar    = barycenter(msh, cl);
+        auto fcs    = faces(msh, cl);
+
+        for (auto& fc : fcs)
+        {
+            /*
+            auto face_pts = points(msh, fc);
+            if (face_pts == 3)
+                integrate_triangular_pyramid(face_pts, bar);
+            else if (face_pts == 4)
+                integrate_quadrilateral_pyramid(face_pts, bar);
+            else
+                integrate_generic_pyramid(face_pts, c_bar, f_bar);
+            */
+        }
+
+        std::vector<quadpoint_type> ret;
+
+        return ret;
+    }
+
+};
 
 template<typename T>
 class quadrature<generic_mesh<T,2>, typename generic_mesh<T,2>::cell>
