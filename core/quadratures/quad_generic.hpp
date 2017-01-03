@@ -37,6 +37,7 @@ public:
     typedef quadrature_point<T,3>                   quadpoint_type;
     typedef typename mesh_type::point_type          point_type;
     typedef T                                       weight_type;
+    typedef T                                       scalar_type;
 
     quadrature()
         : m_order(1)
@@ -60,24 +61,24 @@ public:
     std::vector<quadpoint_type>
     integrate(const mesh_type& msh, const cell_type& cl) const
     {
-        auto meas   = measure(msh, cl);
-        auto bar    = barycenter(msh, cl);
-        auto fcs    = faces(msh, cl);
+        auto rss = split_in_raw_tetrahedra(msh, cl);
 
-        for (auto& fc : fcs)
-        {
-            /*
-            auto face_pts = points(msh, fc);
-            if (face_pts == 3)
-                integrate_triangular_pyramid(face_pts, bar);
-            else if (face_pts == 4)
-                integrate_quadrilateral_pyramid(face_pts, bar);
-            else
-                integrate_generic_pyramid(face_pts, c_bar, f_bar);
-            */
-        }
+        // a call to measure(msh, cl) triggers another call to
+        // split_in_raw_tetrahedra(), so we compute measure using rss
+        scalar_type meas = 0.0;
+        for (auto& rs : rss)
+            meas += measure(rs);
 
         std::vector<quadpoint_type> ret;
+        for (auto& rs : rss)
+        {
+            for (auto& qd : m_quadrature_data)
+            {
+                auto point = map_from_reference(qd.first, rs);
+                auto weight = qd.second * meas;
+                ret.push_back( make_qp(point, weight) );
+            }
+        }
 
         return ret;
     }

@@ -591,22 +591,6 @@ int main(int argc, char **argv)
 
         loader.populate_mesh(msh);
 
-        RealType totvol = 0.0;
-        for (auto& cl : msh)
-        {
-            RealType vol = 0.0;
-            auto rss = split_in_raw_tetrahedra(msh, cl);
-            for (auto& rs : rss)
-                vol += measure(rs);
-
-            totvol += vol;
-
-            //std::cout << vol << std::endl;
-        }
-
-        std::cout << totvol << std::endl;
-
-        /*
         auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
             return M_PI * M_PI * sin(p.x() * M_PI);
             //return 1.0;
@@ -616,9 +600,8 @@ int main(int argc, char **argv)
             return sin(p.x() * M_PI);
             //return -p.x() * p.x() * 0.5;
         };
-        */
 
-        //test_diffusion(msh, f, sf, degree, "plot.dat");
+        test_diffusion(msh, f, sf, degree, "plot.dat");
         //test_gradrec(msh, degree);
     }
 

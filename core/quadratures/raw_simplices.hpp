@@ -133,7 +133,7 @@ split_in_raw_triangles(const Mesh& msh, const typename Mesh::face& fc)
         auto bar = barycenter(msh, fc);
         for (size_t i = 0; i < pts.size(); i++)
         {
-            auto rs = raw_simplex_type( {bar, pts[i], pts[i%pts.size()]} );
+            auto rs = raw_simplex_type( {bar, pts[i], pts[(i+1)%pts.size()]} );
             raw_simplices.push_back( rs );
         }
     }
