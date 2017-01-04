@@ -51,6 +51,17 @@ struct generic_element_traits<generic_element<DIM, DIM>>
     static const size_t codimension = DIM;
 };
 
+template<typename To, typename From>
+std::vector<To>
+convert_to(const std::vector<From>& vec)
+{
+    std::vector<To> ret;
+    ret.reserve(vec.size());
+    for (auto& v : vec)
+        ret.push_back( To(v) );
+
+    return ret;
+}
 
 
 /* element base class (for subelements) */
@@ -78,6 +89,10 @@ public:
         : m_sids_ptrs(sids_ptrs)
     {}
 
+    explicit generic_element_base(std::vector<sub_id_type>&& sids_ptrs)
+        : m_sids_ptrs( std::move(sids_ptrs) )
+    {}
+
     template<typename Itor>
     void set_subelement_ids(const Itor e_begin, const Itor e_end)
     {
@@ -95,6 +110,11 @@ public:
     void set_point_ids(const Itor p_begin, const Itor p_end)
     {
         m_pts_ptrs = std::vector<point_id_type>(p_begin, p_end);
+    }
+
+    void set_point_ids(std::vector<point_id_type>&& pts)
+    {
+        m_pts_ptrs = std::move(pts);
     }
 
     std::vector<point_id_type>
@@ -189,6 +209,13 @@ operator<<(std::ostream& os, const generic_element<DIM, CODIM>& e)
          itor != e.subelement_id_end();
          itor++)
         os << *itor << " ";
+
+    os << "( ";
+    auto pts = e.point_ids();
+    for (auto& pt : pts)
+        os << pt << " ";
+
+    std::cout << ")";
 
     return os;
 }

@@ -22,6 +22,7 @@
 #define _GEOMETRY_GENERIC_HPP_
 
 #include "geometry/element_generic.hpp"
+#include "quadratures/raw_simplices.hpp"
 
 namespace disk {
 
@@ -86,6 +87,36 @@ faces(const generic_mesh<T, DIM>& msh,
                    ret.begin(), id_to_face);
 
     return ret;
+}
+
+template<typename T>
+T
+measure(const generic_mesh<T,3>& msh, const typename generic_mesh<T,3>::cell& cl)
+{
+    T vol = 0.0;
+    auto rss = split_in_raw_tetrahedra(msh, cl);
+    for (auto& rs : rss)
+        vol += measure(rs);
+
+    return vol;
+}
+
+template<typename T>
+T
+measure(const generic_mesh<T,3>& msh, const typename generic_mesh<T,3>::face& fc)
+{
+    auto pts = points(msh, fc);
+
+    T acc{};
+    for (size_t i = 1; i < pts.size() - 1; i++)
+    {
+        auto u = (pts.at(i) - pts.at(0)).to_vector();
+        auto v = (pts.at(i+1) - pts.at(0)).to_vector();
+        auto n = u.cross(v);
+        acc += n.norm() / T(2);
+    }
+
+    return acc;
 }
 
 /* Compute the measure of a 2-cell (= area) */

@@ -126,6 +126,30 @@ normal(const Mesh<T,2,Storage>& msh,
     return n/n.norm();
 }
 
+template<template<typename, size_t, typename> class Mesh,
+         typename T, typename Storage>
+static_vector<T, 3>
+normal(const Mesh<T, 3, Storage>& msh,
+       const typename Mesh<T, 3, Storage>::cell& cl,
+       const typename Mesh<T, 3, Storage>::face& fc)
+{
+    auto pts = points(msh, fc);
+    assert(pts.size() == 4);
+
+    auto v0 = (pts[1] - pts[0]).to_vector();
+    auto v1 = (pts[2] - pts[1]).to_vector();
+    auto n = v0.cross(v1);
+
+    auto cell_bar = barycenter(msh, cl);
+    auto face_bar = barycenter(msh, fc);
+    auto outward_vector = (face_bar - cell_bar).to_vector();
+
+    if ( n.dot(outward_vector) < T(0) )
+        return -n/n.norm();
+
+    return n/n.norm();
+}
+
 
 } // namespace disk
 

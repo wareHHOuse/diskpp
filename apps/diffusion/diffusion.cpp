@@ -588,7 +588,7 @@ int main(int argc, char **argv)
             std::cout << "Problem loading mesh." << std::endl;
             return 1;
         }
-        /*
+
         loader.populate_mesh(msh);
 
         auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
@@ -600,9 +600,13 @@ int main(int argc, char **argv)
             return sin(p.x() * M_PI);
             //return -p.x() * p.x() * 0.5;
         };
-        */
 
-        //test_diffusion(msh, f, sf, degree, "plot.dat");
+        double m = 0.0;
+        for (auto& cl : msh)
+            m += measure(msh, cl);
+        std::cout << m << std::endl;
+
+        test_diffusion(msh, f, sf, degree, "plot.dat");
         //test_gradrec(msh, degree);
     }
 
