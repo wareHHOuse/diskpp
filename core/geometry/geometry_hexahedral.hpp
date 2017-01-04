@@ -200,29 +200,6 @@ measure(const cartesian_mesh<T, DIM>& msh,
     /* NOTREACHED */
 }
 
-template<typename T>
-static_vector<T, 3>
-normal(const cartesian_mesh<T, 3>& msh,
-       const typename cartesian_mesh<T, 3>::cell& cl,
-       const typename cartesian_mesh<T, 3>::face& fc)
-{
-    auto pts = points(msh, fc);
-    assert(pts.size() == 4);
-
-    auto v0 = (pts[1] - pts[0]).to_vector();
-    auto v1 = (pts[2] - pts[1]).to_vector();
-    auto n = v0.cross(v1);
-
-    auto cell_bar = barycenter(msh, cl);
-    auto face_bar = barycenter(msh, fc);
-    auto outward_vector = (face_bar - cell_bar).to_vector();
-
-    if ( n.dot(outward_vector) < T(0) )
-        return -n/n.norm();
-
-    return n/n.norm();
-}
-
 } // namespace disk
 
 #endif /* _GEOMETRY_CARTESIAN_HPP_ */

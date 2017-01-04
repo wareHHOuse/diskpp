@@ -601,6 +601,11 @@ int main(int argc, char **argv)
             //return -p.x() * p.x() * 0.5;
         };
 
+        double m = 0.0;
+        for (auto& cl : msh)
+            m += measure(msh, cl);
+        std::cout << m << std::endl;
+
         test_diffusion(msh, f, sf, degree, "plot.dat");
         //test_gradrec(msh, degree);
     }

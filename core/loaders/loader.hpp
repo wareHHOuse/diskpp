@@ -742,13 +742,23 @@ public:
         storage->surfaces   = std::move(faces);
         storage->volumes    = std::move(volumes);
 
+        std::vector<size_t> bf(storage->surfaces.size());
+        for (auto& vol : storage->volumes)
+        {
+            for (auto itor = vol.subelement_id_begin(); itor != vol.subelement_id_end(); itor++)
+                bf.at(*itor)++;
+        }
+
+        bnd_info bi{0, true};
+        storage->boundary_info.resize(storage->surfaces.size());
+        for (size_t i = 0; i < storage->surfaces.size(); i++)
+            if (bf[i] == 1)
+                storage->boundary_info[i] = bi;
+
         //for (auto v : volumes)
         //    std::cout << v << std::endl;
 
-        std::cout << "Nodes: " << storage->nodes.size() << std::endl;
-        std::cout << "Edges: " << storage->edges.size() << std::endl;
-        std::cout << "Faces: " << storage->surfaces.size() << std::endl;
-        std::cout << "Volumes: " << storage->volumes.size() << std::endl;
+        storage->statistics();
 
         return false;
     }
@@ -1561,6 +1571,8 @@ public:
         std::cout << "Volumes: " << storage->volumes.size() << std::endl;
 
         boundary_surfaces.clear();
+
+        storage->statistics();
 
         return true;
     }

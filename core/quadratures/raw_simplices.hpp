@@ -70,7 +70,7 @@ measure(const raw_simplex<T,2>& rs)
     auto v0 = (pts[1] - pts[0]).to_vector();
     auto v1 = (pts[2] - pts[0]).to_vector();
 
-    return v0.dot(v1).norm()/2.0;
+    return v0.cross(v1).norm()/2.0;
 }
 
 template<typename T>
@@ -106,6 +106,20 @@ map_from_reference(const point<T,3>& p, const raw_simplex<point<T,3>, 3>& rs)
     auto pp = (pts[1] - pts[0]) * p.x() +
               (pts[2] - pts[0]) * p.y() +
               (pts[3] - pts[0]) * p.z() +
+              pts[0];
+
+    return pp;
+}
+
+template<typename T>
+point<T,3>
+map_from_reference(const point<T,2>& p, const raw_simplex<point<T,3>, 2>& rs)
+{
+    auto pts = rs.points();
+    assert(pts.size() == 3);
+
+    auto pp = (pts[1] - pts[0]) * p.x() +
+              (pts[2] - pts[0]) * p.y() +
               pts[0];
 
     return pp;

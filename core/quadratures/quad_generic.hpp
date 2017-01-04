@@ -52,26 +52,62 @@ public:
     }
 
     std::vector<quadpoint_type>
-    integrate_triangular_pyramid(const std::vector<point_type>& pts, const point_type& bar)
-    {
-        assert(pts.size() == 3);
-
-    }
-
-    std::vector<quadpoint_type>
     integrate(const mesh_type& msh, const cell_type& cl) const
     {
         auto rss = split_in_raw_tetrahedra(msh, cl);
 
-        // a call to measure(msh, cl) triggers another call to
-        // split_in_raw_tetrahedra(), so we compute measure using rss
-        scalar_type meas = 0.0;
+        std::vector<quadpoint_type> ret;
         for (auto& rs : rss)
-            meas += measure(rs);
+        {
+            auto meas = measure(rs);
+            for (auto& qd : m_quadrature_data)
+            {
+                auto point = map_from_reference(qd.first, rs);
+                auto weight = qd.second * meas;
+                ret.push_back( make_qp(point, weight) );
+            }
+        }
+
+        return ret;
+    }
+
+};
+
+template<typename T>
+class quadrature<generic_mesh<T,3>, typename generic_mesh<T,3>::face>
+{
+    size_t                                          m_order;
+    std::vector<std::pair<point<T,2>, T>>           m_quadrature_data;
+
+public:
+    typedef generic_mesh<T,3>                       mesh_type;
+    typedef typename mesh_type::face                face_type;
+    typedef quadrature_point<T,3>                   quadpoint_type;
+    typedef typename mesh_type::point_type          point_type;
+    typedef T                                       weight_type;
+    typedef T                                       scalar_type;
+
+    quadrature()
+        : m_order(1)
+    {
+        m_quadrature_data = triangle_quadrature(1);
+    }
+
+    quadrature(size_t order)
+        : m_order(order)
+    {
+        m_quadrature_data = triangle_quadrature(m_order);
+    }
+
+    std::vector<quadpoint_type>
+    integrate(const mesh_type& msh, const face_type& fc) const
+    {
+        auto rss = split_in_raw_triangles(msh, fc);
 
         std::vector<quadpoint_type> ret;
         for (auto& rs : rss)
         {
+            auto meas = measure(rs);
             for (auto& qd : m_quadrature_data)
             {
                 auto point = map_from_reference(qd.first, rs);
