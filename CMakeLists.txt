@@ -24,6 +24,7 @@ if (MKL_FOUND)
 endif()
 
 find_package(Lua REQUIRED)
+include_directories("${LUA_INCLUDE_DIR}")
 set(LINK_LIBS "${LINK_LIBS}" "${LUA_LIBRARIES}")
 
 find_package(Eigen3 REQUIRED)
