@@ -36,7 +36,7 @@ class scaled_monomial_vector_sg_basis
 
 } //namespace disk
 
-//#define POWER_CACHE
+#define POWER_CACHE
 
 #include "geometry/geometry.hpp"
 #include "bases/bases_ranges.hpp"
