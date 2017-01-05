@@ -17,6 +17,7 @@
 #include <iostream>
 #include <regex>
 #include <unistd.h>
+#include <sstream>
 
 #include <map>
 
@@ -181,9 +182,19 @@ public:
 #endif
 
 
+struct timing_data
+{
+    size_t  mesh_elems;
+    size_t  cell_degree, face_degree;
+    size_t  solved_dofs;
+    double  mesh_diameter;
+    double  time_gradrec, time_statcond, time_stab, time_solver;
+    double  l2_error;
+};
+
 
 template<typename MeshType, typename Function, typename Solution>
-void
+timing_data
 test_diffusion(MeshType& msh,               /* handle to the mesh */
                const Function& load,        /* rhs */
                const Solution& solution,    /* solution of the problem */
@@ -201,6 +212,7 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
     typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
 
+    struct timing_data td;
 
     /*
 
@@ -220,6 +232,10 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     int l = 0;
     size_t cell_degree = degree + l;
     size_t face_degree = degree;
+
+    td.cell_degree = cell_degree;
+    td.face_degree = face_degree;
+    td.mesh_elems = msh.cells_size();
 
     std::cout << "Running HHO with cell degree " << cell_degree << " and face degree ";
     std::cout << face_degree << std::endl;
@@ -253,7 +269,11 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
                     face_quadrature_type> assembler(msh, face_degree);
 
     timecounter_new tc;
-    std::map<std::string, double> timings;
+
+    td.time_gradrec = 0.0;
+    td.time_stab = 0.0;
+    td.time_statcond = 0.0;
+    td.time_solver = 0.0;
 
     /* ASSEMBLE PROBLEM */
     std::cout << "Assembling..." << std::endl;
@@ -265,19 +285,19 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
         tc_detail.tic();
         gradrec.compute(msh, cl);
         tc_detail.toc();
-        timings["Gradient reconstruction"] += tc_detail.to_double();
+        td.time_gradrec += tc_detail.to_double();
 
         tc_detail.tic();
         stab.compute(msh, cl, gradrec.oper);
         tc_detail.toc();
-        timings["Stabilization"] += tc_detail.to_double();
+        td.time_stab += tc_detail.to_double();
 
         tc_detail.tic();
         auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, cell_degree);
         dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
         auto scnp = statcond.compute(msh, cl, loc, cell_rhs);
         tc_detail.toc();
-        timings["Static condensation"] += tc_detail.to_double();
+        td.time_statcond += tc_detail.to_double();
 
         assembler.assemble(msh, cl, scnp);
     }
@@ -286,9 +306,6 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     assembler.finalize();
     tc.toc();
     std::cout << "Assembly total time: " << tc << " seconds." << std::endl;
-
-    for (auto& t : timings)
-        std::cout << " * " << t.first << ": " << t.second << " seconds." << std::endl;
 
     /* SOLVE */
     tc.tic();
@@ -302,6 +319,8 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     size_t systsz = assembler.matrix.rows();
     size_t nnz = assembler.matrix.nonZeros();
 
+    td.solved_dofs = systsz;
+
     std::cout << "Starting linear solver..." << std::endl;
     std::cout << " * Solving for " << systsz << " unknowns." << std::endl;
     std::cout << " * Matrix fill: " << 100.0*double(nnz)/(systsz*systsz) << "%" << std::endl;
@@ -313,11 +332,13 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     tc.toc();
     std::cout << "Solver time: " << tc << " seconds." << std::endl;
 
+    td.time_solver = tc.to_double();
+
     scalar_type diam = 0.0;
     scalar_type err_dof = 0.0;
     scalar_type err_fun = 0.0;
 
-    std::ofstream ofs(outfile);
+    //std::ofstream ofs(outfile);
 
     /*
     disk::projector<mesh_type,
@@ -362,6 +383,7 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
         auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, cell_degree);
         dynamic_vector<scalar_type> x = statcond.recover(msh, cl, loc, cell_rhs, xFs);
 
+#if 0
         auto qps = bqd.cell_quadrature.integrate(msh, cl);
         for (auto& qp : qps)
         {
@@ -384,6 +406,7 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
                 ofs << tp[i] << " ";
             ofs << pot << " " << std::abs(pot - solution(tp)) << std::endl;
         }
+#endif
 
         dynamic_vector<scalar_type> true_dof = projk.compute_cell(msh, cl, solution);
         dynamic_vector<scalar_type> comp_dof = x.block(0,0,true_dof.size(), 1);
@@ -391,12 +414,189 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
         err_dof += diff_dof.dot(projk.cell_mm * diff_dof);
     }
 
-    ofs.close();
+    //ofs.close();
 
     std::cout << "Mesh diameter: " << diam << std::endl;
     std::cout << "L2-norm error, dof:   " << std::sqrt(err_dof) << std::endl;
-    //std::cout << "L2-norm error, fun:   " << std::sqrt(err_fun) << std::endl;
+    td.l2_error = std::sqrt(err_dof);
+
+    return td;
 }
+
+
+template<typename MeshType, typename LoaderType>
+void
+test_mesh_format(const std::vector<std::string>& paths,
+                 size_t runs, size_t mindeg, size_t maxdeg,
+                 const std::string& output_basename)
+{
+
+    auto f = [](const point<typename MeshType::scalar_type, MeshType::dimension>& p) -> auto {
+        return M_PI * M_PI * sin(p.x() * M_PI);
+    };
+
+    auto sf = [](const point<typename MeshType::scalar_type, MeshType::dimension>& p) -> auto {
+        return sin(p.x() * M_PI);
+    };
+
+    for (size_t i = mindeg; i <= maxdeg; i++)
+    {
+        std::stringstream ss;
+        ss << output_basename << "_degree_" << i << ".txt";
+
+        std::ofstream ofs(ss.str());
+
+        size_t mesh_index = 1;
+        for (auto& tsp : paths)
+        {
+            MeshType    msh;
+            LoaderType  loader;
+
+            if (!loader.read_mesh(tsp))
+            {
+                std::cout << "Problem loading mesh." << std::endl;
+                return;
+            }
+            loader.populate_mesh(msh);
+
+
+            struct timing_data td;
+            td.time_gradrec     = 0.0;
+            td.time_stab        = 0.0;
+            td.time_statcond    = 0.0;
+            td.time_solver      = 0.0;
+
+            for (size_t run = 0; run < runs; run++)
+            {
+                struct timing_data rtd;
+                rtd = test_diffusion(msh, f, sf, i, "plot.dat");
+
+                td.time_gradrec     += rtd.time_gradrec;
+                td.time_stab        += rtd.time_stab;
+                td.time_statcond    += rtd.time_statcond;
+                td.time_solver      += rtd.time_solver;
+                td.solved_dofs      = rtd.solved_dofs;
+            }
+
+            td.time_gradrec /= runs;
+            td.time_stab /= runs;
+            td.time_statcond /= runs;
+            td.time_solver /= runs;
+
+
+
+            ofs << td.solved_dofs << " ";
+            ofs << td.time_gradrec << " ";
+            ofs << td.time_stab << " ";
+            ofs << td.time_statcond << " ";
+            ofs << td.time_solver << std::endl;
+
+            std::cout << "Degree:                  " << i << std::endl;
+            std::cout << "DOFs:                    " << td.solved_dofs << std::endl;
+            std::cout << "Gradient reconstruction: " << td.time_gradrec << std::endl;
+            std::cout << "Stabilization:           " << td.time_stab << std::endl;
+            std::cout << "Static condensation:     " << td.time_statcond << std::endl;
+            std::cout << "Solver:                  " << td.time_solver << std::endl;
+
+        }
+
+        ofs.close();
+    }
+}
+
+void test_triangles_specialized()
+{
+    size_t runs = 15;
+
+    std::vector<std::string> paths;
+    paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri01.mesh2d");
+    paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri02.mesh2d");
+    paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri03.mesh2d");
+    paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri04.mesh2d");
+
+    typedef disk::simplicial_mesh<double, 2>      MeshType;
+    typedef disk::netgen_mesh_loader<double, 2>   LoaderType;
+
+    test_mesh_format<MeshType, LoaderType>(paths, 15, 0, 3, "triangle_spec");
+}
+
+void test_triangles_generic()
+{
+    size_t runs = 15;
+
+    std::vector<std::string> paths;
+    paths.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_1.typ1");
+    paths.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_2.typ1");
+    paths.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_3.typ1");
+    paths.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_4.typ1");
+
+    typedef disk::generic_mesh<double, 2>       MeshType;
+    typedef disk::fvca5_mesh_loader<double, 2>  LoaderType;
+
+    test_mesh_format<MeshType, LoaderType>(paths, 15, 0, 3, "triangle_gen");
+}
+
+void test_hexagons_generic()
+{
+    size_t runs = 15;
+
+    std::vector<std::string> paths;
+    paths.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_2.typ1");
+    paths.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_3.typ1");
+    paths.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_4.typ1");
+    paths.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_5.typ1");
+
+    typedef disk::generic_mesh<double, 2>       MeshType;
+    typedef disk::fvca5_mesh_loader<double, 2>  LoaderType;
+
+    test_mesh_format<MeshType, LoaderType>(paths, 15, 0, 3, "hexagons_gen");
+}
+
+void test_hexahedra_specialized()
+{
+    size_t runs = 15;
+
+    std::vector<std::string> paths;
+    paths.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-4-4-4.hex");
+    paths.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-8-8-8.hex");
+    paths.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-16-16-16.hex");
+    paths.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-32-32-32.hex");
+
+    typedef disk::cartesian_mesh<double, 3>         MeshType;
+    typedef disk::cartesian_mesh_loader<double, 3>  LoaderType;
+
+    test_mesh_format<MeshType, LoaderType>(paths, 15, 0, 2, "hexahedra_spec");
+}
+
+void test_hexahedra_generic()
+{
+    size_t runs = 15;
+
+    std::vector<std::string> paths;
+    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_4x4x4.hex");
+    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_8x8x8.hex");
+    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_16x16x16.hex");
+    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_32x32x32.hex");
+
+    typedef disk::generic_mesh<double, 3>       MeshType;
+    typedef disk::fvca6_mesh_loader<double, 3>  LoaderType;
+
+    test_mesh_format<MeshType, LoaderType>(paths, 15, 0, 2, "hexahedra_gen");
+}
+
+int main(int argc, char **argv)
+{
+    test_triangles_specialized();
+    test_triangles_generic();
+    test_hexagons_generic();
+    test_hexahedra_specialized();
+    test_hexahedra_generic();
+}
+
+
+#if 0
+
+
 
 int main(int argc, char **argv)
 {
@@ -699,3 +899,5 @@ int main(int argc, char **argv)
 
     return 0;
 }
+
+#endif
