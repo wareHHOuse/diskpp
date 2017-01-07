@@ -280,7 +280,7 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     tc.tic();
     for (auto& cl : msh)
     {
-        timecounter_new tc_detail;
+        timecounter tc_detail;
 
         tc_detail.tic();
         gradrec.compute(msh, cl);
@@ -306,6 +306,10 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     assembler.finalize();
     tc.toc();
     std::cout << "Assembly total time: " << tc << " seconds." << std::endl;
+
+    td.solved_dofs = assembler.matrix.rows();
+
+    return td;
 
     /* SOLVE */
     tc.tic();
@@ -478,12 +482,10 @@ test_mesh_format(const std::vector<std::string>& paths,
                 td.solved_dofs      = rtd.solved_dofs;
             }
 
-            td.time_gradrec /= runs;
-            td.time_stab /= runs;
-            td.time_statcond /= runs;
-            td.time_solver /= runs;
-
-
+            td.time_gradrec /= double(runs);
+            td.time_stab /= double(runs);
+            td.time_statcond /= double(runs);
+            td.time_solver /= double(runs);
 
             ofs << td.solved_dofs << " ";
             ofs << td.time_gradrec << " ";
@@ -506,7 +508,7 @@ test_mesh_format(const std::vector<std::string>& paths,
 
 void test_triangles_specialized()
 {
-    size_t runs = 15;
+    size_t runs = 5;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri01.mesh2d");
@@ -517,12 +519,12 @@ void test_triangles_specialized()
     typedef disk::simplicial_mesh<double, 2>      MeshType;
     typedef disk::netgen_mesh_loader<double, 2>   LoaderType;
 
-    test_mesh_format<MeshType, LoaderType>(paths, 15, 0, 3, "triangle_spec");
+    test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "triangle_spec");
 }
 
 void test_triangles_generic()
 {
-    size_t runs = 15;
+    size_t runs = 5;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_1.typ1");
@@ -533,12 +535,12 @@ void test_triangles_generic()
     typedef disk::generic_mesh<double, 2>       MeshType;
     typedef disk::fvca5_mesh_loader<double, 2>  LoaderType;
 
-    test_mesh_format<MeshType, LoaderType>(paths, 15, 0, 3, "triangle_gen");
+    test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "triangle_gen");
 }
 
 void test_hexagons_generic()
 {
-    size_t runs = 15;
+    size_t runs = 5;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_2.typ1");
@@ -549,48 +551,101 @@ void test_hexagons_generic()
     typedef disk::generic_mesh<double, 2>       MeshType;
     typedef disk::fvca5_mesh_loader<double, 2>  LoaderType;
 
-    test_mesh_format<MeshType, LoaderType>(paths, 15, 0, 3, "hexagons_gen");
+    test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "hexagons_gen");
 }
 
 void test_hexahedra_specialized()
 {
-    size_t runs = 15;
+    size_t runs = 5;
 
     std::vector<std::string> paths;
+    paths.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-2-2-2.hex");
     paths.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-4-4-4.hex");
     paths.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-8-8-8.hex");
     paths.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-16-16-16.hex");
-    paths.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-32-32-32.hex");
+    //paths.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-32-32-32.hex");
 
     typedef disk::cartesian_mesh<double, 3>         MeshType;
     typedef disk::cartesian_mesh_loader<double, 3>  LoaderType;
 
-    test_mesh_format<MeshType, LoaderType>(paths, 15, 0, 2, "hexahedra_spec");
+    test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "hexahedra_spec");
 }
 
 void test_hexahedra_generic()
 {
-    size_t runs = 15;
+    size_t runs = 5;
 
     std::vector<std::string> paths;
-    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_4x4x4.hex");
-    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_8x8x8.hex");
-    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_16x16x16.hex");
-    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_32x32x32.hex");
+    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_2x2x2.msh");
+    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_4x4x4.msh");
+    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_8x8x8.msh");
+    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_16x16x16.msh");
+    //paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_32x32x32.hex");
 
     typedef disk::generic_mesh<double, 3>       MeshType;
     typedef disk::fvca6_mesh_loader<double, 3>  LoaderType;
 
-    test_mesh_format<MeshType, LoaderType>(paths, 15, 0, 2, "hexahedra_gen");
+    test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "hexahedra_gen");
+}
+
+void test_tetrahedra_specialized()
+{
+    size_t runs = 5;
+
+    std::vector<std::string> paths;
+    paths.push_back("../../../diskpp/meshes/3D_tetras/netgen/fvca6_tet1.mesh");
+    paths.push_back("../../../diskpp/meshes/3D_tetras/netgen/fvca6_tet2.mesh");
+    paths.push_back("../../../diskpp/meshes/3D_tetras/netgen/fvca6_tet3.mesh");
+    paths.push_back("../../../diskpp/meshes/3D_tetras/netgen/fvca6_tet4.mesh");
+
+    typedef disk::simplicial_mesh<double, 3>         MeshType;
+    typedef disk::netgen_mesh_loader<double, 3>  LoaderType;
+
+    test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "tetrahedra_spec");
+}
+
+void test_tetrahedra_generic()
+{
+    size_t runs = 5;
+
+    std::vector<std::string> paths;
+    paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.1.msh");
+    paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.2.msh");
+    paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.3.msh");
+    paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.4.msh");
+
+    typedef disk::generic_mesh<double, 3>       MeshType;
+    typedef disk::fvca6_mesh_loader<double, 3>  LoaderType;
+
+    test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "tetrahedra_gen");
+}
+
+void test_polyhedra_generic()
+{
+    size_t runs = 2;
+
+    std::vector<std::string> paths;
+    paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_10.msh");
+    paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_20.msh");
+    paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_30.msh");
+    //paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_40.msh");
+
+    typedef disk::generic_mesh<double, 3>       MeshType;
+    typedef disk::fvca6_mesh_loader<double, 3>  LoaderType;
+
+    test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "polyhedra_gen");
 }
 
 int main(int argc, char **argv)
 {
-    test_triangles_specialized();
-    test_triangles_generic();
-    test_hexagons_generic();
-    test_hexahedra_specialized();
-    test_hexahedra_generic();
+    //test_triangles_specialized();
+    //test_triangles_generic();
+    //test_hexagons_generic();
+    //test_hexahedra_specialized();
+    //test_hexahedra_generic();
+    //test_tetrahedra_specialized();
+    //test_tetrahedra_generic();
+    test_polyhedra_generic();
 }
 
 
