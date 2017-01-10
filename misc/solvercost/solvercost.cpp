@@ -138,8 +138,6 @@ int main(int argc, char **argv)
 
     vector_type sol = mumps.solve(matrix, rhs);
 
-    std::cout << sol << std::endl;
-
     MPI_Finalize();
 
     return 0;

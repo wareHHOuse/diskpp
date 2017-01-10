@@ -5,6 +5,8 @@ if ( WIN32 )
     message(FATAL_ERROR "Sorry, Windows is not supported.")
 endif()
 
+enable_language(Fortran)
+
 set (CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 set(CMAKE_CXX_FLAGS_DEBUG "-std=c++14 -g -fpermissive")
@@ -22,9 +24,12 @@ find_package(MUMPS REQUIRED)
 include_directories(${MUMPS_INCLUDE_DIR})
 set(LINK_LIBS ${LINK_LIBS} ${MUMPS_LIBRARIES})
 
+find_package(BLAS REQUIRED)
+set(LINK_LIBS ${LINK_LIBS} ${BLAS_LIBRARIES})
+
 find_package(MPI REQUIRED)
-include_directories(${MPI_INCLUDE_DIR})
-set(LINK_LIBS ${LINK_LIBS} ${MPI_LIBRARIES} -lmpi_mpifh -lblas)
+include_directories(${MPI_INCLUDE_PATH})
+set(LINK_LIBS ${LINK_LIBS} ${MPI_LIBRARIES})
 
 add_executable(solvercost solvercost.cpp)
 target_link_libraries(solvercost ${LINK_LIBS})
