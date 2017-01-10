@@ -677,13 +677,11 @@ int main(int argc, char **argv)
         loader.populate_mesh(msh);
 
         auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
-            //return M_PI * M_PI * sin(p.x() * M_PI);
             return 1.0;
         };
 
         auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
-            return sin(p.x() * M_PI);
-            //return -p.x() * p.x() * 0.5;
+            return 0.0;
         };
 
         test_diffusion(msh, f, sf, degree, "plot.dat");
@@ -706,13 +704,11 @@ int main(int argc, char **argv)
         loader.populate_mesh(msh);
 
         auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
-            //return M_PI * M_PI * sin(p.x() * M_PI);
             return 1.0;
         };
 
         auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
-            return sin(p.x() * M_PI);
-            //return -p.x() * p.x() * 0.5;
+            return 0.0;
         };
 
         test_diffusion(msh, f, sf, degree, "plot.dat");
