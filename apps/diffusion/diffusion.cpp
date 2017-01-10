@@ -35,152 +35,6 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-#if 0
-template<typename MeshType>
-void
-test_gradrec(MeshType& msh, size_t degree)
-{
-    typedef MeshType                                   mesh_type;
-    typedef typename mesh_type::scalar_type            scalar_type;
-    typedef typename mesh_type::cell                   cell_type;
-    typedef typename mesh_type::face                   face_type;
-
-    typedef disk::quadrature<mesh_type, cell_type>      cell_quadrature_type;
-    typedef disk::quadrature<mesh_type, face_type>      face_quadrature_type;
-
-    typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
-    typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
-
-    auto f = [](const point<scalar_type, mesh_type::dimension>& p) -> auto {
-        return sin(p.x() * M_PI);
-        //return p.x();
-    };
-
-    disk::gradient_reconstruction<mesh_type,
-                                        cell_basis_type,
-                                        cell_quadrature_type,
-                                        face_basis_type,
-                                        face_quadrature_type> gradrec(degree);
-
-    disk::projector<mesh_type,
-                    cell_basis_type,
-                    cell_quadrature_type,
-                    face_basis_type,
-                    face_quadrature_type> projk(degree);
-
-    cell_basis_type cbk1(degree+1);
-
-    cell_quadrature_type cq(2*degree+2);
-
-    std::ofstream ofs("grad.dat");
-    for (auto& cl : msh)
-    {
-        gradrec.compute(msh, cl);
-        dynamic_vector<scalar_type> pk = projk.compute_whole(msh, cl, f);
-        dynamic_vector<scalar_type> pk1 = gradrec.oper * pk;
-
-        auto qps = cq.integrate(msh, cl);
-        for (auto& qp : qps)
-        {
-            auto tp = qp.point();
-            auto phi = cbk1.eval_functions(msh, cl, tp);
-            scalar_type val = pk(0);
-            for (size_t i = 1; i < phi.size(); i++)
-                val += pk1(i-1) * phi[i];
-
-            for (size_t i = 0; i < MeshType::dimension; i++)
-                ofs << tp[i] << " ";
-            ofs << val << " " << std::abs(val - f(tp)) << std::endl;
-        }
-    }
-    ofs.close();
-}
-#endif
-
-#if 0
-template<typename MeshType>
-class diffusion_solver
-{
-    typedef MeshType                            mesh_type;
-    typedef typename mesh_type::scalar_type     scalar_type;
-    typedef typename mesh_type::cell            cell_type;
-    typedef typename mesh_type::face            face_type;
-
-    typedef quadrature<mesh_type, cell_type>    cell_quadrature_type;
-    typedef quadrature<mesh_type, face_type>    face_quadrature_type;
-
-    typedef scaled_monomial_scalar_basis<mesh_type, cell_type>  cell_basis_type;
-    typedef scaled_monomial_scalar_basis<mesh_type, face_type>  face_basis_type;
-
-    typedef gradient_reconstruction<mesh_type, cell_basis_type,
-                                    cell_quadrature_type, face_basis_type,
-                                    face_quadrature_type> gradrec_type;
-
-    typedef diffusion_like_stabilization<mesh_type, cell_basis_type,
-                                         cell_quadrature_type, face_basis_type,
-                                         face_quadrature_type> stab_type;
-
-    typedef diffusion_like_static_condensation<mesh_type, cell_basis_type,
-                                               cell_quadrature_type,
-                                               face_basis_type,
-                                               face_quadrature_type> statcond_type;
-
-    typedef assembler<mesh_type, face_basis_type, face_quadrature_type> assembler_type;
-
-
-    gradrec_type        m_gradrec;
-    stab_type           m_stab;
-    statcond_type       m_statcond;
-    assembler_type      m_assembler;
-
-    size_t              m_degree;
-
-    template<typename Function, typename BoundaryConditions, typename MaterialParamFunction>
-    void assemble_problem(const Function& load,
-                          const BoundaryConditions& bcs,
-                          const MaterialParamFunction& mpf)
-    {
-        timecounter_new tc;
-
-        /* ASSEMBLE PROBLEM */
-        std::cout << "Assembling..." << std::endl;
-        tc.tic();
-        for (auto& cl : msh)
-        {
-            auto mp = mpf(barycenter(msh, cl));
-
-            gradrec.compute(msh, cl, mp);
-            stab.compute(msh, cl, gradrec.oper);
-            auto cell_rhs = compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, load, degree);
-            dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
-            auto scnp = statcond.compute(msh, cl, loc, cell_rhs);
-            assembler.assemble(msh, cl, scnp);
-        }
-
-        std::cout << "  Imposing boundary conditions" << std::endl;
-        assembler.impose_boundary_conditions(msh, solution);
-        std::cout << "  Finalizing" << std::endl;
-        assembler.finalize();
-        tc.toc();
-        std::cout << "Assembly total time: " << tc << " seconds." << std::endl;
-    }
-
-public:
-    diffusion_solver() : m_degree(1)
-    {}
-
-    diffusion_solver(size_t degree) : m_degree(degree)
-    {
-        m_gradrec   = gradrec_type(m_degree);
-        m_stab      = stab_type(m_degree);
-        m_statcond  = statcond_type(m_degree);
-        m_assembler = assembler_type(m_degree);
-    }
-
-};
-
-#endif
-
 
 struct timing_data
 {
@@ -192,6 +46,226 @@ struct timing_data
     double  l2_error;
 };
 
+struct assembly_info
+{
+    size_t  mesh_elems, cell_degree, face_degree;
+    double  time_gradrec, time_statcond, time_stab;
+};
+
+struct solver_info
+{
+    size_t  solved_dofs;
+    double  solver_time;
+};
+
+struct postprocess_info
+{
+    double  l2_error;
+    double  time_postprocess;
+};
+
+template<typename Mesh>
+class diffusion_solver
+{
+    typedef Mesh                                       mesh_type;
+    typedef typename mesh_type::scalar_type            scalar_type;
+    typedef typename mesh_type::cell                   cell_type;
+    typedef typename mesh_type::face                   face_type;
+
+    typedef disk::quadrature<mesh_type, cell_type>      cell_quadrature_type;
+    typedef disk::quadrature<mesh_type, face_type>      face_quadrature_type;
+
+    typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
+    typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
+
+    typedef
+    disk::basis_quadrature_data<mesh_type,
+                                disk::scaled_monomial_scalar_basis,
+                                disk::quadrature> bqdata_type;
+
+    typedef disk::gradient_reconstruction_bq<bqdata_type>               gradrec_type;
+    typedef disk::diffusion_like_stabilization_bq<bqdata_type>          stab_type;
+    typedef disk::diffusion_like_static_condensation_bq<bqdata_type>    statcond_type;
+    typedef disk::assembler<mesh_type, face_basis_type, face_quadrature_type> assembler_type;
+
+    size_t m_cell_degree, m_face_degree;
+
+    bqdata_type     m_bqd;
+
+    typename assembler_type::sparse_matrix_type     m_system_matrix;
+    typename assembler_type::vector_type            m_system_rhs, m_system_solution;
+
+    const mesh_type& m_msh;
+
+public:
+    diffusion_solver(const mesh_type& msh, size_t degree, int l = 0)
+        : m_msh(msh)
+    {
+        if ( l < -1 or l > 1)
+        {
+            if (degree > 0)
+            {
+                std::cout << "'l' should be -1, 0 or 1. Reverting to 0." << std::endl;
+                l = 0;
+            }
+            else
+            {
+                std::cout << "'l' should be 0 or 1. Reverting to 0." << std::endl;
+                l = 0;
+            }
+        }
+
+        m_cell_degree = degree + l;
+        m_face_degree = degree;
+
+        m_bqd = bqdata_type(m_cell_degree, m_face_degree);
+
+        std::cout << "HHO initialized with cell degree ";
+        std::cout << m_cell_degree << " and face degree ";
+        std::cout << m_face_degree << std::endl;
+    }
+
+    template<typename LoadFunction, typename BoundaryConditionFunction>
+    assembly_info
+    assemble(const LoadFunction& lf, const BoundaryConditionFunction& bcf)
+    {
+        auto gradrec    = gradrec_type(m_bqd);
+        auto stab       = stab_type(m_bqd);
+        auto statcond   = statcond_type(m_bqd);
+        auto assembler  = assembler_type(m_msh, m_face_degree);
+
+        assembly_info ai;
+
+        for (auto& cl : m_msh)
+        {
+            gradrec.compute(m_msh, cl);
+            stab.compute(m_msh, cl, gradrec.oper);
+            auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(m_msh, cl, lf, m_cell_degree);
+            dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
+            auto scnp = statcond.compute(m_msh, cl, loc, cell_rhs);
+            assembler.assemble(m_msh, cl, scnp);
+        }
+
+        assembler.impose_boundary_conditions(m_msh, bcf);
+        assembler.finalize(m_system_matrix, m_system_rhs);
+
+        return ai;
+    }
+
+    solver_info
+    solve(void)
+    {
+#ifdef HAVE_INTEL_MKL
+        Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
+#else
+        Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
+#endif
+
+        solver_info si;
+
+        size_t systsz = m_system_matrix.rows();
+        size_t nnz = m_system_matrix.nonZeros();
+
+        std::cout << "Starting linear solver..." << std::endl;
+        std::cout << " * Solving for " << systsz << " unknowns." << std::endl;
+        std::cout << " * Matrix fill: " << 100.0*double(nnz)/(systsz*systsz) << "%" << std::endl;
+
+        solver.analyzePattern(m_system_matrix);
+        solver.factorize(m_system_matrix);
+        m_system_solution = solver.solve(m_system_rhs);
+
+        return si;
+    }
+
+    template<typename LoadFunction, typename AnalyticalSolution>
+    postprocess_info
+    postprocess(const LoadFunction& lf,
+                const AnalyticalSolution& as,
+                const std::string& filename = "")
+    {
+        postprocess_info pi;
+
+        scalar_type diam = 0.0;
+        scalar_type err_dof = 0.0;
+        scalar_type err_fun = 0.0;
+
+        //std::ofstream ofs(outfile);
+
+        disk::projector_bq<bqdata_type> projk(m_bqd);
+        auto gradrec    = gradrec_type(m_bqd);
+        auto stab       = stab_type(m_bqd);
+        auto statcond   = statcond_type(m_bqd);
+
+        size_t fbs = m_bqd.face_basis.size();
+
+        for (auto& cl : m_msh)
+        {
+            diam = std::max(diameter(m_msh, cl), diam);
+            auto fcs = faces(m_msh, cl);
+            auto num_faces = fcs.size();
+
+            dynamic_vector<scalar_type> xFs = dynamic_vector<scalar_type>::Zero(num_faces*fbs);
+
+            for (size_t face_i = 0; face_i < num_faces; face_i++)
+            {
+                auto fc = fcs[face_i];
+                auto eid = find_element_id(m_msh.faces_begin(), m_msh.faces_end(), fc);
+                if (!eid.first)
+                    throw std::invalid_argument("This is a bug: face not found");
+
+                auto face_id = eid.second;
+
+                dynamic_vector<scalar_type> xF = dynamic_vector<scalar_type>::Zero(fbs);
+                xF = m_system_solution.block(face_id * fbs, 0, fbs, 1);
+                xFs.block(face_i * fbs, 0, fbs, 1) = xF;
+            }
+
+            gradrec.compute(m_msh, cl);
+            stab.compute(m_msh, cl, gradrec.oper);
+            dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
+            auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(m_msh, cl, lf, m_cell_degree);
+            dynamic_vector<scalar_type> x = statcond.recover(m_msh, cl, loc, cell_rhs, xFs);
+
+    #if 0
+            auto qps = bqd.cell_quadrature.integrate(msh, cl);
+            for (auto& qp : qps)
+            {
+                auto phi = bqd.cell_basis.eval_functions(msh, cl, qp.point());
+
+                scalar_type pot = 0.0;
+                for (size_t i = 0; i < bqd.cell_basis.range(0, cell_degree).size(); i++)
+                    pot += phi[i] * x(i);
+
+                //auto potr = solution(qp.point());
+
+                //scalar_type diff = 0.0;
+                //diff = (pot - potr) * (pot - potr) * qp.weight();
+                //std::cout << pot << " " << potr << " " << qp.weight() << " " << diff << std::endl;
+
+                //err_fun += diff;
+
+                auto tp = qp.point();
+                for (size_t i = 0; i < MeshType::dimension; i++)
+                    ofs << tp[i] << " ";
+                ofs << pot << " " << std::abs(pot - solution(tp)) << std::endl;
+            }
+    #endif
+
+            dynamic_vector<scalar_type> true_dof = projk.compute_cell(m_msh, cl, as);
+            dynamic_vector<scalar_type> comp_dof = x.block(0,0,true_dof.size(), 1);
+            dynamic_vector<scalar_type> diff_dof = (true_dof - comp_dof);
+            err_dof += diff_dof.dot(projk.cell_mm * diff_dof);
+        }
+
+        //ofs.close();
+
+        std::cout << "Mesh diameter: " << diam << std::endl;
+        std::cout << "L2-norm error, dof:   " << std::sqrt(err_dof) << std::endl;
+
+        return pi;
+    }
+
+};
 
 template<typename MeshType, typename Function, typename Solution>
 timing_data
@@ -628,7 +702,7 @@ void test_polyhedra_generic()
     paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_10.msh");
     paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_20.msh");
     paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_30.msh");
-    //paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_40.msh");
+    paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_40.msh");
 
     typedef disk::generic_mesh<double, 3>       MeshType;
     typedef disk::fvca6_mesh_loader<double, 3>  LoaderType;
@@ -638,6 +712,37 @@ void test_polyhedra_generic()
 
 int main(int argc, char **argv)
 {
+    using RealType = double;
+    typedef disk::cartesian_mesh<RealType, 3>   mesh_type;
+    mesh_type msh;
+
+    disk::cartesian_mesh_loader<RealType, 3> loader;
+    if (!loader.read_mesh("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-4-4-4.hex"))
+    {
+        std::cout << "Problem loading mesh." << std::endl;
+        return 1;
+    }
+    loader.populate_mesh(msh);
+
+    auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+        return M_PI * M_PI * sin(p.x() * M_PI);
+        //return 1.0;
+    };
+
+    auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+        return sin(p.x() * M_PI);
+        //return -p.x() * p.x() * 0.5;
+    };
+
+    diffusion_solver<mesh_type> solver(msh, 0);
+
+    solver.assemble(f, sf);
+    solver.solve();
+    solver.postprocess(f, sf);
+}
+
+//int main(int argc, char **argv)
+//{
     //test_triangles_specialized();
     //test_triangles_generic();
     //test_hexagons_generic();
@@ -645,8 +750,8 @@ int main(int argc, char **argv)
     //test_hexahedra_generic();
     //test_tetrahedra_specialized();
     //test_tetrahedra_generic();
-    test_polyhedra_generic();
-}
+    //test_polyhedra_generic();
+//}
 
 
 #if 0

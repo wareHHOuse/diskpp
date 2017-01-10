@@ -1383,7 +1383,7 @@ class assembler
     typedef FaceQuadType                        face_quadrature_type;
 
     typedef dynamic_matrix<scalar_type>         matrix_type;
-    typedef dynamic_vector<scalar_type>         vector_type;
+
 
     //cell_basis_type                             cell_basis;
     //cell_quadrature_type                        cell_quadrature;
@@ -1393,7 +1393,6 @@ class assembler
 
     size_t                                      m_degree;
 
-    typedef Eigen::SparseMatrix<scalar_type>    sparse_matrix_type;
     typedef Eigen::Triplet<scalar_type>         triplet_type;
 
     std::vector<triplet_type>                   m_triplets;
@@ -1401,12 +1400,13 @@ class assembler
 
 public:
 
+    typedef Eigen::SparseMatrix<scalar_type>    sparse_matrix_type;
+    typedef dynamic_vector<scalar_type>         vector_type;
+
     sparse_matrix_type      matrix;
     vector_type             rhs;
 
     assembler()                 = delete;
-    assembler(const assembler&) = delete;
-    assembler(assembler&&)      = delete;
 
     assembler(const mesh_type& msh, size_t degree)
         : m_degree(degree)
@@ -1469,7 +1469,7 @@ public:
 
     template<typename Function>
     void
-    impose_boundary_conditions(mesh_type& msh, const Function& bc)
+    impose_boundary_conditions(const mesh_type& msh, const Function& bc)
     {
         size_t fbs = face_basis.size();
         size_t face_i = 0;
@@ -1529,6 +1529,15 @@ public:
     {
         matrix.setFromTriplets(m_triplets.begin(), m_triplets.end());
         m_triplets.clear();
+    }
+
+    void
+    finalize(sparse_matrix_type& mat, vector_type& vec)
+    {
+        mat = sparse_matrix_type(m_num_unknowns, m_num_unknowns);
+        mat.setFromTriplets(m_triplets.begin(), m_triplets.end());
+        m_triplets.clear();
+        vec = rhs;
     }
 };
 
