@@ -20,6 +20,8 @@
 
 #include <map>
 
+#include <iomanip>
+
 #include "../../config.h"
 
 #ifdef HAVE_SOLVER_WRAPPERS
@@ -301,6 +303,26 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
 
     size_t systsz = assembler.matrix.rows();
     size_t nnz = assembler.matrix.nonZeros();
+
+    std::cout << "Dumping problem matrix" << std::endl;
+
+    std::ofstream ofsm("matrix.txt");
+
+    ofsm << nnz << " " << systsz << std::endl;
+    for (size_t k = 0; k < assembler.matrix.outerSize(); k++)
+        for (typename Eigen::SparseMatrix<scalar_type>::InnerIterator it(assembler.matrix, k); it; ++it)
+            ofsm << it.row() << " " << it.col() << " " << std::setprecision(15) << it.value() << std::endl;
+
+    ofsm.close();
+
+    std::ofstream ofsr("rhs.txt");
+    ofsr << systsz << std::endl;
+    for (size_t k = 0; k < systsz; k++)
+        ofsr << std::setprecision(15) << assembler.rhs(k) << std::endl;
+
+    ofsr.close();
+
+    return;
 
     std::cout << "Starting linear solver..." << std::endl;
     std::cout << " * Solving for " << systsz << " unknowns." << std::endl;
@@ -655,8 +677,8 @@ int main(int argc, char **argv)
         loader.populate_mesh(msh);
 
         auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
-            return M_PI * M_PI * sin(p.x() * M_PI);
-            //return 1.0;
+            //return M_PI * M_PI * sin(p.x() * M_PI);
+            return 1.0;
         };
 
         auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
@@ -684,8 +706,8 @@ int main(int argc, char **argv)
         loader.populate_mesh(msh);
 
         auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
-            return M_PI * M_PI * sin(p.x() * M_PI);
-            //return 1.0;
+            //return M_PI * M_PI * sin(p.x() * M_PI);
+            return 1.0;
         };
 
         auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
