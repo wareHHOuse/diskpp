@@ -62,11 +62,18 @@ namespace disk {
 template<typename mesh_type>
 class mesh_loader
 {
+    bool    m_verbose;
+
 public:
-    mesh_loader() {}
+    mesh_loader()
+        : m_verbose(false)
+    {}
 
     virtual bool    read_mesh(const std::string&) { return false; }
     virtual bool    populate_mesh(mesh_type&)    = 0;
+
+    bool    verbose(void) const     { return m_verbose; }
+    void    verbose(bool v)         { m_verbose = v; }
 
     virtual ~mesh_loader() {}
 };
@@ -103,7 +110,9 @@ public:
 
     bool populate_mesh(mesh_type& msh)
     {
-        std::cout << " *** POPULATING UNIFORM 1D MESH ***" << std::endl;
+        if (this->verbose())
+            std::cout << " *** POPULATING UNIFORM 1D MESH ***" << std::endl;
+
         auto storage = msh.backend_storage();
 
         auto num_edges = m_number_of_elements;
@@ -178,7 +187,10 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
         T           x, y;
 
         ifs >> elements_to_read;
-        std::cout << "Attempting to read " << elements_to_read << " points" << std::endl;
+
+        if (this->verbose())
+            std::cout << "Attempting to read " << elements_to_read << " points" << std::endl;
+
         m_points.reserve(elements_to_read);
 
         for (size_t i = 0; i < elements_to_read; i++)
@@ -195,7 +207,8 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
         size_t      elements_to_read;
 
         ifs >> elements_to_read;
-        std::cout << "Reading " << elements_to_read << " " << polynum << "-angles" << std::endl;
+        if (this->verbose())
+            std::cout << "Reading " << elements_to_read << " " << polynum << "-angles" << std::endl;
 
         for (size_t i = 0; i < elements_to_read; i++)
         {
@@ -219,7 +232,8 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
         size_t      elements_to_read;
 
         ifs >> elements_to_read;
-        std::cout << "Reading " << elements_to_read << " boundary edges" << std::endl;
+        if (this->verbose())
+            std::cout << "Reading " << elements_to_read << " boundary edges" << std::endl;
 
         m_boundary_edges.reserve(elements_to_read);
 
@@ -245,7 +259,8 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
         size_t      elements_to_read;
 
         ifs >> elements_to_read;
-        std::cout << "Reading " << elements_to_read << " edges" << std::endl;
+        if (this->verbose())
+            std::cout << "Reading " << elements_to_read << " edges" << std::endl;
 
         m_edges.reserve(elements_to_read);
 
@@ -365,13 +380,15 @@ public:
 
     bool read_mesh(const std::string& filename)
     {
-        std::cout << " *** READING FVCA5 MESH ***" << std::endl;
+        if (this->verbose())
+            std::cout << " *** READING FVCA5 MESH ***" << std::endl;
         return fvca5_read(filename);
     }
 
     bool populate_mesh(mesh_type& msh)
     {
-        std::cout << " *** POPULATING FVCA5 MESH ***" << std::endl;
+        if (this->verbose())
+            std::cout << " *** POPULATING FVCA5 MESH ***" << std::endl;
         auto storage = msh.backend_storage();
 
         /* Points */
@@ -461,9 +478,6 @@ public:
         std::sort(surfaces.begin(), surfaces.end());
         storage->surfaces = std::move(surfaces);
 
-        /* Print stats */
-        storage->statistics();
-
         return true;
     }
 };
@@ -549,7 +563,10 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
             return false;
 
         ifs >> lines_to_read;
-        std::cout << "About to read " << lines_to_read << " points" << std::endl;
+
+        if (this->verbose())
+            std::cout << "About to read " << lines_to_read << " points" << std::endl;
+
         m_points.reserve(lines_to_read);
         m_nodes.reserve(lines_to_read);
         for (size_t i = 0; i < lines_to_read; i++)
@@ -565,7 +582,9 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
             return false;
 
         ifs >> lines_to_read;
-        std::cout << "About to read " << lines_to_read << " entries" << std::endl;
+
+        if (this->verbose())
+            std::cout << "About to read " << lines_to_read << " entries" << std::endl;
 
         for (size_t i = 0; i < lines_to_read; i++)
         {
@@ -578,7 +597,9 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
             return false;
 
         ifs >> lines_to_read;
-        std::cout << "About to read " << lines_to_read << " entries" << std::endl;
+
+        if (this->verbose())
+            std::cout << "About to read " << lines_to_read << " entries" << std::endl;
 
         for (size_t i = 0; i < lines_to_read; i++)
         {
@@ -591,7 +612,9 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
             return false;
 
         ifs >> lines_to_read;
-        std::cout << "About to read " << lines_to_read << " entries" << std::endl;
+
+        if (this->verbose())
+            std::cout << "About to read " << lines_to_read << " entries" << std::endl;
 
         for (size_t i = 0; i < lines_to_read; i++)
         {
@@ -604,7 +627,9 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
             return false;
 
         ifs >> lines_to_read;
-        std::cout << "About to read " << lines_to_read << " entries" << std::endl;
+
+        if (this->verbose())
+            std::cout << "About to read " << lines_to_read << " entries" << std::endl;
 
         for (size_t i = 0; i < lines_to_read; i++)
         {
@@ -620,7 +645,9 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
             return false;
 
         ifs >> lines_to_read;
-        std::cout << "About to read " << lines_to_read << " entries" << std::endl;
+
+        if (this->verbose())
+            std::cout << "About to read " << lines_to_read << " entries" << std::endl;
 
         for (size_t i = 0; i < lines_to_read; i++)
         {
@@ -634,7 +661,9 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
             return false;
 
         ifs >> lines_to_read;
-        std::cout << "About to read " << lines_to_read << " entries" << std::endl;
+
+        if (this->verbose())
+            std::cout << "About to read " << lines_to_read << " entries" << std::endl;
 
         for (size_t i = 0; i < lines_to_read; i++)
         {
@@ -658,7 +687,8 @@ public:
 
     bool read_mesh(const std::string& s)
     {
-        std::cout << " *** READING FVCA6 3D MESH ***" << std::endl;
+        if (this->verbose())
+            std::cout << " *** READING FVCA6 3D MESH ***" << std::endl;
         return fvca6_read(s);
     }
 
@@ -754,11 +784,6 @@ public:
         for (size_t i = 0; i < storage->surfaces.size(); i++)
             if (bf[i] == 1)
                 storage->boundary_info[i] = bi;
-
-        //for (auto v : volumes)
-        //    std::cout << v << std::endl;
-
-        storage->statistics();
 
         return false;
     }
@@ -893,7 +918,7 @@ class netgen_mesh_loader<T,2> : public mesh_loader<simplicial_mesh<T,2>>
 
         while (linecount < lines)
         {
-            if ( (linecount%100000) == 0 )
+            if ( this->verbose() && ((linecount%100000) == 0) )
             {
                 std::cout << "Reading points: " << linecount;
                 std::cout << "/" << lines << "\r";
@@ -912,8 +937,11 @@ class netgen_mesh_loader<T,2> : public mesh_loader<simplicial_mesh<T,2>>
             linecount++;
         }
 
-        std::cout << "Reading points: " << linecount;
-        std::cout << "/" << lines << std::endl;
+        if (this->verbose())
+        {
+            std::cout << "Reading points: " << linecount;
+            std::cout << "/" << lines << std::endl;
+        }
 
         /************************ Read triangles ************************/
         linecount = 0;
@@ -925,7 +953,7 @@ class netgen_mesh_loader<T,2> : public mesh_loader<simplicial_mesh<T,2>>
 
         while (linecount < lines)
         {
-            if ( (linecount%100000) == 0 )
+            if ( this->verbose() && ((linecount%100000) == 0) )
             {
                 std::cout << "Reading triangles: " << linecount;
                 std::cout << "/" << lines << "\r";
@@ -948,9 +976,11 @@ class netgen_mesh_loader<T,2> : public mesh_loader<simplicial_mesh<T,2>>
             linecount++;
         }
 
-        std::cout << "Reading triangles: " << linecount;
-        std::cout << "/" << lines << std::endl;
-
+        if (this->verbose())
+        {
+            std::cout << "Reading triangles: " << linecount;
+            std::cout << "/" << lines << std::endl;
+        }
         /************************ Read boundary edges ************************/
         linecount = 0;
 
@@ -960,7 +990,7 @@ class netgen_mesh_loader<T,2> : public mesh_loader<simplicial_mesh<T,2>>
 
         while (linecount < lines)
         {
-            if ( (linecount%50000) == 0 )
+            if ( this->verbose() && ((linecount%50000) == 0) )
             {
                 std::cout << "Reading edges: " << linecount;
                 std::cout << "/" << lines << "\r";
@@ -979,8 +1009,11 @@ class netgen_mesh_loader<T,2> : public mesh_loader<simplicial_mesh<T,2>>
             linecount++;
         }
 
-        std::cout << "Reading edges: " << linecount;
-        std::cout << "/" << lines << std::endl;
+        if (this->verbose())
+        {
+            std::cout << "Reading edges: " << linecount;
+            std::cout << "/" << lines << std::endl;
+        }
 
         return true;
     }
@@ -990,7 +1023,9 @@ public:
 
     bool read_mesh(const std::string& s)
     {
-        std::cout << " *** READING NETGEN 2D MESH ***" << std::endl;
+        if (this->verbose())
+            std::cout << " *** READING NETGEN 2D MESH ***" << std::endl;
+
         return netgen_read(s);
     }
 
@@ -998,8 +1033,11 @@ public:
     {
         auto storage = msh.backend_storage();
 
-        std::cout << "Sorting data...";
-        std::cout.flush();
+        if (this->verbose())
+        {
+            std::cout << "Sorting data...";
+            std::cout.flush();
+        }
 
         storage->points = std::move(points);
         storage->nodes = std::move(nodes);
@@ -1035,11 +1073,14 @@ public:
             storage->boundary_info.at(position.second) = bi;
         }
 
-        std::cout << "done." << std::endl;
+        if (this->verbose())
+        {
+            std::cout << "done." << std::endl;
 
-        std::cout << "Nodes: " << storage->nodes.size() << std::endl;
-        std::cout << "Edges: " << storage->edges.size() << std::endl;
-        std::cout << "Faces: " << storage->surfaces.size() << std::endl;
+            std::cout << "Nodes: " << storage->nodes.size() << std::endl;
+            std::cout << "Edges: " << storage->edges.size() << std::endl;
+            std::cout << "Faces: " << storage->surfaces.size() << std::endl;
+        }
 
         boundary_edges.clear();
 
@@ -1093,7 +1134,7 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
 
         while (linecount < lines)
         {
-            if ( (linecount%100000) == 0 )
+            if ( this->verbose() && ((linecount%100000) == 0) )
             {
                 std::cout << "Reading points: " << linecount;
                 std::cout << "/" << lines << "\r";
@@ -1117,8 +1158,11 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
             linecount++;
         }
 
-        std::cout << "Reading points: " << linecount;
-        std::cout << "/" << lines << std::endl;
+        if (this->verbose())
+        {
+            std::cout << "Reading points: " << linecount;
+            std::cout << "/" << lines << std::endl;
+        }
 
         /************************ Read tetrahedra ************************/
         linecount = 0;
@@ -1131,7 +1175,7 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
 
         while (linecount < lines)
         {
-            if ( (linecount%100000) == 0 )
+            if ( this->verbose() && ((linecount%100000) == 0) )
             {
                 std::cout << "Reading tetrahedra: " << linecount;
                 std::cout << "/" << lines << "\r";
@@ -1166,8 +1210,11 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
             linecount++;
         }
 
-        std::cout << "Reading tetrahedra: " << linecount;
-        std::cout << "/" << lines << std::endl;
+        if (this->verbose())
+        {
+            std::cout << "Reading tetrahedra: " << linecount;
+            std::cout << "/" << lines << std::endl;
+        }
 
         /************************ Read boundary surfaces ************************/
         linecount = 0;
@@ -1178,7 +1225,7 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
 
         while (linecount < lines)
         {
-            if ( (linecount%50000) == 0 )
+            if ( this->verbose() && ((linecount%50000) == 0) )
             {
                 std::cout << "Reading triangle: " << linecount;
                 std::cout << "/" << lines << "\r";
@@ -1198,8 +1245,11 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
             linecount++;
         }
 
-        std::cout << "Reading triangle: " << linecount;
-        std::cout << "/" << lines << std::endl;
+        if (this->verbose())
+        {
+            std::cout << "Reading triangle: " << linecount;
+            std::cout << "/" << lines << std::endl;
+        }
 
         return true;
     }
@@ -1209,7 +1259,8 @@ public:
 
     bool read_mesh(const std::string& s)
     {
-        std::cout << " *** READING NETGEN 3D MESH ***" << std::endl;
+        if (this->verbose())
+            std::cout << " *** READING NETGEN 3D MESH ***" << std::endl;
         return netgen_read(s);
     }
 
@@ -1217,8 +1268,11 @@ public:
     {
         auto storage = msh.backend_storage();
 
-        std::cout << "Sorting data...";
-        std::cout.flush();
+        if (this->verbose())
+        {
+            std::cout << "Sorting data...";
+            std::cout.flush();
+        }
 
         storage->points = std::move(points);
         storage->nodes = std::move(nodes);
@@ -1262,12 +1316,15 @@ public:
             storage->boundary_info.at(position.second) = bi;
         }
 
-        std::cout << "done." << std::endl;
+        if (this->verbose())
+        {
+            std::cout << "done." << std::endl;
 
-        std::cout << "Nodes: " << storage->nodes.size() << std::endl;
-        std::cout << "Edges: " << storage->edges.size() << std::endl;
-        std::cout << "Faces: " << storage->surfaces.size() << std::endl;
-        std::cout << "Volumes: " << storage->volumes.size() << std::endl;
+            std::cout << "Nodes: " << storage->nodes.size() << std::endl;
+            std::cout << "Edges: " << storage->edges.size() << std::endl;
+            std::cout << "Faces: " << storage->surfaces.size() << std::endl;
+            std::cout << "Volumes: " << storage->volumes.size() << std::endl;
+        }
 
         boundary_surfaces.clear();
 
@@ -1389,7 +1446,7 @@ class cartesian_mesh_loader<T,3> : public mesh_loader<cartesian_mesh<T,3>>
 
         while (linecount < lines)
         {
-            if ( (linecount%100000) == 0 )
+            if ( this->verbose() && ((linecount%100000) == 0) )
             {
                 std::cout << "Reading points: " << linecount;
                 std::cout << "/" << lines << "\r";
@@ -1409,8 +1466,11 @@ class cartesian_mesh_loader<T,3> : public mesh_loader<cartesian_mesh<T,3>>
             linecount++;
         }
 
-        std::cout << "Reading points: " << linecount;
-        std::cout << "/" << lines << std::endl;
+        if (this->verbose())
+        {
+            std::cout << "Reading points: " << linecount;
+            std::cout << "/" << lines << std::endl;
+        }
 
         /************************ Read hexahedra ************************/
         linecount = 0;
@@ -1423,7 +1483,7 @@ class cartesian_mesh_loader<T,3> : public mesh_loader<cartesian_mesh<T,3>>
 
         while (linecount < lines)
         {
-            if ( (linecount%100000) == 0 )
+            if ( this->verbose() && ((linecount%100000) == 0) )
             {
                 std::cout << "Reading hexahedra: " << linecount;
                 std::cout << "/" << lines << "\r";
@@ -1466,8 +1526,11 @@ class cartesian_mesh_loader<T,3> : public mesh_loader<cartesian_mesh<T,3>>
             linecount++;
         }
 
-        std::cout << "Reading hexahedra: " << linecount;
-        std::cout << "/" << lines << std::endl;
+        if (this->verbose())
+        {
+            std::cout << "Reading hexahedra: " << linecount;
+            std::cout << "/" << lines << std::endl;
+        }
 
         /************************ Read boundary surfaces ************************/
         linecount = 0;
@@ -1478,7 +1541,7 @@ class cartesian_mesh_loader<T,3> : public mesh_loader<cartesian_mesh<T,3>>
 
         while (linecount < lines)
         {
-            if ( (linecount%50000) == 0 )
+            if ( this->verbose() && ((linecount%50000) == 0) )
             {
                 std::cout << "Reading hex face: " << linecount;
                 std::cout << "/" << lines << "\r";
@@ -1499,8 +1562,11 @@ class cartesian_mesh_loader<T,3> : public mesh_loader<cartesian_mesh<T,3>>
             linecount++;
         }
 
-        std::cout << "Reading hex face: " << linecount;
-        std::cout << "/" << lines << std::endl;
+        if (this->verbose())
+        {
+            std::cout << "Reading hex face: " << linecount;
+            std::cout << "/" << lines << std::endl;
+        }
 
         return true;
     }
@@ -1510,7 +1576,9 @@ public:
 
     bool read_mesh(const std::string& s)
     {
-        std::cout << " *** READING CARTESIAN 3D MESH ***" << std::endl;
+        if (this->verbose())
+            std::cout << " *** READING CARTESIAN 3D MESH ***" << std::endl;
+
         return hex_read(s);
     }
 
@@ -1518,8 +1586,11 @@ public:
     {
         auto storage = msh.backend_storage();
 
-        std::cout << "Sorting data...";
-        std::cout.flush();
+        if (this->verbose())
+        {
+            std::cout << "Sorting data...";
+            std::cout.flush();
+        }
 
         storage->points = std::move(points);
         storage->nodes = std::move(nodes);
@@ -1563,16 +1634,17 @@ public:
             storage->boundary_info.at(position.second) = bi;
         }
 
-        std::cout << "done." << std::endl;
+        if (this->verbose())
+        {
+            std::cout << "done." << std::endl;
 
-        std::cout << "Nodes: " << storage->nodes.size() << std::endl;
-        std::cout << "Edges: " << storage->edges.size() << std::endl;
-        std::cout << "Faces: " << storage->surfaces.size() << std::endl;
-        std::cout << "Volumes: " << storage->volumes.size() << std::endl;
+            std::cout << "Nodes: " << storage->nodes.size() << std::endl;
+            std::cout << "Edges: " << storage->edges.size() << std::endl;
+            std::cout << "Faces: " << storage->surfaces.size() << std::endl;
+            std::cout << "Volumes: " << storage->volumes.size() << std::endl;
+        }
 
         boundary_surfaces.clear();
-
-        storage->statistics();
 
         return true;
     }

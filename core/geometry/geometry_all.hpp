@@ -61,6 +61,19 @@ mesh_h(const Mesh& msh)
     return h;
 }
 
+template<typename Mesh>
+typename Mesh::scalar_type
+average_diameter(const Mesh& msh)
+{
+    typename Mesh::scalar_type h{};
+    for (auto& cl : msh)
+    {
+        h += diameter(msh, cl);
+    }
+
+    return h/msh.cells_size();
+}
+
 template<typename Mesh, typename Element>
 std::vector<typename Mesh::point_type>
 points(const Mesh& msh, const Element& elem)
