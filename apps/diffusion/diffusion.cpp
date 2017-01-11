@@ -22,6 +22,8 @@
 
 #include <map>
 
+#include "colormanip.h"
+
 #include "../../config.h"
 
 #ifdef HAVE_SOLVER_WRAPPERS
@@ -424,28 +426,32 @@ verify_convergence(const std::vector<std::string>& paths,
 
         std::cout << "Convergence rates for k = " << i << ":   ";
 
-        bool ok     = true;
-        bool verify = false;
+        bool pass       = true;
+        bool warning    = false;
+        bool high, low, ok;
         for (size_t i = 1; i < errdiams.size(); i++)
         {
             auto d = log2(errdiams[i-1].first/errdiams[i].first);
             auto e = log2(errdiams[i-1].second/errdiams[i].second);
             auto rate = e/d;
 
-            ok &= (std::abs(expected_rate - rate) < 0.4);
-            bool chk = (std::abs(expected_rate - rate) > 0.2);
+            ok   = (std::abs(expected_rate - rate) < 0.4); /* Test passed */
+            low  = ((expected_rate - rate) > 0.2); /* a bit too low, warn */
+            high = ((rate - expected_rate) > 0.2); /* a bit too high, warn */
 
-            if (chk) std::cout << "\x1b[33;1m";
+            if (low)    std::cout << magenta;
+            if (high)   std::cout << cyan;
             std::cout << std::fixed << std::setprecision(3) << rate << "  ";
-            if (chk) std::cout << "\x1b[0m";
-
-            verify |= chk;
+            if (low or high)
+            {
+                std::cout << reset;
+                warning = true;
+            }
         }
 
-        std::string okfail = "[\x1b[31;1mFAIL\x1b[0m]";
-
-        if (ok && not verify) okfail = "[\x1b[32;1m OK \x1b[0m]";
-        if (ok && verify) okfail = "[\x1b[33;1mVRFY\x1b[0m]";
+        std::string             okfail = "[\x1b[31;1mFAIL\x1b[0m]";
+        if (ok && not warning)  okfail = "[\x1b[32;1m OK \x1b[0m]";
+        if (ok && warning)      okfail = "[\x1b[33;1mWARN\x1b[0m]";
 
         std::cout << okfail << std::endl;
 
@@ -651,28 +657,28 @@ int main(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-    std::cout << "Triangles specialized" << std::endl;
+    std::cout << bold << underline << "Triangles specialized" << reset << std::endl;
     test_triangles_specialized();
 
-    std::cout << "Triangles generic" << std::endl;
+    std::cout << bold << underline << "Triangles generic" << reset << std::endl;
     test_triangles_generic();
 
-    std::cout << "Hexagons" << std::endl;
+    std::cout << bold << underline << "Hexagons" << reset << std::endl;
     test_hexagons_generic();
 
-    std::cout << "Hexahedra specialized" << std::endl;
+    std::cout << bold << underline << "Hexahedra specialized" << reset << std::endl;
     test_hexahedra_specialized();
 
-    std::cout << "Hexahedra generic" << std::endl;
+    std::cout << bold << underline << "Hexahedra generic" << reset << std::endl;
     test_hexahedra_generic();
 
-    std::cout << "Tetrahedra specialized" << std::endl;
+    std::cout << bold << underline << "Tetrahedra specialized" << reset << std::endl;
     test_tetrahedra_specialized();
 
-    std::cout << "Tetrahedra generic" << std::endl;
+    std::cout << bold << underline << "Tetrahedra generic" << reset << std::endl;
     test_tetrahedra_generic();
 
-    std::cout << "Polyhedra" << std::endl;
+    std::cout << bold << underline << "Polyhedra" << reset << std::endl;
     test_polyhedra_generic();
 }
 
