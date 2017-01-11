@@ -651,14 +651,14 @@ int main(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-    //std::cout << "Triangles specialized" << std::endl;
-    //test_triangles_specialized();
+    std::cout << "Triangles specialized" << std::endl;
+    test_triangles_specialized();
 
-    //std::cout << "Triangles generic" << std::endl;
-    //test_triangles_generic();
+    std::cout << "Triangles generic" << std::endl;
+    test_triangles_generic();
 
-    //std::cout << "Hexagons" << std::endl;
-    //test_hexagons_generic();
+    std::cout << "Hexagons" << std::endl;
+    test_hexagons_generic();
 
     std::cout << "Hexahedra specialized" << std::endl;
     test_hexahedra_specialized();
