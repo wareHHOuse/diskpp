@@ -29,6 +29,7 @@
  */
 
 #include <time.h>
+#include <iomanip>
 #include "colormanip.h"
 
 /* COLORS */
@@ -78,5 +79,11 @@ std::ostream& time_now(std::ostream& os)
     strftime (buffer,80,"[%D %T] ",timeinfo);
 
     os << buffer;
+    return os;
+}
+
+std::ostream& sci3(std::ostream& os)
+{
+    os << std::scientific << std::setprecision(3);
     return os;
 }

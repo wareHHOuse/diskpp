@@ -295,7 +295,6 @@ public:
     }
 };
 
-#if 0
 
 template<typename MeshType, typename LoaderType>
 void
@@ -312,10 +311,20 @@ test_mesh_format(const std::vector<std::string>& paths,
         return sin(p.x() * M_PI);
     };
 
-    for (size_t i = mindeg; i <= maxdeg; i++)
+
+    for (size_t deg = mindeg; deg <= maxdeg; deg++)
     {
         std::stringstream ss;
-        ss << output_basename << "_degree_" << i << ".txt";
+        ss << output_basename << "_degree_" << deg << ".txt";
+
+        std::cout << bold << red;
+        std::cout << "Timing vs. # of DoFs, k = " << deg << ", runs = " << runs;
+        std::cout << " [ Saved in " << ss.str() << " ]" << reset << std::endl;
+        std::cout << bold << "   DoFs        ";
+        std::cout << yellow << "Rec        Stab        StatC      " << nocolor;
+        std::cout << "TotAsm        ";
+        std::cout << green << "Sol" << nocolor;
+        std::cout << reset << std::endl;
 
         std::ofstream ofs(ss.str());
 
@@ -332,42 +341,44 @@ test_mesh_format(const std::vector<std::string>& paths,
             }
             loader.populate_mesh(msh);
 
+            double time_gradrec     = 0.0;
+            double time_stab        = 0.0;
+            double time_statcond    = 0.0;
+            double time_solver      = 0.0;
 
-            struct timing_data td;
-            td.time_gradrec     = 0.0;
-            td.time_stab        = 0.0;
-            td.time_statcond    = 0.0;
-            td.time_solver      = 0.0;
-
+            size_t dofs;
             for (size_t run = 0; run < runs; run++)
             {
-                struct timing_data rtd;
-                rtd = test_diffusion(msh, f, sf, i, "plot.dat");
+                diffusion_solver<MeshType> dp(msh, deg);
 
-                td.time_gradrec     += rtd.time_gradrec;
-                td.time_stab        += rtd.time_stab;
-                td.time_statcond    += rtd.time_statcond;
-                td.time_solver      += rtd.time_solver;
-                td.solved_dofs      = rtd.solved_dofs;
+                assembly_info ai = dp.assemble(f, sf);
+                time_gradrec    += ai.time_gradrec;
+                time_stab       += ai.time_stab;
+                time_statcond   += ai.time_statcond;
+                dofs = ai.linear_system_size;
+
+                solver_info si = dp.solve();
+                time_solver += si.time_solver;
             }
 
-            td.time_gradrec /= double(runs);
-            td.time_stab /= double(runs);
-            td.time_statcond /= double(runs);
-            td.time_solver /= double(runs);
+            time_gradrec    /= double(runs);
+            time_stab       /= double(runs);
+            time_statcond   /= double(runs);
+            time_solver     /= double(runs);
 
-            ofs << td.solved_dofs << " ";
-            ofs << td.time_gradrec << " ";
-            ofs << td.time_stab << " ";
-            ofs << td.time_statcond << " ";
-            ofs << td.time_solver << std::endl;
+            ofs << dofs << " ";
+            ofs << time_gradrec << " ";
+            ofs << time_stab << " ";
+            ofs << time_statcond << " ";
+            ofs << time_solver << std::endl;
 
-            std::cout << "Degree:                  " << i << std::endl;
-            std::cout << "DOFs:                    " << td.solved_dofs << std::endl;
-            std::cout << "Gradient reconstruction: " << td.time_gradrec << std::endl;
-            std::cout << "Stabilization:           " << td.time_stab << std::endl;
-            std::cout << "Static condensation:     " << td.time_statcond << std::endl;
-            std::cout << "Solver:                  " << td.time_solver << std::endl;
+            std::cout << " " << std::setw(8) << dofs << "   ";
+            std::cout << sci3 << time_gradrec << "   ";
+            std::cout << sci3 << time_stab << "   ";
+            std::cout << sci3 << time_statcond << "   ";
+            std::cout << sci3 << time_gradrec + time_stab + time_statcond;
+            std::cout << "   " << sci3 << time_solver;
+            std::cout << std::endl;
 
         }
 
@@ -375,7 +386,6 @@ test_mesh_format(const std::vector<std::string>& paths,
     }
 }
 
-#endif
 
 
 template<typename MeshType, typename LoaderType>
@@ -464,11 +474,11 @@ verify_convergence(const std::vector<std::string>& paths,
 
 enum test_type
 {
-    TEST_VERIFY_CONVERGENGE,
+    TEST_VERIFY_CONVERGENCE,
     TEST_MEASURE_TIMES
 };
 
-void test_triangles_specialized()
+void test_triangles_specialized(test_type tt)
 {
     size_t runs = 5;
 
@@ -478,15 +488,26 @@ void test_triangles_specialized()
     paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri03.mesh2d");
     paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri04.mesh2d");
 
-    typedef disk::simplicial_mesh<double, 2>      MeshType;
-    typedef disk::netgen_mesh_loader<double, 2>   LoaderType;
+    typedef disk::simplicial_mesh<double, 2>      MT;
+    typedef disk::netgen_mesh_loader<double, 2>   LT;
 
-    //test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "triangle_spec");
+    switch(tt)
+    {
+        case TEST_MEASURE_TIMES:
+            test_mesh_format<MT, LT>(paths, runs, 0, 3, "triangle_spec");
+            break;
 
-    verify_convergence<MeshType, LoaderType>(paths, 0, 3);
+        case TEST_VERIFY_CONVERGENCE:
+            verify_convergence<MT, LT>(paths, 0, 3);
+            break;
+
+        default:
+            std::cout << "[ Unavailable Test ]" << std::endl;
+            return;
+    }
 }
 
-void test_triangles_generic()
+void test_triangles_generic(test_type tt)
 {
     size_t runs = 5;
 
@@ -496,15 +517,26 @@ void test_triangles_generic()
     paths.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_3.typ1");
     paths.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_4.typ1");
 
-    typedef disk::generic_mesh<double, 2>       MeshType;
-    typedef disk::fvca5_mesh_loader<double, 2>  LoaderType;
+    typedef disk::generic_mesh<double, 2>       MT;
+    typedef disk::fvca5_mesh_loader<double, 2>  LT;
 
-    //test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "triangle_gen");
+    switch(tt)
+    {
+        case TEST_MEASURE_TIMES:
+            test_mesh_format<MT, LT>(paths, runs, 0, 3, "triangle_gen");
+            break;
 
-    verify_convergence<MeshType, LoaderType>(paths, 0, 3);
+        case TEST_VERIFY_CONVERGENCE:
+            verify_convergence<MT, LT>(paths, 0, 3);
+            break;
+
+        default:
+            std::cout << "[ Unavailable Test ]" << std::endl;
+            return;
+    }
 }
 
-void test_hexagons_generic()
+void test_hexagons_generic(test_type tt)
 {
     size_t runs = 5;
 
@@ -514,16 +546,57 @@ void test_hexagons_generic()
     paths.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_4.typ1");
     paths.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_5.typ1");
 
-    typedef disk::generic_mesh<double, 2>       MeshType;
-    typedef disk::fvca5_mesh_loader<double, 2>  LoaderType;
+    typedef disk::generic_mesh<double, 2>       MT;
+    typedef disk::fvca5_mesh_loader<double, 2>  LT;
 
-    //test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "hexagons_gen");
+    switch(tt)
+    {
+        case TEST_MEASURE_TIMES:
+            test_mesh_format<MT, LT>(paths, runs, 0, 3, "hexagons_gen");
+            break;
 
-    verify_convergence<MeshType, LoaderType>(paths, 0, 3);
+        case TEST_VERIFY_CONVERGENCE:
+            verify_convergence<MT, LT>(paths, 0, 3);
+            break;
+
+        default:
+            std::cout << "[ Unavailable Test ]" << std::endl;
+            return;
+    }
+}
+
+void test_kershaw_2d(test_type tt)
+{
+    size_t runs = 5;
+
+    std::vector<std::string> paths;
+    paths.push_back("../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_1.typ1");
+    paths.push_back("../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_2.typ1");
+    paths.push_back("../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_3.typ1");
+    paths.push_back("../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_4.typ1");
+    paths.push_back("../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_5.typ1");
+
+    typedef disk::generic_mesh<double, 2>       MT;
+    typedef disk::fvca5_mesh_loader<double, 2>  LT;
+
+    switch(tt)
+    {
+        case TEST_MEASURE_TIMES:
+            test_mesh_format<MT, LT>(paths, runs, 0, 3, "kershaw_2d");
+            break;
+
+        case TEST_VERIFY_CONVERGENCE:
+            verify_convergence<MT, LT>(paths, 0, 3);
+            break;
+
+        default:
+            std::cout << "[ Unavailable Test ]" << std::endl;
+            return;
+    }
 }
 
 
-void test_hexahedra_specialized()
+void test_hexahedra_specialized(test_type tt)
 {
     size_t runs = 5;
 
@@ -534,15 +607,26 @@ void test_hexahedra_specialized()
     //paths.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-16-16-16.hex");
     //paths.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-32-32-32.hex");
 
-    typedef disk::cartesian_mesh<double, 3>         MeshType;
-    typedef disk::cartesian_mesh_loader<double, 3>  LoaderType;
+    typedef disk::cartesian_mesh<double, 3>         MT;
+    typedef disk::cartesian_mesh_loader<double, 3>  LT;
 
-    //test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "hexahedra_spec");
+    switch(tt)
+    {
+        case TEST_MEASURE_TIMES:
+            test_mesh_format<MT, LT>(paths, runs, 0, 3, "hexahedra_spec");
+            break;
 
-    verify_convergence<MeshType, LoaderType>(paths, 0, 3);
+        case TEST_VERIFY_CONVERGENCE:
+            verify_convergence<MT, LT>(paths, 0, 3);
+            break;
+
+        default:
+            std::cout << "[ Unavailable Test ]" << std::endl;
+            return;
+    }
 }
 
-void test_hexahedra_generic()
+void test_hexahedra_generic(test_type tt)
 {
     size_t runs = 5;
 
@@ -553,15 +637,26 @@ void test_hexahedra_generic()
     //paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_16x16x16.msh");
     //paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_32x32x32.hex");
 
-    typedef disk::generic_mesh<double, 3>       MeshType;
-    typedef disk::fvca6_mesh_loader<double, 3>  LoaderType;
+    typedef disk::generic_mesh<double, 3>       MT;
+    typedef disk::fvca6_mesh_loader<double, 3>  LT;
 
-    //test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "hexahedra_gen");
+    switch(tt)
+    {
+        case TEST_MEASURE_TIMES:
+            test_mesh_format<MT, LT>(paths, runs, 0, 3, "hexahedra_gen");
+            break;
 
-    verify_convergence<MeshType, LoaderType>(paths, 0, 3);
+        case TEST_VERIFY_CONVERGENCE:
+            verify_convergence<MT, LT>(paths, 0, 3);
+            break;
+
+        default:
+            std::cout << "[ Unavailable Test ]" << std::endl;
+            return;
+    }
 }
 
-void test_tetrahedra_specialized()
+void test_tetrahedra_specialized(test_type tt)
 {
     size_t runs = 5;
 
@@ -571,15 +666,26 @@ void test_tetrahedra_specialized()
     paths.push_back("../../../diskpp/meshes/3D_tetras/netgen/fvca6_tet3.mesh");
     paths.push_back("../../../diskpp/meshes/3D_tetras/netgen/fvca6_tet4.mesh");
 
-    typedef disk::simplicial_mesh<double, 3>         MeshType;
-    typedef disk::netgen_mesh_loader<double, 3>  LoaderType;
+    typedef disk::simplicial_mesh<double, 3>    MT;
+    typedef disk::netgen_mesh_loader<double, 3> LT;
 
-    //test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "tetrahedra_spec");
+    switch(tt)
+    {
+        case TEST_MEASURE_TIMES:
+            test_mesh_format<MT, LT>(paths, runs, 0, 3, "tetrahedra_spec");
+            break;
 
-    verify_convergence<MeshType, LoaderType>(paths, 0, 3);
+        case TEST_VERIFY_CONVERGENCE:
+            verify_convergence<MT, LT>(paths, 0, 3);
+            break;
+
+        default:
+            std::cout << "[ Unavailable Test ]" << std::endl;
+            return;
+    }
 }
 
-void test_tetrahedra_generic()
+void test_tetrahedra_generic(test_type tt)
 {
     size_t runs = 5;
 
@@ -589,15 +695,26 @@ void test_tetrahedra_generic()
     paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.3.msh");
     paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.4.msh");
 
-    typedef disk::generic_mesh<double, 3>       MeshType;
-    typedef disk::fvca6_mesh_loader<double, 3>  LoaderType;
+    typedef disk::generic_mesh<double, 3>       MT;
+    typedef disk::fvca6_mesh_loader<double, 3>  LT;
 
-    //test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "tetrahedra_gen");
+    switch(tt)
+    {
+        case TEST_MEASURE_TIMES:
+            test_mesh_format<MT, LT>(paths, runs, 0, 3, "tetrahedra_gen");
+            break;
 
-    verify_convergence<MeshType, LoaderType>(paths, 0, 3);
+        case TEST_VERIFY_CONVERGENCE:
+            verify_convergence<MT, LT>(paths, 0, 3);
+            break;
+
+        default:
+            std::cout << "[ Unavailable Test ]" << std::endl;
+            return;
+    }
 }
 
-void test_polyhedra_generic()
+void test_polyhedra_generic(test_type tt)
 {
     size_t runs = 2;
 
@@ -607,79 +724,55 @@ void test_polyhedra_generic()
     //paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_30.msh");
     //paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_40.msh");
 
-    typedef disk::generic_mesh<double, 3>       MeshType;
-    typedef disk::fvca6_mesh_loader<double, 3>  LoaderType;
+    typedef disk::generic_mesh<double, 3>       MT;
+    typedef disk::fvca6_mesh_loader<double, 3>  LT;
 
-    //test_mesh_format<MeshType, LoaderType>(paths, runs, 0, 3, "polyhedra_gen");
-
-    verify_convergence<MeshType, LoaderType>(paths, 0, 3);
-}
-
-
-#if 0
-int main(int argc, char **argv)
-{
-    test_triangles_specialized();
-    #if 0
-    using RealType = double;
-    typedef disk::cartesian_mesh<RealType, 3>   mesh_type;
-    mesh_type msh;
-
-    disk::cartesian_mesh_loader<RealType, 3> loader;
-    if (!loader.read_mesh("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-8-8-8.hex"))
+    switch(tt)
     {
-        std::cout << "Problem loading mesh." << std::endl;
-        return 1;
+        case TEST_MEASURE_TIMES:
+            test_mesh_format<MT, LT>(paths, runs, 0, 3, "polyhedra");
+            break;
+
+        case TEST_VERIFY_CONVERGENCE:
+            verify_convergence<MT, LT>(paths, 0, 3);
+            break;
+
+        default:
+            std::cout << "[ Unavailable Test ]" << std::endl;
+            return;
     }
-    loader.populate_mesh(msh);
-
-    auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
-        return M_PI * M_PI * sin(p.x() * M_PI);
-        //return 1.0;
-    };
-
-    auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
-        return sin(p.x() * M_PI);
-        //return -p.x() * p.x() * 0.5;
-    };
-
-    diffusion_solver<mesh_type> solver(msh, 0);
-
-    solver.assemble(f, sf);
-    solver.solve();
-    solver.postprocess(f);
-    std::cout << solver.compute_l2_error(sf) << std::endl;
-    solver.plot_solution("test.dat");
-    #endif
 }
 
-#endif
+
 
 int main(int argc, char **argv)
 {
     std::cout << bold << underline << "Triangles specialized" << reset << std::endl;
-    test_triangles_specialized();
+    test_triangles_specialized(TEST_VERIFY_CONVERGENCE);
 
     std::cout << bold << underline << "Triangles generic" << reset << std::endl;
-    test_triangles_generic();
+    test_triangles_generic(TEST_VERIFY_CONVERGENCE);
 
     std::cout << bold << underline << "Hexagons" << reset << std::endl;
-    test_hexagons_generic();
+    test_hexagons_generic(TEST_VERIFY_CONVERGENCE);
+
+    std::cout << bold << underline << "Kershaw 2D" << reset << std::endl;
+    test_kershaw_2d(TEST_VERIFY_CONVERGENCE);
 
     std::cout << bold << underline << "Hexahedra specialized" << reset << std::endl;
-    test_hexahedra_specialized();
+    test_hexahedra_specialized(TEST_VERIFY_CONVERGENCE);
 
     std::cout << bold << underline << "Hexahedra generic" << reset << std::endl;
-    test_hexahedra_generic();
+    test_hexahedra_generic(TEST_VERIFY_CONVERGENCE);
 
     std::cout << bold << underline << "Tetrahedra specialized" << reset << std::endl;
-    test_tetrahedra_specialized();
+    test_tetrahedra_specialized(TEST_VERIFY_CONVERGENCE);
 
     std::cout << bold << underline << "Tetrahedra generic" << reset << std::endl;
-    test_tetrahedra_generic();
+    test_tetrahedra_generic(TEST_VERIFY_CONVERGENCE);
 
     std::cout << bold << underline << "Polyhedra" << reset << std::endl;
-    test_polyhedra_generic();
+    test_polyhedra_generic(TEST_VERIFY_CONVERGENCE);
 }
 
 

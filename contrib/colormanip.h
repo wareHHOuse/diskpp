@@ -58,3 +58,6 @@ std::ostream& noblink(std::ostream& os);
 std::ostream& reset(std::ostream& os);
 
 std::ostream& time_now(std::ostream& os);
+
+
+std::ostream& sci3(std::ostream& os);
