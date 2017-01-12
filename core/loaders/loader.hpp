@@ -1,6 +1,6 @@
 /*
  *       /\
- *      /__\       Matteo Cicuttin (C) 2016 - matteo.cicuttin@enpc.fr
+ *      /__\       Matteo Cicuttin (C) 2016-2017 - matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -1853,7 +1853,64 @@ public:
 
 };
 
+/* Helper to load uniform 1D meshes. */
+template<typename T>
+disk::generic_mesh<T,1>
+load_uniform_1d_mesh(T min, T max, size_t cells)
+{
+    typedef disk::generic_mesh<T, 1>  mesh_type;
 
+    mesh_type msh;
+    disk::uniform_mesh_loader<T, 1> loader(min, max, cells);
+    loader.populate_mesh(msh);
+
+    return msh;
+}
+
+/* Helper to load 2D meshes in FVCA5 format */
+template<typename T>
+disk::generic_mesh<T,2>
+load_fvca5_2d_mesh(const char *filename)
+{
+    typedef disk::generic_mesh<T, 2>  mesh_type;
+
+    mesh_type msh;
+    disk::fvca5_mesh_loader<T, 2> loader;
+    loader.read_mesh(filename);
+    loader.populate_mesh(msh);
+
+    return msh;
+}
+
+/* Helper to load 2D meshes in Netgen format */
+template<typename T>
+disk::simplicial_mesh<T, 2>
+load_netgen_2d_mesh(const char *filename)
+{
+    typedef disk::simplicial_mesh<T, 2>  mesh_type;
+
+    mesh_type msh;
+    disk::netgen_mesh_loader<T, 2> loader;
+    loader.read_mesh(filename);
+    loader.populate_mesh(msh);
+
+    return msh;
+}
+
+/* Helper to load 2D meshes in DiSk++ format */
+template<typename T>
+disk::cartesian_mesh<T, 2>
+load_cartesian_2d_mesh(const char *filename)
+{
+    typedef disk::cartesian_mesh<T, 2>  mesh_type;
+
+    mesh_type msh;
+    disk::cartesian_mesh_loader<T, 2> loader;
+    loader.read_mesh(filename);
+    loader.populate_mesh(msh);
+
+    return msh;
+}
 
 
 } // namespace disk

@@ -295,7 +295,7 @@ public:
 
     basis_quadrature_data(size_t cell_degree, size_t face_degree)
     {
-        if (cell_degree + 1 < face_degree or cell_degree > face_degree + 1)
+        if ( (cell_degree + 1 < face_degree) or (cell_degree > face_degree + 1) )
             throw std::invalid_argument("Invalid cell degree");
 
         m_cell_degree = cell_degree;
