@@ -1912,5 +1912,35 @@ load_cartesian_2d_mesh(const char *filename)
     return msh;
 }
 
+/* Helper to load 3D meshes in Netgen format */
+template<typename T>
+disk::simplicial_mesh<T, 3>
+load_netgen_3d_mesh(const char *filename)
+{
+    typedef disk::simplicial_mesh<T, 3>  mesh_type;
+
+    mesh_type msh;
+    disk::netgen_mesh_loader<T, 3> loader;
+    loader.read_mesh(filename);
+    loader.populate_mesh(msh);
+
+    return msh;
+}
+
+/* Helper to load 3D meshes in DiSk++ format */
+template<typename T>
+disk::cartesian_mesh<T, 3>
+load_cartesian_3d_mesh(const char *filename)
+{
+    typedef disk::cartesian_mesh<T, 3>  mesh_type;
+
+    mesh_type msh;
+    disk::cartesian_mesh_loader<T, 3> loader;
+    loader.read_mesh(filename);
+    loader.populate_mesh(msh);
+
+    return msh;
+}
+
 
 } // namespace disk

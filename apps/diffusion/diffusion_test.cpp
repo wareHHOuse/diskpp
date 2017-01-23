@@ -144,8 +144,6 @@ test_mesh_format(const std::vector<std::string>& paths,
     }
 }
 
-
-
 template<typename MeshType, typename LoaderType>
 bool
 verify_convergence(const std::vector<std::string>& paths,

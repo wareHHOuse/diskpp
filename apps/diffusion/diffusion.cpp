@@ -40,10 +40,17 @@
 
 #include "diffusion_solver.hpp"
 
+struct run_params
+{
+    size_t  degree;
+    int     l;
+    bool    verbose;
+};
+
 template<template<typename, size_t, typename> class Mesh,
          typename T, typename Storage>
 void
-run_diffusion_solver(const Mesh<T, 1, Storage>& msh)
+run_diffusion_solver(const Mesh<T, 1, Storage>& msh, run_params& rp)
 {
     typedef Mesh<T, 1, Storage> mesh_type;
 
@@ -55,17 +62,20 @@ run_diffusion_solver(const Mesh<T, 1, Storage>& msh)
         return sin(p.x() * M_PI);
     };
 
-    diffusion_solver<mesh_type> dp(msh, 1);
+    diffusion_solver<mesh_type> dp(msh, rp.degree);
+    dp.verbose(rp.verbose);
 
     dp.assemble(load, solution);
     dp.solve();
     dp.postprocess(load);
+    dp.plot_solution("plot.dat");
+    std::cout << dp.compute_l2_error(solution) << std::endl;
 }
 
 template<template<typename, size_t, typename> class Mesh,
          typename T, typename Storage>
 void
-run_diffusion_solver(const Mesh<T, 2, Storage>& msh)
+run_diffusion_solver(const Mesh<T, 2, Storage>& msh, run_params& rp)
 {
     typedef Mesh<T, 2, Storage> mesh_type;
 
@@ -77,7 +87,33 @@ run_diffusion_solver(const Mesh<T, 2, Storage>& msh)
         return sin(p.x() * M_PI) * sin(p.y() * M_PI);
     };
 
-    diffusion_solver<mesh_type> dp(msh, 1);
+    diffusion_solver<mesh_type> dp(msh, rp.degree);
+    dp.verbose(rp.verbose);
+
+    dp.assemble(load, solution);
+    dp.solve();
+    dp.postprocess(load);
+    dp.plot_solution("plot.dat");
+    std::cout << dp.compute_l2_error(solution) << std::endl;
+}
+
+template<template<typename, size_t, typename> class Mesh,
+         typename T, typename Storage>
+void
+run_diffusion_solver(const Mesh<T, 3, Storage>& msh, run_params& rp)
+{
+    typedef Mesh<T, 3, Storage> mesh_type;
+
+    auto load = [](const point<T, 3>& p) -> auto {
+        return 3.0 * M_PI * M_PI * sin(p.x() * M_PI) * sin(p.y() * M_PI) * sin(p.z() * M_PI);
+    };
+
+    auto solution = [](const point<T, 3>& p) -> auto {
+        return sin(p.x() * M_PI) * sin(p.y() * M_PI) * sin(p.z() * M_PI);
+    };
+
+    diffusion_solver<mesh_type> dp(msh, rp.degree);
+    dp.verbose(rp.verbose);
 
     dp.assemble(load, solution);
     dp.solve();
@@ -95,7 +131,12 @@ int main(int argc, char **argv)
     int     degree          = 1;
     int     l               = 0;
     int     elems_1d        = 8;
-    bool    verbose_flag    = false;
+
+    run_params rp;
+    rp.degree   = 1;
+    rp.l        = 0;
+    rp.verbose  = false;
+
     int ch;
 
     while ( (ch = getopt(argc, argv, "k:l:n:p:v")) != -1 )
@@ -109,14 +150,15 @@ int main(int argc, char **argv)
                     std::cout << "Degree must be positive. Falling back to 1." << std::endl;
                     degree = 1;
                 }
+                rp.degree = degree;
                 break;
 
             case 'l':
-                l = atoi(optarg);
+                rp.l = atoi(optarg);
                 if (l < -1 or l > 1)
                 {
                     std::cout << "l can be -1, 0 or 1. Falling back to 0." << std::endl;
-                    l = 0;
+                    rp.l = 0;
                 }
                 break;
 
@@ -134,7 +176,7 @@ int main(int argc, char **argv)
                 break;
 
             case 'v':
-                verbose_flag = true;
+                rp.verbose = true;
                 break;
 
             case 'h':
@@ -152,33 +194,54 @@ int main(int argc, char **argv)
     {
         std::cout << "Mesh format: 1D uniform" << std::endl;
         auto msh = disk::load_uniform_1d_mesh<RealType>(0, 1, elems_1d);
-        run_diffusion_solver(msh);
+        run_diffusion_solver(msh, rp);
         return 0;
     }
 
     mesh_filename = argv[0];
 
+    /* FVCA5 2D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
         auto msh = disk::load_fvca5_2d_mesh<RealType>(mesh_filename);
-        run_diffusion_solver(msh);
+        run_diffusion_solver(msh, rp);
         return 0;
     }
 
+    /* Netgen 2D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$") ))
     {
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
         auto msh = disk::load_netgen_2d_mesh<RealType>(mesh_filename);
-        run_diffusion_solver(msh);
+        run_diffusion_solver(msh, rp);
         return 0;
     }
 
+    /* DiSk++ cartesian 2D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.quad$") ))
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
         auto msh = disk::load_cartesian_2d_mesh<RealType>(mesh_filename);
-        run_diffusion_solver(msh);
+        run_diffusion_solver(msh, rp);
+        return 0;
+    }
+
+    /* Netgen 3D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$") ))
+    {
+        std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
+        auto msh = disk::load_netgen_3d_mesh<RealType>(mesh_filename);
+        run_diffusion_solver(msh, rp);
+        return 0;
+    }
+
+    /* DiSk++ cartesian 3D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.hex$") ))
+    {
+        std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
+        auto msh = disk::load_cartesian_3d_mesh<RealType>(mesh_filename);
+        run_diffusion_solver(msh, rp);
         return 0;
     }
 
