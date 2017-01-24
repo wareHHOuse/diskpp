@@ -393,6 +393,10 @@ public:
                                   priv::is_boundary_pred<mesh>>
                                   boundary_face_iterator;
 
+    typedef priv::filter_iterator<typename mesh::const_face_iterator,
+                                  priv::is_boundary_pred<mesh>>
+                                  const_boundary_face_iterator;
+
     typedef priv::filter_iterator<typename mesh::face_iterator,
                                   priv::is_boundary_pred_with_id<mesh>>
                                   boundary_face_with_id_iterator;
@@ -488,12 +492,26 @@ public:
         return boundary_face_iterator(ibp(*this), this->faces_begin(), this->faces_end());
     }
 
+    const_boundary_face_iterator boundary_faces_begin() const
+    {
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+        typedef priv::is_boundary_pred<mesh> ibp;
+        return const_boundary_face_iterator(ibp(*this), this->faces_begin(), this->faces_end());
+    }
+
     /* End iterator to all the boundary faces */
     boundary_face_iterator boundary_faces_end()
     {
         assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
         typedef priv::is_boundary_pred<mesh> ibp;
         return boundary_face_iterator(ibp(*this), this->faces_end(), this->faces_end());
+    }
+
+    const_boundary_face_iterator boundary_faces_end() const
+    {
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+        typedef priv::is_boundary_pred<mesh> ibp;
+        return const_boundary_face_iterator(ibp(*this), this->faces_end(), this->faces_end());
     }
 
     /* Begin iterator to the boundary faces of boundary 'id' */

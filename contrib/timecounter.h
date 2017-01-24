@@ -91,7 +91,7 @@ public:
 
     double to_double() const
     {
-        return get_systime() + get_usertime();
+        return /*get_systime() +*/ get_usertime();
     }
 };
 

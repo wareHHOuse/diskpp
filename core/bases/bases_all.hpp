@@ -166,16 +166,41 @@ map_point(const Mesh<T,3,Storage>& msh,
     auto diam = diameter(msh, fc);
     auto bar = barycenter(msh, fc);
 
-    auto v0 = (pts[1] - pts[0]).to_vector();
-    auto v1 = (pts[pts.size()-1] - pts[0]).to_vector();
+    static_vector<T,3> v0;
+    static_vector<T,3> v1;
 
-    auto e0 = v0 / v0.norm();
-    auto e1 = (v1 - (v1.dot(v0) * v0) / (v0.dot(v0))).norm();
+    bool ok = false;
 
-    auto v = (pt-bar).to_vector() / diam;
+    size_t npts = pts.size();
+    for (size_t i = 0; i < npts; i++)
+    {
+        size_t i0, i1;
+        i0 = (i+1)%npts;
+        i1 = (i-1)%npts;
+        v0 = (pts[i0] - pts[i]).to_vector();
+        v1 = (pts[i1] - pts[i]).to_vector();
 
-    auto eta = v.dot(v0);
-    auto xi = v.dot(v1);
+        static_vector<T,3> v0n = v0/v0.norm();
+        static_vector<T,3> v1n = v1/v1.norm();
+
+        if ( v0n.dot(v1n) < 0.99 ) // we want at least 8 degrees angle
+        {
+            ok = true;
+            break;
+        }
+    }
+
+    if (!ok)
+        throw std::invalid_argument("Degenerate polyhedron, cannot proceed");
+
+    static_vector<T,3> e0 = v0 / v0.norm();
+    static_vector<T,3> e1 = v1 - (v1.dot(v0) * v0) / (v0.dot(v0));
+    e1 = e1 / e1.norm();
+
+    static_vector<T,3> v = (pt-bar).to_vector();
+
+    auto eta = v.dot(e0);
+    auto xi = v.dot(e1);
 
     return point<T,2>({eta, xi});
 }

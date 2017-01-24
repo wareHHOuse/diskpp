@@ -6,3 +6,6 @@
 	path = meshes
 	url = https://github.com/datafl4sh/meshes.git
     branch = master
+[submodule "contrib/sol2"]
+	path = contrib/sol2
+	url = https://github.com/ThePhD/sol2
