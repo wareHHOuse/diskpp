@@ -92,8 +92,8 @@ points(const simplicial_mesh<T,DIM>& msh, const simplicial_element<DIM, CODIM>& 
 
 /* Return the number of elements of the specified cell */
 template<typename T, size_t DIM>
-size_t
-number_of_faces(const simplicial_mesh<T,DIM>& msh, const typename simplicial_mesh<T,DIM>::cell& cl)
+constexpr size_t
+howmany_faces(const simplicial_mesh<T,DIM>& msh, const typename simplicial_mesh<T,DIM>::cell& cl)
 {
     static_assert(DIM == 1 or DIM == 2 or DIM == 3, "wrong dimension");
     switch(DIM)

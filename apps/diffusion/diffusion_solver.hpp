@@ -272,7 +272,7 @@ public:
                 auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, qp.point());
 
                 scalar_type pot = 0.0;
-                for (size_t i = 0; i < m_bqd.cell_basis.range(0, m_cell_degree).size(); i++)
+                for (size_t i = 0; i < howmany_dofs(m_bqd.cell_basis); i++)
                     pot += phi[i] * x(i);
 
                 auto tp = qp.point();

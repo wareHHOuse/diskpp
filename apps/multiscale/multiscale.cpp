@@ -27,7 +27,10 @@
 #include "../../config.h"
 
 #include "loaders/loader.hpp"
-#include "hho/hho.hpp"
+#include "hho/hho_multiscale.hpp"
+
+
+
 
 
 
@@ -43,7 +46,14 @@ int main(int argc, char **argv)
 
     auto msh = disk::load_netgen_2d_mesh<RealType>(argv[1]);
 
-    disk::multiscale_local_problem<decltype(msh)> mlp(1);
+    size_t k = 5;
+    size_t rl = 2;
+    disk::multiscale_local_problem<decltype(msh)> mlp(k, rl);
+    for (auto& cl : msh)
+    {
+        mlp.assemble(msh, cl);
+        break;
+    }
 
     return 0;
 }

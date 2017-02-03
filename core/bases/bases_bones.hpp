@@ -14,6 +14,15 @@
  * cite it.
  */
 
+
+
+/* Modification needed for MsHHO:
+ * A basis has a degree and a computed_degree and then a size() and a
+ * computed_size(). The basis is then treated as a basis of order degree,
+ * except that it is usable up to computed_degree.
+ */
+
+
 #ifndef _BASES_HPP_WAS_INCLUDED_
     #error "You must NOT include this file directly. Include bases.hpp"
 #endif
@@ -21,7 +30,6 @@
 #ifndef _BASES_BONES_HPP_
 #define _BASES_BONES_HPP_
 
-#define POWER_CACHE
 #define VERY_HIGH_DEGREE 42424242   // this is shit in its purest form
 
 #include "bases/monomial_generator.hpp"
@@ -34,7 +42,7 @@ template<size_t DIM, size_t MULT = 1>
 class monomial_basis_bones
 {
     monomial_generator<DIM>     m_monomials;
-    size_t                      m_degree;
+    size_t                      m_degree, m_computed_degree;
 
     static_assert((not (DIM == 0)) or (MULT == 1), "Only multiplicity of one with zero-dim basis");
 
@@ -51,34 +59,53 @@ public:
     static const size_t         multiplicity = MULT;
 
     monomial_basis_bones()
-        : m_degree(1)
+        : m_degree(1), m_computed_degree(1)
     {
         m_monomials = monomial_generator<DIM>(1);
     }
 
     monomial_basis_bones(size_t degree)
-        : m_degree(degree)
+        : m_degree(degree), m_computed_degree(degree)
     {
         m_monomials = monomial_generator<DIM>(m_degree);
     }
 
+    monomial_basis_bones(size_t degree, size_t computed_degree)
+        : m_degree(degree), m_computed_degree(computed_degree)
+    {
+        m_monomials = monomial_generator<DIM>(m_computed_degree);
+    }
+
     size_t degree_index(size_t degree) const {
-        if (degree > m_degree)
+        if (degree > m_computed_degree)
             throw std::invalid_argument("Specified degree too high for this basis");
         return MULT * m_monomials.degree_position(degree);
     }
 
     size_t size() const {
+        return MULT * m_monomials.degree_position(m_degree+1);
+    }
+
+    size_t computed_size() const {
         return MULT * m_monomials.size();
     }
 
+    [[deprecated("You should use degree/computed_degree interface")]]
     size_t max_degree() const {
-        return m_monomials.max_degree();
+        return degree();
+    }
+
+    size_t degree() const {
+        return m_degree;
+    }
+
+    size_t computed_degree() const {
+        return m_computed_degree;
     }
 
     dof_range range(size_t min_degree, size_t max_degree) const
     {
-        if (min_degree > m_degree || max_degree > m_degree)
+        if (min_degree > m_computed_degree || max_degree > m_computed_degree)
             throw std::invalid_argument("Specified degree too high for this basis");
         auto pos_min = MULT * m_monomials.degree_position(min_degree);
         auto pos_max = MULT * m_monomials.degree_position(max_degree+1);
@@ -86,9 +113,18 @@ public:
         return dof_range(pos_min, pos_max);
     }
 
+    [[deprecated("You should use range/computed_range interface")]]
     dof_range full_range() const
     {
         return dof_range(0, size());
+    }
+
+    dof_range range() const {
+        return dof_range(0, size());
+    }
+
+    dof_range computed_range() const {
+        return dof_range(0, computed_size());
     }
 };
 
@@ -100,8 +136,10 @@ public:
 
     monomial_basis_bones(){}
     monomial_basis_bones(size_t){}
+    monomial_basis_bones(size_t, size_t){}
     size_t degree_index(size_t degree) const { return 0; }
     size_t size() const { return 1; }
+    size_t computed_size() const { return 1; }
     dof_range range(size_t, size_t) const { return dof_range(0,1); }
     dof_range full_range() const { return dof_range(0,1); }
 

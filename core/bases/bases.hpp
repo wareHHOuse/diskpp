@@ -16,19 +16,21 @@
 
 #pragma once
 
+#include <type_traits>
+
 #define _BASES_HPP_WAS_INCLUDED_
 
 namespace disk {
 
 template<typename MeshType, typename Element>
-class scaled_monomial_scalar_basis
+struct scaled_monomial_scalar_basis
 {
     static_assert(sizeof(MeshType) == -1, "scaled_monomial_scalar_basis: not suitable for the requested kind of mesh");
     static_assert(sizeof(Element) == -1, "scaled_monomial_scalar_basis: not suitable for the requested kind of element");
 };
 
 template<typename MeshType, typename Element>
-class scaled_monomial_vector_sg_basis
+struct scaled_monomial_vector_sg_basis
 {
     static_assert(sizeof(MeshType) == -1, "scaled_monomial_vector_sg_basis: not suitable for the requested kind of mesh");
     static_assert(sizeof(Element) == -1, "scaled_monomial_vector_sg_basis: not suitable for the requested kind of element");
@@ -46,6 +48,46 @@ class scaled_monomial_vector_sg_basis
 #include "bases/bases_all.hpp"
 #include "bases/bases_simplicial.hpp"
 
+
+namespace disk {
+
+namespace priv {
+
+template<typename MeshType>
+using mct = typename MeshType::cell;
+
+template<typename MeshType>
+using mft = typename MeshType::face;
+
+template<typename MeshType, typename Element>
+using smsb = scaled_monomial_scalar_basis<MeshType, Element>;
+
+} // namespace priv
+
+template<typename MeshType>
+std::pair<  priv::smsb<MeshType, priv::mct<MeshType>>,
+            priv::smsb<MeshType, priv::mft<MeshType>>  >
+make_scaled_monomial_scalar_basis(const MeshType& msh, size_t degree)
+{
+    auto cb = priv::smsb<MeshType, priv::mct<MeshType>>(degree);
+    auto fb = priv::smsb<MeshType, priv::mft<MeshType>>(degree);
+
+    return std::make_pair(cb, fb);
+}
+
+template<typename MeshType>
+std::pair<  priv::smsb<MeshType, priv::mct<MeshType>>,
+            priv::smsb<MeshType, priv::mft<MeshType>>  >
+make_scaled_monomial_scalar_basis(const MeshType& msh, size_t cell_degree,
+                                  size_t face_degree)
+{
+    auto cb = priv::smsb<MeshType, priv::mct<MeshType>>(cell_degree);
+    auto fb = priv::smsb<MeshType, priv::mft<MeshType>>(face_degree);
+
+    return std::make_pair(cb, fb);
+}
+
+} // namespace disk
 
 
 

@@ -52,12 +52,16 @@ public:
         : base(degree)
     {}
 
+    scaled_monomial_scalar_basis(size_t degree, size_t computed_degree)
+        : base(degree, computed_degree)
+    {}
+
     Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>
     eval_functions(const mesh_type& msh, const cell_type& cl,
                    const point<T,3>& pt,
                    size_t mindeg = 0, size_t maxdeg = VERY_HIGH_DEGREE) const
     {
-        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? max_degree() : maxdeg;
+        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
         auto eval_range = range(mindeg, maxdeg);
 
         auto bar = barycenter(msh, cl);
@@ -69,7 +73,7 @@ public:
         ret.resize( eval_range.size(), 1 );
 
 #ifdef POWER_CACHE
-        power_cache<scalar_type, 3> pow(ep, this->max_degree()+1);
+        power_cache<scalar_type, 3> pow(ep, this->computed_degree()+1);
 #endif
         size_t i = 0;
         auto begin = this->monomials_begin();
@@ -101,7 +105,7 @@ public:
                    const point<T,3>& pt,
                    size_t mindeg = 0, size_t maxdeg = VERY_HIGH_DEGREE) const
     {
-        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? max_degree() : maxdeg;
+        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
         auto eval_range = range(mindeg, maxdeg);
 
         auto bar = barycenter(msh, cl);
@@ -114,7 +118,7 @@ public:
         ret.resize( eval_range.size(), 3 );
 
 #ifdef POWER_CACHE
-        power_cache<scalar_type, 3> pow(ep, this->max_degree()+1);
+        power_cache<scalar_type, 3> pow(ep, this->computed_degree()+1);
 #endif
 
         size_t i = 0;
@@ -177,12 +181,16 @@ public:
         : base(degree)
     {}
 
+    scaled_monomial_scalar_basis(size_t degree, size_t computed_degree)
+        : base(degree, computed_degree)
+    {}
+
     Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>
     eval_functions(const mesh_type& msh, const face_type& fc,
                    const point<T,3>& pt,
                    size_t mindeg = 0, size_t maxdeg = VERY_HIGH_DEGREE) const
     {
-        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? max_degree() : maxdeg;
+        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
         auto eval_range = range(mindeg, maxdeg);
 
         auto ep = map_to_reference(msh, fc, pt);
@@ -191,7 +199,7 @@ public:
         ret.resize( eval_range.size(), 1 );
 
 #ifdef POWER_CACHE
-        power_cache<scalar_type, 2> pow(ep, this->max_degree()+1);
+        power_cache<scalar_type, 2> pow(ep, this->computed_degree()+1);
 #endif
 
         size_t i = 0;
@@ -425,22 +433,21 @@ make_test_points(const simplicial_mesh<T,2>& msh,
     std::vector<point<T,2>> test_points;
     auto pts = points(msh, cl);
 
-    auto d0 = (pts[0] - pts[2]) / levels;
-    auto d1 = (pts[1] - pts[2]) / levels;
+    levels += 1;
+    auto d0 = (pts[1] - pts[0]) / levels;
+    auto d1 = (pts[2] - pts[0]) / levels;
 
-    test_points.push_back( pts[2] );
-    for (size_t i = 1; i < levels; i++)
+    test_points.push_back( pts[0] );
+    for (size_t i = 1; i <= levels; i++)
     {
-        auto p0 = pts[2] + i * d0;
-        auto p1 = pts[2] + i * d1;
+        auto p0 = pts[0] + (i * d0);
+        auto p1 = pts[0] + (i * d1);
 
-        auto d2 = (p1 - p0) / i;
+        auto d2 = (p0 - p1) / i;
 
         for (size_t j = 0; j <= i; j++)
-            test_points.push_back( p0 + j * d2 );
+            test_points.push_back( p1 + j * d2 );
     }
-
-    //std::cout << "Test points: " << test_points.size() << std::endl;
 
     return test_points;
 }
