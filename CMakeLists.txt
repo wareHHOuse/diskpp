@@ -55,10 +55,8 @@ configure_file (
   "${PROJECT_SOURCE_DIR}/config.h.in"
   "${PROJECT_BINARY_DIR}/config.h"
   )
-include_directories("${PROJECT_BINARY_DIR}")
-include_directories("${PROJECT_SOURCE_DIR}")
+include_directories(core contrib apps/exemple_visualisation/visualisation "${PROJECT_SOURCE_DIR}")
 
-include_directories(core contrib)
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     set(LINK_LIBS "${LINK_LIBS}" pthread)
@@ -70,6 +68,7 @@ endif()
 
 add_subdirectory(contrib)
 add_subdirectory(core)
+add_subdirectory(apps/exemple_visualisation/visualisation)
 
 add_library(diskpp SHARED ${diskpp_source})
 set(LINK_LIBS "${LINK_LIBS}" diskpp)
