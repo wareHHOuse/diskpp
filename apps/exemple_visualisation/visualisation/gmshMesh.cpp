@@ -28,6 +28,59 @@ namespace visu{
 Gmesh::Gmesh() : _dim_topology(0), _nodes(), _vertices(), _edges(), _triangles(), _quadrangles(),
                  _tetrahedra() , _hexahedra(), _prisms(), _pyramids(), _number_of_elements(0) {}
 
+Gmesh::Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
+      const std::vector<Edge>& edges) :
+      _dim_topology(dim), _nodes(nodes), _vertices(vertices), _edges(edges), _triangles(), _quadrangles(),
+      _tetrahedra() , _hexahedra(), _prisms(), _pyramids(),
+      _number_of_elements(vertices.size() + edges.size()) {}
+
+Gmesh::Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
+      const std::vector<Edge>& edges, const std::vector<Triangle>& triangles,
+      const std::vector<Quadrangle>& quadrangles) :
+      _dim_topology(dim), _nodes(nodes), _vertices(vertices), _edges(edges),
+      _triangles(triangles), _quadrangles(quadrangles),
+      _tetrahedra() , _hexahedra(), _prisms(), _pyramids(),
+      _number_of_elements(vertices.size() + edges.size() + triangles.size() + quadrangles.size()) {}
+
+Gmesh::Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
+      const std::vector<Edge>& edges, const std::vector<Triangle>& triangles,
+      const std::vector<Quadrangle>& quadrangles, const std::vector<Tetrahedron>& tetrahedra,
+      const std::vector<Hexahedron> hexahedra) :
+            _dim_topology(dim), _nodes(nodes), _vertices(vertices), _edges(edges),
+            _triangles(triangles), _quadrangles(quadrangles),
+            _tetrahedra(tetrahedra) , _hexahedra(hexahedra), _prisms(), _pyramids(),
+            _number_of_elements(vertices.size() + edges.size() + triangles.size() + quadrangles.size()
+            + tetrahedra.size() + hexahedra.size()) {}
+
+Gmesh::Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
+      const std::vector<Edge>& edges, const std::vector<Triangle>& triangles,
+      const std::vector<Quadrangle>& quadrangles, const std::vector<Tetrahedron>& tetrahedra,
+      const std::vector<Hexahedron> hexahedra, const std::vector<Prism>& prisms,
+      const std::vector<Pyramid>& pyramids) :
+      _dim_topology(dim), _nodes(nodes), _vertices(vertices), _edges(edges),
+      _triangles(triangles), _quadrangles(quadrangles),
+      _tetrahedra(tetrahedra) , _hexahedra(hexahedra), _prisms(prisms), _pyramids(pyramids),
+      _number_of_elements(vertices.size() + edges.size() + triangles.size() + quadrangles.size()
+      + tetrahedra.size() + hexahedra.size() + prisms.size() + pyramids.size()) {}
+
+Gmesh::Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
+      const std::vector<Edge>& edges, const std::vector<Triangle>& triangles,
+      const std::vector<Tetrahedron>& tetrahedra) :
+            _dim_topology(dim), _nodes(nodes), _vertices(vertices), _edges(edges),
+            _triangles(triangles), _quadrangles(),
+            _tetrahedra(tetrahedra) , _hexahedra(), _prisms(), _pyramids(),
+            _number_of_elements(vertices.size() + edges.size() + triangles.size()
+            + tetrahedra.size()) {}
+
+Gmesh::Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
+            const std::vector<Edge>& edges, const std::vector<Quadrangle>& quadrangles,
+            const std::vector<Hexahedron>& hexahedra) :
+               _dim_topology(dim), _nodes(nodes), _vertices(vertices), _edges(edges),
+               _triangles(), _quadrangles(quadrangles),
+               _tetrahedra() , _hexahedra(hexahedra), _prisms(), _pyramids(),
+               _number_of_elements(vertices.size() + edges.size() + quadrangles.size()
+               + hexahedra.size()) {}
+
 size_t Gmesh::getNumberofNodes() const
 {
   return _nodes.size();

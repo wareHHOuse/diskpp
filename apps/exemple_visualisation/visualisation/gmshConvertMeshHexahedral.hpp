@@ -41,61 +41,76 @@ namespace visu{
 template<typename T>
 Gmesh convertMesh(const disk::cartesian_mesh<T,1>& mesh)
 {
-   Gmesh msh;
-
    auto storage = mesh.backend_storage();
+
+   std::vector<Node> nodes;
+   nodes.reserve(storage->points.size());
+   std::vector<Vertice> vertices;
+   vertices.reserve(storage->points.size());
+   std::vector<Edge> edges;
+   edges.reserve(storage->edges.size());
 
 
    // conversion point in node
    size_t nb_node(0);
    for(auto point :  storage->points){
       nb_node +=1;
-      msh.addNode(convertPoint(point, nb_node));
+      nodes.push_back(convertPoint(point, nb_node));
 
       Vertice vert(nb_node, nb_node, 0, 0);
-      msh.addVertice(vert);
+      vertices.push_back(vert);
    }
-   assert(storage->points.size() == msh.getNumberofNodes());
+   assert(storage->points.size() == nodes.size());
 
 
    // conversion edge
    size_t nb_edge(0);
    for(auto edge :  storage->edges){
       nb_edge +=1;
-      msh.addEdge(convertEdge(mesh, edge, nb_edge));
+      edges.push_back(convertEdge(mesh, edge, nb_edge));
    }
-   assert(storage->edges.size() == msh.getEdges().size());
+   assert(storage->edges.size() == edges.size());
+
+   Gmesh msh(1, nodes, vertices, edges);
 
    return msh;
 };
 
+
 template<typename T>
 Gmesh convertMesh(const disk::cartesian_mesh<T,2>& mesh)
 {
-   Gmesh msh;
-
    auto storage = mesh.backend_storage();
 
+   std::vector<Node> nodes;
+   nodes.reserve(storage->points.size());
+   std::vector<Vertice> vertices;
+   vertices.reserve(storage->points.size());
+   std::vector<Edge> edges;
+   edges.reserve(storage->edges.size());
+   std::vector<Triangle> triangles;
+   std::vector<Quadrangle> quadrangles;
+   quadrangles.reserve(storage->surfaces.size());
 
    // conversion point in node
    size_t nb_node(0);
    for(auto point :  storage->points){
       nb_node +=1;
-      msh.addNode(convertPoint(point, nb_node));
+      nodes.push_back(convertPoint(point, nb_node));
 
       Vertice vert(nb_node, nb_node, 0, 0);
-      msh.addVertice(vert);
+      vertices.push_back(vert);
    }
-   assert(storage->points.size() == msh.getNumberofNodes());
+   assert(storage->points.size() == nodes.size());
 
 
    // conversion edge
    size_t nb_edge(0);
    for(auto edge :  storage->edges){
       nb_edge +=1;
-      msh.addEdge(convertEdge(edge, nb_edge));
+      edges.push_back(convertEdge(mesh, edge, nb_edge));
    }
-   assert(storage->edges.size() == msh.getEdges().size());
+   assert(storage->edges.size() == edges.size());
 
    // conversion quad
    size_t nb_surface(0);
@@ -144,10 +159,11 @@ Gmesh convertMesh(const disk::cartesian_mesh<T,2>& mesh)
          tmpnodes = {ind0 + 1, ind3 + 1, ind2 + 1, ind1 + 1};
       }
       Quadrangle quad(tmpnodes, nb_surface, 0, 0);
-      msh.addQuadrangle(quad);
+      quadrangles.push_back(quad);
    }
-   assert(storage->surfaces.size() == msh.getQuadrangles().size());
+   assert(storage->surfaces.size() == quadrangles.size());
 
+   Gmesh msh(2, nodes, vertices, edges, triangles, quadrangles);
    return msh;
 
 };
@@ -157,51 +173,58 @@ Gmesh convertMesh(const disk::cartesian_mesh<T,2>& mesh)
 template<typename T>
 Gmesh convertMesh(const disk::cartesian_mesh<T,3>& mesh)
 {
-   Gmesh msh;
-
    auto storage = mesh.backend_storage();
+
+   std::vector<Node> nodes;
+   nodes.reserve(storage->points.size());
+   std::vector<Vertice> vertices;
+   vertices.reserve(storage->points.size());
+   std::vector<Edge> edges;
+   edges.reserve(storage->edges.size());
+   std::vector<Quadrangle> quadrangles;
+   quadrangles.reserve(storage->surfaces.size());
+   std::vector<Hexahedron> hexahedra;
+   hexahedra.reserve(storage->volumes.size());
 
 
    // conversion point in node
    size_t nb_node(0);
    for(auto point :  storage->points){
       nb_node +=1;
-      msh.addNode(convertPoint(point, nb_node));
+      nodes.push_back(convertPoint(point, nb_node));
 
       Vertice vert(nb_node, nb_node, 0, 0);
-      msh.addVertice(vert);
+      vertices.push_back(vert);
    }
-   assert(storage->points.size() == msh.getNumberofNodes());
+   assert(storage->points.size() == nodes.size());
 
 
    // conversion edge
    size_t nb_edge(0);
    for(auto edge :  storage->edges){
       nb_edge +=1;
-      msh.addEdge(convertEdge(edge, nb_edge));
+      edges.push_back(convertEdge(mesh, edge, nb_edge));
    }
-   assert(storage->edges.size() == msh.getEdges().size());
+   assert(storage->edges.size() == edges.size());
 
    // conversion triangle
    size_t nb_quads(0);
    for(auto surface :  storage->surfaces){
       nb_quads +=1;
-      msh.addQuadrangle(convertQuadrangle(surface, nb_quads));
+      quadrangles.push_back(convertQuadrangle(surface, nb_quads));
    }
-   assert(storage->surfaces.size() == msh.getQuadrangles().size());
+   assert(storage->surfaces.size() == quadrangles.size());
 
 
    // conversion tetra
    size_t nb_hexas(0);
    for(auto volume :  storage->volumes){
       nb_hexas +=1;
-      msh.addHexahedron(convertHexahedron(volume, nb_hexas));
+      hexahedra.push_back(convertHexahedron(volume, nb_hexas));
    }
-   assert(storage->volumes.size() == msh.getHexahedra().size());
+   assert(storage->volumes.size() == hexahedra.size());
 
-   assert((storage->edges.size() + storage->surfaces.size() + storage->nodes.size()
-         + storage->volumes.size()) == msh.getNumberofElements());
-
+   Gmesh msh(1, nodes, vertices, edges, quadrangles, hexahedra);
    return msh;
 
 };

@@ -49,6 +49,32 @@ class Gmesh
 
    public:
       Gmesh();
+      Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
+            const std::vector<Edge>& edges);
+
+      Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
+            const std::vector<Edge>& edges, const std::vector<Triangle>& triangles,
+            const std::vector<Quadrangle>& quadrangles);
+
+      Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
+            const std::vector<Edge>& edges, const std::vector<Triangle>& triangles,
+            const std::vector<Quadrangle>& quadrangles, const std::vector<Tetrahedron>& tetrahedra,
+            const std::vector<Hexahedron> hexahedra, const std::vector<Prism>& prisms,
+            const std::vector<Pyramid>& pyramids);
+
+      Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
+            const std::vector<Edge>& edges, const std::vector<Triangle>& triangles,
+            const std::vector<Quadrangle>& quadrangles, const std::vector<Tetrahedron>& tetrahedra,
+            const std::vector<Hexahedron> hexahedra);
+
+      Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
+            const std::vector<Edge>& edges, const std::vector<Triangle>& triangles,
+            const std::vector<Tetrahedron>& tetrahedra);
+
+      Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
+            const std::vector<Edge>& edges, const std::vector<Quadrangle>& quadrangles,
+            const std::vector<Hexahedron>& hexahedra);
+
       void readGmesh(const std::string name_mesh);
       void writeGmesh(const std::string name_mesh, const size_t format) const;
       void getInfo() const;

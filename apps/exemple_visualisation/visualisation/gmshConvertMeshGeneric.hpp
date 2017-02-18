@@ -42,64 +42,75 @@ namespace visu{
 template<typename T>
 Gmesh convertMesh(const disk::generic_mesh<T,1>& mesh)
 {
-
-   Gmesh msh;
-
    auto storage = mesh.backend_storage();
 
+   std::vector<Node> nodes;
+   nodes.reserve(storage->points.size());
+   std::vector<Vertice> vertices;
+   vertices.reserve(storage->points.size());
+   std::vector<Edge> edges;
+   edges.reserve(storage->edges.size());
 
    // conversion point in node
    size_t nb_node(0);
-   for(auto& point :  storage->points){
+   for(auto point :  storage->points){
       nb_node +=1;
-      msh.addNode(convertPoint(point, nb_node));
+      nodes.push_back(convertPoint(point, nb_node));
 
       Vertice vert(nb_node, nb_node, 0, 0);
-      msh.addVertice(vert);
+      vertices.push_back(vert);
    }
-   assert(storage->points.size() == msh.getNumberofNodes());
+   assert(storage->points.size() == nodes.size());
 
 
    // conversion edge
    size_t nb_edge(0);
-   for(auto& edge :  storage->edges){
+   for(auto edge :  storage->edges){
       nb_edge +=1;
-      msh.addEdge(convertEdge(mesh, edge, nb_edge));
+      edges.push_back(convertEdge(mesh, edge, nb_edge));
    }
-   assert(storage->edges.size() == msh.getEdges().size());
+   assert(storage->edges.size() == edges.size());
+
+   Gmesh msh(1, nodes, vertices, edges);
 
    return msh;
 };
 
-
 template<typename T>
 Gmesh convertMesh(const disk::generic_mesh<T,2>& mesh)
 {
-
-   Gmesh msh;
-
    auto storage = mesh.backend_storage();
+
+   std::vector<Node> nodes;
+   nodes.reserve(storage->points.size());
+   std::vector<Vertice> vertices;
+   vertices.reserve(storage->points.size());
+   std::vector<Edge> edges;
+   edges.reserve(storage->edges.size());
+   std::vector<Triangle> triangles;
+   triangles.reserve(storage->surfaces.size());
+   std::vector<Quadrangle> quadrangles;
 
 
    // conversion point in node
    size_t nb_node(0);
-   for(auto& point :  storage->points){
+   for(auto point :  storage->points){
       nb_node +=1;
-      msh.addNode(convertPoint(point, nb_node));
+      nodes.push_back(convertPoint(point, nb_node));
 
       Vertice vert(nb_node, nb_node, 0, 0);
-      msh.addVertice(vert);
+      vertices.push_back(vert);
    }
-   assert(storage->points.size() == msh.getNumberofNodes());
+   assert(storage->points.size() == nodes.size());
 
 
    // conversion edge
    size_t nb_edge(0);
-   for(auto& edge :  storage->edges){
+   for(auto edge :  storage->edges){
       nb_edge +=1;
-      msh.addEdge(convertEdge(edge, nb_edge));
+      edges.push_back(convertEdge(mesh, edge, nb_edge));
    }
-   assert(storage->edges.size() == msh.getEdges().size());
+   assert(storage->edges.size() == edges.size());
 
    //conversion surfaces
    size_t nb_surface(0);
@@ -109,7 +120,7 @@ Gmesh convertMesh(const disk::generic_mesh<T,2>& mesh)
          nb_surface += 1;
          auto cell_id = mesh.lookup(cl);
          auto surface = storage->surfaces[cell_id];
-         msh.addTriangle(convertTriangle(mesh, surface, nb_surface));
+         triangles.push_back(convertTriangle(mesh, surface, nb_surface));
       }
       if(fcs.size() == 4){
          nb_surface += 1;
@@ -155,7 +166,7 @@ Gmesh convertMesh(const disk::generic_mesh<T,2>& mesh)
             tmpnodes = {ind0 + 1, ind3 + 1, ind2 + 1, ind1 + 1};
          }
          Quadrangle quad(tmpnodes, nb_surface, 0, 0);
-         msh.addQuadrangle(quad);
+         quadrangles.push_back(quad);
       }
       else{
          auto face_id = mesh.lookup(fcs[0]);
@@ -179,49 +190,52 @@ Gmesh convertMesh(const disk::generic_mesh<T,2>& mesh)
                }
 
                Triangle tri(tmpnodes, nb_surface, 0, 0);
-               msh.addTriangle(tri);
+               triangles.push_back(tri);
             }
          }
       }
    }
 
+   Gmesh msh(2, nodes, vertices, edges, triangles, quadrangles);
    return msh;
 };
 
 template<typename T>
 Gmesh convertMesh(const disk::generic_mesh<T,3>& mesh)
 {
-   Gmesh msh;
-
    auto storage = mesh.backend_storage();
 
+   std::vector<Node> nodes;
+   nodes.reserve(storage->points.size());
+   std::vector<Vertice> vertices;
+   vertices.reserve(storage->points.size());
+   std::vector<Edge> edges;
+   edges.reserve(storage->edges.size());
 
    // conversion point in node
    size_t nb_node(0);
-   for(auto& point :  storage->points){
+   for(auto point :  storage->points){
       nb_node +=1;
-      msh.addNode(convertPoint(point, nb_node));
+      nodes.push_back(convertPoint(point, nb_node));
 
       Vertice vert(nb_node, nb_node, 0, 0);
-      msh.addVertice(vert);
+      vertices.push_back(vert);
    }
-   assert(storage->points.size() == msh.getNumberofNodes());
+   assert(storage->points.size() == nodes.size());
 
 
    // conversion edge
    size_t nb_edge(0);
-   for(auto& edge :  storage->edges){
+   for(auto edge :  storage->edges){
       nb_edge +=1;
-      msh.addEdge(convertEdge(edge, nb_edge));
+      edges.push_back(convertEdge(mesh, edge, nb_edge));
    }
-   assert(storage->edges.size() == msh.getEdges().size());
+   assert(storage->edges.size() == edges.size());
 
-
+   Gmesh msh(3, nodes, vertices, edges);
 
    return msh;
-
 };
-
 
 } //visu
 

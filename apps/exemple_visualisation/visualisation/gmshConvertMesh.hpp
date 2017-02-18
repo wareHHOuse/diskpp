@@ -33,21 +33,19 @@
 #include "gmshDisk.h"
 
 namespace visu{
-// template<template<typename, size_t, typename> class Mesh,
-//          typename T, typename Storage, size_t DIM>
-// Gmesh convertMesh(const Mesh<T, DIM, Storage>& mesh)
-// {
-//     typedef Mesh<T, DIM, Storage>                 mesh_type;
-//
-//     static_assert(sizeof(mesh_type) == -1, "convert: not suitable for the requested kind of mesh");
-// }
+template<template<typename, size_t, typename> class Mesh,
+         typename T, typename Storage, size_t DIM>
+Gmesh convertMesh(const Mesh<T, DIM, Storage>& mesh)
+{
+    typedef Mesh<T, DIM, Storage>                 mesh_type;
+
+    static_assert(sizeof(mesh_type) == -1, "convert: not suitable for the requested kind of mesh");
+}
 
 } //visu
 
 #include "gmshConvertMeshSimplicial.hpp"
 #include "gmshConvertMeshHexahedral.hpp"
 #include "gmshConvertMeshGeneric.hpp"
-
-#undef _GmshConvertMesh_HPP
 
 #endif
