@@ -199,13 +199,9 @@ Tetrahedron convertTetrahedron(const Mesh& mesh, const T& tetrahedron, const siz
 
    // det>0 if the tetrahedra is direct
    if(det >= 0.0){
-      std::cout << "ok sens " << det << '\n';
-      std::cout << nodes[0] + 1 << " " << nodes[1] + 1 << " " << nodes[2] + 1 << " " << nodes[3] + 1 << " " << '\n';
       tmpnodes = { nodes[0] + 1, nodes[1] + 1, nodes[2] + 1, nodes[3] + 1 };
    }
    else {
-      std::cout << "change sens " << det << '\n';
-      std::cout << nodes[0] + 1 << " " << nodes[2] + 1 << " " << nodes[1] + 1 << " " << nodes[3] + 1 << " " << '\n';
       tmpnodes = { nodes[0] + 1, nodes[2] + 1, nodes[1] + 1, nodes[3] + 1 };
    }
 

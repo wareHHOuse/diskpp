@@ -162,13 +162,14 @@ Gmesh convertMesh(const disk::simplicial_mesh<T,3>& mesh)
    assert(storage->edges.size() == edges.size());
 
 
+   // I dont know how ordering the nodes
    // conversion triangle
-   size_t nb_triangles(0);
-   for(auto surface :  storage->surfaces){
-      nb_triangles +=1;
-      triangles.push_back(convertTriangle(surface, nb_triangles));
-   }
-   assert(storage->surfaces.size() == triangles.size());
+   // size_t nb_triangles(0);
+   // for(auto surface :  storage->surfaces){
+   //    nb_triangles +=1;
+   //    triangles.push_back(convertTriangle(mesh, surface, nb_triangles));
+   // }
+   // assert(storage->surfaces.size() == triangles.size());
 
 
    // conversion tetra

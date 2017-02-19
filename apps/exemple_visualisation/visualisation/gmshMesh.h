@@ -78,6 +78,7 @@ class Gmesh
       void readGmesh(const std::string name_mesh);
       void writeGmesh(const std::string name_mesh, const size_t format) const;
       void getInfo() const;
+      size_t getDim() const;
       size_t getNumberofNodes() const;
       size_t getNumberofElements() const;
       std::vector<Node> getNodes() const;

@@ -91,6 +91,11 @@ size_t Gmesh::getNumberofElements() const
   return _number_of_elements;
 }
 
+size_t Gmesh::getDim() const
+{
+   return _dim_topology;
+}
+
 std::vector<Node> Gmesh::getNodes() const
 {
   return _nodes;

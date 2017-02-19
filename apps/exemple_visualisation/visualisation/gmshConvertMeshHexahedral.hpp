@@ -207,13 +207,13 @@ Gmesh convertMesh(const disk::cartesian_mesh<T,3>& mesh)
    }
    assert(storage->edges.size() == edges.size());
 
-   // conversion triangle
-   size_t nb_quads(0);
-   for(auto surface :  storage->surfaces){
-      nb_quads +=1;
-      quadrangles.push_back(convertQuadrangle(surface, nb_quads));
-   }
-   assert(storage->surfaces.size() == quadrangles.size());
+   // // conversion triangle
+   // size_t nb_quads(0);
+   // for(auto surface :  storage->surfaces){
+   //    nb_quads +=1;
+   //    quadrangles.push_back(convertQuadrangle(mesh, surface, nb_quads));
+   // }
+   // assert(storage->surfaces.size() == quadrangles.size());
 
 
    // conversion tetra
