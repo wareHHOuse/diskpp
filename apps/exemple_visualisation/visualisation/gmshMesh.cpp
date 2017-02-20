@@ -967,14 +967,11 @@ void Gmesh::convertInDiscontinuousMesh()
    }
 }
 
-void Gmesh::computeDeformed()
+void Gmesh::computeDeformed(const std::vector<Node>& newNodes)
 {
-   for (size_t i = 0; i < _nodes.size(); i++) {
-      std::vector<double> tmpcoor = _nodes[i].getCoordinate();
-      for (size_t j = 0; j < _dim_topology; j++) {
-         tmpcoor[j] += (rand() % 10) / 100.0;
-      }
-      _nodes[i].changeCoordinates(tmpcoor);
+   assert(newNodes.size() == _nodes.size());
+   for (size_t i = 0; i < newNodes.size(); i++) {
+      _nodes[i].changeCoordinates(newNodes[i].getCoordinate());
    }
 }
 

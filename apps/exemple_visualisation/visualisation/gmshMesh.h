@@ -112,7 +112,7 @@ class Gmesh
       void addPyramid(const Pyramid& pyramid);
 
       void convertInDiscontinuousMesh();
-      void computeDeformed();
+      void computeDeformed(const std::vector<Node>& newNodes);
 
 };
 
