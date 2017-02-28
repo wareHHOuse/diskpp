@@ -110,7 +110,8 @@ class ElementData : public GenericData
 class ElementNodeData : public GenericData
 {
   private:
-     void writeElementNodeData(const std::string name_mesh) const;
+     void writeElementNodeData(const std::string name_mesh, const Gmesh& mesh) const;
+     void transformeData(const Gmesh& mesh);
 
   public:
        void saveElementNodeData(const std::string name_mesh, const Gmesh& mesh) const;
