@@ -159,6 +159,7 @@ public:
     solve(void)
     {
 #ifdef HAVE_INTEL_MKL
+std::cout << "Use PardisoLU solver" << '\n';
         Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
 #else
         Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
@@ -322,9 +323,9 @@ public:
                 for (size_t i = 0; i < m_bqd.cell_basis.range(0, m_cell_degree).size(); i++)
                     pot += phi[i] * x(i);
 
-
                nb_node += 1;
                visu::Node snode = visu::convertPoint(qp.point(), nb_node); //create a node at gauss point
+               //we can save what we want scalar, vector or tensor values (save it in row)
                std::vector<double> value = {double(pot)}; // save the solution at gauss point
                visu::SubData sdata(value, snode);
                subdata.push_back(sdata); // add subdata

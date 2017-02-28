@@ -142,6 +142,7 @@ Triangle convertTriangle(const Mesh& mesh, const T& triangle, const size_t index
    return tri;
 }
 
+// a priori the ordering is (0-1-3-2)
 template< typename T>
 Quadrangle convertQuadrangle( const T& quadrangle, const size_t index)
 {
@@ -210,6 +211,7 @@ Tetrahedron convertTetrahedron(const Mesh& mesh, const T& tetrahedron, const siz
    return tetra;
 }
 
+// the ordering is 0-1-3-2-4-5-7-6
 template< typename T>
 Hexahedron convertHexahedron( const T& hexahedron, const size_t index)
 {
@@ -222,7 +224,7 @@ Hexahedron convertHexahedron( const T& hexahedron, const size_t index)
    std::cout << nodes[4] + 1 << " " << nodes[5] + 1 << " "<< nodes[7] + 1 << " "<< nodes[6] + 1 << " " << std::endl;*/
 
    std::vector<size_t> tmpnodes = { nodes[0] + 1, nodes[1] + 1, nodes[3] + 1, nodes[2] + 1,
-                                    nodes[4] + 1, nodes[5] + 1, nodes[7] + 1, nodes[6] + 1 }; //the ordering of nodes a bit strange
+                                    nodes[4] + 1, nodes[5] + 1, nodes[7] + 1, nodes[6] + 1 };
 
    Hexahedron hexa(tmpnodes, index, 0, 0);
 
