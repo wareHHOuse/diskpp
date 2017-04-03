@@ -47,6 +47,12 @@ struct postprocess_info
     double  time_postprocess;
 };
 
+#define USE_TENSOR
+#define TENSOR_11   1
+#define TENSOR_12   3
+#define TENSOR_21   3
+#define TENSOR_22   1
+
 template<typename Mesh>
 class diffusion_solver
 {
@@ -70,6 +76,8 @@ class diffusion_solver
     typedef disk::diffusion_like_stabilization_bq<bqdata_type>          stab_type;
     typedef disk::diffusion_like_static_condensation_bq<bqdata_type>    statcond_type;
     typedef disk::assembler<mesh_type, face_basis_type, face_quadrature_type> assembler_type;
+
+    typedef static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> tensor_type;
 
     size_t m_cell_degree, m_face_degree;
 
@@ -103,6 +111,8 @@ public:
         m_cell_degree = degree + l;
         m_face_degree = degree;
 
+        //std::cout << "HHO(" << m_cell_degree << "," << m_face_degree << ")" << std::endl;
+
         m_bqd = bqdata_type(m_cell_degree, m_face_degree);
     }
 
@@ -123,10 +133,21 @@ public:
 
         timecounter tc;
 
+        tensor_type tensor = tensor_type::Identity();
+        tensor(0,0) = TENSOR_11;
+        tensor(0,1) = TENSOR_12;
+        tensor(1,0) = TENSOR_21;
+        tensor(1,1) = TENSOR_22;
+
+
         for (auto& cl : m_msh)
         {
             tc.tic();
-            gradrec.compute(m_msh, cl);
+            gradrec.compute(m_msh, cl
+#ifdef USE_TENSOR
+            , tensor
+#endif
+            );
             tc.toc();
             ai.time_gradrec += tc.to_double();
 
@@ -199,6 +220,12 @@ public:
 
         m_postprocess_data.reserve(m_msh.cells_size());
 
+        tensor_type tensor = tensor_type::Identity();
+        tensor(0,0) = TENSOR_11;
+        tensor(0,1) = TENSOR_12;
+        tensor(1,0) = TENSOR_21;
+        tensor(1,1) = TENSOR_22;
+
         timecounter tc;
         tc.tic();
         for (auto& cl : m_msh)
@@ -222,7 +249,11 @@ public:
                 xFs.block(face_i * fbs, 0, fbs, 1) = xF;
             }
 
-            gradrec.compute(m_msh, cl);
+            gradrec.compute(m_msh, cl
+#ifdef USE_TENSOR
+            , tensor
+#endif
+            );
             stab.compute(m_msh, cl, gradrec.oper);
             dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
             auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(m_msh, cl, lf, m_cell_degree);
@@ -272,7 +303,7 @@ public:
                 auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, qp.point());
 
                 scalar_type pot = 0.0;
-                for (size_t i = 0; i < m_bqd.cell_basis.range(0, m_cell_degree).size(); i++)
+                for (size_t i = 0; i < howmany_dofs(m_bqd.cell_basis); i++)
                     pot += phi[i] * x(i);
 
                 auto tp = qp.point();

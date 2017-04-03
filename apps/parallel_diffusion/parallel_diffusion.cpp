@@ -320,11 +320,11 @@ int main(int argc, char **argv)
 
         if (submesh_flag)
         {
-            disk::multiscale_local_problem<mesh_type> mlp(degree);
+            //disk::multiscale_local_problem<mesh_type> mlp(degree);
 
             for (auto& cl : msh)
             {
-                mlp.assemble(msh, cl);
+                //mlp.assemble(msh, cl);
             }
 
         }

@@ -221,7 +221,7 @@ template<typename T, size_t DIM>
 std::ostream&
 operator<<(std::ostream& os, const quadrature_point<T,DIM>& qp)
 {
-    os << qp.point() << " " << qp.weight() << std::endl;
+    os << qp.point() << " " << qp.weight();
     return os;
 }
 

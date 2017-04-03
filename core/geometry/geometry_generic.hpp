@@ -63,8 +63,8 @@ using generic_mesh = mesh<T, DIM, generic_mesh_storage<T, DIM>>;
 /* Return the number of elements of the specified cell */
 template<typename T, size_t DIM>
 size_t
-number_of_faces(const generic_mesh<T,DIM>& msh,
-                const typename generic_mesh<T,DIM>::cell& cl)
+howmany_faces(const generic_mesh<T,DIM>& msh,
+              const typename generic_mesh<T,DIM>::cell& cl)
 {
     return cl.subelement_size();
 }

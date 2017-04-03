@@ -51,12 +51,16 @@ public:
         : base(degree)
     {}
 
+    scaled_monomial_scalar_basis(size_t degree, size_t computed_degree)
+        : base(degree, computed_degree)
+    {}
+
     Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>
     eval_functions(const mesh_type& msh, const cell_type& cl,
                    const point<T,3>& pt,
                    size_t mindeg = 0, size_t maxdeg = VERY_HIGH_DEGREE) const
     {
-        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? max_degree() : maxdeg;
+        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
         auto eval_range = range(mindeg, maxdeg);
 
         auto bar = barycenter(msh, cl);
@@ -68,7 +72,7 @@ public:
         ret.resize( eval_range.size(), 1 );
 
 #ifdef POWER_CACHE
-        power_cache<scalar_type, 3> pow(ep, this->max_degree()+1);
+        power_cache<scalar_type, 3> pow(ep, this->computed_degree()+1);
 #endif
         size_t i = 0;
         auto begin = this->monomials_begin();
@@ -100,7 +104,7 @@ public:
                    const point<T,3>& pt,
                    size_t mindeg = 0, size_t maxdeg = VERY_HIGH_DEGREE) const
     {
-        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? max_degree() : maxdeg;
+        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
         auto eval_range = range(mindeg, maxdeg);
 
         auto bar = barycenter(msh, cl);
@@ -113,7 +117,7 @@ public:
         ret.resize( eval_range.size(), 3 );
 
 #ifdef POWER_CACHE
-        power_cache<scalar_type, 3> pow(ep, this->max_degree()+1);
+        power_cache<scalar_type, 3> pow(ep, this->computed_degree()+1);
 #endif
 
         size_t i = 0;
@@ -227,12 +231,16 @@ public:
         : base(degree)
     {}
 
+    scaled_monomial_scalar_basis(size_t degree, size_t computed_degree)
+        : base(degree, computed_degree)
+    {}
+
     Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>
     eval_functions(const mesh_type& msh, const face_type& fc,
                    const point<T,3>& pt,
                    size_t mindeg = 0, size_t maxdeg = VERY_HIGH_DEGREE) const
     {
-        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? max_degree() : maxdeg;
+        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
         auto eval_range = range(mindeg, maxdeg);
 
         auto ep = map_point(msh, fc, pt);
@@ -241,7 +249,7 @@ public:
         ret.resize( eval_range.size(), 1 );
 
 #ifdef POWER_CACHE
-        power_cache<scalar_type, 2> pow(ep, this->max_degree()+1);
+        power_cache<scalar_type, 2> pow(ep, this->computed_degree()+1);
 #endif
 
         size_t i = 0;
@@ -302,12 +310,16 @@ public:
         : base(degree)
     {}
 
+    scaled_monomial_scalar_basis(size_t degree, size_t computed_degree)
+        : base(degree, computed_degree)
+    {}
+
     Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>
     eval_functions(const mesh_type& msh, const cell_type& cl,
                    const point_type& pt,
                    size_t mindeg = 0, size_t maxdeg = VERY_HIGH_DEGREE) const
     {
-        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? max_degree() : maxdeg;
+        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
         auto eval_range = range(mindeg, maxdeg);
 
         auto bar = barycenter(msh, cl);
@@ -319,7 +331,7 @@ public:
         ret.resize( eval_range.size(), 1 );
 
 #ifdef POWER_CACHE
-        power_cache<scalar_type, 2> pow(ep, this->max_degree()+1);
+        power_cache<scalar_type, 2> pow(ep, this->computed_degree()+1);
 #endif
 
         size_t i = 0;
@@ -348,7 +360,7 @@ public:
                    const point_type& pt,
                    size_t mindeg = 0, size_t maxdeg = VERY_HIGH_DEGREE) const
     {
-        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? max_degree() : maxdeg;
+        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
         auto eval_range = range(mindeg, maxdeg);
 
         auto bar = barycenter(msh, cl);
@@ -361,7 +373,7 @@ public:
         ret.resize( eval_range.size(), 2 );
 
 #ifdef POWER_CACHE
-        power_cache<scalar_type, 2> pow(ep, this->max_degree()+1);
+        power_cache<scalar_type, 2> pow(ep, this->computed_degree()+1);
 #endif
         size_t i = 0;
         auto begin = this->monomials_begin();
@@ -416,19 +428,23 @@ public:
         : base(degree)
     {}
 
+    scaled_monomial_scalar_basis(size_t degree, size_t computed_degree)
+        : base(degree, computed_degree)
+    {}
+
     Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>
     eval_functions(const mesh_type& msh, const face_type& fc,
                    const point_type& pt,
                    size_t mindeg = 0, size_t maxdeg = VERY_HIGH_DEGREE) const
     {
-        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? max_degree() : maxdeg;
+        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
         auto eval_range = range(mindeg, maxdeg);
 
         auto pts = points(msh, fc);
         auto bar = barycenter(msh, fc);
         auto h = diameter(msh, fc);
         auto v = (pts[1] - pts[0]).to_vector();
-        auto t = (pt - bar).to_vector();
+        auto t = (pt - bar).to_vector()/h;
         T dot = v.dot(t);
         auto ep = point<T, 1>({dot/(h*h)});
 
@@ -450,6 +466,32 @@ public:
         return ret;
     }
 };
+
+#if 0
+template<typename T>
+class legendre_bones
+{
+public:
+    T legendre_p0(T x)  { return 1.0; }
+    T legendre_p1(T x)  { return x; }
+    T legendre_p2(T x)  { return 0.5*(3*x*x - 1); }
+    T legendre_p3(T x)  { return 0.5*(5*x*x*x - 3*x); }
+    T legendre_p4(T x)  { return 0.125*(35*x*x*x*x - 30*x*x + 3); }
+
+    T legendre_d0(T x)  { return 0.0; }
+    T legendre_d1(T x)  { return 1.0; }
+    T legendre_d2(T x)  { return 3*x; }
+    T legendre_d3(T x)  { return 0.5*(15*x*x - 3); }
+    T legendre_d4(T x)  { return 0.125*(140*x*x*x - 60*x); }
+};
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class legendre_scalar_basis<Mesh<T,1,Storage>, typename Mesh<T,1,Storage>::cell>
+    : public legendre_bones
+{
+
+};
+#endif
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class scaled_monomial_scalar_basis<Mesh<T,1,Storage>, typename Mesh<T,1,Storage>::cell>
@@ -473,12 +515,16 @@ public:
         : base(degree)
     {}
 
+    scaled_monomial_scalar_basis(size_t degree, size_t computed_degree)
+        : base(degree, computed_degree)
+    {}
+
     Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>
     eval_functions(const mesh_type& msh, const cell_type& cl,
                    const point_type& pt,
                    size_t mindeg = 0, size_t maxdeg = VERY_HIGH_DEGREE) const
     {
-        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? max_degree() : maxdeg;
+        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
         auto eval_range = range(mindeg, maxdeg);
 
         auto bar = barycenter(msh, cl);
@@ -509,7 +555,7 @@ public:
                    const point_type& pt,
                    size_t mindeg = 0, size_t maxdeg = VERY_HIGH_DEGREE) const
     {
-        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? max_degree() : maxdeg;
+        maxdeg = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
         auto eval_range = range(mindeg, maxdeg);
 
         auto bar = barycenter(msh, cl);
@@ -557,6 +603,10 @@ public:
 
     scaled_monomial_scalar_basis(size_t degree)
         : base(degree)
+    {}
+
+    scaled_monomial_scalar_basis(size_t degree, size_t computed_degree)
+        : base(degree, computed_degree)
     {}
 
     Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>

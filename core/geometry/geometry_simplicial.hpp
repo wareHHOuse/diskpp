@@ -92,8 +92,8 @@ points(const simplicial_mesh<T,DIM>& msh, const simplicial_element<DIM, CODIM>& 
 
 /* Return the number of elements of the specified cell */
 template<typename T, size_t DIM>
-size_t
-number_of_faces(const simplicial_mesh<T,DIM>& msh, const typename simplicial_mesh<T,DIM>::cell& cl)
+constexpr size_t
+howmany_faces(const simplicial_mesh<T,DIM>& msh, const typename simplicial_mesh<T,DIM>::cell& cl)
 {
     static_assert(DIM == 1 or DIM == 2 or DIM == 3, "wrong dimension");
     switch(DIM)
@@ -134,6 +134,8 @@ faces(const simplicial_mesh<T, 2>&,
 
     auto ptids = cl.point_ids();
     assert(ptids.size() == 3);
+
+    assert (ptids[0] < ptids[1] && ptids[1] < ptids[2]);
 
     ret[0] = face_type( { ptids[0], ptids[1] } );
     ret[1] = face_type( { ptids[1], ptids[2] } );
@@ -229,10 +231,16 @@ class submesher;
 template<typename T>
 class submesher<simplicial_mesh<T,2>>
 {
-    typedef simplicial_mesh<T,2>                mesh_type;
-    typedef typename mesh_type::point_type      point_type;
-    typedef typename mesh_type::cell            cell_type;
+public:
+    typedef simplicial_mesh<T,2>                    outer_mesh_type;
+    typedef typename outer_mesh_type::cell          outer_cell_type;
 
+    typedef simplicial_mesh<T,2>                    inner_mesh_type;
+    typedef typename inner_mesh_type::cell          inner_cell_type;
+
+    typedef typename outer_mesh_type::point_type    point_type;
+
+private:
     struct edge
     {
         edge(){}
@@ -356,8 +364,9 @@ public:
     submesher()
     {}
 
-    mesh_type
-    generate_mesh(const mesh_type& msh, const cell_type& cl, size_t refinement_steps = 3)
+    inner_mesh_type
+    generate_mesh(const outer_mesh_type& msh, const outer_cell_type& cl,
+                  size_t refinement_steps = 3)
     {
         m_points.clear();
         m_edges.clear();
@@ -388,7 +397,7 @@ public:
 
         refine( refinement_steps );
 
-        mesh_type refined_element_submesh;
+        inner_mesh_type refined_element_submesh;
         auto storage = refined_element_submesh.backend_storage();
 
         storage->points = std::move(m_points);
@@ -396,10 +405,10 @@ public:
         for (size_t i = 0; i < storage->points.size(); i++)
         {
             auto point_id = point_identifier<2>( i );
-            storage->nodes.push_back( typename mesh_type::node_type({point_id}));
+            storage->nodes.push_back( typename inner_mesh_type::node_type({point_id}));
         }
 
-        std::vector<std::pair<typename mesh_type::edge_type, size_t>> be;
+        std::vector<std::pair<typename inner_mesh_type::edge_type, size_t>> be;
         be.reserve( 3 * m_triangles.size() );
 
         storage->edges.reserve( 3 * m_triangles.size() );
@@ -410,14 +419,14 @@ public:
             auto pi1 = point_identifier<2>(t.p1);
             auto pi2 = point_identifier<2>(t.p2);
 
-            auto e0 = typename mesh_type::edge_type({pi0, pi1});
-            auto e1 = typename mesh_type::edge_type({pi1, pi2});
-            auto e2 = typename mesh_type::edge_type({pi0, pi2});
+            auto e0 = typename inner_mesh_type::edge_type({pi0, pi1});
+            auto e1 = typename inner_mesh_type::edge_type({pi1, pi2});
+            auto e2 = typename inner_mesh_type::edge_type({pi0, pi2});
 
             storage->edges.push_back( e0 );
             storage->edges.push_back( e1 );
             storage->edges.push_back( e2 );
-            storage->surfaces.push_back( typename mesh_type::surface_type({pi0, pi1, pi2}) );
+            storage->surfaces.push_back( typename inner_mesh_type::surface_type({pi0, pi1, pi2}) );
 
             auto t_e0 = *std::lower_bound(m_edges.begin(), m_edges.end(), edge(t.p0, t.p1));
             assert(!t_e0.is_broken);
