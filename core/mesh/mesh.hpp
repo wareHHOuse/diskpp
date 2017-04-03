@@ -405,6 +405,7 @@ public:
                                   priv::is_internal_pred<mesh>>
                                   internal_face_iterator;
 
+    /* Return a vector with the ids of all the boundaries */
     std::vector<size_t>
     boundary_id_list(void) const
     {
@@ -591,6 +592,23 @@ public:
     }
 };
 
+template<typename Mesh>
+void cell_info(const Mesh& msh, const typename Mesh::cell& cl)
+{
+    std::cout << "** CELL INFORMATION BEGIN **" << std::endl;
+    std::cout << cl << std::endl;
+    auto fcs = faces(msh, cl);
+    for (auto& fc : fcs)
+    {
+        std::cout << "  - " << fc;
+        if ( msh.is_boundary(fc) )
+            std::cout << " [B " << msh.boundary_id(fc) << "]";
+
+        std::cout << std::endl;
+    }
+    std::cout << "** CELL INFORMATION END **" << std::endl;
+}
+
 template<typename T, size_t DIM, typename Storage>
 typename mesh<T, DIM, Storage>::cell_iterator
 begin(mesh<T, DIM, Storage>& msh)
@@ -642,7 +660,7 @@ dump_to_matlab(const Mesh<T, 2, Storage>& msh, const std::string& filename)
             else
             {
                 ofs << "line([" << pts[0].x() << " " << pts[1].x() << "], [";
-                ofs << pts[0].y() << " " << pts[1].y() << "], 'Color', 'k');";
+                ofs << pts[0].y() << " " << pts[1].y() << "], 'Color', 'g');";
                 ofs << std::endl;
             }
         }

@@ -33,6 +33,17 @@ class quadrature
     static_assert(sizeof(MeshType) == -1, "quadrature: not suitable for the requested kind of mesh");
     static_assert(sizeof(Element) == -1, "quadrature: not suitable for the requested kind of element");
 };
+
+template<typename Mesh>
+std::pair<quadrature<Mesh, typename Mesh::cell>, quadrature<Mesh, typename Mesh::face>>
+make_quadrature(const Mesh& msh, size_t order_cell, size_t order_face)
+{
+    auto cq = quadrature<Mesh, typename Mesh::cell>(order_cell);
+    auto fq = quadrature<Mesh, typename Mesh::face>(order_face);
+
+    return std::make_pair(cq, fq);
+}
+
 } // namespace disk
 
 #include "quadratures/quad_simplicial.hpp"
