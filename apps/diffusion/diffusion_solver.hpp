@@ -47,12 +47,6 @@ struct postprocess_info
     double  time_postprocess;
 };
 
-#define USE_TENSOR
-#define TENSOR_11   1
-#define TENSOR_12   3
-#define TENSOR_21   3
-#define TENSOR_22   1
-
 template<typename Mesh>
 class diffusion_solver
 {
@@ -133,21 +127,18 @@ public:
 
         timecounter tc;
 
-        tensor_type tensor = tensor_type::Identity();
-        tensor(0,0) = TENSOR_11;
-        tensor(0,1) = TENSOR_12;
-        tensor(1,0) = TENSOR_21;
-        tensor(1,1) = TENSOR_22;
-
+        auto tf = [](const typename mesh_type::point_type& pt) -> tensor_type {
+            tensor_type ret = tensor_type::Identity();
+            return 6.72071 * ret;
+            //auto c = cos(M_PI * pt.x()/0.02);
+            //auto s = sin(M_PI * pt.y()/0.02);
+            //return ret * (1 + 100*c*c*s*s);
+        };
 
         for (auto& cl : m_msh)
         {
             tc.tic();
-            gradrec.compute(m_msh, cl
-#ifdef USE_TENSOR
-            , tensor
-#endif
-            );
+            gradrec.compute(m_msh, cl, tf);
             tc.toc();
             ai.time_gradrec += tc.to_double();
 
@@ -220,11 +211,13 @@ public:
 
         m_postprocess_data.reserve(m_msh.cells_size());
 
-        tensor_type tensor = tensor_type::Identity();
-        tensor(0,0) = TENSOR_11;
-        tensor(0,1) = TENSOR_12;
-        tensor(1,0) = TENSOR_21;
-        tensor(1,1) = TENSOR_22;
+        auto tf = [](const typename mesh_type::point_type& pt) -> tensor_type {
+            tensor_type ret = tensor_type::Identity();
+            return 6.72071 * ret;
+            //auto c = cos(M_PI * pt.x()/0.02);
+            //auto s = sin(M_PI * pt.y()/0.02);
+            //return ret * (1 + 100*c*c*s*s);
+        };
 
         timecounter tc;
         tc.tic();
@@ -249,11 +242,7 @@ public:
                 xFs.block(face_i * fbs, 0, fbs, 1) = xF;
             }
 
-            gradrec.compute(m_msh, cl
-#ifdef USE_TENSOR
-            , tensor
-#endif
-            );
+            gradrec.compute(m_msh, cl, tf);
             stab.compute(m_msh, cl, gradrec.oper);
             dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
             auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(m_msh, cl, lf, m_cell_degree);
@@ -297,16 +286,18 @@ public:
         for (auto& cl : m_msh)
         {
             auto x = m_postprocess_data.at(cell_i++);
-            auto qps = m_bqd.cell_quadrature.integrate(m_msh, cl);
-            for (auto& qp : qps)
+            //auto qps = m_bqd.cell_quadrature.integrate(m_msh, cl);
+            //for (auto& qp : qps)
+            auto tps = make_test_points(m_msh, cl, 10);
+            for (auto& tp : tps)
             {
-                auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, qp.point());
+                auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, tp);
 
                 scalar_type pot = 0.0;
                 for (size_t i = 0; i < howmany_dofs(m_bqd.cell_basis); i++)
                     pot += phi[i] * x(i);
 
-                auto tp = qp.point();
+                //auto tp = qp.point();
                 for (size_t i = 0; i < mesh_type::dimension; i++)
                     ofs << tp[i] << " ";
                 ofs << pot << std::endl;

@@ -48,7 +48,7 @@ operator<<(std::ostream& os, const std::vector<T>& vec)
 }
 
 
-int main(int argc, char **argv)
+int main2(int argc, char **argv)
 {
     using RealType = double;
 
@@ -109,11 +109,6 @@ int main(int argc, char **argv)
         fn++;
     }
 
-    std::cout << "*** COMPRESSOR MAPS ***" << std::endl;
-
-    std::cout << face_compress_map << std::endl;
-    std::cout << face_expand_map << std::endl;
-
     std::ofstream mat_ofs("sysmat.dat");
     std::ofstream rhs_ofs("sysrhs.dat");
 
@@ -121,30 +116,20 @@ int main(int argc, char **argv)
     for (auto& cl : msh)
     {
         std::cout << "Assembly: " << elemnum << "/" << msh.cells_size() << std::endl;
-        std::cout << cl << std::endl;
 
         disk::multiscale_local_basis<decltype(msh)> mlb(msh, cl, ccb, cfb, k_inner, rl);
         disk::gradient_reconstruction_multiscale<decltype(msh), decltype(ccb), decltype(cfb)> gradrec(msh, cl, mlb, ccb, cfb);
         
         auto proj = disk::make_projector(msh, cl, ccb, cfb);
 
-        //auto f = [&](const typename decltype(msh)::point_type& pt) ->
-        //    typename decltype(msh)::point_type::value_type
-        //{
-        //    return lua["process_point"](pt.x(), pt.y());
-        //};
-
         auto f = [](const typename decltype(msh)::point_type& pt) ->
             typename decltype(msh)::point_type::value_type
         {
-            //return 1;
-            //return pt.x();
-            return 2 * M_PI * M_PI * sin(pt.x() * M_PI) * sin(pt.y() * M_PI);
-            //return sin(pt.x() * M_PI)*sin(pt.y() * M_PI);
+            //return 2 * M_PI * M_PI * sin(pt.x() * M_PI) * sin(pt.y() * M_PI);
+            return sin(pt.x())*sin(pt.y());
         };
 
         dynamic_vector<RealType> dofs = make_rhs(msh, cl, ccb, cfb, f).head(num_cell_dofs);
-        std::cout << "RHS dofs: " << dofs.transpose() << std::endl;
 
         auto fcs = faces(msh, cl);
         std::sort(fcs.begin(), fcs.end());
@@ -156,7 +141,6 @@ int main(int argc, char **argv)
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc = fcs[face_i];
-            std::cout << " - " << fc << " "; 
 
             auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
             if (!eid.first)
@@ -166,8 +150,6 @@ int main(int argc, char **argv)
             auto face_offset = num_cells * num_cell_dofs + face_compress_map.at(face_id) * num_face_dofs;
             auto pos = face_i * num_face_dofs;
 
-            std::cout << face_id << " -> " << face_compress_map.at(face_id) << std::endl;
-
             for (size_t i = 0; i < num_face_dofs; i++)
             {
                 if ( msh.is_boundary(fc) )
@@ -176,10 +158,6 @@ int main(int argc, char **argv)
                     l2g[num_cell_dofs+pos+i] = face_offset+i;
             }
         }
-
-        std::cout << l2g << std::endl;
-
-        std::cout << gradrec.data << std::endl;
 
         size_t dsz = gradrec.data.rows();
         for (size_t i = 0; i < dsz; i++)
@@ -211,50 +189,80 @@ int main(int argc, char **argv)
     solver.factorize(A);
     x = solver.solve(b);
 
-    std::cout << "GLOBAL RHS:" << std::endl;
-    std::cout << b.transpose() << std::endl;
-    std::cout << "GLOBAL SOL:" << std::endl;
     std::cout << x.transpose() << std::endl;
 
-    elemnum = 0;
-
     std::ofstream sol_ofs("solution.dat");
+    std::ofstream sol_ofs_ms("solution_ms.dat");
 
-    std::cout << " *** POSTPROCESSING ***" << std::endl;
+    //std::cout << " *** POSTPROCESSING ***" << std::endl;
+    elemnum = 0;
     for (auto& cl : msh)
     {
-        auto dofs = x.block(elemnum * num_cell_dofs, 0, num_cell_dofs, 1);
-        std::cout << "Computed: " << dofs.transpose() << std::endl;
+        std::cout << cl << std::endl;
+        auto fcs = faces(msh, cl);
+        std::sort(fcs.begin(), fcs.end());
 
+        dynamic_vector<RealType> dofs =
+            dynamic_vector<RealType>::Zero(num_cell_dofs + fcs.size()*num_face_dofs);
 
-        auto proj = disk::make_projector(msh, cl, ccb, cfb);
+        dofs.head(num_cell_dofs) = x.block(elemnum * num_cell_dofs, 0, num_cell_dofs, 1);
 
-        auto f = [](const typename decltype(msh)::point_type& pt) ->
-            typename decltype(msh)::point_type::value_type
+        for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
-            //return 1;
-            //return pt.x();
-            //return 2 * M_PI * M_PI * sin(pt.x() * M_PI) * sin(pt.y() * M_PI);
-            return sin(pt.x() * M_PI)*sin(pt.y() * M_PI);
-        };
+            auto fc = fcs[face_i];
+            std::cout << " - " << fc << " ";
+            if (msh.is_boundary(fc))
+            {
+                std::cout << "skipped" << std::endl;
+                continue;
+            }
+            std::cout << std::endl;
 
-        auto dofs_sol = proj.project(f);
-        std::cout << "Should be: " << dofs_sol.transpose() << std::endl;
-        dofs_sol = dofs_sol.head(num_cell_dofs);
+            auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+            if (!eid.first)
+                throw std::invalid_argument("This is a bug: face not found");
 
-        auto tps = make_test_points(msh, cl, 10);
+            auto face_id = eid.second;
+            auto face_offset = num_cells * num_cell_dofs + face_compress_map.at(face_id) * num_face_dofs;
+            auto pos = face_i * num_face_dofs;
+
+            dofs.block(num_cell_dofs + pos, 0, num_face_dofs, 1) =
+                x.block(face_offset, 0, num_face_dofs, 1);
+        }
+
+        std::cout << dofs.transpose() << std::endl;
+
+        auto tps = make_test_points(msh, cl, 5);
         for(auto& tp : tps)
         {
             auto phi = ccb.eval_functions(msh, cl, tp);
-            auto val = dofs.dot(phi);
-            auto val_sol = dofs_sol.dot(phi);
-            sol_ofs << tp.x() << " " << tp.y() << " " << val << " " << val_sol << std::endl;
+            auto val = dofs.head(num_cell_dofs).dot(phi);
+            
+            sol_ofs << tp.x() << " " << tp.y() << " " << val << std::endl;
         }
+//#if 0
+        disk::multiscale_local_basis<decltype(msh)> mlb(msh, cl, ccb, cfb, k_inner, rl);
+        disk::gradient_reconstruction_multiscale<decltype(msh), decltype(ccb), decltype(cfb)> gradrec(msh, cl, mlb, ccb, cfb);
+        dynamic_vector<RealType> R = gradrec.oper * dofs;
 
+        auto ms_inner_mesh = mlb.inner_mesh();
+        for (auto& icl : ms_inner_mesh)
+        {
+            auto itps = make_test_points(ms_inner_mesh, icl, 5);
+            for(auto& tp : itps)
+            {
+                auto msphi = mlb.eval_functions(icl, tp);
+                auto msval = R.dot(msphi);
+            
+                sol_ofs_ms << tp.x() << " " << tp.y() << " " << msval << std::endl;
+            }
+        }
+//#endif
         elemnum++;
     }
 
     sol_ofs.close();
+    sol_ofs_ms.close();
 
 }
 
@@ -273,7 +281,7 @@ int main(int argc, char **argv)
 
 
 
-int main2(int argc, char **argv)
+int main(int argc, char **argv)
 {
     using RealType = double;
 
@@ -345,12 +353,12 @@ int main2(int argc, char **argv)
 
         dynamic_vector<double> R = gradrec.oper * dofs;
 
-        std::cout << cl << std::endl;
+        //std::cout << cl << std::endl;
 
-        std::cout << "***********************************" << std::endl;
-        std::cout << dofs.transpose() << std::endl;
-        std::cout << "*****" << std::endl;
-        std::cout << R.transpose() << std::endl;
+        //std::cout << "***********************************" << std::endl;
+        //std::cout << dofs.transpose() << std::endl;
+        //std::cout << "*****" << std::endl;
+        //std::cout << R.transpose() << std::endl;
 
         //std::cout << "R" << std::endl;
         //std::cout << R.transpose() << std::endl;
@@ -368,17 +376,11 @@ int main2(int argc, char **argv)
         z(5) = lua["z5"].get_or(z(5));
         z(6) = lua["z6"].get_or(z(6));
 
-        std::cout << "INT: "<< dofs.transpose() * gradrec.data * dofs << std::endl;
-
         R = R.head(R.size()-1);
 
         double avg = 0;
         for (size_t i = 0; i < R.size(); i++)
             avg += R(i);
-
-        Eigen::FullPivLU<dynamic_matrix<double>> lu(gradrec.stiff_mat);
-        //std::cout << gradrec.stiff_mat << std::endl;
-        std::cout << lu.rank() << std::endl;
 
         for (auto& icl : inner_mesh)
         {

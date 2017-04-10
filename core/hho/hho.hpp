@@ -337,12 +337,16 @@ public:
     void compute(const mesh_type& msh, const cell_type& cl)
     {
         material_tensor_type id_tens;
-        id_tens = material_tensor_type::Identity();
-        compute(msh, cl, id_tens);
+        auto tf = [](const typename mesh_type::point_type& pt) -> auto {
+            return material_tensor_type::Identity();
+        };
+
+        compute(msh, cl, tf);
     }
 
+    template<typename TensorField>
     void compute(const mesh_type& msh, const cell_type& cl,
-                 const material_tensor_type& mtens)
+                 const TensorField& mtens)
     {
         auto cell_basis_size = m_bqd.cell_basis.computed_size();
         auto face_basis_size = m_bqd.face_basis.computed_size();
@@ -355,7 +359,7 @@ public:
         for (auto& qp : cell_quadpoints)
         {
             matrix_type dphi = m_bqd.cell_basis.eval_gradients(msh, cl, qp.point(), 0, cell_degree+1);
-            stiff_mat += qp.weight() * dphi * (mtens * dphi.transpose());
+            stiff_mat += qp.weight() * dphi * (dphi * mtens(qp.point())).transpose();
         }
 
         /* LHS: take basis functions derivatives from degree 1 to K+1 */
@@ -393,7 +397,7 @@ public:
                 matrix_type c_dphi =
                     m_bqd.cell_basis.eval_gradients(msh, cl, qp.point(), 1, cell_degree+1);
 
-                matrix_type c_dphi_n = (mtens * c_dphi.transpose()).transpose() * n;
+                matrix_type c_dphi_n = (c_dphi * mtens(qp.point()).transpose()) * n;
                 matrix_type T = qp.weight() * c_dphi_n * c_phi.transpose();
 
                 BG.block(0, 0, BG.rows(), BG_col_range.size()) -= T;

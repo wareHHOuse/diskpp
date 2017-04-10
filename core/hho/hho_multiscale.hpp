@@ -14,6 +14,9 @@
  * cite it.
  */
 
+#include <functional>
+using namespace std::placeholders;
+
 #include "hho.hpp"
 
 #define _USE_MATH_DEFINES
@@ -26,10 +29,25 @@ static_matrix<T,2,2>
 make_material_tensor(const point<T,2>& pt)
 {
     static_matrix<T,2,2> ret = static_matrix<T,2,2>::Identity();
+    return ret;
 
-    auto c = cos(M_PI * pt.x());
-    auto s = sin(M_PI * pt.y());
+    auto c = cos(M_PI * pt.x()/0.02);
+    auto s = sin(M_PI * pt.y()/0.02);
     return ret * (1 + 100*c*c*s*s);
+}
+
+template<typename T>
+size_t
+local_face_num(const simplicial_mesh<T, 2>& msh,
+               const typename simplicial_mesh<T, 2>::cell& cl,
+               const typename simplicial_mesh<T, 2>::face& fc)
+{
+    auto fcs = faces(msh, cl);
+    for (size_t i = 0; i < fcs.size(); i++)
+        if (fcs[i] == fc)
+            return i;
+
+    throw std::invalid_argument("Face not part of the specified cell");
 }
 
 
@@ -180,8 +198,10 @@ public:
                     l2g[dt_ofs+j] = face_offset+j;
             }
 
+            auto tf = std::bind(make_material_tensor<scalar_type>, _1);
+
             /* Compute HHO element contribution */
-            gradrec.compute(m_inner_mesh, cl);
+            gradrec.compute(m_inner_mesh, cl, tf);
             stab.compute(m_inner_mesh, cl, gradrec.oper);
             dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
             assert(loc.rows() == l2g.size());
@@ -241,7 +261,7 @@ public:
 
             /* since the boundary id on the fine mesh is inherited from the face
              * id on the coarse mesh, we use it to recover the coarse face */
-            auto coarse_fc = *(outer_msh.faces_begin() + bnd_id);
+            auto coarse_fc = *std::next(outer_msh.faces_begin(), bnd_id);
 
             //std::cout << coarse_fc << " " << fc << " (->) " << coarse_cell_face_num << std::endl;
 
@@ -324,9 +344,6 @@ public:
     {
         matrix_type local_dofs = take_local_dofs(cl);
 
-        //std::cout << "xxxxxxxx" << std::endl;
-        //std::cout << local_dofs << std::endl;
-
         gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
         gradrec.compute(m_inner_mesh, cl);
 
@@ -337,8 +354,9 @@ public:
 #ifdef EVAL_WITH_RECONSTRUCTION
             vector_type func_dofs = local_dofs.block(0, i, local_dofs.rows(), 1);
 
+            auto tf = std::bind(make_material_tensor<scalar_type>, _1);
             gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
-            gradrec.compute(m_inner_mesh, cl);
+            gradrec.compute(m_inner_mesh, cl, tf);
 
             vector_type R = gradrec.oper * func_dofs;
 
@@ -375,8 +393,9 @@ public:
 #ifdef EVAL_WITH_RECONSTRUCTION
             vector_type func_dofs = local_dofs.block(0, i, local_dofs.rows(), 1);
 
+            auto tf = std::bind(make_material_tensor<scalar_type>, _1);
             gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
-            gradrec.compute(m_inner_mesh, cl);
+            gradrec.compute(m_inner_mesh, cl, tf);
 
             vector_type R = gradrec.oper * func_dofs;
 
@@ -447,8 +466,7 @@ make_rhs(const Mesh& msh, const typename Mesh::cell& cl,
             auto offset = cbs + face_i*fbs;
             auto phi    = fb.eval_functions(msh, fc, qp.point());
             auto f_val  = f(qp.point());
-            rhs.block(offset, 0, fbs, 1) +=
-                qp.weight() * f_val * phi;
+            rhs.block(offset, 0, fbs, 1) += qp.weight() * f_val * phi;
         }
     }
 
@@ -617,7 +635,7 @@ public:
                 matrix_type vt_phi = cb.eval_functions(outer_mesh, outer_cl, qp.point());
                 matrix_type dphi = multiscale_basis.eval_gradients(icl, qp.point());
                 stiff_mat.block(0,0,ms_basis_size,ms_basis_size) +=
-                    qp.weight() * dphi * /*mtens **/ dphi.transpose();
+                    qp.weight() * dphi * make_material_tensor(qp.point()) * dphi.transpose();
 
                 // Lagrange multiplier to fix the average of the reconstruction
                 stiff_mat.block(0, ms_basis_size, ms_basis_size, 1) += qp.weight() * phi;
@@ -632,7 +650,7 @@ public:
                 matrix_type ms_dphi = multiscale_basis.eval_gradients(icl, qp.point());
                 matrix_type vt_dphi = cb.eval_gradients(outer_mesh, outer_cl, qp.point());                
                 rhs.block(0, 0, ms_basis_size, cb.size()) +=
-                    qp.weight() * ms_dphi * vt_dphi.transpose();
+                    qp.weight() * (ms_dphi * make_material_tensor(qp.point()).transpose()) * vt_dphi.transpose();
             }
 
             auto fcs = faces(inner_mesh, icl);
@@ -660,7 +678,7 @@ public:
 
                 /* since the boundary id on the fine mesh is inherited from the face
                  * id on the coarse mesh, we use it to recover the coarse face */
-                auto outer_fc = *(outer_mesh.faces_begin() + bnd_id);
+                auto outer_fc = *std::next(outer_mesh.faces_begin(), bnd_id);
                 
                 //std::cout << outer_fc << " " << fc << " -> " << outer_face_num << std::endl;
 
@@ -673,34 +691,16 @@ public:
                     vector_type vf_phi = fb.eval_functions(outer_mesh, outer_fc, qp.point());
                     vector_type vt_phi = cb.eval_functions(outer_mesh, outer_cl, qp.point()); 
                     rhs.block(0, col_ofs, ms_basis_size, fb.size()) += 
-                        qp.weight() * (ms_dphi * n) * vf_phi.transpose();
+                        qp.weight() * ((ms_dphi * make_material_tensor(qp.point()).transpose()) * n) * vf_phi.transpose();
 
                     rhs.block(0, 0, ms_basis_size, cb.size()) -=
-                        qp.weight() * (ms_dphi * n) * vt_phi.transpose();
+                        qp.weight() * ((ms_dphi * make_material_tensor(qp.point()).transpose()) * n) * vt_phi.transpose();
                 }
             }
         }
 
-        //rhs(ms_basis_size, 0) = 1;
-
         oper = stiff_mat.lu().solve(rhs);
         data = rhs.transpose() * oper;
-
-        //std::cout << "stiff_mat" << std::endl;
-        //std::cout << stiff_mat << std::endl;
-
-        //std::cout << "rhs" << std::endl;
-        //std::cout << rhs << std::endl;
-        
-        //std::cout << "oper" << std::endl;
-        //std::cout << oper << std::endl;
-        
-        
-        /*
-        std::cout << "data" << std::endl;
-        std::cout << data << std::endl;
-        std::cout << std::endl;
-        */
     }
 };
 
