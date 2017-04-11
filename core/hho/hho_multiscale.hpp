@@ -249,20 +249,12 @@ public:
             /* lookup the boundary number of the current face */
             size_t bnd_id = m_inner_mesh.boundary_id(fc);
 
-            size_t coarse_cell_face_num;
-            for (size_t i = 0; i < bid_list.size(); i++)
-                if (bid_list[i] == bnd_id)
-                {
-                    coarse_cell_face_num = i;
-                    break;
-                }
-
-            assert (coarse_cell_face_num < howmany_faces(outer_msh, outer_cl));
-
             /* since the boundary id on the fine mesh is inherited from the face
              * id on the coarse mesh, we use it to recover the coarse face */
             auto coarse_fc = *std::next(outer_msh.faces_begin(), bnd_id);
 
+            size_t coarse_cell_face_num = local_face_num(outer_msh, outer_cl, coarse_fc);
+            assert (coarse_cell_face_num < howmany_faces(outer_msh, outer_cl));
             //std::cout << coarse_fc << " " << fc << " (->) " << coarse_cell_face_num << std::endl;
 
             matrix_type face_matrix, ff;
@@ -439,7 +431,7 @@ make_rhs(const Mesh& msh, const typename Mesh::cell& cl,
 {
     typedef dynamic_vector<typename Mesh::scalar_type> vector_type;
     auto fcs = faces(msh, cl);
-    std::sort(fcs.begin(), fcs.end());
+    //std::sort(fcs.begin(), fcs.end());
     auto num_faces = fcs.size();
     auto rhs_size = cb.size() + num_faces * fb.size();
     vector_type rhs = vector_type::Zero(rhs_size);
@@ -499,7 +491,7 @@ public:
         : mesh(msh), cell(cl), cell_basis(cb), face_basis(fb)
     {
         auto fcs = faces(msh, cl);
-        std::sort(fcs.begin(), fcs.end());
+        //std::sort(fcs.begin(), fcs.end());
         auto num_faces = fcs.size();
         auto mass_matrix_size = cell_basis.size() + num_faces * face_basis.size();
         mass_matrix = matrix_type::Zero(mass_matrix_size, mass_matrix_size);
@@ -664,21 +656,23 @@ public:
 
                 size_t bnd_id = inner_mesh.boundary_id(fc);
 
-                size_t outer_face_num;
-                for (size_t i = 0; i < bid_list.size(); i++)
-                {
-                    if (bid_list[i] == bnd_id)
-                    {
-                        outer_face_num = i;
-                        break;
-                    }
-                }
+                //size_t outer_face_num;
+                //for (size_t i = 0; i < bid_list.size(); i++)
+                //{
+                //    if (bid_list[i] == bnd_id)
+                //    {
+                //        outer_face_num = i;
+                //        break;
+                //    }
+                //}
 
-                assert (outer_face_num < howmany_faces(outer_mesh, outer_cl));
+                
 
                 /* since the boundary id on the fine mesh is inherited from the face
                  * id on the coarse mesh, we use it to recover the coarse face */
                 auto outer_fc = *std::next(outer_mesh.faces_begin(), bnd_id);
+                size_t outer_face_num = local_face_num(outer_mesh, outer_cl, outer_fc);
+                assert (outer_face_num < howmany_faces(outer_mesh, outer_cl));
                 
                 //std::cout << outer_fc << " " << fc << " -> " << outer_face_num << std::endl;
 

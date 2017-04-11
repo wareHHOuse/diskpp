@@ -47,29 +47,19 @@ operator<<(std::ostream& os, const std::vector<T>& vec)
     return os;
 }
 
-
-int main2(int argc, char **argv)
+template<typename Mesh>
+void test_gradient_reconstruction(sol::state& lua, const Mesh& msh)
 {
-    using RealType = double;
+    typedef Mesh                            mesh_type;
+    typedef typename Mesh::scalar_type      scalar_type;
 
-    typedef Eigen::SparseMatrix<RealType>            sparse_matrix_type;
+    size_t k_outer =    lua["k_outer"];
+    size_t k_inner =    lua["k_inner"];
+    size_t rl =         lua["refinement_levels"];
 
-    if ( !std::regex_match(argv[1], std::regex(".*\\.mesh2d$") ) )
-    {
-        std::cout << "Mesh format must be Netgen 2D" << std::endl;
-        return 1;
-    }
-
-    auto msh = disk::load_netgen_2d_mesh<RealType>(argv[1]);
-
-    sol::state lua;
-    lua.do_file("params.lua");
-
-    size_t k_outer = lua["k_outer"];
-    size_t k_inner = lua["k_inner"];
-    size_t rl = lua["rl"];
-
-
+    std::cout << "K outer: " << k_outer << std::endl;
+    std::cout << "K inner: " << k_inner << std::endl;
+    std::cout << "Refinement levels: " << rl << std::endl;
 
     std::cout << k_outer << " " << k_inner << " " << rl << std::endl;
 
@@ -77,7 +67,163 @@ int main2(int argc, char **argv)
     auto ccb = basis.first;
     auto cfb = basis.second;
 
-    disk::multiscale_local_problem<decltype(msh)> mlp(k_inner, rl);
+    disk::multiscale_local_problem<mesh_type> mlp(k_inner, rl);
+
+
+    std::string output_filename = lua["testgr_filename"].get_or(std::string("testgr.dat"));
+
+    size_t testgr_eval_num = lua["testgr_eval_num"].get_or(5);
+
+    std::ofstream ofs(output_filename);
+
+    size_t howmany = lua["howmany"].get_or(9999999);
+    for (auto& cl : msh)
+    {
+        disk::multiscale_local_basis<mesh_type> mlb(msh, cl, ccb, cfb, k_inner, rl);
+        
+        disk::gradient_reconstruction_multiscale<mesh_type, decltype(ccb), decltype(cfb)> gradrec(msh, cl, mlb, ccb, cfb);
+
+        auto proj = disk::make_projector(msh, cl, ccb, cfb);
+
+        auto f = [&](const typename mesh_type::point_type& pt) -> typename mesh_type::point_type::value_type
+        {
+            return lua["process_point"](pt.x(), pt.y());
+        };
+
+        auto dofs = proj.project(f);
+
+        //auto bar = barycenter(msh, cl);
+
+        //bar = bar+bar/4;
+
+        //std::cout << dofs.transpose() << std::endl;
+        //std::cout << f(bar) << std::endl;
+        //std::cout << disk::evaluate_dofs(msh, cl, ccb, dofs, bar) << std::endl;
+
+        dynamic_vector<double> R = gradrec.oper * dofs;
+        R = R.head(R.size()-1);
+
+        //std::cout << cl << std::endl;
+
+        //std::cout << "***********************************" << std::endl;
+        //std::cout << dofs.transpose() << std::endl;
+        //std::cout << "*****" << std::endl;
+        //std::cout << R.transpose() << std::endl;
+
+        //std::cout << "R" << std::endl;
+        //std::cout << R.transpose() << std::endl;
+        //std::cout << "Postprocess" << std::endl;
+
+
+        auto inner_mesh = mlb.inner_mesh();
+
+        for (auto& icl : inner_mesh)
+        {
+            
+            auto pts = make_test_points(inner_mesh, icl, testgr_eval_num);
+            for (auto& pt : pts)
+            {
+                auto v = mlb.eval_functions(icl, pt);
+                //auto g = mlb.eval_gradients(icl, pt);
+                //assert(v.size() == g.rows());
+                //ofs << pt.x() << " " << pt.y() << " ";
+
+                //for (size_t zz = 0; zz < v.size(); zz++)
+                //    ofs << v(zz) << " " << g(zz,0) << " " << g(zz,1) << " ";
+
+                //ofs << std::endl;
+
+                //std::cout << (gradrec.stiff_mat * z).transpose() << std::endl;
+
+                auto val  = R.dot(v);
+                auto val2 = disk::evaluate_dofs(msh, cl, ccb, dofs, pt);
+                ofs << pt.x() << " " << pt.y() << " " << val << " " << val2 << std::endl;
+            }
+        }
+
+        //mlp.assemble(msh, cl, ccb, cfb);
+
+        if ( 0 == --howmany )
+            break;
+    }
+
+    ofs.close();
+}
+
+
+template<typename T>
+auto
+do_static_condensation(const dynamic_matrix<T>& mat,
+                       const dynamic_vector<T>& vec,
+                       size_t split)
+{
+    auto cell_size = split;
+    assert(mat.rows() == mat.cols());
+    auto face_size = mat.rows() - split;
+
+    dynamic_matrix<T> K_TT = mat.topLeftCorner(cell_size, cell_size);
+    dynamic_matrix<T> K_TF = mat.topRightCorner(cell_size, face_size);
+    dynamic_matrix<T> K_FT = mat.bottomLeftCorner(face_size, cell_size);
+    dynamic_matrix<T> K_FF = mat.bottomRightCorner(face_size, face_size);
+
+    assert(K_TT.cols() == cell_size);
+    assert(K_TT.cols() + K_TF.cols() == mat.cols());
+    assert(K_TT.rows() + K_FT.rows() == mat.rows());
+    assert(K_TF.rows() + K_FF.rows() == mat.rows());
+    assert(K_FT.cols() + K_FF.cols() == mat.cols());
+
+    auto K_TT_ldlt = K_TT.llt();
+    dynamic_matrix<T> AL = K_TT_ldlt.solve(K_TF);
+    dynamic_vector<T> bL = K_TT_ldlt.solve(vec);
+
+    dynamic_matrix<T> AC = K_FF - K_FT * AL;
+    dynamic_vector<T> bC = /* no projection on faces, eqn. 26*/ - K_FT * bL;
+
+    return std::make_pair(AC, bC);
+}
+
+template<typename T>
+dynamic_vector<T>
+recover_static_condensation(const dynamic_matrix<T>& mat,
+                            const dynamic_vector<T>& vec,
+                            const dynamic_vector<T>& solF,
+                            size_t split)
+{
+    auto cell_size = split;
+    assert(mat.rows() == mat.cols());
+    auto face_size = mat.rows() - split;
+
+    dynamic_vector<T> ret( mat.rows() );
+
+    dynamic_matrix<T> K_TT = mat.topLeftCorner(cell_size, cell_size);
+    dynamic_matrix<T> K_TF = mat.topRightCorner(cell_size, face_size);
+
+    dynamic_vector<T> solT = K_TT.llt().solve(vec - K_TF*solF);
+
+    ret.head(cell_size) = solT;
+    ret.tail(face_size) = solF;
+
+    return ret;
+}
+
+
+template<typename Mesh>
+void test_full_problem(sol::state& lua, const Mesh& msh)
+{
+    typedef Mesh                        mesh_type;
+    typedef typename Mesh::scalar_type  scalar_type;
+    typedef Eigen::SparseMatrix<scalar_type> sparse_matrix_type;
+
+    size_t k_outer = lua["k_outer"];
+    size_t k_inner = lua["k_inner"];
+    size_t rl = lua["refinement_levels"];
+
+
+    auto basis = make_scaled_monomial_scalar_basis(msh, k_outer-1, k_outer);
+    auto ccb = basis.first;
+    auto cfb = basis.second;
+
+    disk::multiscale_local_problem<mesh_type> mlp(k_inner, rl);
 
     auto num_cells          = msh.cells_size();
     auto num_faces          = msh.faces_size();
@@ -89,11 +235,11 @@ int main2(int argc, char **argv)
     auto system_size = num_cells*num_cell_dofs + num_internal_faces*num_face_dofs;
 
     sparse_matrix_type              A(system_size, system_size);
-    dynamic_vector<RealType>        b(system_size), x(system_size);
+    dynamic_vector<scalar_type>     b(system_size), x(system_size);
 
-    b = dynamic_vector<RealType>::Zero(system_size);
+    b = dynamic_vector<scalar_type>::Zero(system_size);
 
-    typedef Eigen::Triplet<RealType>         triplet_type;
+    typedef Eigen::Triplet<scalar_type>         triplet_type;
     std::vector<triplet_type>                   triplets;
 
     std::vector<size_t> face_compress_map( num_faces );
@@ -101,6 +247,7 @@ int main2(int argc, char **argv)
     size_t fn = 0, fi = 0;
     for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++, fi++)
     {
+        std::cout << *itor << std::endl;
         if( msh.is_boundary(*itor) )
             continue;
 
@@ -109,30 +256,34 @@ int main2(int argc, char **argv)
         fn++;
     }
 
-    std::ofstream mat_ofs("sysmat.dat");
-    std::ofstream rhs_ofs("sysrhs.dat");
+    std::cout << face_compress_map << std::endl;
+    std::cout << face_expand_map << std::endl;
+
+    //std::ofstream mat_ofs("sysmat.dat");
+    //std::ofstream rhs_ofs("sysrhs.dat");
 
     size_t elemnum = 0;
     for (auto& cl : msh)
     {
         std::cout << "Assembly: " << elemnum << "/" << msh.cells_size() << std::endl;
 
-        disk::multiscale_local_basis<decltype(msh)> mlb(msh, cl, ccb, cfb, k_inner, rl);
-        disk::gradient_reconstruction_multiscale<decltype(msh), decltype(ccb), decltype(cfb)> gradrec(msh, cl, mlb, ccb, cfb);
+        disk::multiscale_local_basis<mesh_type> mlb(msh, cl, ccb, cfb, k_inner, rl);
+        disk::gradient_reconstruction_multiscale<mesh_type, decltype(ccb), decltype(cfb)> gradrec(msh, cl, mlb, ccb, cfb);
         
         auto proj = disk::make_projector(msh, cl, ccb, cfb);
 
-        auto f = [](const typename decltype(msh)::point_type& pt) ->
-            typename decltype(msh)::point_type::value_type
+        auto f = [](const typename mesh_type::point_type& pt) ->
+            typename mesh_type::point_type::value_type
         {
+            return 1.;
             //return 2 * M_PI * M_PI * sin(pt.x() * M_PI) * sin(pt.y() * M_PI);
-            return sin(pt.x())*sin(pt.y());
+            //return sin(pt.x())*sin(pt.y());
         };
 
-        dynamic_vector<RealType> dofs = make_rhs(msh, cl, ccb, cfb, f).head(num_cell_dofs);
+        dynamic_vector<scalar_type> dofs = make_rhs(msh, cl, ccb, cfb, f).head(num_cell_dofs);
 
         auto fcs = faces(msh, cl);
-        std::sort(fcs.begin(), fcs.end());
+        //std::sort(fcs.begin(), fcs.end());
         std::vector<size_t> l2g(num_cell_dofs + fcs.size() * num_face_dofs);
 
         for (size_t cell_i = 0; cell_i < num_cell_dofs; cell_i++)
@@ -166,7 +317,7 @@ int main2(int argc, char **argv)
                 if (l2g[i] == 0xDEADBEEF || l2g[j] == 0xDEADBEEF)
                     continue;
                 triplets.push_back( triplet_type(l2g[i], l2g[j], gradrec.data(i,j)) );
-                mat_ofs << l2g[i]+1 << " " << l2g[j]+1 << " " << gradrec.data(i,j) << std::endl;
+                //mat_ofs << l2g[i]+1 << " " << l2g[j]+1 << " " << gradrec.data(i,j) << std::endl;
             }   
         b.block(elemnum * num_cell_dofs, 0, num_cell_dofs, 1) = dofs;
 
@@ -174,21 +325,22 @@ int main2(int argc, char **argv)
 
     }
 
-    mat_ofs.close();
-    rhs_ofs.close();
+    //mat_ofs.close();
+    //rhs_ofs.close();
 
     A.setFromTriplets(triplets.begin(), triplets.end());
 
 #ifdef HAVE_INTEL_MKL
-    Eigen::PardisoLU<Eigen::SparseMatrix<RealType>>  solver;
+    Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
 #else
-    Eigen::SparseLU<Eigen::SparseMatrix<RealType>>   solver;
+    Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
 #endif
 
     solver.analyzePattern(A);
     solver.factorize(A);
     x = solver.solve(b);
 
+    std::cout << b.transpose() << std::endl;
     std::cout << x.transpose() << std::endl;
 
     std::ofstream sol_ofs("solution.dat");
@@ -200,10 +352,10 @@ int main2(int argc, char **argv)
     {
         std::cout << cl << std::endl;
         auto fcs = faces(msh, cl);
-        std::sort(fcs.begin(), fcs.end());
+        //std::sort(fcs.begin(), fcs.end());
 
-        dynamic_vector<RealType> dofs =
-            dynamic_vector<RealType>::Zero(num_cell_dofs + fcs.size()*num_face_dofs);
+        dynamic_vector<scalar_type> dofs =
+            dynamic_vector<scalar_type>::Zero(num_cell_dofs + fcs.size()*num_face_dofs);
 
         dofs.head(num_cell_dofs) = x.block(elemnum * num_cell_dofs, 0, num_cell_dofs, 1);
 
@@ -241,9 +393,10 @@ int main2(int argc, char **argv)
             sol_ofs << tp.x() << " " << tp.y() << " " << val << std::endl;
         }
 //#if 0
-        disk::multiscale_local_basis<decltype(msh)> mlb(msh, cl, ccb, cfb, k_inner, rl);
-        disk::gradient_reconstruction_multiscale<decltype(msh), decltype(ccb), decltype(cfb)> gradrec(msh, cl, mlb, ccb, cfb);
-        dynamic_vector<RealType> R = gradrec.oper * dofs;
+        disk::multiscale_local_basis<mesh_type> mlb(msh, cl, ccb, cfb, k_inner, rl);
+        disk::gradient_reconstruction_multiscale<mesh_type, decltype(ccb), decltype(cfb)> gradrec(msh, cl, mlb, ccb, cfb);
+        dynamic_vector<scalar_type> R = gradrec.oper * dofs;
+        R = R.head(R.size()-1);
 
         auto ms_inner_mesh = mlb.inner_mesh();
         for (auto& icl : ms_inner_mesh)
@@ -266,153 +419,29 @@ int main2(int argc, char **argv)
 
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
-    using RealType = double;
-
     if ( !std::regex_match(argv[1], std::regex(".*\\.mesh2d$") ) )
     {
         std::cout << "Mesh format must be Netgen 2D" << std::endl;
         return 1;
     }
 
-    auto msh = disk::load_netgen_2d_mesh<RealType>(argv[1]);
+    auto msh = disk::load_netgen_2d_mesh<double>(argv[1]);
 
     sol::state lua;
     lua.do_file("params.lua");
 
-    size_t k_outer = lua["k_outer"];
-    size_t k_inner = lua["k_inner"];
-    size_t rl = lua["rl"];
+    std::string mode = lua["mode"].get_or( std::string("testgr") );
+    std::cout << "Mode: " << mode << std::endl;
 
-
-
-    std::cout << k_outer << " " << k_inner << " " << rl << std::endl;
-
-    auto basis = make_scaled_monomial_scalar_basis(msh, k_outer-1, k_outer);
-    auto ccb = basis.first;
-    auto cfb = basis.second;
-
-    disk::multiscale_local_problem<decltype(msh)> mlp(k_inner, rl);
-
-
-    std::stringstream ss;
-    ss << "testgr_" << k_outer << "_" << k_inner << "_" << rl;
-
-    std::ofstream ofs(ss.str());
-
-    size_t howmany = lua["howmany"].get_or(9999999);
-    for (auto& cl : msh)
-    {
-        //std::cout << "Basis" << std::endl;
-        disk::multiscale_local_basis<decltype(msh)> mlb(msh, cl, ccb, cfb, k_inner, rl);
-        
-        //std::cout << "GR" << std::endl;
-        disk::gradient_reconstruction_multiscale<decltype(msh), decltype(ccb), decltype(cfb)> gradrec(msh, cl, mlb, ccb, cfb);
-
-        auto proj = disk::make_projector(msh, cl, ccb, cfb);
-
-        auto f = [&](const typename decltype(msh)::point_type& pt) -> typename decltype(msh)::point_type::value_type
-        {
-            return lua["process_point"](pt.x(), pt.y());
-        };
-
-        auto dofs = proj.project(f);
-
-        //auto bar = barycenter(msh, cl);
-
-        //bar = bar+bar/4;
-
-        //std::cout << dofs.transpose() << std::endl;
-        //std::cout << f(bar) << std::endl;
-        //std::cout << disk::evaluate_dofs(msh, cl, ccb, dofs, bar) << std::endl;
-
-        dofs(0) = lua["dofs0"].get_or(dofs(0));
-        dofs(1) = lua["dofs1"].get_or(dofs(1));
-        dofs(2) = lua["dofs2"].get_or(dofs(2));
-        dofs(3) = lua["dofs3"].get_or(dofs(3));
-        dofs(4) = lua["dofs4"].get_or(dofs(4));
-        dofs(5) = lua["dofs5"].get_or(dofs(5));
-        dofs(6) = lua["dofs6"].get_or(dofs(6));
-
-
-        dynamic_vector<double> R = gradrec.oper * dofs;
-
-        //std::cout << cl << std::endl;
-
-        //std::cout << "***********************************" << std::endl;
-        //std::cout << dofs.transpose() << std::endl;
-        //std::cout << "*****" << std::endl;
-        //std::cout << R.transpose() << std::endl;
-
-        //std::cout << "R" << std::endl;
-        //std::cout << R.transpose() << std::endl;
-        //std::cout << "Postprocess" << std::endl;
-
-
-        auto inner_mesh = mlb.inner_mesh();
-
-        dynamic_vector<double> z = dynamic_vector<double>::Zero(R.size()-1);
-        z(0) = lua["z0"].get_or(z(0));
-        z(1) = lua["z1"].get_or(z(1));
-        z(2) = lua["z2"].get_or(z(2));
-        z(3) = lua["z3"].get_or(z(3));
-        z(4) = lua["z4"].get_or(z(4));
-        z(5) = lua["z5"].get_or(z(5));
-        z(6) = lua["z6"].get_or(z(6));
-
-        R = R.head(R.size()-1);
-
-        double avg = 0;
-        for (size_t i = 0; i < R.size(); i++)
-            avg += R(i);
-
-        for (auto& icl : inner_mesh)
-        {
-            auto pts = make_test_points(inner_mesh, icl, 10);
-            for (auto& pt : pts)
-            {
-                auto v = mlb.eval_functions(icl, pt);
-                //auto g = mlb.eval_gradients(icl, pt);
-                //assert(v.size() == g.rows());
-                //ofs << pt.x() << " " << pt.y() << " ";
-
-                //for (size_t zz = 0; zz < v.size(); zz++)
-                //    ofs << v(zz) << " " << g(zz,0) << " " << g(zz,1) << " ";
-
-                //ofs << std::endl;
-
-                //std::cout << (gradrec.stiff_mat * z).transpose() << std::endl;
-
-                auto val  = R.dot(v);
-                auto val2 = disk::evaluate_dofs(msh, cl, ccb, dofs, pt);
-                ofs << pt.x() << " " << pt.y() << " " << val << " " << val2 << std::endl;
-            }
-        }
-
-        //mlp.assemble(msh, cl, ccb, cfb);
-
-        if ( 0 == --howmany )
-            break;
-    }
-
-    ofs.close();
-
+    if (mode == "testgr")
+        test_gradient_reconstruction(lua, msh);
+    else if (mode == "testfull")
+        test_full_problem(lua, msh);
 
     return 0;
 }
+
+
