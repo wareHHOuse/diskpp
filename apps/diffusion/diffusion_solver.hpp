@@ -129,10 +129,10 @@ public:
 
         auto tf = [](const typename mesh_type::point_type& pt) -> tensor_type {
             tensor_type ret = tensor_type::Identity();
-            return 6.72071 * ret;
-            //auto c = cos(M_PI * pt.x()/0.02);
-            //auto s = sin(M_PI * pt.y()/0.02);
-            //return ret * (1 + 100*c*c*s*s);
+            //return 6.72071 * ret;
+            auto c = cos(M_PI * pt.x()/0.5);
+            auto s = sin(M_PI * pt.y()/0.5);
+            return ret * (1 + 100*c*c*s*s);
         };
 
         for (auto& cl : m_msh)
@@ -213,10 +213,10 @@ public:
 
         auto tf = [](const typename mesh_type::point_type& pt) -> tensor_type {
             tensor_type ret = tensor_type::Identity();
-            return 6.72071 * ret;
-            //auto c = cos(M_PI * pt.x()/0.02);
-            //auto s = sin(M_PI * pt.y()/0.02);
-            //return ret * (1 + 100*c*c*s*s);
+            //return 6.72071 * ret;
+            auto c = cos(M_PI * pt.x()/0.5);
+            auto s = sin(M_PI * pt.y()/0.5);
+            return ret * (1 + 100*c*c*s*s);
         };
 
         timecounter tc;

@@ -29,10 +29,10 @@ static_matrix<T,2,2>
 make_material_tensor(const point<T,2>& pt)
 {
     static_matrix<T,2,2> ret = static_matrix<T,2,2>::Identity();
-    return ret;
+    return ret * 6.72071;
 
-    auto c = cos(M_PI * pt.x()/0.02);
-    auto s = sin(M_PI * pt.y()/0.02);
+    auto c = cos(M_PI * pt.x()/0.01);
+    auto s = sin(M_PI * pt.y()/0.01);
     return ret * (1 + 100*c*c*s*s);
 }
 
@@ -412,6 +412,12 @@ public:
         return ret;
     }
 
+    vector_type
+    get_lagrange_multipliers()
+    {
+
+    }
+    
     size_t size() const
     {
         return m_X.cols();

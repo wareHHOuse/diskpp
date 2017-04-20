@@ -135,6 +135,19 @@ void test_gradient_reconstruction(sol::state& lua, const Mesh& msh)
 
                 //std::cout << (gradrec.stiff_mat * z).transpose() << std::endl;
 
+                R = dynamic_vector<scalar_type>::Zero(R.size());
+
+                R(0) = 0;
+
+                R(1) = 0;
+                R(2) = 0;
+                
+                R(3) = 1;
+                R(4) = 0;
+                
+                R(5) = 0;
+                R(6) = 0;
+
                 auto val  = R.dot(v);
                 auto val2 = disk::evaluate_dofs(msh, cl, ccb, dofs, pt);
                 ofs << pt.x() << " " << pt.y() << " " << val << " " << val2 << std::endl;
@@ -232,7 +245,7 @@ void test_full_problem(sol::state& lua, const Mesh& msh)
     auto num_boundary_faces = msh.boundary_faces_size();
     auto num_internal_faces = msh.internal_faces_size();
 
-    auto system_size = num_cells*num_cell_dofs + num_internal_faces*num_face_dofs;
+    auto system_size = /*num_cells*num_cell_dofs +*/ num_internal_faces*num_face_dofs;
 
     sparse_matrix_type              A(system_size, system_size);
     dynamic_vector<scalar_type>     b(system_size), x(system_size);
@@ -262,6 +275,14 @@ void test_full_problem(sol::state& lua, const Mesh& msh)
     //std::ofstream mat_ofs("sysmat.dat");
     //std::ofstream rhs_ofs("sysrhs.dat");
 
+    auto f = [](const typename mesh_type::point_type& pt) ->
+                    typename mesh_type::point_type::value_type
+    {
+        //return 1.;
+        //return 2 * M_PI * M_PI * sin(pt.x() * M_PI) * sin(pt.y() * M_PI);
+        return sin(pt.x())*sin(pt.y());
+    };
+
     size_t elemnum = 0;
     for (auto& cl : msh)
     {
@@ -272,22 +293,15 @@ void test_full_problem(sol::state& lua, const Mesh& msh)
         
         auto proj = disk::make_projector(msh, cl, ccb, cfb);
 
-        auto f = [](const typename mesh_type::point_type& pt) ->
-            typename mesh_type::point_type::value_type
-        {
-            return 1.;
-            //return 2 * M_PI * M_PI * sin(pt.x() * M_PI) * sin(pt.y() * M_PI);
-            //return sin(pt.x())*sin(pt.y());
-        };
-
-        dynamic_vector<scalar_type> dofs = make_rhs(msh, cl, ccb, cfb, f).head(num_cell_dofs);
-
+        dynamic_vector<scalar_type> dofs = make_rhs(msh, cl, ccb, cfb, f);
+        dynamic_vector<scalar_type> cdofs = dofs.head(num_cell_dofs);
+        
         auto fcs = faces(msh, cl);
         //std::sort(fcs.begin(), fcs.end());
-        std::vector<size_t> l2g(num_cell_dofs + fcs.size() * num_face_dofs);
+        std::vector<size_t> l2g(/*num_cell_dofs +*/ fcs.size() * num_face_dofs);
 
-        for (size_t cell_i = 0; cell_i < num_cell_dofs; cell_i++)
-            l2g[cell_i] = elemnum * num_cell_dofs + cell_i;
+        //for (size_t cell_i = 0; cell_i < num_cell_dofs; cell_i++)
+        //    l2g[cell_i] = elemnum * num_cell_dofs + cell_i;
 
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
@@ -298,28 +312,39 @@ void test_full_problem(sol::state& lua, const Mesh& msh)
                 throw std::invalid_argument("This is a bug: face not found");
 
             auto face_id = eid.second;
-            auto face_offset = num_cells * num_cell_dofs + face_compress_map.at(face_id) * num_face_dofs;
+            auto face_offset = /*num_cells * num_cell_dofs +*/ face_compress_map.at(face_id) * num_face_dofs;
             auto pos = face_i * num_face_dofs;
 
             for (size_t i = 0; i < num_face_dofs; i++)
             {
                 if ( msh.is_boundary(fc) )
-                    l2g[num_cell_dofs+pos+i] = 0xDEADBEEF;
+                    l2g.at(/*num_cell_dofs+*/pos+i) = 0xDEADBEEF;
                 else
-                    l2g[num_cell_dofs+pos+i] = face_offset+i;
+                    l2g.at(/*num_cell_dofs+*/pos+i) = face_offset+i;
             }
         }
 
-        size_t dsz = gradrec.data.rows();
+        auto sc = do_static_condensation(gradrec.data, cdofs, num_cell_dofs);
+
+        //size_t dsz = gradrec.data.rows();
+        size_t dsz = sc.first.rows();
         for (size_t i = 0; i < dsz; i++)
+        {
+            if (l2g[i] == 0xDEADBEEF)
+                continue;
+
             for (size_t j = 0; j < dsz; j++)
             {
-                if (l2g[i] == 0xDEADBEEF || l2g[j] == 0xDEADBEEF)
+                if (l2g[j] == 0xDEADBEEF)
                     continue;
-                triplets.push_back( triplet_type(l2g[i], l2g[j], gradrec.data(i,j)) );
+
+                triplets.push_back( triplet_type(l2g[i], l2g[j], sc.first(i,j)) );
                 //mat_ofs << l2g[i]+1 << " " << l2g[j]+1 << " " << gradrec.data(i,j) << std::endl;
-            }   
-        b.block(elemnum * num_cell_dofs, 0, num_cell_dofs, 1) = dofs;
+            }
+
+            b(l2g.at(i)) += sc.second(i);
+        }
+        //b.block(elemnum * num_cell_dofs, 0, num_cell_dofs, 1) = dofs;
 
         elemnum++;
 
@@ -354,10 +379,12 @@ void test_full_problem(sol::state& lua, const Mesh& msh)
         auto fcs = faces(msh, cl);
         //std::sort(fcs.begin(), fcs.end());
 
-        dynamic_vector<scalar_type> dofs =
-            dynamic_vector<scalar_type>::Zero(num_cell_dofs + fcs.size()*num_face_dofs);
+        dynamic_vector<scalar_type> rhs = make_rhs(msh, cl, ccb, cfb, f);
 
-        dofs.head(num_cell_dofs) = x.block(elemnum * num_cell_dofs, 0, num_cell_dofs, 1);
+        dynamic_vector<scalar_type> dofs =
+            dynamic_vector<scalar_type>::Zero(/*num_cell_dofs +*/ fcs.size()*num_face_dofs);
+
+        //dofs.head(num_cell_dofs) = x.block(elemnum * num_cell_dofs, 0, num_cell_dofs, 1);
 
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
@@ -375,28 +402,33 @@ void test_full_problem(sol::state& lua, const Mesh& msh)
                 throw std::invalid_argument("This is a bug: face not found");
 
             auto face_id = eid.second;
-            auto face_offset = num_cells * num_cell_dofs + face_compress_map.at(face_id) * num_face_dofs;
+            auto face_offset = /*num_cells * num_cell_dofs +*/ face_compress_map.at(face_id) * num_face_dofs;
             auto pos = face_i * num_face_dofs;
 
-            dofs.block(num_cell_dofs + pos, 0, num_face_dofs, 1) =
+            dofs.block(/*num_cell_dofs + */pos, 0, num_face_dofs, 1) =
                 x.block(face_offset, 0, num_face_dofs, 1);
         }
 
-        std::cout << dofs.transpose() << std::endl;
-
-        auto tps = make_test_points(msh, cl, 5);
-        for(auto& tp : tps)
-        {
-            auto phi = ccb.eval_functions(msh, cl, tp);
-            auto val = dofs.head(num_cell_dofs).dot(phi);
-            
-            sol_ofs << tp.x() << " " << tp.y() << " " << val << std::endl;
-        }
+        //auto tps = make_test_points(msh, cl, 5);
+        //for(auto& tp : tps)
+        //{
+        //    auto phi = ccb.eval_functions(msh, cl, tp);
+        //    auto val = dofs.head(num_cell_dofs).dot(phi);
+        //    
+        //    sol_ofs << tp.x() << " " << tp.y() << " " << val << std::endl;
+        //}
 //#if 0
         disk::multiscale_local_basis<mesh_type> mlb(msh, cl, ccb, cfb, k_inner, rl);
         disk::gradient_reconstruction_multiscale<mesh_type, decltype(ccb), decltype(cfb)> gradrec(msh, cl, mlb, ccb, cfb);
-        dynamic_vector<scalar_type> R = gradrec.oper * dofs;
+        
+        dynamic_vector<scalar_type> rhs_c = rhs.head(num_cell_dofs);
+        dynamic_vector<scalar_type> local_dofs = recover_static_condensation(gradrec.data, rhs_c, dofs, num_cell_dofs);
+
+        dynamic_vector<scalar_type> R = gradrec.oper * local_dofs;
         R = R.head(R.size()-1);
+
+        std::cout << "Elem dofs" << std::endl;
+        std::cout << R.transpose() << std::endl;
 
         auto ms_inner_mesh = mlb.inner_mesh();
         for (auto& icl : ms_inner_mesh)
@@ -429,6 +461,8 @@ main(int argc, char **argv)
     }
 
     auto msh = disk::load_netgen_2d_mesh<double>(argv[1]);
+
+    std::cout << "AVG H: " << average_diameter(msh) << std::endl;
 
     sol::state lua;
     lua.do_file("params.lua");
