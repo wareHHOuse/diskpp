@@ -1276,4 +1276,183 @@ public:
     }
 };
 
+
+
+
+
+
+
+
+
+
+template<typename Mesh, //typename CellBasisType, typename CellQuadType,
+                        typename FaceBasisType, typename FaceQuadType>
+class assembler_homogeneus_dirichlet
+{
+    typedef Mesh                                mesh_type;
+    typedef typename mesh_type::scalar_type     scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
+
+    //typedef CellBasisType                       cell_basis_type;
+    //typedef CellQuadType                        cell_quadrature_type;
+    typedef FaceBasisType                       face_basis_type;
+    typedef FaceQuadType                        face_quadrature_type;
+
+    typedef dynamic_matrix<scalar_type>         matrix_type;
+
+
+    //cell_basis_type                             cell_basis;
+    //cell_quadrature_type                        cell_quadrature;
+
+    face_basis_type                             face_basis;
+    face_quadrature_type                        face_quadrature;
+
+    size_t                                      m_degree;
+
+    typedef Eigen::Triplet<scalar_type>         triplet_type;
+
+    std::vector<triplet_type>                   m_triplets;
+    size_t                                      m_num_unknowns;
+
+public:
+
+    typedef Eigen::SparseMatrix<scalar_type>    sparse_matrix_type;
+    typedef dynamic_vector<scalar_type>         vector_type;
+
+    sparse_matrix_type      matrix;
+    vector_type             rhs;
+    std::vector<size_t>     face_compress_map, face_expand_map;
+
+    assembler_homogeneus_dirichlet()                 = delete;
+
+    assembler_homogeneus_dirichlet(const mesh_type& msh, size_t degree)
+        : m_degree(degree)
+    {
+        face_basis          = face_basis_type(m_degree);
+        face_quadrature     = face_quadrature_type(2*m_degree);
+
+        m_num_unknowns = face_basis.size() * msh.internal_faces_size();
+        matrix = sparse_matrix_type(m_num_unknowns, m_num_unknowns);
+        rhs = vector_type::Zero(m_num_unknowns);
+
+        face_compress_map.resize( msh.faces_size() );
+        face_expand_map.resize( msh.internal_faces_size() );
+        size_t fn = 0, fi = 0;
+        for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++, fi++)
+        {
+            if( msh.is_boundary(*itor) )
+                continue;
+
+            face_compress_map.at(fi) = fn;
+            face_expand_map.at(fn) = fi;
+            fn++;
+        }
+    }
+
+    template<typename LocalContrib>
+    void
+    assemble(const mesh_type& msh, const cell_type& cl, const LocalContrib& lc)
+    {
+        auto fcs = faces(msh, cl);
+        std::vector<size_t> l2g(fcs.size() * face_basis.size());
+        for (size_t face_i = 0; face_i < fcs.size(); face_i++)
+        {
+            auto fc = fcs[face_i];
+            auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+            if (!eid.first)
+                throw std::invalid_argument("This is a bug: face not found");
+
+            auto face_id = eid.second;
+
+            auto face_offset = face_compress_map.at(face_id) * face_basis.size();
+
+            auto pos = face_i * face_basis.size();
+
+            for (size_t i = 0; i < face_basis.size(); i++)
+            {
+                if ( msh.is_boundary(fc) )
+                    l2g.at(pos+i) = 0xDEADBEEF;
+                else
+                    l2g.at(pos+i) = face_offset+i;
+            }
+        }
+
+        assert(lc.first.rows() == lc.first.cols());
+        assert(lc.first.rows() == lc.second.size());
+        assert(lc.second.size() == l2g.size());
+
+        //std::cout << lc.second.size() << " " << l2g.size() << std::endl;
+
+        for (size_t i = 0; i < lc.first.rows(); i++)
+        {
+            if (l2g[i] == 0xDEADBEEF)
+                continue;
+
+            for (size_t j = 0; j < lc.first.cols(); j++)
+            {
+                if (l2g[j] == 0xDEADBEEF)
+                    continue;
+                
+                m_triplets.push_back( triplet_type( l2g.at(i), l2g.at(j), lc.first(i,j) ) );
+            }
+            rhs(l2g.at(i)) += lc.second(i);
+        }
+    }
+
+    vector_type
+    expand_solution(const mesh_type& msh, const vector_type& solution)
+    {
+        vector_type ret = vector_type::Zero(face_basis.size()*msh.faces_size());
+
+        auto basis_size = face_basis.size();
+        auto num_internal_faces = msh.internal_faces_size();
+
+        for (size_t cfacenum = 0; cfacenum < num_internal_faces; cfacenum++)
+        {
+            size_t src_block_offset = cfacenum * basis_size;
+            size_t dst_block_offset = face_expand_map.at(cfacenum) * basis_size;
+            size_t block_size = basis_size;
+            ret.block(dst_block_offset, 0, block_size, 1) =
+                solution.block(src_block_offset, 0, block_size, 1);
+        }
+
+        return ret;
+    }
+
+    template<typename Function>
+    void
+    impose_boundary_conditions(const mesh_type& msh, const Function& bc)
+    {}
+
+    void
+    finalize()
+    {
+        matrix.setFromTriplets(m_triplets.begin(), m_triplets.end());
+        m_triplets.clear();
+    }
+
+    void
+    finalize(sparse_matrix_type& mat, vector_type& vec)
+    {
+        mat = sparse_matrix_type(m_num_unknowns, m_num_unknowns);
+        mat.setFromTriplets(m_triplets.begin(), m_triplets.end());
+        m_triplets.clear();
+        vec = rhs;
+    }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 } // namespace disk

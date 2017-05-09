@@ -152,11 +152,11 @@ verify_convergence(const std::vector<std::string>& paths,
     typedef typename MeshType::scalar_type scalar_type;
 
     auto f = [](const point<typename MeshType::scalar_type, MeshType::dimension>& p) -> auto {
-        return M_PI * M_PI * sin(p.x() * M_PI);
+        return 2.0 * M_PI * M_PI * sin(p.x() * M_PI) * sin(p.y() * M_PI);
     };
 
     auto sf = [](const point<typename MeshType::scalar_type, MeshType::dimension>& p) -> auto {
-        return sin(p.x() * M_PI);
+        return sin(p.x() * M_PI) * sin(p.y() * M_PI);
     };
 
     bool success = true;
@@ -531,7 +531,7 @@ int main(int argc, char **argv)
 
     std::cout << bold << underline << "Triangles specialized" << reset << std::endl;
     test_triangles_specialized(tt);
-
+/*
     std::cout << bold << underline << "Triangles generic" << reset << std::endl;
     test_triangles_generic(tt);
 
@@ -555,4 +555,5 @@ int main(int argc, char **argv)
 
     std::cout << bold << underline << "Polyhedra" << reset << std::endl;
     test_polyhedra_generic(tt);
+*/
 }

@@ -1,6 +1,6 @@
 /*
  *       /\
- *      /__\       Matteo Cicuttin (C) 2016 - matteo.cicuttin@enpc.fr
+ *      /__\       Matteo Cicuttin (C) 2016-2017 - matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -572,8 +572,11 @@ public:
     {
         auto fi = find_element_id(this->faces_begin(), this->faces_end(), fc);
         if (!fi.first)
-            throw std::invalid_argument("Face not present in mesh");
-
+        {
+            std::stringstream ss;
+            ss << fc << ": Face not present in mesh";
+            throw std::invalid_argument(ss.str());
+        }
         return fi.second;
     }
 
@@ -589,6 +592,11 @@ public:
         }
 
         return mfpe;
+    }
+
+    void statistics(void) const
+    {
+        this->backend_storage()->statistics();
     }
 };
 
@@ -645,12 +653,25 @@ dump_to_matlab(const Mesh<T, 2, Storage>& msh, const std::string& filename)
 {
     std::ofstream ofs(filename);
 
+    size_t elemnum = 0;
     for (auto cl : msh)
     {
+        auto bar = barycenter(msh, cl);
+
+        ofs << "text(" << bar.x() << "," << bar.y() << ",'" << elemnum << "');" << std::endl;
+
         auto fcs = faces(msh, cl);
         for (auto fc : fcs)
         {
+            auto ptids = fc.point_ids();
             auto pts = points(msh, fc);
+            assert(ptids.size() == pts.size());
+
+            for (size_t i = 0; i < ptids.size(); i++)
+            {
+                ofs << "text(" << pts[i].x() << "," << pts[i].y() << ",'" << ptids[i] << "');" << std::endl;
+            }
+
             if ( msh.is_boundary(fc) )
             {
                 ofs << "line([" << pts[0].x() << " " << pts[1].x() << "], [";
@@ -664,6 +685,7 @@ dump_to_matlab(const Mesh<T, 2, Storage>& msh, const std::string& filename)
                 ofs << std::endl;
             }
         }
+        elemnum++;
     }
 
     ofs.close();

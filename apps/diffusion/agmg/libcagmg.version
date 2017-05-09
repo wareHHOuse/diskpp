@@ -1,0 +1,4 @@
+CAGMG {
+  global: cagmg_;
+  local: *;
+};
