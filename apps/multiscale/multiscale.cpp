@@ -379,8 +379,6 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
     auto ccb = basis.first;
     auto cfb = basis.second;
 
-    disk::multiscale_local_problem<mesh_type> mlp(k_inner, rl);
-
     auto num_cells          = msh.cells_size();
     auto num_faces          = msh.faces_size();
     auto num_cell_dofs      = ccb.size();
@@ -415,23 +413,67 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
     auto f = [](const typename mesh_type::point_type& pt) ->
                     typename mesh_type::point_type::value_type
     {
-        return 2.0 * M_PI * M_PI * sin(pt.x() * M_PI) * sin(pt.y() * M_PI);
-        //return sin(pt.x())*sin(pt.y());
+        //return 2.0 * M_PI * M_PI * sin(pt.x() * M_PI) * sin(pt.y() * M_PI);
+        return sin(pt.x())*sin(pt.y());
     };
+
+    /*
+    auto f = [](const typename mesh_type::point_type& p) ->
+                    typename mesh_type::point_type::value_type {
+        auto eps = 0.1;
+        return +2.0 * M_PI * M_PI * ( 100.0*sin(M_PI*p.y()/eps)*sin(M_PI*p.y()/eps)*cos(M_PI*p.x()/eps)*cos(M_PI*p.x()/eps) + 1.0) * sin(M_PI*p.x()) * sin(M_PI*p.y())
+               - 200 * M_PI * M_PI * sin(M_PI*p.x()) * sin(M_PI*p.y()/eps) * cos(M_PI*p.y()) * cos(M_PI*p.x()/eps) * cos(M_PI*p.x()/eps) * cos(M_PI*p.y()/eps) / eps
+               + 200 * M_PI * M_PI * sin(M_PI*p.y()) * sin(M_PI*p.x()/eps) * cos(M_PI*p.x()) * sin(M_PI*p.y()/eps) * sin(M_PI*p.y()/eps) * cos(M_PI*p.x()/eps) / eps;
+    
+    };
+    */
+    /*
+    auto f = [](const typename mesh_type::point_type& p) ->
+                    typename mesh_type::point_type::value_type {
+        return
+        + 4.0 * M_PI * M_PI * (100*sin(M_PI*p.y())*sin(M_PI*p.y())*cos(M_PI*p.x())*cos(M_PI*p.x()) + 1)*sin(M_PI*p.x())*sin(M_PI*p.y())
+        + 400 * M_PI * M_PI * sin(M_PI*p.x()) * pow(sin(M_PI*p.y()),3) * cos(M_PI*p.x()) * cos(M_PI*p.x()) 
+        - 400 * M_PI * M_PI * sin(M_PI*p.x()) * sin(M_PI*p.y()) * cos(M_PI*p.x()) * cos(M_PI*p.x()) * cos(M_PI*p.y()) * cos(M_PI*p.y());
+    };
+    */
+
+    /*
+    auto f = [](const typename mesh_type::point_type& p) ->
+                    typename mesh_type::point_type::value_type {
+
+        return 
+        - 2*(100*pow(sin(10.0*M_PI*p.y()),2)*pow(cos(10.0*M_PI*p.x()),2) + 1)*(-M_PI*M_PI*sin(M_PI*p.x())*sin(M_PI*p.y())
+        + 10.0*M_PI*M_PI*sin(10.0*M_PI*p.x())*sin(10.0*M_PI*p.y())) 
+        - 2000.0*M_PI*(M_PI*sin(M_PI*p.x())*cos(M_PI*p.y()) 
+        - M_PI*sin(10.0*M_PI*p.x())*cos(10.0*M_PI*p.y()))*sin(10.0*M_PI*p.y())*pow(cos(10.0*M_PI*p.x()),2)*cos(10.0*M_PI*p.y()) 
+        + 2000.0*M_PI*(M_PI*sin(M_PI*p.y())*cos(M_PI*p.x()) 
+        - M_PI*sin(10.0*M_PI*p.y())*cos(10.0*M_PI*p.x()))*sin(10.0*M_PI*p.x())*pow(sin(10.0*M_PI*p.y()),2)*cos(10.0*M_PI*p.x());
+    };
+    */
 
     std::vector<dynamic_matrix<scalar_type>> gr_opers, gr_datas;
     gr_opers.reserve( msh.cells_size() );
     gr_datas.reserve( msh.cells_size() );
 
+    std::vector<disk::multiscale_local_basis<mesh_type>> multiscale_bases;
+    multiscale_bases.reserve( msh.cells_size() );
+
     size_t elemnum = 0;
     for (auto& cl : msh)
     {
-        std::cout << "Assembly: " << elemnum << "/" << msh.cells_size() << "\r";
+        std::cout << "Assembly: " << elemnum << "/" << msh.cells_size() << ": ";
         std::cout.flush();
         disk::multiscale_local_basis<mesh_type> mlb(msh, cl, ccb, cfb, k_inner, rl);
+        multiscale_bases.push_back(mlb);
+        std::cout << "B ";
+        std::cout.flush();
+
         disk::gradient_reconstruction_multiscale<mesh_type, decltype(ccb), decltype(cfb)> gradrec(msh, cl, mlb, ccb, cfb);
         gr_opers.push_back( gradrec.oper );
         gr_datas.push_back( gradrec.data );
+        std::cout << "GR ";
+        std::cout.flush();
+
         auto proj = disk::make_projector(msh, cl, ccb, cfb);
 
         dynamic_vector<scalar_type> dofs = make_rhs(msh, cl, ccb, cfb, f);
@@ -482,8 +524,10 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
             b(l2g.at(i)) += sc.second(i);
         }
 
-        elemnum++;
+        std::cout << "ASM\r";
+        std::cout.flush();
 
+        elemnum++;
     }
 
     std::cout << std::endl;
@@ -513,7 +557,7 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
                monoscale_cell_basis_type;
     
     monoscale_cell_basis_type     monoscale_cell_basis(monoscale_degree);
-    cell_quadrature_type          cell_quadrature(2*monoscale_degree+2);
+    cell_quadrature_type          cell_quadrature(2*monoscale_degree+6); //XXX
     size_t monoscale_cbs = monoscale_cell_basis.size();
     
     scalar_type error = 0.0, l2_err = 0.0;
@@ -551,8 +595,8 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
                 x.block(face_offset, 0, num_face_dofs, 1);
         }
 
-        disk::multiscale_local_basis<mesh_type> mlb(msh, cl, ccb, cfb, k_inner, rl);
-
+        //disk::multiscale_local_basis<mesh_type> mlb(msh, cl, ccb, cfb, k_inner, rl);
+        auto mlb = multiscale_bases.at(elemnum);
         dynamic_vector<scalar_type> rhs_c = rhs.head(num_cell_dofs);
         dynamic_vector<scalar_type> local_dofs = recover_static_condensation(gr_datas.at(elemnum), rhs_c, dofs, num_cell_dofs);
 
@@ -565,6 +609,7 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
             scalar_type local_err = 0.0;
             scalar_type local_l2_err = 0.0;
             auto qps = cell_quadrature.integrate(ms_inner_mesh, icl);
+            
             for(auto& qp : qps)
             {
                 dynamic_vector<scalar_type> grad_multi = dynamic_vector<scalar_type>::Zero(2);
@@ -594,9 +639,10 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
                     dynamic_matrix<scalar_type> mono_dphi = monoscale_cell_basis.eval_gradients(monoscale_mesh, mono_cell, tp);
                     for (size_t i = 0; i < mono_dofs.size(); i++)
                         grad_mono += (mono_dphi.block(i, 0, 1, 2) * mono_dofs(i)).transpose();
-
-                    grad_mono(0) = M_PI * cos(M_PI * tp.x()) * sin(M_PI * tp.y());
-                    grad_mono(1) = M_PI * sin(M_PI * tp.x()) * cos(M_PI * tp.y());
+                    
+                    //auto eps = 0.1;
+                    //grad_mono(0) = M_PI * cos(M_PI * tp.x()) * sin(M_PI * tp.y()) + M_PI * sin(M_PI*tp.y()/eps)*cos(M_PI*tp.x()/eps);
+                    //grad_mono(1) = M_PI * sin(M_PI * tp.x()) * cos(M_PI * tp.y()) + M_PI * sin(M_PI*tp.x()/eps)*cos(M_PI*tp.y()/eps);
 
                     ofs << tp.x() << " " << tp.y() << " " << msval << " " << mono_val << std::endl;
                     local_l2_err += qp.weight() * (msval-mono_val) * (msval-mono_val);
@@ -701,23 +747,48 @@ void run_multiscale_tests(sol::state& lua)
     auto mn = hierarchy.meshes_size() - 1;
     auto finer_mesh = *std::next(hierarchy.meshes_begin(), mn);
 
-    auto monoscale_solution = 
-        load_monoscale_solution(finer_mesh, "../diffusion/solution_monoscale_k1.bin");
+    if ( lua["dump_last"].get_or(0) )
+        dump_netgen_format(finer_mesh, "finer_mesh.mesh2d");
 
+    auto monoscale_solution = 
+        load_monoscale_solution(finer_mesh, "../diffusion/solution.bin");
+
+    std::cout <<"done" << std::endl;
+
+    std::array<size_t, 6> levels;
+
+    levels[0] = lua["levels0"].get_or(4);
+    levels[1] = lua["levels1"].get_or(4);
+    levels[2] = lua["levels2"].get_or(4);
+    levels[3] = lua["levels3"].get_or(4);
+    levels[4] = lua["levels4"].get_or(4);
+    levels[5] = lua["levels5"].get_or(4);
+
+    if ( lua["do0"].get_or(0) )
+        test_full_problem_error(lua, *(hierarchy.meshes_begin()+0), levels[0], hierarchy, monoscale_solution);
+    
+    if ( lua["do1"].get_or(0) )
+        test_full_problem_error(lua, *(hierarchy.meshes_begin()+1), levels[1], hierarchy, monoscale_solution);
+    
+    if ( lua["do2"].get_or(0) )
+        test_full_problem_error(lua, *(hierarchy.meshes_begin()+2), levels[2], hierarchy, monoscale_solution);
+    
+    if ( lua["do3"].get_or(0) )
+        test_full_problem_error(lua, *(hierarchy.meshes_begin()+3), levels[3], hierarchy, monoscale_solution);
+    
+    if ( lua["do4"].get_or(0) )
+        test_full_problem_error(lua, *(hierarchy.meshes_begin()+4), levels[4], hierarchy, monoscale_solution);
+    
+    //if ( lua["do5"].get_or(0) )
+    //    test_full_problem_error(lua, *(hierarchy.meshes_begin()+5), levels[5], hierarchy, monoscale_solution);
 
     //test_full_problem_error(lua, *(hierarchy.meshes_begin()+0), 6, hierarchy, monoscale_solution);
     //test_full_problem_error(lua, *(hierarchy.meshes_begin()+1), 5, hierarchy, monoscale_solution);
-    //test_full_problem_error(lua, *(hierarchy.meshes_begin()+2), 6, hierarchy, monoscale_solution);
-    //test_full_problem_error(lua, *(hierarchy.meshes_begin()+3), 3, hierarchy, monoscale_solution);
-    //test_full_problem_error(lua, *(hierarchy.meshes_begin()+4), 2, hierarchy, monoscale_solution);
-
-    test_full_problem_error(lua, *(hierarchy.meshes_begin()+0), 5, hierarchy, monoscale_solution);
-    test_full_problem_error(lua, *(hierarchy.meshes_begin()+1), 5, hierarchy, monoscale_solution);
-    test_full_problem_error(lua, *(hierarchy.meshes_begin()+2), 5, hierarchy, monoscale_solution);
-    test_full_problem_error(lua, *(hierarchy.meshes_begin()+3), 5, hierarchy, monoscale_solution);
-    test_full_problem_error(lua, *(hierarchy.meshes_begin()+4), 5, hierarchy, monoscale_solution);
-    test_full_problem_error(lua, *(hierarchy.meshes_begin()+5), 5, hierarchy, monoscale_solution);
-    test_full_problem_error(lua, *(hierarchy.meshes_begin()+6), 5, hierarchy, monoscale_solution);
+    //test_full_problem_error(lua, *(hierarchy.meshes_begin()+2), 4, hierarchy, monoscale_solution);
+    //test_full_problem_error(lua, *(hierarchy.meshes_begin()+3), 4, hierarchy, monoscale_solution);
+    //test_full_problem_error(lua, *(hierarchy.meshes_begin()+4), 4, hierarchy, monoscale_solution);
+    //test_full_problem_error(lua, *(hierarchy.meshes_begin()+5), 3, hierarchy, monoscale_solution);
+    //test_full_problem_error(lua, *(hierarchy.meshes_begin()+6), 2, hierarchy, monoscale_solution);
 
 
 }

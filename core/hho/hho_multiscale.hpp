@@ -31,7 +31,7 @@ static_matrix<T,2,2>
 make_material_tensor(const point<T,2>& pt)
 {
     static_matrix<T,2,2> ret = static_matrix<T,2,2>::Identity();
-    return ret;
+    //return ret;
     //return ret * 6.72071;
 
     auto c = cos(M_PI * pt.x()/0.02);
@@ -146,8 +146,8 @@ public:
         //std::cout << "Inner cells: " << m_inner_mesh.cells_size() << std::endl;
         //std::cout << "Inner h: " << average_diameter(m_inner_mesh) << std::endl;
 
-        auto quadpair = make_quadrature(outer_msh, m_degree+outer_cell_basis.degree(),
-                                             m_degree+2*outer_face_basis.degree());
+        auto quadpair = make_quadrature(outer_msh, 2*outer_cell_basis.degree()+6,
+                                                    2*outer_face_basis.degree()+6); //XXX
 
         auto num_cell_faces = howmany_faces(outer_msh, outer_cl);
 
@@ -239,7 +239,6 @@ public:
 
             auto cell_offset = cell_idx * num_cell_dofs;
             m_rhs.block(cell_offset, 0, num_cell_dofs, num_cell_funcs) += cell_rhs;
-
             cell_idx++;
         } // for (auto& cl : m_inner_mesh)
 
@@ -358,15 +357,17 @@ public:
         vector_type ret = vector_type::Zero( local_dofs.cols() );
 
         auto tf = std::bind(make_material_tensor<scalar_type>, _1);
-        gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
-        gradrec.compute(m_inner_mesh, cl, tf);
+        //gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
+        //gradrec.compute(m_inner_mesh, cl, tf);
 
+        auto cell_id = m_inner_mesh.lookup(cl);
+        auto gr_oper = inner_gr_opers.at(cell_id);
         for (size_t i = 0; i < local_dofs.cols(); i++)
         {
 #ifdef EVAL_WITH_RECONSTRUCTION
             vector_type func_dofs = local_dofs.block(0, i, local_dofs.rows(), 1);
 
-            vector_type R = gradrec.oper * func_dofs;
+            vector_type R = gr_oper * func_dofs;
 
             vector_type phi = bqd.cell_basis.eval_functions(m_inner_mesh, cl, pt, 0, m_degree+1);
 
@@ -396,16 +397,18 @@ public:
         matrix_type ret = matrix_type::Zero( local_dofs.cols(), 2 );
 
         auto tf = std::bind(make_material_tensor<scalar_type>, _1);
-            gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
-            gradrec.compute(m_inner_mesh, cl, tf);
+        //gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
+        //gradrec.compute(m_inner_mesh, cl, tf);
 
+        auto cell_id = m_inner_mesh.lookup(cl);
+        auto gr_oper = inner_gr_opers.at(cell_id);
         for (size_t i = 0; i < local_dofs.cols(); i++)
         {
 
 #ifdef EVAL_WITH_RECONSTRUCTION
             vector_type func_dofs = local_dofs.block(0, i, local_dofs.rows(), 1);
 
-            vector_type R = gradrec.oper * func_dofs;
+            vector_type R = gr_oper * func_dofs;
 
             matrix_type dphi = bqd.cell_basis.eval_gradients(m_inner_mesh, cl, pt, 0, m_degree+1);
 
@@ -634,9 +637,9 @@ public:
 
         /*matrix_type*/ stiff_mat = matrix_type::Zero(ms_basis_size+1, ms_basis_size+1);
 
-        quadrature<ms_inner_mesh_type, ms_inner_cell_type> ms_cell_quad(2*multiscale_basis.degree());
-        auto quadpair = make_quadrature(inner_mesh, 2*cb.degree(),
-                                             2*fb.degree());
+        quadrature<ms_inner_mesh_type, ms_inner_cell_type> ms_cell_quad(2*multiscale_basis.degree()+6);
+        auto quadpair = make_quadrature(inner_mesh, 2*cb.degree()+6,
+                                             2*fb.degree()+6); //XXX
 
         matrix_type rhs;
         auto rhs_cols_size = cb.size() + howmany_faces(outer_mesh, outer_cl) * fb.size();

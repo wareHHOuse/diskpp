@@ -327,8 +327,9 @@ class mesh_hierarchy
         
         for (size_t i = 0; i < levels; i++)
         {
-            std::cout << "Building level " << i+1 << " mesh" << std::endl;
+            std::cout << "Building level " << i+1 << " mesh. H = ";
             auto next_mesh = build_next( meshes[i] );
+            std::cout << average_diameter(next_mesh) << std::endl;
             //next_mesh.statistics();
             meshes.push_back( next_mesh );
             auto c2f = make_coarse_to_fine_map(meshes[i], meshes[i+1]);
@@ -359,7 +360,9 @@ class mesh_hierarchy
         auto u = (dot11 * dot02 - dot01 * dot12) * invDenom;
         auto v = (dot00 * dot12 - dot01 * dot02) * invDenom;
         
-        return (u >= 0) && (v >= 0) && (u + v < 1);
+        auto thresh = 0.0;
+
+        return (u >= (0-thresh)) && (v >= (0-thresh)) && (u + v <= (1+thresh));
     }
     
     size_t

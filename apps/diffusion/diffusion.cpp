@@ -79,16 +79,29 @@ run_diffusion_solver(const Mesh<T, 2, Storage>& msh, run_params& rp)
 {
     typedef Mesh<T, 2, Storage> mesh_type;
 
+    
     auto load = [](const point<T, 2>& p) -> auto {
 
         //return 2.0 * M_PI * M_PI * sin(p.x() * M_PI) * sin(p.y() * M_PI);
         return sin(p.x()) * sin(p.y());
-
     };
+    
 
+    
     auto solution = [](const point<T, 2>& p) -> auto {
         return sin(p.x() * M_PI) * sin(p.y() * M_PI);
     };
+    
+
+    /*
+    auto load = [](const point<T,2>& p) -> auto {
+        auto eps = 1.0;
+        return +2.0 * M_PI * M_PI * ( 100.0*sin(M_PI*p.y()/eps)*sin(M_PI*p.y()/eps)*cos(M_PI*p.x()/eps)*cos(M_PI*p.x()/eps) + 1.0) * sin(M_PI*p.x()) * sin(M_PI*p.y())
+               - 200 * M_PI * M_PI * sin(M_PI*p.x()) * sin(M_PI*p.y()/eps) * cos(M_PI*p.y()) * cos(M_PI*p.x()/eps) * cos(M_PI*p.x()/eps) * cos(M_PI*p.y()/eps) / eps
+               + 200 * M_PI * M_PI * sin(M_PI*p.y()) * sin(M_PI*p.x()/eps) * cos(M_PI*p.x()) * sin(M_PI*p.y()/eps) * sin(M_PI*p.y()/eps) * cos(M_PI*p.x()/eps) / eps;
+    
+    };
+    */
 
     diffusion_solver<mesh_type> dp(msh, rp.degree);
     dp.verbose(rp.verbose);

@@ -27,8 +27,8 @@ int main(int argc, char **argv)
     using RealType = double;
 
     //const char *msh_fn = "/Users/matteo/Desktop/MsHHO meshes/mesh6.mesh2d";
-    const char *msh_fn = "../multiscale/monoscale_hho_mesh.mesh2d";
-    const char *sol_fn = "../diffusion/solution_monoscale_k0.bin";
+    const char *msh_fn = "../multiscale/mesh_ref_6.mesh2d";
+    const char *sol_fn = "../diffusion/solution.bin";
 
     typedef disk::simplicial_mesh<RealType, 2>      mesh_type;
     typedef typename mesh_type::cell                cell_type;
