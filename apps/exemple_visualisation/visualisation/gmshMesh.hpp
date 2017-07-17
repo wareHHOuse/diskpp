@@ -116,7 +116,6 @@ class Gmesh
 
       void convertInDiscontinuousMesh();
       void computeDeformed(const std::vector<Node>& newNodes);
-
 };
 
 } //visu

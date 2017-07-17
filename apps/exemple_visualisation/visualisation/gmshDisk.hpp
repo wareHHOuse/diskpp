@@ -66,8 +66,8 @@ Triangle convertTriangle( const DiskTriangle& triangle, const size_t index)
 
    assert(nodes.size() == 3);
 
-//    std::cout << " ------------------------------------------------ " << std::endl;
-//    std::cout << nodes[0] + 1 << " " << nodes[1] + 1 << " "<< nodes[2] + 1 << " " << std::endl;
+   //    std::cout << " ------------------------------------------------ " << std::endl;
+   //    std::cout << nodes[0] + 1 << " " << nodes[1] + 1 << " "<< nodes[2] + 1 << " " << std::endl;
 
    std::vector<size_t> tmpnodes = { nodes[0] + 1, nodes[1] + 1, nodes[2] + 1 };
 
@@ -120,11 +120,11 @@ Hexahedron convertHexahedron( const DiskHexa& hexahedron, const size_t index)
    std::cout << nodes[4] + 1 << " " << nodes[5] + 1 << " "<< nodes[7] + 1 << " "<< nodes[6] + 1 << " " << std::endl;*/
 
    std::vector<size_t> tmpnodes = { nodes[0] + 1, nodes[1] + 1, nodes[3] + 1, nodes[2] + 1,
-                                    nodes[4] + 1, nodes[5] + 1, nodes[7] + 1, nodes[6] + 1 }; //the ordering of nodes a bit strange
+      nodes[4] + 1, nodes[5] + 1, nodes[7] + 1, nodes[6] + 1 }; //the ordering of nodes a bit strange
 
-   Hexahedron hexa(tmpnodes, index, 0, 0);
+      Hexahedron hexa(tmpnodes, index, 0, 0);
 
-   return hexa;
+      return hexa;
 }
 
 template<typename T, size_t DIM>
@@ -136,7 +136,7 @@ void init_coor( const point<T,DIM>& point, std::array<double, 3>& coor)
 }
 
 template<template<typename, size_t, typename> class Mesh,
-         typename T, typename Storage, size_t DIM, typename Cell>
+typename T, typename Storage, size_t DIM, typename Cell>
 auto cell_nodes(const Mesh<T, DIM, Storage>& mesh, const Cell& cl)
 {
    typedef Mesh<T, DIM, Storage>                 mesh_type;
@@ -144,7 +144,7 @@ auto cell_nodes(const Mesh<T, DIM, Storage>& mesh, const Cell& cl)
 }
 
 template<template<typename, size_t, typename> class Mesh,
-         typename T, typename Storage, typename Cell>
+typename T, typename Storage, typename Cell>
 auto cell_nodes(const Mesh<T, 1, Storage>& mesh, const Cell& cl)
 {
    auto storage = mesh.backend_storage();
@@ -153,7 +153,7 @@ auto cell_nodes(const Mesh<T, 1, Storage>& mesh, const Cell& cl)
 }
 
 template<template<typename, size_t, typename> class Mesh,
-         typename T, typename Storage, typename Cell>
+typename T, typename Storage, typename Cell>
 auto cell_nodes(const Mesh<T, 2, Storage>& mesh, const Cell& cl)
 {
    auto storage = mesh.backend_storage();
@@ -162,7 +162,7 @@ auto cell_nodes(const Mesh<T, 2, Storage>& mesh, const Cell& cl)
 }
 
 template<template<typename, size_t, typename> class Mesh,
-         typename T, typename Storage, typename Cell>
+typename T, typename Storage, typename Cell>
 auto cell_nodes(const Mesh<T, 3, Storage>& mesh, const Cell& cl)
 {
    auto storage = mesh.backend_storage();
@@ -172,7 +172,7 @@ auto cell_nodes(const Mesh<T, 3, Storage>& mesh, const Cell& cl)
 
 
 template<template<typename, size_t, typename> class Mesh,
-         typename T, typename Storage, size_t DIM, typename Face>
+typename T, typename Storage, size_t DIM, typename Face>
 auto face_nodes(const Mesh<T, DIM, Storage>& mesh, const Face& fc)
 {
    typedef Mesh<T, DIM, Storage>                 mesh_type;
@@ -180,7 +180,7 @@ auto face_nodes(const Mesh<T, DIM, Storage>& mesh, const Face& fc)
 }
 
 template<template<typename, size_t, typename> class Mesh,
-         typename T, typename Storage, typename Face>
+typename T, typename Storage, typename Face>
 auto face_nodes(const Mesh<T, 1, Storage>& mesh, const Face& fc)
 {
    auto storage = mesh.backend_storage();
@@ -189,7 +189,7 @@ auto face_nodes(const Mesh<T, 1, Storage>& mesh, const Face& fc)
 }
 
 template<template<typename, size_t, typename> class Mesh,
-         typename T, typename Storage, typename Face>
+typename T, typename Storage, typename Face>
 auto face_nodes(const Mesh<T, 2, Storage>& mesh, const Face& fc)
 {
    auto storage = mesh.backend_storage();
@@ -198,7 +198,7 @@ auto face_nodes(const Mesh<T, 2, Storage>& mesh, const Face& fc)
 }
 
 template<template<typename, size_t, typename> class Mesh,
-         typename T, typename Storage, typename Face>
+typename T, typename Storage, typename Face>
 auto face_nodes(const Mesh<T, 3, Storage>& mesh, const Face& fc)
 {
    auto storage = mesh.backend_storage();

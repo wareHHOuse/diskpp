@@ -19,13 +19,13 @@
  #include<utility>
  #include<fstream>
  #include<iostream>
- 
+
  #include "gmshMesh.hpp"
  #include "gmshData.hpp"
  #include "gmshElement.hpp"
 
 
- namespace visu{
+namespace visu{
 
 
 // Class Data
@@ -60,10 +60,10 @@ void Data::changeIndex(const size_t index) {m_index = index;}
 SubData::SubData() : Data(), m_node() {}
 
 SubData::SubData(const std::vector<double>& data, const Node& node) :
-                Data(node.getIndex(), data), m_node(node) {}
+Data(node.getIndex(), data), m_node(node) {}
 
 SubData::SubData(const Data& data, const Node& node) :
-                SubData(data.getData(), node) {}
+SubData(data.getData(), node) {}
 
 Node SubData::getNode() const {return m_node;}
 
@@ -82,10 +82,10 @@ void SubData::changeIndex(const size_t index)
 GenericData::GenericData() : m_composante(0), m_time_value(0.0), m_title("  "), m_datas() {}
 
 GenericData::GenericData(const size_t nbcompo, const std::vector<Data>& datas) :
-                     m_composante(nbcompo), m_time_value(0.0), m_title("\" Unknown title \" "), m_datas(datas) {}
+m_composante(nbcompo), m_time_value(0.0), m_title("\" Unknown title \" "), m_datas(datas) {}
 
 GenericData::GenericData(const size_t nbcompo, const double time_value, const std::string title, const std::vector<Data>& datas)
-            : m_composante(nbcompo), m_time_value(time_value), m_title(title), m_datas(datas) {}
+: m_composante(nbcompo), m_time_value(time_value), m_title(title), m_datas(datas) {}
 
 std::vector<Data> GenericData::getData() const {return m_datas;}
 
@@ -113,8 +113,8 @@ void GenericData::addData(const size_t index, const std::vector<double>& values)
 // Class NodeData
 NodeData::NodeData() : GenericData(), m_subdatas() {}
 NodeData::NodeData(const size_t nbcompo, const double time_value, const std::string title,
-         const std::vector<Data>& datas, const std::vector<SubData>& subdatas) :
-         GenericData(nbcompo, time_value, title, datas), m_subdatas(subdatas) {}
+   const std::vector<Data>& datas, const std::vector<SubData>& subdatas) :
+   GenericData(nbcompo, time_value, title, datas), m_subdatas(subdatas) {}
 
 void NodeData::addSubData(const Data& subdata, const Node& node)
 {
