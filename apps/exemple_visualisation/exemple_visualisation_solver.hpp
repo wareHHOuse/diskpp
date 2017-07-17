@@ -267,7 +267,7 @@ public:
    plot_l2error_at_gausspoint(const std::string& filename, const AnalyticalSolution& as)
    {
       std::cout << "Compute L2 error at Gauss points" << std::endl;
-      visu::Gmesh msh; //creta a mesh
+      visu::Gmesh msh(m_msh.dimension); //creta a mesh
 
       std::vector<visu::Data> data; //create data (not used)
       std::vector<visu::SubData> subdata; //create subdata to save soution at gauss point
@@ -305,7 +305,7 @@ public:
    plot_solution_at_gausspoint(const std::string& filename)
    {
       std::cout << "Compute solution at Gauss points" << std::endl;
-      visu::Gmesh msh; //creta a mesh
+      visu::Gmesh msh(m_msh.dimension); //creta a mesh
 
       std::vector<visu::Data> data; //create data (not used)
       std::vector<visu::SubData> subdata; //create subdata to save soution at gauss point
