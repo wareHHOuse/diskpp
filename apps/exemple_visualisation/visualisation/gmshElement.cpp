@@ -15,8 +15,8 @@
  */
 
 
-#include "gmshMesh.h"
-#include "gmshElement.h"
+#include "gmshMesh.hpp"
+#include "gmshElement.hpp"
 #include<iostream>
 #include<fstream>
 #include <assert.h>
@@ -28,11 +28,8 @@ namespace visu{
 Node::Node() : m_coordinate(), m_index(0), m_ref(0) {}
 
 
-Node::Node(const std::vector<double>& vert, const size_t index, const size_t ref) :
-                m_coordinate(vert), m_index(index), m_ref(ref)
-{
-  assert((m_coordinate.size() == 3) && "The size of the point is not equal to 3 !");
-}
+Node::Node(const std::array<double, 3>& coor, const size_t index, const size_t ref) :
+                m_coordinate(coor), m_index(index), m_ref(ref) {}
 
 void Node::print() const
 {
@@ -46,7 +43,7 @@ void Node::print() const
    std::cout << "--------------------------------------" <<  std::endl;
 }
 
-std::vector<double> Node::getCoordinate() const
+std::array<double, 3> Node::getCoordinate() const
 {
   return m_coordinate;
 }
@@ -63,19 +60,7 @@ size_t Node::getIndex() const
 
 void Node::changeIndex(const size_t index) {m_index = index;}
 void Node::changeRef(const size_t ref) {m_ref = ref;}
-void Node::changeCoordinates(const std::vector<double>& coor)
-{
-   assert(coor.size() == 3);
-
-   if(m_coordinate.empty()){
-      m_coordinate.reserve(3);
-      m_coordinate = coor;
-   }
-   else{
-      m_coordinate = coor;
-   }
-
-}
+void Node::changeCoordinates(const std::array<double, 3>& coor) { m_coordinate = coor;}
 
 // Class Element
 Element::Element() : _nodes(), _index(0), _type_elem(0),

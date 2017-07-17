@@ -18,35 +18,23 @@
 #define GMSHDISK_H
 
 #include<vector>
+#include<array>
 #include<string>
 #include<utility>
 #include <array>
 #include <cassert>
 
-#include "loaders/loader.hpp"
 #include "geometry/geometry.hpp"
 #include "mesh/point.hpp"
-#include "gmshMesh.h"
-#include "gmshElement.h"
+#include "gmshMesh.hpp"
+#include "gmshElement.hpp"
 
 namespace visu{
-
-template< typename T>
-bool test_triangle2D_direct(const T& p0, const T& p1, const T& p2)
-{
-   if(((p1.x()-p0.x())*(p2.y()-p0.y())-(p1.y()-p0.y())*(p2.x()-p0.x())) >= 0.0){
-      return true;
-   }
-   else{
-      return false;
-   }
-}
-
 
 template<typename T, size_t DIM>
 Node convertPoint( const point<T,DIM>& point, const size_t index)
 {
-   std::vector<double> coor(3,0.0);
+   std::array<double, 3> coor = {double{0.0}, double{0.0}, double{0.0}};
 
    for(size_t i = 0; i < DIM; i++){
       coor[i] = double(point.at(i));
@@ -57,8 +45,8 @@ Node convertPoint( const point<T,DIM>& point, const size_t index)
    return node;
 }
 
-template< typename T>
-Edge convertEdge( const T& edge, const size_t index)
+template<typename DiskEdge>
+Edge convertEdge( const DiskEdge& edge, const size_t index)
 {
    auto nodes = edge.point_ids();
 
@@ -71,33 +59,8 @@ Edge convertEdge( const T& edge, const size_t index)
    return tmpedge;
 }
 
-template< typename T, typename Mesh>
-Edge convertEdge(const Mesh& mesh, const T& edge, const size_t index)
-{
-   auto nodes = edge.point_ids();
-
-   assert(nodes.size() == 2);
-
-   auto storage = mesh.backend_storage();
-
-   auto p0 = storage->points[nodes[0]];
-   auto p1 = storage->points[nodes[1]];
-   std::vector<size_t> tmpnodes(2, 0);
-
-   if(p0.x() <= p1.x()){
-       tmpnodes = { nodes[0] + 1, nodes[1] + 1 };
-   }
-   else {
-       tmpnodes = { nodes[1] + 1, nodes[0] + 1 };
-   }
-
-   Edge tmpedge(tmpnodes, index, 0, 0);
-
-   return tmpedge;
-}
-
-template< typename T>
-Triangle convertTriangle( const T& triangle, const size_t index)
+template<typename DiskTriangle>
+Triangle convertTriangle( const DiskTriangle& triangle, const size_t index)
 {
    auto nodes = triangle.point_ids();
 
@@ -113,38 +76,8 @@ Triangle convertTriangle( const T& triangle, const size_t index)
    return tri;
 }
 
-template< typename T, typename Mesh>
-Triangle convertTriangle(const Mesh& mesh, const T& triangle, const size_t index)
-{
-   auto nodes = triangle.point_ids();
-
-   assert(nodes.size() == 3);
-
-   auto storage = mesh.backend_storage();
-
-   auto p0 = storage->points[nodes[0]];
-   auto p1 = storage->points[nodes[1]];
-   auto p2 = storage->points[nodes[2]];
-   std::vector<size_t> tmpnodes(3,0);
-
-   if(test_triangle2D_direct(p0,p1,p2)){
-      tmpnodes = { nodes[0] + 1, nodes[1] + 1, nodes[2] + 1 };
-   }
-   else{
-      tmpnodes = { nodes[0] + 1, nodes[2] + 1, nodes[1] + 1 };
-   }
-
-//    std::cout << " ------------------------------------------------ " << std::endl;
-//    std::cout << nodes[0] + 1 << " " << nodes[1] + 1 << " "<< nodes[2] + 1 << " " << std::endl;
-
-   Triangle tri(tmpnodes, index, 0, 0);
-
-   return tri;
-}
-
-// a priori the ordering is (0-1-3-2)
-template< typename T>
-Quadrangle convertQuadrangle( const T& quadrangle, const size_t index)
+template<typename DiskQuadrangle>
+Quadrangle convertQuadrangle( const DiskQuadrangle& quadrangle, const size_t index)
 {
    auto nodes = quadrangle.point_ids();
 
@@ -157,8 +90,8 @@ Quadrangle convertQuadrangle( const T& quadrangle, const size_t index)
    return quad;
 }
 
-template< typename T>
-Tetrahedron convertTetrahedron( const T& tetrahedron, const size_t index)
+template<typename DiskTetra>
+Tetrahedron convertTetrahedron( const DiskTetra& tetrahedron, const size_t index)
 {
    auto nodes = tetrahedron.point_ids();
 
@@ -174,46 +107,9 @@ Tetrahedron convertTetrahedron( const T& tetrahedron, const size_t index)
    return tetra;
 }
 
-template< typename T, typename Mesh>
-Tetrahedron convertTetrahedron(const Mesh& mesh, const T& tetrahedron, const size_t index)
-{
-   auto nodes = tetrahedron.point_ids();
 
-   assert(nodes.size() == 4);
-   /*
-   std::cout << " ------------------------------------------------ " << std::endl;
-   std::cout << nodes[0] + 1 << " " << nodes[1] + 1 << " "<< nodes[2] + 1 << " "<< nodes[3] + 1 << " " << std::endl;*/
-   auto storage = mesh.backend_storage();
-   auto p0 = storage->points[nodes[0]];
-   auto p1 = storage->points[nodes[1]];
-   auto p2 = storage->points[nodes[2]];
-   auto p3 = storage->points[nodes[3]];
-
-   auto v1 = p1 - p0;
-   auto v2 = p2 - p0;
-   auto v3 = p3 - p0;
-
-   auto det = v1.x()*v2.y()*v3.z() + v1.z()*v2.x()*v3.y() + v1.y()*v2.z()*v3.x()
-            - v1.z()*v2.y()*v3.x() - v1.y()*v2.x()*v3.z() - v1.x()*v2.z()*v3.y();
-
-   std::vector<size_t> tmpnodes(4, 0);
-
-   // det>0 if the tetrahedra is direct
-   if(det >= 0.0){
-      tmpnodes = { nodes[0] + 1, nodes[1] + 1, nodes[2] + 1, nodes[3] + 1 };
-   }
-   else {
-      tmpnodes = { nodes[0] + 1, nodes[2] + 1, nodes[1] + 1, nodes[3] + 1 };
-   }
-
-   Tetrahedron tetra(tmpnodes, index, 0, 0);
-
-   return tetra;
-}
-
-// the ordering is 0-1-3-2-4-5-7-6
-template< typename T>
-Hexahedron convertHexahedron( const T& hexahedron, const size_t index)
+template<typename DiskHexa>
+Hexahedron convertHexahedron( const DiskHexa& hexahedron, const size_t index)
 {
    auto nodes = hexahedron.point_ids();
 
@@ -224,13 +120,20 @@ Hexahedron convertHexahedron( const T& hexahedron, const size_t index)
    std::cout << nodes[4] + 1 << " " << nodes[5] + 1 << " "<< nodes[7] + 1 << " "<< nodes[6] + 1 << " " << std::endl;*/
 
    std::vector<size_t> tmpnodes = { nodes[0] + 1, nodes[1] + 1, nodes[3] + 1, nodes[2] + 1,
-                                    nodes[4] + 1, nodes[5] + 1, nodes[7] + 1, nodes[6] + 1 };
+                                    nodes[4] + 1, nodes[5] + 1, nodes[7] + 1, nodes[6] + 1 }; //the ordering of nodes a bit strange
 
    Hexahedron hexa(tmpnodes, index, 0, 0);
 
    return hexa;
 }
 
+template<typename T, size_t DIM>
+void init_coor( const point<T,DIM>& point, std::array<double, 3>& coor)
+{
+   for(size_t i = 0; i < DIM; i++){
+      coor[i] = double(point.at(i));
+   }
+}
 
 template<template<typename, size_t, typename> class Mesh,
          typename T, typename Storage, size_t DIM, typename Cell>

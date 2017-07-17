@@ -32,7 +32,7 @@
 
 #include "loaders/loader.hpp"
 #include "hho/hho.hpp"
-#include "apps/exemple_visualisation/visualisation/gmshDisk.h"
+#include "apps/exemple_visualisation/visualisation/gmshDisk.hpp"
 #include "apps/exemple_visualisation/visualisation/gmshConvertMesh.hpp"
 
 #include "timecounter.h"
@@ -70,15 +70,12 @@ run_diffusion_solver(const Mesh<T, 1, Storage>& msh, run_params& rp)
     dp.assemble(load, solution);
     dp.solve();
     dp.postprocess(load);
+    dp.plot_solution_at_gausspoint("solgp1d.msh");
+    dp.plot_l2error_at_gausspoint("errorgp1d.msh", solution);
+    dp.compute_discontinuous_solution("visu1d.msh");
+    dp.compute_deformed("visu1d_deformed.msh");
+    dp.saveMesh("saveMesh1D.msh");
     std::cout << dp.compute_l2_error(solution) << std::endl;
-
-    // exemple of post-processing
-    std::cout << "--- Start of post-processing ---" << std::endl;
-    visu::Gmesh gmsh = visu::convertMesh(msh);
-    gmsh.writeGmesh("save_mesh1D.msh",2);
-    dp.plot_solution_at_gausspoint("solgp.msh", gmsh);
-    dp.plot_l2error_at_gausspoint("errorgp.msh", solution, gmsh);
-    dp.plot_conforme_solution_nodes("sol_nodes.msh", gmsh);
 }
 
 template<template<typename, size_t, typename> class Mesh,
@@ -102,15 +99,12 @@ run_diffusion_solver(const Mesh<T, 2, Storage>& msh, run_params& rp)
     dp.assemble(load, solution);
     dp.solve();
     dp.postprocess(load);
+    dp.plot_solution_at_gausspoint("solgp2d.msh");
+    dp.plot_l2error_at_gausspoint("errorgp2d.msh", solution);
+    dp.compute_discontinuous_solution("visu2d.msh");
+    dp.compute_deformed("visu2d_deformed.msh");
+    dp.saveMesh("saveMesh2D.msh");
     std::cout << dp.compute_l2_error(solution) << std::endl;
-
-    //exemple of post-processing
-    std::cout << "--- Start of post-processing ---" << std::endl;
-    visu::Gmesh gmsh = visu::convertMesh(msh);
-    gmsh.writeGmesh("save_mesh2D.msh",2);
-    dp.plot_solution_at_gausspoint("solgp.msh", gmsh);
-    dp.plot_l2error_at_gausspoint("errorgp.msh", solution, gmsh);
-    dp.plot_conforme_solution_nodes("sol_nodes.msh", gmsh);
 }
 
 template<template<typename, size_t, typename> class Mesh,
@@ -134,15 +128,11 @@ run_diffusion_solver(const Mesh<T, 3, Storage>& msh, run_params& rp)
     dp.assemble(load, solution);
     dp.solve();
     dp.postprocess(load);
+    dp.plot_solution_at_gausspoint("solgp3d.msh");
+    dp.plot_l2error_at_gausspoint("errorgp3d.msh", solution);
+    dp.compute_discontinuous_solution("visu3d.msh");
+    dp.saveMesh("saveMesh3D.msh");
     std::cout << dp.compute_l2_error(solution) << std::endl;
-
-    //exemple of post-processing
-    std::cout << "--- Start of post-processing ---" << std::endl;
-    visu::Gmesh gmsh = visu::convertMesh(msh);
-    gmsh.writeGmesh("save_mesh3D.msh",2);
-    dp.plot_solution_at_gausspoint("solgp.msh", gmsh);
-    dp.plot_l2error_at_gausspoint("errorgp.msh", solution, gmsh);
-    dp.plot_conforme_solution_nodes("sol_nodes.msh", gmsh);
 }
 
 int main(int argc, char **argv)
@@ -229,6 +219,9 @@ int main(int argc, char **argv)
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
         auto msh = disk::load_fvca5_2d_mesh<RealType>(mesh_filename);
         run_diffusion_solver(msh, rp);
+
+        visu::Gmesh gmsh = visu::convertMesh(msh);
+        gmsh.writeGmesh("test_G2.msh",2);
         return 0;
     }
 
@@ -238,6 +231,11 @@ int main(int argc, char **argv)
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
         auto msh = disk::load_netgen_2d_mesh<RealType>(mesh_filename);
         run_diffusion_solver(msh, rp);
+
+        visu::Gmesh gmsh = visu::convertMesh(msh);
+        gmsh.writeGmesh("test_S2.msh",2);
+
+
         return 0;
     }
 
@@ -247,6 +245,9 @@ int main(int argc, char **argv)
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
         auto msh = disk::load_cartesian_2d_mesh<RealType>(mesh_filename);
         run_diffusion_solver(msh, rp);
+
+        visu::Gmesh gmsh = visu::convertMesh(msh);
+        gmsh.writeGmesh("test_Q2.msh",2);
         return 0;
     }
 
@@ -256,6 +257,9 @@ int main(int argc, char **argv)
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
         auto msh = disk::load_netgen_3d_mesh<RealType>(mesh_filename);
         run_diffusion_solver(msh, rp);
+
+        visu::Gmesh gmsh = visu::convertMesh(msh);
+        gmsh.writeGmesh("test_S3.msh",2);
         return 0;
     }
 
@@ -265,7 +269,233 @@ int main(int argc, char **argv)
         std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
         auto msh = disk::load_cartesian_3d_mesh<RealType>(mesh_filename);
         run_diffusion_solver(msh, rp);
+
+        visu::Gmesh gmsh = visu::convertMesh(msh);
+        gmsh.writeGmesh("test_Q3.msh",2);
         return 0;
     }
 
 }
+
+
+
+
+#if 0
+
+
+
+int main(int argc, char **argv)
+{
+    using RealType = double;
+
+    char    *filename       = nullptr;
+    int     degree          = 1;
+    int     l               = 0;
+    int     elems_1d        = 8;
+    bool    submesh_flag    = false;
+    int ch;
+
+    while ( (ch = getopt(argc, argv, "k:n:sl:")) != -1 )
+    {
+        switch(ch)
+        {
+            case 'k':
+                degree = atoi(optarg);
+                if (degree < 0)
+                {
+                    std::cout << "Degree must be positive. Falling back to 1." << std::endl;
+                    degree = 1;
+                }
+                break;
+
+            case 'n':
+                elems_1d = atoi(optarg);
+                if (elems_1d < 0)
+                {
+                    std::cout << "Num of elems must be positive. Falling back to 8." << std::endl;
+                    elems_1d = 8;
+                }
+                break;
+
+            case 's':
+                submesh_flag = true;
+                break;
+
+            case 'l':
+                l = atoi(optarg);
+                if (l < -1 or l > 1)
+                {
+                    std::cout << "l can be -1, 0 or 1. Falling back to 0." << std::endl;
+                    l = 0;
+                }
+                break;
+
+            case 'h':
+            case '?':
+            default:
+                std::cout << "wrong arguments" << std::endl;
+                exit(1);
+        }
+    }
+
+    argc -= optind;
+    argv += optind;
+
+
+    if (argc == 0)
+    {
+        std::cout << "Running 1D test simulation" << std::endl;
+
+        typedef disk::generic_mesh<RealType, 1>  mesh_type;
+
+        mesh_type msh;
+        disk::uniform_mesh_loader<RealType, 1> loader(0,1,elems_1d);
+        loader.populate_mesh(msh);
+
+        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            //return 2.;
+            return M_PI * M_PI * sin(p.x() * M_PI);
+        };
+
+        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            //return - p.x() * p.x();
+            return sin(p.x() * M_PI);
+        };
+
+        //test_gradrec(msh, degree);
+        test_diffusion(msh, f, sf, degree, "plot.dat");
+
+        return 0;
+    }
+
+    filename = argv[0];
+
+
+    if (std::regex_match(filename, std::regex(".*\\.msh$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
+
+        typedef disk::generic_mesh<RealType, 3>   mesh_type;
+
+        mesh_type msh;
+        disk::fvca6_mesh_loader<RealType, 3> loader;
+
+
+        if (!loader.read_mesh(filename))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            return 1;
+        }
+
+        loader.populate_mesh(msh);
+
+        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return M_PI * M_PI * sin(p.x() * M_PI);
+            //return 1.0;
+        };
+
+        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return sin(p.x() * M_PI);
+            //return -p.x() * p.x() * 0.5;
+        };
+
+        double m = 0.0;
+        for (auto& cl : msh)
+            m += measure(msh, cl);
+        std::cout << m << std::endl;
+
+        test_diffusion(msh, f, sf, degree, "plot.dat");
+        //test_gradrec(msh, degree);
+    }
+
+    if (std::regex_match(filename, std::regex(".*\\.mesh$") ))
+    {
+        std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
+
+        typedef disk::simplicial_mesh<RealType, 3>   mesh_type;
+
+        mesh_type msh;
+        disk::netgen_mesh_loader<RealType, 3> loader;
+        if (!loader.read_mesh(filename))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            return 1;
+        }
+        loader.populate_mesh(msh);
+
+        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return M_PI * M_PI * sin(p.x() * M_PI);
+            //return 1.0;
+        };
+
+        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return sin(p.x() * M_PI);
+            //return -p.x() * p.x() * 0.5;
+        };
+
+        test_diffusion(msh, f, sf, degree, "plot.dat");
+        //test_gradrec(msh, degree);
+    }
+
+    if (std::regex_match(filename, std::regex(".*\\.quad$") ))
+    {
+        std::cout << "Guessed mesh format: Cartesian 2D" << std::endl;
+
+        typedef disk::cartesian_mesh<RealType, 2>   mesh_type;
+
+        mesh_type msh;
+        disk::cartesian_mesh_loader<RealType, 2> loader;
+        if (!loader.read_mesh(filename))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            return 1;
+        }
+        loader.populate_mesh(msh);
+
+        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return M_PI * M_PI * sin(p.x() * M_PI);
+            //return 1.0;
+        };
+
+        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return sin(p.x() * M_PI);
+            //return -p.x() * p.x() * 0.5;
+        };
+
+        test_diffusion(msh, f, sf, degree, "plot.dat");
+        //test_gradrec(msh, degree);
+    }
+
+    if (std::regex_match(filename, std::regex(".*\\.hex$") ))
+    {
+        std::cout << "Guessed mesh format: Cartesian 3D" << std::endl;
+
+        typedef disk::cartesian_mesh<RealType, 3>   mesh_type;
+
+        mesh_type msh;
+        disk::cartesian_mesh_loader<RealType, 3> loader;
+        if (!loader.read_mesh(filename))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            return 1;
+        }
+        loader.populate_mesh(msh);
+
+        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return M_PI * M_PI * sin(p.x() * M_PI);
+            //return 1.0;
+        };
+
+        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+            return sin(p.x() * M_PI);
+            //return -p.x() * p.x() * 0.5;
+        };
+
+        test_diffusion(msh, f, sf, degree, "plot.dat");
+        //test_gradrec(msh, degree);
+    }
+
+    return 0;
+}
+
+#endif

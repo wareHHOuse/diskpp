@@ -18,8 +18,9 @@
 #define GMSHMESH_H
 
 #include<vector>
+#include<array>
 #include<string>
-#include "gmshElement.h"
+#include "gmshElement.hpp"
 
 namespace visu{
 
@@ -49,6 +50,8 @@ class Gmesh
 
    public:
       Gmesh();
+      Gmesh(const size_t dim);
+
       Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
             const std::vector<Edge>& edges);
 

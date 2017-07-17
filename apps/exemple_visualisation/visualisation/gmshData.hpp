@@ -18,6 +18,7 @@
 #define GMSHDATA_H
 
 #include<vector>
+#include<array>
 #include<string>
 #include<utility>
 
@@ -50,7 +51,7 @@ class SubData : public Data
       SubData(const std::vector<double>& data, const Node& node);
       SubData(const Data& data, const Node& node);
       Node getNode() const;
-      void changeCoordinates(const std::vector<double>& coor);
+      void changeCoordinates(const std::array<double, 3>& coor);
       void changeIndex(const size_t index);
 
 };
@@ -89,8 +90,6 @@ class NodeData : public GenericData
   public:
      NodeData();
      NodeData(const size_t nbcompo, const double time_value, const std::string title,
-             const std::vector<Data>& datas);
-     NodeData(const size_t nbcompo, const double time_value, const std::string title,
               const std::vector<Data>& datas, const std::vector<SubData>& subdatas);
      void saveNodeData(const std::string name_mesh, const Gmesh& mesh);
      std::vector<SubData> getSubData() const;
@@ -110,8 +109,7 @@ class ElementData : public GenericData
 class ElementNodeData : public GenericData
 {
   private:
-     void writeElementNodeData(const std::string name_mesh, const Gmesh& mesh) const;
-     void transformeData(const Gmesh& mesh);
+     void writeElementNodeData(const std::string name_mesh) const;
 
   public:
        void saveElementNodeData(const std::string name_mesh, const Gmesh& mesh) const;

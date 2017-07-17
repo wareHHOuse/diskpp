@@ -18,6 +18,7 @@
 #define GMSHELEMENT_H
 
 #include<vector>
+#include<array>
 #include<string>
 
 namespace visu{
@@ -25,19 +26,19 @@ namespace visu{
 class Node
 {
    protected:
-      std::vector<double> m_coordinate;
+      std::array<double, 3> m_coordinate{ {double{0.0}, double{0.0}, double{0.0}} };
       size_t m_index;
       size_t m_ref;
    public:
       Node();
-      Node(const std::vector<double>& vert, const size_t index, const size_t ref);
+      Node(const std::array<double, 3>& coor, const size_t index, const size_t ref);
       void print() const;
-      std::vector<double> getCoordinate() const;
+      std::array<double, 3> getCoordinate() const;
       size_t getRef() const;
       size_t getIndex() const;
       void changeIndex(const size_t index);
       void changeRef(const size_t ref);
-      void changeCoordinates(const std::vector<double>& coor);
+      void changeCoordinates(const std::array<double, 3>& coor);
 };
 
 

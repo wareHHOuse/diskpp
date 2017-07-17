@@ -28,7 +28,7 @@
 
 #include "timecounter.h"
 
-#include "visualisation/gmshDisk.h"
+#include "visualisation/gmshDisk.hpp"
 #include "visualisation/gmshConvertMesh.hpp"
 
 #define _USE_MATH_DEFINES
@@ -86,6 +86,8 @@ class diffusion_solver
     std::vector<dynamic_vector<scalar_type>>        m_postprocess_data;
 
     bool m_verbose;
+
+    typedef dynamic_vector<scalar_type>         vector_dynamic;
 
 public:
     diffusion_solver(const mesh_type& msh, size_t degree, int l = 0)
@@ -159,7 +161,6 @@ public:
     solve(void)
     {
 #ifdef HAVE_INTEL_MKL
-std::cout << "Use PardisoLU solver" << '\n';
         Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
 #else
         Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
@@ -263,13 +264,15 @@ std::cout << "Use PardisoLU solver" << '\n';
 
     template<typename AnalyticalSolution>
     void
-    plot_l2error_at_gausspoint(const std::string& filename, const AnalyticalSolution& as, const visu::Gmesh& msh)
+    plot_l2error_at_gausspoint(const std::string& filename, const AnalyticalSolution& as)
     {
-        std::cout << "Compute L2 error at Gauss points" << std::endl;
+       std::cout << "Compute L2 error at Gauss points" << std::endl;
+       visu::Gmesh msh; //creta a mesh
 
         std::vector<visu::Data> data; //create data (not used)
         std::vector<visu::SubData> subdata; //create subdata to save soution at gauss point
         size_t nb_node =  msh.getNumberofNodes();
+
 
         size_t cell_i = 0;
         for (auto& cl : m_msh)
@@ -278,6 +281,7 @@ std::cout << "Use PardisoLU solver" << '\n';
             auto qps = m_bqd.cell_quadrature.integrate(m_msh, cl);
             for (auto& qp : qps)
             {
+
                 auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, qp.point());
 
                 scalar_type pot = 0.0;
@@ -292,22 +296,26 @@ std::cout << "Use PardisoLU solver" << '\n';
                std::vector<double> value = {std::fabs(pot - true_pot)}; // save the solution at gauss point
                visu::SubData sdata(value, snode);
                subdata.push_back(sdata); // add subdata
+
+
             }
         }
 
-        visu::NodeData nodedata(1, 0.0, "\" l2error_gausspoints\" ", data, subdata); // create and init a nodedata view
+        visu::NodeData nodedata(1, 0.0, "sol_scalar", data, subdata); // create and init a nodedata view
 
         nodedata.saveNodeData(filename, msh); // save the view
     }
 
     void
-    plot_solution_at_gausspoint(const std::string& filename, const visu::Gmesh& msh)
+    plot_solution_at_gausspoint(const std::string& filename)
     {
-        std::cout << "Compute solution at Gauss points" << std::endl;
+       std::cout << "Compute solution at Gauss points" << std::endl;
+       visu::Gmesh msh; //creta a mesh
 
         std::vector<visu::Data> data; //create data (not used)
         std::vector<visu::SubData> subdata; //create subdata to save soution at gauss point
         size_t nb_node =  msh.getNumberofNodes();
+
 
         size_t cell_i = 0;
         for (auto& cl : m_msh)
@@ -323,43 +331,43 @@ std::cout << "Use PardisoLU solver" << '\n';
                 for (size_t i = 0; i < m_bqd.cell_basis.range(0, m_cell_degree).size(); i++)
                     pot += phi[i] * x(i);
 
+
                nb_node += 1;
                visu::Node snode = visu::convertPoint(qp.point(), nb_node); //create a node at gauss point
-               //we can save what we want scalar, vector or tensor values (save it in row)
                std::vector<double> value = {double(pot)}; // save the solution at gauss point
                visu::SubData sdata(value, snode);
                subdata.push_back(sdata); // add subdata
+
+
             }
         }
 
-        visu::NodeData nodedata(1, 0.0, "\" sol_gausspoints \"", data, subdata); // create and init a nodedata view
+        visu::NodeData nodedata(1, 0.0, "sol_scalar", data, subdata); // create and init a nodedata view
 
         nodedata.saveNodeData(filename, msh); // save the view
     }
 
  void
-   plot_conforme_solution_nodes(const std::string& filename, const visu::Gmesh& msh)
+   plot_conforme_solution_nodes(const std::string& filename)
    {
       std::cout << "Compute a conforme solution at Nodes" << std::endl;
+      visu::Gmesh msh;
 
-      auto storage = m_msh.backend_storage();
-      size_t nb_node = msh.getNumberofNodes();
-      //first(number of data at this node), second(cumulated value)
-      std::vector<std::pair<size_t, scalar_type > > value(nb_node, std::make_pair(0, 0.0));
+      size_t nb_node(2); // =  msh.getNumberofNodes();
+
+      std::vector<std::pair<size_t, scalar_type > > value(nb_node, std::make_pair(0, 0.0)); //first(number of data at this node), second(cumulated value)
+
 
       size_t cell_i = 0;
       for (auto& cl : m_msh)
       {
-         auto nodes = visu::cell_nodes(m_msh, cl);
-
          auto x = m_postprocess_data.at(cell_i++);
-
-         for (size_t i = 0; i < nodes.size(); i++) //loop on nodes of the cell
+         auto qps = m_bqd.cell_quadrature.integrate(m_msh, cl);
+         for (auto& qp : qps) //loop on nodes of the cell
          {
-            size_t node_id(nodes[i]); //global id of the node
-            auto point = storage->points[node_id];
+            size_t node_id(0); //global id of the node
 
-            auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, point); //compute basic function at the node
+            auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, qp.point()); //compute basic function at the node
 
             scalar_type pot = 0.0;
             for (size_t i = 0; i < m_bqd.cell_basis.range(0, m_cell_degree).size(); i++) //compute solution at the node
@@ -370,17 +378,137 @@ std::cout << "Use PardisoLU solver" << '\n';
           }
       }
 
-      std::vector<visu::Data> data; //create a vector of data
-      data.reserve(nb_node); // data has a size of nb_node
+//       std::vector<visu::Data> data; //create a vector of data
+//       data.reserve(nb_node); // data has a size of nb_node
+//
+//       for(size_t  i_node = 0; i_node < value.size(); i_node++){
+//          //assert((i_node+1) == msh.getNodes()[i_node].getIndex()); //verify the correspondance
+//          std::vector<double> tmp_value = {value[i_node].second/ double(value[i_node].first)};
+//          visu::Data tmp_data(i_node + 1, tmp_value);
+//          data.push_back(tmp_data); //add data
+//       }
+//
+//       visu::NodeData nodedata(1, 0.0, "sol_at_nodes", data, subdata); // create and init a nodedata view
+//       nodedata.saveNodeData(filename, msh); // save the view
+   }
 
-      for(size_t  i_node = 0; i_node < value.size(); i_node++){
-         //assert((i_node+1) == msh.getNodes()[i_node].getIndex()); //verify the correspondance
-         std::vector<double> tmp_value = {value[i_node].second/ double(value[i_node].first)};
-         visu::Data tmp_data(i_node + 1, tmp_value);
-         data.push_back(tmp_data); //add data
+   void
+   compute_discontinuous_solution(const std::string& filename)
+   {
+      const size_t dim = m_msh.dimension;
+      visu::Gmesh gmsh(dim);
+      auto storage = m_msh.backend_storage();
+
+      cell_basis_type cell_basis          = cell_basis_type(m_cell_degree);
+      cell_quadrature_type cell_quadrature     = cell_quadrature_type(m_cell_degree);
+
+      std::vector<visu::Data> data; //create data (not used)
+      std::vector<visu::SubData> subdata; //create subdata to save soution at gauss point
+
+      size_t cell_i(0);
+      size_t nb_nodes(0);
+      for (auto& cl : m_msh)
+      {
+         vector_dynamic x = m_postprocess_data.at(cell_i++);
+         auto cell_nodes = visu::cell_nodes(m_msh, cl);
+         std::vector<visu::Node> new_nodes;
+         for (size_t i = 0; i < cell_nodes.size(); i++)
+         {
+            nb_nodes++;
+            auto point_ids = cell_nodes[i];
+            auto pt = storage->points[point_ids];
+
+            auto phi = cell_basis.eval_functions(m_msh, cl, pt);
+
+            std::array<double, 3> coor = {double{0.0}, double{0.0}, double{0.0}};
+
+            visu::init_coor(pt, coor);
+            visu::Node tmp_node(coor, nb_nodes, 0);
+            new_nodes.push_back(tmp_node);
+            gmsh.addNode(tmp_node);
+
+            // plot magnitude at node
+            scalar_type pot(0.0);
+            for (size_t i = 0; i < m_bqd.cell_basis.range(0, m_cell_degree).size(); i++) //compute solution at the node
+               pot += phi[i] * x(i);
+
+            std::vector<double> value = {double(pot)};
+            visu::Data datatmp(nb_nodes, value);
+            data.push_back(datatmp);
+         }
+         // add new element
+         visu::add_element(gmsh, new_nodes);
       }
 
-      visu::NodeData nodedata(1, 0.0, "\" sol_at_nodes \"", data); // create and init a nodedata view
-      nodedata.saveNodeData(filename, msh); // save the view
+      visu::NodeData nodedata(1, 0.0, "sol_node", data, subdata); // create and init a nodedata view
+
+      nodedata.saveNodeData(filename, gmsh); // save the view
    }
+
+
+   void
+   compute_deformed(const std::string& filename)
+   {
+      const size_t DIM = m_msh.dimension;
+      if(DIM >= 3)
+         std::cout << "Compute deformed only in 1D or 2D" << '\n';
+      else {
+         visu::Gmesh gmsh(DIM);
+         auto storage = m_msh.backend_storage();
+
+         cell_basis_type cell_basis          = cell_basis_type(m_cell_degree);
+         cell_quadrature_type cell_quadrature     = cell_quadrature_type(m_cell_degree);
+
+         std::vector<visu::Data> data; //create data (not used)
+         std::vector<visu::SubData> subdata; //create subdata to save soution at gauss point
+
+         size_t cell_i(0);
+         size_t nb_nodes(0);
+         for (auto& cl : m_msh)
+         {
+            vector_dynamic x = m_postprocess_data.at(cell_i++);
+            auto cell_nodes = visu::cell_nodes(m_msh, cl);
+            std::vector<visu::Node> new_nodes;
+            for (size_t i = 0; i < cell_nodes.size(); i++)
+            {
+               nb_nodes++;
+               auto point_ids = cell_nodes[i];
+               auto pt = storage->points[point_ids];
+
+               auto phi = cell_basis.eval_functions(m_msh, cl, pt);
+
+               std::array<double, 3> coor = {double{0.0}, double{0.0}, double{0.0}};
+
+               visu::init_coor(pt, coor);
+               visu::Node tmp_node(coor, nb_nodes, 0);
+               new_nodes.push_back(tmp_node);
+               gmsh.addNode(tmp_node);
+
+               // plot magnitude at node
+               scalar_type pot(0.0);
+               for (size_t i = 0; i < m_bqd.cell_basis.range(0, m_cell_degree).size(); i++) //compute solution at the node
+                  pot += phi[i] * x(i);
+
+               std::vector<double> value(3, 0.0);
+               value[DIM+1 -1] = {double(pot)};
+               visu::Data datatmp(nb_nodes, value);
+
+               data.push_back(datatmp);
+            }
+            // add new element
+            visu::add_element(gmsh, new_nodes);
+         }
+
+         visu::NodeData nodedata(3, 0.0, "sol_node_deformed", data, subdata); // create and init a nodedata view
+
+         nodedata.saveNodeData(filename, gmsh); // save the view
+      }
+   }
+
+   void
+    saveMesh(const std::string& filename)
+    {
+       visu::Gmesh gmsh = visu::convertMesh(m_msh);
+       gmsh.writeGmesh(filename, 2);
+    }
 };
