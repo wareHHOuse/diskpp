@@ -236,6 +236,9 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
         auto msh = disk::load_netgen_2d_mesh<RealType>(mesh_filename);
+
+        std::cout << msh.faces_size() << std::endl;
+
         run_diffusion_solver(msh, rp);
         return 0;
     }

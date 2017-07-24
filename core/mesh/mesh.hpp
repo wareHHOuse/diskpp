@@ -372,9 +372,11 @@ public:
 
     [[deprecated("Use 'coordinate_type'")]] typedef T scalar_type;
 
-    typedef T coordinate_type;
+    typedef T           coordinate_type;
+    typedef Storage     storage_type;
 
     typedef typename priv::mesh_base<T, DIM, Storage>::point_type   point_type;
+
     typedef typename priv::mesh_base<T, DIM, Storage>::cell         cell;
     typedef typename priv::mesh_base<T, DIM, Storage>::face         face;
 

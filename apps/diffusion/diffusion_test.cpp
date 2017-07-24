@@ -236,7 +236,7 @@ enum test_type
 
 void test_triangles_specialized(test_type tt)
 {
-    size_t runs = 5;
+    size_t runs = 2;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri01.mesh2d");
@@ -265,7 +265,7 @@ void test_triangles_specialized(test_type tt)
 
 void test_triangles_generic(test_type tt)
 {
-    size_t runs = 5;
+    size_t runs = 2;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_1.typ1");
@@ -294,7 +294,7 @@ void test_triangles_generic(test_type tt)
 
 void test_hexagons_generic(test_type tt)
 {
-    size_t runs = 5;
+    size_t runs = 2;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_2.typ1");
@@ -321,9 +321,40 @@ void test_hexagons_generic(test_type tt)
     }
 }
 
+void test_hextri_generic(test_type tt)
+{
+    size_t runs = 2;
+
+    std::vector<std::string> paths;
+    //paths.push_back("../hexagon_splitter/hextri1.typ1");
+    paths.push_back("../hexagon_splitter/hextri2.typ1");
+    paths.push_back("../hexagon_splitter/hextri3.typ1");
+    paths.push_back("../hexagon_splitter/hextri4.typ1");
+    paths.push_back("../hexagon_splitter/hextri5.typ1");
+
+
+    typedef disk::generic_mesh<double, 2>       MT;
+    typedef disk::fvca5_mesh_loader<double, 2>  LT;
+
+    switch(tt)
+    {
+        case TEST_MEASURE_TIMES:
+            test_mesh_format<MT, LT>(paths, runs, 0, 3, "hextri_gen");
+            break;
+
+        case TEST_VERIFY_CONVERGENCE:
+            verify_convergence<MT, LT>(paths, 0, 3);
+            break;
+
+        default:
+            std::cout << "[ Unavailable Test ]" << std::endl;
+            return;
+    }
+}
+
 void test_kershaw_2d(test_type tt)
 {
-    size_t runs = 5;
+    size_t runs = 2;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_1.typ1");
@@ -354,7 +385,7 @@ void test_kershaw_2d(test_type tt)
 
 void test_hexahedra_specialized(test_type tt)
 {
-    size_t runs = 5;
+    size_t runs = 2;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-2-2-2.hex");
@@ -384,7 +415,7 @@ void test_hexahedra_specialized(test_type tt)
 
 void test_hexahedra_generic(test_type tt)
 {
-    size_t runs = 5;
+    size_t runs = 2;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_2x2x2.msh");
@@ -414,7 +445,7 @@ void test_hexahedra_generic(test_type tt)
 
 void test_tetrahedra_specialized(test_type tt)
 {
-    size_t runs = 5;
+    size_t runs = 2;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/3D_tetras/netgen/fvca6_tet1.mesh");
@@ -443,7 +474,7 @@ void test_tetrahedra_specialized(test_type tt)
 
 void test_tetrahedra_generic(test_type tt)
 {
-    size_t runs = 5;
+    size_t runs = 2;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.1.msh");
@@ -528,16 +559,16 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-
+    /*
     std::cout << bold << underline << "Triangles specialized" << reset << std::endl;
     test_triangles_specialized(tt);
-/*
+
     std::cout << bold << underline << "Triangles generic" << reset << std::endl;
     test_triangles_generic(tt);
-
+    */
     std::cout << bold << underline << "Hexagons" << reset << std::endl;
     test_hexagons_generic(tt);
-
+    /*
     std::cout << bold << underline << "Kershaw 2D" << reset << std::endl;
     test_kershaw_2d(tt);
 
@@ -555,5 +586,9 @@ int main(int argc, char **argv)
 
     std::cout << bold << underline << "Polyhedra" << reset << std::endl;
     test_polyhedra_generic(tt);
-*/
+
+    std::cout << bold << underline << "Hextri generic" << reset << std::endl;
+    test_hextri_generic(tt);
+    */
+
 }

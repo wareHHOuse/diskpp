@@ -23,6 +23,10 @@ if (MKL_FOUND)
 	set(HAVE_INTEL_MKL TRUE)
 endif()
 
+find_package(SILO REQUIRED)
+include_directories("${SILO_INCLUDE_DIRS}")
+set(LINK_LIBS "${LINK_LIBS}" "${SILO_LIBRARIES}")
+
 find_package(Lua REQUIRED)
 include_directories("${LUA_INCLUDE_DIR}")
 set(LINK_LIBS "${LINK_LIBS}" "${LUA_LIBRARIES}")

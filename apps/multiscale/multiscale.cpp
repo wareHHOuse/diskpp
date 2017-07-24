@@ -360,6 +360,349 @@ recover_static_condensation(const dynamic_matrix<T>& mat,
 
 
 
+
+#if 0
+
+template<typename Mesh>
+class multiscale_problem_tester
+{
+    sol::state& lua;
+
+    size_t k_inner, k_outer, inner_rl;
+
+    typedef Mesh mesh_type;
+    typedef typename Mesh::scalar_type  scalar_type;
+    typedef Eigen::SparseMatrix<scalar_type> sparse_matrix_type;
+    typedef disk::scaled_monomial_scalar_basis<Mesh, typename Mesh::cell> outer_cell_basis_type;
+    typedef disk::scaled_monomial_scalar_basis<Mesh, typename Mesh::face> outer_face_basis_type;
+
+    outer_cell_basis_type   outer_cell_basis;
+    outer_face_basis_type   outer_face_basis;
+
+    sparse_matrix_type              A;
+    dynamic_vector<scalar_type>     b, x;
+
+    std::vector<size_t>             face_compress_map, face_expand_map;
+    std::vector<dynamic_matrix<scalar_type>>                gr_opers, gr_datas;
+    std::vector<disk::multiscale_local_basis<mesh_type>>    multiscale_bases;
+
+    Mesh msh;
+
+    static typename mesh_type::point_type::value_type
+    load_term(const typename mesh_type::point_type& pt)
+    {
+        return sin(pt.x())*sin(pt.y());
+    };
+
+public:
+    multiscale_problem_tester(sol::state& p_lua, const Mesh& p_msh, size_t p_inner_rl)
+        : lua(p_lua), inner_rl(p_inner_rl), msh(p_msh)
+    {
+        size_t k_outer = lua["k_outer"].get_or(1);
+        size_t k_inner = lua["k_inner"].get_or(1);
+
+        auto basis = make_scaled_monomial_scalar_basis(msh, k_outer-1, k_outer);
+        outer_cell_basis = basis.first;
+        outer_face_basis = basis.second;
+
+        auto num_cells          = msh.cells_size();
+        auto num_faces          = msh.faces_size();
+        auto num_cell_dofs      = outer_cell_basis.size();
+        auto num_face_dofs      = outer_face_basis.size();
+        auto num_boundary_faces = msh.boundary_faces_size();
+        auto num_internal_faces = msh.internal_faces_size();
+
+        auto system_size = num_internal_faces*num_face_dofs;
+
+        A = sparse_matrix_type(system_size, system_size);
+        b = dynamic_vector<scalar_type>::Zero(system_size);
+    }
+
+
+
+    void assemble(void)
+    {
+        auto num_cells          = msh.cells_size();
+        auto num_faces          = msh.faces_size();
+        auto num_cell_dofs      = outer_cell_basis.size();
+        auto num_face_dofs      = outer_face_basis.size();
+        auto num_boundary_faces = msh.boundary_faces_size();
+        auto num_internal_faces = msh.internal_faces_size();
+
+        typedef Eigen::Triplet<scalar_type>         triplet_type;
+        std::vector<triplet_type>                   triplets;
+
+        face_compress_map.resize( num_faces );
+        face_expand_map.resize( num_internal_faces );
+        size_t fn = 0, fi = 0;
+        for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++, fi++)
+        {
+            if( msh.is_boundary(*itor) )
+                continue;
+
+            face_compress_map.at(fi) = fn;
+            face_expand_map.at(fn) = fi;
+            fn++;
+        }
+
+        gr_opers.reserve( msh.cells_size() );
+        gr_datas.reserve( msh.cells_size() );
+        multiscale_bases.reserve( msh.cells_size() );
+
+        size_t elemnum = 0;
+        for (auto& cl : msh)
+        {
+            std::cout << "Assembly: " << elemnum << "/" << msh.cells_size() << ": ";
+            std::cout.flush();
+            disk::multiscale_local_basis<mesh_type> mlb(msh, cl, outer_cell_basis, outer_face_basis, k_inner, inner_rl);
+            multiscale_bases.push_back(mlb);
+            std::cout << "B ";
+            std::cout.flush();
+
+            disk::gradient_reconstruction_multiscale<mesh_type, 
+                                                     outer_cell_basis_type,
+                                                     outer_face_basis_type> gradrec(msh, cl, mlb, outer_cell_basis, outer_face_basis);
+            gr_opers.push_back( gradrec.oper );
+            gr_datas.push_back( gradrec.data );
+            std::cout << "GR ";
+            std::cout.flush();
+
+            auto proj = disk::make_projector(msh, cl, outer_cell_basis, outer_face_basis);
+
+            auto f = std::bind(load_term, _1);
+
+            dynamic_vector<scalar_type> dofs = make_rhs(msh, cl, outer_cell_basis, outer_face_basis, f);
+            dynamic_vector<scalar_type> cdofs = dofs.head(num_cell_dofs);
+            
+            auto fcs = faces(msh, cl);
+            std::vector<size_t> l2g(fcs.size() * num_face_dofs);
+
+            for (size_t face_i = 0; face_i < fcs.size(); face_i++)
+            {
+                auto fc = fcs[face_i];
+
+                auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+                if (!eid.first)
+                    throw std::invalid_argument("This is a bug: face not found");
+
+                auto face_id = eid.second;
+
+                auto face_offset = face_compress_map.at(face_id) * num_face_dofs;
+
+                auto pos = face_i * num_face_dofs;
+
+                for (size_t i = 0; i < num_face_dofs; i++)
+                {
+                    if ( msh.is_boundary(fc) )
+                        l2g.at(pos+i) = 0xDEADBEEF;
+                    else
+                        l2g.at(pos+i) = face_offset+i;
+                }
+            }
+
+            auto sc = do_static_condensation(gradrec.data, cdofs, num_cell_dofs);
+
+            size_t dsz = sc.first.rows();
+            for (size_t i = 0; i < dsz; i++)
+            {
+                if (l2g[i] == 0xDEADBEEF)
+                    continue;
+
+                for (size_t j = 0; j < dsz; j++)
+                {
+                    if (l2g[j] == 0xDEADBEEF)
+                        continue;
+
+                    triplets.push_back( triplet_type(l2g[i], l2g[j], sc.first(i,j)) );
+                }
+
+                b(l2g.at(i)) += sc.second(i);
+            }
+
+            std::cout << "ASM\r";
+            std::cout.flush();
+
+            elemnum++;
+        }
+
+        std::cout << std::endl;
+
+        A.setFromTriplets(triplets.begin(), triplets.end());
+    }
+
+    void solve(void)
+    {
+#ifdef HAVE_INTEL_MKL
+        Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
+#else
+        Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
+#endif
+
+        solver.analyzePattern(A);
+        solver.factorize(A);
+        x = solver.solve(b);
+    }
+
+    void postprocess(disk::mesh_hierarchy<typename Mesh::scalar_type>& hierarchy,
+                     std::pair<size_t, dynamic_vector<typename Mesh::scalar_type>>& monoscale_solution)
+    {
+
+        auto num_cells          = msh.cells_size();
+        auto num_faces          = msh.faces_size();
+        auto num_cell_dofs      = outer_cell_basis.size();
+        auto num_face_dofs      = outer_face_basis.size();
+        auto num_boundary_faces = msh.boundary_faces_size();
+        auto num_internal_faces = msh.internal_faces_size();
+
+        typedef disk::quadrature<mesh_type, typename mesh_type::cell>      cell_quadrature_type;
+
+        auto monoscale_degree   = monoscale_solution.first;
+        auto monoscale_all_dofs = monoscale_solution.second;
+        //std::cout << "MM: " << monoscale_all_dofs.size() << std::endl;
+        auto monoscale_mesh = *std::next(hierarchy.meshes_begin(), hierarchy.meshes_size()-1);
+        typedef disk::scaled_monomial_scalar_basis<mesh_type, typename mesh_type::cell> 
+                monoscale_cell_basis_type;
+        
+        monoscale_cell_basis_type     monoscale_cell_basis(monoscale_degree);
+        cell_quadrature_type          cell_quadrature(2*monoscale_degree+2);
+        size_t monoscale_cbs = monoscale_cell_basis.size();
+        
+        scalar_type error = 0.0, l2_err = 0.0;
+
+        std::ofstream ofs("comparison.dat");
+        std::ofstream probl("probl.dat");
+
+        size_t elemnum = 0;
+        for (auto& cl : msh)
+        {
+            std::cout << "Postprocess: " << elemnum << "/" << msh.cells_size() << "\r";
+            std::cout.flush();
+            auto fcs = faces(msh, cl);
+
+            auto f = std::bind(load_term, _1);
+            dynamic_vector<scalar_type> rhs = make_rhs(msh, cl, outer_cell_basis, outer_face_basis, f);
+
+            dynamic_vector<scalar_type> dofs =
+                dynamic_vector<scalar_type>::Zero(fcs.size()*num_face_dofs);
+
+            for (size_t face_i = 0; face_i < fcs.size(); face_i++)
+            {
+                auto fc = fcs[face_i];
+                if (msh.is_boundary(fc))
+                    continue;
+
+                auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+                if (!eid.first)
+                    throw std::invalid_argument("This is a bug: face not found");
+
+                auto face_id = eid.second;
+                auto face_offset = /*num_cells * num_cell_dofs +*/ face_compress_map.at(face_id) * num_face_dofs;
+                auto pos = face_i * num_face_dofs;
+
+                dofs.block(/*num_cell_dofs + */pos, 0, num_face_dofs, 1) =
+                    x.block(face_offset, 0, num_face_dofs, 1);
+            }
+
+            //disk::multiscale_local_basis<mesh_type> mlb(msh, cl, ccb, cfb, k_inner, rl);
+            auto mlb = multiscale_bases.at(elemnum);
+            dynamic_vector<scalar_type> rhs_c = rhs.head(num_cell_dofs);
+            dynamic_vector<scalar_type> local_dofs = recover_static_condensation(gr_datas.at(elemnum), rhs_c, dofs, num_cell_dofs);
+
+            dynamic_vector<scalar_type> R = gr_opers.at(elemnum) * local_dofs;
+            R = R.head(R.size()-1);
+
+            auto ms_inner_mesh = mlb.inner_mesh();
+            for (auto& icl : ms_inner_mesh)
+            {   
+                scalar_type local_err = 0.0;
+                scalar_type local_l2_err = 0.0;
+                auto qps = cell_quadrature.integrate(ms_inner_mesh, icl);
+                
+                for(auto& qp : qps)
+                {
+                    dynamic_vector<scalar_type> grad_multi = dynamic_vector<scalar_type>::Zero(2);
+                    dynamic_vector<scalar_type> grad_mono = dynamic_vector<scalar_type>::Zero(2);
+
+                    auto tp = qp.point();
+                    auto local_tensor = disk::make_material_tensor(tp);
+                    local_tensor(0,0) = sqrt(local_tensor(0,0));
+                    local_tensor(1,1) = sqrt(local_tensor(1,1));
+                    auto msphi = mlb.eval_functions(icl, tp);
+                    auto msval = R.dot(msphi);
+
+                    dynamic_matrix<scalar_type> msdphi = mlb.eval_gradients(icl, tp);
+                    for (size_t i = 0; i < R.size(); i++)
+                        grad_multi += (msdphi.block(i, 0, 1, 2) * R(i)).transpose();
+
+                    try {
+                        auto mono_cell_id = hierarchy.locate_point(tp, hierarchy.meshes_size()-1);
+                        auto mono_cell = *std::next(monoscale_mesh.cells_begin(), mono_cell_id);
+                        auto mono_dofs_offset = monoscale_cbs * mono_cell_id;
+                        dynamic_vector<scalar_type> mono_dofs =
+                            monoscale_all_dofs.block(mono_dofs_offset, 0, monoscale_cbs, 1);
+
+                        auto mono_phi = monoscale_cell_basis.eval_functions(monoscale_mesh, mono_cell, tp);
+                        auto mono_val = mono_dofs.dot(mono_phi);
+
+                        dynamic_matrix<scalar_type> mono_dphi = monoscale_cell_basis.eval_gradients(monoscale_mesh, mono_cell, tp);
+                        for (size_t i = 0; i < mono_dofs.size(); i++)
+                            grad_mono += (mono_dphi.block(i, 0, 1, 2) * mono_dofs(i)).transpose();
+                        
+                        //auto eps = 0.1;
+                        //grad_mono(0) = M_PI * cos(M_PI * tp.x()) * sin(M_PI * tp.y()) + M_PI * sin(M_PI*tp.y()/eps)*cos(M_PI*tp.x()/eps);
+                        //grad_mono(1) = M_PI * sin(M_PI * tp.x()) * cos(M_PI * tp.y()) + M_PI * sin(M_PI*tp.x()/eps)*cos(M_PI*tp.y()/eps);
+
+                        ofs << tp.x() << " " << tp.y() << " " << msval << " " << mono_val << std::endl;
+                        local_l2_err += qp.weight() * (msval-mono_val) * (msval-mono_val);
+                    }
+
+                    catch(...)
+                    {
+                        std::cout << "problem with: " << tp << std::endl;
+                        probl << tp.x() << " " << tp.y() << " " << 1 << std::endl;
+                    }
+
+                    dynamic_vector<scalar_type> diff = local_tensor*(grad_multi-grad_mono);
+
+                    local_err += qp.weight() * diff.dot(diff);
+                }
+                error += local_err;
+                l2_err += local_l2_err;
+            }
+
+            elemnum++;
+
+            //std::cout << "Gradients: " << std::endl;
+            //std::cout << grad_multi << std::endl;
+            //std::cout << grad_mono << std::endl;
+        }
+
+        std::cout << std::endl;
+        ofs.close();
+        probl.close();
+
+        std::cout << "Error: " << sqrt(error) << std::endl;
+        std::cout << "Error: " << sqrt(l2_err) << std::endl;
+
+    }
+};
+
+
+#endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 template<typename Mesh>
 void 
 test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
@@ -417,40 +760,6 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
         return sin(pt.x())*sin(pt.y());
     };
 
-    /*
-    auto f = [](const typename mesh_type::point_type& p) ->
-                    typename mesh_type::point_type::value_type {
-        auto eps = 0.1;
-        return +2.0 * M_PI * M_PI * ( 100.0*sin(M_PI*p.y()/eps)*sin(M_PI*p.y()/eps)*cos(M_PI*p.x()/eps)*cos(M_PI*p.x()/eps) + 1.0) * sin(M_PI*p.x()) * sin(M_PI*p.y())
-               - 200 * M_PI * M_PI * sin(M_PI*p.x()) * sin(M_PI*p.y()/eps) * cos(M_PI*p.y()) * cos(M_PI*p.x()/eps) * cos(M_PI*p.x()/eps) * cos(M_PI*p.y()/eps) / eps
-               + 200 * M_PI * M_PI * sin(M_PI*p.y()) * sin(M_PI*p.x()/eps) * cos(M_PI*p.x()) * sin(M_PI*p.y()/eps) * sin(M_PI*p.y()/eps) * cos(M_PI*p.x()/eps) / eps;
-    
-    };
-    */
-    /*
-    auto f = [](const typename mesh_type::point_type& p) ->
-                    typename mesh_type::point_type::value_type {
-        return
-        + 4.0 * M_PI * M_PI * (100*sin(M_PI*p.y())*sin(M_PI*p.y())*cos(M_PI*p.x())*cos(M_PI*p.x()) + 1)*sin(M_PI*p.x())*sin(M_PI*p.y())
-        + 400 * M_PI * M_PI * sin(M_PI*p.x()) * pow(sin(M_PI*p.y()),3) * cos(M_PI*p.x()) * cos(M_PI*p.x()) 
-        - 400 * M_PI * M_PI * sin(M_PI*p.x()) * sin(M_PI*p.y()) * cos(M_PI*p.x()) * cos(M_PI*p.x()) * cos(M_PI*p.y()) * cos(M_PI*p.y());
-    };
-    */
-
-    /*
-    auto f = [](const typename mesh_type::point_type& p) ->
-                    typename mesh_type::point_type::value_type {
-
-        return 
-        - 2*(100*pow(sin(10.0*M_PI*p.y()),2)*pow(cos(10.0*M_PI*p.x()),2) + 1)*(-M_PI*M_PI*sin(M_PI*p.x())*sin(M_PI*p.y())
-        + 10.0*M_PI*M_PI*sin(10.0*M_PI*p.x())*sin(10.0*M_PI*p.y())) 
-        - 2000.0*M_PI*(M_PI*sin(M_PI*p.x())*cos(M_PI*p.y()) 
-        - M_PI*sin(10.0*M_PI*p.x())*cos(10.0*M_PI*p.y()))*sin(10.0*M_PI*p.y())*pow(cos(10.0*M_PI*p.x()),2)*cos(10.0*M_PI*p.y()) 
-        + 2000.0*M_PI*(M_PI*sin(M_PI*p.y())*cos(M_PI*p.x()) 
-        - M_PI*sin(10.0*M_PI*p.y())*cos(10.0*M_PI*p.x()))*sin(10.0*M_PI*p.x())*pow(sin(10.0*M_PI*p.y()),2)*cos(10.0*M_PI*p.x());
-    };
-    */
-
     std::vector<dynamic_matrix<scalar_type>> gr_opers, gr_datas;
     gr_opers.reserve( msh.cells_size() );
     gr_datas.reserve( msh.cells_size() );
@@ -464,7 +773,7 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
         std::cout << "Assembly: " << elemnum << "/" << msh.cells_size() << ": ";
         std::cout.flush();
         disk::multiscale_local_basis<mesh_type> mlb(msh, cl, ccb, cfb, k_inner, rl);
-        multiscale_bases.push_back(mlb);
+        //multiscale_bases.push_back(mlb);
         std::cout << "B ";
         std::cout.flush();
 
@@ -557,7 +866,7 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
                monoscale_cell_basis_type;
     
     monoscale_cell_basis_type     monoscale_cell_basis(monoscale_degree);
-    cell_quadrature_type          cell_quadrature(2*monoscale_degree+6); //XXX
+    cell_quadrature_type          cell_quadrature(2*monoscale_degree+2);
     size_t monoscale_cbs = monoscale_cell_basis.size();
     
     scalar_type error = 0.0, l2_err = 0.0;
@@ -595,10 +904,12 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
                 x.block(face_offset, 0, num_face_dofs, 1);
         }
 
-        //disk::multiscale_local_basis<mesh_type> mlb(msh, cl, ccb, cfb, k_inner, rl);
-        auto mlb = multiscale_bases.at(elemnum);
+        disk::multiscale_local_basis<mesh_type> mlb(msh, cl, ccb, cfb, k_inner, rl);
+        //auto mlb = multiscale_bases.at(elemnum);
         dynamic_vector<scalar_type> rhs_c = rhs.head(num_cell_dofs);
         dynamic_vector<scalar_type> local_dofs = recover_static_condensation(gr_datas.at(elemnum), rhs_c, dofs, num_cell_dofs);
+
+        //disk::gradient_reconstruction_multiscale<mesh_type, decltype(ccb), decltype(cfb)> gradrec(msh, cl, mlb, ccb, cfb);
 
         dynamic_vector<scalar_type> R = gr_opers.at(elemnum) * local_dofs;
         R = R.head(R.size()-1);
@@ -690,7 +1001,10 @@ load_monoscale_solution(const mesh_type& msh, const std::string& sol_fn)
     typedef typename mesh_type::scalar_type         scalar_type;
 
     std::ifstream ifs(sol_fn, std::ifstream::binary);
-    
+
+    if (!ifs.is_open())
+        throw std::invalid_argument("cannot open!");
+
     size_t sol_num_elements, cell_basis_deg, face_basis_deg;
     
     ifs.read(reinterpret_cast<char *>(&sol_num_elements), sizeof(size_t));
@@ -721,6 +1035,37 @@ load_monoscale_solution(const mesh_type& msh, const std::string& sol_fn)
 }
 
 
+#if 0
+void run_multiscale_tests_class(sol::state& lua)
+{
+    using T = double;
+    typedef disk::simplicial_mesh<T,2>          mesh_type;
+    typedef typename mesh_type::scalar_type     scalar_type;
+    std::string initial_mesh_filename = lua["initial_mesh_filename"];
+
+    mesh_type initial_mesh;
+    disk::netgen_mesh_loader<T, 2> loader;
+    loader.verbose(true);
+    loader.read_mesh(initial_mesh_filename);
+    loader.populate_mesh(initial_mesh);
+    
+    size_t hierarchy_levels = lua["hierarchy_levels"].get_or(5);
+
+    disk::mesh_hierarchy<scalar_type> hierarchy(initial_mesh, hierarchy_levels);
+
+    auto mn = hierarchy.meshes_size() - 1;
+    auto finer_mesh = *std::next(hierarchy.meshes_begin(), mn);
+
+    auto monoscale_solution = 
+        load_monoscale_solution(finer_mesh, "../diffusion/solution.bin");
+
+    multiscale_problem_tester<mesh_type>  test(lua, *(hierarchy.meshes_begin()+0), 4);
+    test.assemble();
+    test.solve();
+    test.postprocess(hierarchy, monoscale_solution);
+}
+#endif
+
 void run_multiscale_tests(sol::state& lua)
 {
     using T = double;
@@ -735,6 +1080,7 @@ void run_multiscale_tests(sol::state& lua)
 
     size_t testpoints = lua["test_points"].get_or(3);
     std::string initial_mesh_filename = lua["initial_mesh_filename"];
+    std::string reference_solution_filename = lua["reference_solution_filename"];
 
     mesh_type initial_mesh;
     disk::netgen_mesh_loader<T, 2> loader;
@@ -751,11 +1097,11 @@ void run_multiscale_tests(sol::state& lua)
         dump_netgen_format(finer_mesh, "finer_mesh.mesh2d");
 
     auto monoscale_solution = 
-        load_monoscale_solution(finer_mesh, "../diffusion/solution.bin");
+        load_monoscale_solution(finer_mesh, reference_solution_filename);
 
     std::cout <<"done" << std::endl;
 
-    std::array<size_t, 6> levels;
+    std::array<size_t, 7> levels;
 
     levels[0] = lua["levels0"].get_or(4);
     levels[1] = lua["levels1"].get_or(4);
@@ -763,6 +1109,7 @@ void run_multiscale_tests(sol::state& lua)
     levels[3] = lua["levels3"].get_or(4);
     levels[4] = lua["levels4"].get_or(4);
     levels[5] = lua["levels5"].get_or(4);
+    levels[6] = lua["levels6"].get_or(4);
 
     if ( lua["do0"].get_or(0) )
         test_full_problem_error(lua, *(hierarchy.meshes_begin()+0), levels[0], hierarchy, monoscale_solution);
@@ -778,6 +1125,12 @@ void run_multiscale_tests(sol::state& lua)
     
     if ( lua["do4"].get_or(0) )
         test_full_problem_error(lua, *(hierarchy.meshes_begin()+4), levels[4], hierarchy, monoscale_solution);
+
+    if ( lua["do5"].get_or(0) )
+        test_full_problem_error(lua, *(hierarchy.meshes_begin()+5), levels[5], hierarchy, monoscale_solution);
+        
+    if ( lua["do6"].get_or(0) )
+        test_full_problem_error(lua, *(hierarchy.meshes_begin()+6), levels[6], hierarchy, monoscale_solution);
     
     //if ( lua["do5"].get_or(0) )
     //    test_full_problem_error(lua, *(hierarchy.meshes_begin()+5), levels[5], hierarchy, monoscale_solution);
@@ -820,7 +1173,7 @@ void run_multiscale_tests(sol::state& lua)
 
 
 
-
+#if 0
 template<typename Mesh>
 void test_full_problem(sol::state& lua, const Mesh& msh)
 {
@@ -1096,6 +1449,8 @@ void test_full_problem(sol::state& lua, const Mesh& msh)
 #endif
 
 }
+
+#endif
 
 int
 main(int argc, char **argv)

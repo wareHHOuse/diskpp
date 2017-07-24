@@ -34,8 +34,8 @@ make_material_tensor(const point<T,2>& pt)
     //return ret;
     //return ret * 6.72071;
 
-    auto c = cos(M_PI * pt.x()/0.02);
-    auto s = sin(M_PI * pt.y()/0.02);
+    auto c = std::cos(M_PI * pt.x()/0.02);
+    auto s = std::sin(M_PI * pt.y()/0.02);
     return ret * (1 + 100*c*c*s*s);
 }
 
@@ -137,6 +137,8 @@ public:
                            size_t degree, size_t refinement_levels)
         : m_degree(degree), m_refinement_levels(refinement_levels)
     {
+        timecounter tc;
+        tc.tic();
         submesher_type                                  submesher;
         bqd = bqdata_type(m_degree, m_degree);
         gradient_reconstruction_bq<bqdata_type>         gradrec(bqd);
@@ -146,8 +148,8 @@ public:
         //std::cout << "Inner cells: " << m_inner_mesh.cells_size() << std::endl;
         //std::cout << "Inner h: " << average_diameter(m_inner_mesh) << std::endl;
 
-        auto quadpair = make_quadrature(outer_msh, 2*outer_cell_basis.degree()+6,
-                                                    2*outer_face_basis.degree()+6); //XXX
+        auto quadpair = make_quadrature(outer_msh, 2*outer_cell_basis.degree()+2,
+                                                    2*outer_face_basis.degree()+2);
 
         auto num_cell_faces = howmany_faces(outer_msh, outer_cl);
 
@@ -322,9 +324,11 @@ public:
         m_matrix.setFromTriplets(triplets.begin(), triplets.end());
         triplets.clear();
 
+        tc.toc();
+        //std::cout << "Assembly: " << tc << std::endl;
         //std::cout << "solve" << std::endl;
 
-
+        tc.tic();
 #ifdef HAVE_INTEL_MKL
         Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
 #else
@@ -334,6 +338,8 @@ public:
         solver.analyzePattern(m_matrix);
         solver.factorize(m_matrix);
         m_X = solver.solve(m_rhs);
+        tc.toc();
+        //std::cout << "Solver: " << tc << std::endl;
 
         //std::cout << "solver done" << std::endl;
     }
@@ -342,6 +348,130 @@ public:
     inner_mesh(void)
     {
         return m_inner_mesh;
+    }
+
+    template<typename QPType>
+    std::vector<std::pair<vector_type, matrix_type>>
+    eval(const inner_cell_type& cl, const std::vector<QPType>& qpts)
+    {
+        matrix_type local_dofs = take_local_dofs(cl);
+        auto cell_id = m_inner_mesh.lookup(cl);
+        auto gr_oper = inner_gr_opers.at(cell_id);
+
+        matrix_type local_dofs_R = gr_oper * local_dofs;
+
+        std::vector<std::pair<vector_type, matrix_type>> ret;
+        ret.reserve(qpts.size());
+
+
+        for(auto& qpt : qpts)
+        {
+            auto pt = qpt.point();
+            vector_type phi  = bqd.cell_basis.eval_functions(m_inner_mesh, cl, pt, 0, m_degree+1);
+            matrix_type dphi = bqd.cell_basis.eval_gradients(m_inner_mesh, cl, pt, 0, m_degree+1);
+
+            vector_type ret_phi  = vector_type::Zero( local_dofs.cols() );
+            matrix_type ret_dphi = matrix_type::Zero( local_dofs.cols(), 2 );
+
+            for (size_t i = 0; i < local_dofs_R.cols(); i++)
+            {
+                auto const_dof = local_dofs(1,i); 
+                vector_type R = local_dofs_R.block(0, i, local_dofs_R.rows(), 1);
+
+                assert(R.size() == phi.rows()-1);
+                assert(R.size() == dphi.rows()-1);
+
+                for (size_t j = 1; j < phi.rows(); j++)
+                    ret_phi(i) += R(j-1)*phi(j);
+                ret_phi(i) += const_dof * phi(0);
+
+                for (size_t j = 1; j < dphi.rows(); j++)
+                    ret_dphi.block(i,0,1,2) += R(j-1)*dphi.block(j,0,1,2);
+                ret_dphi.block(i,0,1,2) += const_dof * dphi.block(0,0,1,2);
+            }
+
+            ret.push_back( std::make_pair(ret_phi, ret_dphi) );
+        }
+
+        return ret;
+    }
+
+    template<typename QPType>
+    std::vector<vector_type>
+    eval_functions(const inner_cell_type& cl, const std::vector<QPType>& qpts)
+    {
+        matrix_type local_dofs = take_local_dofs(cl);
+        auto cell_id = m_inner_mesh.lookup(cl);
+        auto gr_oper = inner_gr_opers.at(cell_id);
+
+        matrix_type local_dofs_R = gr_oper * local_dofs;
+
+        std::vector<vector_type> ret;
+        ret.reserve(qpts.size());
+
+
+        for(auto& qpt : qpts)
+        {
+            auto pt = qpt.point();
+            vector_type phi  = bqd.cell_basis.eval_functions(m_inner_mesh, cl, pt, 0, m_degree+1);
+
+            vector_type ret_phi  = vector_type::Zero( local_dofs.cols() );
+
+            for (size_t i = 0; i < local_dofs_R.cols(); i++)
+            {
+                auto const_dof = local_dofs(1,i); 
+                vector_type R = local_dofs_R.block(0, i, local_dofs_R.rows(), 1);
+
+                assert(R.size() == phi.rows()-1);
+
+                for (size_t j = 1; j < phi.rows(); j++)
+                    ret_phi(i) += R(j-1)*phi(j);
+                ret_phi(i) += const_dof * phi(0);
+            }
+
+            ret.push_back( ret_phi );
+        }
+
+        return ret;
+    }
+
+    template<typename QPType>
+    std::vector<matrix_type>
+    eval_gradients(const inner_cell_type& cl, const std::vector<QPType>& qpts)
+    {
+        matrix_type local_dofs = take_local_dofs(cl);
+        auto cell_id = m_inner_mesh.lookup(cl);
+        auto gr_oper = inner_gr_opers.at(cell_id);
+
+        matrix_type local_dofs_R = gr_oper * local_dofs;
+
+        std::vector<matrix_type> ret;
+        ret.reserve(qpts.size());
+
+
+        for(auto& qpt : qpts)
+        {
+            auto pt = qpt.point();
+            matrix_type dphi = bqd.cell_basis.eval_gradients(m_inner_mesh, cl, pt, 0, m_degree+1);
+
+            matrix_type ret_dphi = matrix_type::Zero( local_dofs.cols(), 2 );
+
+            for (size_t i = 0; i < local_dofs_R.cols(); i++)
+            {
+                auto const_dof = local_dofs(1,i); 
+                vector_type R = local_dofs_R.block(0, i, local_dofs_R.rows(), 1);
+
+                assert(R.size() == dphi.rows()-1);
+
+                for (size_t j = 1; j < dphi.rows(); j++)
+                    ret_dphi.block(i,0,1,2) += R(j-1)*dphi.block(j,0,1,2);
+                ret_dphi.block(i,0,1,2) += const_dof * dphi.block(0,0,1,2);
+            }
+
+            ret.push_back( ret_dphi );
+        }
+
+        return ret;
     }
 
 #define EVAL_WITH_RECONSTRUCTION
@@ -359,17 +489,17 @@ public:
         auto tf = std::bind(make_material_tensor<scalar_type>, _1);
         //gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
         //gradrec.compute(m_inner_mesh, cl, tf);
-
+#ifdef EVAL_WITH_RECONSTRUCTION
         auto cell_id = m_inner_mesh.lookup(cl);
         auto gr_oper = inner_gr_opers.at(cell_id);
+#endif
+        vector_type phi = bqd.cell_basis.eval_functions(m_inner_mesh, cl, pt, 0, m_degree+1);
         for (size_t i = 0; i < local_dofs.cols(); i++)
         {
 #ifdef EVAL_WITH_RECONSTRUCTION
             vector_type func_dofs = local_dofs.block(0, i, local_dofs.rows(), 1);
 
             vector_type R = gr_oper * func_dofs;
-
-            vector_type phi = bqd.cell_basis.eval_functions(m_inner_mesh, cl, pt, 0, m_degree+1);
 
             assert(R.size() == phi.rows()-1);
 
@@ -378,7 +508,7 @@ public:
 
             ret(i) += func_dofs(0)*phi(0);
 #else
-            auto phi = bqd.cell_basis.eval_functions(m_inner_mesh, cl, pt, 0, m_degree);
+            //auto phi = bqd.cell_basis.eval_functions(m_inner_mesh, cl, pt, 0, m_degree);
             vector_type func_dofs = local_dofs.block(0, i, phi.size(), 1);
 
             ret(i) = func_dofs.dot(phi);
@@ -399,9 +529,11 @@ public:
         auto tf = std::bind(make_material_tensor<scalar_type>, _1);
         //gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
         //gradrec.compute(m_inner_mesh, cl, tf);
-
+#ifdef EVAL_WITH_RECONSTRUCTION
         auto cell_id = m_inner_mesh.lookup(cl);
         auto gr_oper = inner_gr_opers.at(cell_id);
+#endif
+        matrix_type dphi = bqd.cell_basis.eval_gradients(m_inner_mesh, cl, pt, 0, m_degree+1);
         for (size_t i = 0; i < local_dofs.cols(); i++)
         {
 
@@ -410,8 +542,6 @@ public:
 
             vector_type R = gr_oper * func_dofs;
 
-            matrix_type dphi = bqd.cell_basis.eval_gradients(m_inner_mesh, cl, pt, 0, m_degree+1);
-
             assert(R.size() == dphi.rows()-1);
 
             for (size_t j = 1; j < dphi.rows(); j++)
@@ -419,7 +549,7 @@ public:
 
             ret.block(i,0,1,2) += func_dofs(0)*dphi.block(0,0,1,2);
 #else
-            matrix_type dphi = bqd.cell_basis.eval_gradients(m_inner_mesh, cl, pt, 0, m_degree);
+            //matrix_type dphi = bqd.cell_basis.eval_gradients(m_inner_mesh, cl, pt, 0, m_degree);
             vector_type func_dofs = local_dofs.block(0, i, local_dofs.rows(), 1);
             
             for (size_t j = 0; j < dphi.rows(); j++)
@@ -637,9 +767,10 @@ public:
 
         /*matrix_type*/ stiff_mat = matrix_type::Zero(ms_basis_size+1, ms_basis_size+1);
 
-        quadrature<ms_inner_mesh_type, ms_inner_cell_type> ms_cell_quad(2*multiscale_basis.degree()+6);
-        auto quadpair = make_quadrature(inner_mesh, 2*cb.degree()+6,
-                                             2*fb.degree()+6); //XXX
+        typedef quadrature<ms_inner_mesh_type, ms_inner_cell_type> ms_quad_cell_type;
+        ms_quad_cell_type ms_cell_quad(2*multiscale_basis.degree()+2);
+        auto quadpair = make_quadrature(inner_mesh, 2*cb.degree()+2,
+                                             2*fb.degree()+2);
 
         matrix_type rhs;
         auto rhs_cols_size = cb.size() + howmany_faces(outer_mesh, outer_cl) * fb.size();
@@ -659,11 +790,20 @@ public:
 
             /* stiff_mat will be the lhs */
             auto icl_quadpoints = ms_cell_quad.integrate(inner_mesh, icl);
+
+            auto eval_pair = multiscale_basis.eval(icl, icl_quadpoints);
+
+            size_t qp_i = 0;
             for (auto& qp : icl_quadpoints)
             {
                 vector_type phi = multiscale_basis.eval_functions(icl, qp.point());
-                matrix_type vt_phi = cb.eval_functions(outer_mesh, outer_cl, qp.point());
                 matrix_type dphi = multiscale_basis.eval_gradients(icl, qp.point());
+
+                //vector_type phi = eval_pair[qp_i].first;
+                //matrix_type dphi = eval_pair[qp_i].second;
+                qp_i++;
+
+                matrix_type vt_phi = cb.eval_functions(outer_mesh, outer_cl, qp.point());
                 stiff_mat.block(0,0,ms_basis_size,ms_basis_size) +=
                     qp.weight() * dphi * make_material_tensor(qp.point()) * dphi.transpose();
 

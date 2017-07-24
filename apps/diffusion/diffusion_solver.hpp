@@ -194,8 +194,8 @@ public:
         for (auto& cl : m_msh)
         {
 
-            if (elem_i%10000 == 0)
-                std::cout << elem_i << std::endl;
+            //if (elem_i%10000 == 0)
+            //    std::cout << elem_i << std::endl;
 
             elem_i++;
 
@@ -223,7 +223,7 @@ public:
         assembler.finalize(m_system_matrix, m_system_rhs);
 
         ai.linear_system_size = m_system_matrix.rows();
-        std::cout << "System has " << ai.linear_system_size << " unknowns" << std::endl;
+        //std::cout << "System has " << ai.linear_system_size << " unknowns" << std::endl;
         return ai;
     }
 
@@ -252,23 +252,23 @@ public:
             std::cout << " * Matrix fill: " << 100.0*double(nnz)/(systsz*systsz) << "%" << std::endl;
         }
 
-        timecounter tc;
+        timecounter_new tc;
 
         tc.tic();
 
-        //solver.analyzePattern(m_system_matrix);
-        //solver.factorize(m_system_matrix);
-        //auto sol = solver.solve(m_system_rhs);
+        solver.analyzePattern(m_system_matrix);
+        solver.factorize(m_system_matrix);
+        auto sol = solver.solve(m_system_rhs);
         //m_system_solution = sol;
 
-        agmg_solver<scalar_type> agmg;
-        auto sol = agmg.solve(m_system_matrix, m_system_rhs);
+        //agmg_solver<scalar_type> agmg;
+        //auto sol = agmg.solve(m_system_matrix, m_system_rhs);
 
         //Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> sol;
         //conjugated_gradient(m_system_matrix, m_system_rhs, sol);
-        std::cout << "solver done" << std::endl;
+        //std::cout << "solver done" << std::endl;
         m_system_solution = assembler.expand_solution(m_msh, sol);
-        std::cout << "expand done" << std::endl;
+        //std::cout << "expand done" << std::endl;
         
         tc.toc();
         si.time_solver = tc.to_double();
