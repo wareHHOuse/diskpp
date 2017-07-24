@@ -20,16 +20,70 @@
 
 #include "../../config.h"
 
-#ifdef HAVE_SOLVER_WRAPPERS
-#include "agmg/agmg.hpp"
-#endif
-
 #include "hho/hho.hpp"
 
 #include "timecounter.h"
+#include "agmg/agmg.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
+
+
+
+
+
+
+template<typename T>
+bool
+conjugated_gradient(const Eigen::SparseMatrix<T>& A,
+                    const Eigen::Matrix<T, Eigen::Dynamic, 1>& b,
+                    Eigen::Matrix<T, Eigen::Dynamic, 1>& x)
+{
+    size_t                      N = A.cols();
+    size_t                      iter = 0;
+    T                           nr, nr0;
+    T                           alpha, beta, rho;
+    
+    Eigen::Matrix<T, Eigen::Dynamic, 1> d(N), r(N), r0(N), y(N);
+    x = Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(N);
+ 
+
+    r0 = d = r = b - A*x;
+    nr = nr0 = r.norm();
+    
+    std::ofstream ofs("cocg_nopre_convergence.txt");
+    
+    while ( nr/nr0 > 1e-8 && iter < 40000 && nr/nr0 < 10000 )
+    {
+        std::cout << "                                                 \r";
+        std::cout << " -> Iteration " << iter << ", rr = ";
+        std::cout << nr/nr0 << "\b\r";
+        std::cout.flush();
+        
+        ofs << nr/nr0 << std::endl;
+        y = A*d;
+        rho = r.dot(r);
+        alpha = rho/d.dot(y);
+        x = x + alpha * d;
+        r = r - alpha * y;
+        beta = r.dot(r)/rho;
+        d = r + beta * d;
+        
+        nr = r.norm();
+        iter++;
+    }
+    
+    ofs << nr/nr0 << std::endl;
+    ofs.close();
+    
+    std::cout << " -> Iteration " << iter << ", rr = " << nr/nr0 << std::endl;
+    
+    return true;
+}
+
+
+
+
 
 struct assembly_info
 {
@@ -46,12 +100,6 @@ struct postprocess_info
 {
     double  time_postprocess;
 };
-
-#define USE_TENSOR
-#define TENSOR_11   1
-#define TENSOR_12   3
-#define TENSOR_21   3
-#define TENSOR_22   1
 
 template<typename Mesh>
 class diffusion_solver
@@ -75,8 +123,8 @@ class diffusion_solver
     typedef disk::gradient_reconstruction_bq<bqdata_type>               gradrec_type;
     typedef disk::diffusion_like_stabilization_bq<bqdata_type>          stab_type;
     typedef disk::diffusion_like_static_condensation_bq<bqdata_type>    statcond_type;
-    typedef disk::assembler<mesh_type, face_basis_type, face_quadrature_type> assembler_type;
-
+    //typedef disk::assembler<mesh_type, face_basis_type, face_quadrature_type> assembler_type;
+    typedef disk::assembler_homogeneus_dirichlet<mesh_type, face_basis_type, face_quadrature_type> assembler_type;
     typedef static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> tensor_type;
 
     size_t m_cell_degree, m_face_degree;
@@ -133,21 +181,26 @@ public:
 
         timecounter tc;
 
-        tensor_type tensor = tensor_type::Identity();
-        tensor(0,0) = TENSOR_11;
-        tensor(0,1) = TENSOR_12;
-        tensor(1,0) = TENSOR_21;
-        tensor(1,1) = TENSOR_22;
+        auto tf = [](const typename mesh_type::point_type& pt) -> tensor_type {
+            tensor_type ret = tensor_type::Identity();
+            //return ret;
+            //return 6.72071 * ret;
+            auto c = cos(M_PI * pt.x()/0.02);
+            auto s = sin(M_PI * pt.y()/0.02);
+            return ret * (1 + 100*c*c*s*s);
+        };
 
-
+        size_t elem_i = 0;
         for (auto& cl : m_msh)
         {
+
+            //if (elem_i%10000 == 0)
+            //    std::cout << elem_i << std::endl;
+
+            elem_i++;
+
             tc.tic();
-            gradrec.compute(m_msh, cl
-#ifdef USE_TENSOR
-            , tensor
-#endif
-            );
+            gradrec.compute(m_msh, cl, tf);
             tc.toc();
             ai.time_gradrec += tc.to_double();
 
@@ -170,17 +223,22 @@ public:
         assembler.finalize(m_system_matrix, m_system_rhs);
 
         ai.linear_system_size = m_system_matrix.rows();
+        //std::cout << "System has " << ai.linear_system_size << " unknowns" << std::endl;
         return ai;
     }
 
     solver_info
     solve(void)
     {
+        auto assembler  = assembler_type(m_msh, m_face_degree);
+        
 #ifdef HAVE_INTEL_MKL
         Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
+        solver.pardisoParameterArray()[59] = 0; //out-of-core
 #else
         Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
 #endif
+        
 
         solver_info si;
 
@@ -194,12 +252,24 @@ public:
             std::cout << " * Matrix fill: " << 100.0*double(nnz)/(systsz*systsz) << "%" << std::endl;
         }
 
-        timecounter tc;
+        timecounter_new tc;
 
         tc.tic();
+
         solver.analyzePattern(m_system_matrix);
         solver.factorize(m_system_matrix);
-        m_system_solution = solver.solve(m_system_rhs);
+        auto sol = solver.solve(m_system_rhs);
+        //m_system_solution = sol;
+
+        //agmg_solver<scalar_type> agmg;
+        //auto sol = agmg.solve(m_system_matrix, m_system_rhs);
+
+        //Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> sol;
+        //conjugated_gradient(m_system_matrix, m_system_rhs, sol);
+        //std::cout << "solver done" << std::endl;
+        m_system_solution = assembler.expand_solution(m_msh, sol);
+        //std::cout << "expand done" << std::endl;
+        
         tc.toc();
         si.time_solver = tc.to_double();
 
@@ -220,18 +290,33 @@ public:
 
         m_postprocess_data.reserve(m_msh.cells_size());
 
-        tensor_type tensor = tensor_type::Identity();
-        tensor(0,0) = TENSOR_11;
-        tensor(0,1) = TENSOR_12;
-        tensor(1,0) = TENSOR_21;
-        tensor(1,1) = TENSOR_22;
+        auto tf = [](const typename mesh_type::point_type& pt) -> tensor_type {
+            tensor_type ret = tensor_type::Identity();
+            //return ret;
+            //return 6.72071 * ret;
+            auto c = cos(M_PI * pt.x()/0.02);
+            auto s = sin(M_PI * pt.y()/0.02);
+            return ret * (1 + 100*c*c*s*s);
+        };
 
         timecounter tc;
         tc.tic();
+
+#define DUMP_SOLUTION_DATA
+
+#ifdef DUMP_SOLUTION_DATA
+        auto elem_num = m_msh.cells_size();
+        auto cb_deg = m_bqd.cell_basis.degree();
+        auto fb_deg = m_bqd.face_basis.degree();
+        std::ofstream sol_data("solution.bin", std::ios::binary);
+        sol_data.write( reinterpret_cast<char *>(&elem_num), sizeof(elem_num) );
+        sol_data.write( reinterpret_cast<char *>(&cb_deg), sizeof(elem_num) );
+        sol_data.write( reinterpret_cast<char *>(&fb_deg), sizeof(elem_num) );
+#endif
         for (auto& cl : m_msh)
         {
             auto fcs = faces(m_msh, cl);
-            auto num_faces = fcs.size();
+            size_t num_faces = fcs.size();
 
             dynamic_vector<scalar_type> xFs = dynamic_vector<scalar_type>::Zero(num_faces*fbs);
 
@@ -249,17 +334,34 @@ public:
                 xFs.block(face_i * fbs, 0, fbs, 1) = xF;
             }
 
-            gradrec.compute(m_msh, cl
-#ifdef USE_TENSOR
-            , tensor
-#endif
-            );
+            gradrec.compute(m_msh, cl, tf);
             stab.compute(m_msh, cl, gradrec.oper);
             dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
             auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(m_msh, cl, lf, m_cell_degree);
             dynamic_vector<scalar_type> x = statcond.recover(m_msh, cl, loc, cell_rhs, xFs);
             m_postprocess_data.push_back(x);
+            dynamic_vector<scalar_type> Rx = gradrec.oper * x;
+#ifdef DUMP_SOLUTION_DATA
+            // dump number of faces
+            //sol_data.write( reinterpret_cast<char *>(&num_faces), sizeof(size_t) );
+
+            // dump vT and vF coefficients
+            //for (size_t i = 0; i < x.size(); i++)
+            //    sol_data.write( reinterpret_cast<char *>(&x(i)), sizeof(x(i)) );
+
+            // dump R(v)
+            dynamic_vector<scalar_type> Rxd;
+            Rxd = dynamic_vector<scalar_type>::Zero(Rx.size()+1);
+            Rxd(0) = x(0);
+            Rxd.tail(Rx.size()) = Rx;
+
+            for (size_t i = 0; i < Rxd.size(); i++)
+                sol_data.write( reinterpret_cast<char *>(&Rxd(i)), sizeof(Rxd(i)) );
+#endif
         }
+#ifdef DUMP_SOLUTION_DATA
+        sol_data.close();
+#endif
         tc.toc();
 
         pi.time_postprocess = tc.to_double();
@@ -297,16 +399,18 @@ public:
         for (auto& cl : m_msh)
         {
             auto x = m_postprocess_data.at(cell_i++);
-            auto qps = m_bqd.cell_quadrature.integrate(m_msh, cl);
-            for (auto& qp : qps)
+            //auto qps = m_bqd.cell_quadrature.integrate(m_msh, cl);
+            //for (auto& qp : qps)
+            auto tps = make_test_points(m_msh, cl, 10);
+            for (auto& tp : tps)
             {
-                auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, qp.point());
+                auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, tp);
 
                 scalar_type pot = 0.0;
                 for (size_t i = 0; i < howmany_dofs(m_bqd.cell_basis); i++)
                     pot += phi[i] * x(i);
 
-                auto tp = qp.point();
+                //auto tp = qp.point();
                 for (size_t i = 0; i < mesh_type::dimension; i++)
                     ofs << tp[i] << " ";
                 ofs << pot << std::endl;

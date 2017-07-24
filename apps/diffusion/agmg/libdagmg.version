@@ -1,0 +1,4 @@
+DAGMG {
+  global: dagmg_;
+  local: *;
+};

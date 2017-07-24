@@ -68,7 +68,7 @@ run_diffusion_solver(const Mesh<T, 1, Storage>& msh, run_params& rp)
     dp.assemble(load, solution);
     dp.solve();
     dp.postprocess(load);
-    dp.plot_solution("plot.dat");
+    //dp.plot_solution("plot.dat");
     std::cout << dp.compute_l2_error(solution) << std::endl;
 }
 
@@ -79,32 +79,40 @@ run_diffusion_solver(const Mesh<T, 2, Storage>& msh, run_params& rp)
 {
     typedef Mesh<T, 2, Storage> mesh_type;
 
+    
     auto load = [](const point<T, 2>& p) -> auto {
-#ifdef USE_TENSOR
-        typename point<T, 2>::value_type a11, a12, a21, a22;
 
-        a11 = TENSOR_11; a12 = TENSOR_12;
-        a21 = TENSOR_21; a22 = TENSOR_22;
-
-        return (a11 + a22) * M_PI * M_PI * sin(p.x() * M_PI) * sin(p.y() * M_PI) -
-               (a12 + a21) * M_PI * M_PI * cos(p.x() * M_PI) * cos(p.y() * M_PI);
-#else
-        return 2.0 * M_PI * M_PI * sin(p.x() * M_PI) * sin(p.y() * M_PI);
-#endif
-
+        //return 2.0 * M_PI * M_PI * sin(p.x() * M_PI) * sin(p.y() * M_PI);
+        return sin(p.x()) * sin(p.y());
     };
+    
 
+    
     auto solution = [](const point<T, 2>& p) -> auto {
         return sin(p.x() * M_PI) * sin(p.y() * M_PI);
     };
+    
+
+    /*
+    auto load = [](const point<T,2>& p) -> auto {
+        auto eps = 1.0;
+        return +2.0 * M_PI * M_PI * ( 100.0*sin(M_PI*p.y()/eps)*sin(M_PI*p.y()/eps)*cos(M_PI*p.x()/eps)*cos(M_PI*p.x()/eps) + 1.0) * sin(M_PI*p.x()) * sin(M_PI*p.y())
+               - 200 * M_PI * M_PI * sin(M_PI*p.x()) * sin(M_PI*p.y()/eps) * cos(M_PI*p.y()) * cos(M_PI*p.x()/eps) * cos(M_PI*p.x()/eps) * cos(M_PI*p.y()/eps) / eps
+               + 200 * M_PI * M_PI * sin(M_PI*p.y()) * sin(M_PI*p.x()/eps) * cos(M_PI*p.x()) * sin(M_PI*p.y()/eps) * sin(M_PI*p.y()/eps) * cos(M_PI*p.x()/eps) / eps;
+    
+    };
+    */
 
     diffusion_solver<mesh_type> dp(msh, rp.degree);
     dp.verbose(rp.verbose);
 
+    std::cout << "ASM" << std::endl;
     dp.assemble(load, solution);
+    std::cout << "solve" << std::endl;
     dp.solve();
+    std::cout << "post" << std::endl;
     dp.postprocess(load);
-    dp.plot_solution("plot.dat");
+    //dp.plot_solution("plot.dat");
     std::cout << dp.compute_l2_error(solution) << std::endl;
 }
 
@@ -201,6 +209,9 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
+    mesh_filename = argv[0];
+    
+#if 0
     if (argc == 0)
     {
         std::cout << "Mesh format: 1D uniform" << std::endl;
@@ -209,7 +220,7 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    mesh_filename = argv[0];
+    
 
     /* FVCA5 2D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
@@ -219,16 +230,19 @@ int main(int argc, char **argv)
         run_diffusion_solver(msh, rp);
         return 0;
     }
-
+#endif
     /* Netgen 2D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$") ))
     {
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
         auto msh = disk::load_netgen_2d_mesh<RealType>(mesh_filename);
+
+        std::cout << msh.faces_size() << std::endl;
+
         run_diffusion_solver(msh, rp);
         return 0;
     }
-
+#if 0
     /* DiSk++ cartesian 2D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.quad$") ))
     {
@@ -255,6 +269,7 @@ int main(int argc, char **argv)
         run_diffusion_solver(msh, rp);
         return 0;
     }
+#endif
 
 }
 

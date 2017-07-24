@@ -263,11 +263,11 @@ private:
         }
 
         friend bool operator<(const edge& a, const edge& b) {
-            return ( a.p1 < b.p1 or (a.p1 == b.p1 and a.p0 < b.p0) );
+            return ( a.p0 < b.p0 or (a.p0 == b.p0 and a.p1 < b.p1) );
         }
 
         friend bool operator==(const edge& a, const edge& b) {
-            return ( a.p0 == b.p0 and a.p1 == b.p0 );
+            return ( a.p0 == b.p0 and a.p1 == b.p1 );
         }
 
         size_t  p0, p1, pb;
@@ -305,6 +305,8 @@ private:
 
         /* refine the triangles */
         size_t triangles_to_process = m_triangles.size();
+        m_edges.reserve( m_edges.size() + triangles_to_process*12 );
+        auto edges_end = m_edges.end();
         for (size_t i = 0; i < triangles_to_process; i++)
         {
             /* remove the original triangle */
@@ -312,11 +314,11 @@ private:
             m_triangles.pop_front();
 
             /* find the edges of the triangle */
-            auto t_e0 = *std::lower_bound(m_edges.begin(), m_edges.end(), edge(t.p0, t.p1));
+            auto t_e0 = *std::lower_bound(m_edges.begin(), edges_end, edge(t.p0, t.p1));
             assert(t_e0.is_broken);
-            auto t_e1 = *std::lower_bound(m_edges.begin(), m_edges.end(), edge(t.p1, t.p2));
+            auto t_e1 = *std::lower_bound(m_edges.begin(), edges_end, edge(t.p1, t.p2));
             assert(t_e1.is_broken);
-            auto t_e2 = *std::lower_bound(m_edges.begin(), m_edges.end(), edge(t.p0, t.p2));
+            auto t_e2 = *std::lower_bound(m_edges.begin(), edges_end, edge(t.p0, t.p2));
             assert(t_e2.is_broken);
 
             assert(t_e0.p1 == t_e1.p0);

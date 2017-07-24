@@ -25,6 +25,8 @@
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
 
+namespace disk {
+
 template<typename T>
 class mesh_hierarchy
 {
@@ -325,7 +327,10 @@ class mesh_hierarchy
         
         for (size_t i = 0; i < levels; i++)
         {
+            std::cout << "Building level " << i+1 << " mesh. H = ";
             auto next_mesh = build_next( meshes[i] );
+            std::cout << average_diameter(next_mesh) << std::endl;
+            //next_mesh.statistics();
             meshes.push_back( next_mesh );
             auto c2f = make_coarse_to_fine_map(meshes[i], meshes[i+1]);
             coarse_to_fine.push_back( std::move(c2f) );
@@ -337,7 +342,7 @@ class mesh_hierarchy
     }
     
     bool
-    is_inside(const mesh_type& msh, const mesh_triangle_type& t, const point_type& pt)
+    is_inside(const mesh_type& msh, const mesh_triangle_type& t, const point_type& pt) const
     {
         auto pts = points(msh, t);
         
@@ -355,7 +360,9 @@ class mesh_hierarchy
         auto u = (dot11 * dot02 - dot01 * dot12) * invDenom;
         auto v = (dot00 * dot12 - dot01 * dot02) * invDenom;
         
-        return (u >= 0) && (v >= 0) && (u + v < 1);
+        auto thresh = 0.0;
+
+        return (u >= (0-thresh)) && (v >= (0-thresh)) && (u + v <= (1+thresh));
     }
     
     size_t
@@ -376,7 +383,7 @@ class mesh_hierarchy
             if (is_inside(current_mesh, cl, pt))
                 return locate_recursive(pt, cur_level+1, max_level, t);
         }
-        
+
         throw std::invalid_argument("point not found (s)");
     }
     
@@ -384,7 +391,7 @@ public:
     mesh_hierarchy(const mesh_type& initial_mesh, size_t num_levels)
     {
         build_hierarchy(initial_mesh, num_levels);
-        dump_to_matlab(meshes[2], "mesh2.m");
+        //dump_to_matlab(meshes[2], "mesh2.m");
     }
     
     size_t
@@ -448,53 +455,5 @@ dump_netgen_format(const disk::simplicial_mesh<T,2>& msh, const std::string& fil
     ofs.close();
 }
 
-int main(int argc, char **argv)
-{
-    if (argc != 2)
-    {
-        std::cout << "Please specify mesh file name" << std::endl;
-        return 1;
-    }
- 
-    const size_t levels = 8;
-    const size_t num_test_points = 1000000;
-    
-    const char *filename = argv[1];
-    using T = double;
 
-    disk::simplicial_mesh<T,2> msh;
-    disk::netgen_mesh_loader<T,2> loader;
-    loader.verbose(true);
-    loader.read_mesh(filename);
-    loader.populate_mesh(msh);
-    
-    dump_netgen_format(msh, "test.mesh");
-    
-    std::cout << "Loaded, making hierarchy" << std::endl;
-    
-    mesh_hierarchy<T> mh(msh, levels);
-    
-    typedef typename disk::simplicial_mesh<T,2>::point_type point_type;
-    
-    std::random_device r;
-    std::default_random_engine e1(r());
-    std::uniform_real_distribution<double> uniform_dist(0, 1);
-    
-    auto getrand = std::bind(uniform_dist, e1);
-    
-    
-    std::cout << "Making random points" << std::endl;
-    std::vector<point_type> tpts;
-    tpts.reserve(num_test_points);
-    for (size_t i = 0; i < num_test_points; i++)
-        tpts.push_back(point_type({getrand(), getrand()}));
-    
-    std::cout << "Looking up" << std::endl;
-    for (auto& tp : tpts)
-        mh.locate_point(tp, levels);
-    
-    std::cout << "Ended" << std::endl;
-    
-    return 0;
-    
-}
+} //namespace disk

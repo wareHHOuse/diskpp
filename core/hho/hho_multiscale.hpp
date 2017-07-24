@@ -14,10 +14,15 @@
  * cite it.
  */
 
+#include <functional>
+using namespace std::placeholders;
+
 #include "hho.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
+
+#include "common/eigen.hpp"
 
 namespace disk {
 
@@ -26,10 +31,26 @@ static_matrix<T,2,2>
 make_material_tensor(const point<T,2>& pt)
 {
     static_matrix<T,2,2> ret = static_matrix<T,2,2>::Identity();
+    //return ret;
+    //return ret * 6.72071;
 
-    auto c = cos(M_PI * pt.x());
-    auto s = sin(M_PI * pt.y());
+    auto c = std::cos(M_PI * pt.x()/0.02);
+    auto s = std::sin(M_PI * pt.y()/0.02);
     return ret * (1 + 100*c*c*s*s);
+}
+
+template<typename T>
+size_t
+local_face_num(const simplicial_mesh<T, 2>& msh,
+               const typename simplicial_mesh<T, 2>::cell& cl,
+               const typename simplicial_mesh<T, 2>::face& fc)
+{
+    auto fcs = faces(msh, cl);
+    for (size_t i = 0; i < fcs.size(); i++)
+        if (fcs[i] == fc)
+            return i;
+
+    throw std::invalid_argument("Face not part of the specified cell");
 }
 
 
@@ -66,6 +87,8 @@ private:
     size_t                        m_degree, m_refinement_levels;
 
     bqdata_type                   bqd;
+
+    std::vector<matrix_type>    inner_gr_opers, inner_gr_data;
 
     matrix_type
     take_local_dofs(const inner_cell_type& cl)
@@ -114,15 +137,19 @@ public:
                            size_t degree, size_t refinement_levels)
         : m_degree(degree), m_refinement_levels(refinement_levels)
     {
+        timecounter tc;
+        tc.tic();
         submesher_type                                  submesher;
         bqd = bqdata_type(m_degree, m_degree);
         gradient_reconstruction_bq<bqdata_type>         gradrec(bqd);
         diffusion_like_stabilization_bq<bqdata_type>    stab(bqd);
 
         m_inner_mesh = submesher.generate_mesh(outer_msh, outer_cl, m_refinement_levels);
+        //std::cout << "Inner cells: " << m_inner_mesh.cells_size() << std::endl;
+        //std::cout << "Inner h: " << average_diameter(m_inner_mesh) << std::endl;
 
-        auto quadpair = make_quadrature(outer_msh, m_degree+outer_cell_basis.degree(),
-                                             m_degree+2*outer_face_basis.degree());
+        auto quadpair = make_quadrature(outer_msh, 2*outer_cell_basis.degree()+2,
+                                                    2*outer_face_basis.degree()+2);
 
         auto num_cell_faces = howmany_faces(outer_msh, outer_cl);
 
@@ -134,9 +161,9 @@ public:
 
         auto matrix_face_offset = num_cell_dofs * m_inner_mesh.cells_size();
         auto matrix_mult_offset = matrix_face_offset + num_face_dofs * m_inner_mesh.faces_size();
-        auto system_size = num_cell_dofs * m_inner_mesh.cells_size() +
-                           num_face_dofs * m_inner_mesh.faces_size() +
-                           num_face_funcs * num_cell_faces;
+        auto system_size = num_cell_dofs * m_inner_mesh.cells_size() +  // HHO cell dofs
+                           num_face_dofs * m_inner_mesh.faces_size() +  // HHO face dofs
+                           num_face_funcs * num_cell_faces;             // Lagrange multipliers
 
         m_matrix = sparse_matrix_type(system_size, system_size);
 
@@ -144,6 +171,7 @@ public:
         m_rhs = matrix_type::Zero(system_size, rhs_size);
 
         std::vector<triplet_type> triplets;
+        triplets.reserve(100*m_inner_mesh.cells_size());
 
         /* list of the boundary ids on the fine face. there must be as many
          * boundary ids as the faces in the coarse cell */
@@ -151,6 +179,7 @@ public:
         assert( bid_list.size() == howmany_faces(outer_msh, outer_cl) );
 
         /* Assemble standard HHO part */
+        //std::cout << "Inner assembly" << std::endl;
         size_t cell_idx = 0;
         for (auto& cl : m_inner_mesh)
         {
@@ -180,12 +209,17 @@ public:
                     l2g[dt_ofs+j] = face_offset+j;
             }
 
+            auto tf = std::bind(make_material_tensor<scalar_type>, _1);
+
             /* Compute HHO element contribution */
-            gradrec.compute(m_inner_mesh, cl);
+            gradrec.compute(m_inner_mesh, cl, tf);
             stab.compute(m_inner_mesh, cl, gradrec.oper);
             dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
             assert(loc.rows() == l2g.size());
             assert(loc.cols() == l2g.size());
+
+            inner_gr_opers.push_back(gradrec.oper);
+            inner_gr_data.push_back(gradrec.data);
 
             /* Assemble into the matrix */
             for (size_t i = 0; i < l2g.size(); i++)
@@ -207,10 +241,10 @@ public:
 
             auto cell_offset = cell_idx * num_cell_dofs;
             m_rhs.block(cell_offset, 0, num_cell_dofs, num_cell_funcs) += cell_rhs;
-
             cell_idx++;
         } // for (auto& cl : m_inner_mesh)
 
+        //std::cout << "Boundaries" << std::endl;
         for (auto itor = m_inner_mesh.boundary_faces_begin();
                   itor != m_inner_mesh.boundary_faces_end();
                   itor++)
@@ -229,20 +263,12 @@ public:
             /* lookup the boundary number of the current face */
             size_t bnd_id = m_inner_mesh.boundary_id(fc);
 
-            size_t coarse_cell_face_num;
-            for (size_t i = 0; i < bid_list.size(); i++)
-                if (bid_list[i] == bnd_id)
-                {
-                    coarse_cell_face_num = i;
-                    break;
-                }
-
-            assert (coarse_cell_face_num < howmany_faces(outer_msh, outer_cl));
-
             /* since the boundary id on the fine mesh is inherited from the face
              * id on the coarse mesh, we use it to recover the coarse face */
-            auto coarse_fc = *(outer_msh.faces_begin() + bnd_id);
+            auto coarse_fc = *std::next(outer_msh.faces_begin(), bnd_id);
 
+            size_t coarse_cell_face_num = local_face_num(outer_msh, outer_cl, coarse_fc);
+            assert (coarse_cell_face_num < howmany_faces(outer_msh, outer_cl));
             //std::cout << coarse_fc << " " << fc << " (->) " << coarse_cell_face_num << std::endl;
 
             matrix_type face_matrix, ff;
@@ -298,8 +324,11 @@ public:
         m_matrix.setFromTriplets(triplets.begin(), triplets.end());
         triplets.clear();
 
+        tc.toc();
+        //std::cout << "Assembly: " << tc << std::endl;
+        //std::cout << "solve" << std::endl;
 
-
+        tc.tic();
 #ifdef HAVE_INTEL_MKL
         Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
 #else
@@ -309,12 +338,140 @@ public:
         solver.analyzePattern(m_matrix);
         solver.factorize(m_matrix);
         m_X = solver.solve(m_rhs);
+        tc.toc();
+        //std::cout << "Solver: " << tc << std::endl;
+
+        //std::cout << "solver done" << std::endl;
     }
 
     inner_mesh_type
     inner_mesh(void)
     {
         return m_inner_mesh;
+    }
+
+    template<typename QPType>
+    std::vector<std::pair<vector_type, matrix_type>>
+    eval(const inner_cell_type& cl, const std::vector<QPType>& qpts)
+    {
+        matrix_type local_dofs = take_local_dofs(cl);
+        auto cell_id = m_inner_mesh.lookup(cl);
+        auto gr_oper = inner_gr_opers.at(cell_id);
+
+        matrix_type local_dofs_R = gr_oper * local_dofs;
+
+        std::vector<std::pair<vector_type, matrix_type>> ret;
+        ret.reserve(qpts.size());
+
+
+        for(auto& qpt : qpts)
+        {
+            auto pt = qpt.point();
+            vector_type phi  = bqd.cell_basis.eval_functions(m_inner_mesh, cl, pt, 0, m_degree+1);
+            matrix_type dphi = bqd.cell_basis.eval_gradients(m_inner_mesh, cl, pt, 0, m_degree+1);
+
+            vector_type ret_phi  = vector_type::Zero( local_dofs.cols() );
+            matrix_type ret_dphi = matrix_type::Zero( local_dofs.cols(), 2 );
+
+            for (size_t i = 0; i < local_dofs_R.cols(); i++)
+            {
+                auto const_dof = local_dofs(1,i); 
+                vector_type R = local_dofs_R.block(0, i, local_dofs_R.rows(), 1);
+
+                assert(R.size() == phi.rows()-1);
+                assert(R.size() == dphi.rows()-1);
+
+                for (size_t j = 1; j < phi.rows(); j++)
+                    ret_phi(i) += R(j-1)*phi(j);
+                ret_phi(i) += const_dof * phi(0);
+
+                for (size_t j = 1; j < dphi.rows(); j++)
+                    ret_dphi.block(i,0,1,2) += R(j-1)*dphi.block(j,0,1,2);
+                ret_dphi.block(i,0,1,2) += const_dof * dphi.block(0,0,1,2);
+            }
+
+            ret.push_back( std::make_pair(ret_phi, ret_dphi) );
+        }
+
+        return ret;
+    }
+
+    template<typename QPType>
+    std::vector<vector_type>
+    eval_functions(const inner_cell_type& cl, const std::vector<QPType>& qpts)
+    {
+        matrix_type local_dofs = take_local_dofs(cl);
+        auto cell_id = m_inner_mesh.lookup(cl);
+        auto gr_oper = inner_gr_opers.at(cell_id);
+
+        matrix_type local_dofs_R = gr_oper * local_dofs;
+
+        std::vector<vector_type> ret;
+        ret.reserve(qpts.size());
+
+
+        for(auto& qpt : qpts)
+        {
+            auto pt = qpt.point();
+            vector_type phi  = bqd.cell_basis.eval_functions(m_inner_mesh, cl, pt, 0, m_degree+1);
+
+            vector_type ret_phi  = vector_type::Zero( local_dofs.cols() );
+
+            for (size_t i = 0; i < local_dofs_R.cols(); i++)
+            {
+                auto const_dof = local_dofs(1,i); 
+                vector_type R = local_dofs_R.block(0, i, local_dofs_R.rows(), 1);
+
+                assert(R.size() == phi.rows()-1);
+
+                for (size_t j = 1; j < phi.rows(); j++)
+                    ret_phi(i) += R(j-1)*phi(j);
+                ret_phi(i) += const_dof * phi(0);
+            }
+
+            ret.push_back( ret_phi );
+        }
+
+        return ret;
+    }
+
+    template<typename QPType>
+    std::vector<matrix_type>
+    eval_gradients(const inner_cell_type& cl, const std::vector<QPType>& qpts)
+    {
+        matrix_type local_dofs = take_local_dofs(cl);
+        auto cell_id = m_inner_mesh.lookup(cl);
+        auto gr_oper = inner_gr_opers.at(cell_id);
+
+        matrix_type local_dofs_R = gr_oper * local_dofs;
+
+        std::vector<matrix_type> ret;
+        ret.reserve(qpts.size());
+
+
+        for(auto& qpt : qpts)
+        {
+            auto pt = qpt.point();
+            matrix_type dphi = bqd.cell_basis.eval_gradients(m_inner_mesh, cl, pt, 0, m_degree+1);
+
+            matrix_type ret_dphi = matrix_type::Zero( local_dofs.cols(), 2 );
+
+            for (size_t i = 0; i < local_dofs_R.cols(); i++)
+            {
+                auto const_dof = local_dofs(1,i); 
+                vector_type R = local_dofs_R.block(0, i, local_dofs_R.rows(), 1);
+
+                assert(R.size() == dphi.rows()-1);
+
+                for (size_t j = 1; j < dphi.rows(); j++)
+                    ret_dphi.block(i,0,1,2) += R(j-1)*dphi.block(j,0,1,2);
+                ret_dphi.block(i,0,1,2) += const_dof * dphi.block(0,0,1,2);
+            }
+
+            ret.push_back( ret_dphi );
+        }
+
+        return ret;
     }
 
 #define EVAL_WITH_RECONSTRUCTION
@@ -324,25 +481,25 @@ public:
     {
         matrix_type local_dofs = take_local_dofs(cl);
 
-        //std::cout << "xxxxxxxx" << std::endl;
-        //std::cout << local_dofs << std::endl;
-
-        gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
-        gradrec.compute(m_inner_mesh, cl);
+        //gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
+        //gradrec.compute(m_inner_mesh, cl);
 
         vector_type ret = vector_type::Zero( local_dofs.cols() );
 
+        auto tf = std::bind(make_material_tensor<scalar_type>, _1);
+        //gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
+        //gradrec.compute(m_inner_mesh, cl, tf);
+#ifdef EVAL_WITH_RECONSTRUCTION
+        auto cell_id = m_inner_mesh.lookup(cl);
+        auto gr_oper = inner_gr_opers.at(cell_id);
+#endif
+        vector_type phi = bqd.cell_basis.eval_functions(m_inner_mesh, cl, pt, 0, m_degree+1);
         for (size_t i = 0; i < local_dofs.cols(); i++)
         {
 #ifdef EVAL_WITH_RECONSTRUCTION
             vector_type func_dofs = local_dofs.block(0, i, local_dofs.rows(), 1);
 
-            gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
-            gradrec.compute(m_inner_mesh, cl);
-
-            vector_type R = gradrec.oper * func_dofs;
-
-            vector_type phi = bqd.cell_basis.eval_functions(m_inner_mesh, cl, pt, 0, m_degree+1);
+            vector_type R = gr_oper * func_dofs;
 
             assert(R.size() == phi.rows()-1);
 
@@ -351,7 +508,7 @@ public:
 
             ret(i) += func_dofs(0)*phi(0);
 #else
-            auto phi = bqd.cell_basis.eval_functions(m_inner_mesh, cl, pt, 0, m_degree);
+            //auto phi = bqd.cell_basis.eval_functions(m_inner_mesh, cl, pt, 0, m_degree);
             vector_type func_dofs = local_dofs.block(0, i, phi.size(), 1);
 
             ret(i) = func_dofs.dot(phi);
@@ -369,18 +526,21 @@ public:
 
         matrix_type ret = matrix_type::Zero( local_dofs.cols(), 2 );
 
+        auto tf = std::bind(make_material_tensor<scalar_type>, _1);
+        //gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
+        //gradrec.compute(m_inner_mesh, cl, tf);
+#ifdef EVAL_WITH_RECONSTRUCTION
+        auto cell_id = m_inner_mesh.lookup(cl);
+        auto gr_oper = inner_gr_opers.at(cell_id);
+#endif
+        matrix_type dphi = bqd.cell_basis.eval_gradients(m_inner_mesh, cl, pt, 0, m_degree+1);
         for (size_t i = 0; i < local_dofs.cols(); i++)
         {
 
 #ifdef EVAL_WITH_RECONSTRUCTION
             vector_type func_dofs = local_dofs.block(0, i, local_dofs.rows(), 1);
 
-            gradient_reconstruction_bq<bqdata_type> gradrec(bqd);
-            gradrec.compute(m_inner_mesh, cl);
-
-            vector_type R = gradrec.oper * func_dofs;
-
-            matrix_type dphi = bqd.cell_basis.eval_gradients(m_inner_mesh, cl, pt, 0, m_degree+1);
+            vector_type R = gr_oper * func_dofs;
 
             assert(R.size() == dphi.rows()-1);
 
@@ -389,7 +549,7 @@ public:
 
             ret.block(i,0,1,2) += func_dofs(0)*dphi.block(0,0,1,2);
 #else
-            matrix_type dphi = bqd.cell_basis.eval_gradients(m_inner_mesh, cl, pt, 0, m_degree);
+            //matrix_type dphi = bqd.cell_basis.eval_gradients(m_inner_mesh, cl, pt, 0, m_degree);
             vector_type func_dofs = local_dofs.block(0, i, local_dofs.rows(), 1);
             
             for (size_t j = 0; j < dphi.rows(); j++)
@@ -398,6 +558,20 @@ public:
 
         }
 
+        return ret;
+    }
+
+    matrix_type //vector_type
+    get_lagrange_multipliers()
+    {
+        
+        auto num_cell_dofs = howmany_dofs(bqd.cell_basis);
+        auto num_face_dofs = howmany_dofs(bqd.face_basis);
+        auto begin = num_cell_dofs * m_inner_mesh.cells_size() + num_face_dofs * m_inner_mesh.faces_size();
+        auto end = m_X.rows();
+        //std::cout << m_X.rows() << " " << m_X.cols() << std::endl;
+        //std::cout << begin << " " << end << std::endl;
+        matrix_type ret = m_X.block(begin, 0, end-begin, m_X.cols());
         return ret;
     }
 
@@ -420,7 +594,7 @@ make_rhs(const Mesh& msh, const typename Mesh::cell& cl,
 {
     typedef dynamic_vector<typename Mesh::scalar_type> vector_type;
     auto fcs = faces(msh, cl);
-    std::sort(fcs.begin(), fcs.end());
+    //std::sort(fcs.begin(), fcs.end());
     auto num_faces = fcs.size();
     auto rhs_size = cb.size() + num_faces * fb.size();
     vector_type rhs = vector_type::Zero(rhs_size);
@@ -447,8 +621,7 @@ make_rhs(const Mesh& msh, const typename Mesh::cell& cl,
             auto offset = cbs + face_i*fbs;
             auto phi    = fb.eval_functions(msh, fc, qp.point());
             auto f_val  = f(qp.point());
-            rhs.block(offset, 0, fbs, 1) +=
-                qp.weight() * f_val * phi;
+            rhs.block(offset, 0, fbs, 1) += qp.weight() * f_val * phi;
         }
     }
 
@@ -481,7 +654,7 @@ public:
         : mesh(msh), cell(cl), cell_basis(cb), face_basis(fb)
     {
         auto fcs = faces(msh, cl);
-        std::sort(fcs.begin(), fcs.end());
+        //std::sort(fcs.begin(), fcs.end());
         auto num_faces = fcs.size();
         auto mass_matrix_size = cell_basis.size() + num_faces * face_basis.size();
         mass_matrix = matrix_type::Zero(mass_matrix_size, mass_matrix_size);
@@ -552,7 +725,7 @@ evaluate_dofs(const Mesh& msh, const typename Mesh::cell& cl,
     return ret;
 }
 
-
+//#define USE_22_FOR_GR
 
 template<typename Mesh, typename OuterCellBasis, typename OuterFaceBasis>
 class gradient_reconstruction_multiscale
@@ -594,9 +767,10 @@ public:
 
         /*matrix_type*/ stiff_mat = matrix_type::Zero(ms_basis_size+1, ms_basis_size+1);
 
-        quadrature<ms_inner_mesh_type, ms_inner_cell_type> ms_cell_quad(2*multiscale_basis.degree());
-        auto quadpair = make_quadrature(inner_mesh, 2*cb.degree(),
-                                             2*fb.degree());
+        typedef quadrature<ms_inner_mesh_type, ms_inner_cell_type> ms_quad_cell_type;
+        ms_quad_cell_type ms_cell_quad(2*multiscale_basis.degree()+2);
+        auto quadpair = make_quadrature(inner_mesh, 2*cb.degree()+2,
+                                             2*fb.degree()+2);
 
         matrix_type rhs;
         auto rhs_cols_size = cb.size() + howmany_faces(outer_mesh, outer_cl) * fb.size();
@@ -605,19 +779,33 @@ public:
         auto bid_list = inner_mesh.boundary_id_list();
         assert( bid_list.size() == howmany_faces(outer_mesh, outer_cl) );
 
+#ifdef USE_22_FOR_GR
+        matrix_type lmlm = multiscale_basis.get_lagrange_multipliers().transpose();
+        //std::cout << "LM" << std::endl;
+        //std::cout << lmlm << std::endl;
+#endif
         for (auto& icl : inner_mesh)
         {   
             //cell_info(inner_mesh, icl);
 
             /* stiff_mat will be the lhs */
             auto icl_quadpoints = ms_cell_quad.integrate(inner_mesh, icl);
+
+            auto eval_pair = multiscale_basis.eval(icl, icl_quadpoints);
+
+            size_t qp_i = 0;
             for (auto& qp : icl_quadpoints)
             {
                 vector_type phi = multiscale_basis.eval_functions(icl, qp.point());
-                matrix_type vt_phi = cb.eval_functions(outer_mesh, outer_cl, qp.point());
                 matrix_type dphi = multiscale_basis.eval_gradients(icl, qp.point());
+
+                //vector_type phi = eval_pair[qp_i].first;
+                //matrix_type dphi = eval_pair[qp_i].second;
+                qp_i++;
+
+                matrix_type vt_phi = cb.eval_functions(outer_mesh, outer_cl, qp.point());
                 stiff_mat.block(0,0,ms_basis_size,ms_basis_size) +=
-                    qp.weight() * dphi * /*mtens **/ dphi.transpose();
+                    qp.weight() * dphi * make_material_tensor(qp.point()) * dphi.transpose();
 
                 // Lagrange multiplier to fix the average of the reconstruction
                 stiff_mat.block(0, ms_basis_size, ms_basis_size, 1) += qp.weight() * phi;
@@ -629,15 +817,22 @@ public:
 
             for (auto& qp : rhs_qps)
             {
+#ifdef USE_22_FOR_GR
+                vector_type vt_phi_outer = cb.eval_functions(outer_mesh, outer_cl, qp.point());
+                rhs.block(0, 0, cb.size(), cb.size()) +=
+                    qp.weight() * vt_phi_outer * vt_phi_outer.transpose();
+#else
                 matrix_type ms_dphi = multiscale_basis.eval_gradients(icl, qp.point());
                 matrix_type vt_dphi = cb.eval_gradients(outer_mesh, outer_cl, qp.point());                
                 rhs.block(0, 0, ms_basis_size, cb.size()) +=
-                    qp.weight() * ms_dphi * vt_dphi.transpose();
+                    qp.weight() * (ms_dphi * make_material_tensor(qp.point()).transpose()) * vt_dphi.transpose();
+#endif
             }
 
             auto fcs = faces(inner_mesh, icl);
             auto num_faces = fcs.size();
 
+#ifdef USE_22_FOR_GR
             for (size_t face_i = 0; face_i < num_faces; face_i++)
             {
                 auto fc = fcs[face_i];
@@ -646,21 +841,38 @@ public:
 
                 size_t bnd_id = inner_mesh.boundary_id(fc);
 
-                size_t outer_face_num;
-                for (size_t i = 0; i < bid_list.size(); i++)
-                {
-                    if (bid_list[i] == bnd_id)
-                    {
-                        outer_face_num = i;
-                        break;
-                    }
-                }
-
+                /* since the boundary id on the fine mesh is inherited from the face
+                 * id on the coarse mesh, we use it to recover the coarse face */
+                auto outer_fc = *std::next(outer_mesh.faces_begin(), bnd_id);
+                size_t outer_face_num = local_face_num(outer_mesh, outer_cl, outer_fc);
                 assert (outer_face_num < howmany_faces(outer_mesh, outer_cl));
+                
+                matrix_type face_contrib = matrix_type::Zero(ms_basis_size, fb.size());
+                auto face_quadpoints = quadpair.second.integrate(inner_mesh, fc);
+                for (auto& qp : face_quadpoints)
+                {
+                    auto begin = face_i * fb.size();
+                    auto lm = lmlm.block(0, begin, lmlm.rows(), fb.size());
+                    vector_type vf_phi = fb.eval_functions(outer_mesh, outer_fc, qp.point());
+                    face_contrib += (lm*vf_phi) * vf_phi.transpose();
+                }
+                auto rhs_ofs = cb.size() + face_i*fb.size();
+                rhs.block(0, rhs_ofs, ms_basis_size, fb.size()) += face_contrib;
+            }
+#else
+            for (size_t face_i = 0; face_i < num_faces; face_i++)
+            {
+                auto fc = fcs[face_i];
+                if ( !inner_mesh.is_boundary(fc) )
+                    continue;
+
+                size_t bnd_id = inner_mesh.boundary_id(fc);
 
                 /* since the boundary id on the fine mesh is inherited from the face
                  * id on the coarse mesh, we use it to recover the coarse face */
-                auto outer_fc = *(outer_mesh.faces_begin() + bnd_id);
+                auto outer_fc = *std::next(outer_mesh.faces_begin(), bnd_id);
+                size_t outer_face_num = local_face_num(outer_mesh, outer_cl, outer_fc);
+                assert (outer_face_num < howmany_faces(outer_mesh, outer_cl));
                 
                 //std::cout << outer_fc << " " << fc << " -> " << outer_face_num << std::endl;
 
@@ -673,34 +885,16 @@ public:
                     vector_type vf_phi = fb.eval_functions(outer_mesh, outer_fc, qp.point());
                     vector_type vt_phi = cb.eval_functions(outer_mesh, outer_cl, qp.point()); 
                     rhs.block(0, col_ofs, ms_basis_size, fb.size()) += 
-                        qp.weight() * (ms_dphi * n) * vf_phi.transpose();
-
+                        qp.weight() * ((ms_dphi * make_material_tensor(qp.point()).transpose()) * n) * vf_phi.transpose();
                     rhs.block(0, 0, ms_basis_size, cb.size()) -=
-                        qp.weight() * (ms_dphi * n) * vt_phi.transpose();
+                        qp.weight() * ((ms_dphi * make_material_tensor(qp.point()).transpose()) * n) * vt_phi.transpose();
+
                 }
             }
+#endif
         }
-
-        //rhs(ms_basis_size, 0) = 1;
-
         oper = stiff_mat.lu().solve(rhs);
         data = rhs.transpose() * oper;
-
-        //std::cout << "stiff_mat" << std::endl;
-        //std::cout << stiff_mat << std::endl;
-
-        //std::cout << "rhs" << std::endl;
-        //std::cout << rhs << std::endl;
-        
-        //std::cout << "oper" << std::endl;
-        //std::cout << oper << std::endl;
-        
-        
-        /*
-        std::cout << "data" << std::endl;
-        std::cout << data << std::endl;
-        std::cout << std::endl;
-        */
     }
 };
 
@@ -902,7 +1096,7 @@ public:
         for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++)
         {
             auto fc = *itor;
-            std::cout << fc << std::endl;
+            //std::cout << fc << std::endl;
             auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
             if (!eid.first)
                 throw std::invalid_argument("This is a bug: face not found");

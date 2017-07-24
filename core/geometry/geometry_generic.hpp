@@ -184,6 +184,36 @@ barycenter(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::face&
     return bar;
 }
 
+/* Compute the barycenter of a 2-cell */
+template<typename T>
+point<T,2>
+barycenter(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::cell& cl)
+{
+    auto pts = points(msh, cl);
+    auto ptsnum = pts.size();
+
+    typedef typename generic_mesh<T,2>::point_type point_type;
+
+    point_type  bar{0.0, 0.0};
+    T           area = 0.0;
+
+
+    for (size_t i = 0; i < ptsnum; i++)
+    {
+        auto p0 = pts[i];
+        auto p1 = pts[(i+1)%ptsnum];
+
+        auto a = p0.x()*p1.y() - p1.x()*p0.y();
+
+        bar = bar + (p0 + p1) * a;
+        area += a;
+    }
+
+    area *= 0.5;
+
+    return bar/(6.0 * area);
+}
+
 template<typename T>
 static_vector<T, 2>
 normal(const generic_mesh<T,2>& msh,
