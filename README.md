@@ -75,7 +75,10 @@ If diskpp-master can not find Silo after installation, add LIBRARY and INCLUDE p
 
 3. Lua lightweight embeddable scripting language: https://www.lua.org/download.html
 Lua is also available on most Linux platforms. Make sure to install version 5.2, both main and development files, e.g.:
-sudo apt-get install lua5.2
-sudo apt-get install liblua5.2-dev
+
+```
+    sudo apt-get install lua5.2
+    sudo apt-get install liblua5.2-dev
+```
 
 4. Eigen C++ template library for linear algebra: http://eigen.tuxfamily.org/
