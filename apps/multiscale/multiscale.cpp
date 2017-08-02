@@ -1094,7 +1094,10 @@ void run_multiscale_tests(sol::state& lua)
     auto finer_mesh = *std::next(hierarchy.meshes_begin(), mn);
 
     if ( lua["dump_last"].get_or(0) )
+    {
         dump_netgen_format(finer_mesh, "finer_mesh.mesh2d");
+        return;
+    }
 
     auto monoscale_solution = 
         load_monoscale_solution(finer_mesh, reference_solution_filename);

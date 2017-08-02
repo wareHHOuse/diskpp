@@ -34,6 +34,8 @@ set(LINK_LIBS "${LINK_LIBS}" "${LUA_LIBRARIES}")
 find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
+include_directories("${PROJECT_SOURCE_DIR}/contrib/spectra/include")
+
 set (SOLVER_WRAPPERS_SOURCE_DIR "${PROJECT_SOURCE_DIR}/contrib/solver_wrappers/")
 
 if ( EXISTS "${SOLVER_WRAPPERS_SOURCE_DIR}/CMakeLists.txt" )

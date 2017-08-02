@@ -90,12 +90,25 @@ mass_matrix(const disk::simplicial_mesh<T, 2>& msh,
 {
     static_matrix<T, 3, 3> ret;
     auto pts = points(msh, cl);
+
+    auto p0 = (pts[0] + pts[1])/2;
+    auto p1 = (pts[1] + pts[2])/2;
+    auto p2 = (pts[0] + pts[2])/2;
     
     auto meas = measure(msh, cl);
-    auto dphi = eval_basis_grad(msh, cl);
-    auto stiff = meas * dphi.transpose() * dphi;
+    auto phi = eval_basis(msh, cl, p0);
+    
+    ret = phi * phi.transpose();
 
-    return stiff;
+    phi = eval_basis(msh, cl, p1);
+    ret = ret + phi * phi.transpose();
+
+    phi = eval_basis(msh, cl, p2);
+    ret = ret + phi * phi.transpose();
+
+    ret *= meas/3.0;
+
+    return ret;
 }
 
 template<typename T>

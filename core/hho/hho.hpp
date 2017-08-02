@@ -308,6 +308,47 @@ public:
     size_t face_degree(void) const { return m_face_degree; }
 };
 
+
+template<typename BQData>
+class eigval_mass_matrix_bq
+{
+    typedef typename BQData::mesh_type          mesh_type;
+    typedef typename mesh_type::scalar_type     scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
+    typedef typename BQData::cell_basis_type    cell_basis_type;
+    typedef typename BQData::face_basis_type    face_basis_type;
+    typedef typename BQData::cell_quad_type     cell_quadrature_type;
+    typedef typename BQData::face_quad_type     face_quadrature_type;
+    typedef dynamic_matrix<scalar_type>         matrix_type;
+    typedef dynamic_vector<scalar_type>         vector_type;
+
+    const BQData&                               m_bqd;
+
+public:
+    matrix_type     data;
+
+    eigval_mass_matrix_bq(const BQData& bqd) : m_bqd(bqd)
+    {}
+
+    void compute(const mesh_type& msh, const cell_type& cl)
+    {
+        auto cell_basis_size = howmany_dofs(m_bqd.cell_basis);
+        auto cell_degree = m_bqd.cell_degree();
+
+        data = matrix_type::Zero(cell_basis_size, cell_basis_size);
+
+        auto cell_quadpoints = m_bqd.cell_quadrature.integrate(msh, cl);
+        for (auto& qp : cell_quadpoints)
+        {
+            matrix_type phi = m_bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, cell_degree);
+            data += qp.weight() * phi * phi.transpose();
+        }
+    }
+};
+
+
+
 template<typename BQData>
 class gradient_reconstruction_bq
 {

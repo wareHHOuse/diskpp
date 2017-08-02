@@ -185,8 +185,8 @@ public:
             tensor_type ret = tensor_type::Identity();
             //return ret;
             //return 6.72071 * ret;
-            auto c = cos(M_PI * pt.x()/0.02);
-            auto s = sin(M_PI * pt.y()/0.02);
+            auto c = cos(M_PI * pt.x()/0.004);
+            auto s = sin(M_PI * pt.y()/0.004);
             return ret * (1 + 100*c*c*s*s);
         };
 
@@ -294,8 +294,8 @@ public:
             tensor_type ret = tensor_type::Identity();
             //return ret;
             //return 6.72071 * ret;
-            auto c = cos(M_PI * pt.x()/0.02);
-            auto s = sin(M_PI * pt.y()/0.02);
+            auto c = cos(M_PI * pt.x()/0.004);
+            auto s = sin(M_PI * pt.y()/0.004);
             return ret * (1 + 100*c*c*s*s);
         };
 

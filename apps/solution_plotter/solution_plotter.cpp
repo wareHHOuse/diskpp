@@ -27,8 +27,8 @@ int main(int argc, char **argv)
     using RealType = double;
 
     //const char *msh_fn = "/Users/matteo/Desktop/MsHHO meshes/mesh6.mesh2d";
-    const char *msh_fn = "/Volumes/Virtual Machines/mshho-cermics/refsol_L11.mesh2d";
-    const char *sol_fn = "/Volumes/Virtual Machines/mshho-cermics/solution_K0_L11.bin";
+    const char *msh_fn = "../multiscale/newsol/L11-2.mesh2d";
+    const char *sol_fn = "../multiscale/newsol/solution-L11-2.bin";
 
     
     typedef disk::simplicial_mesh<RealType, 2>      mesh_type;
@@ -85,7 +85,7 @@ int main(int argc, char **argv)
     
     ifs.close();
     
-    /*
+    
     std::ofstream ofs("pippo.dat");
     
     size_t elemnum = 0;
@@ -106,9 +106,9 @@ int main(int argc, char **argv)
     }
     
     ofs.close();
-     */
     
     
+    /*
     double norm = 0.0;
     double norm_chk = 0.0;
     size_t elemnum = 0;
@@ -149,7 +149,7 @@ int main(int argc, char **argv)
     
     std::cout << norm << std::endl;
     std::cout << norm_chk << std::endl;
-    
+    */
     
     return 0;
 

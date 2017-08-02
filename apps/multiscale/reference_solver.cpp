@@ -15,15 +15,289 @@
  */
 
 #include <iostream>
+#include <sstream>
 #include <regex>
+
+#include <Eigen/Eigenvalues>
 
 #include "loaders/loader.hpp"
 #include "cfem/cfem.hpp"
+#include "hho/hho.hpp"
 #include "output/silo.hpp"
 #include "solvers/solver.hpp"
+#include "solvers/feast.hpp"
 
 #include "contrib/sol2/sol.hpp"
 #include "contrib/timecounter.h"
+
+#include "GenEigsSolver.h"
+
+
+template<typename Mesh>
+bool
+hho_solver(sol::state& lua, const Mesh& msh)
+{
+    typedef Mesh                                       mesh_type;
+    typedef typename mesh_type::scalar_type            scalar_type;
+    typedef typename mesh_type::cell                   cell_type;
+    typedef typename mesh_type::face                   face_type;
+
+    typedef disk::quadrature<mesh_type, cell_type>      cell_quadrature_type;
+    typedef disk::quadrature<mesh_type, face_type>      face_quadrature_type;
+
+    typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
+    typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
+
+    typedef
+    disk::basis_quadrature_data<mesh_type,
+                                disk::scaled_monomial_scalar_basis,
+                                disk::quadrature> bqdata_type;
+
+    typedef disk::gradient_reconstruction_bq<bqdata_type>               gradrec_type;
+    typedef disk::diffusion_like_stabilization_bq<bqdata_type>          stab_type;
+    typedef disk::diffusion_like_static_condensation_bq<bqdata_type>    statcond_type;
+    //typedef disk::assembler<mesh_type, face_basis_type, face_quadrature_type> assembler_type;
+    typedef disk::assembler_homogeneus_dirichlet<mesh_type, face_basis_type, face_quadrature_type> assembler_type;
+    typename assembler_type::sparse_matrix_type     system_matrix;
+    typename assembler_type::vector_type            system_rhs, system_solution;
+    typedef static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> tensor_type;
+
+    size_t          degree      = lua["config"]["degree"].get_or(1);
+
+    auto bqd = bqdata_type(degree, degree);
+
+    auto gradrec    = gradrec_type(bqd);
+    auto stab       = stab_type(bqd);
+    auto statcond   = statcond_type(bqd);
+    auto assembler  = assembler_type(msh, degree);
+
+    auto lua_rhs_fun = lua["right_hand_side"];
+    if ( !lua_rhs_fun.valid() )
+    {
+        std::cout << "[config] right_hand_side() not defined" << std::endl;
+        return false;
+    }
+
+    auto f = [&](const typename mesh_type::point_type& pt) -> scalar_type {
+        return lua_rhs_fun(pt.x(), pt.y());
+    };
+
+    auto lua_matparam_fun = lua["material_parameter"];
+    if ( !lua_matparam_fun.valid() )
+    {
+        std::cout << "[config] material_parameter() not defined" << std::endl;
+        return false;
+    }
+
+    auto kappa = [&](const typename mesh_type::point_type& pt) -> tensor_type {
+        tensor_type ret = tensor_type::Identity();
+        scalar_type k = lua_matparam_fun(pt.x(), pt.y());
+        return ret * k;
+    };
+
+    size_t elem_i = 0;
+    for (auto& cl : msh)
+    {
+        elem_i++;
+
+        gradrec.compute(msh, cl, kappa);
+        stab.compute(msh, cl, gradrec.oper);
+        auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, f, degree);
+        dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
+        auto scnp = statcond.compute(msh, cl, loc, cell_rhs);
+        assembler.assemble(msh, cl, scnp);
+    }
+
+    //assembler.impose_boundary_conditions(msh, bcf);
+    assembler.finalize(system_matrix, system_rhs);
+
+    size_t systsz = system_matrix.rows();
+    size_t nnz = system_matrix.nonZeros();
+
+    std::cout << "Starting linear solver..." << std::endl;
+    std::cout << " * Solving for " << systsz << " unknowns." << std::endl;
+    std::cout << " * Matrix fill: " << 100.0*double(nnz)/(systsz*systsz) << "%" << std::endl;
+
+    dynamic_vector<scalar_type> sol = dynamic_vector<scalar_type>::Zero(systsz);
+    disk::solvers::linear_solver(lua, system_matrix, system_rhs, sol);
+
+    system_solution = assembler.expand_solution(msh, sol);
+    
+    return true;
+}
+
+
+
+template<typename T>
+bool
+setup_feast(sol::state& lua, feast_eigensolver_params<T>& fep)
+{
+    fep.verbose     = lua["solver"]["feast"]["verbose"].get_or(false);
+    fep.tolerance   = lua["solver"]["feast"]["tolerance"].get_or(9);
+    
+    auto min_ev = lua["solver"]["feast"]["min_eigval"];
+    if (!min_ev.valid())
+    {
+        std::cout << "solver.feast.min_eigval not set." << std::endl;
+        return false;
+    }
+    fep.min_eigval = min_ev;
+
+    auto max_ev = lua["solver"]["feast"]["max_eigval"];
+    if (!max_ev.valid())
+    {
+        std::cout << "solver.feast.max_eigval not set." << std::endl;
+        return false;
+    }
+    fep.max_eigval = max_ev;
+
+    auto subsp = lua["solver"]["feast"]["subspace_size"];
+    if (!subsp.valid())
+    {
+        std::cout << "solver.feast.subspace_size not set." << std::endl;
+        return false;
+    }
+    fep.subspace_size = subsp;
+
+    return true;
+}
+
+
+template<typename T>
+bool
+cfem_eigenvalue_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
+{
+    feast_eigensolver_params<T> fep;
+
+    if ( !setup_feast(lua, fep) )
+    {
+        std::cout << "Problems with parameters. Check configuration." << std::endl;
+        return false;
+    }
+
+    typedef Eigen::SparseMatrix<T>  sparse_matrix_type;
+    typedef Eigen::Triplet<T>       triplet_type;
+
+    std::vector<bool> dirichlet_nodes( msh.points_size() );
+    for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++)
+    {
+        auto fc = *itor;
+        auto ptids = fc.point_ids();
+        dirichlet_nodes.at(ptids[0]) = true;
+        dirichlet_nodes.at(ptids[1]) = true;
+    }
+
+    std::vector<size_t> compress_map, expand_map;
+    compress_map.resize( msh.points_size() );
+    size_t system_size = std::count_if(dirichlet_nodes.begin(), dirichlet_nodes.end(), [](bool d) -> bool {return !d;});
+    expand_map.resize( system_size );
+
+    auto nnum = 0;
+    for (size_t i = 0; i < msh.points_size(); i++)
+    {
+        if ( dirichlet_nodes.at(i) )
+            continue;
+        
+        expand_map.at(nnum) = i;
+        compress_map.at(i) = nnum++;
+    }
+
+    sparse_matrix_type  gK(system_size, system_size);
+    sparse_matrix_type  gM(system_size, system_size);
+
+    std::vector<triplet_type> gtK, gtM;
+
+    for (auto& cl : msh)
+    {
+        auto bar = barycenter(msh, cl);
+        
+
+        auto K = disk::cfem::stiffness_matrix(msh, cl);
+        auto M = disk::cfem::mass_matrix(msh, cl);
+        
+
+        auto ptids = cl.point_ids();
+
+        for (size_t i = 0; i < K.rows(); i++)
+        {
+            if ( dirichlet_nodes.at(ptids[i]) )
+                continue;
+
+            for (size_t j = 0; j < K.cols(); j++)
+            {
+                if ( dirichlet_nodes.at(ptids[j]) )
+                    continue;
+
+                gtK.push_back( triplet_type(compress_map.at(ptids[i]),
+                                            compress_map.at(ptids[j]),
+                                            K(i,j)) );
+
+                gtM.push_back( triplet_type(compress_map.at(ptids[i]),
+                                            compress_map.at(ptids[j]),
+                                            M(i,j)) );
+            }
+        }
+    }
+
+    gK.setFromTriplets(gtK.begin(), gtK.end());
+    gM.setFromTriplets(gtM.begin(), gtM.end());
+
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>   eigvecs;
+    Eigen::Matrix<double, Eigen::Dynamic, 1>                eigvals;
+
+    bool solver_ok = generalized_eigenvalue_solver(fep, gK, gM, eigvecs, eigvals);
+    if (!solver_ok)
+    {
+        std::cout << "Problem during solution phase" << std::endl;
+        return false;
+    }
+
+    auto eigenvalues_output_filename = lua["config"]["eigval_output"];
+    if ( eigenvalues_output_filename.valid() )
+    {
+        std::string fname = eigenvalues_output_filename;
+
+        std::ofstream ofs(fname);
+
+        for (size_t i = 0; i < fep.eigvals_found; i++)
+            ofs << eigvals(i) << std::endl;
+
+        ofs.close();
+    }
+
+
+    disk::silo_database silo_db;
+    auto visit_output_filename = lua["config"]["visit_output"];
+    if ( visit_output_filename.valid() )
+    {
+        
+        silo_db.create(visit_output_filename);
+        silo_db.add_mesh(msh, "mesh");
+    }
+
+    for (size_t i = 0; i < fep.eigvals_found; i++)
+    {
+        std::vector<T> solution_vals;
+        solution_vals.resize(msh.points_size());
+
+        dynamic_vector<T> gx = eigvecs.block(0,i,eigvecs.rows(),1);
+        for (size_t i = 0; i < gx.size(); i++)
+            solution_vals.at( expand_map.at(i) ) = gx(i);
+        
+        std::stringstream ss;
+        ss << "u" << i;
+
+        disk::silo_nodal_variable<T> u(ss.str(), solution_vals);
+        silo_db.add_variable("mesh", u);
+    }
+
+    silo_db.close();
+
+    return true;
+}
+
+
+
 
 
 template<typename T>
@@ -191,8 +465,282 @@ cfem_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
 
 
 
+template<typename Mesh>
+bool
+eigval_solver(sol::state& lua, const Mesh& msh)
+{
+    typedef Mesh                                       mesh_type;
+    typedef typename mesh_type::scalar_type            scalar_type;
+    typedef typename mesh_type::cell                   cell_type;
+    typedef typename mesh_type::face                   face_type;
+
+    typedef disk::quadrature<mesh_type, cell_type>      cell_quadrature_type;
+    typedef disk::quadrature<mesh_type, face_type>      face_quadrature_type;
+
+    typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
+    typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
+
+    typedef
+    disk::basis_quadrature_data<mesh_type,
+                                disk::scaled_monomial_scalar_basis,
+                                disk::quadrature> bqdata_type;
+
+    typedef disk::gradient_reconstruction_bq<bqdata_type>               gradrec_type;
+    typedef disk::diffusion_like_stabilization_bq<bqdata_type>          stab_type;
+    typedef disk::eigval_mass_matrix_bq<bqdata_type>                    mass_type;
+    
+    typedef Eigen::Triplet<scalar_type>                                 triplet_type;
 
 
+    feast_eigensolver_params<scalar_type> fep;
+
+    if ( !setup_feast(lua, fep) )
+    {
+        std::cout << "Problems with parameters. Check configuration." << std::endl;
+        return false;
+    }
+
+
+    size_t          degree      = lua["config"]["degree"].get_or(1);
+
+    auto bqd = bqdata_type(degree, degree);
+
+    auto gradrec    = gradrec_type(bqd);
+    auto stab       = stab_type(bqd);
+    auto mass       = mass_type(bqd);
+
+    std::cout << "Assembly" << std::endl;
+
+    size_t num_cell_dofs = howmany_dofs(bqd.cell_basis);
+    size_t num_face_dofs = howmany_dofs(bqd.face_basis);
+    size_t num_global_cell_dofs = msh.cells_size() * num_cell_dofs;
+    size_t num_global_face_dofs = msh.internal_faces_size() * num_face_dofs;
+
+    std::vector<size_t> compress_map, expand_map;
+    compress_map.resize( msh.faces_size() );
+    size_t num_non_dirichlet_faces = msh.internal_faces_size();
+    size_t system_size = num_non_dirichlet_faces * num_face_dofs;
+    expand_map.resize( system_size );
+
+    size_t fnum = 0;
+    size_t face_i = 0;
+    for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++)
+    {
+        if ( msh.is_boundary(*itor) )
+        {
+            face_i++;
+            continue;
+        }
+        
+        expand_map.at(fnum) = face_i;
+        compress_map.at(face_i) = fnum++;
+        face_i++;
+    }
+
+
+    sparse_matrix<scalar_type> Ktt(num_global_cell_dofs, num_global_cell_dofs);
+    sparse_matrix<scalar_type> Ktf(num_global_cell_dofs, num_global_face_dofs);
+    sparse_matrix<scalar_type> Kft(num_global_face_dofs, num_global_cell_dofs);
+    sparse_matrix<scalar_type> Kff(num_global_face_dofs, num_global_face_dofs);
+    sparse_matrix<scalar_type> Mtt(num_global_cell_dofs, num_global_cell_dofs);
+
+    std::vector<triplet_type> Ktt_triplets, Ktf_triplets, Kft_triplets, Kff_triplets;
+    std::vector<triplet_type> Mtt_triplets;
+
+    size_t elem_i = 0;
+    for (auto& cl : msh)
+    {
+        dynamic_matrix<scalar_type> Ktt_loc, Ktf_loc, Kft_loc, Kff_loc;
+        dynamic_matrix<scalar_type> Mtt_loc;
+
+        gradrec.compute(msh, cl);
+        stab.compute(msh, cl, gradrec.oper);
+        mass.compute(msh, cl);
+
+        auto lc = gradrec.data + stab.data;
+
+        auto fcs = faces(msh, cl);
+        auto num_faces = fcs.size();
+
+        disk::dofspace_ranges dsr(num_cell_dofs, num_face_dofs, num_faces);
+        auto cell_range = dsr.cell_range();
+        auto all_faces_range = dsr.all_faces_range();
+
+        Ktt_loc = lc.block(0, 0, cell_range.size(), cell_range.size());
+        Ktf_loc = lc.block(0, all_faces_range.min(), cell_range.size(), all_faces_range.size());
+        Kft_loc = lc.block(all_faces_range.min(), 0, all_faces_range.size(), cell_range.size());
+        Kff_loc = lc.block(all_faces_range.min(), all_faces_range.min(),
+                           all_faces_range.size(), all_faces_range.size());
+
+        Mtt_loc = mass.data;
+
+
+        for (size_t i = 0; i < num_cell_dofs; i++)
+        {
+            for (size_t j = 0; j < num_cell_dofs; j++)
+            {
+                size_t i_ofs = elem_i * num_cell_dofs + i;
+                size_t j_ofs = elem_i * num_cell_dofs + j;
+                assert(i_ofs < num_global_cell_dofs);
+                assert(j_ofs < num_global_cell_dofs);
+                Ktt_triplets.push_back( triplet_type(i_ofs, j_ofs, Ktt_loc(i,j)) );
+                Mtt_triplets.push_back( triplet_type(i_ofs, j_ofs, Mtt_loc(i,j)) );
+            }
+        }
+
+        std::vector<size_t> face_offset_table;
+        face_offset_table.resize(num_face_dofs*num_faces);
+
+        for (size_t i = 0; i < num_faces; i++)
+        {
+            auto fc = fcs[i];
+            
+            if ( msh.is_boundary(fc) )
+            {
+                for (size_t j = 0; j < num_face_dofs; j++)
+                    face_offset_table.at(i*num_face_dofs + j) = 0xdeadbeef;
+            }
+            else
+            {
+                auto face_id = msh.lookup(fc);
+                auto face_pos = compress_map.at(face_id);
+                //std::cout << face_id << " -> " << face_pos << std::endl;
+                for (size_t j = 0; j < num_face_dofs; j++)
+                    face_offset_table.at(i*num_face_dofs + j) = num_face_dofs*face_pos+j;
+            }
+        }
+
+        //for (auto& fo : face_offset_table)
+        //    std::cout << fo << " ";
+        //std::cout << std::endl;
+
+
+        for (size_t i = 0; i < num_cell_dofs; i++)
+        {
+            for (size_t j = 0; j < Ktf_loc.cols(); j++)
+            {
+                if (face_offset_table.at(j) == 0xdeadbeef)
+                    continue;
+                
+                size_t i_ofs = elem_i * num_cell_dofs + i;
+                size_t j_ofs = face_offset_table.at(j);
+
+                //assert(i_ofs < num_global_cell_dofs);
+                //assert(j_ofs < num_global_face_dofs);
+                //assert(j_loc_ofs < Ktf_loc.cols());
+
+                Ktf_triplets.push_back( triplet_type(i_ofs, j_ofs, Ktf_loc(i, j)) );
+                Kft_triplets.push_back( triplet_type(j_ofs, i_ofs, Ktf_loc(i, j)) );
+            }
+        }
+
+        for (size_t i = 0; i < Kff_loc.rows(); i++)
+        {
+            if (face_offset_table.at(i) == 0xdeadbeef)
+                    continue;
+
+            for (size_t j = 0; j < Kff_loc.cols(); j++)
+            {
+                if (face_offset_table.at(j) == 0xdeadbeef)
+                    continue;
+                
+                size_t i_ofs = face_offset_table.at(i);
+                size_t j_ofs = face_offset_table.at(j);
+
+                //assert(i_ofs < num_global_cell_dofs);
+                //assert(j_ofs < num_global_face_dofs);
+                //assert(j_loc_ofs < Ktf_loc.cols());
+
+                Kff_triplets.push_back( triplet_type(i_ofs, j_ofs, Kff_loc(i, j)) );
+            }
+        }
+
+        elem_i++;
+    }
+
+    Ktt.setFromTriplets(Ktt_triplets.begin(), Ktt_triplets.end());
+    Ktf.setFromTriplets(Ktf_triplets.begin(), Ktf_triplets.end());
+    Kft.setFromTriplets(Kft_triplets.begin(), Kft_triplets.end());
+    Kff.setFromTriplets(Kff_triplets.begin(), Kff_triplets.end());
+    Mtt.setFromTriplets(Mtt_triplets.begin(), Mtt_triplets.end());
+
+/*
+    dump_sparse_matrix(Ktt, "ktt.txt");
+    dump_sparse_matrix(Ktf, "ktf.txt");
+    dump_sparse_matrix(Kft, "kft.txt");
+    dump_sparse_matrix(Kff, "kff.txt");
+    dump_sparse_matrix(Mtt, "mtt.txt");
+*/
+    Eigen::Matrix<scalar_type, Eigen::Dynamic, Eigen::Dynamic> eigvecs;
+    Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> eigvals;
+
+    std::cout << "Inverting Kff" << std::endl;
+
+    Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
+
+    solver.analyzePattern(Kff);
+    solver.factorize(Kff);
+    Eigen::SparseMatrix<scalar_type> KffinvKft = solver.solve(Kft);
+
+    std::cout << "Eigval solver" << std::endl;
+    Eigen::SparseMatrix<scalar_type> stiff = Ktt - Ktf*KffinvKft;
+
+    generalized_eigenvalue_solver(fep, stiff, Mtt, eigvecs, eigvals);
+
+    std::cout << "Postprocessing" << std::endl;
+
+    auto eigenvalues_output_filename = lua["config"]["eigval_output"];
+    if ( eigenvalues_output_filename.valid() )
+    {
+        std::string fname = eigenvalues_output_filename;
+
+        std::ofstream ofs(fname);
+
+        for (size_t i = 0; i < fep.eigvals_found; i++)
+            ofs << eigvals(i) << std::endl;
+
+        ofs.close();
+    }
+
+
+    disk::silo_database silo_db;
+    auto visit_output_filename = lua["config"]["visit_output"];
+    if ( visit_output_filename.valid() )
+    {
+        
+        silo_db.create(visit_output_filename);
+        silo_db.add_mesh(msh, "mesh");
+    }
+
+    for (size_t i = 0; i < fep.eigvals_found; i++)
+    {
+        std::vector<scalar_type> solution_vals;
+        solution_vals.resize(msh.cells_size());
+
+        dynamic_vector<scalar_type> gx = eigvecs.block(0,i,eigvecs.rows(),1);
+        
+        size_t cell_i = 0;
+        for (auto& cl : msh)
+        {
+            auto bar = barycenter(msh, cl);
+            auto local_dofs = gx.block(cell_i*num_cell_dofs, 0, num_cell_dofs, 1);
+            auto phi = bqd.cell_basis.eval_functions(msh, cl, bar);
+            auto val = local_dofs.dot(phi);
+            solution_vals.at(cell_i) = val;
+            cell_i++;
+        }
+
+        std::stringstream ss;
+        ss << "u" << i;
+
+        disk::silo_zonal_variable<scalar_type> u(ss.str(), solution_vals);
+        silo_db.add_variable("mesh", u);
+    }
+
+    silo_db.close();
+
+    return true;
+}
 
 
 
@@ -212,6 +760,7 @@ int main(int argc, char **argv)
     lua.open_libraries(sol::lib::math);
     lua["config"] = lua.create_table();
     disk::solvers::init_lua(lua);
+    lua["solver"]["feast"] = lua.create_table();
 
     auto r = lua.do_file(argv[1]);
 
@@ -222,7 +771,6 @@ int main(int argc, char **argv)
     }
 
     std::string     method      = lua["config"]["method"].get_or(std::string("hho"));
-    size_t          degree      = lua["config"]["degree"].get_or(1);
     std::string     input_mesh  = lua["config"]["input_mesh"];
     std::string     hdf5_output = lua["config"]["hdf5_output"];
     
@@ -242,7 +790,14 @@ int main(int argc, char **argv)
         
         loader.populate_mesh(msh);
 
-        cfem_solver(lua, msh);
+        if (method == "fem")
+            cfem_solver(lua, msh);
+        else if (method == "hho")
+            hho_solver(lua, msh);
+        else if (method == "eigs")
+            eigval_solver(lua, msh);
+        else if (method == "fem_eigs")
+            cfem_eigenvalue_solver(lua, msh);
     }
     
     return 0;
