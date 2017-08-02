@@ -515,7 +515,9 @@ eigval_solver(sol::state& lua, const Mesh& msh)
     size_t num_face_dofs = howmany_dofs(bqd.face_basis);
     size_t num_global_cell_dofs = msh.cells_size() * num_cell_dofs;
     size_t num_global_face_dofs = msh.internal_faces_size() * num_face_dofs;
+    size_t num_global_dofs = num_global_cell_dofs + num_global_face_dofs;
 
+    /* Strong imposition of dirichlet bc */
     std::vector<size_t> compress_map, expand_map;
     compress_map.resize( msh.faces_size() );
     size_t num_non_dirichlet_faces = msh.internal_faces_size();
@@ -537,31 +539,25 @@ eigval_solver(sol::state& lua, const Mesh& msh)
         face_i++;
     }
 
+    sparse_matrix<scalar_type> gK(num_global_dofs, num_global_dofs);
+    sparse_matrix<scalar_type> gM(num_global_dofs, num_global_dofs);
 
-    sparse_matrix<scalar_type> Ktt(num_global_cell_dofs, num_global_cell_dofs);
-    sparse_matrix<scalar_type> Ktf(num_global_cell_dofs, num_global_face_dofs);
-    sparse_matrix<scalar_type> Kft(num_global_face_dofs, num_global_cell_dofs);
-    sparse_matrix<scalar_type> Kff(num_global_face_dofs, num_global_face_dofs);
-    sparse_matrix<scalar_type> Mtt(num_global_cell_dofs, num_global_cell_dofs);
-
-    std::vector<triplet_type> Ktt_triplets, Ktf_triplets, Kft_triplets, Kff_triplets;
-    std::vector<triplet_type> Mtt_triplets;
+    std::vector<triplet_type> gtK, gtM;
 
     size_t elem_i = 0;
     for (auto& cl : msh)
     {
-        dynamic_matrix<scalar_type> Ktt_loc, Ktf_loc, Kft_loc, Kff_loc;
-        dynamic_matrix<scalar_type> Mtt_loc;
-
         gradrec.compute(msh, cl);
         stab.compute(msh, cl, gradrec.oper);
         mass.compute(msh, cl);
 
-        auto lc = gradrec.data + stab.data;
+        auto K = gradrec.data + stab.data;
+        auto M = mass.data;
 
         auto fcs = faces(msh, cl);
         auto num_faces = fcs.size();
 
+        /*
         disk::dofspace_ranges dsr(num_cell_dofs, num_face_dofs, num_faces);
         auto cell_range = dsr.cell_range();
         auto all_faces_range = dsr.all_faces_range();
@@ -571,25 +567,14 @@ eigval_solver(sol::state& lua, const Mesh& msh)
         Kft_loc = lc.block(all_faces_range.min(), 0, all_faces_range.size(), cell_range.size());
         Kff_loc = lc.block(all_faces_range.min(), all_faces_range.min(),
                            all_faces_range.size(), all_faces_range.size());
+        */
+        
 
-        Mtt_loc = mass.data;
-
+        std::vector<size_t> offset_table;
+        offset_table.resize(num_cell_dofs + num_face_dofs*num_faces);
 
         for (size_t i = 0; i < num_cell_dofs; i++)
-        {
-            for (size_t j = 0; j < num_cell_dofs; j++)
-            {
-                size_t i_ofs = elem_i * num_cell_dofs + i;
-                size_t j_ofs = elem_i * num_cell_dofs + j;
-                assert(i_ofs < num_global_cell_dofs);
-                assert(j_ofs < num_global_cell_dofs);
-                Ktt_triplets.push_back( triplet_type(i_ofs, j_ofs, Ktt_loc(i,j)) );
-                Mtt_triplets.push_back( triplet_type(i_ofs, j_ofs, Mtt_loc(i,j)) );
-            }
-        }
-
-        std::vector<size_t> face_offset_table;
-        face_offset_table.resize(num_face_dofs*num_faces);
+            offset_table.at(i) = elem_i*num_cell_dofs + i;
 
         for (size_t i = 0; i < num_faces; i++)
         {
@@ -598,7 +583,7 @@ eigval_solver(sol::state& lua, const Mesh& msh)
             if ( msh.is_boundary(fc) )
             {
                 for (size_t j = 0; j < num_face_dofs; j++)
-                    face_offset_table.at(i*num_face_dofs + j) = 0xdeadbeef;
+                    offset_table.at(num_cell_dofs + i*num_face_dofs + j) = 0xdeadbeef;
             }
             else
             {
@@ -606,63 +591,47 @@ eigval_solver(sol::state& lua, const Mesh& msh)
                 auto face_pos = compress_map.at(face_id);
                 //std::cout << face_id << " -> " << face_pos << std::endl;
                 for (size_t j = 0; j < num_face_dofs; j++)
-                    face_offset_table.at(i*num_face_dofs + j) = num_face_dofs*face_pos+j;
+                    offset_table.at(num_cell_dofs + i*num_face_dofs + j) = num_cell_dofs*msh.cells_size() + num_face_dofs*face_pos+j;
             }
         }
 
-        //for (auto& fo : face_offset_table)
-        //    std::cout << fo << " ";
-        //std::cout << std::endl;
-
-
-        for (size_t i = 0; i < num_cell_dofs; i++)
+        /* K has cell and face parts */
+        for (size_t i = 0; i < K.rows(); i++)
         {
-            for (size_t j = 0; j < Ktf_loc.cols(); j++)
+            size_t i_ofs = offset_table.at(i);
+            if (i_ofs == 0xdeadbeef)
+                continue;
+            
+            for (size_t j = 0; j < K.cols(); j++)
             {
-                if (face_offset_table.at(j) == 0xdeadbeef)
+                size_t j_ofs = offset_table.at(j);
+                if (j_ofs == 0xdeadbeef)
                     continue;
                 
-                size_t i_ofs = elem_i * num_cell_dofs + i;
-                size_t j_ofs = face_offset_table.at(j);
-
-                //assert(i_ofs < num_global_cell_dofs);
-                //assert(j_ofs < num_global_face_dofs);
-                //assert(j_loc_ofs < Ktf_loc.cols());
-
-                Ktf_triplets.push_back( triplet_type(i_ofs, j_ofs, Ktf_loc(i, j)) );
-                Kft_triplets.push_back( triplet_type(j_ofs, i_ofs, Ktf_loc(i, j)) );
+                assert(i_ofs < num_global_dofs);
+                assert(j_ofs < num_global_dofs);
+                gtK.push_back( triplet_type(i_ofs, j_ofs, K(i,j)) );
             }
         }
 
-        for (size_t i = 0; i < Kff_loc.rows(); i++)
+        /* M has only cell part */
+        for (size_t i = 0; i < M.rows(); i++)
         {
-            if (face_offset_table.at(i) == 0xdeadbeef)
-                    continue;
-
-            for (size_t j = 0; j < Kff_loc.cols(); j++)
+            for (size_t j = 0; j < M.cols(); j++)
             {
-                if (face_offset_table.at(j) == 0xdeadbeef)
-                    continue;
-                
-                size_t i_ofs = face_offset_table.at(i);
-                size_t j_ofs = face_offset_table.at(j);
-
-                //assert(i_ofs < num_global_cell_dofs);
-                //assert(j_ofs < num_global_face_dofs);
-                //assert(j_loc_ofs < Ktf_loc.cols());
-
-                Kff_triplets.push_back( triplet_type(i_ofs, j_ofs, Kff_loc(i, j)) );
+                size_t i_ofs = offset_table.at(i);
+                size_t j_ofs = offset_table.at(j);
+                assert(i_ofs < num_global_dofs);
+                assert(j_ofs < num_global_dofs);
+                gtM.push_back( triplet_type(i_ofs, j_ofs, M(i,j)) );
             }
         }
 
         elem_i++;
     }
 
-    Ktt.setFromTriplets(Ktt_triplets.begin(), Ktt_triplets.end());
-    Ktf.setFromTriplets(Ktf_triplets.begin(), Ktf_triplets.end());
-    Kft.setFromTriplets(Kft_triplets.begin(), Kft_triplets.end());
-    Kff.setFromTriplets(Kff_triplets.begin(), Kff_triplets.end());
-    Mtt.setFromTriplets(Mtt_triplets.begin(), Mtt_triplets.end());
+    gK.setFromTriplets(gtK.begin(), gtK.end());
+    gM.setFromTriplets(gtM.begin(), gtM.end());
 
 /*
     dump_sparse_matrix(Ktt, "ktt.txt");
@@ -671,9 +640,11 @@ eigval_solver(sol::state& lua, const Mesh& msh)
     dump_sparse_matrix(Kff, "kff.txt");
     dump_sparse_matrix(Mtt, "mtt.txt");
 */
+    
     Eigen::Matrix<scalar_type, Eigen::Dynamic, Eigen::Dynamic> eigvecs;
     Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> eigvals;
 
+    /*
     std::cout << "Inverting Kff" << std::endl;
 
     Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
@@ -685,7 +656,8 @@ eigval_solver(sol::state& lua, const Mesh& msh)
     std::cout << "Eigval solver" << std::endl;
     Eigen::SparseMatrix<scalar_type> stiff = Ktt - Ktf*KffinvKft;
 
-    generalized_eigenvalue_solver(fep, stiff, Mtt, eigvecs, eigvals);
+    */
+    generalized_eigenvalue_solver(fep, gK, gM, eigvecs, eigvals);
 
     std::cout << "Postprocessing" << std::endl;
 
@@ -738,6 +710,50 @@ eigval_solver(sol::state& lua, const Mesh& msh)
     }
 
     silo_db.close();
+
+    return true;
+}
+
+template<typename T>
+bool
+eigval_reference(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
+{
+    disk::silo_database silo_db;
+    auto visit_output_filename = lua["config"]["visit_output"];
+    auto mode_x_max = lua["config"]["mode_x_max"].get_or(5);
+    auto mode_y_max = lua["config"]["mode_y_max"].get_or(5);
+    
+    if ( visit_output_filename.valid() )
+    {
+        
+        silo_db.create(visit_output_filename);
+        silo_db.add_mesh(msh, "mesh");
+
+        for (size_t i = 0; i < mode_x_max; i++)
+        {
+            for (size_t j = 0; j < mode_y_max; j++)
+            {
+                std::stringstream ss;
+                ss << "ref_" << i << "_" << j;
+
+                std::cout << i << " " << j << " " << M_PI*(i+1)*M_PI*(i+1) + M_PI*(j+1)*M_PI*(j+1) << std::endl;
+
+                std::vector<T> solution_vals;
+                solution_vals.reserve(msh.points_size());
+                for (auto itor = msh.points_begin(); itor != msh.points_end(); itor++)
+                {
+                    auto pt = *itor;
+                    auto ef = std::sin((i+1)*pt.x()*M_PI) * std::sin((j+1)*pt.y()*M_PI);
+                    solution_vals.push_back(ef);
+                }
+
+                disk::silo_nodal_variable<T> u(ss.str(), solution_vals);
+                silo_db.add_variable("mesh", u);
+            }
+        }
+
+        silo_db.close();
+    }
 
     return true;
 }
@@ -798,6 +814,8 @@ int main(int argc, char **argv)
             eigval_solver(lua, msh);
         else if (method == "fem_eigs")
             cfem_eigenvalue_solver(lua, msh);
+        else if (method == "reference")
+            eigval_reference(lua, msh);
     }
     
     return 0;
