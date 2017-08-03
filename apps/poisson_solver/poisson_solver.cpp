@@ -16,6 +16,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <iomanip>
 #include <regex>
 
 #include <Eigen/Eigenvalues>
@@ -260,38 +261,36 @@ cfem_eigenvalue_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
         std::ofstream ofs(fname);
 
         for (size_t i = 0; i < fep.eigvals_found; i++)
-            ofs << eigvals(i) << std::endl;
+            ofs << std::setprecision(10) << eigvals(i) << std::endl;
 
         ofs.close();
     }
 
-
-    disk::silo_database silo_db;
     auto visit_output_filename = lua["config"]["visit_output"];
     if ( visit_output_filename.valid() )
     {
-        
+        disk::silo_database silo_db;        
         silo_db.create(visit_output_filename);
         silo_db.add_mesh(msh, "mesh");
+
+        for (size_t i = 0; i < fep.eigvals_found; i++)
+        {
+            std::vector<T> solution_vals;
+            solution_vals.resize(msh.points_size());
+
+            dynamic_vector<T> gx = eigvecs.block(0,i,eigvecs.rows(),1);
+            for (size_t i = 0; i < gx.size(); i++)
+                solution_vals.at( expand_map.at(i) ) = gx(i);
+            
+            std::stringstream ss;
+            ss << "u" << i;
+
+            disk::silo_nodal_variable<T> u(ss.str(), solution_vals);
+            silo_db.add_variable("mesh", u);
+        }
+
+        silo_db.close();
     }
-
-    for (size_t i = 0; i < fep.eigvals_found; i++)
-    {
-        std::vector<T> solution_vals;
-        solution_vals.resize(msh.points_size());
-
-        dynamic_vector<T> gx = eigvecs.block(0,i,eigvecs.rows(),1);
-        for (size_t i = 0; i < gx.size(); i++)
-            solution_vals.at( expand_map.at(i) ) = gx(i);
-        
-        std::stringstream ss;
-        ss << "u" << i;
-
-        disk::silo_nodal_variable<T> u(ss.str(), solution_vals);
-        silo_db.add_variable("mesh", u);
-    }
-
-    silo_db.close();
 
     return true;
 }
@@ -557,19 +556,6 @@ eigval_solver(sol::state& lua, const Mesh& msh)
         auto fcs = faces(msh, cl);
         auto num_faces = fcs.size();
 
-        /*
-        disk::dofspace_ranges dsr(num_cell_dofs, num_face_dofs, num_faces);
-        auto cell_range = dsr.cell_range();
-        auto all_faces_range = dsr.all_faces_range();
-
-        Ktt_loc = lc.block(0, 0, cell_range.size(), cell_range.size());
-        Ktf_loc = lc.block(0, all_faces_range.min(), cell_range.size(), all_faces_range.size());
-        Kft_loc = lc.block(all_faces_range.min(), 0, all_faces_range.size(), cell_range.size());
-        Kff_loc = lc.block(all_faces_range.min(), all_faces_range.min(),
-                           all_faces_range.size(), all_faces_range.size());
-        */
-        
-
         std::vector<size_t> offset_table;
         offset_table.resize(num_cell_dofs + num_face_dofs*num_faces);
 
@@ -632,31 +618,10 @@ eigval_solver(sol::state& lua, const Mesh& msh)
 
     gK.setFromTriplets(gtK.begin(), gtK.end());
     gM.setFromTriplets(gtM.begin(), gtM.end());
-
-/*
-    dump_sparse_matrix(Ktt, "ktt.txt");
-    dump_sparse_matrix(Ktf, "ktf.txt");
-    dump_sparse_matrix(Kft, "kft.txt");
-    dump_sparse_matrix(Kff, "kff.txt");
-    dump_sparse_matrix(Mtt, "mtt.txt");
-*/
     
     Eigen::Matrix<scalar_type, Eigen::Dynamic, Eigen::Dynamic> eigvecs;
     Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> eigvals;
 
-    /*
-    std::cout << "Inverting Kff" << std::endl;
-
-    Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
-
-    solver.analyzePattern(Kff);
-    solver.factorize(Kff);
-    Eigen::SparseMatrix<scalar_type> KffinvKft = solver.solve(Kft);
-
-    std::cout << "Eigval solver" << std::endl;
-    Eigen::SparseMatrix<scalar_type> stiff = Ktt - Ktf*KffinvKft;
-
-    */
     generalized_eigenvalue_solver(fep, gK, gM, eigvecs, eigvals);
 
     std::cout << "Postprocessing" << std::endl;
@@ -669,47 +634,45 @@ eigval_solver(sol::state& lua, const Mesh& msh)
         std::ofstream ofs(fname);
 
         for (size_t i = 0; i < fep.eigvals_found; i++)
-            ofs << eigvals(i) << std::endl;
+            ofs << std::setprecision(10) << eigvals(i) << std::endl;
 
         ofs.close();
     }
 
-
-    disk::silo_database silo_db;
     auto visit_output_filename = lua["config"]["visit_output"];
     if ( visit_output_filename.valid() )
     {
-        
+        disk::silo_database silo_db;        
         silo_db.create(visit_output_filename);
         silo_db.add_mesh(msh, "mesh");
-    }
 
-    for (size_t i = 0; i < fep.eigvals_found; i++)
-    {
-        std::vector<scalar_type> solution_vals;
-        solution_vals.resize(msh.cells_size());
-
-        dynamic_vector<scalar_type> gx = eigvecs.block(0,i,eigvecs.rows(),1);
-        
-        size_t cell_i = 0;
-        for (auto& cl : msh)
+        for (size_t i = 0; i < fep.eigvals_found; i++)
         {
-            auto bar = barycenter(msh, cl);
-            auto local_dofs = gx.block(cell_i*num_cell_dofs, 0, num_cell_dofs, 1);
-            auto phi = bqd.cell_basis.eval_functions(msh, cl, bar);
-            auto val = local_dofs.dot(phi);
-            solution_vals.at(cell_i) = val;
-            cell_i++;
+            std::vector<scalar_type> solution_vals;
+            solution_vals.resize(msh.cells_size());
+
+            dynamic_vector<scalar_type> gx = eigvecs.block(0,i,eigvecs.rows(),1);
+            
+            size_t cell_i = 0;
+            for (auto& cl : msh)
+            {
+                auto bar = barycenter(msh, cl);
+                auto local_dofs = gx.block(cell_i*num_cell_dofs, 0, num_cell_dofs, 1);
+                auto phi = bqd.cell_basis.eval_functions(msh, cl, bar);
+                auto val = local_dofs.dot(phi);
+                solution_vals.at(cell_i) = val;
+                cell_i++;
+            }
+
+            std::stringstream ss;
+            ss << "u" << i;
+
+            disk::silo_zonal_variable<scalar_type> u(ss.str(), solution_vals);
+            silo_db.add_variable("mesh", u);
         }
 
-        std::stringstream ss;
-        ss << "u" << i;
-
-        disk::silo_zonal_variable<scalar_type> u(ss.str(), solution_vals);
-        silo_db.add_variable("mesh", u);
+        silo_db.close();
     }
-
-    silo_db.close();
 
     return true;
 }
@@ -725,7 +688,6 @@ eigval_reference(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
     
     if ( visit_output_filename.valid() )
     {
-        
         silo_db.create(visit_output_filename);
         silo_db.add_mesh(msh, "mesh");
 
@@ -810,7 +772,7 @@ int main(int argc, char **argv)
             cfem_solver(lua, msh);
         else if (method == "hho")
             hho_solver(lua, msh);
-        else if (method == "eigs")
+        else if (method == "hho_eigs")
             eigval_solver(lua, msh);
         else if (method == "fem_eigs")
             cfem_eigenvalue_solver(lua, msh);

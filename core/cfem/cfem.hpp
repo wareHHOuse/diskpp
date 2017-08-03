@@ -58,11 +58,11 @@ eval_basis(const disk::simplicial_mesh<T, 2>& msh,
 }
 
 template<typename T>
-static_matrix<T, 2, 3>
+static_matrix<T, 3, 2>
 eval_basis_grad(const disk::simplicial_mesh<T, 2>& msh,
                 const typename disk::simplicial_mesh<T, 2>::cell& cl)
 {
-    static_matrix<T, 2, 3> ret;
+    static_matrix<T, 3, 2> ret;
     
     auto meas = cfem_measure(msh, cl);
 
@@ -74,11 +74,11 @@ eval_basis_grad(const disk::simplicial_mesh<T, 2>& msh,
     auto x2 = pts[2].x(); auto y2 = pts[2].y();
     
     ret(0,0) = (y1 - y2) * C;
-    ret(0,1) = (y2 - y0) * C;
-    ret(0,2) = (y0 - y1) * C;
-    ret(1,0) = (x2 - x1) * C;
+    ret(1,0) = (y2 - y0) * C;
+    ret(2,0) = (y0 - y1) * C;
+    ret(0,1) = (x2 - x1) * C;
     ret(1,1) = (x0 - x2) * C;
-    ret(1,2) = (x1 - x0) * C;
+    ret(2,1) = (x1 - x0) * C;
 
     return ret;
 }
@@ -120,7 +120,7 @@ stiffness_matrix(const disk::simplicial_mesh<T, 2>& msh,
     
     auto meas = measure(msh, cl);
     auto dphi = eval_basis_grad(msh, cl);
-    auto stiff = meas * dphi.transpose() * dphi;
+    auto stiff = meas * dphi * dphi.transpose();
 
     return stiff;
 }
@@ -136,7 +136,7 @@ stiffness_matrix(const disk::simplicial_mesh<T, 2>& msh,
     auto meas = measure(msh, cl);
 
     auto dphi = eval_basis_grad(msh, cl);
-    auto stiff = meas * dphi.transpose() * (kappa*dphi);
+    auto stiff = meas * dphi * (kappa * dphi.transpose());
 
     return stiff;
 }
