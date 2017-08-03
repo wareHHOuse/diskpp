@@ -768,6 +768,8 @@ int main(int argc, char **argv)
         
         loader.populate_mesh(msh);
 
+        std::cout << "Mesh avg. diameter: " << mesh_h(msh) << std::endl;
+
         if (method == "fem")
             cfem_solver(lua, msh);
         else if (method == "hho")
