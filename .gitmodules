@@ -9,6 +9,3 @@
 [submodule "contrib/sol2"]
 	path = contrib/sol2
 	url = https://github.com/ThePhD/sol2
-[submodule "contrib/spectra"]
-	path = contrib/spectra
-	url = https://github.com/yixuan/spectra.git

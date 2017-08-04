@@ -23,7 +23,6 @@
 #include "hho/hho.hpp"
 
 #include "timecounter.h"
-#include "agmg/agmg.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>

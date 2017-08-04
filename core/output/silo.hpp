@@ -210,6 +210,12 @@ public:
 
         return true;
     }
+
+    template<typename T>
+    bool add_mesh(const generic_mesh<T,2>& msh, const std::string& name)
+    {
+        return true;
+    }
     
     
     /* Scalar variable, REAL case */

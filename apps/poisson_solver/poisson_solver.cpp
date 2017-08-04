@@ -124,43 +124,6 @@ hho_solver(sol::state& lua, const Mesh& msh)
     return true;
 }
 
-
-
-template<typename T>
-bool
-setup_feast(sol::state& lua, feast_eigensolver_params<T>& fep)
-{
-    fep.verbose     = lua["solver"]["feast"]["verbose"].get_or(false);
-    fep.tolerance   = lua["solver"]["feast"]["tolerance"].get_or(9);
-    
-    auto min_ev = lua["solver"]["feast"]["min_eigval"];
-    if (!min_ev.valid())
-    {
-        std::cout << "solver.feast.min_eigval not set." << std::endl;
-        return false;
-    }
-    fep.min_eigval = min_ev;
-
-    auto max_ev = lua["solver"]["feast"]["max_eigval"];
-    if (!max_ev.valid())
-    {
-        std::cout << "solver.feast.max_eigval not set." << std::endl;
-        return false;
-    }
-    fep.max_eigval = max_ev;
-
-    auto subsp = lua["solver"]["feast"]["subspace_size"];
-    if (!subsp.valid())
-    {
-        std::cout << "solver.feast.subspace_size not set." << std::endl;
-        return false;
-    }
-    fep.subspace_size = subsp;
-
-    return true;
-}
-
-
 template<typename T>
 bool
 cfem_eigenvalue_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
@@ -777,6 +740,30 @@ int main(int argc, char **argv)
             cfem_eigenvalue_solver(lua, msh);
         else if (method == "reference")
             eigval_reference(lua, msh);
+    }
+
+    if (std::regex_match(input_mesh, std::regex(".*\\.typ1$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
+
+        typedef disk::generic_mesh<scalar_type, 2>  mesh_type;
+
+        mesh_type msh;
+        disk::fvca5_mesh_loader<scalar_type, 2> loader;
+        if (!loader.read_mesh(input_mesh))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            return 1;
+        }
+        
+        loader.populate_mesh(msh);
+
+        std::cout << "Mesh avg. diameter: " << mesh_h(msh) << std::endl;
+
+        if (method == "hho")
+            hho_solver(lua, msh);
+        else if (method == "hho_eigs")
+            eigval_solver(lua, msh);
     }
     
     return 0;

@@ -191,6 +191,41 @@ generalized_eigenvalue_solver(feast_eigensolver_params<double>& params,
     return true;
 }
 
+template<typename T>
+bool
+setup_feast(sol::state& lua, feast_eigensolver_params<T>& fep)
+{
+    fep.verbose     = lua["solver"]["feast"]["verbose"].get_or(false);
+    fep.tolerance   = lua["solver"]["feast"]["tolerance"].get_or(9);
+    
+    auto min_ev = lua["solver"]["feast"]["min_eigval"];
+    if (!min_ev.valid())
+    {
+        std::cout << "solver.feast.min_eigval not set." << std::endl;
+        return false;
+    }
+    fep.min_eigval = min_ev;
+
+    auto max_ev = lua["solver"]["feast"]["max_eigval"];
+    if (!max_ev.valid())
+    {
+        std::cout << "solver.feast.max_eigval not set." << std::endl;
+        return false;
+    }
+    fep.max_eigval = max_ev;
+
+    auto subsp = lua["solver"]["feast"]["subspace_size"];
+    if (!subsp.valid())
+    {
+        std::cout << "solver.feast.subspace_size not set." << std::endl;
+        return false;
+    }
+    fep.subspace_size = subsp;
+
+    return true;
+}
+
+
 /*
 
 bool test_eigenvalue_solver(void)
