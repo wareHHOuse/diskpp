@@ -1,7 +1,7 @@
 
 enable_language (Fortran)
 
-set (AGMG_SOURCE_DIR "${PROJECT_SOURCE_DIR}/apps/diffusion/agmg/agmg_source/")
+set (AGMG_SOURCE_DIR "${PROJECT_SOURCE_DIR}/contrib/agmg/agmg_source/")
 
 message(${AGMG_SOURCE_DIR})
 

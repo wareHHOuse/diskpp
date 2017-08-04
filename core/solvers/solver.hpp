@@ -16,6 +16,7 @@
 
 #include "contrib/sol2/sol.hpp"
 #include "common/eigen.hpp"
+#include "agmg.hpp"
 
 namespace disk { namespace solvers {
 
@@ -24,41 +25,91 @@ init_lua(sol::state& lua)
 {
     lua["solver"] = lua.create_table();
     lua["solver"]["cg"] = lua.create_table();
+    lua["solver"]["pardiso"] = lua.create_table();
 }
 
 template<typename T>
+struct conjugated_gradient_params
+{
+    T               rr_tol;
+    T               rr_max;
+    size_t          max_iter;
+    bool            verbose;
+    bool            save_iteration_history;
+    bool            use_initial_guess;
+    std::string     history_filename;
+
+    conjugated_gradient_params() : rr_tol(1e-8),
+                                   rr_max(20),
+                                   max_iter(100),
+                                   verbose(false),
+                                   save_iteration_history(false),
+                                   use_initial_guess(false) {}
+};
+
+// TODO: return false and some kind of error in case of non convergence.
+template<typename T>
 bool
-conjugated_gradient(sol::state& lua,
+conjugated_gradient(const conjugated_gradient_params<T>& cgp,
                     const Eigen::SparseMatrix<T>& A,
                     const Eigen::Matrix<T, Eigen::Dynamic, 1>& b,
                     Eigen::Matrix<T, Eigen::Dynamic, 1>& x)
 {
-    size_t                      N = A.cols();
+    if ( A.rows() != A.cols() )
+    {
+        if (cgp.verbose)
+            std::cout << "[CG solver] A square matrix is required" << std::endl;
+
+        return false;
+    }
+
+    size_t N = A.cols();
+
+    if (b.size() != N)
+    {
+        if (cgp.verbose)
+            std::cout << "[CG solver] Wrong size of RHS vector" << std::endl;
+
+        return false;
+    }
+
+    if (x.size() != N)
+    {
+        if (cgp.verbose)
+            std::cout << "[CG solver] Wrong size of solution vector" << std::endl;
+
+        return false;
+    }
+
+    if (!cgp.use_initial_guess)
+        x = Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(N);
+
     size_t                      iter = 0;
     T                           nr, nr0;
     T                           alpha, beta, rho;
     
     Eigen::Matrix<T, Eigen::Dynamic, 1> d(N), r(N), r0(N), y(N);
-    x = Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(N);
- 
-
+    
     r0 = d = r = b - A*x;
     nr = nr0 = r.norm();
+    
+    std::ofstream iter_hist_ofs;
+    if (cgp.save_iteration_history)
+        iter_hist_ofs.open(cgp.history_filename);
 
-    size_t max_iter = lua["solver"]["cg"]["max_iter"].get_or(1000);
-    double rr_tol = lua["sover"]["cg"]["rr_tol"].get_or(1e-8);
-    double rr_max = lua["solver"]["cg"]["rr_max"].get_or(20.0);
-    
-    //std::ofstream ofs("cocg_nopre_convergence.txt");
-    
-    while ( nr/nr0 > rr_tol && iter < max_iter && nr/nr0 < rr_max )
+    while ( nr/nr0 > cgp.rr_tol && iter < cgp.max_iter && nr/nr0 < cgp.rr_max )
     {
-        std::cout << "                                                 \r";
-        std::cout << " -> Iteration " << iter << ", rr = ";
-        std::cout << nr/nr0 << "\b\r";
-        std::cout.flush();
+        if (cgp.verbose)
+        {
+            std::cout << "                                                 \r";
+            std::cout << " -> Iteration " << iter << ", rr = ";
+            std::cout << nr/nr0 << "\b\r";
+            std::cout.flush();
+        }
+
+        if (cgp.save_iteration_history)
+            iter_hist_ofs << nr/nr0 << std::endl;
         
-        //ofs << nr/nr0 << std::endl;
         y = A*d;
         rho = r.dot(r);
         alpha = rho/d.dot(y);
@@ -71,11 +122,77 @@ conjugated_gradient(sol::state& lua,
         iter++;
     }
     
-    //ofs << nr/nr0 << std::endl;
-    //ofs.close();
+    if (cgp.save_iteration_history)
+    {
+        iter_hist_ofs << nr/nr0 << std::endl;
+        iter_hist_ofs.close();
+    }
+
+    if (cgp.verbose)
+        std::cout << " -> Iteration " << iter << ", rr = " << nr/nr0 << std::endl;
     
-    std::cout << " -> Iteration " << iter << ", rr = " << nr/nr0 << std::endl;
-    
+    return true;
+}
+
+template<typename T>
+bool
+conjugated_gradient(sol::state& lua,
+                    const Eigen::SparseMatrix<T>& A,
+                    const Eigen::Matrix<T, Eigen::Dynamic, 1>& b,
+                    Eigen::Matrix<T, Eigen::Dynamic, 1>& x)
+{
+    conjugated_gradient_params<T> cgp;
+
+    cgp.max_iter    = lua["solver"]["cg"]["max_iter"].get_or(1000);
+    cgp.rr_tol      = lua["sover"]["cg"]["rr_tol"].get_or(1e-8);
+    cgp.rr_max      = lua["solver"]["cg"]["rr_max"].get_or(20.0);
+    cgp.verbose     = lua["solver"]["cg"]["verbose"].get_or(false);
+
+    auto iter_hist_filename = lua["solver"]["cg"]["hist_file"];
+    if (iter_hist_filename.valid())
+    {
+        cgp.save_iteration_history = true;
+        cgp.history_filename = iter_hist_filename;
+    }
+
+    return conjugated_gradient(cgp, A, b, x);
+}
+
+template<typename T>
+struct pardiso_params
+{
+    bool    report_factorization_Mflops;
+    int     out_of_core; //0: IC, 1: IC, OOC if limits passed, 2: OOC
+
+    pardiso_params() : report_factorization_Mflops(false),
+                       out_of_core(0) {}
+};
+
+template<typename T>
+bool
+mkl_pardiso(const pardiso_params<T>& params,
+            const Eigen::SparseMatrix<T>& A,
+            const Eigen::Matrix<T, Eigen::Dynamic, 1>& b,
+            Eigen::Matrix<T, Eigen::Dynamic, 1>& x)
+{
+    Eigen::PardisoLU<Eigen::SparseMatrix<T>>  solver;
+
+    if (params.out_of_core >= 0 && params.out_of_core <= 2)
+        solver.pardisoParameterArray()[59] = params.out_of_core;
+
+    if (params.report_factorization_Mflops)
+        solver.pardisoParameterArray()[18] = -1; //report flops
+
+    solver.analyzePattern(A);
+    solver.factorize(A);
+    x = solver.solve(b);
+
+    if (params.report_factorization_Mflops)
+    {
+        int mflops = solver.pardisoParameterArray()[18];
+        std::cout << "[PARDISO] Factorization Mflops: " << mflops << std::endl;
+    }
+
     return true;
 }
 
@@ -86,21 +203,19 @@ mkl_pardiso(sol::state& lua,
             const Eigen::Matrix<T, Eigen::Dynamic, 1>& b,
             Eigen::Matrix<T, Eigen::Dynamic, 1>& x)
 {
-    Eigen::PardisoLU<Eigen::SparseMatrix<T>>  solver;
-    //solver.pardisoParameterArray()[59] = 0; //out-of-core
+    pardiso_params<T> pparams;
 
-    solver.analyzePattern(A);
-    solver.factorize(A);
-    x = solver.solve(b);
+    pparams.report_factorization_Mflops = lua["solver"]["pardiso"]["print_mflops"].get_or(false);
+    pparams.out_of_core = lua["solver"]["pardiso"]["out_of_core"].get_or(0);
 
-    return true;
+    return mkl_pardiso(pparams, A, b, x);
 }
 
 template<typename T>
 bool
 linear_solver(sol::state& lua,
-              const Eigen::SparseMatrix<T>& A,
-              const Eigen::Matrix<T, Eigen::Dynamic, 1>& b,
+              Eigen::SparseMatrix<T>& A,
+              Eigen::Matrix<T, Eigen::Dynamic, 1>& b,
               Eigen::Matrix<T, Eigen::Dynamic, 1>& x)
 {
     std::string solver_type = lua["solver"]["solver_type"].get_or(std::string("cg"));
@@ -111,6 +226,8 @@ linear_solver(sol::state& lua,
     else if ( solver_type == "pardiso" )
         return mkl_pardiso(lua, A, b, x);
 #endif
+    else if ( solver_type == "agmg" )
+        return agmg_multigrid_solver(lua, A, b, x);
         
 //        Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
 

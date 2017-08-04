@@ -21,19 +21,6 @@
 namespace disk { namespace cfem {
 
 template<typename T>
-T cfem_measure(const disk::simplicial_mesh<T, 2>& msh,
-               const typename disk::simplicial_mesh<T, 2>::cell& cl)
-{
-    auto pts = points(msh, cl);
-
-    auto x0 = pts[0].x(); auto y0 = pts[0].y();
-    auto x1 = pts[1].x(); auto y1 = pts[1].y();
-    auto x2 = pts[2].x(); auto y2 = pts[2].y();
-
-    return (x1*y2 - y1*x2 - x0*(y2 - y1) + y0*(x2 - x1))/2.0;
-}
-
-template<typename T>
 static_vector<T, 3>
 eval_basis(const disk::simplicial_mesh<T, 2>& msh,
            const typename disk::simplicial_mesh<T, 2>::cell& cl,
@@ -41,18 +28,16 @@ eval_basis(const disk::simplicial_mesh<T, 2>& msh,
 {
     static_vector<T, 3> ret;
     
-    auto meas = cfem_measure(msh, cl);
-
     auto pts = points(msh, cl);
-
-    auto C = 1./(2.*meas);
     auto x0 = pts[0].x(); auto y0 = pts[0].y();
     auto x1 = pts[1].x(); auto y1 = pts[1].y();
     auto x2 = pts[2].x(); auto y2 = pts[2].y();
 
-    ret(0) = (x1*y2 - y1*x2 - pt.x() * (y2 - y1) + pt.y() * (x2 - x1)) * C;
-    ret(1) = (x2*y0 - y2*x0 + pt.x() * (y2 - y0) - pt.y() * (x2 - x0)) * C;
-    ret(2) = (x0*y1 - y0*x1 - pt.x() * (y1 - y0) + pt.y() * (x1 - x0)) * C;
+    auto m = (x1*y2 - y1*x2 - x0*(y2 - y1) + y0*(x2 - x1));
+
+    ret(0) = (x1*y2 - y1*x2 - pt.x() * (y2 - y1) + pt.y() * (x2 - x1)) / m;
+    ret(1) = (x2*y0 - y2*x0 + pt.x() * (y2 - y0) - pt.y() * (x2 - x0)) / m;
+    ret(2) = (x0*y1 - y0*x1 - pt.x() * (y1 - y0) + pt.y() * (x1 - x0)) / m;
 
     return ret;
 }
@@ -63,22 +48,20 @@ eval_basis_grad(const disk::simplicial_mesh<T, 2>& msh,
                 const typename disk::simplicial_mesh<T, 2>::cell& cl)
 {
     static_matrix<T, 3, 2> ret;
-    
-    auto meas = cfem_measure(msh, cl);
 
     auto pts = points(msh, cl);
-
-    auto C = 1./(2.*meas);
     auto x0 = pts[0].x(); auto y0 = pts[0].y();
     auto x1 = pts[1].x(); auto y1 = pts[1].y();
     auto x2 = pts[2].x(); auto y2 = pts[2].y();
+
+    auto m = (x1*y2 - y1*x2 - x0*(y2 - y1) + y0*(x2 - x1));
     
-    ret(0,0) = (y1 - y2) * C;
-    ret(1,0) = (y2 - y0) * C;
-    ret(2,0) = (y0 - y1) * C;
-    ret(0,1) = (x2 - x1) * C;
-    ret(1,1) = (x0 - x2) * C;
-    ret(2,1) = (x1 - x0) * C;
+    ret(0,0) = (y1 - y2) / m;
+    ret(1,0) = (y2 - y0) / m;
+    ret(2,0) = (y0 - y1) / m;
+    ret(0,1) = (x2 - x1) / m;
+    ret(1,1) = (x0 - x2) / m;
+    ret(2,1) = (x1 - x0) / m;
 
     return ret;
 }
@@ -140,24 +123,6 @@ stiffness_matrix(const disk::simplicial_mesh<T, 2>& msh,
 
     return stiff;
 }
-/*
-template<typename T, typename Function>
-static_matrix<T, 3, 3>
-stiffness_matrix(const disk::simplicial_mesh<T, 2>& msh,
-                 const typename disk::simplicial_mesh<T, 2>::cell& cl,
-                 Function& kappa)
-{
-    static_matrix<T, 3, 3> ret;
-    
-    auto meas = measure(msh, cl);
-    auto bar = barycenter(msh, cl);
-
-    auto dphi = eval_basis_grad(msh, cl);
-    auto stiff = meas * dphi.transpose() * (kappa(bar)*dphi);
-
-    return stiff;
-}
-*/
 
 template<typename T, typename Function>
 static_vector<T, 3>
@@ -167,12 +132,12 @@ make_rhs(const disk::simplicial_mesh<T, 2>& msh,
 {
     static_vector<T, 3> ret;
 
-    auto meas = cfem_measure(msh, cl);
+    auto meas = measure(msh, cl);
     auto bar = barycenter(msh, cl);
 
     static_vector<T,3> r = static_vector<T,3>::Ones();
 
-    ret = f(bar) * std::abs(meas) * r / 3.0;
+    ret = f(bar) * meas * r / 3.0;
 
     return ret;
 }

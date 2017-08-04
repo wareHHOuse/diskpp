@@ -1,4 +1,20 @@
 /*
+ *       /\
+ *      /__\       Matteo Cicuttin (C) 2016-2017 - matteo.cicuttin@enpc.fr
+ *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
+ *    /\    /\
+ *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
+ *  /_\/_\/_\/_\   methods.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ *
+ * If you use this code for scientific publications, you are required to
+ * cite it.
+ */
+
+/*
  * Copyright (C) 2013-2016, Matteo Cicuttin - matteo.cicuttin@uniud.it
  * Department of Electrical Engineering, University of Udine
  * All rights reserved.
@@ -30,20 +46,13 @@
 
 
 
-#define ENABLE_EIGEN
 
-#ifdef ENABLE_EIGEN
-    #include <Eigen/Dense>
-    #include <Eigen/Sparse>
-    #define AGMG_HAS_SOME_LIBRARY
-#endif
-
-#ifdef ENABLE_ARMADILLO
-    #include <armadillo>
-    #define AGMG_HAS_SOME_LIBRARY
-#endif
+#include <Eigen/Dense>
+#include <Eigen/Sparse>
 
 #define CALL_FORTRAN(function) function##_
+
+namespace disk { namespace solvers {
 
 namespace agmg_priv {
 
@@ -113,46 +122,36 @@ call_agmg<std::complex<double>>(int& N, std::complex<double> *a, int *ja,
 } // namespace agmg_priv
 
 
+template<typename T>
+struct agmg_solver_config
+{
+    int         ijob;
+    int         iprint;
+    int         num_restarts;
+    int         max_iters;
+    double      tolerance;
+
+    agmg_solver_config() : ijob(0),
+                           iprint(6),
+                           num_restarts(1),
+                           max_iters(10000),
+                           tolerance(1e-8)
+    {}
+};
 
 template<typename T>
 class agmg_solver
 {
-    int         m_agmg_ijob;
-    int         m_agmg_iprint;
-    int         m_agmg_nrest;
-    int         m_agmg_iter;
-    double      m_agmg_tol;
-
-#ifndef AGMG_HAS_SOME_LIBRARY
-    static_assert(false, "AGMG wrapper does not have any library to interface with. "
-                         "This might not be what you want...");
-#endif
+    agmg_solver_config<T>   config;
 
 public:
     agmg_solver()
-        : m_agmg_ijob(0), m_agmg_iprint(6), m_agmg_nrest(1),
-          m_agmg_iter(10000), m_agmg_tol(1e-8)
     {}
 
-    void ijob(int val) {
-        m_agmg_ijob = val;
-    }
+    agmg_solver(const agmg_solver_config<T>& conf) : config(conf) {}
 
-    int ijob(void) const {
-        return m_agmg_ijob;
-    }
-
-    void iprint(int val) {
-        m_agmg_iprint = val;
-    }
-
-    int iprint(void) const {
-        return m_agmg_iprint;
-    }
-
-#ifdef ENABLE_EIGEN
     template<int _Options, typename _Index>
-    Eigen::Matrix<T, 1, Eigen::Dynamic>
+    Eigen::Matrix<T, Eigen::Dynamic, 1>
     solve(Eigen::SparseMatrix<T, _Options, _Index>& A,
           Eigen::Matrix<T, Eigen::Dynamic, 1>& b)
     {
@@ -188,17 +187,17 @@ public:
         {
             // User asked to use the transpose, but backend is CSC: don't ask
             // AGMG to compute with the transpose.
-            if (m_agmg_ijob > 100)
-                m_agmg_ijob -= 100;
+            if (config.ijob > 100)
+                config.ijob -= 100;
 
             // User did not ask to use the transpose, but backend is CSC: ask
             // AGMG to NOT compute with the transpose.
-            if (m_agmg_ijob < 100)
-                m_agmg_ijob += 100;
+            if (config.ijob < 100)
+                config.ijob += 100;
         }
 
-        agmg_priv::call_agmg<T>(N, data, ja, ia, f, x, m_agmg_ijob, m_agmg_iprint,
-                                m_agmg_nrest, m_agmg_iter, m_agmg_tol);
+        agmg_priv::call_agmg<T>(N, data, ja, ia, f, x, config.ijob, config.iprint,
+                                config.num_restarts, config.max_iters, config.tolerance);
 
         /* Convert back to zero-based */
         for (size_t i = 0; i < is+1; i++)
@@ -209,32 +208,21 @@ public:
 
         return ret;
     }
-
-#endif
-
-#ifdef ENABLE_ARMADILLO
-    template<typename T>
-    arma::Col<T>
-    solve(arma::SpMat<T>& A, arma::Col<T>& b)
-    {
-        if ( A.n_rows != A.n_cols )
-            throw std::invalid_argument("Only square matrices");
-
-        if (_Options == Eigen::ColMajor)
-        {
-            // User asked to use the transpose, but backend is CSC: don't ask
-            // AGMG to compute with the transpose.
-            if (m_agmg_ijob > 100)
-                m_agmg_ijob -= 100;
-
-            // User did not ask to use the transpose, but backend is CSC: ask
-            // AGMG to NOT compute with the transpose.
-            if (m_agmg_ijob < 100)
-                m_agmg_ijob += 100;
-        }
-    }
-#endif
-
 };
 
 
+template<typename T>
+bool
+agmg_multigrid_solver(sol::state& lua,
+                      Eigen::SparseMatrix<T>& A,
+                      Eigen::Matrix<T, Eigen::Dynamic, 1>& b,
+                      Eigen::Matrix<T, Eigen::Dynamic, 1>& x)
+{
+    agmg_solver<T> agmg;
+
+    x = agmg.solve(A, b);
+
+    return true;
+}
+
+}} // namespaces

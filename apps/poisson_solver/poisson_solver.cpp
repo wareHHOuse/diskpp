@@ -31,9 +31,6 @@
 #include "contrib/sol2/sol.hpp"
 #include "contrib/timecounter.h"
 
-#include "GenEigsSolver.h"
-
-
 template<typename Mesh>
 bool
 hho_solver(sol::state& lua, const Mesh& msh)
