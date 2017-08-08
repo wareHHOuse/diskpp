@@ -495,6 +495,8 @@ eigval_solver(sol::state& lua, const Mesh& msh)
 
     std::vector<triplet_type> gtK, gtM;
 
+    scalar_type stab_weight = lua["config"]["stabilization_weight"].get_or(1.0);
+
     size_t elem_i = 0;
     for (auto& cl : msh)
     {
@@ -502,7 +504,7 @@ eigval_solver(sol::state& lua, const Mesh& msh)
         stab.compute(msh, cl, gradrec.oper);
         mass.compute(msh, cl);
 
-        auto K = gradrec.data + stab.data;
+        auto K = gradrec.data + stab_weight * stab.data;
         auto M = mass.data;
 
         auto fcs = faces(msh, cl);
@@ -573,6 +575,14 @@ eigval_solver(sol::state& lua, const Mesh& msh)
     
     Eigen::Matrix<scalar_type, Eigen::Dynamic, Eigen::Dynamic> eigvecs;
     Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> eigvals;
+
+    bool only_dump = lua["config"]["only_dump"].get_or(false);
+    if (only_dump)
+    {
+        dump_sparse_matrix(gK, "stiff_matrix.txt");
+        dump_sparse_matrix(gM, "mass_matrix.txt");
+        return true;
+    }
 
     generalized_eigenvalue_solver(fep, gK, gM, eigvecs, eigvals);
 
