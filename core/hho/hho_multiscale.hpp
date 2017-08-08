@@ -23,6 +23,7 @@ using namespace std::placeholders;
 #include <cmath>
 
 #include "common/eigen.hpp"
+#include "mesh/mesh_utility.hpp"
 
 namespace disk {
 

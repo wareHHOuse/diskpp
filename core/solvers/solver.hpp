@@ -16,7 +16,14 @@
 
 #include "contrib/sol2/sol.hpp"
 #include "common/eigen.hpp"
-#include "agmg.hpp"
+
+#ifdef HAVE_AGMG
+    #include "agmg.hpp"
+#endif
+
+#ifdef HAVE_INTEL_MKL
+    #include "feast.hpp"
+#endif
 
 namespace disk { namespace solvers {
 
@@ -25,7 +32,11 @@ init_lua(sol::state& lua)
 {
     lua["solver"] = lua.create_table();
     lua["solver"]["cg"] = lua.create_table();
+
+#ifdef HAVE_INTEL_MKL
     lua["solver"]["pardiso"] = lua.create_table();
+#endif
+
 }
 
 template<typename T>
@@ -158,6 +169,8 @@ conjugated_gradient(sol::state& lua,
     return conjugated_gradient(cgp, A, b, x);
 }
 
+#ifdef HAVE_INTEL_MKL
+
 template<typename T>
 struct pardiso_params
 {
@@ -211,6 +224,8 @@ mkl_pardiso(sol::state& lua,
     return mkl_pardiso(pparams, A, b, x);
 }
 
+#endif /* HAVE_INTEL_MKL */
+
 template<typename T>
 bool
 linear_solver(sol::state& lua,
@@ -222,15 +237,16 @@ linear_solver(sol::state& lua,
 
     if ( solver_type == "cg" )
         return conjugated_gradient(lua, A, b, x);
+
 #ifdef HAVE_INTEL_MKL
     else if ( solver_type == "pardiso" )
         return mkl_pardiso(lua, A, b, x);
-#endif
+#endif /* HAVE_INTEL_MKL */
+
+#ifdef HAVE_AGMG
     else if ( solver_type == "agmg" )
         return agmg_multigrid_solver(lua, A, b, x);
-        
-//        Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
-
+#endif /* HAVE_AGMG */
 
     return false;
 }

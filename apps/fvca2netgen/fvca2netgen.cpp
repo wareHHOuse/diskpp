@@ -17,7 +17,6 @@
 #include <iostream>
 #include <fstream>
 #include <regex>
-#include "../../config.h"
 #include "loaders/loader.hpp"
 
 int main(int argc, char **argv)

@@ -30,7 +30,7 @@
 
 #include "colormanip.h"
 
-#include "../../config.h"
+#include "config.h"
 
 #include "loaders/loader.hpp"
 #include "hho/hho_multiscale.hpp"

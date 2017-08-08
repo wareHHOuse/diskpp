@@ -24,11 +24,7 @@
 
 #include "colormanip.h"
 
-#include "../../config.h"
-
-#ifdef HAVE_SOLVER_WRAPPERS
- #include "agmg/agmg.hpp"
-#endif
+#include "config.h"
 
 #include "loaders/loader.hpp"
 #include "hho/hho.hpp"

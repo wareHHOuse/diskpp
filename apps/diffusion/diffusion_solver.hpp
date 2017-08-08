@@ -18,7 +18,7 @@
 
 #include <sstream>
 
-#include "../../config.h"
+#include "config.h"
 
 #include "hho/hho.hpp"
 

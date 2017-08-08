@@ -26,7 +26,6 @@
 #include "hho/hho.hpp"
 #include "output/silo.hpp"
 #include "solvers/solver.hpp"
-#include "solvers/feast.hpp"
 
 #include "contrib/sol2/sol.hpp"
 #include "contrib/timecounter.h"
@@ -359,64 +358,57 @@ cfem_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
 
     gA.setFromTriplets(triplets.begin(), triplets.end());
 
-#ifdef HAVE_INTEL_MKL
-        Eigen::PardisoLU<Eigen::SparseMatrix<T>>  solver;
-        //solver.pardisoParameterArray()[59] = 0; //out-of-core
-#else
-        Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
-#endif
+    size_t systsz = gA.rows();
+    size_t nnz = gA.nonZeros();
 
-        size_t systsz = gA.rows();
-        size_t nnz = gA.nonZeros();
+    std::cout << "Starting linear solver..." << std::endl;
+    std::cout << " * Solving for " << systsz << " unknowns." << std::endl;
+    std::cout << " * Matrix fill: " << 100.0*double(nnz)/(systsz*systsz) << "%" << std::endl;
 
-        std::cout << "Starting linear solver..." << std::endl;
-        std::cout << " * Solving for " << systsz << " unknowns." << std::endl;
-        std::cout << " * Matrix fill: " << 100.0*double(nnz)/(systsz*systsz) << "%" << std::endl;
+    disk::solvers::linear_solver(lua, gA, gb, gx);
 
-        disk::solvers::linear_solver(lua, gA, gb, gx);
+    dynamic_vector<T> e_gx(msh.points_size());
+    e_gx = dynamic_vector<T>::Zero(msh.points_size());
 
-        dynamic_vector<T> e_gx(msh.points_size());
-        e_gx = dynamic_vector<T>::Zero(msh.points_size());
+    for (size_t i = 0; i < gx.size(); i++)
+        e_gx( expand_map.at(i) ) = gx(i);
 
-        for (size_t i = 0; i < gx.size(); i++)
-            e_gx( expand_map.at(i) ) = gx(i);
+    std::ofstream ofs("solution.dat");
 
-        std::ofstream ofs("solution.dat");
+    std::vector<T> solution_vals;
+    solution_vals.reserve(msh.cells_size());
 
-        std::vector<T> solution_vals;
-        solution_vals.reserve(msh.cells_size());
+    size_t cellnum = 0;
+    for (auto& cl : msh)
+    {
+        auto bar = barycenter(msh, cl);
+        auto phi = disk::cfem::eval_basis(msh, cl, bar);
+        auto ptids = cl.point_ids();
 
-        size_t cellnum = 0;
-        for (auto& cl : msh)
-        {
-            auto bar = barycenter(msh, cl);
-            auto phi = disk::cfem::eval_basis(msh, cl, bar);
-            auto ptids = cl.point_ids();
+        double val = 0.0;
+        for (size_t i = 0; i < 3; i++)
+            val += e_gx(ptids[i]) * phi(i);
 
-            double val = 0.0;
-            for (size_t i = 0; i < 3; i++)
-                val += e_gx(ptids[i]) * phi(i);
+        ofs << bar.x() << " " << bar.y() << " " << val << std::endl;
+        solution_vals.push_back(val);
+        cellnum++;
+    }
 
-            ofs << bar.x() << " " << bar.y() << " " << val << std::endl;
-            solution_vals.push_back(val);
-            cellnum++;
-        }
+    ofs.close();
 
-        ofs.close();
+    auto visit_output_filename = lua["config"]["visit_output"];
+    if ( visit_output_filename.valid() )
+    {
+        disk::silo_database silo_db;
+        silo_db.create(visit_output_filename);
+        silo_db.add_mesh(msh, "mesh");
+    
+        disk::silo_zonal_variable<T> u("u", solution_vals);
+        silo_db.add_variable("mesh", u);
+        silo_db.close();
+    }
 
-        auto visit_output_filename = lua["config"]["visit_output"];
-        if ( visit_output_filename.valid() )
-        {
-            disk::silo_database silo_db;
-            silo_db.create(visit_output_filename);
-            silo_db.add_mesh(msh, "mesh");
-        
-            disk::silo_zonal_variable<T> u("u", solution_vals);
-            silo_db.add_variable("mesh", u);
-            silo_db.close();
-        }
-
-        return true;
+    return true;
 }
 
 

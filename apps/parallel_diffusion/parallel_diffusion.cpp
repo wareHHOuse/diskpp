@@ -20,12 +20,6 @@
 
 #include <map>
 
-#include "../../config.h"
-
-#ifdef HAVE_SOLVER_WRAPPERS
-    #include "agmg/agmg.hpp"
-#endif
-
 #include "loaders/loader.hpp"
 #include "hho/hho.hpp"
 

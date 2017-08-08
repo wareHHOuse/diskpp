@@ -16,19 +16,22 @@
 
 #include <iostream>
 #include <list>
+#include <vector>
 #include <sstream>
 
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
+#include "mesh/mesh_utility.hpp"
+
 
 int main(int argc, char **argv)
 {
     using T = double;
-    using mesh_type = disk::simplicial_mesh<T,2>;
+    using mesh_type = disk::generic_mesh<T,2>;
 
     mesh_type msh;
-    disk::netgen_mesh_loader<T,2> loader;
-    loader.read_mesh("../../../diskpp/meshes/square_submesh_test.mesh2d");
+    disk::fvca5_mesh_loader<T,2> loader;
+    loader.read_mesh("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_1.typ1");
     loader.populate_mesh(msh);
 
     dump_to_matlab(msh, "basemesh.m");
@@ -37,7 +40,8 @@ int main(int argc, char **argv)
     size_t count = 0;
     for (auto& cl : msh)
     {
-        auto submesh = sm.generate_mesh(msh, cl);
+        auto submesh = sm.generate_mesh(msh, cl, 2);
+        relax_mesh(submesh);
 
         std::stringstream ss;
         ss << "element_" << count << ".m";

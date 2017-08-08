@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "../../config.h"
+#include "config.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wall"
