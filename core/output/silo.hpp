@@ -212,9 +212,58 @@ public:
     }
 
     template<typename T>
+    bool add_mesh(const cartesian_mesh<T,2>& msh, const std::string& name)
+    {
+        std::vector<T> x_coords, y_coords;
+        x_coords.reserve(msh.points_size());
+        y_coords.reserve(msh.points_size());
+
+        for (auto itor = msh.points_begin(); itor != msh.points_end(); itor++)
+        {
+            auto pt = *itor;
+            x_coords.push_back(pt.x());
+            y_coords.push_back(pt.y());
+        }
+
+        T *coords[] = {x_coords.data(), y_coords.data()};
+
+        std::vector<int> nodelist;
+        nodelist.reserve( 4*msh.cells_size() );
+
+        for (auto& cl : msh)
+        {
+            auto ptids = cl.point_ids();
+            assert(ptids.size() == 4);
+
+            nodelist.push_back( ptids[0]+1 );
+            nodelist.push_back( ptids[1]+1 );
+            nodelist.push_back( ptids[3]+1 );
+            nodelist.push_back( ptids[2]+1 );
+        }
+
+        int lnodelist = nodelist.size();
+
+        int shapesize[] = {4};
+        int shapecounts[] = { static_cast<int>(msh.cells_size()) };
+        int nshapetypes = 1;
+        int nnodes = msh.points_size();
+        int nzones = msh.cells_size();
+        int ndims = 2;
+
+        DBPutZonelist(m_siloDb, "zonelist", nzones, ndims, nodelist.data(), lnodelist,
+            1, shapesize, shapecounts, nshapetypes);
+        
+        DBPutUcdmesh(m_siloDb, "mesh", ndims, NULL, coords, nnodes, nzones,
+            "zonelist", NULL, DB_DOUBLE, NULL);
+        
+        return true;
+    }
+
+    template<typename T>
     bool add_mesh(const generic_mesh<T,2>& msh, const std::string& name)
     {
-        return true;
+        std::cout << "Export of generic meshes not yet supported." << std::endl;
+        return false;
     }
     
     

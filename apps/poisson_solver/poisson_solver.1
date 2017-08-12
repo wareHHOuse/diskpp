@@ -1,0 +1,63 @@
+.TH poisson_solver 1
+.SH NAME
+poisson_solver \- DiSk++ solver for the Poisson's equation
+.SH SYNOPSIS
+.B poisson_solver
+.IR config-file
+.SH DESCRIPTION
+.B poisson_solver
+solves the diffusion equation using one of the methods available in DiSk++.
+.SH OPTIONS
+.TP
+It just takes the name of the configuration file (which is a Lua script).
+.SH THE CONFIGURATION FILE
+The configuration file allows to specify different configuration options for the solver.
+Configuration is divided in namespaces pertaining to different aspects of the
+solution process.
+.PP
+.I "General configuration"
+.TP
+.BR config.method " " \fR [STRING]
+Specifies the method to use for the solution. Different methods are
+available for different meshes. HHO is usually available on any mesh, while FEM at the
+moment is available only on triangular meshes. At the moment the following methods are
+available:
+.PP
+.TP
+.BR config.degree " " \fR "[INTEGER]"
+Specifies the polynomial degree that has to be used by the numerical method. Maybe this
+should go in a method-specific namespace like ``hho.degree'' or ``fem.degree''
+.PP
+.TP
+.BR config.input_mesh " " \fR "[STRING]"
+.PP
+.TP
+.BR config.visit_output " " \fR "[STRING]"
+.PP
+.TP
+.BR config.eigval_output " " \fR "[STRING]"
+.PP
+.TP
+.BR config.stabilization_weight " " \fR "[INTEGER, default: 1]"
+.PP
+.TP
+.BR config.only_dump " " \fR "[BOOLEAN, default: false]"
+.PP
+.I "FEAST eigensolver configuration"
+.br
+The FEAST eigensolver is available only if DiSk++ was compiled with Intel MKL support.
+Otherwise, the namespace will not be available.
+.TP
+.BR solver.feast.verbose " " \fR "[BOOLEAN, default: false]"
+.PP
+.TP
+.BR solver.feast.tolerance " " \fR "[INTEGER, default: 9]"
+.PP
+.TP
+.BR solver.feast.min_eigval " " \fR "[FP]"
+.PP
+.TP
+.BR solver.feast.max_eigval " " \fR "[FP]"
+.PP
+.TP
+.BR solver.feast.subspace_size " " \fR "[INTEGER]"

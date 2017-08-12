@@ -58,6 +58,8 @@
 #include <array>
 #include <cstdlib>
 #include <cstdio>
+#include <random>
+#include <functional>
 
 #include <unistd.h>
 #include <limits.h>
@@ -101,6 +103,7 @@ usage(const char *progname)
     printf("    -m: number of elements in x direction\n");
     printf("    -n: number of elements in y direction\n");
     printf("    -p: number of elements in z direction (ignored in 2D)\n");
+    printf("    -r: apply a random offset to interior points\n");
 }
 
 template<typename T, size_t DIM>
@@ -115,11 +118,13 @@ struct mesh_params<T, 2>
 
         min_x = 0.0; max_x = 1.0;
         min_y = 0.0; max_y = 1.0;
+        randomize = false;
     }
 
     char *      filename;
     size_t      nx, ny;
     T           min_x, max_x, min_y, max_y;
+    bool        randomize;
 };
 
 template<typename T>
@@ -131,11 +136,13 @@ struct mesh_params<T, 3>
         min_x = 0.0; max_x = 1.0;
         min_y = 0.0; max_y = 1.0;
         min_z = 0.0; max_z = 1.0;
+        randomize = false;
     }
 
     char *      filename;
     size_t      nx, ny, nz;
     T           min_x, max_x, min_y, max_y, min_z, max_z;
+    bool        randomize;
 };
 
 template<typename T, size_t DIM>
@@ -268,15 +275,30 @@ generate(const mesh_params<T,2>& mp)
     fprintf(fp, "%lu\n", num_points);
 #endif
 
+
+    std::default_random_engine e;
+    std::uniform_real_distribution<T> dist_x(-hx/5., hx/5.);
+    std::uniform_real_distribution<T> dist_y(-hy/5., hy/5.);
+    auto rx = std::bind(dist_x, e);
+    auto ry = std::bind(dist_y, e);
+
     /* Generate points */
     for (size_t j = 0; j < mp.ny+1; j++)
     {
         for (size_t i = 0; i < mp.nx+1; i++)
         {
             typename mesh_data<T,2>::point_type p;
-            p[0] = mp.min_x + i*hx;
-            p[1] = mp.min_y + j*hy;
-
+            bool is_boundary = (i == 0) || (j == 0) || (i == mp.nx) || (j == mp.ny);
+            if (mp.randomize && !is_boundary)
+            {
+                p[0] = mp.min_x + i*hx + rx();
+                p[1] = mp.min_y + j*hy + ry();
+            }
+            else
+            {
+                p[0] = mp.min_x + i*hx;
+                p[1] = mp.min_y + j*hy;
+            }
 #ifdef BUILD_IN_MEMORY
             md.points.push_back(p);
 #else
@@ -580,8 +602,9 @@ int main(int argc, char **argv)
     T           min_z = 0.0, max_z = 1.0;
     bool        three_dimensions = true;
     int         ch;
+    bool        randomize = false;
 
-    while ( (ch = getopt(argc, argv, "23x:X:y:Y:z:Z:m:n:p:")) != -1 )
+    while ( (ch = getopt(argc, argv, "23x:X:y:Y:z:Z:m:n:p:r")) != -1 )
     {
         switch(ch)
         {
@@ -596,6 +619,7 @@ int main(int argc, char **argv)
             case 'Z':   max_z = strto<T>(optarg); break;
             case '2':   three_dimensions = false; break;
             case '3':   three_dimensions = true; break;
+            case 'r':   randomize = true; break;
 
             case 'h':
             case '?':
@@ -615,6 +639,7 @@ int main(int argc, char **argv)
         mp.min_y = min_y; mp.max_x = max_y;
         mp.min_z = min_z; mp.max_x = max_z;
         mp.nx = nx; mp.ny = ny; mp.nz = nz;
+        mp.randomize = randomize;
 
         if ( mp.max_x < mp.min_x or mp.max_y < mp.min_y or mp.max_z < mp.min_z )
         {
@@ -637,6 +662,7 @@ int main(int argc, char **argv)
         mp.min_x = min_x; mp.max_x = max_x;
         mp.min_y = min_y; mp.max_x = max_y;
         mp.nx = nx; mp.ny = ny;
+        mp.randomize = randomize;
 
         if ( mp.max_x < mp.min_x or mp.max_y < mp.min_y )
         {

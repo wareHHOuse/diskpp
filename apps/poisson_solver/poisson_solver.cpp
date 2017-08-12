@@ -767,6 +767,30 @@ int main(int argc, char **argv)
         else if (method == "hho_eigs")
             eigval_solver(lua, msh);
     }
+
+    if (std::regex_match(input_mesh, std::regex(".*\\.quad$") ))
+    {
+        std::cout << "Guessed mesh format: Cartesian 2D" << std::endl;
+
+        typedef disk::cartesian_mesh<scalar_type, 2>  mesh_type;
+
+        mesh_type msh;
+        disk::cartesian_mesh_loader<scalar_type, 2> loader;
+        if (!loader.read_mesh(input_mesh))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            return 1;
+        }
+        
+        loader.populate_mesh(msh);
+
+        std::cout << "Mesh avg. diameter: " << mesh_h(msh) << std::endl;
+
+        if (method == "hho")
+            hho_solver(lua, msh);
+        else if (method == "hho_eigs")
+            eigval_solver(lua, msh);
+    }
     
     return 0;
 }

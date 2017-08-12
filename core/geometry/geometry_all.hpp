@@ -116,6 +116,31 @@ diameter(const Mesh& msh, const Element& elem)
     return diam;
 }
 
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+bool
+is_inside(const Mesh<T, 2>& msh,
+          const typename Mesh<T, 2>::cell& cl,
+          const typename Mesh<T, 2>::point_type& pt)
+{
+    /* Nodes MUST be ordered COUNTERCLOCKWISE */
+    auto pts = points(msh, cl);
+
+    for (size_t i = 0; i < pts.size(); i++)
+    {
+        p0 = pts[i];
+        p1 = pts[i%pts.size()];
+
+        auto x = pt.x();  auto y = pt.y();
+        auto x0 = p0.x(); auto y0 = p0.y();
+        auto x1 = p1.x(); auto y1 = p1.y();
+
+        if ( (y - y0)*(x1 - x0) - (x - x0)*(y1 - y0) < 0.0 )
+            return false;
+    }
+
+    return true;
+}
+
 template<template<typename, size_t, typename> class Mesh,
          typename T, typename Storage>
 static_vector<T, 2>

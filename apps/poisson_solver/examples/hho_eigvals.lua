@@ -7,7 +7,7 @@ config.eigval_output = "eigs_hho.txt"
 --config.stabilization_weight = 2*config.degree + 3
 
 --Dump only stiffness and mass matrices, don't start eigenval solver (only hho)
---config.dump_only = true
+--config.only_dump = true
 
 -- Solver config for eigenvalue problems
 solver.feast.verbose = true         -- Print solver logs
