@@ -693,6 +693,47 @@ dump_to_matlab(const Mesh<T, 2, Storage>& msh, const std::string& filename)
     ofs.close();
 }
 
+template<typename Mesh>
+class connectivity
+{
+    typedef Mesh                        mesh_type;
+    typedef typename mesh_type::cell    cell_type;
+    typedef typename mesh_type::face    face_type;
+
+    std::vector< std::set<cell_type> >      face_cell_connectivity;
+
+    Mesh m_msh;
+
+public:
+    connectivity(const Mesh& msh) : m_msh(msh)
+    {
+        face_cell_connectivity.resize( msh.faces_size() );
+
+        size_t cell_i = 0;
+        for (auto& cl : msh)
+        {
+            auto fcs = faces(msh, cl);
+            for (auto fc : fcs)
+            {
+                auto face_id = msh.lookup(fc);
+                face_cell_connectivity.at(face_id).insert(cl);
+            }
+        }
+    }
+
+    std::set<cell_type>
+    connected_cells(const face_type& fc)
+    {
+        auto face_id = m_msh.lookup(fc);
+        return face_cell_connectivity.at(face_id);
+    }
+};
+
+template<typename Mesh>
+auto make_connectivity(const Mesh& msh)
+{
+    return connectivity<Mesh>(msh);
+}
 
 template<typename Mesh>
 class bounding_box

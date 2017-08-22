@@ -718,7 +718,7 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
     size_t testpoints = lua["test_points"].get_or(3);
 
 
-    auto basis = make_scaled_monomial_scalar_basis(msh, k_outer-1, k_outer);
+    auto basis = make_scaled_monomial_scalar_basis(msh, k_outer, k_outer);
     auto ccb = basis.first;
     auto cfb = basis.second;
 
@@ -778,6 +778,7 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
         std::cout.flush();
 
         disk::gradient_reconstruction_multiscale<mesh_type, decltype(ccb), decltype(cfb)> gradrec(msh, cl, mlb, ccb, cfb);
+        disk::stabilization_multiscale<mesh_type, decltype(ccb), decltype(cfb)> stab(msh, cl, mlb, ccb, cfb, gradrec.oper);
         gr_opers.push_back( gradrec.oper );
         gr_datas.push_back( gradrec.data );
         std::cout << "GR ";
@@ -814,7 +815,9 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
             }
         }
 
-        auto sc = do_static_condensation(gradrec.data, cdofs, num_cell_dofs);
+        dynamic_matrix<scalar_type> lc = gradrec.data + stab.data;
+
+        auto sc = do_static_condensation(lc, cdofs, num_cell_dofs);
 
         size_t dsz = sc.first.rows();
         for (size_t i = 0; i < dsz; i++)
@@ -1113,6 +1116,8 @@ void run_multiscale_tests(sol::state& lua)
     levels[4] = lua["levels4"].get_or(4);
     levels[5] = lua["levels5"].get_or(4);
     levels[6] = lua["levels6"].get_or(4);
+    levels[7] = lua["levels7"].get_or(4);
+    levels[8] = lua["levels8"].get_or(4);
 
     if ( lua["do0"].get_or(0) )
         test_full_problem_error(lua, *(hierarchy.meshes_begin()+0), levels[0], hierarchy, monoscale_solution);
@@ -1134,17 +1139,13 @@ void run_multiscale_tests(sol::state& lua)
         
     if ( lua["do6"].get_or(0) )
         test_full_problem_error(lua, *(hierarchy.meshes_begin()+6), levels[6], hierarchy, monoscale_solution);
-    
-    //if ( lua["do5"].get_or(0) )
-    //    test_full_problem_error(lua, *(hierarchy.meshes_begin()+5), levels[5], hierarchy, monoscale_solution);
 
-    //test_full_problem_error(lua, *(hierarchy.meshes_begin()+0), 6, hierarchy, monoscale_solution);
-    //test_full_problem_error(lua, *(hierarchy.meshes_begin()+1), 5, hierarchy, monoscale_solution);
-    //test_full_problem_error(lua, *(hierarchy.meshes_begin()+2), 4, hierarchy, monoscale_solution);
-    //test_full_problem_error(lua, *(hierarchy.meshes_begin()+3), 4, hierarchy, monoscale_solution);
-    //test_full_problem_error(lua, *(hierarchy.meshes_begin()+4), 4, hierarchy, monoscale_solution);
-    //test_full_problem_error(lua, *(hierarchy.meshes_begin()+5), 3, hierarchy, monoscale_solution);
-    //test_full_problem_error(lua, *(hierarchy.meshes_begin()+6), 2, hierarchy, monoscale_solution);
+    if ( lua["do7"].get_or(0) )
+        test_full_problem_error(lua, *(hierarchy.meshes_begin()+7), levels[7], hierarchy, monoscale_solution);
+        
+    if ( lua["do8"].get_or(0) )
+        test_full_problem_error(lua, *(hierarchy.meshes_begin()+8), levels[8], hierarchy, monoscale_solution);
+    
 
 
 }

@@ -908,6 +908,154 @@ public:
 
 
 
+template<typename Mesh, typename OuterCellBasis, typename OuterFaceBasis>
+class stabilization_multiscale
+{
+    typedef Mesh                                                mesh_type;
+    typedef typename mesh_type::scalar_type                     scalar_type;
+    typedef typename mesh_type::cell                            cell_type;
+    typedef typename mesh_type::face                            face_type;
+    typedef OuterCellBasis                                      cell_basis_type;
+    typedef OuterFaceBasis                                      face_basis_type;
+    typedef quadrature<mesh_type, cell_type>                    cell_quad_type;
+    typedef quadrature<mesh_type, face_type>                    face_quad_type;
+    typedef dynamic_matrix<scalar_type>                         matrix_type;
+    typedef dynamic_vector<scalar_type>                         vector_type;
+
+    typedef multiscale_local_basis<mesh_type>                   multiscale_basis_type;
+
+    typedef typename multiscale_basis_type::inner_mesh_type     ms_inner_mesh_type;
+    typedef typename multiscale_basis_type::inner_cell_type     ms_inner_cell_type;
+
+    multiscale_basis_type&                  multiscale_basis;
+    cell_basis_type&                        cell_basis;
+    face_basis_type&                        face_basis;
+
+public:
+    matrix_type     oper;
+    matrix_type     data;
+    matrix_type     stiff_mat;
+
+    stabilization_multiscale(const mesh_type& outer_mesh,
+                             const typename mesh_type::cell& outer_cl,
+                             multiscale_basis_type& mb,
+                             cell_basis_type& cb,
+                             face_basis_type& fb,
+                             dynamic_matrix<typename mesh_type::scalar_type> &gradrec)
+        : multiscale_basis(mb), cell_basis(cb), face_basis(fb)
+    {
+        auto inner_mesh = multiscale_basis.inner_mesh();
+        auto ms_basis_size = multiscale_basis.size();
+
+        typedef quadrature<ms_inner_mesh_type, ms_inner_cell_type> ms_quad_cell_type;
+        ms_quad_cell_type ms_cell_quad(2*multiscale_basis.degree()+2);
+        auto quadpair = make_quadrature(inner_mesh, 2*cb.degree()+2,
+                                             2*fb.degree()+2);
+
+        auto bid_list = inner_mesh.boundary_id_list();
+        assert( bid_list.size() == howmany_faces(outer_mesh, outer_cl) );
+
+
+        auto num_cell_dofs = cb.size();
+        auto num_face_dofs = fb.size();
+        dynamic_matrix<scalar_type> Mtt = dynamic_matrix<scalar_type>::Zero(num_cell_dofs, num_cell_dofs);
+        dynamic_matrix<scalar_type> It = dynamic_matrix<scalar_type>::Identity(num_cell_dofs, num_cell_dofs);
+
+        auto cell_quadpoints = quadpair.first.integrate(outer_mesh, outer_cl);
+        for (auto& qp : cell_quadpoints)
+        {
+            vector_type vt_phi = cb.eval_functions(outer_mesh, outer_cl, qp.point());
+            Mtt += qp.weight() * vt_phi * vt_phi.transpose();
+        }
+
+        dynamic_matrix<scalar_type> Mf2c = dynamic_matrix<scalar_type>::Zero(num_cell_dofs, ms_basis_size);
+        for (auto& icl : inner_mesh)
+        {
+            auto cell_quadpoints = ms_cell_quad.integrate(inner_mesh, icl);
+            for (auto& qp : cell_quadpoints)
+            {
+                vector_type vt_phi = cb.eval_functions(outer_mesh, outer_cl, qp.point());
+                vector_type ms_phi = multiscale_basis.eval_functions(icl, qp.point());
+                Mf2c += qp.weight() * vt_phi * ms_phi.transpose();
+            }
+        }
+
+        auto fact_Mtt = Mtt.ldlt();
+        auto R = gradrec.block(0, 0, gradrec.rows()-1, gradrec.cols());
+        dynamic_matrix<scalar_type> P1 = fact_Mtt.solve(Mf2c*R);
+        P1.block(0, 0, num_cell_dofs, num_cell_dofs) -= It;
+
+
+        auto fcs = faces(outer_mesh, outer_cl);
+        auto num_dofs = num_cell_dofs + fcs.size() * num_face_dofs;
+        data = dynamic_matrix<scalar_type>::Zero(num_dofs, num_dofs);
+        size_t face_i = 0;
+        for (auto& fc : fcs)
+        {
+            auto hf = measure(outer_mesh, fc);
+
+            dynamic_matrix<scalar_type> Mff = dynamic_matrix<scalar_type>::Zero(num_face_dofs, num_face_dofs);
+            dynamic_matrix<scalar_type> Mft = dynamic_matrix<scalar_type>::Zero(num_face_dofs, num_cell_dofs);
+            auto face_quadpoints = quadpair.second.integrate(outer_mesh, fc);
+            for (auto& qp : face_quadpoints)
+            {
+                vector_type vt_phi = cb.eval_functions(outer_mesh, outer_cl, qp.point());
+                vector_type vf_phi = fb.eval_functions(outer_mesh, fc, qp.point());
+                Mft += qp.weight() * vf_phi * vt_phi.transpose();
+                Mff += qp.weight() * vf_phi * vf_phi.transpose();
+            }
+
+            auto fact_Mff = Mff.ldlt();
+
+            dynamic_matrix<scalar_type> P2 = fact_Mff.solve(Mft * P1);
+
+            data += (1./hf) * P2.transpose() * Mff * P2;
+
+            face_i++;
+        }
+
+#if 0
+        dynamic_matrix<scalar_type> Mf2c = 
+            dynamic_matrix<scalar_type>::Zero(cb.size(), multiscale_basis.size());
+
+        for (auto& icl : inner_mesh)
+        {
+            if ( !has_faces_on_boundary(inner_mesh, icl) )
+                continue;
+            
+            auto fcs = faces(inner_mesh, icl);
+            auto num_faces = fcs.size();
+
+            for (size_t face_i = 0; face_i < num_faces; face_i++)
+            {
+                auto fc = fcs[face_i];
+                if ( !inner_mesh.is_boundary(fc) )
+                    continue;
+
+                size_t bnd_id = inner_mesh.boundary_id(fc);
+
+                /* since the boundary id on the fine mesh is inherited from the face
+                 * id on the coarse mesh, we use it to recover the coarse face */
+                auto outer_fc = *std::next(outer_mesh.faces_begin(), bnd_id);
+                size_t outer_face_num = local_face_num(outer_mesh, outer_cl, outer_fc);
+                assert (outer_face_num < howmany_faces(outer_mesh, outer_cl));
+                
+                //std::cout << outer_fc << " " << fc << " -> " << outer_face_num << std::endl;
+                auto face_quadpoints = quadpair.second.integrate(inner_mesh, fc);
+                for (auto& qp : face_quadpoints)
+                {
+                    matrix_type ms_phi = multiscale_basis.eval_functions(icl, qp.point());
+                    vector_type vt_phi = cb.eval_functions(outer_mesh, outer_cl, qp.point());
+                    Mf2c += vt_phi * ms_phi.transpose();
+                }
+            }
+        }
+#endif
+    }
+};
+
+
+
 
 
 

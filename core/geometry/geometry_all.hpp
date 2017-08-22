@@ -118,17 +118,17 @@ diameter(const Mesh& msh, const Element& elem)
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 bool
-is_inside(const Mesh<T, 2>& msh,
-          const typename Mesh<T, 2>::cell& cl,
-          const typename Mesh<T, 2>::point_type& pt)
+is_inside(const Mesh<T, 2, Storage>& msh,
+          const typename Mesh<T, 2, Storage>::cell& cl,
+          const typename Mesh<T, 2, Storage>::point_type& pt)
 {
-    /* Nodes MUST be ordered COUNTERCLOCKWISE */
+    /* Nodes MUST be ordered COUNTERCLOCKWISE and the polygon must be CONVEX */
     auto pts = points(msh, cl);
 
     for (size_t i = 0; i < pts.size(); i++)
     {
-        p0 = pts[i];
-        p1 = pts[i%pts.size()];
+        auto p0 = pts[i];
+        auto p1 = pts[i%pts.size()];
 
         auto x = pt.x();  auto y = pt.y();
         auto x0 = p0.x(); auto y0 = p0.y();
@@ -140,6 +140,20 @@ is_inside(const Mesh<T, 2>& msh,
 
     return true;
 }
+
+template<typename Mesh>
+bool
+has_faces_on_boundary(const Mesh& msh, const typename Mesh::cell& cl)
+{
+    auto fcs = faces(msh, cl);
+    bool has_bnd = false;
+    for (auto& fc : fcs)
+        if ( msh.is_boundary(fc) )
+            has_bnd = true;
+
+    return has_bnd;
+}
+
 
 template<template<typename, size_t, typename> class Mesh,
          typename T, typename Storage>
