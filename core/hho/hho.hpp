@@ -1434,7 +1434,7 @@ public:
             {
                 if (l2g[j] == 0xDEADBEEF)
                     continue;
-                
+
                 m_triplets.push_back( triplet_type( l2g.at(i), l2g.at(j), lc.first(i,j) ) );
             }
             rhs(l2g.at(i)) += lc.second(i);

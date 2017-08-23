@@ -442,9 +442,9 @@ public:
 
         auto pts = points(msh, fc);
         auto bar = barycenter(msh, fc);
-        auto h = diameter(msh, fc);
-        auto v = (pts[1] - pts[0]).to_vector();
-        auto t = (pt - bar).to_vector()/h;
+        auto h = (pts[1] - pts[0]).to_vector().norm()/2.0;
+        auto v = (bar - pts[0]).to_vector();
+        auto t = (pt - bar).to_vector();
         T dot = v.dot(t);
         auto ep = point<T, 1>({dot/(h*h)});
 

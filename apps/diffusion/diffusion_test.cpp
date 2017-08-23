@@ -555,16 +555,16 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-    /*
+
     std::cout << bold << underline << "Triangles specialized" << reset << std::endl;
     test_triangles_specialized(tt);
 
     std::cout << bold << underline << "Triangles generic" << reset << std::endl;
     test_triangles_generic(tt);
-    */
+
     std::cout << bold << underline << "Hexagons" << reset << std::endl;
     test_hexagons_generic(tt);
-    /*
+
     std::cout << bold << underline << "Kershaw 2D" << reset << std::endl;
     test_kershaw_2d(tt);
 
@@ -585,6 +585,5 @@ int main(int argc, char **argv)
 
     std::cout << bold << underline << "Hextri generic" << reset << std::endl;
     test_hextri_generic(tt);
-    */
 
 }
