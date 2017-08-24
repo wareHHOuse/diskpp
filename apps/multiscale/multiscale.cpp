@@ -778,7 +778,7 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
         std::cout.flush();
 
         disk::gradient_reconstruction_multiscale<mesh_type, decltype(ccb), decltype(cfb)> gradrec(msh, cl, mlb, ccb, cfb);
-        disk::stabilization_multiscale<mesh_type, decltype(ccb), decltype(cfb)> stab(msh, cl, mlb, ccb, cfb, gradrec.oper);
+        //disk::stabilization_multiscale<mesh_type, decltype(ccb), decltype(cfb)> stab(msh, cl, mlb, ccb, cfb, gradrec.oper);
         gr_opers.push_back( gradrec.oper );
         gr_datas.push_back( gradrec.data );
         std::cout << "GR ";
@@ -815,7 +815,7 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
             }
         }
 
-        dynamic_matrix<scalar_type> lc = gradrec.data + stab.data;
+        dynamic_matrix<scalar_type> lc = gradrec.data;// + stab.data;
 
         auto sc = do_static_condensation(lc, cdofs, num_cell_dofs);
 

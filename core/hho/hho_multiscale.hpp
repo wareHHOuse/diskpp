@@ -303,6 +303,9 @@ public:
                 //std::cout << "Coarse face basis: " << phi_coarse.transpose() << std::endl;
             }
 
+            auto factff = ff.llt();
+            auto fm2 = factff.solve(face_matrix);
+
             auto mult_offset = matrix_mult_offset + coarse_cell_face_num * num_face_funcs;
             auto rhs_offset = num_cell_funcs + coarse_cell_face_num * num_face_funcs;
 
@@ -313,8 +316,8 @@ public:
                     size_t row = face_offset + j;
                     size_t col = mult_offset + k;
 
-                    triplets.push_back( triplet_type(row, col, -face_matrix(j,k)) );
-                    triplets.push_back( triplet_type(col, row, face_matrix(j,k)) );
+                    triplets.push_back( triplet_type(row, col, -fm2(j,k)) );
+                    triplets.push_back( triplet_type(col, row, fm2(j,k)) );
                 }
             }
 
