@@ -272,10 +272,10 @@ public:
             assert (coarse_cell_face_num < howmany_faces(outer_msh, outer_cl));
             //std::cout << coarse_fc << " " << fc << " (->) " << coarse_cell_face_num << std::endl;
 
-            matrix_type face_matrix, ff;
+            matrix_type face_matrix, ff;//, inner_face_mass;
             face_matrix = matrix_type::Zero(num_face_dofs, num_face_funcs);
             ff = matrix_type::Zero(num_face_funcs, num_face_funcs);
-
+            //inner_face_mass = matrix_type::Zero(num_face_dofs, num_face_dofs);
             //std::cout << " INT " << std::endl;
             auto face_quadpoints = bqd.face_quadrature.integrate(m_inner_mesh, fc);
             //auto face_quadpoints = quadpair.second.integrate(msh, fc);
@@ -285,6 +285,7 @@ public:
                 auto phi = bqd.face_basis.eval_functions(m_inner_mesh, fc, qp.point());
                 auto phi_coarse = outer_face_basis.eval_functions(outer_msh, coarse_fc, qp.point());
                 face_matrix += qp.weight() * phi * phi_coarse.transpose();
+                //inner_face_mass += qp.weight() * phi * phi.transpose();
                 //std::cout << "Fine face basis:   " << phi.transpose() << std::endl;
                 //std::cout << "Coarse face basis: " << phi_coarse.transpose() << std::endl;
             }
@@ -303,8 +304,9 @@ public:
                 //std::cout << "Coarse face basis: " << phi_coarse.transpose() << std::endl;
             }
 
-            auto factff = ff.llt();
-            auto fm2 = factff.solve(face_matrix);
+            auto fact_ff = ff.llt();
+            matrix_type fm2 = fact_ff.solve(face_matrix.transpose()).transpose();
+
 
             auto mult_offset = matrix_mult_offset + coarse_cell_face_num * num_face_funcs;
             auto rhs_offset = num_cell_funcs + coarse_cell_face_num * num_face_funcs;
@@ -335,6 +337,7 @@ public:
         tc.tic();
 #ifdef HAVE_INTEL_MKL
         Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
+        solver.pardisoParameterArray()[59] = 0;
 #else
         Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
 #endif
