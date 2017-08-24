@@ -337,7 +337,7 @@ public:
         tc.tic();
 #ifdef HAVE_INTEL_MKL
         Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
-        solver.pardisoParameterArray()[59] = 0;
+        //solver.pardisoParameterArray()[59] = 0;
 #else
         Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
 #endif

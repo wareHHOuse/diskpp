@@ -718,7 +718,7 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
     size_t testpoints = lua["test_points"].get_or(3);
 
 
-    auto basis = make_scaled_monomial_scalar_basis(msh, k_outer, k_outer);
+    auto basis = make_scaled_monomial_scalar_basis(msh, k_outer-1, k_outer);
     auto ccb = basis.first;
     auto cfb = basis.second;
 
@@ -849,7 +849,7 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
 
 #ifdef HAVE_INTEL_MKL
     Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
-    solver.pardisoParameterArray()[59] = 0;
+    //solver.pardisoParameterArray()[59] = 0;
 #else
     Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
 #endif
@@ -1108,7 +1108,7 @@ void run_multiscale_tests(sol::state& lua)
 
     std::cout <<"done" << std::endl;
 
-    std::array<size_t, 7> levels;
+    std::array<size_t, 10> levels;
 
     levels[0] = lua["levels0"].get_or(4);
     levels[1] = lua["levels1"].get_or(4);
