@@ -128,7 +128,7 @@ void test_gradient_reconstruction(sol::state& lua, const Mesh& msh)
 
     std::cout << k_outer << " " << k_inner << " " << rl << std::endl;
 
-    auto basis = make_scaled_monomial_scalar_basis(msh, k_outer-1, k_outer);
+    auto basis = make_scaled_monomial_scalar_basis(msh, k_outer, k_outer);
     auto ccb = basis.first;
     auto cfb = basis.second;
 
@@ -718,7 +718,7 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
     size_t testpoints = lua["test_points"].get_or(3);
 
 
-    auto basis = make_scaled_monomial_scalar_basis(msh, k_outer-1, k_outer);
+    auto basis = make_scaled_monomial_scalar_basis(msh, k_outer, k_outer);
     auto ccb = basis.first;
     auto cfb = basis.second;
 
@@ -778,7 +778,7 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
         std::cout.flush();
 
         disk::gradient_reconstruction_multiscale<mesh_type, decltype(ccb), decltype(cfb)> gradrec(msh, cl, mlb, ccb, cfb);
-        //disk::stabilization_multiscale<mesh_type, decltype(ccb), decltype(cfb)> stab(msh, cl, mlb, ccb, cfb, gradrec.oper);
+        disk::stabilization_multiscale<mesh_type, decltype(ccb), decltype(cfb)> stab(msh, cl, mlb, ccb, cfb, gradrec.oper);
         gr_opers.push_back( gradrec.oper );
         gr_datas.push_back( gradrec.data );
         std::cout << "GR ";
@@ -815,7 +815,7 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
             }
         }
 
-        dynamic_matrix<scalar_type> lc = gradrec.data;// + stab.data;
+        dynamic_matrix<scalar_type> lc = gradrec.data + stab.data;
 
         auto sc = do_static_condensation(lc, cdofs, num_cell_dofs);
 

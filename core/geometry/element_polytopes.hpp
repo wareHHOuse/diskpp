@@ -149,7 +149,8 @@ template<size_t DIM, size_t CODIM, typename UserData, typename StoragePolicy>
 class polytope;
 
 template<size_t DIM, size_t CODIM, typename UserData, size_t N>
-class polytope<DIM, CODIM, UserData, fixed_storage_polytope<N>> : public element_info<CODIM, UserData>
+class polytope<DIM, CODIM, UserData, fixed_storage_polytope<N>>
+    : public element_info<CODIM, UserData>
 {
     std::array<point_id_type, N>    m_pts;
 
@@ -189,7 +190,8 @@ public:
 };
 
 template<size_t DIM, size_t CODIM, typename UserData, size_t N>
-class polytope<DIM, CODIM, UserData, limited_storage_polytope<N>> : public priv::element_info<CODIM, UserData>
+class polytope<DIM, CODIM, UserData, limited_storage_polytope<N>>
+    : public priv::element_info<CODIM, UserData>
 {
     std::array<point_id_type, N>    m_pts;
     size_t                          m_actual_pts;
@@ -234,6 +236,54 @@ public:
     }
 };
 
+template<size_t DIM, size_t CODIM, typename UserData>
+class polytope<DIM, CODIM, UserData, dynamic_storage_polytope>
+    : public priv::element_info<CODIM, UserData>
+{
+    std::vector<point_id_type>      m_pts;
+
+public:
+    polytope()
+    {}
+
+    polytope(std::initializer_list<point_id_type> l)
+    {
+        assert(l.size() >= 3);
+        m_pts.resize(l.size());
+        std::copy(l.begin(), l.end(), m_pts.begin());
+    }
+
+    template<typename Iterator>
+    polytope(Iterator begin, Iterator end)
+        : m_pts(begin, end)
+    {
+    }
+
+    /* Userdata-changing constructor */
+    template<typename OtherUD>
+    explicit polytope(const polytope<DIM, CODIM, OtherUD, dynamic_storage_polytope>& other)
+    {
+        priv::copy_element_info(other, *this);
+        m_pts = other.point_identifiers();
+    }
+
+    std::vector<point_id_type>
+    point_identifiers() const
+    {
+        return m_pts;
+    }
+
+    bool operator<(const polytope& other)
+    {
+        return (m_pts < other.m_pts);
+    }
+
+    bool operator==(const polytope& other)
+    {
+        return (m_pts == other.m_pts);
+    }
+};
+
 } // namespace priv
 
 
@@ -263,7 +313,7 @@ std::ostream& operator<<(std::ostream& os, const priv::polytope<DIM, CODIM, User
         case 2: os << "surface<" << CODIM << ">: "; break;
         case 3: os << "volume<" << CODIM << ">: "; break;
     }
-    
+
     auto ptids = s.point_identifiers();
     for (auto& ptid : ptids)
         os << ptid << " ";

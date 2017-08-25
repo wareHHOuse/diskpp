@@ -276,14 +276,74 @@ public:
     }
 };
 
+#if 0
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class cell_basis<Mesh<T,2,Storage>>
+{
+    typedef Mesh                                mesh_type;
+    typedef typename mesh_type::cell_type       cell_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef typename mesh_type::scalar_type     scalar_type;
+
+    point_type                      bar;
+    scalar_type                     h, invh;
+    
+    std::shared_ptr<monomial_generator<2>>    monomials;
+
+public:
+    basis(std::shared_ptr<monomial_generator<2>> mg, const Mesh& msh, const Mesh::cell_type& cl)
+        : monomials(mg)
+    {
+        bar     = barycenter(msh, cl);
+        h       = diameter(msh, cl)/2.0;
+        invh    = 1./h;
+    }
+
+    dynamic_vector<scalar_type>
+    eval_functions(const point_type& pt) const
+    {
+        dynamic_vector<scalar_type> ret;
+        ret.resize( monomials->size(), 1 );
+
+        auto eval_point = (pt - bar)*invh;
+
+        size_t i = 0;
+        auto begin = monomials->begin();
+        auto end = monomials->end();
+        for (auto itor = begin; itor != end; itor++)
+        {
+            auto m = *itor;
+
+            auto vx = iexp_pow(eval_point.x(), m[0]);
+            auto vy = iexp_pow(eval_point.y(), m[1]);
+
+            ret(i++) = vx * vy;
+        }
+
+        return ret;
+    }
+}
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class hho_space<Mesh<T,2,Storage>>
+{
+    typedef Mesh<T,2,Storage>       mesh_type;
+
+    monomial_generator<2>           cell_mg;
+    monomial_generator<1>           face_mg;
+
+public:
+    hho_space(const mesh_type& msh, size_t degree)
+        : cell_mg(degree), face_mg(degree)
+    {}
+
+    hho_space(const mesh_type& msh, size_t cell_degree, size_t face_degree)
+        : cell_mg(cell_degree), face_mg(face_degree)
+    {}
+};
 
 
-
-
-
-
-
-
+#endif
 
 
 
