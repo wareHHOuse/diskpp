@@ -29,28 +29,26 @@
 
 namespace disk {
 
-struct storage_class_simplicial;
-
 template<size_t DIM>
-struct storage_class_trait<storage_class_simplicial, DIM> {
+struct simplicial_storage_class {
     static_assert(DIM > 0 && DIM <= 3, "element_types: CODIM must be less than DIM");
 };
 
 template<>
-struct storage_class_trait<storage_class_simplicial, 1> {
+struct simplicial_storage_class<1> {
     typedef simplicial_element<1,0>    edge_type;
     typedef simplicial_element<1,1>    node_type;
 };
 
 template<>
-struct storage_class_trait<storage_class_simplicial, 2> {
+struct simplicial_storage_class<2> {
     typedef simplicial_element<2,0>    surface_type;
     typedef simplicial_element<2,1>    edge_type;
     typedef simplicial_element<2,2>    node_type;
 };
 
 template<>
-struct storage_class_trait<storage_class_simplicial, 3> {
+struct simplicial_storage_class<3> {
     typedef simplicial_element<3,0>    volume_type;
     typedef simplicial_element<3,1>    surface_type;
     typedef simplicial_element<3,2>    edge_type;
@@ -58,7 +56,7 @@ struct storage_class_trait<storage_class_simplicial, 3> {
 };
 
 template<typename T, size_t DIM>
-using simplicial_mesh_storage = mesh_storage<T, DIM, storage_class_simplicial>;
+using simplicial_mesh_storage = mesh_storage<T, DIM, simplicial_storage_class<DIM>>;
 
 template<typename T, size_t DIM>
 using simplicial_mesh = mesh<T, DIM, simplicial_mesh_storage<T, DIM>>;

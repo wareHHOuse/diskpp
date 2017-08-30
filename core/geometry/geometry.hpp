@@ -18,16 +18,6 @@
 
 #define _GEOMETRY_HPP_WAS_INCLUDED_
 
-namespace disk {
-
-template<typename T, size_t DIM>
-struct storage_class_trait
-{
-    static_assert(sizeof(T) == -1, "Undefined storage class");
-};
-
-}
-
 #include "mesh/mesh.hpp"
 
 #include "geometry_all.hpp"

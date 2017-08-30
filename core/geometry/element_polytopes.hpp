@@ -20,7 +20,7 @@
 #include <cassert>
 #include <type_traits>
 
-//#include "core/mesh/point.hpp"
+#include "core/mesh/ident.hpp"
 
 typedef size_t  domain_id_type;
 typedef size_t  boundary_id_type;
@@ -124,8 +124,9 @@ template<typename UserDataS, typename UserDataD>
 void
 copy_element_info(const element_info<1, UserDataS>& src, element_info<1, UserDataD>& dst)
 {
-    dst.boundary_id( src.boundary_id() );
-    dst.is_boundary( src.is_boundary() );
+    auto bi = src.boundary_id();
+    dst.boundary_id( bi.first );
+    dst.is_boundary( bi.second );
 }
 
 template<size_t CODIM, typename UserDataS, typename UserDataD>
@@ -143,6 +144,12 @@ struct limited_storage_polytope;
 
 struct dynamic_storage_polytope;    /* Tag to identify fully dynamic storage polytopes */
 
+enum class node_ordering
+{
+    UNSORTED,
+    SORTED
+};
+
 namespace priv {
 
 template<size_t DIM, size_t CODIM, typename UserData, typename StoragePolicy>
@@ -154,15 +161,70 @@ class polytope<DIM, CODIM, UserData, fixed_storage_polytope<N>>
 {
     std::array<point_id_type, N>    m_pts;
 
+    struct dom_constructor_sfinae_dummy;
+    struct bnd_constructor_sfinae_dummy;
+
 public:
+
+    typedef identifier<polytope, ident_impl_t, 0> id_type;
+
     polytope()
     {}
 
-    polytope(std::initializer_list<point_id_type> l)
+    polytope(std::initializer_list<point_id_type> l,
+             node_ordering no = node_ordering::UNSORTED)
     {
         assert(l.size() == N);
         std::copy(l.begin(), l.end(), m_pts.begin());
+
+        if (no == node_ordering::SORTED)
+            std::sort(m_pts.begin(), m_pts.end());
     }
+
+    template <typename DIT = domain_id_type> 
+    polytope(std::initializer_list<point_id_type> l,
+             typename std::enable_if<CODIM == 0, DIT>::type d_id,
+             node_ordering no = node_ordering::UNSORTED,
+             dom_constructor_sfinae_dummy *dummy = nullptr)
+    {
+        assert(l.size() == N);
+        std::copy(l.begin(), l.end(), m_pts.begin());
+
+        if (no == node_ordering::SORTED)
+            std::sort(m_pts.begin(), m_pts.end());
+
+        this->domain_id(d_id);
+    } 
+
+    template <typename BIT = boundary_id_type> 
+    polytope(std::initializer_list<point_id_type> l,
+             typename std::enable_if<CODIM == 1, BIT>::type b_id,
+             node_ordering no = node_ordering::UNSORTED,
+             bnd_constructor_sfinae_dummy *dummy = nullptr)
+    {
+        assert(l.size() == N);
+        std::copy(l.begin(), l.end(), m_pts.begin());
+
+        if (no == node_ordering::SORTED)
+            std::sort(m_pts.begin(), m_pts.end());
+
+        this->boundary_id(b_id);
+    }
+
+    template <typename BIT = std::pair<boundary_id_type, bool>> 
+    polytope(std::initializer_list<point_id_type> l,
+             typename std::enable_if<CODIM == 1, BIT>::type b_id,
+             node_ordering no = node_ordering::UNSORTED)
+    {
+        assert(l.size() == N);
+        std::copy(l.begin(), l.end(), m_pts.begin());
+
+        if (no == node_ordering::SORTED)
+            std::sort(m_pts.begin(), m_pts.end());
+
+        if (b_id.second)
+            this->boundary_id(b_id.first);
+    } 
 
     /* Userdata-changing constructor */
     template<typename OtherUD>
@@ -178,12 +240,12 @@ public:
         return m_pts;
     }
 
-    bool operator<(const polytope& other)
+    bool operator<(const polytope& other) const
     {
         return (m_pts < other.m_pts);
     }
 
-    bool operator==(const polytope& other)
+    bool operator==(const polytope& other) const
     {
         return (m_pts == other.m_pts);
     }
@@ -207,6 +269,7 @@ public:
         m_actual_pts = l.size();
     }
 
+
     /* Userdata-changing constructor */
     template<typename OtherUD>
     explicit polytope(const polytope<DIM, CODIM, OtherUD, limited_storage_polytope<N>>& other)
@@ -225,12 +288,12 @@ public:
         return std::vector<point_id_type>(m_pts.begin(), m_pts.begin() + m_actual_pts);
     }
 
-    bool operator<(const polytope& other)
+    bool operator<(const polytope& other) const
     {
         return (m_pts < other.m_pts);
     }
 
-    bool operator==(const polytope& other)
+    bool operator==(const polytope& other) const
     {
         return (m_pts == other.m_pts);
     }
@@ -273,18 +336,65 @@ public:
         return m_pts;
     }
 
-    bool operator<(const polytope& other)
+    bool operator<(const polytope& other) const
     {
         return (m_pts < other.m_pts);
     }
 
-    bool operator==(const polytope& other)
+    bool operator==(const polytope& other) const
     {
         return (m_pts == other.m_pts);
     }
 };
 
 } // namespace priv
+
+template<size_t DIM, size_t CODIM, typename UD_Src, typename UD_Dst, typename SP_Src, typename SP_Dst>
+priv::polytope<DIM, CODIM, UD_Dst, SP_Dst>
+polytope_cast(const priv::polytope<DIM, CODIM, UD_Src, SP_Src>& p)
+{
+    typedef priv::polytope<DIM, CODIM, UD_Dst, SP_Dst> return_type;
+    return return_type(p);
+}
+
+template<typename>
+struct polytope_traits;
+
+template<size_t DIM, size_t CODIM, typename UserData, size_t N>
+struct polytope_traits< priv::polytope<DIM, CODIM, UserData, fixed_storage_polytope<N>> >
+{
+    static const bool       is_fixed_storage = true;
+    static const bool       is_limited_storage = false;
+    static const bool       is_dynamic_storage = false;
+    static const size_t     storage_size = N;
+};
+
+template<size_t DIM, size_t CODIM, typename UserData, size_t N>
+struct polytope_traits< priv::polytope<DIM, CODIM, UserData, limited_storage_polytope<N>> >
+{
+    static const bool       is_fixed_storage = false;
+    static const bool       is_limited_storage = true;
+    static const bool       is_dynamic_storage = false;
+    static const size_t     storage_size = N;
+};
+
+template<size_t DIM, size_t CODIM, typename UserData>
+struct polytope_traits< priv::polytope<DIM, CODIM, UserData, dynamic_storage_polytope> >
+{
+    static const bool       is_fixed_storage = false;
+    static const bool       is_limited_storage = false;
+    static const bool       is_dynamic_storage = true;
+};
+
+template<typename>
+struct is_fixed_storage
+    : public std::false_type
+{};
+
+template<size_t DIM, size_t CODIM, typename UserData, size_t N>
+struct is_fixed_storage< priv::polytope<DIM, CODIM, UserData, fixed_storage_polytope<N>> >
+    : public std::true_type
+{};
 
 
 /**
@@ -300,6 +410,9 @@ using edge = priv::polytope<1, CODIM, UserData, fixed_storage_polytope<2>>;
 
 template<size_t CODIM, typename UserData, typename StoragePolicy>
 using surface = priv::polytope<2, CODIM, UserData, StoragePolicy>;
+
+template<size_t DIM, size_t CODIM, typename UserData, typename StoragePolicy>
+using polytope = priv::polytope<DIM, CODIM, UserData, StoragePolicy>;
 
 
 /******************************************************************************/
@@ -323,11 +436,18 @@ std::ostream& operator<<(std::ostream& os, const priv::polytope<DIM, CODIM, User
     
     return os;    
 }
-/*
-template<typename UserData, typename StorageScheme>
-std::ostream& operator<<(std::ostream& os, const surface<1, UserData, StorageScheme>& s)
+
+template<size_t DIM, typename UserData, typename StorageScheme>
+std::ostream& operator<<(std::ostream& os, const priv::polytope<DIM, 1, UserData, StorageScheme>& s)
 {
-    os << "surface<" << 1 << ">: ";
+    switch(DIM)
+    {
+        case 0: os << "node<1>: "; break;
+        case 1: os << "edge<1>: "; break;
+        case 2: os << "surface<1>: "; break;
+        case 3: os << "volume<1>: "; break;
+    }
+
     auto ptids = s.point_identifiers();
     for (auto& ptid : ptids)
         os << ptid << " ";
@@ -344,10 +464,17 @@ std::ostream& operator<<(std::ostream& os, const surface<1, UserData, StorageSch
     return os;    
 }
 
-template<typename UserData, typename StorageScheme>
-std::ostream& operator<<(std::ostream& os, const surface<0, UserData, StorageScheme>& s)
+template<size_t DIM, typename UserData, typename StorageScheme>
+std::ostream& operator<<(std::ostream& os, const priv::polytope<DIM, 0, UserData, StorageScheme>& s)
 {
-    os << "surface<" << 0 << ">: ";
+    switch(DIM)
+    {
+        case 0: os << "node<0>: "; break;
+        case 1: os << "edge<0>: "; break;
+        case 2: os << "surface<0>: "; break;
+        case 3: os << "volume<0>: "; break;
+    }
+
     auto ptids = s.point_identifiers();
     for (auto& ptid : ptids)
         os << ptid << " ";
@@ -359,7 +486,7 @@ std::ostream& operator<<(std::ostream& os, const surface<0, UserData, StorageSch
     
     return os;    
 }
-*/
+
 
 /******************************************************************************/
 
@@ -373,16 +500,14 @@ class volume : public priv::element_info<CODIM, UserData>
 
 
 /******************************************************************************/
-/*
-template<size_t CODIM, typename UserData>
-using triangle = surface<CODIM, UserData, fixed_polygon<3>>;
 
 template<size_t CODIM, typename UserData>
-using quadrilateral = surface<CODIM, UserData, fixed_polygon<4>>;
+using triangle = surface<CODIM, UserData, fixed_storage_polytope<3>>;
 
 template<size_t CODIM, typename UserData>
-using arbitrary_polygon = surface<CODIM, UserData, dynamic_polygon>;
-*/
+using quadrilateral = surface<CODIM, UserData, fixed_storage_polytope<4>>;
 
+template<size_t CODIM, typename UserData>
+using arbitrary_polygon = surface<CODIM, UserData, dynamic_storage_polytope>;
 
 } // namespace disk

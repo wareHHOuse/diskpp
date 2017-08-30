@@ -56,7 +56,6 @@
 #include <set>
 
 #include "ident.hpp"
-#include "point.hpp"
 
 #include "mesh_storage.hpp"
 
@@ -792,5 +791,133 @@ std::ostream& operator<<(std::ostream& os, const bounding_box<Mesh>& bb)
     os << "[" << bb.min() << ", " << bb.max() << "]";
     return os;
 }
+
+
+
+
+
+namespace mesh_v2 {
+
+template<size_t DIM, typename Storage>
+class mesh : public priv::mesh_base<typename Storage::coordinate_type,
+                                    DIM, Storage>
+{
+    typedef priv::mesh_base<typename Storage::coordinate_type,
+                            DIM, Storage> base_type;
+
+public:
+    static const size_t dimension = DIM;
+
+    typedef typename Storage::coordinate_type   coordinate_type;
+    typedef Storage                             storage_type;
+
+    typedef typename storage_type::point_type   point_type;
+
+    typedef typename base_type::cell            cell_type;
+    typedef typename base_type::face            face_type;
+
+    /* point iterators */
+    typedef typename std::vector<point_type>::iterator              point_iterator;
+    typedef typename std::vector<point_type>::const_iterator        const_point_iterator;
+
+    point_iterator          points_begin() { return this->backend_storage()->points.begin(); }
+    point_iterator          points_end()   { return this->backend_storage()->points.end(); }
+    const_point_iterator    points_begin() const { return this->backend_storage()->points.begin(); }
+    const_point_iterator    points_end()   const { return this->backend_storage()->points.end(); }
+
+    size_t  points_size() const { return this->backend_storage()->points.size(); }
+};
+
+template<size_t DIM, typename Storage>
+typename mesh<DIM, Storage>::const_cell_iterator
+begin(const mesh<DIM, Storage>& msh)
+{
+    return msh.cells_begin();
+}
+
+template<size_t DIM, typename Storage>
+typename mesh<DIM, Storage>::const_cell_iterator
+end(const mesh<DIM, Storage>& msh)
+{
+    return msh.cells_end();
+}
+
+template<typename Mesh>
+struct mesh_traits : mesh_storage_traits<typename Mesh::storage_type>
+{};
+
+
+
+template<template<size_t, typename> class Mesh, typename Storage>
+void
+dump_to_matlab(const Mesh<2, Storage>& msh, const std::string& filename)
+{
+    std::ofstream ofs(filename);
+
+    size_t elemnum = 0;
+    for (auto cl : msh)
+    {
+        auto bar = barycenter(msh, cl);
+
+        ofs << "text(" << bar.x() << "," << bar.y() << ",'" << elemnum << "');" << std::endl;
+        /*
+        auto fcs = faces(msh, cl);
+        for (auto fc : fcs)
+        {
+            auto ptids = fc.point_ids();
+            auto pts = points(msh, fc);
+            assert(ptids.size() == pts.size());
+
+            for (size_t i = 0; i < ptids.size(); i++)
+            {
+                ofs << "text(" << pts[i].x() << "," << pts[i].y() << ",'" << ptids[i] << "');" << std::endl;
+            }
+
+            if ( msh.is_boundary(fc) )
+            {
+                ofs << "line([" << pts[0].x() << " " << pts[1].x() << "], [";
+                ofs << pts[0].y() << " " << pts[1].y() << "], 'Color', 'r');";
+                ofs << std::endl;
+            }
+            else
+            {
+                ofs << "line([" << pts[0].x() << " " << pts[1].x() << "], [";
+                ofs << pts[0].y() << " " << pts[1].y() << "], 'Color', 'g');";
+                ofs << std::endl;
+            }
+        }
+        */
+
+        auto pts = points(msh, cl);
+
+        for (size_t i = 0; i < pts.size(); i++)
+        {
+            auto p0 = pts[i];
+            auto p1 = pts[(i+1)%pts.size()];
+
+            ofs << "line([" << p0.x() << " " << p1.x() << "], [";
+            ofs << p0.y() << " " << p1.y() << "], 'Color', 'g');";
+            ofs << std::endl;
+        }
+
+        elemnum++;
+    }
+
+    ofs.close();
+}
+
+
+
+
+
+
+
+} //namespace mesh_v2
+
+
+
+
+
+
 
 } // namespace disk

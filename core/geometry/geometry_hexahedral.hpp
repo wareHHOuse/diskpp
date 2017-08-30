@@ -27,15 +27,13 @@
 
 namespace disk {
 
-struct storage_class_cartesian;
-
 template<size_t DIM>
-struct storage_class_trait<storage_class_cartesian, DIM> {
+struct cartesian_storage_class {
     static_assert(DIM == 2 or DIM == 3, "Only DIM = 2 or DIM = 3 for cartesian meshes");
 };
 
 template<>
-struct storage_class_trait<storage_class_cartesian, 3> {
+struct cartesian_storage_class<3> {
     typedef cartesian_element<3,0>  volume_type;
     typedef cartesian_element<3,1>  surface_type;
     typedef cartesian_element<3,2>  edge_type;
@@ -43,14 +41,14 @@ struct storage_class_trait<storage_class_cartesian, 3> {
 };
 
 template<>
-struct storage_class_trait<storage_class_cartesian, 2> {
+struct cartesian_storage_class<2> {
     typedef cartesian_element<2,0>  surface_type;
     typedef cartesian_element<2,1>  edge_type;
     typedef cartesian_element<2,2>  node_type;
 };
 
 template<typename T, size_t DIM>
-using cartesian_mesh_storage = mesh_storage<T, DIM, storage_class_cartesian>;
+using cartesian_mesh_storage = mesh_storage<T, DIM, cartesian_storage_class<DIM>>;
 
 template<typename T, size_t DIM>
 using cartesian_mesh = mesh<T, DIM, cartesian_mesh_storage<T, DIM>>;

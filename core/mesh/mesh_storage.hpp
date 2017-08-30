@@ -18,6 +18,7 @@
 
 #include <vector>
 
+#include "ident.hpp"
 #include "point.hpp"
 
 namespace disk {
@@ -56,13 +57,22 @@ struct bnd_info
 template<typename T, typename StorageClass>
 struct mesh_storage<T, 3, StorageClass>
 {
-    typedef storage_class_trait<StorageClass, 3>    sc_trait;
-    typedef typename sc_trait::volume_type          volume_type;
-    typedef typename sc_trait::surface_type         surface_type;
-    typedef typename sc_trait::edge_type            edge_type;
-    typedef typename sc_trait::node_type            node_type;
-    typedef T                                       value_type;
-    typedef point<T,3>                              point_type;
+    typedef StorageClass                            sc_type;
+    typedef typename sc_type::volume_type           volume_type;
+    typedef typename sc_type::surface_type          surface_type;
+    typedef typename sc_type::edge_type             edge_type;
+    typedef typename sc_type::node_type             node_type;
+ 
+    typedef T                                       coordinate_type;
+    static const size_t                             dimension = 3;
+    typedef point<coordinate_type,3>                point_type;
+
+    template<typename ET> using id = identifier<ET, ident_impl_t, 0>;
+    typedef id<volume_type>                         volume_id_type;
+    typedef id<surface_type>                        surface_id_type;
+    typedef id<edge_type>                           edge_id_type;
+    typedef id<node_type>                           node_id_type;
+    //typedef id<point_type>                          point_id_type;
 
     std::vector<volume_type>                        volumes;
     std::vector<surface_type>                       surfaces;
@@ -93,12 +103,20 @@ struct mesh_storage<T, 3, StorageClass>
 template<typename T, typename StorageClass>
 struct mesh_storage<T, 2, StorageClass>
 {
-    typedef storage_class_trait<StorageClass, 2>    sc_trait;
-    typedef typename sc_trait::surface_type         surface_type;
-    typedef typename sc_trait::edge_type            edge_type;
-    typedef typename sc_trait::node_type            node_type;
-    typedef T                                       value_type;
-    typedef point<T,2>                              point_type;
+    typedef StorageClass                            sc_type;
+    typedef typename sc_type::surface_type          surface_type;
+    typedef typename sc_type::edge_type             edge_type;
+    typedef typename sc_type::node_type             node_type;
+
+    typedef T                                       coordinate_type;
+    static const size_t                             dimension = 2;
+    typedef point<coordinate_type,2>                point_type;
+
+    template<typename ET> using id = identifier<ET, ident_impl_t, 0>;
+    typedef id<surface_type>                        surface_id_type;
+    typedef id<edge_type>                           edge_id_type;
+    typedef id<node_type>                           node_id_type;
+    //typedef id<point_type>                          point_id_type;
 
     std::vector<surface_type>                       surfaces;
     std::vector<edge_type>                          edges;
@@ -126,11 +144,18 @@ struct mesh_storage<T, 2, StorageClass>
 template<typename T, typename StorageClass>
 struct mesh_storage<T, 1, StorageClass>
 {
-    typedef storage_class_trait<StorageClass, 1>    sc_trait;
-    typedef typename sc_trait::edge_type            edge_type;
-    typedef typename sc_trait::node_type            node_type;
-    typedef T                                       value_type;
-    typedef point<T,1>                              point_type;
+    typedef StorageClass                            sc_type;
+    typedef typename sc_type::edge_type             edge_type;
+    typedef typename sc_type::node_type             node_type;
+
+    typedef T                                       coordinate_type;
+    static const size_t                             dimension = 1;
+    typedef point<coordinate_type,1>                point_type;
+
+    template<typename ET> using id = identifier<ET, ident_impl_t, 0>;
+    typedef id<edge_type>                           edge_id_type;
+    typedef id<node_type>                           node_id_type;
+    //typedef id<point_type>                          point_id_type;
 
     std::vector<edge_type>                          edges;
     std::vector<node_type>                          nodes;
@@ -145,6 +170,55 @@ struct mesh_storage<T, 1, StorageClass>
         std::cout << "Nodes: " << nodes.size() << std::endl;
         std::cout << "Edges: " << edges.size() << std::endl;
     }
+};
+
+
+template<typename>
+struct mesh_storage_traits {};
+
+template<typename T, typename StorageClass>
+struct mesh_storage_traits<mesh_storage<T, 3, StorageClass>>
+{
+    typedef mesh_storage<T, 3, StorageClass>            storage_type;
+    typedef typename storage_type::node_type            node_type;
+    typedef typename storage_type::node_id_type         node_id_type;
+    typedef typename storage_type::edge_type            edge_type;
+    typedef typename storage_type::edge_id_type         edge_id_type;
+    typedef typename storage_type::surface_type         surface_type;
+    typedef typename storage_type::surface_id_type      surface_id_type;
+    typedef typename storage_type::volume_type          volume_type;
+    typedef typename storage_type::volume_id_type       volume_id_type;
+    typedef typename storage_type::coordinate_type      coordinate_type;
+    typedef typename storage_type::point_type           point_type;
+    static const size_t                                 dimension = 3;
+};
+
+template<typename T, typename StorageClass>
+struct mesh_storage_traits<mesh_storage<T, 2, StorageClass>>
+{
+    typedef mesh_storage<T, 2, StorageClass>            storage_type;
+    typedef typename storage_type::node_type            node_type;
+    typedef typename storage_type::node_id_type         node_id_type;
+    typedef typename storage_type::edge_type            edge_type;
+    typedef typename storage_type::edge_id_type         edge_id_type;
+    typedef typename storage_type::surface_type         surface_type;
+    typedef typename storage_type::surface_id_type      surface_id_type;
+    typedef typename storage_type::coordinate_type      coordinate_type;
+    typedef typename storage_type::point_type           point_type;
+    static const size_t                                 dimension = 2;
+};
+
+template<typename T, typename StorageClass>
+struct mesh_storage_traits<mesh_storage<T, 1, StorageClass>>
+{
+    typedef mesh_storage<T, 1, StorageClass>            storage_type;
+    typedef typename storage_type::node_type            node_type;
+    typedef typename storage_type::node_id_type         node_id_type;
+    typedef typename storage_type::edge_type            edge_type;
+    typedef typename storage_type::edge_id_type         edge_id_type;
+    typedef typename storage_type::coordinate_type      coordinate_type;
+    typedef typename storage_type::point_type           point_type;
+    static const size_t                                 dimension = 1;
 };
 
 } // namespace disk

@@ -26,28 +26,29 @@
 
 namespace disk {
 
-struct storage_class_generic;
+template<size_t DIM>
+struct generic_storage_class;
 
 template<size_t DIM>
-struct storage_class_trait<storage_class_generic, DIM> {
-    static_assert(DIM > 0 && DIM <= 3, "element_types: CODIM must be less than DIM");
+struct generic_storage_class {
+    static_assert(DIM > 0 && DIM <= 3, "This storage class supports DIM between 0 and 3");
 };
 
 template<>
-struct storage_class_trait<storage_class_generic, 1> {
+struct generic_storage_class<1> {
     typedef generic_element<1,0>    edge_type;
     typedef generic_element<1,1>    node_type;
 };
 
 template<>
-struct storage_class_trait<storage_class_generic, 2> {
+struct generic_storage_class<2> {
     typedef generic_element<2,0>    surface_type;
     typedef generic_element<2,1>    edge_type;
     typedef generic_element<2,2>    node_type;
 };
 
 template<>
-struct storage_class_trait<storage_class_generic, 3> {
+struct generic_storage_class<3> {
         typedef generic_element<3,0>    volume_type;
         typedef generic_element<3,1>    surface_type;
         typedef generic_element<3,2>    edge_type;
@@ -55,7 +56,7 @@ struct storage_class_trait<storage_class_generic, 3> {
 };
 
 template<typename T, size_t DIM>
-using generic_mesh_storage = mesh_storage<T, DIM, storage_class_generic>;
+using generic_mesh_storage = mesh_storage<T, DIM, generic_storage_class<DIM>>;
 
 template<typename T, size_t DIM>
 using generic_mesh = mesh<T, DIM, generic_mesh_storage<T, DIM>>;
