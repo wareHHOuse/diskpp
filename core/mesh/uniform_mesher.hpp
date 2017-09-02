@@ -80,6 +80,8 @@ class uniform_mesher< mesh_v2::triangular_mesh<T> >
 
     internal_mesh_type                          internal_mesh;
 
+    std::vector<std::array<size_t, 4>>          hierarchy;
+
     void make_first_mesh()
     {
         auto be = internal_mesh.backend_storage();
@@ -214,6 +216,8 @@ class uniform_mesher< mesh_v2::triangular_mesh<T> >
         be->nodes.clear();
     }
 
+public:
+
     user_mesh_type convert_to_user() const
     {
         user_mesh_type user_mesh;
@@ -250,7 +254,6 @@ class uniform_mesher< mesh_v2::triangular_mesh<T> >
         return user_mesh;
     }
 
-public:
     uniform_mesher()
     {
         make_first_mesh();
@@ -260,9 +263,7 @@ public:
         refine();
         dump_to_matlab(internal_mesh, "third.m");
 
-        auto m = convert_to_user();
-
-        dump_to_matlab(m, "user.m");
+        
 
 
         //timecounter tc;

@@ -14,6 +14,8 @@
  * cite it.
  */
 
+#include "core/output/hdf5_io.hpp"
+
 namespace disk {
 
 namespace mesh_v2 {
@@ -42,6 +44,76 @@ using simplicial_mesh = mesh<DIM, simplicial_mesh_storage<T, DIM>>;
 
 template<typename T>
 using triangular_mesh = simplicial_mesh<T, 2>;
+
+
+template<typename T>
+bool save(const hdf5_context& hctx, const triangular_mesh<T>& mesh,
+          const std::string& name)
+{
+    hid_t file_id = hctx.get_file_descriptor();
+
+    hid_t group_id;
+
+    herr_t status = H5Eset_auto(H5E_DEFAULT, NULL, NULL);
+    status = H5Gget_objinfo (file_id, "/meshes/standalone", 0, NULL);
+
+    if (status != 0)
+    {
+        group_id = H5Gcreate(file_id, "meshes",
+                             H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        
+        group_id = H5Gcreate(group_id, "standalone",
+                             H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    }
+    else
+    {
+        group_id = H5Gopen(file_id, "/meshes/standalone", H5P_DEFAULT);
+    }
+
+    group_id = H5Gcreate(group_id, name.c_str(),
+                             H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+    
+    //if (group_id < 0)
+    //{
+    //    group_id = H5Gcreate(file_id, "/meshes", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    //    std::cout << "GID: " << group_id << std::endl;
+    //}
+
+    return true;
+}
+
+
+struct child_cells_offsets
+{
+    std::array<size_t, 4>   offsets;
+    bool                    has_childs;
+
+    child_cells_offsets() : has_childs(false) {}
+};
+
+template<size_t DIM>
+struct hierarchical_simplicial_storage_class;
+
+template<>
+struct hierarchical_simplicial_storage_class<2>
+{
+    typedef triangle<0, child_cells_offsets>    surface_type;
+    typedef edge<1, void>                       edge_type;
+    typedef node<2, void>                       node_type;
+};
+
+template<typename T, size_t DIM>
+using hierarchical_simplicial_mesh_storage = mesh_storage<T, DIM, 
+                                    hierarchical_simplicial_storage_class<DIM>>;
+
+template<typename T, size_t DIM>
+using hierarchical_simplicial_mesh = mesh<DIM, hierarchical_simplicial_mesh_storage<T, DIM>>;
+
+template<typename T>
+using hierarchical_triangular_mesh = hierarchical_simplicial_mesh<T, 2>;
+
+
 
 /* Return the point identifiers of a specified element. This is a catch-all function,
  * but it is likely that some elements will not have the point_identifiers() method.

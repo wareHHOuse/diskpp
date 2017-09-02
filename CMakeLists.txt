@@ -36,6 +36,12 @@ find_package(SILO REQUIRED)
     set(HAVE_SILO TRUE)
 #endif()
 
+find_package(HDF5 REQUIRED)
+    include_directories(${HDF5_INCLUDE_DIRS})
+    set(LINK_LIBS ${LINK_LIBS} ${HDF5_LIBRARIES})
+    set(HAVE_HDF5 TRUE)
+
+
 find_package(Lua REQUIRED)
 include_directories("${LUA_INCLUDE_DIR}")
 set(LINK_LIBS ${LINK_LIBS} ${LUA_LIBRARIES})

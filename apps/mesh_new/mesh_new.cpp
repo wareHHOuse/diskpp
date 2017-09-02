@@ -20,11 +20,24 @@
 
 #include "core/mesh/uniform_mesher.hpp"
 
+#include "core/output/hdf5_io.hpp"
+
 
 int main(int argc, char **argv)
 {
+    hdf5_context hctx("test.h5");
+
     typedef disk::mesh_v2::triangular_mesh<double>      mesh_type;
     typedef typename mesh_type::point_type              point_type;
 
     disk::uniform_mesher<mesh_type> um;
+
+
+
+    mesh_type m = um.convert_to_user();
+
+    dump_to_matlab(m, "user.m");
+
+    save(hctx, m, "test");
+
 }

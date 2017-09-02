@@ -18,6 +18,8 @@
 #include <sstream>
 #include <iomanip>
 #include <regex>
+#include <type_traits>
+#include <cassert>
 
 #include <Eigen/Eigenvalues>
 
@@ -29,6 +31,8 @@
 
 #include "contrib/sol2/sol.hpp"
 #include "contrib/timecounter.h"
+
+#include "core/output/hdf5_io.hpp"
 
 template<typename Mesh>
 bool
@@ -119,7 +123,112 @@ hho_solver(sol::state& lua, const Mesh& msh)
     disk::solvers::linear_solver(lua, system_matrix, system_rhs, sol);
 
     system_solution = assembler.expand_solution(msh, sol);
-    
+
+    auto num_cell_dofs = bqd.cell_basis.size();
+    auto num_face_dofs = bqd.face_basis.size();
+
+    auto num_rec_dofs = bqd.cell_basis.computed_size();
+
+    dynamic_vector<scalar_type> reconstructed_solution =
+        dynamic_vector<scalar_type>::Zero(num_rec_dofs*msh.cells_size());
+
+    std::vector<scalar_type> vals(msh.cells_size());
+    std::vector<scalar_type> recvals(msh.cells_size());
+
+    auto expected_solution = lua["expected_solution"];
+    scalar_type error = 0.0;
+
+    elem_i = 0;
+    for (auto& cl : msh)
+    {
+
+        gradrec.compute(msh, cl, kappa);
+        stab.compute(msh, cl, gradrec.oper);
+        auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, f, degree);
+        dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
+
+
+        auto fcs = faces(msh, cl);
+        auto num_faces = fcs.size();
+        auto num_local_face_dofs = num_face_dofs*num_faces;
+        dynamic_vector<scalar_type> local_face_dofs =
+            dynamic_vector<scalar_type>::Zero(num_local_face_dofs);
+
+        size_t face_i = 0;
+        for (auto& fc : fcs)
+        {
+            size_t face_ofs = msh.lookup(fc);
+            auto local_face_ofs = face_i*num_face_dofs;
+            auto global_face_ofs = face_ofs*num_face_dofs;
+            local_face_dofs.segment(local_face_ofs, num_face_dofs) =
+                system_solution.segment(global_face_ofs, num_face_dofs);
+
+            face_i++;
+        }
+
+        dynamic_vector<scalar_type> local_dofs =
+            statcond.recover(msh, cl, loc, cell_rhs, local_face_dofs);
+
+        dynamic_vector<scalar_type> R = gradrec.oper*local_dofs;
+
+        reconstructed_solution.segment(elem_i*num_rec_dofs+1, num_rec_dofs-1) = R;
+        reconstructed_solution(elem_i*num_rec_dofs) = local_dofs(0);
+
+        auto bar = barycenter(msh, cl);
+        dynamic_vector<scalar_type> vT = local_dofs.segment(0, num_cell_dofs);
+        auto phi = bqd.cell_basis.eval_functions(msh, cl, bar);
+        vals.at(elem_i) = vT.dot(phi);
+
+        auto phi1 = bqd.cell_basis.eval_functions(msh, cl, bar, 1, degree+1);
+        recvals.at(elem_i) = R.dot(phi1) + vT(0);
+        elem_i++;
+
+        if ( expected_solution.valid() )
+        {
+            dynamic_matrix<scalar_type> cell_mm =
+                dynamic_matrix<scalar_type>::Zero(num_cell_dofs, num_cell_dofs);
+
+            dynamic_vector<scalar_type> cell_rhs =
+                dynamic_vector<scalar_type>::Zero(num_cell_dofs);
+
+            auto ep_f = [&](const typename mesh_type::point_type& pt) -> scalar_type {
+                return expected_solution(pt.x(), pt.y());
+            };
+
+            auto cell_quadpoints = bqd.cell_quadrature.integrate(msh, cl);
+            for (auto& qp : cell_quadpoints)
+            {
+                auto phi    = bqd.cell_basis.eval_functions(msh, cl, qp.point());
+                auto wphi   = qp.weight() * phi;
+                cell_mm     += wphi * phi.transpose();
+                cell_rhs    += wphi * ep_f(qp.point());
+            }
+
+            dynamic_vector<scalar_type> vT_exact = cell_mm.llt().solve(cell_rhs);
+            dynamic_vector<scalar_type> diff = vT_exact - vT;
+            error += diff.dot(cell_mm*diff);
+        }
+    }
+
+    if ( expected_solution.valid() )
+        std::cout << "L2-norm error: " << sqrt(error) << std::endl;
+
+    auto visit_output_filename = lua["config"]["visit_output"];
+    if ( visit_output_filename.valid() )
+    {
+        disk::silo_database silo_db;
+        silo_db.create(visit_output_filename);
+        silo_db.add_mesh(msh, "mesh");
+
+        disk::silo_zonal_variable<scalar_type> u("u", vals);
+        silo_db.add_variable("mesh", u);
+
+        disk::silo_zonal_variable<scalar_type> Ru("Ru", recvals);
+        silo_db.add_variable("mesh", Ru);
+
+        silo_db.close();
+    }
+
     return true;
 }
 
@@ -157,7 +266,7 @@ cfem_eigenvalue_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
     {
         if ( dirichlet_nodes.at(i) )
             continue;
-        
+
         expand_map.at(nnum) = i;
         compress_map.at(i) = nnum++;
     }
@@ -170,11 +279,11 @@ cfem_eigenvalue_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
     for (auto& cl : msh)
     {
         auto bar = barycenter(msh, cl);
-        
+
 
         auto K = disk::cfem::stiffness_matrix(msh, cl);
         auto M = disk::cfem::mass_matrix(msh, cl);
-        
+
 
         auto ptids = cl.point_ids();
 
@@ -228,7 +337,7 @@ cfem_eigenvalue_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
     auto visit_output_filename = lua["config"]["visit_output"];
     if ( visit_output_filename.valid() )
     {
-        disk::silo_database silo_db;        
+        disk::silo_database silo_db;
         silo_db.create(visit_output_filename);
         silo_db.add_mesh(msh, "mesh");
 
@@ -240,7 +349,7 @@ cfem_eigenvalue_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
             dynamic_vector<T> gx = eigvecs.block(0,i,eigvecs.rows(),1);
             for (size_t i = 0; i < gx.size(); i++)
                 solution_vals.at( expand_map.at(i) ) = gx(i);
-            
+
             std::stringstream ss;
             ss << "u" << i;
 
@@ -295,17 +404,17 @@ cfem_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
     {
         if ( dirichlet_nodes.at(i) )
             continue;
-        
+
         expand_map.at(nnum) = i;
         compress_map.at(i) = nnum++;
     }
 
     sparse_matrix_type              gA(system_size, system_size);
     dynamic_vector<T>               gb(system_size), gx(system_size);
-    
+
     gb = dynamic_vector<T>::Zero(system_size);
 
-    
+
     std::vector<triplet_type>       triplets;
 
     timecounter tc;
@@ -322,9 +431,9 @@ cfem_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
     {
         static_matrix<T, 2, 2> kappa = static_matrix<T, 2, 2>::Zero();
         auto bar = barycenter(msh, cl);
-        
+
         T eps = lua_matparam_fun(bar.x(), bar.y());
-        
+
         kappa(0,0) = eps;
         kappa(1,1) = eps;
 
@@ -373,6 +482,40 @@ cfem_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
     for (size_t i = 0; i < gx.size(); i++)
         e_gx( expand_map.at(i) ) = gx(i);
 
+    auto hdf5_output_filename = lua["config"]["hdf5_output"];
+    if ( hdf5_output_filename.valid() )
+    {
+        //assert(std::is_same<T, double>::value);
+
+        std::string fn = hdf5_output_filename;
+
+        hid_t file_id = hdf5_open_or_create( fn.c_str() );
+
+        herr_t status = H5Eset_auto(H5E_DEFAULT, NULL, NULL);
+        status = H5Gget_objinfo (file_id, "/fem", 0, NULL);
+
+        hid_t group_id;
+
+        if (status != 0)
+            group_id = H5Gcreate(file_id, "/fem", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        else
+            group_id = H5Gopen(file_id, "/fem", H5P_DEFAULT);
+
+        hsize_t dim1_sz = e_gx.size();
+        hid_t   dataspace_id = H5Screate_simple(1, &dim1_sz, NULL);
+
+        hid_t   dataset_id = H5Dcreate(group_id, "solution", H5T_IEEE_F64LE, dataspace_id,
+                                       H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+        status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL,
+                          H5P_DEFAULT, e_gx.data());
+
+        H5Dclose(dataset_id);
+        H5Sclose(dataspace_id);
+        H5Gclose(group_id);
+        H5Fclose(file_id);
+    }
+
     std::ofstream ofs("solution.dat");
 
     std::vector<T> solution_vals;
@@ -402,7 +545,7 @@ cfem_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
         disk::silo_database silo_db;
         silo_db.create(visit_output_filename);
         silo_db.add_mesh(msh, "mesh");
-    
+
         disk::silo_zonal_variable<T> u("u", solution_vals);
         silo_db.add_variable("mesh", u);
         silo_db.close();
@@ -439,7 +582,7 @@ eigval_solver(sol::state& lua, const Mesh& msh)
     typedef disk::gradient_reconstruction_bq<bqdata_type>               gradrec_type;
     typedef disk::diffusion_like_stabilization_bq<bqdata_type>          stab_type;
     typedef disk::eigval_mass_matrix_bq<bqdata_type>                    mass_type;
-    
+
     typedef Eigen::Triplet<scalar_type>                                 triplet_type;
 
 
@@ -484,7 +627,7 @@ eigval_solver(sol::state& lua, const Mesh& msh)
             face_i++;
             continue;
         }
-        
+
         expand_map.at(fnum) = face_i;
         compress_map.at(face_i) = fnum++;
         face_i++;
@@ -519,7 +662,7 @@ eigval_solver(sol::state& lua, const Mesh& msh)
         for (size_t i = 0; i < num_faces; i++)
         {
             auto fc = fcs[i];
-            
+
             if ( msh.is_boundary(fc) )
             {
                 for (size_t j = 0; j < num_face_dofs; j++)
@@ -541,13 +684,13 @@ eigval_solver(sol::state& lua, const Mesh& msh)
             size_t i_ofs = offset_table.at(i);
             if (i_ofs == 0xdeadbeef)
                 continue;
-            
+
             for (size_t j = 0; j < K.cols(); j++)
             {
                 size_t j_ofs = offset_table.at(j);
                 if (j_ofs == 0xdeadbeef)
                     continue;
-                
+
                 assert(i_ofs < num_global_dofs);
                 assert(j_ofs < num_global_dofs);
                 gtK.push_back( triplet_type(i_ofs, j_ofs, K(i,j)) );
@@ -572,7 +715,7 @@ eigval_solver(sol::state& lua, const Mesh& msh)
 
     gK.setFromTriplets(gtK.begin(), gtK.end());
     gM.setFromTriplets(gtM.begin(), gtM.end());
-    
+
     Eigen::Matrix<scalar_type, Eigen::Dynamic, Eigen::Dynamic> eigvecs;
     Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> eigvals;
 
@@ -604,7 +747,7 @@ eigval_solver(sol::state& lua, const Mesh& msh)
     auto visit_output_filename = lua["config"]["visit_output"];
     if ( visit_output_filename.valid() )
     {
-        disk::silo_database silo_db;        
+        disk::silo_database silo_db;
         silo_db.create(visit_output_filename);
         silo_db.add_mesh(msh, "mesh");
 
@@ -614,7 +757,7 @@ eigval_solver(sol::state& lua, const Mesh& msh)
             solution_vals.resize(msh.cells_size());
 
             dynamic_vector<scalar_type> gx = eigvecs.block(0,i,eigvecs.rows(),1);
-            
+
             size_t cell_i = 0;
             for (auto& cl : msh)
             {
@@ -647,7 +790,7 @@ eigval_reference(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
     auto visit_output_filename = lua["config"]["visit_output"];
     auto mode_x_max = lua["config"]["mode_x_max"].get_or(5);
     auto mode_y_max = lua["config"]["mode_y_max"].get_or(5);
-    
+
     if ( visit_output_filename.valid() )
     {
         silo_db.create(visit_output_filename);
@@ -684,6 +827,42 @@ eigval_reference(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
 
 
 
+class fem_solver
+{
+public:
+
+    std::string     input_mesh;
+    int             degree;
+    bool            verbose;
+
+    fem_solver()
+    {
+        std::cout << "Constructed!" << std::endl;
+    }
+
+    void run()
+    {
+        std::cout << "running!" << std::endl;
+        std::cout << input_mesh << std::endl;
+        std::cout << degree << std::endl;
+        std::cout << verbose << std::endl;
+    }
+
+};
+
+void
+lua_register_fem_solver_usertype(sol::state& lua)
+{
+    lua.new_usertype<fem_solver>( "fem_solver",
+        sol::constructors<fem_solver()>(),
+        "run", &fem_solver::run,
+        "input_mesh", &fem_solver::input_mesh,
+        "degree", &fem_solver::degree,
+        "verbose", &fem_solver::verbose
+        );
+}
+
+
 
 
 int main(int argc, char **argv)
@@ -697,10 +876,12 @@ int main(int argc, char **argv)
     }
 
     sol::state lua;
-    lua.open_libraries(sol::lib::math);
+    lua.open_libraries(sol::lib::math, sol::lib::base);
     lua["config"] = lua.create_table();
     disk::solvers::init_lua(lua);
     lua["solver"]["feast"] = lua.create_table();
+
+    lua_register_fem_solver_usertype(lua);
 
     auto r = lua.do_file(argv[1]);
 
@@ -710,10 +891,12 @@ int main(int argc, char **argv)
         return 1;
     }
 
+
     std::string     method      = lua["config"]["method"].get_or(std::string("hho"));
     std::string     input_mesh  = lua["config"]["input_mesh"];
     std::string     hdf5_output = lua["config"]["hdf5_output"];
-    
+    bool            verbose     = lua["config"]["verbose"].get_or(false);
+
     if (std::regex_match(input_mesh, std::regex(".*\\.mesh2d$") ))
     {
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
@@ -722,12 +905,13 @@ int main(int argc, char **argv)
 
         mesh_type msh;
         disk::netgen_mesh_loader<scalar_type, 2> loader;
+        loader.verbose(verbose);
         if (!loader.read_mesh(input_mesh))
         {
             std::cout << "Problem loading mesh." << std::endl;
             return 1;
         }
-        
+
         loader.populate_mesh(msh);
 
         std::cout << "Mesh avg. diameter: " << mesh_h(msh) << std::endl;
@@ -752,12 +936,13 @@ int main(int argc, char **argv)
 
         mesh_type msh;
         disk::fvca5_mesh_loader<scalar_type, 2> loader;
+        loader.verbose(verbose);
         if (!loader.read_mesh(input_mesh))
         {
             std::cout << "Problem loading mesh." << std::endl;
             return 1;
         }
-        
+
         loader.populate_mesh(msh);
 
         std::cout << "Mesh avg. diameter: " << mesh_h(msh) << std::endl;
@@ -776,12 +961,13 @@ int main(int argc, char **argv)
 
         mesh_type msh;
         disk::cartesian_mesh_loader<scalar_type, 2> loader;
+        loader.verbose(verbose);
         if (!loader.read_mesh(input_mesh))
         {
             std::cout << "Problem loading mesh." << std::endl;
             return 1;
         }
-        
+
         loader.populate_mesh(msh);
 
         std::cout << "Mesh avg. diameter: " << mesh_h(msh) << std::endl;
@@ -791,6 +977,6 @@ int main(int argc, char **argv)
         else if (method == "hho_eigs")
             eigval_solver(lua, msh);
     }
-    
+
     return 0;
 }
