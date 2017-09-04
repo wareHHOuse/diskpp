@@ -213,6 +213,52 @@ hho_solver(sol::state& lua, const Mesh& msh)
     if ( expected_solution.valid() )
         std::cout << "L2-norm error: " << sqrt(error) << std::endl;
 
+    auto hdf5_output_filename = lua["config"]["hdf5_output"];
+    if ( hdf5_output_filename.valid() )
+    {
+        std::string fn = hdf5_output_filename;
+
+        hid_t file_id = H5Fcreate(fn.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+
+        hid_t group_id = H5Gcreate(file_id, "/hho", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+        hsize_t dim1_sz = reconstructed_solution.size();
+        hid_t   dataspace_id = H5Screate_simple(1, &dim1_sz, NULL);
+
+        hid_t   dataset_id = H5Dcreate(group_id, "solution", H5T_IEEE_F64LE, dataspace_id,
+                                       H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+        H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL,
+                 H5P_DEFAULT, reconstructed_solution.data());
+
+
+        hsize_t dims = 1;
+        hid_t attr_dataspace_id = H5Screate_simple(1, &dims, NULL);
+
+        hid_t attribute_id = H5Acreate2(dataset_id, "degree", H5T_STD_I32BE,
+                                        attr_dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
+
+        int attr_data = bqd.cell_basis.degree()+1;
+        H5Awrite(attribute_id, H5T_NATIVE_INT, &attr_data);
+
+        H5Aclose(attribute_id);
+
+        attribute_id = H5Acreate2(dataset_id, "elems", H5T_STD_I32BE,
+                                        attr_dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
+
+        attr_data = msh.cells_size();
+        H5Awrite(attribute_id, H5T_NATIVE_INT, &attr_data);
+
+        H5Aclose(attribute_id);
+
+        H5Sclose(attr_dataspace_id);
+
+        H5Dclose(dataset_id);
+        H5Sclose(dataspace_id);
+        H5Gclose(group_id);
+        H5Fclose(file_id);
+    }
+
     auto visit_output_filename = lua["config"]["visit_output"];
     if ( visit_output_filename.valid() )
     {
@@ -830,7 +876,6 @@ eigval_reference(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
 class fem_solver
 {
 public:
-
     std::string     input_mesh;
     int             degree;
     bool            verbose;
