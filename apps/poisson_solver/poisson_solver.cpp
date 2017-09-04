@@ -107,9 +107,15 @@ hho_solver(sol::state& lua, const Mesh& msh)
         dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
         auto scnp = statcond.compute(msh, cl, loc, cell_rhs);
         assembler.assemble(msh, cl, scnp);
-
-        std::cout << "Assembly " << double(100*elem_i)/msh.cells_size() << "%" << std::endl;
+        if (elem_i % 10000 == 0)
+            std::cout << "\33[2K\rAssembly " << double(100*elem_i)/msh.cells_size() << "%" << std::flush;
     }
+
+    std::cout << std::endl;
+
+    //auto bcf = [](const typename mesh_type::point_type& pt) -> scalar_type {
+    //    return 0;
+    //};
 
     //assembler.impose_boundary_conditions(msh, bcf);
     assembler.finalize(system_matrix, system_rhs);
@@ -125,6 +131,7 @@ hho_solver(sol::state& lua, const Mesh& msh)
     disk::solvers::linear_solver(lua, system_matrix, system_rhs, sol);
 
     system_solution = assembler.expand_solution(msh, sol);
+    //system_solution = sol;
 
     auto num_cell_dofs = bqd.cell_basis.size();
     auto num_face_dofs = bqd.face_basis.size();
