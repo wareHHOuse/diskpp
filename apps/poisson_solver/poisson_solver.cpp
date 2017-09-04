@@ -107,6 +107,8 @@ hho_solver(sol::state& lua, const Mesh& msh)
         dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
         auto scnp = statcond.compute(msh, cl, loc, cell_rhs);
         assembler.assemble(msh, cl, scnp);
+
+        std::cout << "Assembly " << double(100*elem_i)/msh.cells_size() << "%" << std::endl;
     }
 
     //assembler.impose_boundary_conditions(msh, bcf);

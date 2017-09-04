@@ -22,6 +22,8 @@
 #include <iomanip>
 #include <fstream>
 
+#include <hdf5.h>
+
 //#undef NDEBUG
 
 #include "common/eigen.hpp"
@@ -75,7 +77,7 @@ void plot_multiscale_basis_functions(sol::state& lua, const Mesh& msh)
 
     size_t pms_eval_num = lua["pms_eval_num"].get_or(5);
 
-    
+
 
     size_t elemnum = 0;
     for (auto& cl : msh)
@@ -145,7 +147,7 @@ void test_gradient_reconstruction(sol::state& lua, const Mesh& msh)
     for (auto& cl : msh)
     {
         disk::multiscale_local_basis<mesh_type> mlb(msh, cl, ccb, cfb, k_inner, rl);
-        
+
         disk::gradient_reconstruction_multiscale<mesh_type, decltype(ccb), decltype(cfb)> gradrec(msh, cl, mlb, ccb, cfb);
 
         auto proj = disk::make_projector(msh, cl, ccb, cfb);
@@ -184,7 +186,7 @@ void test_gradient_reconstruction(sol::state& lua, const Mesh& msh)
 
         for (auto& icl : inner_mesh)
         {
-            
+
             auto pts = make_test_points(inner_mesh, icl, testgr_eval_num);
             for (auto& pt : pts)
             {
@@ -206,10 +208,10 @@ void test_gradient_reconstruction(sol::state& lua, const Mesh& msh)
 
                 R(1) = 0;
                 R(2) = 0;
-                
+
                 R(3) = 1;
                 R(4) = 0;
-                
+
                 R(5) = 0;
                 R(6) = 0;
 
@@ -244,23 +246,23 @@ conjugated_gradient(const Eigen::SparseMatrix<T>& A,
     size_t                      iter = 0;
     T                           nr, nr0;
     T                           alpha, beta, rho;
-    
+
     Eigen::Matrix<T, Eigen::Dynamic, 1> d(N), r(N), r0(N), y(N);
     x = Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(N);
- 
+
 
     r0 = d = r = b - A*x;
     nr = nr0 = r.norm();
-    
+
     std::ofstream ofs("cocg_nopre_convergence.txt");
-    
+
     while ( nr/nr0 > 1e-8 && iter < 4000 && nr/nr0 < 10000 )
     {
         std::cout << "                                                 \r";
         std::cout << " -> Iteration " << iter << ", rr = ";
         std::cout << nr/nr0 << "\b\r";
         std::cout.flush();
-        
+
         ofs << nr/nr0 << std::endl;
         y = A*d;
         rho = r.dot(r);
@@ -269,16 +271,16 @@ conjugated_gradient(const Eigen::SparseMatrix<T>& A,
         r = r - alpha * y;
         beta = r.dot(r)/rho;
         d = r + beta * d;
-        
+
         nr = r.norm();
         iter++;
     }
-    
+
     ofs << nr/nr0 << std::endl;
     ofs.close();
-    
+
     std::cout << " -> Iteration " << iter << ", rr = " << nr/nr0 << std::endl;
-    
+
     return true;
 }
 
@@ -459,7 +461,7 @@ public:
             std::cout << "B ";
             std::cout.flush();
 
-            disk::gradient_reconstruction_multiscale<mesh_type, 
+            disk::gradient_reconstruction_multiscale<mesh_type,
                                                      outer_cell_basis_type,
                                                      outer_face_basis_type> gradrec(msh, cl, mlb, outer_cell_basis, outer_face_basis);
             gr_opers.push_back( gradrec.oper );
@@ -473,7 +475,7 @@ public:
 
             dynamic_vector<scalar_type> dofs = make_rhs(msh, cl, outer_cell_basis, outer_face_basis, f);
             dynamic_vector<scalar_type> cdofs = dofs.head(num_cell_dofs);
-            
+
             auto fcs = faces(msh, cl);
             std::vector<size_t> l2g(fcs.size() * num_face_dofs);
 
@@ -560,13 +562,13 @@ public:
         auto monoscale_all_dofs = monoscale_solution.second;
         //std::cout << "MM: " << monoscale_all_dofs.size() << std::endl;
         auto monoscale_mesh = *std::next(hierarchy.meshes_begin(), hierarchy.meshes_size()-1);
-        typedef disk::scaled_monomial_scalar_basis<mesh_type, typename mesh_type::cell> 
+        typedef disk::scaled_monomial_scalar_basis<mesh_type, typename mesh_type::cell>
                 monoscale_cell_basis_type;
-        
+
         monoscale_cell_basis_type     monoscale_cell_basis(monoscale_degree);
         cell_quadrature_type          cell_quadrature(2*monoscale_degree+2);
         size_t monoscale_cbs = monoscale_cell_basis.size();
-        
+
         scalar_type error = 0.0, l2_err = 0.0;
 
         std::ofstream ofs("comparison.dat");
@@ -613,11 +615,11 @@ public:
 
             auto ms_inner_mesh = mlb.inner_mesh();
             for (auto& icl : ms_inner_mesh)
-            {   
+            {
                 scalar_type local_err = 0.0;
                 scalar_type local_l2_err = 0.0;
                 auto qps = cell_quadrature.integrate(ms_inner_mesh, icl);
-                
+
                 for(auto& qp : qps)
                 {
                     dynamic_vector<scalar_type> grad_multi = dynamic_vector<scalar_type>::Zero(2);
@@ -647,7 +649,7 @@ public:
                         dynamic_matrix<scalar_type> mono_dphi = monoscale_cell_basis.eval_gradients(monoscale_mesh, mono_cell, tp);
                         for (size_t i = 0; i < mono_dofs.size(); i++)
                             grad_mono += (mono_dphi.block(i, 0, 1, 2) * mono_dofs(i)).transpose();
-                        
+
                         //auto eps = 0.1;
                         //grad_mono(0) = M_PI * cos(M_PI * tp.x()) * sin(M_PI * tp.y()) + M_PI * sin(M_PI*tp.y()/eps)*cos(M_PI*tp.x()/eps);
                         //grad_mono(1) = M_PI * sin(M_PI * tp.x()) * cos(M_PI * tp.y()) + M_PI * sin(M_PI*tp.x()/eps)*cos(M_PI*tp.y()/eps);
@@ -704,7 +706,7 @@ public:
 
 
 template<typename Mesh>
-void 
+void
 test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
                         disk::mesh_hierarchy<typename Mesh::scalar_type>& hierarchy,
                         const std::pair<size_t, dynamic_vector<typename Mesh::scalar_type>>& monoscale_solution)
@@ -717,8 +719,12 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
     size_t k_inner = lua["k_inner"];
     size_t testpoints = lua["test_points"].get_or(3);
 
+    bool equal_order = lua["equal_order"].get_or(false);
 
-    auto basis = make_scaled_monomial_scalar_basis(msh, k_outer, k_outer);
+    size_t cell_order = equal_order ? k_outer : k_outer - 1;
+    size_t face_order = k_outer;
+
+    auto basis = make_scaled_monomial_scalar_basis(msh, cell_order, face_order);
     auto ccb = basis.first;
     auto cfb = basis.second;
 
@@ -788,7 +794,7 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
 
         dynamic_vector<scalar_type> dofs = make_rhs(msh, cl, ccb, cfb, f);
         dynamic_vector<scalar_type> cdofs = dofs.head(num_cell_dofs);
-        
+
         auto fcs = faces(msh, cl);
         std::vector<size_t> l2g(/*num_cell_dofs +*/ fcs.size() * num_face_dofs);
 
@@ -866,13 +872,13 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
     auto monoscale_all_dofs = monoscale_solution.second;
     //std::cout << "MM: " << monoscale_all_dofs.size() << std::endl;
     auto monoscale_mesh = *std::next(hierarchy.meshes_begin(), hierarchy.meshes_size()-1);
-    typedef disk::scaled_monomial_scalar_basis<mesh_type, typename mesh_type::cell> 
+    typedef disk::scaled_monomial_scalar_basis<mesh_type, typename mesh_type::cell>
                monoscale_cell_basis_type;
-    
+
     monoscale_cell_basis_type     monoscale_cell_basis(monoscale_degree);
     cell_quadrature_type          cell_quadrature(2*monoscale_degree+2);
     size_t monoscale_cbs = monoscale_cell_basis.size();
-    
+
     scalar_type error = 0.0, l2_err = 0.0;
 
     std::ofstream ofs("comparison.dat");
@@ -920,11 +926,11 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
 
         auto ms_inner_mesh = mlb.inner_mesh();
         for (auto& icl : ms_inner_mesh)
-        {   
+        {
             scalar_type local_err = 0.0;
             scalar_type local_l2_err = 0.0;
             auto qps = cell_quadrature.integrate(ms_inner_mesh, icl);
-            
+
             for(auto& qp : qps)
             {
                 dynamic_vector<scalar_type> grad_multi = dynamic_vector<scalar_type>::Zero(2);
@@ -954,7 +960,7 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
                     dynamic_matrix<scalar_type> mono_dphi = monoscale_cell_basis.eval_gradients(monoscale_mesh, mono_cell, tp);
                     for (size_t i = 0; i < mono_dofs.size(); i++)
                         grad_mono += (mono_dphi.block(i, 0, 1, 2) * mono_dofs(i)).transpose();
-                    
+
                     //auto eps = 0.1;
                     //grad_mono(0) = M_PI * cos(M_PI * tp.x()) * sin(M_PI * tp.y()) + M_PI * sin(M_PI*tp.y()/eps)*cos(M_PI*tp.x()/eps);
                     //grad_mono(1) = M_PI * sin(M_PI * tp.x()) * cos(M_PI * tp.y()) + M_PI * sin(M_PI*tp.x()/eps)*cos(M_PI*tp.y()/eps);
@@ -1010,32 +1016,49 @@ load_monoscale_solution(const mesh_type& msh, const std::string& sol_fn)
         throw std::invalid_argument("cannot open!");
 
     size_t sol_num_elements, cell_basis_deg, face_basis_deg;
-    
+
     ifs.read(reinterpret_cast<char *>(&sol_num_elements), sizeof(size_t));
     ifs.read(reinterpret_cast<char *>(&cell_basis_deg), sizeof(size_t));
     ifs.read(reinterpret_cast<char *>(&face_basis_deg), sizeof(size_t));
-    
+
     if (sol_num_elements != msh.cells_size())
     {
         std::cout << "Solution has a different number of elements than the mesh (";
         std::cout << sol_num_elements << " vs. " << msh.cells_size() << ")" << std::endl;
         throw std::invalid_argument("");
     }
-        
+
     typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
-    
+
     cell_basis_type     cell_basis_k1(cell_basis_deg+1);
-    
+
     size_t local_dofs_size = cell_basis_k1.size();
     size_t dofs_vec_size = msh.cells_size() * local_dofs_size;
     dynamic_vector<scalar_type> cell_dofs = dynamic_vector<scalar_type>::Zero(dofs_vec_size);
-    
+
     for (size_t i = 0; i < dofs_vec_size; i++)
         ifs.read(reinterpret_cast<char *>(&cell_dofs(i)), sizeof(scalar_type));
-    
+
     ifs.close();
 
     return std::make_pair(cell_basis_deg+1,cell_dofs);
+}
+
+template<typename mesh_type>
+std::pair<size_t, dynamic_vector<typename mesh_type::scalar_type>>
+load_monoscale_solution_hdf5(const mesh_type& msh, const std::string& sol_fn)
+{
+    typedef typename mesh_type::cell                cell_type;
+    typedef typename mesh_type::scalar_type         scalar_type;
+
+    hid_t file_id = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
+
+    hid_t group = H5Gopen(file_id, "/hho", H5P_DEFAULT);
+
+    hid_t H5Dopen(file_id, "solution", H5P_DEFAULT );
+
+    //status = H5Dread (dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT,
+    //            rdata[0]);
 }
 
 
@@ -1052,7 +1075,7 @@ void run_multiscale_tests_class(sol::state& lua)
     loader.verbose(true);
     loader.read_mesh(initial_mesh_filename);
     loader.populate_mesh(initial_mesh);
-    
+
     size_t hierarchy_levels = lua["hierarchy_levels"].get_or(5);
 
     disk::mesh_hierarchy<scalar_type> hierarchy(initial_mesh, hierarchy_levels);
@@ -1060,7 +1083,7 @@ void run_multiscale_tests_class(sol::state& lua)
     auto mn = hierarchy.meshes_size() - 1;
     auto finer_mesh = *std::next(hierarchy.meshes_begin(), mn);
 
-    auto monoscale_solution = 
+    auto monoscale_solution =
         load_monoscale_solution(finer_mesh, "../diffusion/solution.bin");
 
     multiscale_problem_tester<mesh_type>  test(lua, *(hierarchy.meshes_begin()+0), 4);
@@ -1103,7 +1126,7 @@ void run_multiscale_tests(sol::state& lua)
         return;
     }
 
-    auto monoscale_solution = 
+    auto monoscale_solution =
         load_monoscale_solution(finer_mesh, reference_solution_filename);
 
     std::cout <<"done" << std::endl;
@@ -1122,31 +1145,31 @@ void run_multiscale_tests(sol::state& lua)
 
     if ( lua["do0"].get_or(0) )
         test_full_problem_error(lua, *(hierarchy.meshes_begin()+0), levels[0], hierarchy, monoscale_solution);
-    
+
     if ( lua["do1"].get_or(0) )
         test_full_problem_error(lua, *(hierarchy.meshes_begin()+1), levels[1], hierarchy, monoscale_solution);
-    
+
     if ( lua["do2"].get_or(0) )
         test_full_problem_error(lua, *(hierarchy.meshes_begin()+2), levels[2], hierarchy, monoscale_solution);
-    
+
     if ( lua["do3"].get_or(0) )
         test_full_problem_error(lua, *(hierarchy.meshes_begin()+3), levels[3], hierarchy, monoscale_solution);
-    
+
     if ( lua["do4"].get_or(0) )
         test_full_problem_error(lua, *(hierarchy.meshes_begin()+4), levels[4], hierarchy, monoscale_solution);
 
     if ( lua["do5"].get_or(0) )
         test_full_problem_error(lua, *(hierarchy.meshes_begin()+5), levels[5], hierarchy, monoscale_solution);
-        
+
     if ( lua["do6"].get_or(0) )
         test_full_problem_error(lua, *(hierarchy.meshes_begin()+6), levels[6], hierarchy, monoscale_solution);
 
     if ( lua["do7"].get_or(0) )
         test_full_problem_error(lua, *(hierarchy.meshes_begin()+7), levels[7], hierarchy, monoscale_solution);
-        
+
     if ( lua["do8"].get_or(0) )
         test_full_problem_error(lua, *(hierarchy.meshes_begin()+8), levels[8], hierarchy, monoscale_solution);
-    
+
 
 
 }
@@ -1270,7 +1293,7 @@ void test_full_problem(sol::state& lua, const Mesh& msh)
 
         dynamic_vector<scalar_type> dofs = make_rhs(msh, cl, ccb, cfb, f);
         dynamic_vector<scalar_type> cdofs = dofs.head(num_cell_dofs);
-        
+
         auto fcs = faces(msh, cl);
         //std::sort(fcs.begin(), fcs.end());
 #ifdef WITH_STATIC_CONDENSATION
@@ -1416,7 +1439,7 @@ void test_full_problem(sol::state& lua, const Mesh& msh)
         //{
         //    auto phi = ccb.eval_functions(msh, cl, tp);
         //    auto val = dofs.head(num_cell_dofs).dot(phi);
-        //    
+        //
         //    sol_ofs << tp.x() << " " << tp.y() << " " << val << std::endl;
         //}
 //#if 0
@@ -1462,7 +1485,7 @@ main(int argc, char **argv)
 {
     sol::state lua;
     lua.do_file("params.lua");
-    
+
     /*
     if ( !std::regex_match(argv[1], std::regex(".*\\.mesh2d$") ) )
     {
@@ -1474,7 +1497,7 @@ main(int argc, char **argv)
 
     std::cout << "AVG H: " << average_diameter(msh) << std::endl;
 
-    
+
 
     std::string mode = lua["mode"].get_or( std::string("testgr") );
     std::cout << "Mode: " << mode << std::endl;
@@ -1487,10 +1510,8 @@ main(int argc, char **argv)
         plot_multiscale_basis_functions(lua, msh);
     else if (mode == "run_ms_test")
     */
-    
+
     run_multiscale_tests(lua);
 
     return 0;
 }
-
-
