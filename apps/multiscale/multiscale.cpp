@@ -721,6 +721,9 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
 
     bool equal_order = lua["equal_order"].get_or(false);
 
+    if (k_outer == 0)
+        equal_order = true;
+
     size_t cell_order = equal_order ? k_outer : k_outer - 1;
     size_t face_order = k_outer;
 
@@ -1041,8 +1044,15 @@ load_monoscale_solution(const mesh_type& msh, const std::string& sol_fn)
 
     ifs.close();
 
-    return std::make_pair(cell_basis_deg+1,cell_dofs);
+    return std::make_pair(cell_basis_deg+1, cell_dofs);
 }
+
+enum class ref_type
+{
+    REF_NONE,
+    REF_HHO,
+    REF_FEM
+};
 
 template<typename mesh_type>
 std::pair<size_t, dynamic_vector<typename mesh_type::scalar_type>>
@@ -1051,11 +1061,71 @@ load_monoscale_solution_hdf5(const mesh_type& msh, const std::string& sol_fn)
     typedef typename mesh_type::cell                cell_type;
     typedef typename mesh_type::scalar_type         scalar_type;
 
-    hid_t file_id = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
+    hid_t file_id = H5Fopen(sol_fn.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
 
-    hid_t group = H5Gopen(file_id, "/hho", H5P_DEFAULT);
+    ref_type rt = ref_type::REF_NONE;
 
-    hid_t H5Dopen(file_id, "solution", H5P_DEFAULT );
+    herr_t status;
+
+    status = H5Eset_auto(H5E_DEFAULT, NULL, NULL);
+    status = H5Gget_objinfo(file_id, "/hho", 0, NULL);
+    if (status == 0)
+    {
+        rt = ref_type::REF_HHO;
+
+        hid_t group_id      = H5Gopen(file_id, "/hho", H5P_DEFAULT);
+        hid_t dset_id       = H5Dopen(group_id, "solution", H5P_DEFAULT);
+        hid_t attr_deg_id   = H5Aopen(dset_id, "degree", H5P_DEFAULT);
+        hid_t attr_elem_id  = H5Aopen(dset_id, "elems", H5P_DEFAULT);
+
+        int degree;
+        int elems;
+        H5Aread(attr_deg_id, H5T_NATIVE_INT, &degree);
+        H5Aread(attr_elem_id, H5T_NATIVE_INT, &elems);
+
+        std::cout << "Reference: K = " << degree << ", #T = " << elems << std::endl;
+
+        if (elems != msh.cells_size())
+        {
+            std::cout << "Problem mesh has " << msh.cells_size() << " elements, ";
+            std::cout << "while reference has " << elems << ". Cannot use this reference.";
+            std::cout << std::endl;
+            throw std::invalid_argument("");
+        }
+
+        hid_t dspace_id = H5Dget_space(dset_id);
+        int ndims = H5Sget_simple_extent_ndims(dspace_id);
+        if (ndims != 1)
+            throw std::invalid_argument("Invalid data in HDF5 file");
+
+        hsize_t dim;
+        H5Sget_simple_extent_dims(dspace_id, &dim, NULL);
+
+        std::cout << "Reference solution has " << dim << " dofs" << std::endl;
+
+        dynamic_vector<typename mesh_type::scalar_type> sol_data;
+        sol_data.resize(dim);
+
+        status = H5Dread(dset_id, H5T_NATIVE_DOUBLE, H5S_ALL,
+                         H5S_ALL, H5P_DEFAULT, sol_data.data());
+
+        H5Aclose(attr_elem_id);
+        H5Aclose(attr_deg_id);
+        H5Dclose(dset_id);
+        H5Gclose(group_id);
+        H5Fclose(file_id);
+
+        return std::make_pair(degree, sol_data);
+    }
+
+    throw std::logic_error("shouldn't be here");
+
+    //status = H5Get_objinfo(file_id, "/fem", 0, NULL);
+    //if (status == 0)
+    //    rt = ref_type::REF_FEM;
+
+
+
 
     //status = H5Dread (dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT,
     //            rdata[0]);
@@ -1127,7 +1197,7 @@ void run_multiscale_tests(sol::state& lua)
     }
 
     auto monoscale_solution =
-        load_monoscale_solution(finer_mesh, reference_solution_filename);
+        load_monoscale_solution_hdf5(finer_mesh, reference_solution_filename);
 
     std::cout <<"done" << std::endl;
 

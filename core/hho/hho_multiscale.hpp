@@ -35,8 +35,8 @@ make_material_tensor(const point<T,2>& pt)
     //return ret;
     //return ret * 6.72071;
 
-    auto c = std::cos(M_PI * pt.x()/0.004);
-    auto s = std::sin(M_PI * pt.y()/0.004);
+    auto c = std::cos(M_PI * pt.x()/0.08);
+    auto s = std::sin(M_PI * pt.y()/0.08);
     return ret * (1 + 100*c*c*s*s);
 }
 
@@ -382,7 +382,7 @@ public:
 
             for (size_t i = 0; i < local_dofs_R.cols(); i++)
             {
-                auto const_dof = local_dofs(1,i); 
+                auto const_dof = local_dofs(1,i);
                 vector_type R = local_dofs_R.block(0, i, local_dofs_R.rows(), 1);
 
                 assert(R.size() == phi.rows()-1);
@@ -426,7 +426,7 @@ public:
 
             for (size_t i = 0; i < local_dofs_R.cols(); i++)
             {
-                auto const_dof = local_dofs(1,i); 
+                auto const_dof = local_dofs(1,i);
                 vector_type R = local_dofs_R.block(0, i, local_dofs_R.rows(), 1);
 
                 assert(R.size() == phi.rows()-1);
@@ -465,7 +465,7 @@ public:
 
             for (size_t i = 0; i < local_dofs_R.cols(); i++)
             {
-                auto const_dof = local_dofs(1,i); 
+                auto const_dof = local_dofs(1,i);
                 vector_type R = local_dofs_R.block(0, i, local_dofs_R.rows(), 1);
 
                 assert(R.size() == dphi.rows()-1);
@@ -558,7 +558,7 @@ public:
 #else
             //matrix_type dphi = bqd.cell_basis.eval_gradients(m_inner_mesh, cl, pt, 0, m_degree);
             vector_type func_dofs = local_dofs.block(0, i, local_dofs.rows(), 1);
-            
+
             for (size_t j = 0; j < dphi.rows(); j++)
                 ret.block(i,0,1,2) += func_dofs(j)*dphi.block(j,0,1,2);
 #endif
@@ -571,7 +571,7 @@ public:
     matrix_type //vector_type
     get_lagrange_multipliers()
     {
-        
+
         auto num_cell_dofs = howmany_dofs(bqd.cell_basis);
         auto num_face_dofs = howmany_dofs(bqd.face_basis);
         auto begin = num_cell_dofs * m_inner_mesh.cells_size() + num_face_dofs * m_inner_mesh.faces_size();
@@ -723,7 +723,7 @@ evaluate_dofs(const Mesh& msh, const typename Mesh::cell& cl,
               const typename Mesh::point_type& pt)
 {
     auto phi = cb.eval_functions(msh, cl, pt);
-    
+
     typename Mesh::scalar_type ret{};
 
     for (size_t i = 0; i < cb.size(); i++)
@@ -792,7 +792,7 @@ public:
         //std::cout << lmlm << std::endl;
 #endif
         for (auto& icl : inner_mesh)
-        {   
+        {
             //cell_info(inner_mesh, icl);
 
             /* stiff_mat will be the lhs */
@@ -830,7 +830,7 @@ public:
                     qp.weight() * vt_phi_outer * vt_phi_outer.transpose();
 #else
                 matrix_type ms_dphi = multiscale_basis.eval_gradients(icl, qp.point());
-                matrix_type vt_dphi = cb.eval_gradients(outer_mesh, outer_cl, qp.point());                
+                matrix_type vt_dphi = cb.eval_gradients(outer_mesh, outer_cl, qp.point());
                 rhs.block(0, 0, ms_basis_size, cb.size()) +=
                     qp.weight() * (ms_dphi * make_material_tensor(qp.point()).transpose()) * vt_dphi.transpose();
 #endif
@@ -853,7 +853,7 @@ public:
                 auto outer_fc = *std::next(outer_mesh.faces_begin(), bnd_id);
                 size_t outer_face_num = local_face_num(outer_mesh, outer_cl, outer_fc);
                 assert (outer_face_num < howmany_faces(outer_mesh, outer_cl));
-                
+
                 matrix_type face_contrib = matrix_type::Zero(ms_basis_size, fb.size());
                 auto face_quadpoints = quadpair.second.integrate(inner_mesh, fc);
                 for (auto& qp : face_quadpoints)
@@ -880,7 +880,7 @@ public:
                 auto outer_fc = *std::next(outer_mesh.faces_begin(), bnd_id);
                 size_t outer_face_num = local_face_num(outer_mesh, outer_cl, outer_fc);
                 assert (outer_face_num < howmany_faces(outer_mesh, outer_cl));
-                
+
                 //std::cout << outer_fc << " " << fc << " -> " << outer_face_num << std::endl;
 
                 auto n = normal(outer_mesh, outer_cl, outer_fc);
@@ -890,8 +890,8 @@ public:
                 {
                     matrix_type ms_dphi = multiscale_basis.eval_gradients(icl, qp.point());
                     vector_type vf_phi = fb.eval_functions(outer_mesh, outer_fc, qp.point());
-                    vector_type vt_phi = cb.eval_functions(outer_mesh, outer_cl, qp.point()); 
-                    rhs.block(0, col_ofs, ms_basis_size, fb.size()) += 
+                    vector_type vt_phi = cb.eval_functions(outer_mesh, outer_cl, qp.point());
+                    rhs.block(0, col_ofs, ms_basis_size, fb.size()) +=
                         qp.weight() * ((ms_dphi * make_material_tensor(qp.point()).transpose()) * n) * vf_phi.transpose();
                     rhs.block(0, 0, ms_basis_size, cb.size()) -=
                         qp.weight() * ((ms_dphi * make_material_tensor(qp.point()).transpose()) * n) * vt_phi.transpose();
@@ -1021,14 +1021,14 @@ public:
         }
 
 #if 0
-        dynamic_matrix<scalar_type> Mf2c = 
+        dynamic_matrix<scalar_type> Mf2c =
             dynamic_matrix<scalar_type>::Zero(cb.size(), multiscale_basis.size());
 
         for (auto& icl : inner_mesh)
         {
             if ( !has_faces_on_boundary(inner_mesh, icl) )
                 continue;
-            
+
             auto fcs = faces(inner_mesh, icl);
             auto num_faces = fcs.size();
 
@@ -1045,7 +1045,7 @@ public:
                 auto outer_fc = *std::next(outer_mesh.faces_begin(), bnd_id);
                 size_t outer_face_num = local_face_num(outer_mesh, outer_cl, outer_fc);
                 assert (outer_face_num < howmany_faces(outer_mesh, outer_cl));
-                
+
                 //std::cout << outer_fc << " " << fc << " -> " << outer_face_num << std::endl;
                 auto face_quadpoints = quadpair.second.integrate(inner_mesh, fc);
                 for (auto& qp : face_quadpoints)
