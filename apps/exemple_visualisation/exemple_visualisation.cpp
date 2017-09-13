@@ -24,15 +24,12 @@
 
 #include "colormanip.h"
 
-#include "../../config.h"
-
 #ifdef HAVE_SOLVER_WRAPPERS
     #include "agmg/agmg.hpp"
 #endif
 
 #include "loaders/loader.hpp"
 #include "hho/hho.hpp"
-#include "apps/exemple_visualisation/visualisation/gmshDisk.hpp"
 #include "apps/exemple_visualisation/visualisation/gmshConvertMesh.hpp"
 
 #include "timecounter.h"
@@ -73,7 +70,7 @@ run_diffusion_solver(const Mesh<T, 1, Storage>& msh, run_params& rp)
     dp.plot_solution_at_gausspoint("solgp1d.msh");
     dp.plot_l2error_at_gausspoint("errorgp1d.msh", solution);
     dp.plot_conforme_solution("visu1d_conforme.msh");
-    dp.plot_discontinuous_solution("visu1d.msh");
+    dp.plot_discontinuous_solution("visu1d_discontinuous.msh");
     dp.plot_deformed_conforme("visu1d_deformed_conforme.msh");
     dp.plot_deformed_discontinuous("visu1d_deformed_discontinuous.msh");
     dp.saveMesh("saveMesh1D.msh");
@@ -104,7 +101,7 @@ run_diffusion_solver(const Mesh<T, 2, Storage>& msh, run_params& rp)
     dp.plot_solution_at_gausspoint("solgp2d.msh");
     dp.plot_l2error_at_gausspoint("errorgp2d.msh", solution);
     dp.plot_conforme_solution("visu2d_conforme.msh");
-    dp.plot_discontinuous_solution("visu2d.msh");
+    dp.plot_discontinuous_solution("visu2d_discontinuous.msh");
     dp.plot_deformed_conforme("visu2d_deformed_conforme.msh");
     dp.plot_deformed_discontinuous("visu2d_deformed_discontinuous.msh");
     dp.saveMesh("saveMesh2D.msh");
@@ -135,7 +132,7 @@ run_diffusion_solver(const Mesh<T, 3, Storage>& msh, run_params& rp)
     dp.plot_solution_at_gausspoint("solgp3d.msh");
     dp.plot_l2error_at_gausspoint("errorgp3d.msh", solution);
     dp.plot_conforme_solution("visu3d_conforme.msh");
-    dp.plot_discontinuous_solution("visu3d.msh");
+    dp.plot_discontinuous_solution("visu3d_discontinuous.msh");
     dp.saveMesh("saveMesh3D.msh");
     std::cout << dp.compute_l2_error(solution) << std::endl;
 }

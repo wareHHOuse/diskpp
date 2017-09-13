@@ -45,11 +45,11 @@ public:
 class Element
 {
 protected:
-   std::vector<size_t> _nodes;
-   size_t _index;
-   size_t _type_elem;
-   size_t _physical_entities;
-   size_t _elem_tag;
+   std::vector<size_t> m_nodes;
+   size_t m_index;
+   size_t m_type_elem;
+   size_t m_physical_entities;
+   size_t m_elem_tag;
 
 public:
    Element();

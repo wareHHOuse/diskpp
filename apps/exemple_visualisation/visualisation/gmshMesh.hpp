@@ -27,17 +27,19 @@ namespace visu{
 class Gmesh
 {
    protected:
-      size_t _dim_topology;
-      std::vector<Node> _nodes;
-      std::vector<Vertice> _vertices;
-      std::vector<Edge> _edges;
-      std::vector<Triangle> _triangles;
-      std::vector<Quadrangle> _quadrangles;
-      std::vector<Tetrahedron> _tetrahedra;
-      std::vector<Hexahedron> _hexahedra;
-      std::vector<Prism> _prisms;
-      std::vector<Pyramid> _pyramids;
-      size_t _number_of_elements;
+      size_t m_dim_topology;
+      std::vector<Node> m_nodes;
+      std::vector<Vertice> m_vertices;
+      std::vector<Edge> m_edges;
+      std::vector<Triangle> m_triangles;
+      std::vector<Quadrangle> m_quadrangles;
+      std::vector<Tetrahedron> m_tetrahedra;
+      std::vector<Hexahedron> m_hexahedra;
+      std::vector<Prism> m_prisms;
+      std::vector<Pyramid> m_pyramids;
+      size_t m_number_of_elements;
+
+// private functions
       void readGmesh_MEDITformat(const std::string name_mesh);
       void writeGmesh_MEDITformat(const std::string name_mesh) const;
       void readGmesh_MSHformat(const std::string name_mesh);
@@ -115,7 +117,6 @@ class Gmesh
       void addPyramid(const Pyramid& pyramid);
 
       void convertInDiscontinuousMesh();
-      void computeDeformed(const std::vector<Node>& newNodes);
 };
 
 } //visu
