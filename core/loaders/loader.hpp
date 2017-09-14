@@ -1666,109 +1666,115 @@ class cartesian_mesh_loader<T,2> : public mesh_loader<cartesian_mesh<T,2>>
     std::vector<surface_type>                       surfaces;
 
 
-    bool hex_read(const std::string& filename)
-    {
-        /* Open file */
-        if (filename.size() == 0)
-        {
+   bool quad_read(const std::string& filename)
+   {
+      /* Open file */
+      if (filename.size() == 0)
+      {
             std::cout << "Invalid mesh file name" << std::endl;
             return false;
-        }
+      }
 
-        size_t lines, linecount;
+      size_t lines, linecount;
 
-        mapped_file mf(filename);
+      mapped_file mf(filename);
 
-        //std::cout << green << " * * * Reading NETGEN format mesh * * * ";
-        //std::cout << nocolor << std::endl;
+      //std::cout << green << " * * * Reading NETGEN format mesh * * * ";
+      //std::cout << nocolor << std::endl;
 
-        /************************ Read points ************************/
-        linecount = 0;
+      /************************ Read points ************************/
+      linecount = 0;
 
-        const char *data = mf.mem();
-        char *endptr;
+      const char *data = mf.mem();
+      char *endptr;
 
-        lines = strtot<size_t>(data, &endptr);
+      lines = strtot<size_t>(data, &endptr);
 
-        points.reserve(lines);
-        nodes.reserve(lines);
+      points.reserve(lines);
+      nodes.reserve(lines);
 
-        while (linecount < lines)
-        {
-            if ( (linecount%100000) == 0 )
+      while (linecount < lines)
+      {
+         if (  this->verbose() && (linecount%100000) == 0 )
+         {
+            std::cout << "Reading points: " << linecount;
+            std::cout << "/" << lines << "\r";
+            std::cout.flush();
+         }
+
+         auto point = priv::read_2d_point_line<T>(endptr, &endptr, 1.0);
+
+         points.push_back( point );
+
+         auto point_id = point_identifier<2>( linecount );
+         auto node = node_type( { point_id } );
+
+         nodes.push_back(node);
+         /* Do something with that point */
+
+         linecount++;
+      }
+
+      if (this->verbose())
+      {
+         std::cout << "Reading points: " << linecount;
+         std::cout << "/" << lines << std::endl;
+      }
+
+      /************************ Read hexahedra ************************/
+      linecount = 0;
+
+      lines = strtot<size_t>(endptr, &endptr);
+
+      edges.reserve(lines*4);
+      surfaces.reserve(lines);
+
+      while (linecount < lines)
+      {
+         if (  this->verbose() && (linecount%100000) == 0 )
+         {
+            std::cout << "Reading quads: " << linecount;
+            std::cout << "/" << lines << "\r";
+            std::cout.flush();
+         }
+
+         auto t = priv::read_quad_line<size_t>(endptr, &endptr);
+
+         point_identifier<2>     p0(std::get<0>(t));
+         point_identifier<2>     p1(std::get<1>(t));
+         point_identifier<2>     p2(std::get<2>(t));
+         point_identifier<2>     p3(std::get<3>(t));
+
+         edges.push_back( edge_type( { p0, p1 } ) );
+         edges.push_back( edge_type( { p0, p2 } ) );
+         edges.push_back( edge_type( { p1, p3 } ) );
+         edges.push_back( edge_type( { p2, p3 } ) );
+
+         surfaces.push_back( surface_type( { p0, p1, p2, p3 } ) );
+
+         linecount++;
+      }
+
+      if (this->verbose())
+      {
+         std::cout << "Reading quads: " << linecount;
+         std::cout << "/" << lines << std::endl;
+      }
+
+      /************************ Read boundary surfaces ************************/
+      linecount = 0;
+
+      lines = strtot<size_t>(endptr, &endptr);
+
+      boundary_edges.reserve(lines);
+
+      while (linecount < lines)
+      {
+         if (  this->verbose() && (linecount%50000) == 0 )
             {
-                std::cout << "Reading points: " << linecount;
-                std::cout << "/" << lines << "\r";
-                std::cout.flush();
-            }
-
-            auto point = priv::read_2d_point_line<T>(endptr, &endptr, 1.0);
-
-            points.push_back( point );
-
-            auto point_id = point_identifier<2>( linecount );
-            auto node = node_type( { point_id } );
-
-            nodes.push_back(node);
-            /* Do something with that point */
-
-            linecount++;
-        }
-
-        std::cout << "Reading points: " << linecount;
-        std::cout << "/" << lines << std::endl;
-
-        /************************ Read hexahedra ************************/
-        linecount = 0;
-
-        lines = strtot<size_t>(endptr, &endptr);
-
-        edges.reserve(lines*4);
-        surfaces.reserve(lines);
-
-        while (linecount < lines)
-        {
-            if ( (linecount%100000) == 0 )
-            {
-                std::cout << "Reading quads: " << linecount;
-                std::cout << "/" << lines << "\r";
-                std::cout.flush();
-            }
-
-            auto t = priv::read_quad_line<size_t>(endptr, &endptr);
-
-            point_identifier<2>     p0(std::get<0>(t));
-            point_identifier<2>     p1(std::get<1>(t));
-            point_identifier<2>     p2(std::get<2>(t));
-            point_identifier<2>     p3(std::get<3>(t));
-
-            edges.push_back( edge_type( { p0, p1 } ) );
-            edges.push_back( edge_type( { p0, p2 } ) );
-            edges.push_back( edge_type( { p1, p3 } ) );
-            edges.push_back( edge_type( { p2, p3 } ) );
-
-            surfaces.push_back( surface_type( { p0, p1, p2, p3 } ) );
-
-            linecount++;
-        }
-
-        std::cout << "Reading quads: " << linecount;
-        std::cout << "/" << lines << std::endl;
-
-        /************************ Read boundary surfaces ************************/
-        linecount = 0;
-
-        lines = strtot<size_t>(endptr, &endptr);
-
-        boundary_edges.reserve(lines);
-
-        while (linecount < lines)
-        {
-            if ( (linecount%50000) == 0 )
-            {
-                std::cout << "Reading faces: " << linecount;
-                std::cout << "/" << lines << "\r";
-                std::cout.flush();
+               std::cout << "Reading faces: " << linecount;
+               std::cout << "/" << lines << "\r";
+               std::cout.flush();
             }
 
             auto t = priv::read_quad_face_line<size_t>(endptr, &endptr);
@@ -1781,29 +1787,37 @@ class cartesian_mesh_loader<T,2> : public mesh_loader<cartesian_mesh<T,2>>
             boundary_edges.push_back( bnd );
 
             linecount++;
-        }
+      }
 
-        std::cout << "Reading faces: " << linecount;
-        std::cout << "/" << lines << std::endl;
+      if (this->verbose())
+      {
+         std::cout << "Reading faces: " << linecount;
+         std::cout << "/" << lines << std::endl;
+      }
 
-        return true;
-    }
+      return true;
+   }
 
 public:
     cartesian_mesh_loader() = default;
 
     bool read_mesh(const std::string& s)
     {
-        std::cout << " *** READING CARTESIAN 2D MESH ***" << std::endl;
-        return hex_read(s);
+       if (this->verbose())
+         std::cout << " *** READING CARTESIAN 2D MESH ***" << std::endl;
+
+        return quad_read(s);
     }
 
     bool populate_mesh(mesh_type& msh)
     {
         auto storage = msh.backend_storage();
 
-        std::cout << "Sorting data...";
-        std::cout.flush();
+        if (this->verbose())
+        {
+           std::cout << "Sorting data...";
+           std::cout.flush();
+        }
 
         storage->points = std::move(points);
         storage->nodes = std::move(nodes);
@@ -1840,11 +1854,14 @@ public:
             storage->boundary_info.at(position.second) = bi;
         }
 
+        if (this->verbose())
+        {
         std::cout << "done." << std::endl;
 
         std::cout << "Nodes: " << storage->nodes.size() << std::endl;
         std::cout << "Edges: " << storage->edges.size() << std::endl;
         std::cout << "Faces: " << storage->surfaces.size() << std::endl;
+        }
 
         boundary_edges.clear();
 
