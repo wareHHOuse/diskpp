@@ -38,6 +38,7 @@ class Gmesh
       std::vector<Prism> m_prisms;
       std::vector<Pyramid> m_pyramids;
       size_t m_number_of_elements;
+      bool m_verbose;
 
 // private functions
       void readGmesh_MEDITformat(const std::string name_mesh);
@@ -53,6 +54,8 @@ class Gmesh
    public:
       Gmesh();
       Gmesh(const size_t dim);
+
+      Gmesh(const size_t dim, const bool verbose);
 
       Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
             const std::vector<Edge>& edges);
@@ -86,6 +89,8 @@ class Gmesh
       size_t getDim() const;
       size_t getNumberofNodes() const;
       size_t getNumberofElements() const;
+      bool verbose() const;
+      void verbose(const bool verb);
       std::vector<Node> getNodes() const;
       std::vector<Vertice> getVertices() const;
       std::vector<Edge> getEdges() const;

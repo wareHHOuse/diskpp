@@ -26,16 +26,19 @@ namespace visu{
 //  Class Gmesh
 
 Gmesh::Gmesh() : m_dim_topology(0), m_nodes(), m_vertices(), m_edges(), m_triangles(), m_quadrangles(),
-                 m_tetrahedra() , m_hexahedra(), m_prisms(), m_pyramids(), m_number_of_elements(0) {}
+                 m_tetrahedra() , m_hexahedra(), m_prisms(), m_pyramids(), m_number_of_elements(0), m_verbose(true) {}
 
-Gmesh::Gmesh(size_t dim) : m_dim_topology(dim), m_nodes(), m_vertices(), m_edges(), m_triangles(), m_quadrangles(),
-                 m_tetrahedra() , m_hexahedra(), m_prisms(), m_pyramids(), m_number_of_elements(0) {}
+Gmesh::Gmesh(const size_t dim) : m_dim_topology(dim), m_nodes(), m_vertices(), m_edges(), m_triangles(), m_quadrangles(),
+                 m_tetrahedra() , m_hexahedra(), m_prisms(), m_pyramids(), m_number_of_elements(0), m_verbose(true) {}
+
+Gmesh::Gmesh(const size_t dim, const bool verbose) : m_dim_topology(dim), m_nodes(), m_vertices(), m_edges(), m_triangles(), m_quadrangles(),
+                 m_tetrahedra() , m_hexahedra(), m_prisms(), m_pyramids(), m_number_of_elements(0), m_verbose(verbose) {}
 
 Gmesh::Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
       const std::vector<Edge>& edges) :
       m_dim_topology(dim), m_nodes(nodes), m_vertices(vertices), m_edges(edges), m_triangles(), m_quadrangles(),
       m_tetrahedra() , m_hexahedra(), m_prisms(), m_pyramids(),
-      m_number_of_elements(vertices.size() + edges.size()) {}
+      m_number_of_elements(vertices.size() + edges.size()), m_verbose(true) {}
 
 Gmesh::Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
       const std::vector<Edge>& edges, const std::vector<Triangle>& triangles,
@@ -53,7 +56,7 @@ Gmesh::Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector
             m_triangles(triangles), m_quadrangles(quadrangles),
             m_tetrahedra(tetrahedra) , m_hexahedra(hexahedra), m_prisms(), m_pyramids(),
             m_number_of_elements(vertices.size() + edges.size() + triangles.size() + quadrangles.size()
-            + tetrahedra.size() + hexahedra.size()) {}
+            + tetrahedra.size() + hexahedra.size()), m_verbose(true) {}
 
 Gmesh::Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
       const std::vector<Edge>& edges, const std::vector<Triangle>& triangles,
@@ -64,7 +67,7 @@ Gmesh::Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector
       m_triangles(triangles), m_quadrangles(quadrangles),
       m_tetrahedra(tetrahedra) , m_hexahedra(hexahedra), m_prisms(prisms), m_pyramids(pyramids),
       m_number_of_elements(vertices.size() + edges.size() + triangles.size() + quadrangles.size()
-      + tetrahedra.size() + hexahedra.size() + prisms.size() + pyramids.size()) {}
+      + tetrahedra.size() + hexahedra.size() + prisms.size() + pyramids.size()), m_verbose(true) {}
 
 Gmesh::Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
       const std::vector<Edge>& edges, const std::vector<Triangle>& triangles,
@@ -73,7 +76,7 @@ Gmesh::Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector
             m_triangles(triangles), m_quadrangles(),
             m_tetrahedra(tetrahedra) , m_hexahedra(), m_prisms(), m_pyramids(),
             m_number_of_elements(vertices.size() + edges.size() + triangles.size()
-            + tetrahedra.size()) {}
+            + tetrahedra.size()), m_verbose(true) {}
 
 Gmesh::Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
             const std::vector<Edge>& edges, const std::vector<Quadrangle>& quadrangles,
@@ -82,8 +85,16 @@ Gmesh::Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector
                m_triangles(), m_quadrangles(quadrangles),
                m_tetrahedra() , m_hexahedra(hexahedra), m_prisms(), m_pyramids(),
                m_number_of_elements(vertices.size() + edges.size() + quadrangles.size()
-               + hexahedra.size()) {}
+               + hexahedra.size()), m_verbose(true) {}
 
+bool Gmesh::verbose() const
+{
+   return m_verbose;
+}
+void Gmesh::verbose(const bool verb)
+{
+   m_verbose = verb;
+}
 size_t Gmesh::getNumberofNodes() const
 {
    return m_nodes.size();
@@ -198,11 +209,12 @@ void Gmesh::readGmesh_MEDITformat(const std::string name_mesh)
       abort();
    }
 
-   std::cout << "------------------------" << std::endl;
-   std::cout << "Reading mesh " << name_mesh << std::endl;
-   std::cout << "MEDIT Format" << std::endl;
-   std::cout << "------------------------" << std::endl;
-
+   if(m_verbose){
+      std::cout << "------------------------" << std::endl;
+      std::cout << "Reading mesh " << name_mesh << std::endl;
+      std::cout << "MEDIT Format" << std::endl;
+      std::cout << "------------------------" << std::endl;
+   }
 
    std::string file_line;
    size_t nb_nodes(0), nb_edges(0), nb_triangles(0), nb_tetras(0), nb_quad(0), nb_hexa(0);
@@ -216,7 +228,8 @@ void Gmesh::readGmesh_MEDITformat(const std::string name_mesh)
       if ((file_line.find("Vertices") != std::string::npos)&&(loopm_nodes))
       {
          mesh_file >> nb_nodes;
-         std::cout << "Reading vertices (" << nb_nodes << ")" << std::endl;
+         if(m_verbose)
+            std::cout << "Reading vertices (" << nb_nodes << ")" << std::endl;
          for (size_t i = 1 ; i <= nb_nodes ; i++)
          {
             mesh_file >> coor[0] >> coor[1] >> coor[2] >> ref;
@@ -229,7 +242,8 @@ void Gmesh::readGmesh_MEDITformat(const std::string name_mesh)
       if (file_line.find("Edges") != std::string::npos)
       {
          mesh_file >> nb_edges;
-         std::cout << "Reading edges (" << nb_edges << ")" << std::endl;
+         if(m_verbose)
+            std::cout << "Reading edges (" << nb_edges << ")" << std::endl;
          for (size_t i = 1 ; i <= nb_edges ; i++)
          {
             mesh_file >> edg[0] >> edg[1] >> ref;
@@ -243,7 +257,8 @@ void Gmesh::readGmesh_MEDITformat(const std::string name_mesh)
       if (file_line.find("Triangles") != std::string::npos)
       {
          mesh_file >> nb_triangles;
-         std::cout << "Reading triangles (" << nb_triangles << ")" << std::endl;
+         if(m_verbose)
+            std::cout << "Reading triangles (" << nb_triangles << ")" << std::endl;
          for (size_t i = 1 ; i <= nb_triangles ; i++)
          {
             mesh_file >> tri[0] >> tri[1] >> tri[2] >> ref;
@@ -257,7 +272,8 @@ void Gmesh::readGmesh_MEDITformat(const std::string name_mesh)
       if (file_line.find("Tetrahedra") != std::string::npos)
       {
          mesh_file >> nb_tetras;
-         std::cout << "Reading tetrahedra (" << nb_tetras << ")" << std::endl;
+         if(m_verbose)
+            std::cout << "Reading tetrahedra (" << nb_tetras << ")" << std::endl;
          for (size_t i = 0 ; i < nb_tetras ; i++)
          {
             mesh_file >> tet[0] >> tet[1] >> tet[2] >> tet[3] >> ref;
@@ -271,7 +287,8 @@ void Gmesh::readGmesh_MEDITformat(const std::string name_mesh)
       if (file_line.find("Quadrilaterals") != std::string::npos)
       {
          mesh_file >> nb_quad;
-         std::cout << "Reading quadrilaterals (" << nb_quad << ")" << std::endl;
+         if(m_verbose)
+            std::cout << "Reading quadrilaterals (" << nb_quad << ")" << std::endl;
          for (size_t i = 1 ; i <= nb_quad ; i++)
          {
             mesh_file >> quad[0] >> quad[1] >> quad[2] >> quad[3]  >> ref;
@@ -285,7 +302,8 @@ void Gmesh::readGmesh_MEDITformat(const std::string name_mesh)
       if (file_line.find("Hexahedra") != std::string::npos)
       {
          mesh_file >> nb_hexa;
-         std::cout << "Reading hexahedra (" << nb_hexa << ")" << std::endl;
+         if(m_verbose)
+            std::cout << "Reading hexahedra (" << nb_hexa << ")" << std::endl;
          for (size_t i = 0 ; i < nb_hexa ; i++)
          {
             mesh_file >> hexa[0] >> hexa[1] >> hexa[2] >> hexa[3] >> hexa[4]
@@ -327,10 +345,12 @@ void Gmesh::readGmesh_MSHformat(const std::string name_mesh)
       abort();
    }
 
-   std::cout << "------------------------" << std::endl;
-   std::cout << "Reading mesh " << name_mesh << std::endl;
-   std::cout << "MSH Format"  << std::endl;
-   std::cout << "------------------------" << std::endl;
+   if(m_verbose){
+      std::cout << "------------------------" << std::endl;
+      std::cout << "Reading mesh " << name_mesh << std::endl;
+      std::cout << "MSH Format"  << std::endl;
+      std::cout << "------------------------" << std::endl;
+   }
 
 
    std::string file_line;
@@ -344,7 +364,8 @@ void Gmesh::readGmesh_MSHformat(const std::string name_mesh)
       if ((file_line.find("$Nodes") != std::string::npos)&&(loop_nodes))
       {
          mesh_file >> nb_nodes;
-         std::cout << "Reading nodes (" << nb_nodes << ")" << std::endl;
+         if(m_verbose)
+            std::cout << "Reading nodes (" << nb_nodes << ")" << std::endl;
          for (size_t i = 0 ; i < nb_nodes ; ++i)
          {
             mesh_file >> index >> coor[0] >> coor[1] >> coor[2];
@@ -360,7 +381,6 @@ void Gmesh::readGmesh_MSHformat(const std::string name_mesh)
          m_number_of_elements = nb_elements;
          for (size_t i = 0 ; i < nb_elements ; ++i)
          {
-            std::cout << i << " / " << nb_elements - 1 << std::endl;
             mesh_file >> index >> type_elem >> nbinteger_tag;
 
             std::vector<size_t> integer_tag(nbinteger_tag);
@@ -427,7 +447,7 @@ void Gmesh::readGmesh_MSHformat(const std::string name_mesh)
                m_pyramids.push_back(pyra);
             }
             else {
-               std::cout << "Unsupported element" << std::endl;
+               throw std::invalid_argument("Unsupported Element");
             }
          }
          loop_elem = 0;
@@ -478,10 +498,12 @@ void Gmesh::writeGmesh_MEDITformat(const std::string name_mesh) const
    }
    else
    {
-      std::cout << "------------------------" << std::endl;
-      std::cout << "Writing mesh " << name_mesh << std::endl;
-      std::cout << "MESH file format"  << std::endl;
-      std::cout << "------------------------" << std::endl;
+      if(m_verbose){
+         std::cout << "------------------------" << std::endl;
+         std::cout << "Writing mesh " << name_mesh << std::endl;
+         std::cout << "MESH file format"  << std::endl;
+         std::cout << "------------------------" << std::endl;
+      }
    }
 
    mesh_file << "MeshVersionFormatted 2" << std::endl;
@@ -590,10 +612,12 @@ void Gmesh::writeGmesh_MSHformat(const std::string name_mesh) const
    }
    else
    {
-      std::cout << "------------------------" << std::endl;
-      std::cout << "Writing mesh " << name_mesh << std::endl;
-      std::cout << "MSH ASCII file format"  << std::endl;
-      std::cout << "------------------------" << std::endl;
+      if(m_verbose){
+         std::cout << "------------------------" << std::endl;
+         std::cout << "Writing mesh " << name_mesh << std::endl;
+         std::cout << "MSH ASCII file format"  << std::endl;
+         std::cout << "------------------------" << std::endl;
+      }
    }
 
    size_t offset_elements(1);

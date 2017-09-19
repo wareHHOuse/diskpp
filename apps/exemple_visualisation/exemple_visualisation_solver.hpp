@@ -263,8 +263,9 @@ public:
    void
    plot_l2error_at_gausspoint(const std::string& filename, const AnalyticalSolution& as)
    {
-      std::cout << "Compute L2 error at Gauss points" << std::endl;
-      visu::Gmesh msh(m_msh.dimension); //creta a mesh
+      if(verbose())
+         std::cout << "Compute L2 error at Gauss points" << std::endl;
+      visu::Gmesh msh(m_msh.dimension, verbose()); //creta a mesh
 
       std::vector<visu::Data> data; //create data (not used)
       std::vector<visu::SubData> subdata; //create subdata to save soution at gauss point
@@ -301,8 +302,9 @@ public:
    void
    plot_solution_at_gausspoint(const std::string& filename)
    {
-      std::cout << "Compute solution at Gauss points" << std::endl;
-      visu::Gmesh msh(m_msh.dimension); //creta a mesh
+      if(verbose())
+         std::cout << "Compute solution at Gauss points" << std::endl;
+      visu::Gmesh msh(m_msh.dimension, verbose()); //creta a mesh
 
       std::vector<visu::Data> data; //create data (not used)
       std::vector<visu::SubData> subdata; //create subdata to save soution at gauss point
@@ -337,6 +339,8 @@ public:
    plot_conforme_solution(const std::string& filename)
    {
       visu::Gmesh gmsh = visu::convertMesh(m_msh);
+      gmsh.verbose(verbose());
+
       auto storage = m_msh.backend_storage();
       size_t nb_nodes(gmsh.getNumberofNodes());
 
@@ -386,7 +390,7 @@ public:
    void
    plot_discontinuous_solution(const std::string& filename)
    {
-      visu::Gmesh gmsh(m_msh.dimension);
+      visu::Gmesh gmsh(m_msh.dimension, verbose());
       std::vector<visu::Data> data; //create data
 
       size_t cell_i(0);
@@ -432,9 +436,10 @@ public:
    {
       const size_t DIM = m_msh.dimension;
       if(DIM >= 3)
-      std::cout << "Compute deformed only in 1D or 2D" << '\n';
+         std::cout << "Compute deformed only in 1D or 2D" << '\n';
       else {
          visu::Gmesh gmsh = visu::convertMesh(m_msh);
+         gmsh.verbose(verbose());
          auto storage = m_msh.backend_storage();
          size_t nb_nodes(gmsh.getNumberofNodes());
 
@@ -490,7 +495,7 @@ public:
       if(DIM >= 3)
          std::cout << "Compute deformed only in 1D or 2D" << '\n';
       else {
-         visu::Gmesh gmsh(DIM);
+         visu::Gmesh gmsh(DIM, verbose());
          std::vector<visu::Data> data; //create data
 
          size_t cell_i(0);
@@ -537,6 +542,7 @@ public:
    saveMesh(const std::string& filename)
    {
       visu::Gmesh gmsh = visu::convertMesh(m_msh);
+      gmsh.verbose(verbose());
       gmsh.writeGmesh(filename, 2);
    }
 };
