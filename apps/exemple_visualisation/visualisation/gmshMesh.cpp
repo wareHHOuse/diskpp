@@ -317,7 +317,7 @@ void Gmesh::readGmesh_MEDITformat(const std::string name_mesh)
       }
    }
 
-   assert(offset_elements == (nbm_edges + nbm_triangles + nb_quad + nb_hexa + nb_tetras));
+   assert(offset_elements == (nb_edges + nb_triangles + nb_quad + nb_hexa + nb_tetras));
    m_number_of_elements = offset_elements;
 
    mesh_file.close();
