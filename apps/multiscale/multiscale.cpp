@@ -1,6 +1,6 @@
 /*
- *       /\
- *      /__\       Matteo Cicuttin (C) 2016, 2017 - matteo.cicuttin@enpc.fr
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,8 +10,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 #include <iostream>
@@ -776,6 +782,10 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
     std::vector<disk::multiscale_local_basis<mesh_type>> multiscale_bases;
     multiscale_bases.reserve( msh.cells_size() );
 
+    timecounter tc_asm;
+
+    tc_asm.tic();
+
     size_t elemnum = 0;
     for (auto& cl : msh)
     {
@@ -853,8 +863,16 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
 
     std::cout << std::endl;
 
+    tc_asm.toc();
+    std::cout << "Offline time: " << tc_asm << std::endl;
+
 
     A.setFromTriplets(triplets.begin(), triplets.end());
+
+    std::cout << "System size: " << A.rows() << std::endl;
+
+    timecounter tc_sys;
+    tc_sys.tic();
 
 #ifdef HAVE_INTEL_MKL
     Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>>  solver;
@@ -866,6 +884,10 @@ test_full_problem_error(sol::state& lua, const Mesh& msh, size_t rl,
     solver.analyzePattern(A);
     solver.factorize(A);
     x = solver.solve(b);
+
+    tc_sys.toc();
+
+    std::cout << "Online time: " << tc_sys << std::endl;
 
     //std::cout << " *** POSTPROCESSING ***" << std::endl;
 

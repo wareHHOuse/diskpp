@@ -1,6 +1,6 @@
 /*
- *       /\
- *      /__\       Matteo Cicuttin (C) 2016, 2017 - matteo.cicuttin@enpc.fr
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,8 +10,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 /*
@@ -52,101 +58,101 @@
 
 
 namespace disk {
-    
+
 enum variable_centering_t
 {
     nodal_variable_t,
     zonal_variable_t
 };
-    
+
 template<typename T, variable_centering_t centering>
 class silo_variable
 {
     std::string     m_name;
     std::vector<T>  m_values;
-    
+
 public:
-    
+
     typedef typename std::vector<T>::iterator           iterator;
     typedef typename std::vector<T>::const_iterator     const_iterator;
-    
+
     silo_variable()
     {}
-    
+
     silo_variable(const std::string& name, const std::vector<T>& values)
     {
         m_name = name;
         m_values.resize( values.size() );
         std::copy(values.begin(), values.end(), m_values.begin());
     }
-    
+
     silo_variable(const std::string& name, std::vector<T>&& values)
     {
         m_name = name;
         m_values = std::move(values);
     }
-    
+
     size_t size(void) const {
         return m_values.size();
     }
-    
+
     std::string name(void) const {
         return m_name;
     }
-    
+
     T* data(void) {
         return m_values.data();
     }
-    
+
     iterator begin() {
         return m_values.begin();
     }
-    
+
     iterator end() {
         return m_values.end();
     }
-    
+
     const_iterator begin() const {
         return m_values.begin();
     }
-    
+
     const_iterator end() const {
         return m_values.end();
     }
-    
+
 };
-    
+
 template<typename T>
 using silo_nodal_variable = silo_variable<T, nodal_variable_t>;
-    
+
 template<typename T>
 using silo_zonal_variable = silo_variable<T, zonal_variable_t>;
 
 class silo_database
 {
     DBfile          *m_siloDb;
-    
+
 public:
     silo_database()
         : m_siloDb(nullptr)
     {}
-    
+
     bool create(const std::string& db_name)
     {
         m_siloDb = DBCreate(db_name.c_str(), DB_CLOBBER, DB_LOCAL, NULL, DB_PDB);
         if (m_siloDb)
             return true;
-        
+
         std::cout << "Error creating database" << std::endl;
         return false;
     }
-    
+
     bool open(const std::string& db_name)
     {
         m_siloDb = DBOpen(db_name.c_str(), DB_PDB, DB_APPEND);
         if (m_siloDb)
             return true;
-        
+
         std::cout << "Error opening database" << std::endl;
         return false;
     }
@@ -164,7 +170,7 @@ public:
         if (m_siloDb)
             DBClose(m_siloDb);
     }
-    
+
     template<typename T>
     bool add_mesh(const simplicial_mesh<T,2>& msh, const std::string& name)
     {
@@ -204,7 +210,7 @@ public:
 
         DBPutZonelist(m_siloDb, "zonelist", nzones, ndims, nodelist.data(), lnodelist,
             1, shapesize, shapecounts, nshapetypes);
-        
+
         DBPutUcdmesh(m_siloDb, "mesh", ndims, NULL, coords, nnodes, nzones,
             "zonelist", NULL, DB_DOUBLE, NULL);
 
@@ -252,10 +258,10 @@ public:
 
         DBPutZonelist(m_siloDb, "zonelist", nzones, ndims, nodelist.data(), lnodelist,
             1, shapesize, shapecounts, nshapetypes);
-        
+
         DBPutUcdmesh(m_siloDb, "mesh", ndims, NULL, coords, nnodes, nzones,
             "zonelist", NULL, DB_DOUBLE, NULL);
-        
+
         return true;
     }
 
@@ -265,21 +271,21 @@ public:
         std::cout << "Export of generic meshes not yet supported." << std::endl;
         return false;
     }
-    
-    
+
+
     /* Scalar variable, REAL case */
     template<typename T, variable_centering_t centering>
     bool add_variable(const std::string& mesh_name,
                       silo_variable<T, centering>& var)
     {
         static_assert(std::is_same<T, double>::value, "Sorry, only double for now");
-     
+
         if (!m_siloDb)
         {
             std::cout << "Silo database not opened" << std::endl;
             return false;
         }
-        
+
         if (centering == zonal_variable_t)
         {
             DBPutUcdvar1(m_siloDb, var.name().c_str(), mesh_name.c_str(),
@@ -296,25 +302,12 @@ public:
         }
         else
             return false;
-        
+
         return true;
     }
 };
-    
-    
+
+
 
 
 } //namespaces
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,5 +1,5 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016-2017
+ *       /\        Matteo Cicuttin (C) 2016, 2017
  *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
@@ -10,8 +10,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 #include <iostream>
@@ -181,7 +187,7 @@ public:
             std::sort(m_pts.begin(), m_pts.end());
     }
 
-    template <typename DIT = domain_id_type> 
+    template <typename DIT = domain_id_type>
     polytope(std::initializer_list<point_id_type> l,
              typename std::enable_if<CODIM == 0, DIT>::type d_id,
              node_ordering no = node_ordering::UNSORTED,
@@ -194,9 +200,9 @@ public:
             std::sort(m_pts.begin(), m_pts.end());
 
         this->domain_id(d_id);
-    } 
+    }
 
-    template <typename BIT = boundary_id_type> 
+    template <typename BIT = boundary_id_type>
     polytope(std::initializer_list<point_id_type> l,
              typename std::enable_if<CODIM == 1, BIT>::type b_id,
              node_ordering no = node_ordering::UNSORTED,
@@ -211,7 +217,7 @@ public:
         this->boundary_id(b_id);
     }
 
-    template <typename BIT = std::pair<boundary_id_type, bool>> 
+    template <typename BIT = std::pair<boundary_id_type, bool>>
     polytope(std::initializer_list<point_id_type> l,
              typename std::enable_if<CODIM == 1, BIT>::type b_id,
              node_ordering no = node_ordering::UNSORTED)
@@ -224,7 +230,7 @@ public:
 
         if (b_id.second)
             this->boundary_id(b_id.first);
-    } 
+    }
 
     /* Userdata-changing constructor */
     template<typename OtherUD>
@@ -433,8 +439,8 @@ std::ostream& operator<<(std::ostream& os, const priv::polytope<DIM, CODIM, User
 
     if ( !std::is_same<UserData, void>::value )
         os << "[UD] ";
-    
-    return os;    
+
+    return os;
 }
 
 template<size_t DIM, typename UserData, typename StorageScheme>
@@ -460,8 +466,8 @@ std::ostream& operator<<(std::ostream& os, const priv::polytope<DIM, 1, UserData
         auto bid = s.boundary_id();
         os << "[B " << bid.first << "] ";
     }
-    
-    return os;    
+
+    return os;
 }
 
 template<size_t DIM, typename UserData, typename StorageScheme>
@@ -483,8 +489,8 @@ std::ostream& operator<<(std::ostream& os, const priv::polytope<DIM, 0, UserData
         os << "[UD] ";
 
     os << "[D " << s.domain_id() << "] ";
-    
-    return os;    
+
+    return os;
 }
 
 

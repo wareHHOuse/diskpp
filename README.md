@@ -19,9 +19,7 @@ for (auto& cl : msh)
         auto pt = qp.point();
         auto phi  = cb.eval_functions(msh, cl, pt);
 
-        for (size_t i = 0; i < phi.size(); i++)
-            for (size_t j = 0; j < phi.size(); j++)
-                mass(i,j) = qp.weight() * mm_prod(phi[i], phi[j]);
+        mass += qp.weight() * phi * phi.transpose();
     }
 }
 ```

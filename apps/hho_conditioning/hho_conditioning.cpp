@@ -1,6 +1,6 @@
 /*
- *       /\
- *      /__\       Matteo Cicuttin (C) 2016 - matteo.cicuttin@enpc.fr
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,8 +10,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 #include <iostream>
@@ -87,7 +93,7 @@ estimate_element_cond(sol::state& lua, const Mesh& msh)
         Eigen::JacobiSVD<dynamic_matrix<scalar_type>> svd(cloc);
         auto sigma_max = svd.singularValues()(0);
         auto sigma_min = svd.singularValues()(svd.singularValues().size()-1);
-        auto cond =  sigma_max / sigma_min; 
+        auto cond =  sigma_max / sigma_min;
         std::cout << "Condition number: " << cond << std::endl;
         //std::cout << "Sigma max: " << sigma_max << std::endl;
         //std::cout << "Sigma min: " << sigma_min << std::endl;
@@ -119,7 +125,7 @@ int main(int argc, char **argv)
     }
 
     std::string     input_mesh  = lua["config"]["input_mesh"];
-    
+
 
     if (std::regex_match(input_mesh, std::regex(".*\\.typ1$") ))
     {
@@ -129,13 +135,13 @@ int main(int argc, char **argv)
 
         mesh_type msh;
         disk::fvca5_mesh_loader<scalar_type, 2> loader;
-        
+
         if (!loader.read_mesh(input_mesh))
         {
             std::cout << "Problem loading mesh." << std::endl;
             return 1;
         }
-        
+
         loader.populate_mesh(msh);
 
         estimate_element_cond(lua, msh);

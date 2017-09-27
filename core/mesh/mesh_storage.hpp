@@ -1,6 +1,6 @@
 /*
- *       /\
- *      /__\       Matteo Cicuttin (C) 2016 - matteo.cicuttin@enpc.fr
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,8 +10,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 #pragma once
@@ -62,7 +68,7 @@ struct mesh_storage<T, 3, StorageClass>
     typedef typename sc_type::surface_type          surface_type;
     typedef typename sc_type::edge_type             edge_type;
     typedef typename sc_type::node_type             node_type;
- 
+
     typedef T                                       coordinate_type;
     static const size_t                             dimension = 3;
     typedef point<coordinate_type,3>                point_type;
@@ -90,7 +96,7 @@ struct mesh_storage<T, 3, StorageClass>
         std::cout << "Edges: " << edges.size() << std::endl;
         std::cout << "Surfaces: " << surfaces.size() << std::endl;
         std::cout << "Volumes: " << volumes.size() << std::endl;
-        auto bs = std::count_if(boundary_info.begin(), boundary_info.end(), 
+        auto bs = std::count_if(boundary_info.begin(), boundary_info.end(),
                     [&](const bnd_info& bi){ return bi.is_boundary; }  );
         std::cout << "Boundary surfaces: " << bs << std::endl;
     }

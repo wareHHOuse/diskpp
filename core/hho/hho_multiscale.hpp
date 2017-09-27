@@ -1,6 +1,6 @@
 /*
- *       /\
- *      /__\       Matteo Cicuttin (C) 2016, 2017 - matteo.cicuttin@enpc.fr
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,8 +10,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 #include <functional>
@@ -35,9 +41,10 @@ make_material_tensor(const point<T,2>& pt)
     //return ret;
     //return ret * 6.72071;
 
-    auto c = std::cos(M_PI * pt.x()/0.08);
-    auto s = std::sin(M_PI * pt.y()/0.08);
-    return ret * (1 + 100*c*c*s*s);
+    auto c = std::cos(M_PI * pt.x()/0.02);
+    auto s = std::sin(M_PI * pt.y()/0.02);
+    auto e = std::exp( (pt.x()*pt.x() + pt.y()*pt.y())/2.0 );
+    return ret * (1 + 100*c*c*s*s + e);
 }
 
 template<typename T>

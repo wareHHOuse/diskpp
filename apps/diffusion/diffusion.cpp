@@ -1,6 +1,6 @@
 /*
- *       /\
- *      /__\       Matteo Cicuttin (C) 2016, 2017 - matteo.cicuttin@enpc.fr
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,8 +10,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 #include <iostream>
@@ -73,19 +79,19 @@ run_diffusion_solver(const Mesh<T, 2, Storage>& msh, run_params& rp)
 {
     typedef Mesh<T, 2, Storage> mesh_type;
 
-    
+
     auto load = [](const point<T, 2>& p) -> auto {
 
         //return 2.0 * M_PI * M_PI * sin(p.x() * M_PI) * sin(p.y() * M_PI);
         return sin(p.x()) * sin(p.y());
     };
-    
 
-    
+
+
     auto solution = [](const point<T, 2>& p) -> auto {
         return sin(p.x() * M_PI) * sin(p.y() * M_PI);
     };
-    
+
 
     /*
     auto load = [](const point<T,2>& p) -> auto {
@@ -93,7 +99,7 @@ run_diffusion_solver(const Mesh<T, 2, Storage>& msh, run_params& rp)
         return +2.0 * M_PI * M_PI * ( 100.0*sin(M_PI*p.y()/eps)*sin(M_PI*p.y()/eps)*cos(M_PI*p.x()/eps)*cos(M_PI*p.x()/eps) + 1.0) * sin(M_PI*p.x()) * sin(M_PI*p.y())
                - 200 * M_PI * M_PI * sin(M_PI*p.x()) * sin(M_PI*p.y()/eps) * cos(M_PI*p.y()) * cos(M_PI*p.x()/eps) * cos(M_PI*p.x()/eps) * cos(M_PI*p.y()/eps) / eps
                + 200 * M_PI * M_PI * sin(M_PI*p.y()) * sin(M_PI*p.x()/eps) * cos(M_PI*p.x()) * sin(M_PI*p.y()/eps) * sin(M_PI*p.y()/eps) * cos(M_PI*p.x()/eps) / eps;
-    
+
     };
     */
 
@@ -204,7 +210,7 @@ int main(int argc, char **argv)
     argv += optind;
 
     mesh_filename = argv[0];
-    
+
 #if 0
     if (argc == 0)
     {
@@ -214,7 +220,7 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    
+
 
     /* FVCA5 2D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))

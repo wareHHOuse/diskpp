@@ -1,6 +1,6 @@
 /*
- *       /\
- *      /__\       Matteo Cicuttin (C) 2016 - matteo.cicuttin@enpc.fr
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,8 +10,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 #include <iostream>
@@ -52,17 +58,17 @@ cfem_solver(const disk::simplicial_mesh<T, 2>& msh)
     {
         if ( dirichlet_nodes.at(i) )
             continue;
-        
+
         expand_map.at(nnum) = i;
         compress_map.at(i) = nnum++;
     }
 
     sparse_matrix_type              gA(system_size, system_size);
     dynamic_vector<T>               gb(system_size), gx(system_size);
-    
+
     gb = dynamic_vector<T>::Zero(system_size);
 
-    
+
     std::vector<triplet_type>       triplets;
 
     //T integral = 0.0;
@@ -71,7 +77,7 @@ cfem_solver(const disk::simplicial_mesh<T, 2>& msh)
     {
         static_matrix<T, 2, 2> kappa = static_matrix<T, 2, 2>::Zero();
         auto bar = barycenter(msh, cl);
-        
+
         auto c = std::cos(M_PI * bar.x()/0.02);
         auto s = std::sin(M_PI * bar.y()/0.02);
         auto eps = 1 + 100*c*c*s*s;// + std::exp( (bar.x()*bar.x() + bar.y()*bar.y())/2. );
@@ -129,9 +135,9 @@ cfem_solver(const disk::simplicial_mesh<T, 2>& msh)
             e_gx( expand_map.at(i) ) = gx(i);
 
 
-        
 
-        
+
+
 
         std::ofstream ofs("solution.dat");
 
@@ -161,7 +167,7 @@ cfem_solver(const disk::simplicial_mesh<T, 2>& msh)
         disk::silo_database silo_db;
         silo_db.create("test.silo");
         silo_db.add_mesh(msh, "test");
-        
+
         disk::silo_zonal_variable<double> u("u", solution_vals);
         silo_db.add_variable("mesh", u);
 

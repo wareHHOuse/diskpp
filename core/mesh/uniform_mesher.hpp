@@ -1,6 +1,6 @@
 /*
- *       /\
- *      /__\       Matteo Cicuttin (C) 2016,2017 - matteo.cicuttin@enpc.fr
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,8 +10,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 #include <iostream>
@@ -60,7 +66,7 @@ operator<<(std::ostream& os, const edge<1, priv::mesh_refinement_info>& e)
         os << " [B " << b.first << "]";
     return os;
 }
-    
+
 template<typename T>
 using mesher_triangular_storage = mesh_storage<T, 2, mesher_triangular_storage_class>;
 
@@ -263,7 +269,7 @@ public:
         refine();
         dump_to_matlab(internal_mesh, "third.m");
 
-        
+
 
 
         //timecounter tc;
@@ -278,14 +284,14 @@ public:
         {
             std::cout << cl << " -> " << measure(internal_mesh, cl) << std::endl;
         }
-        
+
         for (auto itor = internal_mesh.faces_begin(); itor != internal_mesh.faces_end(); itor++)
         {
             std::cout << *itor << std::endl;
             //std::cout << measure(internal_mesh, *itor) << std::endl;
         }
         #endif
-        
+
     }
 };
 

@@ -1,6 +1,6 @@
 /*
- *       /\
- *      /__\       Matteo Cicuttin (C) 2016,2017 - matteo.cicuttin@enpc.fr
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,10 +10,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
-
 #include "core/output/hdf5_io.hpp"
 
 namespace disk {
@@ -61,7 +66,7 @@ bool save(const hdf5_context& hctx, const triangular_mesh<T>& mesh,
     {
         group_id = H5Gcreate(file_id, "meshes",
                              H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-        
+
         group_id = H5Gcreate(group_id, "standalone",
                              H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     }
@@ -73,7 +78,7 @@ bool save(const hdf5_context& hctx, const triangular_mesh<T>& mesh,
     group_id = H5Gcreate(group_id, name.c_str(),
                              H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
-    
+
     //if (group_id < 0)
     //{
     //    group_id = H5Gcreate(file_id, "/meshes", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
@@ -104,7 +109,7 @@ struct hierarchical_simplicial_storage_class<2>
 };
 
 template<typename T, size_t DIM>
-using hierarchical_simplicial_mesh_storage = mesh_storage<T, DIM, 
+using hierarchical_simplicial_mesh_storage = mesh_storage<T, DIM,
                                     hierarchical_simplicial_storage_class<DIM>>;
 
 template<typename T, size_t DIM>
@@ -141,7 +146,7 @@ points(const Mesh& msh, const polytope<EDIM, CODIM, UserData, fixed_storage_poly
 
     for (size_t i = 0; i < ptids.size(); i++)
         ret[i] = *std::next(msh.points_begin(), ptids[i]);
-    
+
     return ret;
 }
 
@@ -202,12 +207,12 @@ barycenter(const Mesh& msh, const triangle<CODIM, UserData>& t)
 template<typename Mesh>
 std::array<typename Mesh::face_type, polytope_traits<typename Mesh::cell_type>::storage_size>
 faces(const Mesh& msh,
-      typename std::enable_if<is_fixed_storage<typename Mesh::cell_type>::value, 
+      typename std::enable_if<is_fixed_storage<typename Mesh::cell_type>::value,
                               const typename Mesh::cell_type>::type& cl)
 {
     using return_type = std::array<typename Mesh::face_type,
                                    polytope_traits<typename Mesh::cell_type>::storage_size>;
-    
+
     return_type ret;
 
     return ret;
@@ -216,7 +221,7 @@ faces(const Mesh& msh,
 template<typename Mesh>
 std::vector<typename Mesh::face_type>
 faces(const Mesh& msh,
-        typename std::enable_if<!is_fixed_storage<typename Mesh::cell_type>::value, 
+        typename std::enable_if<!is_fixed_storage<typename Mesh::cell_type>::value,
                                 const typename Mesh::cell_type>::type& cl)
 {
 
