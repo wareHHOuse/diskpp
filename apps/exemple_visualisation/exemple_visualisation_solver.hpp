@@ -1,6 +1,6 @@
 /*
- *       /\
- *      /__\       Matteo Cicuttin (C) 2016, 2017 - matteo.cicuttin@enpc.fr
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,8 +10,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 #include <iostream>
@@ -406,7 +412,7 @@ public:
 
             auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, pt);
 
-            std::array<double, 3> coor = {double{0.0}, double{0.0}, double{0.0}};
+            std::array<double, 3> coor = {{double{0.0}, double{0.0}, double{0.0}}};
 
             visu::init_coordinate(pt, coor);
             visu::Node tmp_node(coor, nb_nodes, 0);
@@ -510,7 +516,7 @@ public:
                nb_nodes++;
                auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, pt);
 
-               std::array<double, 3> coor = {double{0.0}, double{0.0}, double{0.0}};
+               std::array<double, 3> coor = {{double{0.0}, double{0.0}, double{0.0}}};
 
                visu::init_coordinate(pt, coor);
                visu::Node tmp_node(coor, nb_nodes, 0);

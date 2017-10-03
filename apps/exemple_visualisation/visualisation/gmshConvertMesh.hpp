@@ -1,17 +1,23 @@
 /*
- *       /\
- *      /__\       Nicolas Pignet (C) 2017
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
- *   /__\  /__\    Gmsh tools
- *  /_\/_\/_\/_\
+ *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
+ *  /_\/_\/_\/_\   methods.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 #pragma once
@@ -44,7 +50,7 @@ namespace visu{
    template<typename T, size_t DIM>
    Node convertPoint( const point<T,DIM>& point, const size_t index)
    {
-      std::array<double, 3> coor = {double{0.0}, double{0.0}, double{0.0}};
+      std::array<double, 3> coor = {{double{0.0}, double{0.0}, double{0.0}}};
 
       init_coordinate(point, coor);
 
@@ -58,7 +64,7 @@ sort_nodes_2D(const std::vector<Node>& list_nodes)
 {
    //Works only for 2D case
    //compute barycenter
-   std::array<double, 2> bar = {double{0.0}, double{0.0}};
+   std::array<double, 2> bar = {{double{0.0}, double{0.0}}};
 
    for(size_t i = 0; i < list_nodes.size(); i++) {
       std::array<double, 3> coor_node = list_nodes[i].getCoordinate();
@@ -120,7 +126,7 @@ sort_nodes_3D(const std::vector<Node>& list_nodes)
       v3[0] -= v0[0]; v3[1] -= v0[1]; v3[2] -= v0[2];
 
       //
-      std::array<double, 3> v4 = {double{0.0}, double{0.0}, double{0.0}};
+      std::array<double, 3> v4 = {{double{0.0}, double{0.0}, double{0.0}}};
 
       // v4 = v2 cross v3
       v4[0] = v1[1]*v2[2] - v1[2]*v2[1];
