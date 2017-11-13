@@ -161,7 +161,7 @@ public:
 
     bool operator<(const generic_element& other) const
     {
-        return this->m_sids_ptrs < other.m_sids_ptrs;
+        return (this->m_sids_ptrs < other.m_sids_ptrs);
     }
 
     bool operator==(const generic_element& other) const

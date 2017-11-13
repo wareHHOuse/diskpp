@@ -26,6 +26,11 @@ for (auto& cl : msh)
 
 this code will work independently of the dimension of the problem (1D, 2D, 3D) and the kind of mesh.
 
+## Cloning the repository
+The repository has some dependencies that must be fetched. When you clone, make sure to do a recursive clone by using
+
+```git clone --recursive https://github.com/datafl4sh/diskpp```
+
 ## Installation
 The library runs on Unix systems. The main development is made on Mac OS X, but it compiles and runs fine also on Linux and FreeBSD. It is written in C++14 and requires a recent compiler to be compiled (GCC >= 5.0 or Clang >= 3.8). Older compilers may work but they are neither supported nor tested.
 

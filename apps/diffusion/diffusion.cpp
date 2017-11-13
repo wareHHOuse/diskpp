@@ -79,17 +79,20 @@ run_diffusion_solver(const Mesh<T, 2, Storage>& msh, run_params& rp)
 {
     typedef Mesh<T, 2, Storage> mesh_type;
 
+    std::cout << mesh_h(msh) << std::endl;
 
     auto load = [](const point<T, 2>& p) -> auto {
 
         //return 2.0 * M_PI * M_PI * sin(p.x() * M_PI) * sin(p.y() * M_PI);
-        return sin(p.x()) * sin(p.y());
+        //return sin(p.x()) * sin(p.y());
+        return 1.0;
     };
 
 
 
     auto solution = [](const point<T, 2>& p) -> auto {
-        return sin(p.x() * M_PI) * sin(p.y() * M_PI);
+        //return sin(p.x() * M_PI) * sin(p.y() * M_PI);
+        return 0.5 * ( 1.0 - p.x()*p.x() - p.y()*p.y() );
     };
 
 
@@ -112,7 +115,7 @@ run_diffusion_solver(const Mesh<T, 2, Storage>& msh, run_params& rp)
     dp.solve();
     std::cout << "post" << std::endl;
     dp.postprocess(load);
-    //dp.plot_solution("plot.dat");
+    dp.plot_solution("plot.dat");
     std::cout << dp.compute_l2_error(solution) << std::endl;
 }
 
@@ -221,7 +224,7 @@ int main(int argc, char **argv)
     }
 
 
-
+#endif
     /* FVCA5 2D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
     {
@@ -230,7 +233,7 @@ int main(int argc, char **argv)
         run_diffusion_solver(msh, rp);
         return 0;
     }
-#endif
+
     /* Netgen 2D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$") ))
     {

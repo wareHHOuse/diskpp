@@ -819,6 +819,47 @@ eigval_solver(sol::state& lua, const Mesh& msh)
 
             dynamic_vector<scalar_type> gx = eigvecs.block(0,i,eigvecs.rows(),1);
 
+            std::stringstream ss_fn;
+            ss_fn << "eigval_" << i << ".vtk";
+            std::ofstream ofs(ss_fn.str());
+
+            ofs << "# vtk DataFile Version 1.0" << std::endl;
+            ofs << "Eigenval problem solution" << std::endl;
+            ofs << "ASCII" << std::endl;
+
+            ofs << "DATASET UNSTRUCTURED_GRID" << std::endl;
+            ofs << "POINTS " << msh.points_size() << " float" << std::endl;
+
+            for (auto itor = msh.points_begin(); itor != msh.points_end(); itor++)
+            {
+                auto pt = (*itor);
+                ofs << pt.x() << " " << pt.y() << " 0.0" << std::endl;
+            }
+
+            size_t listlen = 0;
+            for (auto& cl : msh)
+            {
+                auto ptids = cl.point_ids();
+                listlen += ptids.size() + 1;
+            }
+
+            ofs << "CELLS " << msh.cells_size() << " " << listlen << std::endl;
+            for (auto& cl : msh)
+            {
+                auto ptids = cl.point_ids();
+                ofs << ptids.size() << " ";
+                for (auto& ptid : ptids)
+                    ofs << ptid << " ";
+                ofs << std::endl;
+            }
+
+            ofs << "CELL_TYPES " << msh.cells_size() << std::endl;
+            for (size_t i = 0; i < msh.cells_size(); i++)
+                ofs << 7 << std::endl;
+
+            ofs << "CELL_DATA " << msh.cells_size() << std::endl;
+            ofs << "SCALARS cell_scalars float 1" << std::endl;
+            ofs << "LOOKUP_TABLE default" << std::endl;
             size_t cell_i = 0;
             for (auto& cl : msh)
             {
@@ -828,6 +869,7 @@ eigval_solver(sol::state& lua, const Mesh& msh)
                 auto val = local_dofs.dot(phi);
                 solution_vals.at(cell_i) = val;
                 cell_i++;
+                ofs << val << std::endl;
             }
 
             std::stringstream ss;

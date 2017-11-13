@@ -128,8 +128,8 @@ class diffusion_solver
     typedef disk::gradient_reconstruction_bq<bqdata_type>               gradrec_type;
     typedef disk::diffusion_like_stabilization_bq<bqdata_type>          stab_type;
     typedef disk::diffusion_like_static_condensation_bq<bqdata_type>    statcond_type;
-    //typedef disk::assembler<mesh_type, face_basis_type, face_quadrature_type> assembler_type;
-    typedef disk::assembler_homogeneus_dirichlet<mesh_type, face_basis_type, face_quadrature_type> assembler_type;
+    typedef disk::assembler<mesh_type, face_basis_type, face_quadrature_type> assembler_type;
+    //typedef disk::assembler_homogeneus_dirichlet<mesh_type, face_basis_type, face_quadrature_type> assembler_type;
     typedef static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> tensor_type;
 
     size_t m_cell_degree, m_face_degree;
@@ -264,7 +264,7 @@ public:
         solver.analyzePattern(m_system_matrix);
         solver.factorize(m_system_matrix);
         auto sol = solver.solve(m_system_rhs);
-        //m_system_solution = sol;
+        m_system_solution = sol;
 
         //agmg_solver<scalar_type> agmg;
         //auto sol = agmg.solve(m_system_matrix, m_system_rhs);
@@ -272,7 +272,7 @@ public:
         //Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> sol;
         //conjugated_gradient(m_system_matrix, m_system_rhs, sol);
         //std::cout << "solver done" << std::endl;
-        m_system_solution = assembler.expand_solution(m_msh, sol);
+        //m_system_solution = assembler.expand_solution(m_msh, sol);
         //std::cout << "expand done" << std::endl;
 
         tc.toc();
@@ -406,8 +406,11 @@ public:
             auto x = m_postprocess_data.at(cell_i++);
             //auto qps = m_bqd.cell_quadrature.integrate(m_msh, cl);
             //for (auto& qp : qps)
-            auto tps = make_test_points(m_msh, cl, 10);
-            for (auto& tp : tps)
+            //auto tps = make_test_points(m_msh, cl, 10);
+
+            auto tp = barycenter(m_msh, cl);
+
+            //for (auto& tp : tps)
             {
                 auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, tp);
 

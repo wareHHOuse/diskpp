@@ -268,8 +268,64 @@ public:
     template<typename T>
     bool add_mesh(const generic_mesh<T,2>& msh, const std::string& name)
     {
-        std::cout << "Export of generic meshes not yet supported." << std::endl;
-        return false;
+        static_assert(std::is_same<T,double>::value, "Only double for now");
+
+        std::vector<T> x_coords, y_coords;
+        x_coords.reserve(msh.points_size());
+        y_coords.reserve(msh.points_size());
+
+        for (auto itor = msh.points_begin(); itor != msh.points_end(); itor++)
+        {
+            auto pt = *itor;
+            x_coords.push_back(pt.x());
+            y_coords.push_back(pt.y());
+        }
+
+        T *coords[] = {x_coords.data(), y_coords.data()};
+
+
+        std::map<int, int>  polygon_types;
+        std::vector<int>    nodelist;
+
+        for (auto& cl : msh)
+        {
+            std::cout << cl << std::endl;
+            auto ptids = cl.point_ids();
+            auto size = ptids.size();
+            assert(size > 2);
+            polygon_types[size]++;
+            for (auto& ptid : ptids)
+                nodelist.push_back(ptid+1); // Silo wants 1-based indices
+        }
+
+        std::cout << "*** " << polygon_types.size() << std::endl;
+        for (auto& pt : polygon_types)
+            std::cout << pt.first << ": " << pt.second << std::endl;
+
+        int lnodelist       = nodelist.size();
+        int nshapetypes     = polygon_types.size();
+
+        std::vector<int> shapesize, shapecount;
+        for (auto& pt : polygon_types)
+        {
+            shapesize.push_back(pt.first);
+            shapecount.push_back(pt.second);
+        }
+
+        assert(shapesize.size() == nshapetypes);
+        assert(shapecount.size() == nshapetypes);
+
+        int nnodes = msh.points_size();
+        int nzones = msh.cells_size();
+        int ndims = 2;
+
+        DBPutZonelist(m_siloDb, "zonelist", nzones, ndims, nodelist.data(), lnodelist,
+            1, shapesize.data(), shapecount.data(), nshapetypes);
+
+        DBPutUcdmesh(m_siloDb, name.c_str(), ndims, NULL, coords, nnodes, nzones,
+            "zonelist", NULL, DB_DOUBLE, NULL);
+
+        return true;
     }
 
 
