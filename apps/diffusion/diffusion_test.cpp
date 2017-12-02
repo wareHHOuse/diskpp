@@ -187,7 +187,7 @@ verify_convergence(const std::vector<std::string>& paths,
 
             dp.assemble(f, sf);
             dp.solve();
-            dp.postprocess(f);
+            dp.postprocess(f, sf);
             auto error = dp.compute_l2_error(sf);
             auto diam = average_diameter(msh);
 

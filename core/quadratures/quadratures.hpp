@@ -27,8 +27,9 @@
 #include "geometry/geometry.hpp"
 #include "quadratures/quad_bones.hpp"
 
-namespace disk {
-template<typename MeshType, typename Element>
+namespace disk
+{
+template <typename MeshType, typename Element>
 class quadrature
 {
     typedef MeshType                            mesh_type;
@@ -40,12 +41,12 @@ class quadrature
     static_assert(sizeof(Element) == -1, "quadrature: not suitable for the requested kind of element");
 };
 
-template<typename Mesh>
+template <typename Mesh>
 std::pair<quadrature<Mesh, typename Mesh::cell>, quadrature<Mesh, typename Mesh::face>>
-make_quadrature(const Mesh& msh, size_t order_cell, size_t order_face)
+make_quadrature(const Mesh &msh, size_t order_cell, size_t order_face)
 {
-    auto cq = quadrature<Mesh, typename Mesh::cell>(order_cell);
-    auto fq = quadrature<Mesh, typename Mesh::face>(order_face);
+    const auto cq = quadrature<Mesh, typename Mesh::cell>(order_cell);
+    const auto fq = quadrature<Mesh, typename Mesh::face>(order_face);
 
     return std::make_pair(cq, fq);
 }

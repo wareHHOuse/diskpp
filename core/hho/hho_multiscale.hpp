@@ -24,6 +24,8 @@
 using namespace std::placeholders;
 
 #include "hho.hpp"
+#include "hho_bq.hpp"
+#include "hho/gradient_reconstruction.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -84,7 +86,7 @@ public:
 
 private:
 
-    typedef basis_quadrature_data<inner_mesh_type,
+    typedef hho::basis_quadrature_data<inner_mesh_type,
                                   scaled_monomial_scalar_basis,
                                   quadrature>           bqdata_type;
 
@@ -149,7 +151,7 @@ public:
         tc.tic();
         submesher_type                                  submesher;
         bqd = bqdata_type(m_degree, m_degree);
-        gradient_reconstruction_bq<bqdata_type>         gradrec(bqd);
+        hho::gradient_reconstruction_bq<bqdata_type>         gradrec(bqd);
         diffusion_like_stabilization_bq<bqdata_type>    stab(bqd);
 
         m_inner_mesh = submesher.generate_mesh(outer_msh, outer_cl, m_refinement_levels);
@@ -1089,7 +1091,7 @@ class multiscale_local_problem
     typedef Eigen::SparseMatrix<scalar_type>    sparse_matrix_type;
     typedef Eigen::Triplet<scalar_type>         triplet_type;
 
-    typedef basis_quadrature_data<mesh_type,
+    typedef hho::basis_quadrature_data<mesh_type,
                                   scaled_monomial_scalar_basis,
                                   quadrature>   bqdata_type;
 
@@ -1157,7 +1159,7 @@ public:
     {
         submesher<Mesh>                                 submesher;
         bqdata_type                                     bqd(m_degree, m_degree);
-        gradient_reconstruction_bq<bqdata_type>         gradrec(bqd);
+        hho::gradient_reconstruction_bq<bqdata_type>         gradrec(bqd);
         diffusion_like_stabilization_bq<bqdata_type>    stab(bqd);
 
         auto msh = submesher.generate_mesh(coarse_msh, coarse_cl, m_refinement_levels);

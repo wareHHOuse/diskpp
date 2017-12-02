@@ -1,6 +1,6 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
- *      /__\       matteo.cicuttin@enpc.fr
+ *       /\
+ *      /__\       Matteo Cicuttin (C) 2016 - matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,14 +10,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code or parts of it for scientific publications, you
- * are required to cite it as following:
- *
- * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
- * polytopal meshes using generic programming.
- * M. Cicuttin, D. A. Di Pietro, A. Ern.
- * Journal of Computational and Applied Mathematics.
- * DOI: 10.1016/j.cam.2017.09.017
+ * If you use this code for scientific publications, you are required to
+ * cite it.
  */
 
 #pragma once
@@ -36,10 +30,38 @@ struct scaled_monomial_scalar_basis
 };
 
 template<typename MeshType, typename Element>
+struct scaled_monomial_vector_basis
+{
+   static_assert(sizeof(MeshType) == -1, "scaled_monomial_vector_basis: not suitable for the requested kind of mesh");
+   static_assert(sizeof(Element) == -1, "scaled_monomial_vector_basis: not suitable for the requested kind of element");
+};
+
+template<typename MeshType, typename Element>
+struct scaled_monomial_matrix_basis
+{
+   static_assert(sizeof(MeshType) == -1, "scaled_monomial_matrix_basis: not suitable for the requested kind of mesh");
+   static_assert(sizeof(Element) == -1, "scaled_monomial_matrix_basis: not suitable for the requested kind of element");
+};
+
+template<typename MeshType, typename Element>
 struct scaled_monomial_vector_sg_basis
 {
     static_assert(sizeof(MeshType) == -1, "scaled_monomial_vector_sg_basis: not suitable for the requested kind of mesh");
     static_assert(sizeof(Element) == -1, "scaled_monomial_vector_sg_basis: not suitable for the requested kind of element");
+};
+
+template<typename MeshType, typename Element>
+struct Raviart_Thomas_vector_basis
+{
+   static_assert(sizeof(MeshType) == -1, "Raviart_Thomas_vector_basis: not suitable for the requested kind of mesh");
+   static_assert(sizeof(Element) == -1, "Raviart_Thomas_vector_basis: not suitable for the requested kind of element");
+};
+
+template<typename MeshType, typename Element>
+struct Raviart_Thomas_matrix_basis
+{
+   static_assert(sizeof(MeshType) == -1, "Raviart_Thomas_matrix_basis: not suitable for the requested kind of mesh");
+   static_assert(sizeof(Element) == -1, "Raviart_Thomas_matrix_basis: not suitable for the requested kind of element");
 };
 
 } //namespace disk
@@ -52,7 +74,7 @@ struct scaled_monomial_vector_sg_basis
 #include "bases/bases_utils.hpp"
 
 #include "bases/bases_all.hpp"
-#include "bases/bases_simplicial.hpp"
+//#include "bases/bases_simplicial.hpp"
 
 
 namespace disk {

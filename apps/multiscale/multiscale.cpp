@@ -42,6 +42,7 @@
 
 #include "loaders/loader.hpp"
 #include "hho/hho_multiscale.hpp"
+#include "hho/hho_bq.hpp"
 
 
 #include "contrib/sol2/sol.hpp"

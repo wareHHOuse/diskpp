@@ -30,8 +30,11 @@
 #include "loaders/loader.hpp"
 #include "cfem/cfem.hpp"
 #include "hho/hho.hpp"
+#include "hho/hho_bq.hpp"
+#include "hho/gradient_reconstruction.hpp"
 #include "output/silo.hpp"
 #include "solvers/solver.hpp"
+#include <common/condition_number.hpp>
 
 #include "contrib/sol2/sol.hpp"
 #include "contrib/timecounter.h"
@@ -52,11 +55,11 @@ estimate_element_cond(sol::state& lua, const Mesh& msh)
     typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
 
     typedef
-    disk::basis_quadrature_data<mesh_type,
+    disk::hho::basis_quadrature_data<mesh_type,
                                 disk::scaled_monomial_scalar_basis,
                                 disk::quadrature> bqdata_type;
 
-    typedef disk::gradient_reconstruction_bq<bqdata_type>               gradrec_type;
+    typedef disk::hho::gradient_reconstruction_bq<bqdata_type>               gradrec_type;
     typedef disk::diffusion_like_stabilization_bq<bqdata_type>          stab_type;
     typedef disk::diffusion_like_static_condensation_bq<bqdata_type>    statcond_type;
 
@@ -89,11 +92,8 @@ estimate_element_cond(sol::state& lua, const Mesh& msh)
 
         auto cbs = bqd.cell_basis.size();
 
-        auto cloc = loc.block(0,0,cbs,cbs);
-        Eigen::JacobiSVD<dynamic_matrix<scalar_type>> svd(cloc);
-        auto sigma_max = svd.singularValues()(0);
-        auto sigma_min = svd.singularValues()(svd.singularValues().size()-1);
-        auto cond =  sigma_max / sigma_min;
+        const dynamic_matrix<scalar_type> cloc = loc.block(0,0,cbs,cbs);
+        const scalar_type cond(condition_number(cloc));
         std::cout << "Condition number: " << cond << std::endl;
         //std::cout << "Sigma max: " << sigma_max << std::endl;
         //std::cout << "Sigma min: " << sigma_min << std::endl;

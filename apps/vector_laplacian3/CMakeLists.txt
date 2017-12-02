@@ -1,0 +1,6 @@
+add_executable(vector_laplacian3 vector_laplacian3.cpp)
+target_link_libraries(vector_laplacian3 ${LINK_LIBS})
+
+add_executable(vector_laplacian3_test_conditioning vector_laplacian3_test_conditioning.cpp)
+target_link_libraries(vector_laplacian3_test_conditioning ${LINK_LIBS})
+install(TARGETS vector_laplacian3_test_conditioning RUNTIME DESTINATION bin)

@@ -32,6 +32,8 @@
 #include "loaders/loader.hpp"
 #include "cfem/cfem.hpp"
 #include "hho/hho.hpp"
+#include "hho/hho_bq.hpp"
+#include "hho/gradient_reconstruction.hpp"
 #include "output/silo.hpp"
 #include "solvers/solver.hpp"
 
@@ -56,11 +58,11 @@ hho_solver(sol::state& lua, const Mesh& msh)
     typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
 
     typedef
-    disk::basis_quadrature_data<mesh_type,
+    disk::hho::basis_quadrature_data<mesh_type,
                                 disk::scaled_monomial_scalar_basis,
                                 disk::quadrature> bqdata_type;
 
-    typedef disk::gradient_reconstruction_bq<bqdata_type>               gradrec_type;
+    typedef disk::hho::gradient_reconstruction_bq<bqdata_type>               gradrec_type;
     typedef disk::diffusion_like_stabilization_bq<bqdata_type>          stab_type;
     typedef disk::diffusion_like_static_condensation_bq<bqdata_type>    statcond_type;
     //typedef disk::assembler<mesh_type, face_basis_type, face_quadrature_type> assembler_type;
@@ -426,8 +428,6 @@ cfem_eigenvalue_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
 
 
 
-
-
 template<typename T>
 bool
 cfem_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
@@ -636,11 +636,11 @@ eigval_solver(sol::state& lua, const Mesh& msh)
     typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
 
     typedef
-    disk::basis_quadrature_data<mesh_type,
+    disk::hho::basis_quadrature_data<mesh_type,
                                 disk::scaled_monomial_scalar_basis,
                                 disk::quadrature> bqdata_type;
 
-    typedef disk::gradient_reconstruction_bq<bqdata_type>               gradrec_type;
+    typedef disk::hho::gradient_reconstruction_bq<bqdata_type>               gradrec_type;
     typedef disk::diffusion_like_stabilization_bq<bqdata_type>          stab_type;
     typedef disk::eigval_mass_matrix_bq<bqdata_type>                    mass_type;
 
@@ -832,34 +832,35 @@ eigval_solver(sol::state& lua, const Mesh& msh)
 
             for (auto itor = msh.points_begin(); itor != msh.points_end(); itor++)
             {
-                auto pt = (*itor);
-                ofs << pt.x() << " " << pt.y() << " 0.0" << std::endl;
+               auto pt = (*itor);
+               ofs << pt.x() << " " << pt.y() << " 0.0" << std::endl;
             }
 
             size_t listlen = 0;
             for (auto& cl : msh)
             {
-                auto ptids = cl.point_ids();
-                listlen += ptids.size() + 1;
+               auto ptids = cl.point_ids();
+               listlen += ptids.size() + 1;
             }
 
             ofs << "CELLS " << msh.cells_size() << " " << listlen << std::endl;
             for (auto& cl : msh)
             {
-                auto ptids = cl.point_ids();
-                ofs << ptids.size() << " ";
-                for (auto& ptid : ptids)
-                    ofs << ptid << " ";
-                ofs << std::endl;
+               auto ptids = cl.point_ids();
+               ofs << ptids.size() << " ";
+               for (auto& ptid : ptids)
+               ofs << ptid << " ";
+               ofs << std::endl;
             }
 
             ofs << "CELL_TYPES " << msh.cells_size() << std::endl;
             for (size_t i = 0; i < msh.cells_size(); i++)
-                ofs << 7 << std::endl;
+            ofs << 7 << std::endl;
 
             ofs << "CELL_DATA " << msh.cells_size() << std::endl;
             ofs << "SCALARS cell_scalars float 1" << std::endl;
             ofs << "LOOKUP_TABLE default" << std::endl;
+
             size_t cell_i = 0;
             for (auto& cl : msh)
             {

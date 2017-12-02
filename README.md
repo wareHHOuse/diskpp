@@ -70,13 +70,13 @@ A file named `plot.dat` will be generated, to view the result it is sufficient t
 ### Linux
 The project requires several packages to be installed on the system:
 
-1. Intel Math Kernel Library (MKL): https://software.intel.com/en-us/mkl  
+1. Intel Math Kernel Library (MKL): https://software.intel.com/en-us/mkl
 diskpp-master will be able to find MKL after a correct installation. Check cmake/FindMKL.cmake if an error occures.
 
-2. Silo library for reading and writing a wide variety of scientific data to binary, disk files: https://wci.llnl.gov/simulation/computer-codes/silo  
+2. Silo library for reading and writing a wide variety of scientific data to binary, disk files: https://wci.llnl.gov/simulation/computer-codes/silo
 If diskpp-master can not find Silo after installation, add LIBRARY and INCLUDE path to cmake/FindSILO.cmake.
 
-3. Lua lightweight embeddable scripting language: https://www.lua.org/download.html  
+3. Lua lightweight embeddable scripting language: https://www.lua.org/download.html
 Lua is also available on most Linux platforms. Version 5.2 has been tested, make sure to install both main and development files, e.g.:
 
 ```

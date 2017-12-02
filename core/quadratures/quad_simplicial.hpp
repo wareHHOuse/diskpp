@@ -36,24 +36,24 @@ map_to_reference(const simplicial_mesh<T,3>& msh,
                  const typename simplicial_mesh<T,3>::face& face,
                  const point<T,3>& pm)
 {
-    auto pts = points(msh, face);
+    const auto pts = points(msh, face);
 
-    auto v0 = (pts[1] - pts[0]).to_vector();
-    auto v1 = (pts[2] - pts[0]).to_vector();
-    auto v2 = (pm - pts[0]).to_vector();
-    auto d00 = v0.dot(v0);
-    auto d01 = v0.dot(v1);
-    auto d11 = v1.dot(v1);
-    auto d20 = v2.dot(v0);
-    auto d21 = v2.dot(v1);
+    const auto v0 = (pts[1] - pts[0]).to_vector();
+    const auto v1 = (pts[2] - pts[0]).to_vector();
+    const auto v2 = (pm - pts[0]).to_vector();
+    const auto d00 = v0.dot(v0);
+    const auto d01 = v0.dot(v1);
+    const auto d11 = v1.dot(v1);
+    const auto d20 = v2.dot(v0);
+    const auto d21 = v2.dot(v1);
 
-    auto invden = 1./(d00*d11 - d01*d01);
-    auto v = (d11*d20 - d01*d21)*invden;
-    auto w = (d00*d21 - d01*d20)*invden;
-    auto u = 1 - v - w;
+    const auto invden = 1./(d00*d11 - d01*d01);
+    const auto v = (d11*d20 - d01*d21)*invden;
+    const auto w = (d00*d21 - d01*d20)*invden;
+    const auto u = 1 - v - w;
 
-    auto x = u*0 + v*1 + w*0;
-    auto y = u*0 + v*0 + w*1;
+    const auto x = u*0 + v*1 + w*0;
+    const auto y = u*0 + v*0 + w*1;
 
     return point<T,2>{x,y};
 }
@@ -64,7 +64,7 @@ map_to_physical(const simplicial_mesh<T,3>& msh,
                 const simplicial_element<3,1>& face,
                 const point<T,2>& pm)
 {
-    auto pts = points(msh, face);
+    const auto pts = points(msh, face);
     return pts[0] + (pts[1]-pts[0])*pm.x() + (pts[2]-pts[0])*pm.y();
 }
 
@@ -74,9 +74,9 @@ map_to_physical(const simplicial_mesh<T,3>& msh,
                 const typename simplicial_mesh<T,3>::cell& cell,
                 const point<T,3>& p)
 {
-    auto pts = points(msh, cell);
+    const auto pts = points(msh, cell);
 
-    auto pp = (pts[1] - pts[0]) * p.x() +
+    const auto pp = (pts[1] - pts[0]) * p.x() +
               (pts[2] - pts[0]) * p.y() +
               (pts[3] - pts[0]) * p.z() +
               pts[0];
@@ -112,11 +112,11 @@ public:
     std::vector<quadpoint_type>
     integrate(const mesh_type& msh, const cell_type& cl) const
     {
-        auto meas = measure(msh, cl);
+        const auto meas = measure(msh, cl);
 
         auto tr = [&](const std::pair<point<T,3>, T>& qd) -> auto {
-            auto point = map_to_physical(msh, cl, qd.first);
-            auto weight = qd.second * meas;
+            const auto point = map_to_physical(msh, cl, qd.first);
+            const auto weight = qd.second * meas;
             return make_qp(point, weight);
         };
 
@@ -156,11 +156,11 @@ public:
     std::vector<quadpoint_type>
     integrate(const mesh_type& msh, const face_type& fc) const
     {
-        auto meas = measure(msh, fc);
+        const auto meas = measure(msh, fc);
 
         auto tr = [&](const std::pair<point<T,2>, T>& qd) -> auto {
-            auto point = map_to_physical(msh, fc, qd.first);
-            auto weight = qd.second * meas;
+            const auto point = map_to_physical(msh, fc, qd.first);
+            const auto weight = qd.second * meas;
             return make_qp(point, weight);
         };
 
@@ -201,28 +201,26 @@ public:
     std::vector<quadpoint_type>
     integrate(const mesh_type& msh, const cell_type& cl) const
     {
-        auto pts        = points(msh, cl);
+        const auto pts        = points(msh, cl);
 
         std::vector<quadpoint_type> ret;
 
-        ret.resize( m_quadrature_data.size() );
+        ret.resize( m_quadrature_data.size());
 
-        auto col1 = pts[1] - pts[0];
-        auto col2 = pts[2] - pts[0];
+        const auto col1 = pts[1] - pts[0];
+        const auto col2 = pts[2] - pts[0];
 
         /* Compute the area of the sub-triangle */
-        auto tm = (col1.x()*col2.y() - col2.x()*col1.y())/2.;
+        const auto tm = (col1.x()*col2.y() - col2.x()*col1.y())/2.;
 
         auto tr = [&](const std::pair<point<T,2>, T>& qd) -> auto {
-            auto point = col1*qd.first.x() + col2*qd.first.y() + pts[0];
-            auto weight = qd.second * std::abs(tm);
+            const auto point = col1*qd.first.x() + col2*qd.first.y() + pts[0];
+            const auto weight = qd.second * std::abs(tm);
             return make_qp(point, weight);
         };
 
-        auto retbegin = ret.begin();
-
         std::transform(m_quadrature_data.begin(), m_quadrature_data.end(),
-                       retbegin, tr);
+                       ret.begin(), tr);
 
         return ret;
     }
@@ -256,11 +254,11 @@ public:
     std::vector<quadpoint_type>
     integrate(const mesh_type& msh, const face_type& fc) const
     {
-        auto meas = measure(msh, fc);
-        auto pts = points(msh, fc);
+        const auto meas = measure(msh, fc);
+        const auto pts = points(msh, fc);
         auto tr = [&](const std::pair<point<T,1>, T>& qd) -> auto {
-            auto point = (pts[1] - pts[0])*qd.first.x() + pts[0];
-            auto weight = qd.second * meas;
+            const auto point = (pts[1] - pts[0])*qd.first.x() + pts[0];
+            const auto weight = qd.second * meas;
             return make_qp(point, weight);
         };
 
@@ -271,7 +269,6 @@ public:
         return ret;
     }
 };
-
 
 } // namespace disk
 
