@@ -22,12 +22,13 @@
 
 #pragma once
 
+#include <cassert>
+
 #include "common/eigen.hpp"
 #include "hho/hho.hpp"
 #include "hho/hho_bq.hpp"
 #include "hho/hho_mass_matrix.hpp"
 #include "hho/hho_utils.hpp"
-#include "hho/hho_vector_bq.hpp"
 #include "mechanics/BoundaryConditions.hpp"
 
 namespace disk {
@@ -308,7 +309,7 @@ class assembler_by_elimination_bq
          }
 
          if (fc_is_boundary) {
-            const vector_type sol_F = projector.compute_face(msh, fc, bc);
+            const vector_type sol_F = projector.projectOnFace(msh, fc, bc);
             for (size_t face_j = 0; face_j < fcs.size(); face_j++) {
                const auto fcj             = fcs[face_j];
                const bool fcj_is_boundary = msh.is_boundary(fcj);
@@ -406,7 +407,7 @@ class assembler_by_elimination_mechanics_bq
 
    const BQData& m_bqd;
 
-   typedef projector_vector_bq<BQData> projector_type;
+   typedef projector_bq<BQData> projector_type;
 
  public:
    typedef Eigen::SparseMatrix<scalar_type> sparse_matrix_type;
@@ -483,7 +484,7 @@ class assembler_by_elimination_mechanics_bq
          }
 
          if (fc_is_dirichlet_boundary) {
-            const vector_type proj_bcf = projector.compute_face(msh, fc, bc);
+            const vector_type proj_bcf = projector.projectOnFace(msh, fc, bc);
             for (size_t face_j = 0; face_j < fcs.size(); face_j++) {
                const auto fcj  = fcs[face_j];
                auto       eidj = find_element_id(msh.faces_begin(), msh.faces_end(), fcj);
@@ -561,7 +562,7 @@ class assembler_by_elimination_mechanics_bq
          const auto face_id = eid.second;
 
          if (boundary_conditions.is_dirichlet_face(face_id)) {
-            const vector_type proj_bcf    = projector.compute_face(msh, bfc, bc);
+            const vector_type proj_bcf    = projector.projectOnFace(msh, bfc, bc);
             const auto        face_offset = face_id * face_basis_size;
             switch (boundary_conditions.dirichlet_boundary_type(face_id)) {
                case DIRICHLET: {
@@ -644,7 +645,7 @@ class assembler_by_elimination_mechanics_bq
 };
 
 template<typename BQData>
-class assembler_full_substitution_vector_bq
+class assembler_by_elimination_without_static_condensation_bq
 {
    typedef typename BQData::mesh_type      mesh_type;
    typedef typename mesh_type::scalar_type scalar_type;
@@ -660,7 +661,7 @@ class assembler_full_substitution_vector_bq
 
    const BQData& m_bqd;
 
-   typedef projector_vector_bq<BQData> projector_type;
+   typedef projector_bq<BQData> projector_type;
 
  public:
    typedef Eigen::SparseMatrix<scalar_type> sparse_matrix_type;
@@ -670,9 +671,9 @@ class assembler_full_substitution_vector_bq
    vector_type         rhs;
    std::vector<size_t> face_compress_map, face_expand_map;
 
-   assembler_full_substitution_vector_bq() = delete;
+   assembler_by_elimination_without_static_condensation_bq() = delete;
 
-   assembler_full_substitution_vector_bq(const mesh_type& msh, const BQData& bqd)
+   assembler_by_elimination_without_static_condensation_bq(const mesh_type& msh, const BQData& bqd)
      : m_bqd(bqd)
    {
       const size_t cells_dofs = howmany_dofs(m_bqd.cell_basis) * msh.cells_size();
@@ -686,37 +687,6 @@ class assembler_full_substitution_vector_bq
       size_t fn = 0, fi = 0;
       for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++, fi++) {
          if (msh.is_boundary(*itor)) continue;
-
-         face_compress_map.at(fi) = fn;
-         face_expand_map.at(fn)   = fi;
-         fn++;
-      }
-   }
-
-   assembler_full_substitution_vector_bq(const mesh_type&          msh,
-                                         const BQData&             bqd,
-                                         const BoundaryConditions& boundary_conditions)
-     : m_bqd(bqd)
-   {
-      const size_t cells_dofs = howmany_dofs(m_bqd.cell_basis) * msh.cells_size();
-      const size_t faces_dofs = howmany_dofs(m_bqd.face_basis) *
-                                (msh.faces_size() - boundary_conditions.nb_faces_dirichlet());
-      m_num_unknowns = cells_dofs + faces_dofs;
-      matrix         = sparse_matrix_type(m_num_unknowns, m_num_unknowns);
-      rhs            = vector_type::Zero(m_num_unknowns);
-
-      face_compress_map.resize(msh.faces_size());
-      face_expand_map.resize(msh.internal_faces_size() + boundary_conditions.nb_faces_neumann());
-      size_t fn = 0, fi = 0;
-      for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++, fi++) {
-         if (msh.is_boundary(*itor)) {
-            auto bfc = *itor;
-            auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), bfc);
-            if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
-
-            const auto face_id = eid.second;
-            if (boundary_conditions.is_dirichlet_face(face_id)) continue;
-         }
 
          face_compress_map.at(fi) = fn;
          face_expand_map.at(fn)   = fi;
@@ -773,7 +743,7 @@ class assembler_full_substitution_vector_bq
          }
 
          if (fc_is_boundary) {
-            const vector_type sol_F = projector.compute_face(msh, fc, bc);
+            const vector_type sol_F = projector.projectOnFace(msh, fc, bc);
             for (size_t face_j = 0; face_j < fcs.size(); face_j++) {
                const auto fcj             = fcs[face_j];
                const bool fcj_is_boundary = msh.is_boundary(fcj);
@@ -785,118 +755,6 @@ class assembler_full_substitution_vector_bq
                                    face_basis_size,
                                    face_basis_size) *
                     sol_F;
-               }
-            }
-         }
-      }
-
-      assert(lc.first.rows() == lc.first.cols());
-      assert(lc.first.rows() == lc.second.size());
-      assert(lc.second.size() == l2g.size());
-
-      // std::cout << lc.second.size() << " " << l2g.size() << std::endl;
-
-      for (size_t i = 0; i < lc.first.rows(); i++) {
-         if (l2g[i] == 0xDEADBEEF) continue;
-
-         for (size_t j = 0; j < lc.first.cols(); j++) {
-            if (l2g[j] == 0xDEADBEEF) continue;
-
-            m_triplets.push_back(triplet_type(l2g.at(i), l2g.at(j), lc.first(i, j)));
-         }
-         rhs(l2g.at(i)) += lc.second(i) - rhs_bc(i);
-      }
-   }
-
-   template<typename LocalContrib, typename Function>
-   void assemble_nl(const mesh_type&                msh,
-                    const cell_type&                cl,
-                    const LocalContrib&             lc,
-                    const Function&                 bc,
-                    const BoundaryConditions&       boundary_conditions,
-                    const std::vector<vector_type>& sol_F)
-   {
-      const auto   cell_basis_size = howmany_dofs(m_bqd.cell_basis);
-      const auto   face_basis_size = howmany_dofs(m_bqd.face_basis);
-      const auto   fcs             = faces(msh, cl);
-      const size_t total_dof       = cell_basis_size + fcs.size() * face_basis_size;
-
-      std::vector<size_t> l2g(total_dof);
-
-      const auto cid = find_element_id(msh.cells_begin(), msh.cells_end(), cl);
-      if (!cid.first) throw std::invalid_argument("This is a bug: cell not found");
-
-      const auto cell_id     = cid.second;
-      const auto cell_offset = cell_id * cell_basis_size;
-
-      for (size_t i = 0; i < cell_basis_size; i++) {
-         l2g[i] = cell_offset + i;
-      }
-
-      const size_t cells_offset = msh.cells_size() * cell_basis_size;
-
-      vector_type rhs_bc = vector_type::Zero(total_dof);
-
-      projector_type projector(m_bqd);
-
-      for (size_t face_i = 0; face_i < fcs.size(); face_i++) {
-         const auto fc = fcs[face_i];
-
-         auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
-         if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
-
-         const auto face_id                  = eid.second;
-         const bool fc_is_dirichlet_boundary = boundary_conditions.is_dirichlet_face(face_id);
-
-         const auto face_offset = cells_offset + face_compress_map.at(face_id) * face_basis_size;
-
-         const auto pos = cell_basis_size + face_i * face_basis_size;
-
-         for (size_t i = 0; i < face_basis_size; i++) {
-            if (fc_is_dirichlet_boundary)
-               l2g.at(pos + i) = 0xDEADBEEF;
-            else
-               l2g.at(pos + i) = face_offset + i;
-         }
-
-         if (fc_is_dirichlet_boundary) {
-            const vector_type proj_bcf = projector.compute_face(msh, fc, bc);
-            for (size_t face_j = 0; face_j < fcs.size(); face_j++) {
-               const auto fcj  = fcs[face_j];
-               auto       eidj = find_element_id(msh.faces_begin(), msh.faces_end(), fcj);
-               if (!eidj.first) throw std::invalid_argument("This is a bug: face not found");
-
-               const auto face_idj = eidj.second;
-               const bool fcj_is_dirichlet_boundary =
-                 boundary_conditions.is_dirichlet_face(face_idj);
-
-               if (!fcj_is_dirichlet_boundary) {
-                  switch (boundary_conditions.dirichlet_boundary_type(face_id)) {
-                     case DIRICHLET: {
-                        rhs_bc.block(
-                          cell_basis_size + face_j * face_basis_size, 0, face_basis_size, 1) +=
-                          lc.first.block(cell_basis_size + face_j * face_basis_size,
-                                         pos,
-                                         face_basis_size,
-                                         face_basis_size) *
-                          (proj_bcf - sol_F[face_id]);
-                        break;
-                     }
-                     case CLAMPED: {
-                        rhs_bc.block(face_j * face_basis_size, 0, face_basis_size, 1) -=
-                          lc.first.block(cell_basis_size + face_j * face_basis_size,
-                                         pos,
-                                         face_basis_size,
-                                         face_basis_size) *
-                          sol_F[face_id];
-                        break;
-                     }
-                     default: {
-                        std::cout << "Unknown Dirichlet Conditions: we do nothing (assembly)"
-                                  << std::endl;
-                        break;
-                     }
-                  }
                }
             }
          }

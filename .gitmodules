@@ -9,3 +9,11 @@
 [submodule "contrib/sol2"]
 	path = contrib/sol2
 	url = https://github.com/ThePhD/sol2
+[submodule "contrib/Spectra"]
+	path = contrib/Spectra
+	url = https://github.com/yixuan/spectra.git
+	branch = master
+[submodule "contrib/gmsh_tools"]
+	path = contrib/gmsh_tools
+	url = https://github.com/npaster/gmsh_tools
+	branch = master

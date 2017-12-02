@@ -123,7 +123,7 @@ class diffusion_solver
          ai.time_gradrec += tc.to_double();
 
          tc.tic();
-         const auto cell_rhs = disk::hho::compute_rhs_bq(m_msh, cl, lf, m_bqd);
+         const auto cell_rhs = disk::hho::compute_rhs(m_msh, cl, lf, m_bqd);
          const auto scnp     = statcond.compute(m_msh, cl, gradrec.data, cell_rhs);
 
          tc.toc();
@@ -207,9 +207,9 @@ class diffusion_solver
          }
 
          gradrec.compute(m_msh, cl);
-         const dynamic_matrix<scalar_type> loc = gradrec.data;
-         const auto cell_rhs                   = disk::hho::compute_rhs_bq(m_msh, cl, lf, m_bqd);
-         const dynamic_vector<scalar_type> x   = statcond.recover(m_msh, cl, loc, cell_rhs, xFs);
+         const dynamic_matrix<scalar_type> loc      = gradrec.data;
+         const auto                        cell_rhs = disk::hho::compute_rhs(m_msh, cl, lf, m_bqd);
+         const dynamic_vector<scalar_type> x = statcond.recover(m_msh, cl, loc, cell_rhs, xFs);
          m_postprocess_data.push_back(x);
       }
       tc.toc();

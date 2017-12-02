@@ -28,14 +28,11 @@
 
 #include "hho/assembler.hpp"
 #include "hho/gradient_reconstruction.hpp"
-#include "hho/hho.hpp"
 #include "hho/hho_bq.hpp"
 #include "hho/hho_utils.hpp"
 #include "hho/projector.hpp"
 #include "hho/stabilization.hpp"
 #include "hho/static_condensation.hpp"
-
-#include <Eigen/Eigenvalues>
 
 #include "timecounter.h"
 
@@ -164,10 +161,9 @@ class diffusion_solver
    template<typename LoadFunction, typename BoundaryConditionFunction>
    assembly_info assemble(const LoadFunction& lf, const BoundaryConditionFunction& bcf)
    {
-      auto gradrec  = gradrec_type(m_bqd);
-      auto stab     = stab_type(m_bqd);
-      auto statcond = statcond_type(m_bqd);
-      // auto assembler  = assembler_type(m_msh, m_face_degree);
+      auto gradrec   = gradrec_type(m_bqd);
+      auto stab      = stab_type(m_bqd);
+      auto statcond  = statcond_type(m_bqd);
       auto assembler = assembler_type(m_msh, m_bqd);
 
       assembly_info ai;
@@ -179,16 +175,13 @@ class diffusion_solver
          tensor_type ret = tensor_type::Identity();
          return ret;
          // return 6.72071 * ret;
-         auto c = cos(M_PI * pt.x() / 0.004);
-         auto s = sin(M_PI * pt.y() / 0.004);
+         const auto c = cos(M_PI * pt.x() / 0.004);
+         const auto s = sin(M_PI * pt.y() / 0.004);
          return ret * (1 + 100 * c * c * s * s);
       };
 
       size_t elem_i = 0;
       for (auto& cl : m_msh) {
-
-         // if (elem_i%10000 == 0)
-         //    std::cout << elem_i << std::endl;
 
          elem_i++;
 
@@ -273,8 +266,8 @@ class diffusion_solver
          tensor_type ret = tensor_type::Identity();
          return ret;
          // return 6.72071 * ret;
-         auto c = cos(M_PI * pt.x() / 0.004);
-         auto s = sin(M_PI * pt.y() / 0.004);
+         const auto c = cos(M_PI * pt.x() / 0.004);
+         const auto s = sin(M_PI * pt.y() / 0.004);
          return ret * (1 + 100 * c * c * s * s);
       };
 
@@ -354,10 +347,10 @@ class diffusion_solver
 
       size_t i = 0;
       for (auto& cl : m_msh) {
-         auto                        x        = m_postprocess_data.at(i++);
-         dynamic_vector<scalar_type> true_dof = projk.projectOnCell(m_msh, cl, as);
-         dynamic_vector<scalar_type> comp_dof = x.block(0, 0, true_dof.size(), 1);
-         dynamic_vector<scalar_type> diff_dof = (true_dof - comp_dof);
+         const auto                        x        = m_postprocess_data.at(i++);
+         const dynamic_vector<scalar_type> true_dof = projk.projectOnCell(m_msh, cl, as);
+         const dynamic_vector<scalar_type> comp_dof = x.block(0, 0, true_dof.size(), 1);
+         const dynamic_vector<scalar_type> diff_dof = (true_dof - comp_dof);
          err_dof += diff_dof.dot(projk.cell_mm * diff_dof);
       }
 
@@ -370,12 +363,11 @@ class diffusion_solver
 
       size_t cell_i = 0;
       for (auto& cl : m_msh) {
-         auto x = m_postprocess_data.at(cell_i++);
-         // auto qps = m_bqd.cell_quadrature.integrate(m_msh, cl);
-         // for (auto& qp : qps)
-         auto tps = make_test_points(m_msh, cl, 10);
+         const auto x = m_postprocess_data.at(cell_i++);
+
+         const auto tps = make_test_points(m_msh, cl, 10);
          for (auto& tp : tps) {
-            auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, tp);
+            const auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, tp);
 
             scalar_type pot = 0.0;
             for (size_t i = 0; i < howmany_dofs(m_bqd.cell_basis); i++)

@@ -18,13 +18,10 @@
 
 #include <sstream>
 
-#include "config.h"
-
 #include "hho/assembler.hpp"
 #include "hho/gradient_reconstruction.hpp"
-#include "hho/hho.hpp"
 #include "hho/hho_bq.hpp"
-#include "hho/hho_vector_bq.hpp"
+#include "hho/hho_utils.hpp"
 #include "hho/projector.hpp"
 #include "hho/static_condensation.hpp"
 
@@ -177,7 +174,7 @@ class vector_laplacian_solver
          ai.time_gradrec += tc.to_double();
 
          tc.tic();
-         const auto cell_rhs = disk::hho::compute_rhs_bq(m_msh, cl, lf, m_bqd);
+         const auto cell_rhs = disk::hho::compute_rhs(m_msh, cl, lf, m_bqd);
 
          const dynamic_matrix<scalar_type> loc  = m_laplacian_parameters.lambda * gradrec.data;
          const auto                        scnp = statcond.compute(m_msh, cl, loc, cell_rhs);
@@ -260,9 +257,9 @@ class vector_laplacian_solver
          }
 
          gradrec.compute(m_msh, cl);
-         const dynamic_matrix<scalar_type> loc = m_laplacian_parameters.lambda * gradrec.data;
-         const auto cell_rhs                   = disk::hho::compute_rhs_bq(m_msh, cl, lf, m_bqd);
-         const dynamic_vector<scalar_type> x   = statcond.recover(m_msh, cl, loc, cell_rhs, xFs);
+         const dynamic_matrix<scalar_type> loc      = m_laplacian_parameters.lambda * gradrec.data;
+         const auto                        cell_rhs = disk::hho::compute_rhs(m_msh, cl, lf, m_bqd);
+         const dynamic_vector<scalar_type> x = statcond.recover(m_msh, cl, loc, cell_rhs, xFs);
          m_solution_data.push_back(x);
       }
       tc.toc();

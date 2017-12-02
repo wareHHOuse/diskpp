@@ -23,130 +23,134 @@
 #pragma once
 
 #include "common/eigen.hpp"
+#include "geometry/geometry.hpp"
 
-namespace disk { namespace cfem {
+namespace disk {
+namespace cfem {
 
 template<typename T>
 static_vector<T, 3>
-eval_basis(const disk::simplicial_mesh<T, 2>& msh,
-           const typename disk::simplicial_mesh<T, 2>::cell& cl,
+eval_basis(const disk::simplicial_mesh<T, 2>&                      msh,
+           const typename disk::simplicial_mesh<T, 2>::cell&       cl,
            const typename disk::simplicial_mesh<T, 2>::point_type& pt)
 {
-    static_vector<T, 3> ret;
+   static_vector<T, 3> ret;
 
-    auto pts = points(msh, cl);
-    auto x0 = pts[0].x(); auto y0 = pts[0].y();
-    auto x1 = pts[1].x(); auto y1 = pts[1].y();
-    auto x2 = pts[2].x(); auto y2 = pts[2].y();
+   const auto pts = points(msh, cl);
+   const auto x0  = pts[0].x();
+   const auto y0  = pts[0].y();
+   const auto x1  = pts[1].x();
+   const auto y1  = pts[1].y();
+   const auto x2  = pts[2].x();
+   const auto y2  = pts[2].y();
 
-    auto m = (x1*y2 - y1*x2 - x0*(y2 - y1) + y0*(x2 - x1));
+   const auto m = (x1 * y2 - y1 * x2 - x0 * (y2 - y1) + y0 * (x2 - x1));
 
-    ret(0) = (x1*y2 - y1*x2 - pt.x() * (y2 - y1) + pt.y() * (x2 - x1)) / m;
-    ret(1) = (x2*y0 - y2*x0 + pt.x() * (y2 - y0) - pt.y() * (x2 - x0)) / m;
-    ret(2) = (x0*y1 - y0*x1 - pt.x() * (y1 - y0) + pt.y() * (x1 - x0)) / m;
+   ret(0) = (x1 * y2 - y1 * x2 - pt.x() * (y2 - y1) + pt.y() * (x2 - x1)) / m;
+   ret(1) = (x2 * y0 - y2 * x0 + pt.x() * (y2 - y0) - pt.y() * (x2 - x0)) / m;
+   ret(2) = (x0 * y1 - y0 * x1 - pt.x() * (y1 - y0) + pt.y() * (x1 - x0)) / m;
 
-    return ret;
+   return ret;
 }
 
 template<typename T>
 static_matrix<T, 3, 2>
-eval_basis_grad(const disk::simplicial_mesh<T, 2>& msh,
+eval_basis_grad(const disk::simplicial_mesh<T, 2>&                msh,
                 const typename disk::simplicial_mesh<T, 2>::cell& cl)
 {
-    static_matrix<T, 3, 2> ret;
+   static_matrix<T, 3, 2> ret;
 
-    auto pts = points(msh, cl);
-    auto x0 = pts[0].x(); auto y0 = pts[0].y();
-    auto x1 = pts[1].x(); auto y1 = pts[1].y();
-    auto x2 = pts[2].x(); auto y2 = pts[2].y();
+   const auto pts = points(msh, cl);
+   const auto x0  = pts[0].x();
+   const auto y0  = pts[0].y();
+   const auto x1  = pts[1].x();
+   const auto y1  = pts[1].y();
+   const auto x2  = pts[2].x();
+   const auto y2  = pts[2].y();
 
-    auto m = (x1*y2 - y1*x2 - x0*(y2 - y1) + y0*(x2 - x1));
+   const auto m = (x1 * y2 - y1 * x2 - x0 * (y2 - y1) + y0 * (x2 - x1));
 
-    ret(0,0) = (y1 - y2) / m;
-    ret(1,0) = (y2 - y0) / m;
-    ret(2,0) = (y0 - y1) / m;
-    ret(0,1) = (x2 - x1) / m;
-    ret(1,1) = (x0 - x2) / m;
-    ret(2,1) = (x1 - x0) / m;
+   ret(0, 0) = (y1 - y2) / m;
+   ret(1, 0) = (y2 - y0) / m;
+   ret(2, 0) = (y0 - y1) / m;
+   ret(0, 1) = (x2 - x1) / m;
+   ret(1, 1) = (x0 - x2) / m;
+   ret(2, 1) = (x1 - x0) / m;
 
-    return ret;
+   return ret;
 }
 
 template<typename T>
 static_matrix<T, 3, 3>
-mass_matrix(const disk::simplicial_mesh<T, 2>& msh,
+mass_matrix(const disk::simplicial_mesh<T, 2>&                msh,
             const typename disk::simplicial_mesh<T, 2>::cell& cl)
 {
-    static_matrix<T, 3, 3> ret;
-    auto pts = points(msh, cl);
+   static_matrix<T, 3, 3> ret;
+   const auto             pts = points(msh, cl);
 
-    auto p0 = (pts[0] + pts[1])/2;
-    auto p1 = (pts[1] + pts[2])/2;
-    auto p2 = (pts[0] + pts[2])/2;
+   const auto p0 = (pts[0] + pts[1]) / 2;
+   const auto p1 = (pts[1] + pts[2]) / 2;
+   const auto p2 = (pts[0] + pts[2]) / 2;
 
-    auto meas = measure(msh, cl);
-    auto phi = eval_basis(msh, cl, p0);
+   const auto meas = measure(msh, cl);
+   const auto phi  = eval_basis(msh, cl, p0);
 
-    ret = phi * phi.transpose();
+   ret = phi * phi.transpose();
 
-    phi = eval_basis(msh, cl, p1);
-    ret = ret + phi * phi.transpose();
+   phi = eval_basis(msh, cl, p1);
+   ret = ret + phi * phi.transpose();
 
-    phi = eval_basis(msh, cl, p2);
-    ret = ret + phi * phi.transpose();
+   phi = eval_basis(msh, cl, p2);
+   ret = ret + phi * phi.transpose();
 
-    ret *= meas/3.0;
+   ret *= meas / 3.0;
 
-    return ret;
+   return ret;
 }
 
 template<typename T>
 static_matrix<T, 3, 3>
-stiffness_matrix(const disk::simplicial_mesh<T, 2>& msh,
+stiffness_matrix(const disk::simplicial_mesh<T, 2>&                msh,
                  const typename disk::simplicial_mesh<T, 2>::cell& cl)
 {
-    static_matrix<T, 3, 3> ret;
+   const auto meas  = measure(msh, cl);
+   const auto dphi  = eval_basis_grad(msh, cl);
+   const auto stiff = meas * dphi * dphi.transpose();
 
-    auto meas = measure(msh, cl);
-    auto dphi = eval_basis_grad(msh, cl);
-    auto stiff = meas * dphi * dphi.transpose();
-
-    return stiff;
+   return stiff;
 }
 
 template<typename T>
 static_matrix<T, 3, 3>
-stiffness_matrix(const disk::simplicial_mesh<T, 2>& msh,
+stiffness_matrix(const disk::simplicial_mesh<T, 2>&                msh,
                  const typename disk::simplicial_mesh<T, 2>::cell& cl,
-                 const static_matrix<T, 2, 2>& kappa)
+                 const static_matrix<T, 2, 2>&                     kappa)
 {
-    static_matrix<T, 3, 3> ret;
+   const auto meas = measure(msh, cl);
 
-    auto meas = measure(msh, cl);
+   const auto dphi  = eval_basis_grad(msh, cl);
+   const auto stiff = meas * dphi * (kappa * dphi.transpose());
 
-    auto dphi = eval_basis_grad(msh, cl);
-    auto stiff = meas * dphi * (kappa * dphi.transpose());
-
-    return stiff;
+   return stiff;
 }
 
 template<typename T, typename Function>
 static_vector<T, 3>
-make_rhs(const disk::simplicial_mesh<T, 2>& msh,
+make_rhs(const disk::simplicial_mesh<T, 2>&                msh,
          const typename disk::simplicial_mesh<T, 2>::cell& cl,
-         const Function& f)
+         const Function&                                   f)
 {
-    static_vector<T, 3> ret;
+   static_vector<T, 3> ret;
 
-    auto meas = measure(msh, cl);
-    auto bar = barycenter(msh, cl);
+   const auto meas = measure(msh, cl);
+   const auto bar  = barycenter(msh, cl);
 
-    static_vector<T,3> r = static_vector<T,3>::Ones();
+   const static_vector<T, 3> r = static_vector<T, 3>::Ones();
 
-    ret = f(bar) * meas * r / 3.0;
+   ret = f(bar) * meas * r / 3.0;
 
-    return ret;
+   return ret;
 }
 
-} //namespace cfem
-} //namespace disk
+} // namespace cfem
+} // namespace disk

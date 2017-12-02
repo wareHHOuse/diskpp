@@ -1,6 +1,6 @@
 /*
- *       /\
- *      /__\       Matteo Cicuttin (C) 2016 - matteo.cicuttin@enpc.fr
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,17 +10,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 #pragma once
 
-#include "bases/bases_ranges.hpp"
-#include "bases/bases_utils.hpp"
-#include "common/eigen.hpp"
-#include "timecounter.h"
-//#include "contrib/sol2/sol.hpp"
+#include "bases/bases.hpp"
 
 //#define USE_BLAS
 #define FILL_COLMAJOR
@@ -170,29 +172,21 @@ class basis_quadrature_data_full /* this name really sucks */
    size_t grad_degree(void) const { return m_grad_degree; }
 };
 
-template<typename BQData, typename Function>
-dynamic_vector<typename BQData::mesh_type::scalar_type>
-compute_rhs_bq(const typename BQData::mesh_type&       msh,
-               const typename BQData::mesh_type::cell& cl,
-               const Function&                         f,
-               const BQData&                           bqd)
+// traits
+template<typename BQData>
+struct have_grad_space
 {
-   typedef typename BQData::mesh_type      mesh_type;
-   typedef typename mesh_type::scalar_type scalar_type;
-   typedef dynamic_vector<scalar_type>     vector_type;
+   static const bool value = false;
+};
 
-   vector_type ret = vector_type::Zero(bqd.cell_basis.size());
-
-   const auto cell_quadpoints = bqd.cell_quadrature.integrate(msh, cl);
-   for (auto& qp : cell_quadpoints) {
-      auto phi  = bqd.cell_basis.eval_functions(msh, cl, qp.point());
-      auto fval = f(qp.point());
-      for (size_t i = 0; i < bqd.cell_basis.size(); i++)
-         ret(i) += qp.weight() * mm_prod(fval, phi[i]);
-   }
-
-   return ret;
-}
+template<typename Mesh,
+         template<typename, typename> class BasisFunction,
+         template<typename, typename> class BasisGradient,
+         template<typename, typename> class Quadrature>
+struct have_grad_space<basis_quadrature_data_full<Mesh, BasisFunction, BasisGradient, Quadrature>>
+{
+   static const bool value = true;
+};
 
 } // namespace hho
 
