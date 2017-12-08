@@ -1,6 +1,6 @@
 /*
- *       /\
- *      /__\       Matteo Cicuttin (C) 2016-2017 - matteo.cicuttin@enpc.fr
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,8 +10,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 /*
@@ -51,94 +57,91 @@
 #ifndef _LOADER_UNIFORM_HPP_
 #define _LOADER_UNIFORM_HPP_
 
-
-#include <vector>
 #include <array>
-#include <fstream>
 #include <cassert>
+#include <fstream>
 #include <set>
+#include <vector>
 
 #include "geometry/geometry.hpp"
-#include "loader_utils.hpp"
 #include "loader_template.hpp"
+#include "loader_utils.hpp"
 
 #include "mapped_file.h"
 #include "strtot.hpp"
 
 namespace disk {
 
-   template<typename T, size_t N>
-   class uniform_mesh_loader
+template<typename T, size_t N>
+class uniform_mesh_loader
+{
+   static_assert(N == 1, "at the moment only 1D uniform meshes are available");
+};
+
+template<typename T>
+class uniform_mesh_loader<T, 1> : public mesh_loader<generic_mesh<T, 1>>
+{
+   typedef generic_mesh<T, 1>             mesh_type;
+   typedef typename mesh_type::point_type point_type;
+   typedef typename mesh_type::node_type  node_type;
+   typedef typename mesh_type::edge_type  edge_type;
+
+   T      m_h, m_x_min, m_x_max;
+   size_t m_number_of_elements;
+
+ public:
+   uniform_mesh_loader() : m_x_min(T(0)), m_x_max(T(1)), m_number_of_elements(8)
    {
-      static_assert(N == 1, "at the moment only 1D uniform meshes are available");
-   };
+      m_h = fabs(m_x_max - m_x_min) / m_number_of_elements;
+   }
 
-   template<typename T>
-   class uniform_mesh_loader<T,1> : public mesh_loader<generic_mesh<T, 1>>
+   uniform_mesh_loader(T x_min, T x_max, size_t N) :
+     m_x_min(x_min), m_x_max(x_max), m_number_of_elements(N)
    {
-      typedef generic_mesh<T,1>                       mesh_type;
-      typedef typename mesh_type::point_type          point_type;
-      typedef typename mesh_type::node_type           node_type;
-      typedef typename mesh_type::edge_type           edge_type;
+      m_h = fabs(m_x_max - m_x_min) / m_number_of_elements;
+   }
 
-      T       m_h, m_x_min, m_x_max;
-      size_t  m_number_of_elements;
+   bool
+   populate_mesh(mesh_type& msh)
+   {
+      if (this->verbose()) std::cout << " *** POPULATING UNIFORM 1D MESH ***" << std::endl;
 
-   public:
-      uniform_mesh_loader()
-      : m_x_min(T(0)), m_x_max(T(1)), m_number_of_elements(8)
-      {
-         m_h = fabs(m_x_max - m_x_min) / m_number_of_elements;
+      auto storage = msh.backend_storage();
+
+      auto num_edges = m_number_of_elements;
+      auto num_nodes = m_number_of_elements + 1;
+
+      storage->points.resize(num_nodes);
+      storage->nodes.resize(num_nodes);
+      storage->edges.resize(num_edges);
+
+      for (size_t i = 0; i < num_edges; i++) {
+         storage->points.at(i)     = point_type({m_x_min + (m_h * i)});
+         storage->points.at(i + 1) = point_type({m_x_min + (m_h * (i + 1))});
+
+         auto n0 = typename node_type::id_type(i);
+         auto n1 = typename node_type::id_type(i + 1);
+         auto e  = edge_type{{n0, n1}};
+
+         std::vector<point_identifier<1>> pts(2);
+         pts[0] = point_identifier<1>(i);
+         pts[1] = point_identifier<1>(i + 1);
+         e.set_point_ids(pts.begin(), pts.end());
+
+         storage->edges.at(i) = e;
       }
 
-      uniform_mesh_loader(T x_min, T x_max, size_t N)
-      : m_x_min(x_min), m_x_max(x_max), m_number_of_elements(N)
-      {
-         m_h = fabs(m_x_max - m_x_min) / m_number_of_elements;
-      }
+      for (size_t i = 0; i < num_nodes; i++)
+         storage->nodes.at(i) = node_type(point_identifier<1>(i));
 
-      bool populate_mesh(mesh_type& msh)
-      {
-         if (this->verbose())
-            std::cout << " *** POPULATING UNIFORM 1D MESH ***" << std::endl;
+      storage->boundary_info.resize(num_nodes);
+      bnd_info bi{0, true};
+      storage->boundary_info.at(0)             = bi;
+      storage->boundary_info.at(num_nodes - 1) = bi;
 
-         auto storage = msh.backend_storage();
-
-         auto num_edges = m_number_of_elements;
-         auto num_nodes = m_number_of_elements + 1;
-
-         storage->points.resize(num_nodes);
-         storage->nodes.resize(num_nodes);
-         storage->edges.resize(num_edges);
-
-         for (size_t i = 0; i < num_edges; i++)
-         {
-            storage->points.at(i)   = point_type({m_x_min + (m_h * i)});
-            storage->points.at(i+1) = point_type({m_x_min + (m_h * (i + 1))});
-
-            auto n0 = typename node_type::id_type(i);
-            auto n1 = typename node_type::id_type(i+1);
-            auto e = edge_type{{n0, n1}};
-
-            std::vector<point_identifier<1>> pts(2);
-            pts[0] = point_identifier<1>(i);
-            pts[1] = point_identifier<1>(i+1);
-            e.set_point_ids(pts.begin(), pts.end());
-
-            storage->edges.at(i) = e;
-         }
-
-         for (size_t i = 0; i < num_nodes; i++)
-            storage->nodes.at(i) = node_type(point_identifier<1>(i));
-
-         storage->boundary_info.resize(num_nodes);
-         bnd_info bi{0, true};
-         storage->boundary_info.at(0) = bi;
-         storage->boundary_info.at(num_nodes - 1) = bi;
-
-         return true;
-      }
-   };
+      return true;
+   }
+};
 
 } // namespace disk
 

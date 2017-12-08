@@ -1,0 +1,7 @@
+add_executable(diffusion_RT diffusion_RT.cpp)
+target_link_libraries(diffusion_RT ${LINK_LIBS})
+install(TARGETS diffusion_RT RUNTIME DESTINATION bin)
+
+add_executable(diffusion_RT_test_convergence_rates diffusion_RT_test_convergence_rates.cpp)
+target_link_libraries(diffusion_RT_test_convergence_rates ${LINK_LIBS})
+install(TARGETS diffusion_RT_test_convergence_rates RUNTIME DESTINATION bin)

@@ -28,8 +28,6 @@
 
 #include <map>
 
-#include "colormanip.h"
-
 #include "loaders/loader.hpp"
 
 #include "timecounter.h"
@@ -37,7 +35,7 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-#include "vector_laplacian_solver.hpp"
+#include "vector_laplacian_RT_solver.hpp"
 
 struct error_type
 {
@@ -62,8 +60,7 @@ usage(const char* progname)
    printf("    -1: test 1D mesh (default)\n");
    printf("    -2: test 2D mesh\n");
    printf("    -3: test 3D mesh\n");
-   printf("    -k: face degree (>=0)\n");
-   printf("    -l: difference beetween cell and face degree (-1 <= l <= 1) \n");
+   printf("    -k: degree (>=0)\n");
    printf("    -v: verbose\n");
 }
 
@@ -315,7 +312,7 @@ test_triangles_fvca5(const run_params& rp, LaplacianParameters material_data)
    std::vector<error_type> error_sumup;
 
    for (size_t i = 0; i < runs; i++) {
-      auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+      const auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
       error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
    }
    printResults(error_sumup);
@@ -337,7 +334,7 @@ test_triangles_netgen(const run_params& rp, LaplacianParameters material_data)
    std::vector<error_type> error_sumup;
 
    for (size_t i = 0; i < runs; i++) {
-      auto msh = disk::load_netgen_2d_mesh<T>(paths[i].c_str());
+      const auto msh = disk::load_netgen_2d_mesh<T>(paths[i].c_str());
       error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
    }
    printResults(error_sumup);
@@ -359,7 +356,7 @@ test_hexagons(const run_params& rp, LaplacianParameters material_data)
    std::vector<error_type> error_sumup;
 
    for (size_t i = 0; i < runs; i++) {
-      auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+      const auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
       error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
    }
    printResults(error_sumup);
@@ -381,7 +378,7 @@ test_kershaws(const run_params& rp, LaplacianParameters material_data)
    std::vector<error_type> error_sumup;
 
    for (size_t i = 0; i < runs; i++) {
-      auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+      const auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
       error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
    }
    printResults(error_sumup);
@@ -403,7 +400,7 @@ test_quads_fvca5(const run_params& rp, LaplacianParameters material_data)
    std::vector<error_type> error_sumup;
 
    for (size_t i = 0; i < runs; i++) {
-      auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+      const auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
       error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
    }
    printResults(error_sumup);
@@ -425,7 +422,7 @@ test_quads_diskpp(const run_params& rp, LaplacianParameters material_data)
    std::vector<error_type> error_sumup;
 
    for (size_t i = 0; i < runs; i++) {
-      auto msh = disk::load_cartesian_2d_mesh<T>(paths[i].c_str());
+      const auto msh = disk::load_cartesian_2d_mesh<T>(paths[i].c_str());
       error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
    }
    printResults(error_sumup);
@@ -447,7 +444,7 @@ test_hexahedra_diskpp(const run_params& rp, LaplacianParameters material_data)
    std::vector<error_type> error_sumup;
 
    for (int i = 0; i < runs; i++) {
-      auto msh = disk::load_cartesian_3d_mesh<T>(paths[i].c_str());
+      const auto msh = disk::load_cartesian_3d_mesh<T>(paths[i].c_str());
       error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
    }
    printResults(error_sumup);
@@ -469,7 +466,7 @@ test_hexahedra_fvca6(const run_params& rp, LaplacianParameters material_data)
    std::vector<error_type> error_sumup;
 
    for (int i = 0; i < runs; i++) {
-      auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
+      const auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
       error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
    }
    printResults(error_sumup);
@@ -491,7 +488,7 @@ test_tetrahedra_netgen(const run_params& rp, LaplacianParameters material_data)
    std::vector<error_type> error_sumup;
 
    for (int i = 0; i < runs; i++) {
-      auto msh = disk::load_netgen_3d_mesh<T>(paths[i].c_str());
+      const auto msh = disk::load_netgen_3d_mesh<T>(paths[i].c_str());
       error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
    }
    printResults(error_sumup);
@@ -512,7 +509,7 @@ test_polyhedra_fvca6(const run_params& rp, LaplacianParameters material_data)
    std::vector<error_type> error_sumup;
 
    for (int i = 0; i < runs; i++) {
-      auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
+      const auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
       error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
    }
    printResults(error_sumup);
@@ -534,7 +531,7 @@ test_tetrahedra_fvca6(const run_params& rp, LaplacianParameters material_data)
    std::vector<error_type> error_sumup;
 
    for (int i = 0; i < runs; i++) {
-      auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
+      const auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
       error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
    }
    printResults(error_sumup);
@@ -546,7 +543,6 @@ main(int argc, char** argv)
    using RealType = double;
 
    int    degree = 1;
-   int    l      = 0;
    size_t dim    = 1;
 
    run_params rp;
@@ -560,7 +556,7 @@ main(int argc, char** argv)
 
    int ch;
 
-   while ((ch = getopt(argc, argv, "231k:l:v")) != -1) {
+   while ((ch = getopt(argc, argv, "123k:v")) != -1) {
       switch (ch) {
          case '1': dim = 1; break;
          case '2': dim = 2; break;
@@ -573,15 +569,6 @@ main(int argc, char** argv)
                degree = 1;
             }
             rp.degree = degree;
-            break;
-
-         case 'l':
-            l = atoi(optarg);
-            if (l < -1 or l > 1) {
-               std::cout << "l can be -1, 0 or 1. Falling back to 0." << std::endl;
-               l = 0;
-            }
-            rp.l = l;
             break;
 
          case 'v': rp.verbose = true; break;
@@ -607,7 +594,7 @@ main(int argc, char** argv)
    if (dim == 3) {
       tc.tic();
       std::cout << "-Tetrahedras fvca6:" << std::endl;
-      // test_tetrahedra_fvca6<RealType>(rp, material_data);
+      test_tetrahedra_fvca6<RealType>(rp, material_data);
       tc.toc();
       std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
       std::cout << " " << std::endl;
@@ -619,26 +606,26 @@ main(int argc, char** argv)
       std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
       std::cout << " " << std::endl;
 
-      tc.tic();
-      std::cout << "-Hexahedras fvca6:" << std::endl;
-      test_hexahedra_fvca6<RealType>(rp, material_data);
-      tc.toc();
-      std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      std::cout << " " << std::endl;
+      // tc.tic();
+      // std::cout << "-Hexahedras fvca6:"  << std::endl;
+      // test_hexahedra_fvca6<RealType>(rp, material_data);
+      // tc.toc();
+      // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+      // std::cout << " "<< std::endl;
 
-      tc.tic();
-      std::cout << "-Hexahedras diskpp:" << std::endl;
-      test_hexahedra_diskpp<RealType>(rp, material_data);
-      tc.toc();
-      std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      std::cout << " " << std::endl;
+      // tc.tic();
+      // std::cout << "-Hexahedras diskpp:"  << std::endl;
+      // test_hexahedra_diskpp<RealType>(rp, material_data);
+      // tc.toc();
+      // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+      // std::cout << " "<< std::endl;
 
-      tc.tic();
-      std::cout << "-Polyhedra:" << std::endl;
-      test_polyhedra_fvca6<RealType>(rp, material_data);
-      tc.toc();
-      std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      std::cout << " " << std::endl;
+      // tc.tic();
+      // std::cout << "-Polyhedra:"  << std::endl;
+      // test_polyhedra_fvca6<RealType>(rp, material_data);
+      // tc.toc();
+      // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+      // std::cout << " "<< std::endl;
    } else if (dim == 2) {
 
       tc.tic();
@@ -655,33 +642,33 @@ main(int argc, char** argv)
       std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
       std::cout << " " << std::endl;
 
-      tc.tic();
-      std::cout << "-Quadrangles fvca5:" << std::endl;
-      test_quads_fvca5<RealType>(rp, material_data);
-      tc.toc();
-      std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      std::cout << " " << std::endl;
+      // tc.tic();
+      // std::cout << "-Quadrangles fvca5:"  << std::endl;
+      // test_quads_fvca5<RealType>(rp, material_data);
+      // tc.toc();
+      // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+      // std::cout << " "<< std::endl;
 
-      tc.tic();
-      std::cout << "-Quadrangles diskpp:" << std::endl;
-      test_quads_diskpp<RealType>(rp, material_data);
-      tc.toc();
-      std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      std::cout << " " << std::endl;
+      // tc.tic();
+      // std::cout << "-Quadrangles diskpp:"  << std::endl;
+      // test_quads_diskpp<RealType>(rp, material_data);
+      // tc.toc();
+      // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+      // std::cout << " "<< std::endl;
 
-      tc.tic();
-      std::cout << "-Hexagons:" << std::endl;
-      test_hexagons<RealType>(rp, material_data);
-      tc.toc();
-      std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      std::cout << " " << std::endl;
+      // tc.tic();
+      // std::cout << "-Hexagons:"  << std::endl;
+      // test_hexagons<RealType>(rp, material_data);
+      // tc.toc();
+      // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+      // std::cout << " "<< std::endl;
 
-      tc.tic();
-      std::cout << "-Kershaws:" << std::endl;
-      test_kershaws<RealType>(rp, material_data);
-      tc.toc();
-      std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      std::cout << " " << std::endl;
+      // tc.tic();
+      // std::cout << "-Kershaws:"  << std::endl;
+      // test_kershaws<RealType>(rp, material_data);
+      // tc.toc();
+      // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+      // std::cout << " "<< std::endl;
    } else {
       tc.tic();
       std::cout << "-Test 1D:" << std::endl;

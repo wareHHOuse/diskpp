@@ -25,11 +25,107 @@
 #include "common/eigen.hpp"
 #include "hho/hho_bq.hpp"
 #include "hho/hho_mass_matrix.hpp"
+#include "hho/hho_stiffness_matrix.hpp"
 #include "hho/hho_utils.hpp"
 
 namespace disk {
 
 namespace hho {
+
+namespace priv {
+template<bool b, typename BQData>
+struct proj_use_gradient_full
+{
+   typedef typename BQData::mesh_type      mesh_type;
+   typedef typename mesh_type::scalar_type scalar_type;
+   typedef typename mesh_type::cell        cell_type;
+
+   typedef dynamic_matrix<scalar_type> matrix_type;
+   typedef dynamic_vector<scalar_type> vector_type;
+
+   typedef typename BQData::cell_basis_type::gradient_value_type gvt;
+
+   template<typename Function>
+   static vector_type
+   impl(const mesh_type& msh,
+        const cell_type& cl,
+        const Function&  func,
+        const BQData&    bqd,
+
+        matrix_type& grad_mm,
+        int          degree = -1)
+   {
+      if (degree < 0) degree = bqd.cell_degree() + 1;
+      const auto grad_basis_size = bqd.cell_basis.range(1, degree).size();
+
+      grad_mm = stiffness_matrix(msh, cl, bqd, 1, degree);
+      assert(grad_mm.rows() == grad_mm.cols() && grad_mm.rows() == grad_basis_size);
+
+      vector_type rhs = vector_type::Zero(grad_basis_size);
+
+      const auto grad_quadpoints = bqd.cell_quadrature.integrate(msh, cl);
+      assert(2 * degree <= bqd.cell_quadrature.order());
+
+      for (auto& qp : grad_quadpoints) {
+         const auto gphi = bqd.cell_basis.eval_gradients(msh, cl, qp.point(), 1, degree);
+         assert(gphi.size() == grad_basis_size);
+
+         const gvt f_qp = qp.weight() * func(qp.point());
+         for (size_t i = 0; i < grad_basis_size; i++) {
+            rhs(i) += mm_prod(f_qp, gphi[i]);
+         }
+      }
+
+      return grad_mm.llt().solve(rhs);
+   }
+};
+
+template<typename BQData>
+struct proj_use_gradient_full<true, BQData>
+{
+   typedef typename BQData::mesh_type      mesh_type;
+   typedef typename mesh_type::scalar_type scalar_type;
+   typedef typename mesh_type::cell        cell_type;
+
+   typedef dynamic_matrix<scalar_type> matrix_type;
+   typedef dynamic_vector<scalar_type> vector_type;
+
+   typedef typename BQData::grad_basis_type::function_value_type gvt;
+
+   template<typename Function>
+   static vector_type
+   impl(const mesh_type& msh,
+        const cell_type& cl,
+        const Function&  func,
+        const BQData&    bqd,
+        matrix_type&     grad_mm,
+        int              degree = -1)
+   {
+      if (degree < 0) degree = bqd.grad_degree();
+      const auto grad_basis_size = bqd.grad_basis.range(0, degree).size();
+
+      grad_mm = grad_mass_matrix(msh, cl, bqd, 0, degree);
+      assert(grad_mm.rows() == grad_mm.cols() && grad_mm.rows() == grad_basis_size);
+
+      vector_type rhs = vector_type::Zero(grad_basis_size);
+
+      const auto grad_quadpoints = bqd.grad_quadrature.integrate(msh, cl);
+      assert(2 * degree <= bqd.grad_quadrature.order());
+
+      for (auto& qp : grad_quadpoints) {
+         const auto gphi = bqd.grad_basis.eval_functions(msh, cl, qp.point(), 0, degree);
+         assert(gphi.size() == grad_basis_size);
+
+         const gvt f_qp = qp.weight() * func(qp.point());
+         for (size_t i = 0; i < grad_basis_size; i++) {
+            rhs(i) += mm_prod(f_qp, gphi[i]);
+         }
+      }
+
+      return grad_mm.llt().solve(rhs);
+   }
+};
+} // end priv
 
 template<typename BQData>
 class projector_bq
@@ -45,76 +141,52 @@ class projector_bq
    const BQData& m_bqd;
 
  public:
-   projector_bq(const BQData& bqd)
-     : m_bqd(bqd)
-   {}
+   projector_bq(const BQData& bqd) : m_bqd(bqd) {}
 
    matrix_type cell_mm;
    matrix_type face_mm;
    matrix_type grad_mm;
 
    template<typename Function>
-   vector_type projectOnCell(const mesh_type& msh,
-                             const cell_type& cl,
-                             const Function&  func,
-                             int              degree = -1)
+   vector_type
+   projectOnCell(const mesh_type& msh, const cell_type& cl, const Function& func, int degree = -1)
    {
       if (degree < 0) degree = m_bqd.cell_degree();
 
-      cell_mm               = mass_matrix(msh, cl, m_bqd, degree);
+      const auto cell_basis_size = m_bqd.cell_basis.range(0, degree).size();
+
+      cell_mm               = mass_matrix(msh, cl, m_bqd, 0, degree);
       const vector_type rhs = compute_rhs(msh, cl, func, m_bqd, degree);
+
+      assert(cell_mm.rows() == cell_mm.cols() && cell_mm.rows() == cell_basis_size);
+      assert(rhs.rows() == cell_basis_size);
 
       return cell_mm.llt().solve(rhs);
    }
 
    template<typename Function>
-   vector_type projectOnFace(const mesh_type& msh,
-                             const face_type& fc,
-                             const Function&  func,
-                             int              degree = -1)
+   vector_type
+   projectOnFace(const mesh_type& msh, const face_type& fc, const Function& func, int degree = -1)
    {
-      if (degree < 0) degree = m_bqd.cell_degree();
+      if (degree < 0) degree = m_bqd.face_degree();
 
-      face_mm               = mass_matrix(msh, fc, m_bqd, degree);
+      const auto face_basis_size = m_bqd.face_basis.range(0, degree).size();
+
+      face_mm               = mass_matrix(msh, fc, m_bqd, 0, degree);
       const vector_type rhs = compute_rhs(msh, fc, func, m_bqd, degree);
+
+      assert(face_mm.rows() == face_mm.cols() && face_mm.rows() == face_basis_size);
+      assert(rhs.rows() == face_basis_size);
 
       return face_mm.llt().solve(rhs);
    }
 
    template<typename Function>
-   vector_type projectGradOnCell(const mesh_type& msh,
-                                 const cell_type& cl,
-                                 const Function&  f,
-                                 int              degree = -1)
+   vector_type
+   projectGradOnCell(const mesh_type& msh, const cell_type& cl, const Function& f, int degree = -1)
    {
-      const size_t grad_basis_size = m_bqd.grad_basis.size();
-
-      // on doit enore creer un compute rhs et mass du grad  !!!
-      matrix_type mm  = matrix_type::Zero(grad_basis_size, grad_basis_size);
-      vector_type rhs = vector_type::Zero(grad_basis_size);
-
-      const auto grad_quadpoints = m_bqd.grad_quadrature.integrate(msh, cl);
-      for (auto& qp : grad_quadpoints) {
-         auto gphi = m_bqd.grad_basis.eval_functions(msh, cl, qp.point());
-
-         for (size_t j = 0; j < grad_basis_size; j++) {
-            for (size_t i = j; i < grad_basis_size; i++) {
-               mm(i, j) += qp.weight() * mm_prod(gphi[i], gphi[j]);
-            }
-         }
-
-         for (size_t i = 0; i < grad_basis_size; i++) {
-            rhs(i) += qp.weight() * mm_prod(f(qp.point()), gphi[i]);
-         }
-      }
-
-      // lower part
-      for (size_t i = 0; i < grad_basis_size; i++)
-         for (size_t j = i; j < grad_basis_size; j++)
-            mm(i, j) = mm(j, i);
-
-      grad_mm = mm;
-      return grad_mm.llt().solve(rhs);
+      return priv::proj_use_gradient_full<have_grad_space<BQData>::value, BQData>::impl(
+        msh, cl, f, m_bqd, grad_mm, degree);
    }
 };
 

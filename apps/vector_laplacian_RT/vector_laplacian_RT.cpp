@@ -26,10 +26,6 @@
 #include <sstream>
 #include <unistd.h>
 
-#include <map>
-
-#include "colormanip.h"
-
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
 
@@ -38,15 +34,14 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-#include "vector_laplacian_solver.hpp"
+#include "vector_laplacian_RT_solver.hpp"
 
 void
 usage(const char* progname)
 {
    printf("Usage: %s <options> <filename>\n\n", progname);
-   printf("    -n: number of elements for 1D mesh (default)\n");
-   printf("    -k: face degree (>=0)\n");
-   printf("    -l: difference beetween cell and face degree (-1 <= l <= 1) \n");
+   printf("    -n: number of elements of 1D mesh (>0)\n");
+   printf("    -k: degree (>=0)\n");
    printf("    -v: verbose\n");
 }
 
@@ -127,8 +122,9 @@ run_vector_laplacian_solver(const Mesh<T, 2, Storage>& msh,
                             run_params&                rp,
                             LaplacianParameters        material_data)
 {
-   typedef Mesh<T, 2, Storage> mesh_type;
-   typedef static_vector<T, 2> result_type;
+   typedef Mesh<T, 2, Storage>    mesh_type;
+   typedef static_vector<T, 2>    result_type;
+   typedef static_matrix<T, 2, 2> result_grad_type;
 
    timecounter tc;
    tc.tic();
@@ -147,7 +143,17 @@ run_vector_laplacian_solver(const Mesh<T, 2, Storage>& msh,
       return result_type{fx, fy};
    };
 
-   vector_laplacian_solver<mesh_type> vl(msh, rp.degree);
+   auto gradient = [material_data](const point<T, 2>& p) -> result_grad_type {
+      result_grad_type grad = result_grad_type::Zero();
+
+      grad(0, 0) = cos(M_PI * p.x()) * sin(M_PI * p.y());
+      grad(0, 1) = sin(M_PI * p.x()) * cos(M_PI * p.y());
+      grad(1, 0) = -sin(M_PI * p.x()) * cos(M_PI * p.y());
+      grad(1, 1) = -cos(M_PI * p.x()) * sin(M_PI * p.y());
+      return M_PI * grad;
+   };
+
+   vector_laplacian_solver<mesh_type> vl(msh, rp.degree, rp.l);
    vl.verbose(rp.verbose);
 
    vl.changeLaplacianParameters(material_data);
@@ -172,6 +178,7 @@ run_vector_laplacian_solver(const Mesh<T, 2, Storage>& msh,
 
    std::cout << "Discetisation h: " << disk::mesh_h(msh) << std::endl;
    std::cout << "L2 error: " << vl.compute_l2_error(solution) << std::endl;
+   std::cout << "L2 gradient error: " << vl.compute_l2_gradient_error(gradient) << std::endl;
 
    tc.toc();
 
@@ -197,8 +204,9 @@ run_vector_laplacian_solver(const Mesh<T, 3, Storage>& msh,
                             run_params&                rp,
                             LaplacianParameters        material_data)
 {
-   typedef Mesh<T, 3, Storage> mesh_type;
-   typedef static_vector<T, 3> result_type;
+   typedef Mesh<T, 3, Storage>    mesh_type;
+   typedef static_vector<T, 3>    result_type;
+   typedef static_matrix<T, 3, 3> result_grad_type;
 
    timecounter tc;
    tc.tic();
@@ -222,7 +230,19 @@ run_vector_laplacian_solver(const Mesh<T, 3, Storage>& msh,
       return result_type{fx, fy, fz};
    };
 
-   vector_laplacian_solver<mesh_type> vl(msh, rp.degree);
+   auto gradient = [material_data](const point<T, 3>& p) -> result_grad_type {
+      result_grad_type grad = result_grad_type::Zero();
+
+      grad(0, 0) = -sin(M_PI * p.x()) * sin(M_PI * p.y());
+      grad(0, 1) = cos(M_PI * p.x()) * cos(M_PI * p.y());
+      grad(1, 1) = -sin(M_PI * p.y()) * sin(M_PI * p.z());
+      grad(1, 2) = cos(M_PI * p.y()) * cos(M_PI * p.z());
+      grad(2, 2) = -sin(M_PI * p.z()) * sin(M_PI * p.x());
+      grad(2, 0) = cos(M_PI * p.z()) * cos(M_PI * p.x());
+      return M_PI * grad;
+   };
+
+   vector_laplacian_solver<mesh_type> vl(msh, rp.degree, rp.l);
    vl.verbose(rp.verbose);
 
    vl.changeLaplacianParameters(material_data);
@@ -247,6 +267,7 @@ run_vector_laplacian_solver(const Mesh<T, 3, Storage>& msh,
 
    std::cout << "Discetisation h: " << disk::mesh_h(msh) << std::endl;
    std::cout << "L2 error: " << vl.compute_l2_error(solution) << std::endl;
+   std::cout << "L2 gradient error: " << vl.compute_l2_gradient_error(gradient) << std::endl;
 
    tc.toc();
 
@@ -257,7 +278,6 @@ run_vector_laplacian_solver(const Mesh<T, 3, Storage>& msh,
       std::cout << "**** Assembly time: " << assembling_info.time_assembly << " sec" << std::endl;
       std::cout << "****** Gradient reconstruction: " << assembling_info.time_gradrec << " sec"
                 << std::endl;
-      std::cout << "****** Stabilisation: " << assembling_info.time_stab << " sec" << std::endl;
       std::cout << "****** Static condensation: " << assembling_info.time_statcond << " sec"
                 << std::endl;
       std::cout << "**** Solver time: " << solve_info.time_solver << " sec" << std::endl;
@@ -288,7 +308,7 @@ main(int argc, char** argv)
 
    int ch;
 
-   while ((ch = getopt(argc, argv, "k:l:n:v")) != -1) {
+   while ((ch = getopt(argc, argv, "k:n:v")) != -1) {
       switch (ch) {
          case 'k':
             degree = atoi(optarg);
@@ -297,14 +317,6 @@ main(int argc, char** argv)
                degree = 1;
             }
             rp.degree = degree;
-            break;
-
-         case 'l':
-            rp.l = atoi(optarg);
-            if (rp.l < -1 or rp.l > 1) {
-               std::cout << "l can be -1, 0 or 1. Falling back to 0." << std::endl;
-               rp.l = 0;
-            }
             break;
 
          case 'n':
@@ -317,7 +329,6 @@ main(int argc, char** argv)
 
          case 'v': rp.verbose = true; break;
 
-         case 'h':
          case '?':
          default:
             std::cout << "wrong arguments" << std::endl;
@@ -330,8 +341,8 @@ main(int argc, char** argv)
    argv += optind;
 
    if (argc == 0) {
-      std::cout << "Mesh format: 1D uniform" << std::endl;
-      auto msh = disk::load_uniform_1d_mesh<RealType>(0, 1, elems_1d);
+      std::cout << "Mesh format: 1D uniform (Not avaible)" << std::endl;
+      const auto msh = disk::load_uniform_1d_mesh<RealType>(0, 1, elems_1d);
       run_vector_laplacian_solver(msh, rp, material_data);
       return 0;
    }
@@ -341,7 +352,7 @@ main(int argc, char** argv)
    /* FVCA5 2D */
    if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$"))) {
       std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
-      auto msh = disk::load_fvca5_2d_mesh<RealType>(mesh_filename);
+      const auto msh = disk::load_fvca5_2d_mesh<RealType>(mesh_filename);
       run_vector_laplacian_solver(msh, rp, material_data);
       return 0;
    }
@@ -349,15 +360,7 @@ main(int argc, char** argv)
    /* Netgen 2D */
    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$"))) {
       std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
-      auto msh = disk::load_netgen_2d_mesh<RealType>(mesh_filename);
-      run_vector_laplacian_solver(msh, rp, material_data);
-      return 0;
-   }
-
-   /* DiSk++ cartesian 2D */
-   if (std::regex_match(mesh_filename, std::regex(".*\\.quad$"))) {
-      std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
-      auto msh = disk::load_cartesian_2d_mesh<RealType>(mesh_filename);
+      const auto msh = disk::load_netgen_2d_mesh<RealType>(mesh_filename);
       run_vector_laplacian_solver(msh, rp, material_data);
       return 0;
    }
@@ -365,22 +368,23 @@ main(int argc, char** argv)
    /* Medit 2d*/
    if (std::regex_match(mesh_filename, std::regex(".*\\.medit2d$"))) {
       std::cout << "Guessed mesh format: Medit format" << std::endl;
-      auto msh = disk::load_medit_2d_mesh<RealType>(mesh_filename);
+      const auto msh = disk::load_medit_2d_mesh<RealType>(mesh_filename);
+      run_vector_laplacian_solver(msh, rp, material_data);
+      return 0;
+   }
+
+   /* FVCA6 3D */
+   if (std::regex_match(mesh_filename, std::regex(".*\\.msh$"))) {
+      std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
+      const auto msh = disk::load_fvca6_3d_mesh<RealType>(mesh_filename);
+      run_vector_laplacian_solver(msh, rp, material_data);
       return 0;
    }
 
    /* Netgen 3D */
    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$"))) {
       std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-      auto msh = disk::load_netgen_3d_mesh<RealType>(mesh_filename);
-      run_vector_laplacian_solver(msh, rp, material_data);
-      return 0;
-   }
-
-   /* DiSk++ cartesian 3D */
-   if (std::regex_match(mesh_filename, std::regex(".*\\.hex$"))) {
-      std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
-      auto msh = disk::load_cartesian_3d_mesh<RealType>(mesh_filename);
+      const auto msh = disk::load_netgen_3d_mesh<RealType>(mesh_filename);
       run_vector_laplacian_solver(msh, rp, material_data);
       return 0;
    }

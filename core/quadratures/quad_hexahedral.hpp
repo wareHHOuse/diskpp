@@ -21,301 +21,311 @@
  */
 
 #ifndef _QUADRATURES_HPP_WAS_INCLUDED_
-    #error "You must NOT include this file. Include quadratures.hpp"
+#error "You must NOT include this file. Include quadratures.hpp"
 #endif
 
 #ifndef _QUAD_HEXAHEDRAL_HPP_
 #define _QUAD_HEXAHEDRAL_HPP_
 
-namespace disk
-{
+namespace disk {
 
-template <typename T>
+template<typename T>
 class quadrature<cartesian_mesh<T, 3>, typename cartesian_mesh<T, 3>::cell>
 {
-    std::vector<std::pair<point<T, 1>, T>> m_quadrature_data;
+   std::vector<std::pair<point<T, 1>, T>> m_quadrature_data;
 
-  public:
-    typedef cartesian_mesh<T,3>                     mesh_type;
-    typedef typename mesh_type::cell                cell_type;
-    typedef quadrature_point<T,3>                   quadpoint_type;
-    typedef typename mesh_type::point_type          point_type;
-    typedef T                                       weight_type;
+ public:
+   typedef cartesian_mesh<T, 3>           mesh_type;
+   typedef typename mesh_type::cell       cell_type;
+   typedef quadrature_point<T, 3>         quadpoint_type;
+   typedef typename mesh_type::point_type point_type;
+   typedef T                              weight_type;
 
-  private:
-    size_t m_order;
+ private:
+   size_t m_order;
 
-  public:
-    quadrature()
-        : m_order(1)
-    {
-        m_quadrature_data = edge_quadrature<T>(1);
-    }
+ public:
+   quadrature()
+     : m_order(1)
+   {
+      m_quadrature_data = edge_quadrature<T>(1);
+   }
 
-    quadrature(size_t order)
-        : m_order(order)
-    {
-        m_quadrature_data = edge_quadrature<T>(m_order);
-    }
+   quadrature(size_t order)
+     : m_order(order)
+   {
+      m_quadrature_data = edge_quadrature<T>(m_order);
+   }
 
-    std::vector<quadpoint_type>
-    integrate(const mesh_type &msh, const cell_type &cl) const
-    {
-        const auto pts = points(msh, cl);
-        const auto meas = measure(msh, cl);
+   size_t
+   order() const
+   {
+      return m_order;
+   }
 
-        assert(pts.size() == 8);
+   std::vector<quadpoint_type>
+   integrate(const mesh_type& msh, const cell_type& cl) const
+   {
+      const auto pts  = points(msh, cl);
+      const auto meas = measure(msh, cl);
 
-        const size_t qd_size = m_quadrature_data.size();
-        std::vector<std::pair<point<T, 3>, T>> qd;
-        qd.reserve(qd_size * qd_size * qd_size);
+      assert(pts.size() == 8);
 
-        for (size_t i = 0; i < qd_size; i++)
-        {
-            const auto px = m_quadrature_data[i].first;
-            const auto wx = m_quadrature_data[i].second;
+      const size_t                           qd_size = m_quadrature_data.size();
+      std::vector<std::pair<point<T, 3>, T>> qd;
+      qd.reserve(qd_size * qd_size * qd_size);
 
-            for (size_t j = 0; j < qd_size; j++)
-            {
-                const auto py = m_quadrature_data[j].first;
-                const auto wy = m_quadrature_data[j].second;
+      for (size_t i = 0; i < qd_size; i++) {
+         const auto px = m_quadrature_data[i].first;
+         const auto wx = m_quadrature_data[i].second;
 
-                for (size_t k = 0; k < qd_size; k++)
-                {
-                    const auto pz = m_quadrature_data[k].first;
-                    const auto wz = m_quadrature_data[k].second;
+         for (size_t j = 0; j < qd_size; j++) {
+            const auto py = m_quadrature_data[j].first;
+            const auto wy = m_quadrature_data[j].second;
 
-                    const auto pt = point<T, 3>({px[0], py[0], pz[0]});
-                    const auto wt = wx * wy * wz;
+            for (size_t k = 0; k < qd_size; k++) {
+               const auto pz = m_quadrature_data[k].first;
+               const auto wz = m_quadrature_data[k].second;
 
-                    qd.push_back(std::make_pair(pt, wt));
-                }
+               const auto pt = point<T, 3>({px[0], py[0], pz[0]});
+               const auto wt = wx * wy * wz;
+
+               qd.push_back(std::make_pair(pt, wt));
             }
-        }
+         }
+      }
 
-        auto tr = [&](const std::pair<point<T, 3>, T> &qd) -> auto
-        {
+      auto tr = [&](const std::pair<point<T, 3>, T>& qd) -> auto
+      {
 
-            const auto point = (pts[1] - pts[0]) * qd.first.x() +
-                               (pts[2] - pts[0]) * qd.first.y() +
-                               (pts[4] - pts[0]) * qd.first.z() +
-                               pts[0];
+         const auto point = (pts[1] - pts[0]) * qd.first.x() + (pts[2] - pts[0]) * qd.first.y() +
+                            (pts[4] - pts[0]) * qd.first.z() + pts[0];
 
-            const auto weight = qd.second * meas;
-            return make_qp(point, weight);
-        };
+         const auto weight = qd.second * meas;
+         return make_qp(point, weight);
+      };
 
-        std::vector<quadpoint_type> ret;
-        ret.resize(qd_size * qd_size * qd_size);
-        std::transform(qd.begin(), qd.end(), ret.begin(), tr);
+      std::vector<quadpoint_type> ret;
+      ret.resize(qd_size * qd_size * qd_size);
+      std::transform(qd.begin(), qd.end(), ret.begin(), tr);
 
-        return ret;
-    }
+      return ret;
+   }
 };
 
-template <typename T>
+template<typename T>
 class quadrature<cartesian_mesh<T, 3>, typename cartesian_mesh<T, 3>::face>
 {
-    std::vector<std::pair<point<T, 1>, T>> m_quadrature_data;
+   std::vector<std::pair<point<T, 1>, T>> m_quadrature_data;
 
-public:
-    typedef cartesian_mesh<T,3>                     mesh_type;
-    typedef typename mesh_type::face                face_type;
-    typedef quadrature_point<T,3>                   quadpoint_type;
-    typedef T                                       weight_type;
+ public:
+   typedef cartesian_mesh<T, 3>     mesh_type;
+   typedef typename mesh_type::face face_type;
+   typedef quadrature_point<T, 3>   quadpoint_type;
+   typedef T                        weight_type;
 
-  private:
-    size_t m_order;
+ private:
+   size_t m_order;
 
-  public:
-    quadrature()
-        : m_order(1)
-    {
-        m_quadrature_data = edge_quadrature<T>(1);
-    }
+ public:
+   quadrature()
+     : m_order(1)
+   {
+      m_quadrature_data = edge_quadrature<T>(1);
+   }
 
-    quadrature(size_t order)
-        : m_order(order)
-    {
-        m_quadrature_data = edge_quadrature<T>(m_order);
-    }
+   quadrature(size_t order)
+     : m_order(order)
+   {
+      m_quadrature_data = edge_quadrature<T>(m_order);
+   }
 
-    std::vector<quadpoint_type>
-    integrate(const mesh_type &msh, const face_type &fc) const
-    {
-        const auto pts = points(msh, fc);
-        const auto meas = measure(msh, fc);
+   size_t
+   order() const
+   {
+      return m_order;
+   }
 
-        assert(pts.size() == 4);
+   std::vector<quadpoint_type>
+   integrate(const mesh_type& msh, const face_type& fc) const
+   {
+      const auto pts  = points(msh, fc);
+      const auto meas = measure(msh, fc);
 
-        const size_t qd_size = m_quadrature_data.size();
-        std::vector<std::pair<point<T, 2>, T>> qd;
-        qd.reserve(qd_size * qd_size);
+      assert(pts.size() == 4);
 
-        for (size_t i = 0; i < qd_size; i++)
-        {
-            const auto px = m_quadrature_data[i].first;
-            const auto wx = m_quadrature_data[i].second;
+      const size_t                           qd_size = m_quadrature_data.size();
+      std::vector<std::pair<point<T, 2>, T>> qd;
+      qd.reserve(qd_size * qd_size);
 
-            for (size_t j = 0; j < qd_size; j++)
-            {
-                const auto py = m_quadrature_data[j].first;
-                const auto wy = m_quadrature_data[j].second;
+      for (size_t i = 0; i < qd_size; i++) {
+         const auto px = m_quadrature_data[i].first;
+         const auto wx = m_quadrature_data[i].second;
 
-                const auto pt = point<T, 2>({px[0], py[0]});
-                const auto wt = wx * wy;
+         for (size_t j = 0; j < qd_size; j++) {
+            const auto py = m_quadrature_data[j].first;
+            const auto wy = m_quadrature_data[j].second;
 
-                qd.push_back(std::make_pair(pt, wt));
-            }
-        }
+            const auto pt = point<T, 2>({px[0], py[0]});
+            const auto wt = wx * wy;
 
-        auto tr = [&](const std::pair<point<T, 2>, T> &qd) -> auto
-        {
+            qd.push_back(std::make_pair(pt, wt));
+         }
+      }
 
-            const auto point = (pts[1] - pts[0]) * qd.first.x() +
-                                (pts[3] - pts[0]) * qd.first.y() +
-                                pts[0];
+      auto tr = [&](const std::pair<point<T, 2>, T>& qd) -> auto
+      {
 
-            const auto weight = qd.second * meas;
-            return make_qp(point, weight);
-        };
+         const auto point =
+           (pts[1] - pts[0]) * qd.first.x() + (pts[3] - pts[0]) * qd.first.y() + pts[0];
 
-        std::vector<quadpoint_type> ret;
-        ret.resize(qd_size * qd_size);
-        std::transform(qd.begin(), qd.end(), ret.begin(), tr);
+         const auto weight = qd.second * meas;
+         return make_qp(point, weight);
+      };
 
-        return ret;
-    }
+      std::vector<quadpoint_type> ret;
+      ret.resize(qd_size * qd_size);
+      std::transform(qd.begin(), qd.end(), ret.begin(), tr);
+
+      return ret;
+   }
 };
 
-template <typename T>
+template<typename T>
 class quadrature<cartesian_mesh<T, 2>, typename cartesian_mesh<T, 2>::cell>
 {
-    std::vector<std::pair<point<T, 1>, T>> m_quadrature_data;
+   std::vector<std::pair<point<T, 1>, T>> m_quadrature_data;
 
-public:
-    typedef cartesian_mesh<T,2>                     mesh_type;
-    typedef typename mesh_type::cell                cell_type;
-    typedef quadrature_point<T,2>                   quadpoint_type;
-    typedef typename mesh_type::point_type          point_type;
-    typedef T                                       weight_type;
+ public:
+   typedef cartesian_mesh<T, 2>           mesh_type;
+   typedef typename mesh_type::cell       cell_type;
+   typedef quadrature_point<T, 2>         quadpoint_type;
+   typedef typename mesh_type::point_type point_type;
+   typedef T                              weight_type;
 
-private:
+ private:
+ private:
+   size_t m_order;
 
-  private:
-    size_t m_order;
+ public:
+   quadrature()
+     : m_order(1)
+   {
+      m_quadrature_data = edge_quadrature<T>(1);
+   }
 
-  public:
-    quadrature()
-        : m_order(1)
-    {
-        m_quadrature_data = edge_quadrature<T>(1);
-    }
+   quadrature(size_t order)
+     : m_order(order)
+   {
+      m_quadrature_data = edge_quadrature<T>(m_order);
+   }
 
-    quadrature(size_t order)
-        : m_order(order)
-    {
-        m_quadrature_data = edge_quadrature<T>(m_order);
-    }
+   size_t
+   order() const
+   {
+      return m_order;
+   }
 
-    std::vector<quadpoint_type>
-    integrate(const mesh_type &msh, const cell_type &cl) const
-    {
-        const auto pts = points(msh, cl);
-        const auto meas = measure(msh, cl);
+   std::vector<quadpoint_type>
+   integrate(const mesh_type& msh, const cell_type& cl) const
+   {
+      const auto pts  = points(msh, cl);
+      const auto meas = measure(msh, cl);
 
-        assert(pts.size() == 4);
+      assert(pts.size() == 4);
 
-        const size_t qd_size = m_quadrature_data.size();
-        std::vector<std::pair<point<T, 2>, T>> qd;
-        qd.reserve(qd_size * qd_size);
+      const size_t                           qd_size = m_quadrature_data.size();
+      std::vector<std::pair<point<T, 2>, T>> qd;
+      qd.reserve(qd_size * qd_size);
 
-        for (size_t i = 0; i < qd_size; i++)
-        {
-            const auto px = m_quadrature_data[i].first;
-            const auto wx = m_quadrature_data[i].second;
+      for (size_t i = 0; i < qd_size; i++) {
+         const auto px = m_quadrature_data[i].first;
+         const auto wx = m_quadrature_data[i].second;
 
-            for (size_t j = 0; j < qd_size; j++)
-            {
-                const auto py = m_quadrature_data[j].first;
-                const auto wy = m_quadrature_data[j].second;
+         for (size_t j = 0; j < qd_size; j++) {
+            const auto py = m_quadrature_data[j].first;
+            const auto wy = m_quadrature_data[j].second;
 
-                const auto pt = point<T, 2>({px[0], py[0]});
-                const auto wt = wx * wy;
+            const auto pt = point<T, 2>({px[0], py[0]});
+            const auto wt = wx * wy;
 
-                qd.push_back(std::make_pair(pt, wt));
-            }
-        }
+            qd.push_back(std::make_pair(pt, wt));
+         }
+      }
 
-        auto tr = [&](const std::pair<point<T, 2>, T> &qd) -> auto
-        {
+      auto tr = [&](const std::pair<point<T, 2>, T>& qd) -> auto
+      {
 
-            const auto point = (pts[1] - pts[0]) * qd.first.x() +
-                                (pts[2] - pts[0]) * qd.first.y() +
-                                pts[0];
+         const auto point =
+           (pts[1] - pts[0]) * qd.first.x() + (pts[2] - pts[0]) * qd.first.y() + pts[0];
 
-            const auto weight = qd.second * meas;
-            return make_qp(point, weight);
-        };
+         const auto weight = qd.second * meas;
+         return make_qp(point, weight);
+      };
 
-        std::vector<quadpoint_type> ret;
-        ret.resize(qd_size * qd_size);
-        std::transform(qd.begin(), qd.end(), ret.begin(), tr);
+      std::vector<quadpoint_type> ret;
+      ret.resize(qd_size * qd_size);
+      std::transform(qd.begin(), qd.end(), ret.begin(), tr);
 
-        return ret;
-    }
+      return ret;
+   }
 };
 
-template <typename T>
+template<typename T>
 class quadrature<cartesian_mesh<T, 2>, typename cartesian_mesh<T, 2>::face>
 {
-    std::vector<std::pair<point<T, 1>, T>> m_quadrature_data;
+   std::vector<std::pair<point<T, 1>, T>> m_quadrature_data;
 
-public:
-    typedef cartesian_mesh<T,2>                     mesh_type;
-    typedef typename mesh_type::face                face_type;
-    typedef quadrature_point<T,2>                   quadpoint_type;
-    typedef T                                       weight_type;
+ public:
+   typedef cartesian_mesh<T, 2>     mesh_type;
+   typedef typename mesh_type::face face_type;
+   typedef quadrature_point<T, 2>   quadpoint_type;
+   typedef T                        weight_type;
 
-  private:
-    size_t m_order;
+ private:
+   size_t m_order;
 
-  public:
-    quadrature()
-        : m_order(1)
-    {
-        m_quadrature_data = edge_quadrature<T>(1);
-    }
+ public:
+   quadrature()
+     : m_order(1)
+   {
+      m_quadrature_data = edge_quadrature<T>(1);
+   }
 
-    quadrature(size_t order)
-        : m_order(order)
-    {
-        m_quadrature_data = edge_quadrature<T>(m_order);
-    }
+   quadrature(size_t order)
+     : m_order(order)
+   {
+      m_quadrature_data = edge_quadrature<T>(m_order);
+   }
 
-    std::vector<quadpoint_type>
-    integrate(const mesh_type &msh, const face_type &fc) const
-    {
-        const auto pts = points(msh, fc);
-        const auto meas = measure(msh, fc);
+   size_t
+   order() const
+   {
+      return m_order;
+   }
 
-        assert(pts.size() == 2);
+   std::vector<quadpoint_type>
+   integrate(const mesh_type& msh, const face_type& fc) const
+   {
+      const auto pts  = points(msh, fc);
+      const auto meas = measure(msh, fc);
 
-        auto tr = [&](const std::pair<point<T, 1>, T> &qd) -> auto
-        {
+      assert(pts.size() == 2);
 
-            const auto point = (pts[1] - pts[0]) * qd.first.x() + pts[0];
-            const auto weight = qd.second * meas;
-            return make_qp(point, weight);
-        };
+      auto tr = [&](const std::pair<point<T, 1>, T>& qd) -> auto
+      {
 
-        std::vector<quadpoint_type> ret;
-        ret.resize(m_quadrature_data.size());
-        std::transform(m_quadrature_data.begin(), m_quadrature_data.end(),
-                       ret.begin(), tr);
+         const auto point  = (pts[1] - pts[0]) * qd.first.x() + pts[0];
+         const auto weight = qd.second * meas;
+         return make_qp(point, weight);
+      };
 
-        return ret;
-    }
+      std::vector<quadpoint_type> ret;
+      ret.resize(m_quadrature_data.size());
+      std::transform(m_quadrature_data.begin(), m_quadrature_data.end(), ret.begin(), tr);
+
+      return ret;
+   }
 };
 
 } // namespace disk

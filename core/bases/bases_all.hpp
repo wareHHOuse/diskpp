@@ -29,6 +29,8 @@
 
 #include <vector>
 
+#include "bases/bases_bones.hpp"
+#include "bases/bases_ranges.hpp"
 #include "common/eigen.hpp"
 
 namespace disk {
@@ -46,24 +48,20 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
    typedef T                   function_value_type;
    typedef static_vector<T, 3> gradient_value_type;
 
-   scaled_monomial_scalar_basis()
-     : base(1)
+   scaled_monomial_scalar_basis() : base(1) {}
+
+   scaled_monomial_scalar_basis(size_t degree) : base(degree) {}
+
+   scaled_monomial_scalar_basis(size_t degree, size_t computed_degree) :
+     base(degree, computed_degree)
    {}
 
-   scaled_monomial_scalar_basis(size_t degree)
-     : base(degree)
-   {}
-
-   scaled_monomial_scalar_basis(size_t degree, size_t computed_degree)
-     : base(degree, computed_degree)
-   {}
-
-   Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> eval_functions(
-     const mesh_type&   msh,
-     const cell_type&   cl,
-     const point<T, 3>& pt,
-     size_t             mindeg = 0,
-     size_t             maxdeg = VERY_HIGH_DEGREE) const
+   Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>
+   eval_functions(const mesh_type&   msh,
+                  const cell_type&   cl,
+                  const point<T, 3>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -103,12 +101,12 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
       return ret;
    }
 
-   Eigen::Matrix<scalar_type, Eigen::Dynamic, 3> eval_gradients(
-     const mesh_type&   msh,
-     const cell_type&   cl,
-     const point<T, 3>& pt,
-     size_t             mindeg = 0,
-     size_t             maxdeg = VERY_HIGH_DEGREE) const
+   Eigen::Matrix<scalar_type, Eigen::Dynamic, 3>
+   eval_gradients(const mesh_type&   msh,
+                  const cell_type&   cl,
+                  const point<T, 3>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -219,24 +217,20 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
  public:
    typedef T function_value_type;
 
-   scaled_monomial_scalar_basis()
-     : base(1)
+   scaled_monomial_scalar_basis() : base(1) {}
+
+   scaled_monomial_scalar_basis(size_t degree) : base(degree) {}
+
+   scaled_monomial_scalar_basis(size_t degree, size_t computed_degree) :
+     base(degree, computed_degree)
    {}
 
-   scaled_monomial_scalar_basis(size_t degree)
-     : base(degree)
-   {}
-
-   scaled_monomial_scalar_basis(size_t degree, size_t computed_degree)
-     : base(degree, computed_degree)
-   {}
-
-   Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> eval_functions(
-     const mesh_type&   msh,
-     const face_type&   fc,
-     const point<T, 3>& pt,
-     size_t             mindeg = 0,
-     size_t             maxdeg = VERY_HIGH_DEGREE) const
+   Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>
+   eval_functions(const mesh_type&   msh,
+                  const face_type&   fc,
+                  const point<T, 3>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -355,24 +349,20 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
    typedef T                   function_value_type;
    typedef static_vector<T, 2> gradient_value_type;
 
-   scaled_monomial_scalar_basis()
-     : base(1)
+   scaled_monomial_scalar_basis() : base(1) {}
+
+   scaled_monomial_scalar_basis(size_t degree) : base(degree) {}
+
+   scaled_monomial_scalar_basis(size_t degree, size_t computed_degree) :
+     base(degree, computed_degree)
    {}
 
-   scaled_monomial_scalar_basis(size_t degree)
-     : base(degree)
-   {}
-
-   scaled_monomial_scalar_basis(size_t degree, size_t computed_degree)
-     : base(degree, computed_degree)
-   {}
-
-   Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> eval_functions(
-     const mesh_type&  msh,
-     const cell_type&  cl,
-     const point_type& pt,
-     size_t            mindeg = 0,
-     size_t            maxdeg = VERY_HIGH_DEGREE) const
+   Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>
+   eval_functions(const mesh_type&  msh,
+                  const cell_type&  cl,
+                  const point_type& pt,
+                  size_t            mindeg = 0,
+                  size_t            maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -409,12 +399,12 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
       return ret;
    }
 
-   Eigen::Matrix<scalar_type, Eigen::Dynamic, 2> eval_gradients(
-     const mesh_type&  msh,
-     const cell_type&  cl,
-     const point_type& pt,
-     size_t            mindeg = 0,
-     size_t            maxdeg = VERY_HIGH_DEGREE) const
+   Eigen::Matrix<scalar_type, Eigen::Dynamic, 2>
+   eval_gradients(const mesh_type&  msh,
+                  const cell_type&  cl,
+                  const point_type& pt,
+                  size_t            mindeg = 0,
+                  size_t            maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -474,24 +464,20 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
  public:
    typedef T function_value_type;
 
-   scaled_monomial_scalar_basis()
-     : base(1)
+   scaled_monomial_scalar_basis() : base(1) {}
+
+   scaled_monomial_scalar_basis(size_t degree) : base(degree) {}
+
+   scaled_monomial_scalar_basis(size_t degree, size_t computed_degree) :
+     base(degree, computed_degree)
    {}
 
-   scaled_monomial_scalar_basis(size_t degree)
-     : base(degree)
-   {}
-
-   scaled_monomial_scalar_basis(size_t degree, size_t computed_degree)
-     : base(degree, computed_degree)
-   {}
-
-   Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> eval_functions(
-     const mesh_type&  msh,
-     const face_type&  fc,
-     const point_type& pt,
-     size_t            mindeg = 0,
-     size_t            maxdeg = VERY_HIGH_DEGREE) const
+   Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>
+   eval_functions(const mesh_type&  msh,
+                  const face_type&  fc,
+                  const point_type& pt,
+                  size_t            mindeg = 0,
+                  size_t            maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -562,24 +548,20 @@ class scaled_monomial_scalar_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Stor
    typedef T function_value_type;
    typedef T gradient_value_type;
 
-   scaled_monomial_scalar_basis()
-     : base(1)
+   scaled_monomial_scalar_basis() : base(1) {}
+
+   scaled_monomial_scalar_basis(size_t degree) : base(degree) {}
+
+   scaled_monomial_scalar_basis(size_t degree, size_t computed_degree) :
+     base(degree, computed_degree)
    {}
 
-   scaled_monomial_scalar_basis(size_t degree)
-     : base(degree)
-   {}
-
-   scaled_monomial_scalar_basis(size_t degree, size_t computed_degree)
-     : base(degree, computed_degree)
-   {}
-
-   Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> eval_functions(
-     const mesh_type&  msh,
-     const cell_type&  cl,
-     const point_type& pt,
-     size_t            mindeg = 0,
-     size_t            maxdeg = VERY_HIGH_DEGREE) const
+   Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>
+   eval_functions(const mesh_type&  msh,
+                  const cell_type&  cl,
+                  const point_type& pt,
+                  size_t            mindeg = 0,
+                  size_t            maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -606,12 +588,12 @@ class scaled_monomial_scalar_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Stor
       return ret;
    }
 
-   Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> eval_gradients(
-     const mesh_type&  msh,
-     const cell_type&  cl,
-     const point_type& pt,
-     size_t            mindeg = 0,
-     size_t            maxdeg = VERY_HIGH_DEGREE) const
+   Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>
+   eval_gradients(const mesh_type&  msh,
+                  const cell_type&  cl,
+                  const point_type& pt,
+                  size_t            mindeg = 0,
+                  size_t            maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -654,21 +636,20 @@ class scaled_monomial_scalar_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Stor
  public:
    typedef T function_value_type;
 
-   scaled_monomial_scalar_basis()
-     : base(1)
+   scaled_monomial_scalar_basis() : base(1) {}
+
+   scaled_monomial_scalar_basis(size_t degree) : base(degree) {}
+
+   scaled_monomial_scalar_basis(size_t degree, size_t computed_degree) :
+     base(degree, computed_degree)
    {}
 
-   scaled_monomial_scalar_basis(size_t degree)
-     : base(degree)
-   {}
-
-   scaled_monomial_scalar_basis(size_t degree, size_t computed_degree)
-     : base(degree, computed_degree)
-   {}
-
-   Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> eval_functions(const mesh_type&  msh,
-                                                                const face_type&  fc,
-                                                                const point_type& pt) const
+   Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>
+   eval_functions(const mesh_type&  msh,
+                  const face_type&  fc,
+                  const point_type& pt,
+                  size_t            mindeg = 0,
+                  size_t            maxdeg = 0) const
    {
       Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> ret(1);
       ret(0) = 1;
@@ -690,19 +671,20 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
    typedef static_vector<T, 3>    function_value_type;
    typedef static_matrix<T, 3, 3> gradient_value_type;
 
-   scaled_monomial_vector_basis()
-     : base(1)
+   scaled_monomial_vector_basis() : base(1) {}
+
+   scaled_monomial_vector_basis(size_t degree) : base(degree) {}
+
+   scaled_monomial_vector_basis(size_t degree, size_t computed_degree) :
+     base(degree, computed_degree)
    {}
 
-   scaled_monomial_vector_basis(size_t degree)
-     : base(degree)
-   {}
-
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const cell_type&   cl,
-                                                   const point<T, 3>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const cell_type&   cl,
+                  const point<T, 3>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -734,11 +716,12 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
       return ret;
    }
 
-   std::vector<gradient_value_type> eval_sgradients(const mesh_type&   msh,
-                                                    const cell_type&   cl,
-                                                    const point<T, 3>& pt,
-                                                    size_t             mindeg = 0,
-                                                    size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<gradient_value_type>
+   eval_sgradients(const mesh_type&   msh,
+                   const cell_type&   cl,
+                   const point<T, 3>& pt,
+                   size_t             mindeg = 0,
+                   size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -794,11 +777,12 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
       return ret;
    }
 
-   std::vector<gradient_value_type> eval_gradients(const mesh_type&   msh,
-                                                   const cell_type&   cl,
-                                                   const point<T, 3>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<gradient_value_type>
+   eval_gradients(const mesh_type&   msh,
+                  const cell_type&   cl,
+                  const point<T, 3>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -866,19 +850,16 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
  public:
    typedef static_vector<T, 3> function_value_type;
 
-   scaled_monomial_vector_basis()
-     : base(1)
-   {}
+   scaled_monomial_vector_basis() : base(1) {}
 
-   scaled_monomial_vector_basis(size_t degree)
-     : base(degree)
-   {}
+   scaled_monomial_vector_basis(size_t degree) : base(degree) {}
 
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const face_type&   fc,
-                                                   const point<T, 3>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const face_type&   fc,
+                  const point<T, 3>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -921,19 +902,20 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
    typedef static_vector<T, 2>    function_value_type;
    typedef static_matrix<T, 2, 2> gradient_value_type;
 
-   scaled_monomial_vector_basis()
-     : base(1)
+   scaled_monomial_vector_basis() : base(1) {}
+
+   scaled_monomial_vector_basis(size_t degree) : base(degree) {}
+
+   scaled_monomial_vector_basis(size_t degree, size_t computed_degree) :
+     base(degree, computed_degree)
    {}
 
-   scaled_monomial_vector_basis(size_t degree)
-     : base(degree)
-   {}
-
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const cell_type&   cl,
-                                                   const point<T, 2>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const cell_type&   cl,
+                  const point<T, 2>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -963,11 +945,12 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
       return ret;
    }
 
-   std::vector<gradient_value_type> eval_sgradients(const mesh_type&   msh,
-                                                    const cell_type&   cl,
-                                                    const point<T, 2>& pt,
-                                                    size_t             mindeg = 0,
-                                                    size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<gradient_value_type>
+   eval_sgradients(const mesh_type&   msh,
+                   const cell_type&   cl,
+                   const point<T, 2>& pt,
+                   size_t             mindeg = 0,
+                   size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -1011,11 +994,12 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
       return ret;
    }
 
-   std::vector<gradient_value_type> eval_gradients(const mesh_type&   msh,
-                                                   const cell_type&   cl,
-                                                   const point<T, 2>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<gradient_value_type>
+   eval_gradients(const mesh_type&   msh,
+                  const cell_type&   cl,
+                  const point<T, 2>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -1071,19 +1055,16 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
  public:
    typedef static_vector<T, 2> function_value_type;
 
-   scaled_monomial_vector_basis()
-     : base(1)
-   {}
+   scaled_monomial_vector_basis() : base(1) {}
 
-   scaled_monomial_vector_basis(size_t degree)
-     : base(degree)
-   {}
+   scaled_monomial_vector_basis(size_t degree) : base(degree) {}
 
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const face_type&   fc,
-                                                   const point<T, 2>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const face_type&   fc,
+                  const point<T, 2>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -1130,19 +1111,20 @@ class scaled_monomial_vector_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Stor
    typedef T function_value_type;
    typedef T gradient_value_type;
 
-   scaled_monomial_vector_basis()
-     : base(1)
+   scaled_monomial_vector_basis() : base(1) {}
+
+   scaled_monomial_vector_basis(size_t degree) : base(degree) {}
+
+   scaled_monomial_vector_basis(size_t degree, size_t computed_degree) :
+     base(degree, computed_degree)
    {}
 
-   scaled_monomial_vector_basis(size_t degree)
-     : base(degree)
-   {}
-
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const cell_type&   cl,
-                                                   const point<T, 1>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const cell_type&   cl,
+                  const point<T, 1>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -1171,11 +1153,12 @@ class scaled_monomial_vector_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Stor
       return ret;
    }
 
-   std::vector<gradient_value_type> eval_gradients(const mesh_type&   msh,
-                                                   const cell_type&   cl,
-                                                   const point<T, 1>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<gradient_value_type>
+   eval_gradients(const mesh_type&   msh,
+                  const cell_type&   cl,
+                  const point<T, 1>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -1205,11 +1188,12 @@ class scaled_monomial_vector_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Stor
       return ret;
    }
 
-   std::vector<gradient_value_type> eval_sgradients(const mesh_type&   msh,
-                                                    const cell_type&   cl,
-                                                    const point<T, 1>& pt,
-                                                    size_t             mindeg = 0,
-                                                    size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<gradient_value_type>
+   eval_sgradients(const mesh_type&   msh,
+                   const cell_type&   cl,
+                   const point<T, 1>& pt,
+                   size_t             mindeg = 0,
+                   size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -1251,19 +1235,16 @@ class scaled_monomial_vector_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Stor
  public:
    typedef T function_value_type;
 
-   scaled_monomial_vector_basis()
-     : base(1)
-   {}
+   scaled_monomial_vector_basis() : base(1) {}
 
-   scaled_monomial_vector_basis(size_t degree)
-     : base(degree)
-   {}
+   scaled_monomial_vector_basis(size_t degree) : base(degree) {}
 
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const face_type&   fc,
-                                                   const point<T, 1>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const face_type&   fc,
+                  const point<T, 1>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       std::vector<function_value_type> ret;
       ret.reserve(this->size());
@@ -1345,40 +1326,58 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
  public:
    typedef static_matrix<T, 3, 3> function_value_type;
 
-   scaled_monomial_matrix_basis()
-     : base(1)
-   {}
+   scaled_monomial_matrix_basis() : base(1) {}
 
-   scaled_monomial_matrix_basis(size_t degree)
-     : base(degree)
-   {}
+   scaled_monomial_matrix_basis(size_t degree) : base(degree) {}
 
    // overloaded function
 
-   size_t degree_index(const size_t degree) const { return 3 * base::degree_index(degree); }
+   size_t
+   degree_index(const size_t degree) const
+   {
+      return 3 * base::degree_index(degree);
+   }
 
-   size_t size() const { return 3 * base::size(); }
+   size_t
+   size() const
+   {
+      return 3 * base::size();
+   }
 
-   size_t computed_size() const { return 3 * base::computed_size(); }
+   size_t
+   computed_size() const
+   {
+      return 3 * base::computed_size();
+   }
 
-   dof_range range(const size_t min_degree, const size_t max_degree) const
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
    {
       const dof_range vector_range = base::range(min_degree, max_degree);
 
       return dof_range(3 * vector_range.min(), 3 * vector_range.max());
    }
 
-   dof_range range() const { return dof_range(0, size()); }
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
 
-   dof_range computed_range() const { return dof_range(0, computed_size()); }
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
 
    // evaluation
 
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const cell_type&   cl,
-                                                   const point<T, 3>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const cell_type&   cl,
+                  const point<T, 3>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -1433,40 +1432,58 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
  public:
    typedef static_matrix<T, 3, 3> function_value_type;
 
-   scaled_monomial_matrix_basis()
-     : base(1)
-   {}
+   scaled_monomial_matrix_basis() : base(1) {}
 
-   scaled_monomial_matrix_basis(size_t degree)
-     : base(degree)
-   {}
+   scaled_monomial_matrix_basis(size_t degree) : base(degree) {}
 
    // overloaded function
 
-   size_t degree_index(const size_t degree) const { return 3 * base::degree_index(degree); }
+   size_t
+   degree_index(const size_t degree) const
+   {
+      return 3 * base::degree_index(degree);
+   }
 
-   size_t size() const { return 3 * base::size(); }
+   size_t
+   size() const
+   {
+      return 3 * base::size();
+   }
 
-   size_t computed_size() const { return 3 * base::computed_size(); }
+   size_t
+   computed_size() const
+   {
+      return 3 * base::computed_size();
+   }
 
-   dof_range range(const size_t min_degree, const size_t max_degree) const
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
    {
       const dof_range vector_range = base::range(min_degree, max_degree);
 
       return dof_range(3 * vector_range.min(), 3 * vector_range.max());
    }
 
-   dof_range range() const { return dof_range(0, size()); }
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
 
-   dof_range computed_range() const { return dof_range(0, computed_size()); }
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
 
    // evaluation
 
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const face_type&   fc,
-                                                   const point<T, 3>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const face_type&   fc,
+                  const point<T, 3>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -1517,40 +1534,58 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
  public:
    typedef static_matrix<T, 2, 2> function_value_type;
 
-   scaled_monomial_matrix_basis()
-     : base(1)
-   {}
+   scaled_monomial_matrix_basis() : base(1) {}
 
-   scaled_monomial_matrix_basis(size_t degree)
-     : base(degree)
-   {}
+   scaled_monomial_matrix_basis(size_t degree) : base(degree) {}
 
    // overloaded function
 
-   size_t degree_index(const size_t degree) const { return 2 * base::degree_index(degree); }
+   size_t
+   degree_index(const size_t degree) const
+   {
+      return 2 * base::degree_index(degree);
+   }
 
-   size_t size() const { return 2 * base::size(); }
+   size_t
+   size() const
+   {
+      return 2 * base::size();
+   }
 
-   size_t computed_size() const { return 2 * base::computed_size(); }
+   size_t
+   computed_size() const
+   {
+      return 2 * base::computed_size();
+   }
 
-   dof_range range(const size_t min_degree, const size_t max_degree) const
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
    {
       const dof_range vector_range = base::range(min_degree, max_degree);
 
       return dof_range(2 * vector_range.min(), 2 * vector_range.max());
    }
 
-   dof_range range() const { return dof_range(0, size()); }
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
 
-   dof_range computed_range() const { return dof_range(0, computed_size()); }
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
 
    // evaluation
 
-   std::vector<function_value_type> eval_functions(const mesh_type&  msh,
-                                                   const cell_type&  cl,
-                                                   const point_type& pt,
-                                                   size_t            mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&  msh,
+                  const cell_type&  cl,
+                  const point_type& pt,
+                  size_t            mindeg = 0,
+                  size_t            maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -1604,40 +1639,58 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
  public:
    typedef static_matrix<T, 2, 2> function_value_type;
 
-   scaled_monomial_matrix_basis()
-     : base(1)
-   {}
+   scaled_monomial_matrix_basis() : base(1) {}
 
-   scaled_monomial_matrix_basis(size_t degree)
-     : base(degree)
-   {}
+   scaled_monomial_matrix_basis(size_t degree) : base(degree) {}
 
    // overloaded function
 
-   size_t degree_index(const size_t degree) const { return 2 * base::degree_index(degree); }
+   size_t
+   degree_index(const size_t degree) const
+   {
+      return 2 * base::degree_index(degree);
+   }
 
-   size_t size() const { return 2 * base::size(); }
+   size_t
+   size() const
+   {
+      return 2 * base::size();
+   }
 
-   size_t computed_size() const { return 2 * base::computed_size(); }
+   size_t
+   computed_size() const
+   {
+      return 2 * base::computed_size();
+   }
 
-   dof_range range(const size_t min_degree, const size_t max_degree) const
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
    {
       const dof_range vector_range = base::range(min_degree, max_degree);
 
       return dof_range(2 * vector_range.min(), 2 * vector_range.max());
    }
 
-   dof_range range() const { return dof_range(0, size()); }
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
 
-   dof_range computed_range() const { return dof_range(0, computed_size()); }
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
 
    // evaluation
 
-   std::vector<function_value_type> eval_functions(const mesh_type&  msh,
-                                                   const face_type&  fc,
-                                                   const point_type& pt,
-                                                   size_t            mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&  msh,
+                  const face_type&  fc,
+                  const point_type& pt,
+                  size_t            mindeg = 0,
+                  size_t            maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -1689,19 +1742,16 @@ class scaled_monomial_matrix_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Stor
  public:
    typedef T function_value_type;
 
-   scaled_monomial_matrix_basis()
-     : base(1)
-   {}
+   scaled_monomial_matrix_basis() : base(1) {}
 
-   scaled_monomial_matrix_basis(size_t degree)
-     : base(degree)
-   {}
+   scaled_monomial_matrix_basis(size_t degree) : base(degree) {}
 
-   std::vector<function_value_type> eval_functions(const mesh_type&  msh,
-                                                   const cell_type&  cl,
-                                                   const point_type& pt,
-                                                   size_t            mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&  msh,
+                  const cell_type&  cl,
+                  const point_type& pt,
+                  size_t            mindeg = 0,
+                  size_t            maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
@@ -1743,22 +1793,441 @@ class scaled_monomial_matrix_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Stor
  public:
    typedef T function_value_type;
 
-   scaled_monomial_matrix_basis()
-     : base(1)
-   {}
+   scaled_monomial_matrix_basis() : base(1) {}
 
-   scaled_monomial_matrix_basis(size_t degree)
-     : base(degree)
-   {}
+   scaled_monomial_matrix_basis(size_t degree) : base(degree) {}
 
-   std::vector<function_value_type> eval_functions(const mesh_type&  msh,
-                                                   const face_type&  fc,
-                                                   const point_type& pt,
-                                                   size_t            mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&  msh,
+                  const face_type&  fc,
+                  const point_type& pt,
+                  size_t            mindeg = 0,
+                  size_t            maxdeg = VERY_HIGH_DEGREE) const
    {
       assert(this->size() == 1);
       std::vector<function_value_type> ret(1, T{1});
+
+      return ret;
+   }
+};
+
+/////////////////////////
+// symetric matrix basis function
+//////////////////////////
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell>
+  : public priv::monomial_basis_bones<3>
+{
+   typedef Mesh<T, 3, Storage>             mesh_type;
+   typedef typename mesh_type::scalar_type scalar_type;
+   typedef typename mesh_type::cell        cell_type;
+   typedef priv::monomial_basis_bones<3>   base;
+
+ public:
+   typedef static_matrix<T, 3, 3> function_value_type;
+
+   scaled_monomial_sym_matrix_basis() : base(1) {}
+
+   scaled_monomial_sym_matrix_basis(size_t degree) : base(degree) {}
+
+   // overloaded function
+   // it is 6 because we have 6 basic functions
+   size_t
+   degree_index(const size_t degree) const
+   {
+      return 6 * base::degree_index(degree);
+   }
+
+   size_t
+   size() const
+   {
+      return 6 * base::size();
+   }
+
+   size_t
+   computed_size() const
+   {
+      return 6 * base::computed_size();
+   }
+
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
+   {
+      const dof_range vector_range = base::range(min_degree, max_degree);
+
+      return dof_range(6 * vector_range.min(), 6 * vector_range.max());
+   }
+
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
+
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
+
+   // evaluation
+
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const cell_type&   cl,
+                  const point<T, 3>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
+   {
+      maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
+      const auto eval_range = range(mindeg, maxdeg);
+
+      const auto bar = barycenter(msh, cl);
+      const auto h   = diameter(msh, cl);
+
+      const auto ep = (pt - bar) / h;
+
+      std::vector<function_value_type> ret;
+      ret.reserve(eval_range.size());
+
+      auto begin = this->monomials_begin();
+      std::advance(begin, eval_range.min() / 6);
+      auto end = this->monomials_begin();
+      std::advance(end, eval_range.max() / 6);
+
+      for (auto itor = begin; itor != end; itor++) {
+         const auto m = *itor;
+
+         const auto vx = iexp_pow(ep.x(), m[0]);
+         const auto vy = iexp_pow(ep.y(), m[1]);
+         const auto vz = iexp_pow(ep.z(), m[2]);
+
+         const auto val = vx * vy * vz;
+
+         function_value_type fc;
+
+         for (size_t j = 0; j < 3; j++) {
+            for (size_t i = 0; i <= j; i++) {
+               fc       = function_value_type::Zero();
+               fc(i, j) = val;
+               fc(j, i) = val;
+               ret.push_back(fc);
+            }
+         }
+      }
+
+      return ret;
+   }
+};
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face>
+  : public priv::monomial_basis_bones<2>
+{
+   typedef Mesh<T, 3, Storage>             mesh_type;
+   typedef typename mesh_type::scalar_type scalar_type;
+   typedef typename mesh_type::face        face_type;
+
+   typedef priv::monomial_basis_bones<2> base;
+
+ public:
+   typedef static_matrix<T, 3, 3> function_value_type;
+
+   scaled_monomial_sym_matrix_basis() : base(1) {}
+
+   scaled_monomial_sym_matrix_basis(size_t degree) : base(degree) {}
+
+   // overloaded function
+   // this is 6 because we have 6 basic functions
+   size_t
+   degree_index(const size_t degree) const
+   {
+      return 6 * base::degree_index(degree);
+   }
+
+   size_t
+   size() const
+   {
+      return 6 * base::size();
+   }
+
+   size_t
+   computed_size() const
+   {
+      return 6 * base::computed_size();
+   }
+
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
+   {
+      const dof_range vector_range = base::range(min_degree, max_degree);
+
+      return dof_range(6 * vector_range.min(), 6 * vector_range.max());
+   }
+
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
+
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
+
+   // evaluation
+
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const face_type&   fc,
+                  const point<T, 3>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
+   {
+      maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
+      const auto eval_range = range(mindeg, maxdeg);
+
+      const auto ep = map_point(msh, fc, pt);
+
+      std::vector<function_value_type> ret;
+      ret.reserve(eval_range.size());
+
+      auto begin = this->monomials_begin();
+      std::advance(begin, eval_range.min() / 6);
+      auto end = this->monomials_begin();
+      std::advance(end, eval_range.max() / 6);
+
+      for (auto itor = begin; itor != end; itor++) {
+         const auto m = *itor;
+
+         const auto vx = iexp_pow(ep.x(), m[0]);
+         const auto vy = iexp_pow(ep.y(), m[1]);
+
+         const auto val = vx * vy;
+
+         function_value_type fc;
+
+         for (size_t j = 0; j < 3; j++) {
+            for (size_t i = 0; i <= j; i++) {
+               fc       = function_value_type::Zero();
+               fc(i, j) = val;
+               fc(j, i) = val;
+               ret.push_back(fc);
+            }
+         }
+      }
+
+      return ret;
+   }
+};
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell>
+  : public priv::monomial_basis_bones<2>
+{
+   typedef Mesh<T, 2, Storage>             mesh_type;
+   typedef typename mesh_type::scalar_type scalar_type;
+   typedef typename mesh_type::cell        cell_type;
+   typedef typename mesh_type::point_type  point_type;
+   typedef priv::monomial_basis_bones<2>   base;
+
+ public:
+   typedef static_matrix<T, 2, 2> function_value_type;
+
+   scaled_monomial_sym_matrix_basis() : base(1) {}
+
+   scaled_monomial_sym_matrix_basis(size_t degree) : base(degree) {}
+
+   // overloaded function
+   // this is 3 because we have 3 basic functions
+   size_t
+   degree_index(const size_t degree) const
+   {
+      return 3 * base::degree_index(degree);
+   }
+
+   size_t
+   size() const
+   {
+      return 3 * base::size();
+   }
+
+   size_t
+   computed_size() const
+   {
+      return 3 * base::computed_size();
+   }
+
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
+   {
+      const dof_range vector_range = base::range(min_degree, max_degree);
+      return dof_range(3 * vector_range.min(), 3 * vector_range.max());
+   }
+
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
+
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
+
+   // evaluation
+
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&  msh,
+                  const cell_type&  cl,
+                  const point_type& pt,
+                  size_t            mindeg = 0,
+                  size_t            maxdeg = VERY_HIGH_DEGREE) const
+   {
+      maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
+      const auto eval_range = this->range(mindeg, maxdeg);
+
+      const auto bar = barycenter(msh, cl);
+      const auto h   = diameter(msh, cl);
+
+      const auto ep = (pt - bar) / h;
+
+      std::vector<function_value_type> ret;
+      ret.reserve(eval_range.size());
+
+      auto begin = this->monomials_begin();
+      std::advance(begin, eval_range.min() / 3);
+      auto end = this->monomials_begin();
+      std::advance(end, eval_range.max() / 3);
+
+      for (auto itor = begin; itor != end; itor++) {
+         const auto m = *itor;
+
+         const auto vx = iexp_pow(ep.x(), m[0]);
+         const auto vy = iexp_pow(ep.y(), m[1]);
+
+         const auto val = vx * vy;
+
+         function_value_type fc;
+
+         for (size_t j = 0; j < 2; j++) {
+            for (size_t i = 0; i <= j; i++) {
+               fc       = function_value_type::Zero();
+               fc(i, j) = val;
+               fc(j, i) = val;
+               ret.push_back(fc);
+            }
+         }
+      }
+
+      return ret;
+   }
+};
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::face>
+  : public priv::monomial_basis_bones<1>
+{
+   typedef Mesh<T, 2, Storage>             mesh_type;
+   typedef typename mesh_type::scalar_type scalar_type;
+   typedef typename mesh_type::point_type  point_type;
+   typedef typename mesh_type::face        face_type;
+   typedef priv::monomial_basis_bones<1>   base;
+
+ public:
+   typedef static_matrix<T, 2, 2> function_value_type;
+
+   scaled_monomial_sym_matrix_basis() : base(1) {}
+
+   scaled_monomial_sym_matrix_basis(size_t degree) : base(degree) {}
+
+   // overloaded function
+   // this is 3 because we have 3 basic functions
+   size_t
+   degree_index(const size_t degree) const
+   {
+      return 3 * base::degree_index(degree);
+   }
+
+   size_t
+   size() const
+   {
+      return 3 * base::size();
+   }
+
+   size_t
+   computed_size() const
+   {
+      return 3 * base::computed_size();
+   }
+
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
+   {
+      const dof_range vector_range = base::range(min_degree, max_degree);
+
+      return dof_range(3 * vector_range.min(), 3 * vector_range.max());
+   }
+
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
+
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
+
+   // evaluation
+
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&  msh,
+                  const face_type&  fc,
+                  const point_type& pt,
+                  size_t            mindeg = 0,
+                  size_t            maxdeg = VERY_HIGH_DEGREE) const
+   {
+      maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
+      const auto eval_range = range(mindeg, maxdeg);
+
+      const auto pts = points(msh, fc);
+      const auto bar = barycenter(msh, fc);
+      const auto h   = diameter(msh, fc);
+      const auto v   = (pts[1] - pts[0]).to_vector();
+      const auto t   = (pt - bar).to_vector();
+      const T    dot = v.dot(t);
+      const auto ep  = point<T, 1>({dot / (h * h)});
+
+      std::vector<function_value_type> ret;
+      ret.reserve(eval_range.size());
+
+      auto begin = this->monomials_begin();
+      std::advance(begin, eval_range.min() / 3);
+      auto end = this->monomials_begin();
+      std::advance(end, eval_range.max() / 3);
+
+      for (auto itor = begin; itor != end; itor++) {
+         const auto          m  = *itor;
+         const auto          vx = iexp_pow(ep.x(), m[0]);
+         function_value_type fc;
+
+         for (size_t j = 0; j < 2; j++) {
+            for (size_t i = 0; i <= j; i++) {
+               fc       = function_value_type::Zero();
+               fc(i, j) = vx;
+               fc(j, i) = vx;
+               ret.push_back(fc);
+            }
+         }
+      }
 
       return ret;
    }
@@ -1788,15 +2257,13 @@ class Raviart_Thomas_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stora
    typedef static_vector<T, 3>    function_value_type;
    typedef static_matrix<T, 3, 3> gradient_value_type;
 
-   Raviart_Thomas_vector_basis()
-     : base(1)
+   Raviart_Thomas_vector_basis() : base(1)
    {
       smscb = scaled_monomial_scalar_cell_basis_type(this->degree() - 1);
       smvcb = scaled_monomial_vector_cell_basis_type(this->degree() - 1);
    }
 
-   Raviart_Thomas_vector_basis(size_t degree)
-     : base(degree)
+   Raviart_Thomas_vector_basis(size_t degree) : base(degree)
    {
       if (this->degree() == 0) {
          throw std::invalid_argument("Raviart-Thomas basis: degree <=0");
@@ -1807,19 +2274,22 @@ class Raviart_Thomas_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stora
 
    // overloaded function
 
-   size_t size() const
+   size_t
+   size() const
    {
       const size_t degree = this->degree() - 1;
       return (degree + 1) * (degree + 2) * (degree + 4) / 2;
    }
 
-   size_t computed_size() const
+   size_t
+   computed_size() const
    {
       const size_t computed_degree = this->computed_degree() - 1;
       return (computed_degree + 1) * (computed_degree + 2) * (computed_degree + 4) / 2;
    }
 
-   dof_range range(const size_t min_degree, const size_t max_degree) const
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
    {
       const size_t degree = this->degree() - 1;
       if (max_degree <= degree) {
@@ -1836,43 +2306,57 @@ class Raviart_Thomas_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stora
       }
    }
 
-   dof_range range() const { return dof_range(0, size()); }
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
 
-   dof_range computed_range() const { return dof_range(0, computed_size()); }
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
 
    // evaluation
 
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const cell_type&   cl,
-                                                   const point<T, 3>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const cell_type&   cl,
+                  const point<T, 3>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
 
       std::vector<function_value_type> ret;
-      const size_t                     poly_degree = (this->degree() - 1);
-      ret.reserve((poly_degree + 1) * (poly_degree + 2) * (poly_degree + 4) / 2);
+      ret.reserve(eval_range.size());
 
+      const size_t poly_degree = (this->degree() - 1);
       // basis functions of P^{poly_degree}_d(T; R^d)
-      const auto smvcb_phi = smvcb.eval_functions(msh, cl, pt);
+      if (mindeg <= poly_degree) {
+         const auto smvcb_phi =
+           smvcb.eval_functions(msh, cl, pt, mindeg, std::min(maxdeg, poly_degree));
 
-      for (size_t i = 0; i < smvcb_phi.size(); i++) {
-         ret.push_back(smvcb_phi[i]);
+         for (size_t i = 0; i < smvcb_phi.size(); i++) {
+            ret.push_back(smvcb_phi[i]);
+         }
       }
 
-      // basis functions of P^{poly_degree},H_d(T; R)
-      const auto   smscb_phi = smscb.eval_functions(msh, cl, pt, poly_degree, poly_degree);
-      const size_t dim_PHk   = (poly_degree + 1) * (poly_degree + 2) / 2;
-      assert(smscb_phi.rows() == dim_PHk);
+      if (maxdeg > poly_degree) {
+         // basis functions of P^{poly_degree},H_d(T; R)
+         const auto   smscb_phi = smscb.eval_functions(msh, cl, pt, poly_degree, poly_degree);
+         const size_t dim_PHk   = (poly_degree + 1) * (poly_degree + 2) / 2;
+         assert(smscb_phi.rows() == dim_PHk);
 
-      // basis functions of x*P^k,H_d(T; R)
-      for (size_t i = 0; i < dim_PHk; i++) {
-         const auto vx = pt.x() * smscb_phi(i);
-         const auto vy = pt.y() * smscb_phi(i);
-         const auto vz = pt.z() * smscb_phi(i);
-         ret.push_back(static_vector<T, 3>({vx, vy, vz}));
+         // basis functions of x*P^k,H_d(T; R)
+         for (size_t i = 0; i < dim_PHk; i++) {
+            const auto vx = pt.x() * smscb_phi(i);
+            const auto vy = pt.y() * smscb_phi(i);
+            const auto vz = pt.z() * smscb_phi(i);
+            ret.push_back(static_vector<T, 3>({vx, vy, vz}));
+         }
       }
 
       return ret;
@@ -1897,15 +2381,13 @@ class Raviart_Thomas_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stora
  public:
    typedef static_vector<T, 3> function_value_type;
 
-   Raviart_Thomas_vector_basis()
-     : base(1)
+   Raviart_Thomas_vector_basis() : base(1)
    {
       smsfb = scaled_monomial_scalar_face_basis_type(this->degree() - 1);
       smvfb = scaled_monomial_vector_face_basis_type(this->degree() - 1);
    }
 
-   Raviart_Thomas_vector_basis(size_t degree)
-     : base(degree)
+   Raviart_Thomas_vector_basis(size_t degree) : base(degree)
    {
       if (this->degree() == 0) {
          throw std::invalid_argument("Raviart-Thomas basis: degree <=0");
@@ -1916,19 +2398,22 @@ class Raviart_Thomas_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stora
 
    // overloaded function
 
-   size_t size() const
+   size_t
+   size() const
    {
       const size_t degree = this->degree() - 1;
       return (degree + 1) * (degree + 2) * (degree + 4) / 2;
    }
 
-   size_t computed_size() const
+   size_t
+   computed_size() const
    {
       const size_t computed_degree = this->computed_degree() - 1;
       return (computed_degree * (computed_degree + 2) * (computed_degree + 4) / 2);
    }
 
-   dof_range range(const size_t min_degree, const size_t max_degree) const
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
    {
       const size_t degree = this->degree() - 1;
       if (max_degree <= degree) {
@@ -1945,43 +2430,57 @@ class Raviart_Thomas_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stora
       }
    }
 
-   dof_range range() const { return dof_range(0, size()); }
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
 
-   dof_range computed_range() const { return dof_range(0, computed_size()); }
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
 
    // evaluation
 
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const face_type&   fc,
-                                                   const point<T, 3>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const face_type&   fc,
+                  const point<T, 3>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
 
       std::vector<function_value_type> ret;
-      const size_t                     poly_degree = (this->degree() - 1);
-      ret.reserve((poly_degree + 1) * (poly_degree + 2) * (poly_degree + 4) / 2);
+      ret.reserve(eval_range.size());
 
+      const size_t poly_degree = (this->degree() - 1);
       // basis functions of P^{poly_degree}_d(T; R^d)
-      const auto smvfb_phi = smvfb.eval_functions(msh, fc, pt);
+      if (mindeg <= poly_degree) {
+         const auto smvfb_phi =
+           smvfb.eval_functions(msh, fc, pt, mindeg, std::min(maxdeg, poly_degree));
 
-      for (size_t i = 0; i < smvfb_phi.size(); i++) {
-         ret.push_back(smvfb_phi[i]);
+         for (size_t i = 0; i < smvfb_phi.size(); i++) {
+            ret.push_back(smvfb_phi[i]);
+         }
       }
 
-      // basis functions of P^k,H_d(T; R)
-      const auto   smsfb_phi = smsfb.eval_functions(msh, fc, pt, poly_degree, poly_degree);
-      const size_t dim_PHk   = (poly_degree + 1) * (poly_degree + 2) / 2;
-      assert(smsfb_phi.rows() == dim_PHk);
+      if (maxdeg > poly_degree) {
+         // basis functions of P^k,H_d(T; R)
+         const auto   smsfb_phi = smsfb.eval_functions(msh, fc, pt, poly_degree, poly_degree);
+         const size_t dim_PHk   = (poly_degree + 1) * (poly_degree + 2) / 2;
+         assert(smsfb_phi.rows() == dim_PHk);
 
-      // basis functions of x*P^k,H_d(T; R)
-      for (size_t i = 0; i < dim_PHk; i++) {
-         const auto vx = pt.x() * smsfb_phi(i);
-         const auto vy = pt.y() * smsfb_phi(i);
-         const auto vz = pt.z() * smsfb_phi(i);
-         ret.push_back(static_vector<T, 3>({vx, vy, vz}));
+         // basis functions of x*P^k,H_d(T; R)
+         for (size_t i = 0; i < dim_PHk; i++) {
+            const auto vx = pt.x() * smsfb_phi(i);
+            const auto vy = pt.y() * smsfb_phi(i);
+            const auto vz = pt.z() * smsfb_phi(i);
+            ret.push_back(static_vector<T, 3>({vx, vy, vz}));
+         }
       }
 
       return ret;
@@ -2007,15 +2506,13 @@ class Raviart_Thomas_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stora
    typedef static_vector<T, 2>    function_value_type;
    typedef static_matrix<T, 2, 2> gradient_value_type;
 
-   Raviart_Thomas_vector_basis()
-     : base(1)
+   Raviart_Thomas_vector_basis() : base(1)
    {
       smscb = scaled_monomial_scalar_cell_basis_type(this->degree() - 1);
       smvcb = scaled_monomial_vector_cell_basis_type(this->degree() - 1);
    }
 
-   Raviart_Thomas_vector_basis(size_t degree)
-     : base(degree)
+   Raviart_Thomas_vector_basis(size_t degree) : base(degree)
    {
       if (this->degree() == 0) {
          throw std::invalid_argument("Raviart-Thomas basis: degree <=0");
@@ -2026,19 +2523,22 @@ class Raviart_Thomas_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stora
 
    // overloaded function
 
-   size_t size() const
+   size_t
+   size() const
    {
       const size_t degree = this->degree() - 1;
       return (degree + 1) * (degree + 3);
    }
 
-   size_t computed_size() const
+   size_t
+   computed_size() const
    {
       const size_t computed_degree = this->computed_degree() - 1;
       return (computed_degree + 1) * (computed_degree + 3);
    }
 
-   dof_range range(const size_t min_degree, const size_t max_degree) const
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
    {
       const size_t degree = this->degree() - 1;
       if (max_degree <= degree) {
@@ -2055,42 +2555,56 @@ class Raviart_Thomas_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stora
       }
    }
 
-   dof_range range() const { return dof_range(0, size()); }
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
 
-   dof_range computed_range() const { return dof_range(0, computed_size()); }
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
 
    // evaluation
 
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const cell_type&   cl,
-                                                   const point<T, 2>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const cell_type&   cl,
+                  const point<T, 2>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
 
       std::vector<function_value_type> ret;
-      const size_t                     poly_degree = this->degree() - 1;
-      ret.reserve((poly_degree + 1) * (poly_degree + 3));
+      ret.reserve(eval_range.size());
 
+      const size_t poly_degree = (this->degree() - 1);
       // basis functions of P^k_d(T; R^d)
-      const auto smvcb_phi = smvcb.eval_functions(msh, cl, pt);
+      if (mindeg <= poly_degree) {
+         const auto smvcb_phi =
+           smvcb.eval_functions(msh, cl, pt, mindeg, std::min(maxdeg, poly_degree));
 
-      for (size_t i = 0; i < smvcb_phi.size(); i++) {
-         ret.push_back(smvcb_phi[i]);
+         for (size_t i = 0; i < smvcb_phi.size(); i++) {
+            ret.push_back(smvcb_phi[i]);
+         }
       }
 
-      // basis functions of P^k,H_d(T; R)
-      const auto   smscb_phi = smscb.eval_functions(msh, cl, pt, poly_degree, poly_degree);
-      const size_t dim_PHk   = (poly_degree + 1);
-      assert(smscb_phi.rows() == dim_PHk);
+      if (maxdeg > poly_degree) {
+         // basis functions of P^k,H_d(T; R)
+         const auto   smscb_phi = smscb.eval_functions(msh, cl, pt, poly_degree, poly_degree);
+         const size_t dim_PHk   = (poly_degree + 1);
+         assert(smscb_phi.rows() == dim_PHk);
 
-      // basis functions of x*P^k,H_d(T; R)
-      for (size_t i = 0; i < dim_PHk; i++) {
-         const auto vx = pt.x() * smscb_phi(i);
-         const auto vy = pt.y() * smscb_phi(i);
-         ret.push_back(static_vector<T, 2>({vx, vy}));
+         // basis functions of x*P^k,H_d(T; R)
+         for (size_t i = 0; i < dim_PHk; i++) {
+            const auto vx = pt.x() * smscb_phi(i);
+            const auto vy = pt.y() * smscb_phi(i);
+            ret.push_back(static_vector<T, 2>({vx, vy}));
+         }
       }
 
       return ret;
@@ -2114,15 +2628,13 @@ class Raviart_Thomas_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stora
  public:
    typedef static_vector<T, 2> function_value_type;
 
-   Raviart_Thomas_vector_basis()
-     : base(1)
+   Raviart_Thomas_vector_basis() : base(1)
    {
       smsfb = scaled_monomial_scalar_face_basis_type(this->degree() - 1);
       smvfb = scaled_monomial_vector_face_basis_type(this->degree() - 1);
    }
 
-   Raviart_Thomas_vector_basis(size_t degree)
-     : base(degree)
+   Raviart_Thomas_vector_basis(size_t degree) : base(degree)
    {
       if (this->degree() == 0) {
          throw std::invalid_argument("Raviart-Thomas basis: degree <=0");
@@ -2133,19 +2645,22 @@ class Raviart_Thomas_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stora
 
    // overloaded function
 
-   size_t size() const
+   size_t
+   size() const
    {
       const size_t degree = this->degree() - 1;
       return (degree + 1) * (degree + 3);
    }
 
-   size_t computed_size() const
+   size_t
+   computed_size() const
    {
       const size_t computed_degree = this->computed_degree() - 1;
       return (computed_degree + 1) * (computed_degree + 3);
    }
 
-   dof_range range(const size_t min_degree, const size_t max_degree) const
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
    {
       const size_t degree = this->degree() - 1;
       if (max_degree <= degree) {
@@ -2162,45 +2677,171 @@ class Raviart_Thomas_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stora
       }
    }
 
-   dof_range range() const { return dof_range(0, size()); }
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
 
-   dof_range computed_range() const { return dof_range(0, computed_size()); }
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
 
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const face_type&   fc,
-                                                   const point<T, 2>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const face_type&   fc,
+                  const point<T, 2>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
 
       std::vector<function_value_type> ret;
-      const size_t                     poly_degree = this->degree() - 1;
-      ret.reserve((poly_degree + 1) * (poly_degree + 3));
+      ret.reserve(eval_range.size());
 
+      const size_t poly_degree = (this->degree() - 1);
       // basis functions of P^k_d(T; R^d)
-      const auto smvfb_phi = smvfb.eval_functions(msh, fc, pt);
+      if (mindeg <= poly_degree) {
+         const auto smvfb_phi =
+           smvfb.eval_functions(msh, fc, pt, mindeg, std::min(maxdeg, poly_degree));
 
-      for (size_t i = 0; i < smvfb_phi.size(); i++) {
-         ret.push_back(smvfb_phi[i]);
+         for (size_t i = 0; i < smvfb_phi.size(); i++) {
+            ret.push_back(smvfb_phi[i]);
+         }
       }
 
       // basis functions of P^k,H_d(T; R)
-      const auto   smsfb_phi = smsfb.eval_functions(msh, fc, pt, poly_degree, poly_degree);
-      const size_t dim_PHk   = poly_degree + 1;
-      assert(smsfb_phi.rows() == dim_PHk);
+      if (maxdeg > poly_degree) {
+         const auto   smsfb_phi = smsfb.eval_functions(msh, fc, pt, poly_degree, poly_degree);
+         const size_t dim_PHk   = poly_degree + 1;
+         assert(smsfb_phi.rows() == dim_PHk);
 
-      // basis functions of x*P^k,H_d(T; R)
-      for (size_t i = 0; i < dim_PHk; i++) {
-         const auto vx = pt.x() * smsfb_phi(i);
-         const auto vy = pt.y() * smsfb_phi(i);
-         ret.push_back(static_vector<T, 2>({vx, vy}));
+         // basis functions of x*P^k,H_d(T; R)
+         for (size_t i = 0; i < dim_PHk; i++) {
+            const auto vx = pt.x() * smsfb_phi(i);
+            const auto vy = pt.y() * smsfb_phi(i);
+            ret.push_back(static_vector<T, 2>({vx, vy}));
+         }
       }
 
       return ret;
    }
 };
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class Raviart_Thomas_vector_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Storage>::cell>
+  : public priv::monomial_basis_bones<1, 1>
+{
+   typedef Mesh<T, 1, Storage>              mesh_type;
+   typedef typename mesh_type::cell         cell_type;
+   typedef priv::monomial_basis_bones<1, 1> base;
+
+   typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>
+     scaled_monomial_scalar_cell_basis_type;
+   typedef disk::scaled_monomial_vector_basis<mesh_type, cell_type>
+                                          scaled_monomial_vector_cell_basis_type;
+   scaled_monomial_scalar_cell_basis_type smscb;
+   scaled_monomial_vector_cell_basis_type smvcb;
+
+ public:
+   typedef T function_value_type;
+   typedef T gradient_value_type;
+
+   Raviart_Thomas_vector_basis() : base(1)
+   {
+      smscb = scaled_monomial_scalar_cell_basis_type(this->degree() - 1);
+      smvcb = scaled_monomial_vector_cell_basis_type(this->degree() - 1);
+   }
+
+   Raviart_Thomas_vector_basis(size_t degree) : base(degree)
+   {
+      if (this->degree() == 0) {
+         throw std::invalid_argument("Raviart-Thomas basis: degree <=0");
+      }
+      smscb = scaled_monomial_scalar_cell_basis_type(this->degree() - 1);
+      smvcb = scaled_monomial_vector_cell_basis_type(this->degree() - 1);
+   }
+
+   // evaluation
+
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const cell_type&   cl,
+                  const point<T, 1>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
+   {
+      maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
+      const auto eval_range = range(mindeg, maxdeg);
+
+      std::vector<function_value_type> ret;
+      ret.reserve(eval_range.size());
+
+      const size_t poly_degree = this->degree() - 1;
+      // basis functions of P^k_d(T; R^d)
+      if (mindeg <= poly_degree) {
+         const auto smvcb_phi =
+           smvcb.eval_functions(msh, cl, pt, mindeg, std::min(maxdeg, poly_degree));
+
+         for (size_t i = 0; i < smvcb_phi.size(); i++) {
+            ret.push_back(smvcb_phi[i]);
+         }
+      }
+
+      if (maxdeg > poly_degree) {
+         // basis functions of P^k,H_d(T; R)
+         const auto   smscb_phi = smscb.eval_functions(msh, cl, pt, poly_degree, poly_degree);
+         const size_t dim_PHk   = 1;
+         assert(smscb_phi.rows() == dim_PHk);
+
+         // basis functions of x*P^k,H_d(T; R)
+         for (size_t i = 0; i < dim_PHk; i++) {
+            const auto vx = pt.x() * smscb_phi(i);
+            ret.push_back(vx);
+         }
+      }
+
+      return ret;
+   }
+};
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class Raviart_Thomas_vector_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Storage>::face>
+  : public priv::monomial_basis_bones<0, 1>
+{
+   typedef Mesh<T, 1, Storage>              mesh_type;
+   typedef typename mesh_type::face         face_type;
+   typedef priv::monomial_basis_bones<0, 1> base;
+
+ public:
+   typedef T function_value_type;
+
+   Raviart_Thomas_vector_basis() : base(1) {}
+
+   Raviart_Thomas_vector_basis(size_t degree) : base(degree) {}
+
+   // overloaded function
+
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const face_type&   fc,
+                  const point<T, 1>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
+   {
+      assert(this->size() == 1);
+      std::vector<function_value_type> ret(1, T{1});
+
+      return ret;
+   }
+};
+
+////////////////////////////
+// RT matrix basis
+//////////////////////////
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class Raviart_Thomas_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell>
@@ -2220,15 +2861,13 @@ class Raviart_Thomas_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stora
  public:
    typedef static_matrix<T, 3, 3> function_value_type;
 
-   Raviart_Thomas_matrix_basis()
-     : base(1)
+   Raviart_Thomas_matrix_basis() : base(1)
    {
       smscb = scaled_monomial_scalar_cell_basis_type(this->degree() - 1);
       smmcb = scaled_monomial_matrix_cell_basis_type(this->degree() - 1);
    }
 
-   Raviart_Thomas_matrix_basis(size_t degree)
-     : base(degree)
+   Raviart_Thomas_matrix_basis(size_t degree) : base(degree)
    {
       if (this->degree() == 0) {
          throw std::invalid_argument("Raviart-Thomas basis: degree <=0");
@@ -2239,13 +2878,15 @@ class Raviart_Thomas_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stora
 
    // overloaded function
 
-   size_t size() const
+   size_t
+   size() const
    {
       const size_t degree = this->degree() - 1;
       return 3 * (degree + 1) * (degree + 2) * (degree + 4) / 2;
    }
 
-   size_t computed_size() const
+   size_t
+   computed_size() const
    {
       if (this->computed_degree() == 0) {
          throw std::invalid_argument("Raviart-Thomas basis: computed_degree <=0");
@@ -2254,7 +2895,8 @@ class Raviart_Thomas_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stora
       return 3 * (computed_degree + 1) * (computed_degree + 2) * (computed_degree + 4) / 2;
    }
 
-   dof_range range(const size_t min_degree, const size_t max_degree) const
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
    {
       const size_t    degree       = this->degree() - 1;
       const dof_range vector_range = base::range(min_degree, max_degree);
@@ -2273,59 +2915,69 @@ class Raviart_Thomas_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stora
       }
    }
 
-   dof_range range() const { return dof_range(0, size()); }
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
 
-   dof_range computed_range() const { return dof_range(0, computed_size()); }
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
 
    // evaluation
 
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const cell_type&   cl,
-                                                   const point<T, 3>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const cell_type&   cl,
+                  const point<T, 3>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
 
       std::vector<function_value_type> ret;
-      const size_t                     poly_degree = this->degree() - 1;
-      ret.reserve(3 * (poly_degree + 1) * (poly_degree + 2) * (poly_degree + 4) / 2);
+      ret.reserve(eval_range.size());
 
+      const size_t poly_degree = this->degree() - 1;
       // basis functions of P^k_d(T; R^d)
+      if (mindeg <= poly_degree) {
+         const auto smmcb_phi =
+           smmcb.eval_functions(msh, cl, pt, mindeg, std::min(maxdeg, poly_degree));
 
-      const auto smmcb_phi = smmcb.eval_functions(msh, cl, pt);
-
-      for (size_t i = 0; i < smmcb_phi.size(); i++) {
-         ret.push_back(smmcb_phi[i]);
-      }
-
-      // basis functions of P^k,H_d(T; R)
-      const auto   smscb_phi = smscb.eval_functions(msh, cl, pt, poly_degree, poly_degree);
-      const size_t dim_PHk   = (poly_degree + 1) * (poly_degree + 2) / 2;
-      assert(smscb_phi.rows() == dim_PHk);
-
-      // basis functions of P^k,H_d(T; R) * X
-      for (size_t i = 0; i < dim_PHk; i++) {
-         const auto vx = pt.x() * smscb_phi(i);
-         const auto vy = pt.y() * smscb_phi(i);
-         const auto vz = pt.z() * smscb_phi(i);
-
-         function_value_type fc;
-
-         for (size_t k = 0; k < 3; k++) {
-            fc = function_value_type::Zero();
-
-            fc(k, 0) = vx;
-            fc(k, 1) = vy;
-            fc(k, 2) = vz;
-
-            ret.push_back(fc);
+         for (size_t i = 0; i < smmcb_phi.size(); i++) {
+            ret.push_back(smmcb_phi[i]);
          }
       }
 
-      assert(3 * (poly_degree + 1) * (poly_degree + 2) * (poly_degree + 4) / 2 ==
-             (3 * dim_PHk + smmcb_phi.size()));
+      if (maxdeg > poly_degree) {
+         // basis functions of P^k,H_d(T; R)
+         const auto   smscb_phi = smscb.eval_functions(msh, cl, pt, poly_degree, poly_degree);
+         const size_t dim_PHk   = (poly_degree + 1) * (poly_degree + 2) / 2;
+         assert(smscb_phi.rows() == dim_PHk);
+
+         // basis functions of P^k,H_d(T; R) * X
+         for (size_t i = 0; i < dim_PHk; i++) {
+            const auto vx = pt.x() * smscb_phi(i);
+            const auto vy = pt.y() * smscb_phi(i);
+            const auto vz = pt.z() * smscb_phi(i);
+
+            function_value_type fc;
+
+            for (size_t k = 0; k < 3; k++) {
+               fc = function_value_type::Zero();
+
+               fc(k, 0) = vx;
+               fc(k, 1) = vy;
+               fc(k, 2) = vz;
+
+               ret.push_back(fc);
+            }
+         }
+      }
 
       return ret;
    }
@@ -2348,17 +3000,15 @@ class Raviart_Thomas_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stora
    scaled_monomial_matrix_face_basis_type smmfb;
 
  public:
-   typedef static_matrix<T, 2, 2> function_value_type;
+   typedef static_matrix<T, 3, 3> function_value_type;
 
-   Raviart_Thomas_matrix_basis()
-     : base(1)
+   Raviart_Thomas_matrix_basis() : base(1)
    {
       smsfb = scaled_monomial_scalar_face_basis_type(this->degree() - 1);
       smmfb = scaled_monomial_matrix_face_basis_type(this->degree() - 1);
    }
 
-   Raviart_Thomas_matrix_basis(size_t degree)
-     : base(degree)
+   Raviart_Thomas_matrix_basis(size_t degree) : base(degree)
    {
       if (this->degree() == 0) {
          throw std::invalid_argument("Raviart-Thomas basis: degree <=0");
@@ -2369,13 +3019,15 @@ class Raviart_Thomas_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stora
 
    // overloaded function
 
-   size_t size() const
+   size_t
+   size() const
    {
       const size_t degree = this->degree() - 1;
       return 3 * (degree + 1) * (degree + 2) * (degree + 4) / 2;
    }
 
-   size_t computed_size() const
+   size_t
+   computed_size() const
    {
       if (this->computed_degree() == 0) {
          throw std::invalid_argument("Raviart-Thomas basis: computed_degree <=0");
@@ -2384,7 +3036,8 @@ class Raviart_Thomas_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stora
       return 3 * (computed_degree + 1) * (computed_degree + 2) * (computed_degree + 4) / 2;
    }
 
-   dof_range range(const size_t min_degree, const size_t max_degree) const
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
    {
       const size_t    degree       = this->degree() - 1;
       const dof_range vector_range = base::range(min_degree, max_degree);
@@ -2403,59 +3056,69 @@ class Raviart_Thomas_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stora
       }
    }
 
-   dof_range range() const { return dof_range(0, size()); }
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
 
-   dof_range computed_range() const { return dof_range(0, computed_size()); }
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
 
    // evaluation
 
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const face_type&   fc,
-                                                   const point<T, 3>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const face_type&   fc,
+                  const point<T, 3>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
 
       std::vector<function_value_type> ret;
-      const size_t                     poly_degree = this->degree() - 1;
-      ret.reserve(3 * (poly_degree + 1) * (poly_degree + 2) * (poly_degree + 4) / 2);
+      ret.reserve(eval_range.size());
 
+      const size_t poly_degree = this->degree() - 1;
       // basis functions of P^k_d(T; R^d)
+      if (mindeg <= poly_degree) {
+         const auto smmfb_phi =
+           smmfb.eval_functions(msh, fc, pt, mindeg, std::min(maxdeg, poly_degree));
 
-      const auto smmfb_phi = smmfb.eval_functions(msh, fc, pt);
-
-      for (size_t i = 0; i < smmfb_phi.size(); i++) {
-         ret.push_back(smmfb_phi[i]);
-      }
-
-      // basis functions of P^k,H_d(T; R)
-      const auto   smsfb_phi = smsfb.eval_functions(msh, fc, pt, poly_degree, poly_degree);
-      const size_t dim_PHk   = (poly_degree + 1) * (poly_degree + 2) / 2;
-      assert(smsfb_phi.rows() == dim_PHk);
-
-      // basis functions of P^k,H_d(T; R) * X
-      for (size_t i = 0; i < dim_PHk; i++) {
-         const auto vx = pt.x() * smsfb_phi(i);
-         const auto vy = pt.y() * smsfb_phi(i);
-         const auto vz = pt.z() * smsfb_phi(i);
-
-         function_value_type fc;
-
-         for (size_t k = 0; k < 3; k++) {
-            fc = function_value_type::Zero();
-
-            fc(k, 0) = vx;
-            fc(k, 1) = vy;
-            fc(k, 2) = vz;
-
-            ret.push_back(fc);
+         for (size_t i = 0; i < smmfb_phi.size(); i++) {
+            ret.push_back(smmfb_phi[i]);
          }
       }
 
-      assert(3 * (poly_degree + 1) * (poly_degree + 2) * (poly_degree + 4) / 2 ==
-             (3 * dim_PHk + smmfb_phi.size()));
+      if (maxdeg > poly_degree) {
+         // basis functions of P^k,H_d(T; R)
+         const auto   smsfb_phi = smsfb.eval_functions(msh, fc, pt, poly_degree, poly_degree);
+         const size_t dim_PHk   = (poly_degree + 1) * (poly_degree + 2) / 2;
+         assert(smsfb_phi.rows() == dim_PHk);
+
+         // basis functions of P^k,H_d(T; R) * X
+         for (size_t i = 0; i < dim_PHk; i++) {
+            const auto vx = pt.x() * smsfb_phi(i);
+            const auto vy = pt.y() * smsfb_phi(i);
+            const auto vz = pt.z() * smsfb_phi(i);
+
+            function_value_type fc;
+
+            for (size_t k = 0; k < 3; k++) {
+               fc = function_value_type::Zero();
+
+               fc(k, 0) = vx;
+               fc(k, 1) = vy;
+               fc(k, 2) = vz;
+
+               ret.push_back(fc);
+            }
+         }
+      }
 
       return ret;
    }
@@ -2480,15 +3143,13 @@ class Raviart_Thomas_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stora
  public:
    typedef static_matrix<T, 2, 2> function_value_type;
 
-   Raviart_Thomas_matrix_basis()
-     : base(1)
+   Raviart_Thomas_matrix_basis() : base(1)
    {
       smscb = scaled_monomial_scalar_cell_basis_type(this->degree() - 1);
       smmcb = scaled_monomial_matrix_cell_basis_type(this->degree() - 1);
    }
 
-   Raviart_Thomas_matrix_basis(size_t degree)
-     : base(degree)
+   Raviart_Thomas_matrix_basis(size_t degree) : base(degree)
    {
       if (this->degree() == 0) {
          throw std::invalid_argument("Raviart-Thomas basis: degree <=0");
@@ -2499,19 +3160,22 @@ class Raviart_Thomas_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stora
 
    // overloaded function
 
-   size_t size() const
+   size_t
+   size() const
    {
       const size_t degree = this->degree() - 1;
       return 2 * (degree + 1) * (degree + 3);
    }
 
-   size_t computed_size() const
+   size_t
+   computed_size() const
    {
       const size_t computed_degree = this->computed_degree() - 1;
       return 2 * (computed_degree + 1) * (computed_degree + 3);
    }
 
-   dof_range range(const size_t min_degree, const size_t max_degree) const
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
    {
       const size_t    degree       = this->degree() - 1;
       const dof_range vector_range = base::range(min_degree, max_degree);
@@ -2528,55 +3192,67 @@ class Raviart_Thomas_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stora
       }
    }
 
-   dof_range range() const { return dof_range(0, size()); }
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
 
-   dof_range computed_range() const { return dof_range(0, computed_size()); }
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
 
    // evaluation
 
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const cell_type&   cl,
-                                                   const point<T, 2>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const cell_type&   cl,
+                  const point<T, 2>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
 
       std::vector<function_value_type> ret;
-      const size_t                     poly_degree = this->degree() - 1;
-      ret.reserve(2 * (poly_degree + 1) * (poly_degree + 3));
+      ret.reserve(eval_range.size());
 
+      const size_t poly_degree = this->degree() - 1;
       // basis functions of P^k_d(T; R^d)
-      const auto smmcb_phi = smmcb.eval_functions(msh, cl, pt);
+      if (mindeg <= poly_degree) {
+         const auto smmcb_phi =
+           smmcb.eval_functions(msh, cl, pt, mindeg, std::min(maxdeg, poly_degree));
 
-      for (size_t i = 0; i < smmcb_phi.size(); i++) {
-         ret.push_back(smmcb_phi[i]);
-      }
-
-      // basis functions of P^k,H_d(T; R)
-      const auto   smscb_phi = smscb.eval_functions(msh, cl, pt, poly_degree, poly_degree);
-      const size_t dim_PHk   = (poly_degree + 1);
-      assert(smscb_phi.rows() == dim_PHk);
-
-      // basis functions of x*P^k,H_d(T; R)
-      for (size_t i = 0; i < dim_PHk; i++) {
-         const auto vx = pt.x() * smscb_phi(i);
-         const auto vy = pt.y() * smscb_phi(i);
-
-         function_value_type fc;
-
-         for (size_t k = 0; k < 2; k++) {
-            fc = function_value_type::Zero();
-
-            fc(k, 0) = vx;
-            fc(k, 1) = vy;
-
-            ret.push_back(fc);
+         for (size_t i = 0; i < smmcb_phi.size(); i++) {
+            ret.push_back(smmcb_phi[i]);
          }
       }
 
-      assert(2 * (poly_degree + 1) * (poly_degree + 3) == (2 * dim_PHk + smmcb_phi.size()));
+      if (maxdeg > poly_degree) {
+         // basis functions of P^k,H_d(T; R)
+         const auto   smscb_phi = smscb.eval_functions(msh, cl, pt, poly_degree, poly_degree);
+         const size_t dim_PHk   = (poly_degree + 1);
+         assert(smscb_phi.rows() == dim_PHk);
+
+         // basis functions of x*P^k,H_d(T; R)
+         for (size_t i = 0; i < dim_PHk; i++) {
+            const auto vx = pt.x() * smscb_phi(i);
+            const auto vy = pt.y() * smscb_phi(i);
+
+            function_value_type fc;
+
+            for (size_t k = 0; k < 2; k++) {
+               fc = function_value_type::Zero();
+
+               fc(k, 0) = vx;
+               fc(k, 1) = vy;
+
+               ret.push_back(fc);
+            }
+         }
+      }
 
       return ret;
    }
@@ -2599,15 +3275,13 @@ class Raviart_Thomas_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stora
  public:
    typedef static_matrix<T, 2, 2> function_value_type;
 
-   Raviart_Thomas_matrix_basis()
-     : base(1)
+   Raviart_Thomas_matrix_basis() : base(1)
    {
       smsfb = scaled_monomial_scalar_face_basis_type(this->degree() - 1);
       smmfb = scaled_monomial_matrix_face_basis_type(this->degree() - 1);
    }
 
-   Raviart_Thomas_matrix_basis(size_t degree)
-     : base(degree)
+   Raviart_Thomas_matrix_basis(size_t degree) : base(degree)
    {
       if (this->degree() == 0) {
          throw std::invalid_argument("Raviart-Thomas basis: degree <=0");
@@ -2618,19 +3292,22 @@ class Raviart_Thomas_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stora
 
    // overloaded function
 
-   size_t size() const
+   size_t
+   size() const
    {
       const size_t degree = this->degree() - 1;
       return 2 * (degree + 1) * (degree + 3);
    }
 
-   size_t computed_size() const
+   size_t
+   computed_size() const
    {
       const size_t computed_degree = this->computed_degree() - 1;
       return 2 * (computed_degree + 1) * (computed_degree + 3);
    }
 
-   dof_range range(const size_t min_degree, const size_t max_degree) const
+   dof_range
+   range(const size_t min_degree, const size_t max_degree) const
    {
       const size_t    degree       = this->degree() - 1;
       const dof_range vector_range = base::range(min_degree, max_degree);
@@ -2647,56 +3324,104 @@ class Raviart_Thomas_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stora
       }
    }
 
-   dof_range range() const { return dof_range(0, size()); }
+   dof_range
+   range() const
+   {
+      return dof_range(0, size());
+   }
 
-   dof_range computed_range() const { return dof_range(0, computed_size()); }
+   dof_range
+   computed_range() const
+   {
+      return dof_range(0, computed_size());
+   }
 
    // evaluation
 
-   std::vector<function_value_type> eval_functions(const mesh_type&   msh,
-                                                   const face_type&   fc,
-                                                   const point<T, 2>& pt,
-                                                   size_t             mindeg = 0,
-                                                   size_t maxdeg = VERY_HIGH_DEGREE) const
+   std::vector<function_value_type>
+   eval_functions(const mesh_type&   msh,
+                  const face_type&   fc,
+                  const point<T, 2>& pt,
+                  size_t             mindeg = 0,
+                  size_t             maxdeg = VERY_HIGH_DEGREE) const
    {
       maxdeg                = (maxdeg == VERY_HIGH_DEGREE) ? degree() : maxdeg;
       const auto eval_range = range(mindeg, maxdeg);
 
       std::vector<function_value_type> ret;
-      const size_t                     poly_degree = this->degree() - 1;
-      ret.reserve(2 * (poly_degree + 1) * (poly_degree + 3));
+      ret.reserve(eval_range.size());
+
+      const size_t poly_degree = this->degree() - 1;
+      const size_t dim_PHk     = poly_degree + 1;
 
       // basis functions of P^k_d(T; R^d)
-      const auto smmfb_phi = smmfb.eval_functions(msh, fc, pt);
+      if (mindeg <= poly_degree) {
+         const auto smmfb_phi =
+           smmfb.eval_functions(msh, fc, pt, mindeg, std::min(maxdeg, poly_degree));
 
-      for (size_t i = 0; i < smmfb_phi.size(); i++) {
-         ret.push_back(smmfb_phi[i]);
+         for (size_t i = 0; i < smmfb_phi.size(); i++) {
+            ret.push_back(smmfb_phi[i]);
+         }
       }
 
-      // basis functions of P^k,H_d(T; R)
-      const auto   smsfb_phi = smsfb.eval_functions(msh, fc, pt, poly_degree, poly_degree);
-      const size_t dim_PHk   = poly_degree + 1;
-      assert(smsfb_phi.rows() == dim_PHk);
+      if (maxdeg > poly_degree) {
+         // basis functions of P^k,H_d(T; R)
+         const auto smsfb_phi = smsfb.eval_functions(msh, fc, pt, poly_degree, poly_degree);
+         assert(smsfb_phi.rows() == dim_PHk);
 
-      // basis functions of x*P^k,H_d(T; R)
-      for (size_t i = 0; i < dim_PHk; i++) {
-         const auto vx = pt.x() * smsfb_phi(i);
-         const auto vy = pt.y() * smsfb_phi(i);
+         // basis functions of x*P^k,H_d(T; R)
+         for (size_t i = 0; i < dim_PHk; i++) {
+            const auto vx = pt.x() * smsfb_phi(i);
+            const auto vy = pt.y() * smsfb_phi(i);
 
-         function_value_type fc;
+            function_value_type fc;
 
-         for (size_t k = 0; k < 2; k++) {
-            fc = function_value_type::Zero();
+            for (size_t k = 0; k < 2; k++) {
+               fc = function_value_type::Zero();
 
-            fc(k, 0) = vx;
-            fc(k, 1) = vy;
+               fc(k, 0) = vx;
+               fc(k, 1) = vy;
 
-            ret.push_back(fc);
+               ret.push_back(fc);
+            }
          }
       }
 
       return ret;
    }
+};
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class Raviart_Thomas_matrix_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Storage>::cell>
+  : public Raviart_Thomas_vector_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Storage>::cell>
+{
+   typedef Mesh<T, 1, Storage>                               mesh_type;
+   typedef typename mesh_type::cell                          cell_type;
+   typedef Raviart_Thomas_vector_basis<mesh_type, cell_type> base;
+
+ public:
+   typedef T function_value_type;
+   typedef T gradient_value_type;
+
+   Raviart_Thomas_matrix_basis() : base(1) {}
+
+   Raviart_Thomas_matrix_basis(size_t degree) : base(degree) {}
+};
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class Raviart_Thomas_matrix_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Storage>::face>
+  : public Raviart_Thomas_vector_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Storage>::face>
+{
+   typedef Mesh<T, 1, Storage>                               mesh_type;
+   typedef typename mesh_type::face                          face_type;
+   typedef Raviart_Thomas_vector_basis<mesh_type, face_type> base;
+
+ public:
+   typedef T function_value_type;
+
+   Raviart_Thomas_matrix_basis() : base(1) {}
+
+   Raviart_Thomas_matrix_basis(size_t degree) : base(degree) {}
 };
 
 } // namespace disk

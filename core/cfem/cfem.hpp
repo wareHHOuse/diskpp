@@ -93,7 +93,7 @@ mass_matrix(const disk::simplicial_mesh<T, 2>&                msh,
    const auto p2 = (pts[0] + pts[2]) / 2;
 
    const auto meas = measure(msh, cl);
-   const auto phi  = eval_basis(msh, cl, p0);
+   auto       phi  = eval_basis(msh, cl, p0);
 
    ret = phi * phi.transpose();
 

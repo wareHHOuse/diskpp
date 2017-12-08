@@ -21,10 +21,10 @@
  */
 
 #include <iostream>
+
 #include <sstream>
 
 #include "hho/assembler.hpp"
-#include "hho/divergence.hpp"
 #include "hho/hho_bq.hpp"
 #include "hho/hho_utils.hpp"
 #include "hho/projector.hpp"
@@ -40,7 +40,7 @@
 struct assembly_info
 {
    size_t linear_system_size;
-   double time_gradrec, time_statcond, time_stab, time_assembly, time_divrec;
+   double time_gradrec, time_statcond, time_stab, time_assembly;
 };
 
 struct solver_info
@@ -53,37 +53,36 @@ struct postprocess_info
    double time_postprocess;
 };
 
-struct ElasticityParameters
+struct LaplacianParameters
 {
    double lambda;
-   double mu;
 };
 
+/* Solve the vectorial laplacian problem in any dimension with HHO method (works on general
+ * meshes)*/
+
 template<typename Mesh>
-class linear_elasticity_solver
+class vector_laplacian_solver
 {
    typedef Mesh                            mesh_type;
    typedef typename mesh_type::scalar_type scalar_type;
    typedef typename mesh_type::cell        cell_type;
    typedef typename mesh_type::face        face_type;
 
-   typedef disk::hho::basis_quadrature_data_linear_elasticity<mesh_type,
-                                                              disk::scaled_monomial_vector_basis,
-                                                              disk::scaled_monomial_scalar_basis,
-                                                              disk::quadrature>
-     bqdata_type;
-
    typedef dynamic_matrix<scalar_type> matrix_dynamic;
    typedef dynamic_vector<scalar_type> vector_dynamic;
 
-   typedef disk::hho::sym_gradient_reconstruction_bq<bqdata_type> sgradrec_type;
-   typedef disk::hho::divergence_reconstruction_bq<bqdata_type>   divrec_type;
+   typedef disk::hho::
+     basis_quadrature_data<mesh_type, disk::scaled_monomial_vector_basis, disk::quadrature>
+       bqdata_type;
+
+   typedef disk::hho::sym_gradient_reconstruction_bq<bqdata_type> gradrec_type;
 
    typedef disk::hho::hho_stabilization_bq<bqdata_type> stab_type;
 
    typedef disk::hho::static_condensation_bq<bqdata_type> statcond_type;
 
-   typedef disk::hho::assembler_by_elimination_bq<bqdata_type> assembler_type;
+   typedef disk::hho::assembler_bq<bqdata_type> assembler_type;
 
    typedef disk::hho::projector_bq<bqdata_type> projector_type;
 
@@ -92,17 +91,18 @@ class linear_elasticity_solver
 
    size_t m_cell_degree, m_face_degree;
 
+   bqdata_type m_bqd;
+
    const mesh_type& m_msh;
-   bqdata_type      m_bqd;
 
    std::vector<vector_dynamic> m_solution_data;
 
    bool m_verbose;
 
-   ElasticityParameters m_elas_parameters;
+   LaplacianParameters m_laplacian_parameters;
 
  public:
-   linear_elasticity_solver(const mesh_type& msh, size_t degree, int l = 0) :
+   vector_laplacian_solver(const mesh_type& msh, size_t degree, int l = 0) :
      m_msh(msh), m_verbose(false)
    {
       if (l < -1 or l > 1) {
@@ -118,43 +118,25 @@ class linear_elasticity_solver
       m_cell_degree = degree + l;
       m_face_degree = degree;
 
-      m_elas_parameters.mu     = 1.0;
-      m_elas_parameters.lambda = 1.0;
-
-      m_bqd = bqdata_type(m_face_degree, m_cell_degree);
+      m_bqd                         = bqdata_type(m_face_degree, m_cell_degree);
+      m_laplacian_parameters.lambda = 1.0;
    }
 
-   linear_elasticity_solver(const mesh_type&           msh,
-                            size_t                     degree,
-                            const ElasticityParameters data,
-                            int                        l = 0) :
+   vector_laplacian_solver(const mesh_type&          msh,
+                           size_t                    degree,
+                           const LaplacianParameters data,
+                           int                       l = 0) :
      m_msh(msh),
      m_verbose(false)
    {
-      if (l < -1 or l > 1) {
-         std::cout << "'l' should be -1, 0 or 1. Reverting to 0." << std::endl;
-         l = 0;
-      }
-
-      if (degree == 0 && l == -1) {
-         std::cout << "'l' should be 0 or 1. Reverting to 0." << std::endl;
-         l = 0;
-      }
-
-      m_cell_degree = degree + l;
-      m_face_degree = degree;
-
-      m_elas_parameters.mu     = data.mu;
-      m_elas_parameters.lambda = data.lambda;
-
-      m_bqd = bqdata_type(m_face_degree, m_cell_degree);
+      vector_laplacian_solver(msh, degree, l);
+      m_laplacian_parameters.lambda = data.lambda;
    }
 
    void
-   changeElasticityParameters(const ElasticityParameters data)
+   changeLaplacianParameters(const LaplacianParameters data)
    {
-      m_elas_parameters.mu     = data.mu;
-      m_elas_parameters.lambda = data.lambda;
+      m_laplacian_parameters.lambda = data.lambda;
    }
 
    bool
@@ -167,19 +149,17 @@ class linear_elasticity_solver
    {
       m_verbose = v;
    }
-
    size_t
    getDofs()
    {
-      return m_msh.faces_size() * disk::howmany_dofs(m_bqd.face_basis);
+      return m_msh.faces_size() * m_bqd.face_basis.size();
    }
 
    template<typename LoadFunction, typename BoundaryConditionFunction>
    assembly_info
    assemble(const LoadFunction& lf, const BoundaryConditionFunction& bcf)
    {
-      auto sgradrec  = sgradrec_type(m_bqd);
-      auto divrec    = divrec_type(m_bqd);
+      auto gradrec   = gradrec_type(m_bqd);
       auto stab      = stab_type(m_bqd);
       auto statcond  = statcond_type(m_bqd);
       auto assembler = assembler_type(m_msh, m_bqd);
@@ -191,36 +171,35 @@ class linear_elasticity_solver
 
       for (auto& cl : m_msh) {
          tc.tic();
-         sgradrec.compute(m_msh, cl);
+         gradrec.compute(m_msh, cl);
          tc.toc();
          ai.time_gradrec += tc.to_double();
 
          tc.tic();
-         divrec.compute(m_msh, cl);
-         tc.toc();
-         ai.time_divrec += tc.to_double();
-
-         tc.tic();
-         stab.compute(m_msh, cl, sgradrec.oper);
+         stab.compute(m_msh, cl, gradrec.oper);
          tc.toc();
          ai.time_stab += tc.to_double();
+
+         assert(gradrec.data.rows() == stab.data.rows());
+         assert(gradrec.data.cols() == stab.data.cols());
 
          tc.tic();
          const auto cell_rhs = disk::hho::compute_rhs(m_msh, cl, lf, m_bqd, m_cell_degree);
          const dynamic_matrix<scalar_type> loc =
-           2.0 * m_elas_parameters.mu * (sgradrec.data + stab.data) +
-           m_elas_parameters.lambda * divrec.data;
+           m_laplacian_parameters.lambda * (gradrec.data + stab.data); //
+
          const auto scnp = statcond.compute(m_msh, cl, loc, cell_rhs);
          tc.toc();
          ai.time_statcond += tc.to_double();
 
-         assembler.assemble(m_msh, cl, scnp, bcf);
+         assembler.assemble(m_msh, cl, scnp);
       }
 
+      assembler.impose_boundary_conditions(m_msh, bcf);
       assembler.finalize(m_system_matrix, m_system_rhs);
 
       ai.linear_system_size = m_system_matrix.rows();
-      ai.time_assembly      = ai.time_gradrec + ai.time_divrec + ai.time_stab + ai.time_statcond;
+      ai.time_assembly      = ai.time_gradrec + ai.time_stab + ai.time_statcond;
       return ai;
    }
 
@@ -235,8 +214,8 @@ class linear_elasticity_solver
 
       solver_info si;
 
-      size_t systsz = m_system_matrix.rows();
-      size_t nnz    = m_system_matrix.nonZeros();
+      const size_t systsz = m_system_matrix.rows();
+      const size_t nnz    = m_system_matrix.nonZeros();
 
       if (verbose()) {
          std::cout << "Starting linear solver..." << std::endl;
@@ -257,23 +236,20 @@ class linear_elasticity_solver
       return si;
    }
 
-   template<typename LoadFunction, typename BoundaryConditionFunction>
+   template<typename LoadFunction>
    postprocess_info
-   postprocess(const LoadFunction& lf, const BoundaryConditionFunction& bcf)
+   postprocess(const LoadFunction& lf)
    {
-      auto sgradrec  = sgradrec_type(m_bqd);
-      auto divrec    = divrec_type(m_bqd);
+      auto assembler = assembler_type(m_msh, m_bqd);
+      auto gradrec   = gradrec_type(m_bqd);
       auto stab      = stab_type(m_bqd);
       auto statcond  = statcond_type(m_bqd);
-      auto assembler = assembler_type(m_msh, m_bqd);
 
-      const size_t fbs = disk::howmany_dofs(m_bqd.face_basis);
+      const size_t fbs = howmany_dofs(m_bqd.face_basis);
 
       postprocess_info pi;
 
       m_solution_data.reserve(m_msh.cells_size());
-
-      const auto solF = assembler.expand_solution(m_msh, m_system_solution, bcf);
 
       timecounter tc;
       tc.tic();
@@ -291,18 +267,15 @@ class linear_elasticity_solver
             const auto face_id = eid.second;
 
             dynamic_vector<scalar_type> xF     = dynamic_vector<scalar_type>::Zero(fbs);
-            xF                                 = solF.block(face_id * fbs, 0, fbs, 1);
+            xF                                 = m_system_solution.block(face_id * fbs, 0, fbs, 1);
             xFs.block(face_i * fbs, 0, fbs, 1) = xF;
          }
 
-         sgradrec.compute(m_msh, cl);
-         divrec.compute(m_msh, cl);
-         stab.compute(m_msh, cl, sgradrec.oper);
+         gradrec.compute(m_msh, cl);
+         stab.compute(m_msh, cl, gradrec.oper);
          const dynamic_matrix<scalar_type> loc =
-           2.0 * m_elas_parameters.mu * (sgradrec.data + stab.data) +
-           m_elas_parameters.lambda * divrec.data;
+           m_laplacian_parameters.lambda * (gradrec.data + stab.data); //
          const auto cell_rhs = disk::hho::compute_rhs(m_msh, cl, lf, m_bqd, m_cell_degree);
-
          const dynamic_vector<scalar_type> x = statcond.recover(m_msh, cl, loc, cell_rhs, xFs);
          m_solution_data.push_back(x);
       }
@@ -317,18 +290,45 @@ class linear_elasticity_solver
    scalar_type
    compute_l2_error(const AnalyticalSolution& as)
    {
-      scalar_type err_dof = 0;
+      scalar_type err_dof = scalar_type(0.0);
 
       projector_type projk(m_bqd);
 
-      size_t cell_i = 0;
+      size_t i = 0;
 
       for (auto& cl : m_msh) {
-         const auto                        x        = m_solution_data.at(cell_i++);
-         const dynamic_vector<scalar_type> true_dof = projk.projectOnCell(m_msh, cl, as);
+         const auto                        x = m_solution_data.at(i++);
+         const dynamic_vector<scalar_type> true_dof =
+           projk.projectOnCell(m_msh, cl, as, m_cell_degree);
          const dynamic_vector<scalar_type> comp_dof = x.block(0, 0, true_dof.size(), 1);
          const dynamic_vector<scalar_type> diff_dof = (true_dof - comp_dof);
          err_dof += diff_dof.dot(projk.cell_mm * diff_dof);
+      }
+
+      return sqrt(err_dof);
+   }
+
+   template<typename AnalyticalSolution>
+   scalar_type
+   compute_l2_gradient_error(const AnalyticalSolution& grad)
+   {
+      scalar_type err_dof = scalar_type{0.0};
+
+      projector_type projk(m_bqd);
+
+      gradrec_type gradrec(m_bqd);
+
+      size_t i = 0;
+
+      for (auto& cl : m_msh) {
+         const auto x = m_solution_data.at(i++);
+         gradrec.compute(m_msh, cl);
+         const dynamic_vector<scalar_type> RTu = gradrec.oper * x;
+
+         const dynamic_vector<scalar_type> true_dof = projk.projectGradOnCell(m_msh, cl, grad);
+         const dynamic_vector<scalar_type> comp_dof = RTu.block(0, 0, true_dof.size(), 1);
+         const dynamic_vector<scalar_type> diff_dof = (true_dof - comp_dof);
+         err_dof += diff_dof.dot(projk.grad_mm * diff_dof);
       }
 
       return sqrt(err_dof);

@@ -32,9 +32,11 @@
 #include "cfem/cfem.hpp"
 #include "hho/assembler.hpp"
 #include "hho/gradient_reconstruction.hpp"
+#include "hho/hho.hpp"
 #include "hho/hho_bq.hpp"
 #include "hho/hho_utils.hpp"
 #include "hho/stabilization.hpp"
+#include "hho/static_condensation.hpp"
 #include "loaders/loader.hpp"
 #include "output/silo.hpp"
 #include "solvers/solver.hpp"
@@ -136,7 +138,7 @@ hho_solver(sol::state& lua, const Mesh& msh)
    dynamic_vector<scalar_type> sol = dynamic_vector<scalar_type>::Zero(systsz);
    disk::solvers::linear_solver(lua, system_matrix, system_rhs, sol);
 
-   system_solution = assembler.expand_solution(msh, sol);
+   system_solution = assembler.expand_solution(msh, sol, bcf);
 
    const auto num_cell_dofs = howmany_dofs(bqd.cell_basis);
    const auto num_face_dofs = howmany_dofs(bqd.face_basis);
@@ -594,7 +596,7 @@ eigval_solver(sol::state& lua, const Mesh& msh)
 
    typedef disk::hho::gradient_reconstruction_bq<bqdata_type> gradrec_type;
    typedef disk::hho::hho_stabilization_bq<bqdata_type>       stab_type;
-   typedef disk::eigval_mass_matrix_bq<bqdata_type>           mass_type;
+   typedef disk::hho::eigval_mass_matrix_bq<bqdata_type>      mass_type;
 
    typedef Eigen::Triplet<scalar_type> triplet_type;
 
@@ -865,13 +867,11 @@ class fem_solver
    int         degree;
    bool        verbose;
 
-   fem_solver()
-     : input_mesh("")
-     , degree(1)
-     , verbose(false)
-   {}
+   fem_solver() : input_mesh(""), degree(1), verbose(false) {}
 
-   void run() {}
+   void
+   run()
+   {}
 };
 
 void

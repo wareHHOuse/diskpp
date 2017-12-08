@@ -1,6 +1,6 @@
 /*
- *       /\
- *      /__\       Matteo Cicuttin (C) 2016, 2017 - matteo.cicuttin@enpc.fr
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,8 +10,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 #include <iostream>
@@ -25,9 +31,6 @@
 #include "hho/projector.hpp"
 #include "hho/stabilization.hpp"
 #include "hho/static_condensation.hpp"
-
-#include "output/gmshConvertMesh.hpp"
-#include "output/gmshDisk.hpp"
 
 #include "timecounter.h"
 
@@ -52,14 +55,11 @@ struct postprocess_info
 
 struct LaplacianParameters
 {
-   LaplacianParameters(double _lambda = 1.)
-     : lambda(_lambda)
-   {
-      // Do nothing
-   }
-
    double lambda;
 };
+
+/* Solve the vectorial laplacian problem in any dimension with HHO method (works on general
+ * meshes)*/
 
 template<typename Mesh>
 class vector_laplacian_solver
@@ -72,11 +72,9 @@ class vector_laplacian_solver
    typedef dynamic_matrix<scalar_type> matrix_dynamic;
    typedef dynamic_vector<scalar_type> vector_dynamic;
 
-   typedef disk::hho::basis_quadrature_data_full<mesh_type,
-                                                 disk::scaled_monomial_vector_basis,
-                                                 disk::scaled_monomial_matrix_basis,
-                                                 disk::quadrature>
-     bqdata_type;
+   typedef disk::hho::
+     basis_quadrature_data<mesh_type, disk::scaled_monomial_vector_basis, disk::quadrature>
+       bqdata_type;
 
    typedef disk::hho::gradient_reconstruction_bq<bqdata_type> gradrec_type;
 
@@ -84,7 +82,7 @@ class vector_laplacian_solver
 
    typedef disk::hho::static_condensation_bq<bqdata_type> statcond_type;
 
-   typedef disk::hho::assembler_by_elimination_bq<bqdata_type> assembler_type;
+   typedef disk::hho::assembler_bq<bqdata_type> assembler_type;
 
    typedef disk::hho::projector_bq<bqdata_type> projector_type;
 
@@ -104,9 +102,8 @@ class vector_laplacian_solver
    LaplacianParameters m_laplacian_parameters;
 
  public:
-   vector_laplacian_solver(const mesh_type& msh, size_t degree, int l = 0)
-     : m_msh(msh)
-     , m_verbose(false)
+   vector_laplacian_solver(const mesh_type& msh, size_t degree, int l = 0) :
+     m_msh(msh), m_verbose(false)
    {
       if (l < -1 or l > 1) {
          std::cout << "'l' should be -1, 0 or 1. Reverting to 0." << std::endl;
@@ -121,45 +118,46 @@ class vector_laplacian_solver
       m_cell_degree = degree + l;
       m_face_degree = degree;
 
-      m_bqd                         = bqdata_type(m_face_degree, m_cell_degree, m_cell_degree);
+      m_bqd                         = bqdata_type(m_cell_degree, m_face_degree);
       m_laplacian_parameters.lambda = 1.0;
    }
 
    vector_laplacian_solver(const mesh_type&          msh,
                            size_t                    degree,
                            const LaplacianParameters data,
-                           int                       l = 0)
-     : m_msh(msh)
-     , m_verbose(false)
+                           int                       l = 0) :
+     m_msh(msh),
+     m_verbose(false)
    {
-      if (l < -1 or l > 1) {
-         std::cout << "'l' should be -1, 0 or 1. Reverting to 0." << std::endl;
-         l = 0;
-      }
-
-      if (degree == 0 && l == -1) {
-         std::cout << "'l' should be 0 or 1. Reverting to 0." << std::endl;
-         l = 0;
-      }
-
-      m_cell_degree = degree + l;
-      m_face_degree = degree;
-
+      vector_laplacian_solver(msh, degree, l);
       m_laplacian_parameters.lambda = data.lambda;
-      m_bqd                         = bqdata_type(m_face_degree, m_cell_degree, m_cell_degree);
    }
 
-   void changeLaplacianParameters(const LaplacianParameters data)
+   void
+   changeLaplacianParameters(const LaplacianParameters data)
    {
       m_laplacian_parameters.lambda = data.lambda;
    }
 
-   bool   verbose(void) const { return m_verbose; }
-   void   verbose(bool v) { m_verbose = v; }
-   size_t getDofs() { return m_msh.faces_size() * m_bqd.face_basis.size(); }
+   bool
+   verbose(void) const
+   {
+      return m_verbose;
+   }
+   void
+   verbose(bool v)
+   {
+      m_verbose = v;
+   }
+   size_t
+   getDofs()
+   {
+      return m_msh.faces_size() * m_bqd.face_basis.size();
+   }
 
    template<typename LoadFunction, typename BoundaryConditionFunction>
-   assembly_info assemble(const LoadFunction& lf, const BoundaryConditionFunction& bcf)
+   assembly_info
+   assemble(const LoadFunction& lf, const BoundaryConditionFunction& bcf)
    {
       auto gradrec   = gradrec_type(m_bqd);
       auto stab      = stab_type(m_bqd);
@@ -186,16 +184,18 @@ class vector_laplacian_solver
          assert(gradrec.data.cols() == stab.data.cols());
 
          tc.tic();
-         const auto                        cell_rhs = disk::hho::compute_rhs(m_msh, cl, lf, m_bqd);
+         const auto cell_rhs = disk::hho::compute_rhs(m_msh, cl, lf, m_bqd, m_cell_degree);
          const dynamic_matrix<scalar_type> loc =
            m_laplacian_parameters.lambda * (gradrec.data + stab.data);
+
          const auto scnp = statcond.compute(m_msh, cl, loc, cell_rhs);
          tc.toc();
          ai.time_statcond += tc.to_double();
 
-         assembler.assemble(m_msh, cl, scnp, bcf);
+         assembler.assemble(m_msh, cl, scnp);
       }
 
+      assembler.impose_boundary_conditions(m_msh, bcf);
       assembler.finalize(m_system_matrix, m_system_rhs);
 
       ai.linear_system_size = m_system_matrix.rows();
@@ -203,7 +203,8 @@ class vector_laplacian_solver
       return ai;
    }
 
-   solver_info solve(void)
+   solver_info
+   solve(void)
    {
 #ifdef HAVE_INTEL_MKL
       Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>> solver;
@@ -235,21 +236,20 @@ class vector_laplacian_solver
       return si;
    }
 
-   template<typename LoadFunction, typename BoundaryConditionFunction>
-   postprocess_info postprocess(const LoadFunction& lf, const BoundaryConditionFunction& bcf)
+   template<typename LoadFunction>
+   postprocess_info
+   postprocess(const LoadFunction& lf)
    {
       auto assembler = assembler_type(m_msh, m_bqd);
       auto gradrec   = gradrec_type(m_bqd);
       auto stab      = stab_type(m_bqd);
       auto statcond  = statcond_type(m_bqd);
 
-      const size_t fbs = m_bqd.face_basis.size();
+      const size_t fbs = howmany_dofs(m_bqd.face_basis);
 
       postprocess_info pi;
 
       m_solution_data.reserve(m_msh.cells_size());
-
-      const auto sol = assembler.expand_solution(m_msh, m_system_solution, bcf);
 
       timecounter tc;
       tc.tic();
@@ -267,7 +267,7 @@ class vector_laplacian_solver
             const auto face_id = eid.second;
 
             dynamic_vector<scalar_type> xF     = dynamic_vector<scalar_type>::Zero(fbs);
-            xF                                 = sol.block(face_id * fbs, 0, fbs, 1);
+            xF                                 = m_system_solution.block(face_id * fbs, 0, fbs, 1);
             xFs.block(face_i * fbs, 0, fbs, 1) = xF;
          }
 
@@ -275,7 +275,7 @@ class vector_laplacian_solver
          stab.compute(m_msh, cl, gradrec.oper);
          const dynamic_matrix<scalar_type> loc =
            m_laplacian_parameters.lambda * (gradrec.data + stab.data);
-         const auto                        cell_rhs = disk::hho::compute_rhs(m_msh, cl, lf, m_bqd);
+         const auto cell_rhs = disk::hho::compute_rhs(m_msh, cl, lf, m_bqd, m_cell_degree);
          const dynamic_vector<scalar_type> x = statcond.recover(m_msh, cl, loc, cell_rhs, xFs);
          m_solution_data.push_back(x);
       }
@@ -287,7 +287,8 @@ class vector_laplacian_solver
    }
 
    template<typename AnalyticalSolution>
-   scalar_type compute_l2_error(const AnalyticalSolution& as)
+   scalar_type
+   compute_l2_error(const AnalyticalSolution& as)
    {
       scalar_type err_dof = scalar_type(0.0);
 
@@ -296,8 +297,9 @@ class vector_laplacian_solver
       size_t i = 0;
 
       for (auto& cl : m_msh) {
-         const auto                        x        = m_solution_data.at(i++);
-         const dynamic_vector<scalar_type> true_dof = projk.projectOnCell(m_msh, cl, as);
+         const auto                        x = m_solution_data.at(i++);
+         const dynamic_vector<scalar_type> true_dof =
+           projk.projectOnCell(m_msh, cl, as, m_cell_degree);
          const dynamic_vector<scalar_type> comp_dof = x.block(0, 0, true_dof.size(), 1);
          const dynamic_vector<scalar_type> diff_dof = (true_dof - comp_dof);
          err_dof += diff_dof.dot(projk.cell_mm * diff_dof);
@@ -307,7 +309,8 @@ class vector_laplacian_solver
    }
 
    template<typename AnalyticalSolution>
-   scalar_type compute_l2_gradient_error(const AnalyticalSolution& grad)
+   scalar_type
+   compute_l2_gradient_error(const AnalyticalSolution& grad)
    {
       scalar_type err_dof = scalar_type{0.0};
 

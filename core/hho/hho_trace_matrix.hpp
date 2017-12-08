@@ -38,12 +38,13 @@ struct trace_matrix_F
    typedef typename mesh_type::cell        cell_type;
    typedef typename mesh_type::face        face_type;
 
-   static void impl(const mesh_type& msh,
-                    const cell_type& cl,
-                    const face_type& fc,
-                    const BQData&    bqd,
-                    const size_t&    cell_degree,
-                    const size_t&    face_degree)
+   static void
+   impl(const mesh_type& msh,
+        const cell_type& cl,
+        const face_type& fc,
+        const BQData&    bqd,
+        const size_t&    cell_degree,
+        const size_t&    face_degree)
    {
       static_assert(sizeof(BQData) == -1, "BQData not known in trace_matrix_F");
    }
@@ -61,12 +62,13 @@ struct trace_matrix_F<
    typedef typename mesh_type::face        face_type;
    typedef dynamic_matrix<scalar_type>     matrix_type;
 
-   static matrix_type impl(const mesh_type& msh,
-                           const cell_type& cl,
-                           const face_type& fc,
-                           const BQData&    bqd,
-                           const size_t&    cell_degree,
-                           const size_t&    face_degree)
+   static matrix_type
+   impl(const mesh_type& msh,
+        const cell_type& cl,
+        const face_type& fc,
+        const BQData&    bqd,
+        const size_t&    cell_degree,
+        const size_t&    face_degree)
    {
       const auto cell_basis_size = bqd.cell_basis.range(0, cell_degree).size();
       const auto face_basis_size = bqd.face_basis.range(0, face_degree).size();
@@ -74,12 +76,16 @@ struct trace_matrix_F<
       matrix_type mat = matrix_type::Zero(face_basis_size, cell_basis_size);
 
       const auto face_quadpoints = bqd.face_trace_quadrature.integrate(msh, fc);
+      assert((msh.dimension == 1 && bqd.face_trace_quadrature.order() == 0) ||
+             (cell_degree + face_degree) <= bqd.face_trace_quadrature.order());
+
       for (auto& qp : face_quadpoints) {
          const matrix_type fphi =
            bqd.face_basis.eval_functions(msh, fc, qp.point(), 0, face_degree);
          assert(fphi.rows() == face_basis_size);
+
          const auto cphi = bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, cell_degree);
-         assert(cphi.size() == cell_basis_size);
+         assert(cphi.rows() == cell_basis_size);
 
          mat += qp.weight() * fphi * cphi.transpose();
       }
@@ -100,12 +106,13 @@ struct trace_matrix_F<
    typedef typename mesh_type::face        face_type;
    typedef dynamic_matrix<scalar_type>     matrix_type;
 
-   static matrix_type impl(const mesh_type& msh,
-                           const cell_type& cl,
-                           const face_type& fc,
-                           const BQData&    bqd,
-                           const size_t&    cell_degree,
-                           const size_t&    face_degree)
+   static matrix_type
+   impl(const mesh_type& msh,
+        const cell_type& cl,
+        const face_type& fc,
+        const BQData&    bqd,
+        const size_t&    cell_degree,
+        const size_t&    face_degree)
    {
       const auto cell_basis_size = bqd.cell_basis.range(0, cell_degree).size();
       const auto face_basis_size = bqd.face_basis.range(0, face_degree).size();
@@ -113,10 +120,13 @@ struct trace_matrix_F<
       matrix_type mat = matrix_type::Zero(face_basis_size, cell_basis_size);
 
       const auto face_quadpoints = bqd.face_trace_quadrature.integrate(msh, fc);
+      assert((msh.dimension == 1 && bqd.face_trace_quadrature.order() == 0) ||
+             (cell_degree + face_degree) <= bqd.face_trace_quadrature.order());
+
       for (auto& qp : face_quadpoints) {
-         const matrix_type fphi =
-           bqd.face_basis.eval_functions(msh, fc, qp.point(), 0, face_degree);
-         assert(fphi.rows() == face_basis_size);
+         const auto fphi = bqd.face_basis.eval_functions(msh, fc, qp.point(), 0, face_degree);
+         assert(fphi.size() == face_basis_size);
+
          const auto cphi = bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, cell_degree);
          assert(cphi.size() == cell_basis_size);
 

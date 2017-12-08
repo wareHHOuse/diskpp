@@ -96,6 +96,18 @@ struct is_matrix_basis<scaled_monomial_matrix_basis<MeshType, typename MeshType:
 };
 
 template<typename MeshType>
+struct is_matrix_basis<scaled_monomial_sym_matrix_basis<MeshType, typename MeshType::cell>>
+{
+   static const bool value = true;
+};
+
+template<typename MeshType>
+struct is_matrix_basis<scaled_monomial_sym_matrix_basis<MeshType, typename MeshType::face>>
+{
+   static const bool value = true;
+};
+
+template<typename MeshType>
 struct is_matrix_basis<Raviart_Thomas_matrix_basis<MeshType, typename MeshType::cell>>
 {
    static const bool value = true;
@@ -122,6 +134,18 @@ struct use_vector_container<scaled_monomial_vector_basis<MeshType, typename Mesh
 
 template<typename MeshType>
 struct use_vector_container<scaled_monomial_vector_basis<MeshType, typename MeshType::face>>
+{
+   static const bool value = true;
+};
+
+template<typename MeshType>
+struct use_vector_container<scaled_monomial_sym_matrix_basis<MeshType, typename MeshType::cell>>
+{
+   static const bool value = true;
+};
+
+template<typename MeshType>
+struct use_vector_container<scaled_monomial_sym_matrix_basis<MeshType, typename MeshType::face>>
 {
    static const bool value = true;
 };

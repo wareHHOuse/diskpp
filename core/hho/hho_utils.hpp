@@ -22,12 +22,18 @@
 
 #pragma once
 
+#include <cassert>
+
 #include "common/eigen.hpp"
+#include "hho/hho_bq.hpp"
 
 namespace disk {
 
 namespace hho {
 
+////////////////////////////////
+// evaluate hho value at a point
+////////////////////////////////
 // scalar case
 template<typename T>
 T
@@ -85,6 +91,62 @@ eval(const dynamic_vector<T>& tab_coeff, const std::vector<static_vector<T, DIM>
    return ret;
 }
 
+/////////////////////////////////////////////////
+// to convert dymanic_matrix to vector container
+////////////////////////////////////////////////
+namespace details {
+template<typename T, int DIM>
+struct convert_vector_F
+{
+   static std::vector<static_vector<T, DIM>>
+   impl(const dynamic_matrix<T>& dphi)
+   {
+      assert(dphi.cols() == DIM);
+      std::vector<static_vector<T, DIM>> ret;
+      ret.reserve(dphi.rows());
+
+      for (int i = 0; i < dphi.rows(); i++) {
+         static_vector<T, DIM> dphi_j = static_vector<T, DIM>::Zero();
+         for (size_t k = 0; k < DIM; k++) {
+            dphi_j(k) = dphi(i, k);
+         }
+
+         ret.push_back(dphi_j);
+      }
+
+      return ret;
+   }
+};
+
+template<typename T>
+struct convert_vector_F<T, 1>
+{
+   static std::vector<T>
+   impl(const dynamic_matrix<T>& dphi)
+   {
+      assert(dphi.cols() == 1);
+      std::vector<T> ret(dphi.rows(), 0);
+
+      for (int i = 0; i < dphi.rows(); i++) {
+         ret[i] = dphi(i);
+      }
+
+      return ret;
+   }
+};
+}
+
+template<typename T, int DIM>
+auto /* std::vector<static_vector<T, DIM>> or std::vector<T>*/
+convert_to_vector(const Eigen::Matrix<T, Eigen::Dynamic, DIM>& mat)
+{
+   return details::convert_vector_F<T, DIM>::impl(mat);
+}
+
+///////////////////
+// to compute rhs
+////////////////////
+
 namespace priv {
 // compute_rhs
 template<typename BQData, typename BasisType, typename Function>
@@ -94,11 +156,12 @@ struct compute_rhs_face_F
    typedef typename mesh_type::scalar_type scalar_type;
    typedef typename mesh_type::face        face_type;
 
-   static void impl(const mesh_type& msh,
-                    const face_type& fc,
-                    const Function&  func,
-                    const BQData&    bqd,
-                    const size_t&    degree)
+   static void
+   impl(const mesh_type& msh,
+        const face_type& fc,
+        const Function&  func,
+        const BQData&    bqd,
+        const size_t&    degree)
    {
       static_assert(sizeof(BQData) == -1, "BQData not known in compute_rhs_face_F");
    }
@@ -117,17 +180,21 @@ struct compute_rhs_face_F<
    typedef dynamic_vector<scalar_type>     vector_type;
    typedef dynamic_matrix<scalar_type>     matrix_type;
 
-   static vector_type impl(const mesh_type& msh,
-                           const face_type& fc,
-                           const Function&  func,
-                           const BQData&    bqd,
-                           const size_t&    degree)
+   static vector_type
+   impl(const mesh_type& msh,
+        const face_type& fc,
+        const Function&  func,
+        const BQData&    bqd,
+        const size_t&    degree)
    {
       const auto face_basis_size = bqd.face_basis.range(0, degree).size();
 
       vector_type vec = vector_type::Zero(face_basis_size);
 
       const auto face_quadpoints = bqd.face_quadrature.integrate(msh, fc);
+      assert((msh.dimension == 1 && bqd.face_quadrature.order() == 0) ||
+             2 * degree <= bqd.face_quadrature.order());
+
       for (auto& qp : face_quadpoints) {
          const matrix_type fphi = bqd.face_basis.eval_functions(msh, fc, qp.point(), 0, degree);
          assert(fphi.rows() == face_basis_size);
@@ -151,17 +218,21 @@ struct compute_rhs_face_F<
    typedef typename mesh_type::face        face_type;
    typedef dynamic_vector<scalar_type>     vector_type;
 
-   static vector_type impl(const mesh_type& msh,
-                           const face_type& fc,
-                           const Function&  func,
-                           const BQData&    bqd,
-                           const size_t&    degree)
+   static vector_type
+   impl(const mesh_type& msh,
+        const face_type& fc,
+        const Function&  func,
+        const BQData&    bqd,
+        const size_t&    degree)
    {
       const auto face_basis_size = bqd.face_basis.range(0, degree).size();
 
       vector_type vec = vector_type::Zero(face_basis_size);
 
       const auto face_quadpoints = bqd.face_quadrature.integrate(msh, fc);
+      assert((msh.dimension == 1 && bqd.face_quadrature.order() == 0) ||
+             2 * degree <= bqd.face_quadrature.order());
+
       for (auto& qp : face_quadpoints) {
          const auto fphi = bqd.face_basis.eval_functions(msh, fc, qp.point(), 0, degree);
          assert(fphi.size() == face_basis_size);
@@ -183,11 +254,12 @@ struct compute_rhs_cell_F
    typedef typename mesh_type::scalar_type scalar_type;
    typedef typename mesh_type::cell        cell_type;
 
-   static void impl(const mesh_type& msh,
-                    const cell_type& cl,
-                    const Function&  func,
-                    const BQData&    bqd,
-                    const size_t&    degree)
+   static void
+   impl(const mesh_type& msh,
+        const cell_type& cl,
+        const Function&  func,
+        const BQData&    bqd,
+        const size_t&    degree)
    {
       static_assert(sizeof(BQData) == -1, "BQData not known in compute_rhs_cell_F");
    }
@@ -205,17 +277,20 @@ struct compute_rhs_cell_F<
    typedef typename mesh_type::cell        cell_type;
    typedef dynamic_vector<scalar_type>     vector_type;
 
-   static vector_type impl(const mesh_type& msh,
-                           const cell_type& cl,
-                           const Function&  func,
-                           const BQData&    bqd,
-                           const size_t&    degree)
+   static vector_type
+   impl(const mesh_type& msh,
+        const cell_type& cl,
+        const Function&  func,
+        const BQData&    bqd,
+        const size_t&    degree)
    {
       const auto cell_basis_size = bqd.cell_basis.range(0, degree).size();
 
       vector_type vec = vector_type::Zero(cell_basis_size);
 
       const auto cell_quadpoints = bqd.cell_quadrature.integrate(msh, cl);
+      assert(2 * degree <= bqd.cell_quadrature.order());
+
       for (auto& qp : cell_quadpoints) {
          const vector_type cphi = bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, degree);
          assert(cphi.rows() == cell_basis_size);
@@ -239,17 +314,20 @@ struct compute_rhs_cell_F<
    typedef typename mesh_type::cell        cell_type;
    typedef dynamic_vector<scalar_type>     vector_type;
 
-   static vector_type impl(const mesh_type& msh,
-                           const cell_type& cl,
-                           const Function&  func,
-                           const BQData&    bqd,
-                           const size_t&    degree)
+   static vector_type
+   impl(const mesh_type& msh,
+        const cell_type& cl,
+        const Function&  func,
+        const BQData&    bqd,
+        const size_t&    degree)
    {
       const auto cell_basis_size = bqd.cell_basis.range(0, degree).size();
 
       vector_type vec = vector_type::Zero(cell_basis_size);
 
       const auto cell_quadpoints = bqd.cell_quadrature.integrate(msh, cl);
+      assert(2 * degree <= bqd.cell_quadrature.order());
+
       for (auto& qp : cell_quadpoints) {
          const auto cphi = bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, degree);
          assert(cphi.size() == cell_basis_size);

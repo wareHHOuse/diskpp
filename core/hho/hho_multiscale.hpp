@@ -33,6 +33,7 @@ using namespace std::placeholders;
 
 #include "common/eigen.hpp"
 #include "mesh/mesh_utility.hpp"
+#include "timecounter.h"
 
 namespace disk {
 
@@ -97,7 +98,8 @@ class multiscale_local_basis
 
    std::vector<matrix_type> inner_gr_opers, inner_gr_data;
 
-   matrix_type take_local_dofs(const inner_cell_type& cl)
+   matrix_type
+   take_local_dofs(const inner_cell_type& cl)
    {
       auto num_cell_dofs = bqd.cell_basis.size();
       auto num_face_dofs = bqd.face_basis.size();
@@ -345,11 +347,15 @@ class multiscale_local_basis
       // std::cout << "solver done" << std::endl;
    }
 
-   inner_mesh_type inner_mesh(void) { return m_inner_mesh; }
+   inner_mesh_type
+   inner_mesh(void)
+   {
+      return m_inner_mesh;
+   }
 
    template<typename QPType>
-   std::vector<std::pair<vector_type, matrix_type>> eval(const inner_cell_type&     cl,
-                                                         const std::vector<QPType>& qpts)
+   std::vector<std::pair<vector_type, matrix_type>>
+   eval(const inner_cell_type& cl, const std::vector<QPType>& qpts)
    {
       matrix_type local_dofs = take_local_dofs(cl);
       auto        cell_id    = m_inner_mesh.lookup(cl);
@@ -391,8 +397,8 @@ class multiscale_local_basis
    }
 
    template<typename QPType>
-   std::vector<vector_type> eval_functions(const inner_cell_type&     cl,
-                                           const std::vector<QPType>& qpts)
+   std::vector<vector_type>
+   eval_functions(const inner_cell_type& cl, const std::vector<QPType>& qpts)
    {
       matrix_type local_dofs = take_local_dofs(cl);
       auto        cell_id    = m_inner_mesh.lookup(cl);
@@ -427,8 +433,8 @@ class multiscale_local_basis
    }
 
    template<typename QPType>
-   std::vector<matrix_type> eval_gradients(const inner_cell_type&     cl,
-                                           const std::vector<QPType>& qpts)
+   std::vector<matrix_type>
+   eval_gradients(const inner_cell_type& cl, const std::vector<QPType>& qpts)
    {
       matrix_type local_dofs = take_local_dofs(cl);
       auto        cell_id    = m_inner_mesh.lookup(cl);
@@ -464,7 +470,8 @@ class multiscale_local_basis
 
 #define EVAL_WITH_RECONSTRUCTION
 
-   vector_type eval_functions(const inner_cell_type& cl, const point_type& pt)
+   vector_type
+   eval_functions(const inner_cell_type& cl, const point_type& pt)
    {
       matrix_type local_dofs = take_local_dofs(cl);
 
@@ -505,7 +512,8 @@ class multiscale_local_basis
       return ret;
    }
 
-   matrix_type eval_gradients(const inner_cell_type& cl, const point_type& pt)
+   matrix_type
+   eval_gradients(const inner_cell_type& cl, const point_type& pt)
    {
       matrix_type local_dofs = take_local_dofs(cl);
 
@@ -559,9 +567,17 @@ class multiscale_local_basis
       return ret;
    }
 
-   size_t size() const { return m_X.cols(); }
+   size_t
+   size() const
+   {
+      return m_X.cols();
+   }
 
-   size_t degree() const { return m_degree; }
+   size_t
+   degree() const
+   {
+      return m_degree;
+   }
 };
 
 template<typename Mesh, typename CellBasis, typename FaceBasis, typename Function>
@@ -665,7 +681,8 @@ class projector_new
    }
 
    template<typename Function>
-   vector_type project(const Function& f)
+   vector_type
+   project(const Function& f)
    {
       auto rhs = make_rhs(mesh, cell, cell_basis, face_basis, f);
       return dec_mass_matrix.solve(rhs);
@@ -1030,11 +1047,12 @@ class multiscale_local_problem
    size_t m_degree;
    size_t m_refinement_levels;
 
-   vector_type take_local_dofs(const mesh_type&   msh,
-                               const cell_type&   cl,
-                               const vector_type& solution,
-                               size_t             num_cell_dofs,
-                               size_t             num_face_dofs)
+   vector_type
+   take_local_dofs(const mesh_type&   msh,
+                   const cell_type&   cl,
+                   const vector_type& solution,
+                   size_t             num_cell_dofs,
+                   size_t             num_face_dofs)
    {
       auto cid = find_element_id(msh.cells_begin(), msh.cells_end(), cl);
       if (!cid.first) throw std::invalid_argument("This is a bug: cell not found");
@@ -1079,10 +1097,11 @@ class multiscale_local_problem
    }
 
    template<typename OuterCellBasis, typename OuterFaceBasis>
-   void assemble(const mesh_type&      coarse_msh,
-                 const cell_type&      coarse_cl,
-                 const OuterCellBasis& coarse_cell_basis,
-                 const OuterFaceBasis& coarse_face_basis)
+   void
+   assemble(const mesh_type&      coarse_msh,
+            const cell_type&      coarse_cl,
+            const OuterCellBasis& coarse_cell_basis,
+            const OuterFaceBasis& coarse_face_basis)
    {
       submesher<Mesh>                              submesher;
       bqdata_type                                  bqd(m_degree, m_degree);

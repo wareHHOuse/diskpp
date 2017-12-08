@@ -25,28 +25,58 @@
 #include <thread>
 #include <vector>
 
+#include "loaders/strtot.hpp"
+
 namespace disk {
 
 namespace priv {
 
 template<typename T>
+point<T, 2>
+read_2d_point_line(const char* str, char** endptr, T scalefactor)
+{
+   T t1, t2;
+
+   t1 = strtot<T>(str, endptr);
+   t2 = strtot<T>(*endptr, endptr);
+
+   return point<T, 2>{t1 * scalefactor, t2 * scalefactor};
+}
+
+template<typename T>
+point<T, 3>
+read_3d_point_line(const char* str, char** endptr, T scalefactor)
+{
+   T t1, t2, t3;
+
+   t1 = strtot<T>(str, endptr);
+   t2 = strtot<T>(*endptr, endptr);
+   t3 = strtot<T>(*endptr, endptr);
+
+   return point<T, 3>{t1 * scalefactor, t2 * scalefactor, t3 * scalefactor};
+}
+
+template<typename T>
 void
 sort_uniq(std::vector<T>& v)
 {
-    std::sort(v.begin(), v.end());
-    auto uniq_iter = std::unique(v.begin(), v.end());
-    v.erase(uniq_iter, v.end());
+   std::sort(v.begin(), v.end());
+   auto uniq_iter = std::unique(v.begin(), v.end());
+   v.erase(uniq_iter, v.end());
 }
 
-} //namespace priv
+} // namespace priv
 
-} //namespace disk
+} // namespace disk
 
 #define THREADED
 #ifdef THREADED
-    #define THREAD(name, body) std::thread name([&]{body})
-    #define WAIT_THREAD(name) name.join()
+#define THREAD(name, body) std::thread name([&] { body })
+#define WAIT_THREAD(name) name.join()
 #else
-    #define THREAD(name, body) {body}
-    #define WAIT_THREAD(name)
+#define THREAD(name, body)                                                                         \
+   {                                                                                               \
+      body                                                                                         \
+   }
+#define WAIT_THREAD(name)
 #endif

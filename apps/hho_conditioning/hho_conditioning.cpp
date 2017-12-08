@@ -25,6 +25,7 @@
 #include <regex>
 #include <sstream>
 
+#include "geometry/geometry.hpp"
 #include "hho/gradient_reconstruction.hpp"
 #include "hho/hho_bq.hpp"
 #include "hho/hho_utils.hpp"

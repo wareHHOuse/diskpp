@@ -155,11 +155,20 @@ class diffusion_solver
       m_bqd = bqdata_type(m_cell_degree, m_face_degree);
    }
 
-   bool verbose(void) const { return m_verbose; }
-   void verbose(bool v) { m_verbose = v; }
+   bool
+   verbose(void) const
+   {
+      return m_verbose;
+   }
+   void
+   verbose(bool v)
+   {
+      m_verbose = v;
+   }
 
    template<typename LoadFunction, typename BoundaryConditionFunction>
-   assembly_info assemble(const LoadFunction& lf, const BoundaryConditionFunction& bcf)
+   assembly_info
+   assemble(const LoadFunction& lf, const BoundaryConditionFunction& bcf)
    {
       auto gradrec   = gradrec_type(m_bqd);
       auto stab      = stab_type(m_bqd);
@@ -171,14 +180,14 @@ class diffusion_solver
 
       timecounter tc;
 
-      auto tf = [](const typename mesh_type::point_type& pt) -> tensor_type {
-         tensor_type ret = tensor_type::Identity();
-         return ret;
-         // return 6.72071 * ret;
-         const auto c = cos(M_PI * pt.x() / 0.004);
-         const auto s = sin(M_PI * pt.y() / 0.004);
-         return ret * (1 + 100 * c * c * s * s);
-      };
+      // auto tf = [](const typename mesh_type::point_type& pt) -> tensor_type {
+      //    tensor_type ret = tensor_type::Identity();
+      //    return ret;
+      //    // return 6.72071 * ret;
+      //    const auto c = cos(M_PI * pt.x() / 0.004);
+      //    const auto s = sin(M_PI * pt.y() / 0.004);
+      //    return ret * (1 + 100 * c * c * s * s);
+      // };
 
       size_t elem_i = 0;
       for (auto& cl : m_msh) {
@@ -186,7 +195,7 @@ class diffusion_solver
          elem_i++;
 
          tc.tic();
-         gradrec.compute(m_msh, cl, tf);
+         gradrec.compute(m_msh, cl);
          tc.toc();
          ai.time_gradrec += tc.to_double();
 
@@ -212,7 +221,8 @@ class diffusion_solver
       return ai;
    }
 
-   solver_info solve(void)
+   solver_info
+   solve(void)
    {
 #ifdef HAVE_INTEL_MKL
       Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>> solver;
@@ -247,7 +257,8 @@ class diffusion_solver
    }
 
    template<typename LoadFunction, typename BoundaryConditionFunction>
-   postprocess_info postprocess(const LoadFunction& lf, const BoundaryConditionFunction& bcf)
+   postprocess_info
+   postprocess(const LoadFunction& lf, const BoundaryConditionFunction& bcf)
    {
       // expand solution
       auto assembler = assembler_type(m_msh, m_bqd);
@@ -262,19 +273,19 @@ class diffusion_solver
 
       m_postprocess_data.reserve(m_msh.cells_size());
 
-      auto tf = [](const typename mesh_type::point_type& pt) -> tensor_type {
-         tensor_type ret = tensor_type::Identity();
-         return ret;
-         // return 6.72071 * ret;
-         const auto c = cos(M_PI * pt.x() / 0.004);
-         const auto s = sin(M_PI * pt.y() / 0.004);
-         return ret * (1 + 100 * c * c * s * s);
-      };
+      // auto tf = [](const typename mesh_type::point_type& pt) -> tensor_type {
+      //    tensor_type ret = tensor_type::Identity();
+      //    return ret;
+      //    // return 6.72071 * ret;
+      //    const auto c = cos(M_PI * pt.x() / 0.004);
+      //    const auto s = sin(M_PI * pt.y() / 0.004);
+      //    return ret * (1 + 100 * c * c * s * s);
+      // };
 
       timecounter tc;
       tc.tic();
 
-#define DUMP_SOLUTION_DATA
+      //#define DUMP_SOLUTION_DATA
 
 #ifdef DUMP_SOLUTION_DATA
       auto          elem_num = m_msh.cells_size();
@@ -303,7 +314,7 @@ class diffusion_solver
             xFs.block(face_i * fbs, 0, fbs, 1) = xF;
          }
 
-         gradrec.compute(m_msh, cl, tf);
+         gradrec.compute(m_msh, cl);
          stab.compute(m_msh, cl, gradrec.oper);
          const dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
          const auto cell_rhs = disk::hho::compute_rhs(m_msh, cl, lf, m_bqd, m_bqd.cell_degree());
@@ -339,7 +350,8 @@ class diffusion_solver
    }
 
    template<typename AnalyticalSolution>
-   scalar_type compute_l2_error(const AnalyticalSolution& as)
+   scalar_type
+   compute_l2_error(const AnalyticalSolution& as)
    {
       scalar_type err_dof = 0.0;
 
@@ -357,7 +369,8 @@ class diffusion_solver
       return sqrt(err_dof);
    }
 
-   void plot_solution(const std::string& filename)
+   void
+   plot_solution(const std::string& filename)
    {
       std::ofstream ofs(filename);
 
