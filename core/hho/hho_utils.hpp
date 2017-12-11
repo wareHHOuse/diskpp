@@ -237,9 +237,9 @@ struct compute_rhs_face_F<
          const auto fphi = bqd.face_basis.eval_functions(msh, fc, qp.point(), 0, degree);
          assert(fphi.size() == face_basis_size);
 
-         const auto fval = func(qp.point());
+         const auto fval = mm_prod(qp.weight(), func(qp.point()));
          for (size_t i = 0; i < face_basis_size; i++) {
-            vec(i) += qp.weight() * mm_prod(fphi[i], fval);
+            vec(i) += mm_prod(fphi[i], fval);
          }
       }
 
@@ -332,9 +332,9 @@ struct compute_rhs_cell_F<
          const auto cphi = bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, degree);
          assert(cphi.size() == cell_basis_size);
 
-         const auto feval = func(qp.point());
+         const auto feval = mm_prod(qp.weight(), func(qp.point()));
          for (size_t i = 0; i < cell_basis_size; i++) {
-            vec(i) += qp.weight() * mm_prod(cphi[i], feval);
+            vec(i) += mm_prod(cphi[i], feval);
          }
       }
 

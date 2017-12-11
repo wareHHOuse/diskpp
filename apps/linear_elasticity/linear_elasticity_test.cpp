@@ -90,16 +90,21 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>& msh,
       return result_type{fx, fy};
    };
 
-   linear_elasticity_solver<mesh_type> le(msh, rp.degree);
+   typedef BoundaryConditions<mesh_type, decltype(solution)> Bnd_type;
+   Bnd_type                                                  bnd(msh);
+
+   bnd.addDirichletEverywhere(solution);
+
+   linear_elasticity_solver<mesh_type, Bnd_type> le(msh, bnd, material_data, rp.degree);
    le.verbose(rp.verbose);
 
    le.changeElasticityParameters(material_data);
 
-   assembly_info assembling_info = le.assemble(load, solution);
+   assembly_info assembling_info = le.assemble(load);
 
    solver_info solve_info = le.solve();
 
-   postprocess_info post_info = le.postprocess(load, solution);
+   postprocess_info post_info = le.postprocess(load);
 
    error_type error;
    error.h          = average_diameter(msh);
@@ -166,16 +171,21 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>&  msh,
       return result_type{fx, fy, fz};
    };
 
-   linear_elasticity_solver<mesh_type> le(msh, rp.degree);
+   typedef BoundaryConditions<mesh_type, decltype(solution)> Bnd_type;
+   Bnd_type                                                  bnd(msh);
+
+   bnd.addDirichletEverywhere(solution);
+
+   linear_elasticity_solver<mesh_type, Bnd_type> le(msh, bnd, material_data, rp.degree);
    le.verbose(rp.verbose);
 
    le.changeElasticityParameters(material_data);
 
-   assembly_info assembling_info = le.assemble(load, solution);
+   assembly_info assembling_info = le.assemble(load);
 
    solver_info solve_info = le.solve();
 
-   postprocess_info post_info = le.postprocess(load, solution);
+   postprocess_info post_info = le.postprocess(load);
 
    error_type error;
    error.h          = average_diameter(msh);

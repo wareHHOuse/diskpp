@@ -31,6 +31,10 @@
 #include "hho/stabilization.hpp"
 #include "hho/static_condensation.hpp"
 #include "hho/sym_gradient_reconstruction.hpp"
+#include "mechanics/BoundaryConditions.hpp"
+
+#include "output/gmshConvertMesh.hpp"
+#include "output/gmshDisk.hpp"
 
 #include "timecounter.h"
 
@@ -59,13 +63,14 @@ struct ElasticityParameters
    double mu;
 };
 
-template<typename Mesh>
+template<typename Mesh, typename BCType>
 class linear_elasticity_solver
 {
    typedef Mesh                            mesh_type;
    typedef typename mesh_type::scalar_type scalar_type;
    typedef typename mesh_type::cell        cell_type;
    typedef typename mesh_type::face        face_type;
+   typedef BCType                          bnd_type;
 
    typedef disk::hho::basis_quadrature_data_linear_elasticity<mesh_type,
                                                               disk::scaled_monomial_vector_basis,
@@ -83,7 +88,7 @@ class linear_elasticity_solver
 
    typedef disk::hho::static_condensation_bq<bqdata_type> statcond_type;
 
-   typedef disk::hho::assembler_by_elimination_bq<bqdata_type> assembler_type;
+   typedef disk::hho::assembler_by_elimination_mechanics_bq<bqdata_type, bnd_type> assembler_type;
 
    typedef disk::hho::projector_bq<bqdata_type> projector_type;
 
@@ -92,6 +97,9 @@ class linear_elasticity_solver
 
    size_t m_cell_degree, m_face_degree;
 
+   const static size_t dimension = mesh_type::dimension;
+
+   const bnd_type&  m_bnd;
    const mesh_type& m_msh;
    bqdata_type      m_bqd;
 
@@ -102,34 +110,13 @@ class linear_elasticity_solver
    ElasticityParameters m_elas_parameters;
 
  public:
-   linear_elasticity_solver(const mesh_type& msh, size_t degree, int l = 0) :
-     m_msh(msh), m_verbose(false)
-   {
-      if (l < -1 or l > 1) {
-         std::cout << "'l' should be -1, 0 or 1. Reverting to 0." << std::endl;
-         l = 0;
-      }
-
-      if (degree == 0 && l == -1) {
-         std::cout << "'l' should be 0 or 1. Reverting to 0." << std::endl;
-         l = 0;
-      }
-
-      m_cell_degree = degree + l;
-      m_face_degree = degree;
-
-      m_elas_parameters.mu     = 1.0;
-      m_elas_parameters.lambda = 1.0;
-
-      m_bqd = bqdata_type(m_face_degree, m_cell_degree);
-   }
-
    linear_elasticity_solver(const mesh_type&           msh,
-                            size_t                     degree,
+                            const bnd_type&            bnd,
                             const ElasticityParameters data,
+                            size_t                     degree,
                             int                        l = 0) :
      m_msh(msh),
-     m_verbose(false)
+     m_verbose(false), m_bnd(bnd)
    {
       if (l < -1 or l > 1) {
          std::cout << "'l' should be -1, 0 or 1. Reverting to 0." << std::endl;
@@ -174,15 +161,15 @@ class linear_elasticity_solver
       return m_msh.faces_size() * disk::howmany_dofs(m_bqd.face_basis);
    }
 
-   template<typename LoadFunction, typename BoundaryConditionFunction>
+   template<typename LoadFunction>
    assembly_info
-   assemble(const LoadFunction& lf, const BoundaryConditionFunction& bcf)
+   assemble(const LoadFunction& lf)
    {
       auto sgradrec  = sgradrec_type(m_bqd);
       auto divrec    = divrec_type(m_bqd);
       auto stab      = stab_type(m_bqd);
       auto statcond  = statcond_type(m_bqd);
-      auto assembler = assembler_type(m_msh, m_bqd);
+      auto assembler = assembler_type(m_msh, m_bqd, m_bnd);
 
       assembly_info ai;
       bzero(&ai, sizeof(ai));
@@ -214,9 +201,10 @@ class linear_elasticity_solver
          tc.toc();
          ai.time_statcond += tc.to_double();
 
-         assembler.assemble(m_msh, cl, scnp, bcf);
+         assembler.assemble(m_msh, cl, scnp);
       }
 
+      assembler.impose_neumann_boundary_conditions(m_msh);
       assembler.finalize(m_system_matrix, m_system_rhs);
 
       ai.linear_system_size = m_system_matrix.rows();
@@ -257,15 +245,15 @@ class linear_elasticity_solver
       return si;
    }
 
-   template<typename LoadFunction, typename BoundaryConditionFunction>
+   template<typename LoadFunction>
    postprocess_info
-   postprocess(const LoadFunction& lf, const BoundaryConditionFunction& bcf)
+   postprocess(const LoadFunction& lf)
    {
       auto sgradrec  = sgradrec_type(m_bqd);
       auto divrec    = divrec_type(m_bqd);
       auto stab      = stab_type(m_bqd);
       auto statcond  = statcond_type(m_bqd);
-      auto assembler = assembler_type(m_msh, m_bqd);
+      auto assembler = assembler_type(m_msh, m_bqd, m_bnd);
 
       const size_t fbs = disk::howmany_dofs(m_bqd.face_basis);
 
@@ -273,7 +261,7 @@ class linear_elasticity_solver
 
       m_solution_data.reserve(m_msh.cells_size());
 
-      const auto solF = assembler.expand_solution(m_msh, m_system_solution, bcf);
+      const auto solF = assembler.expand_solution(m_msh, m_system_solution);
 
       timecounter tc;
       tc.tic();
@@ -332,5 +320,89 @@ class linear_elasticity_solver
       }
 
       return sqrt(err_dof);
+   }
+
+   template<typename AnalyticalSolution>
+   scalar_type
+   compute_l2_gradient_error(const AnalyticalSolution& grad)
+   {
+      scalar_type err_dof = scalar_type{0.0};
+
+      projector_type projk(m_bqd);
+
+      sgradrec_type gradrec(m_bqd);
+
+      size_t i = 0;
+
+      for (auto& cl : m_msh) {
+         const auto x = m_solution_data.at(i++);
+         gradrec.compute(m_msh, cl);
+         const dynamic_vector<scalar_type> RTu = gradrec.oper * x;
+
+         const dynamic_vector<scalar_type> true_dof =
+           projk.projectOnSymStiffnessSpace(m_msh, cl, grad);
+         const dynamic_vector<scalar_type> comp_dof = RTu.block(0, 0, true_dof.size(), 1);
+         const dynamic_vector<scalar_type> diff_dof = (true_dof - comp_dof);
+         err_dof += diff_dof.dot(projk.grad_mm * diff_dof);
+      }
+
+      return sqrt(err_dof);
+   }
+
+   void
+   compute_discontinuous_displacement(const std::string& filename) const
+   {
+      const size_t cell_degree   = m_bqd.cell_degree();
+      const size_t num_cell_dofs = (m_bqd.cell_basis.range(0, cell_degree)).size();
+
+      visu::Gmesh gmsh(dimension);
+      auto        storage = m_msh.backend_storage();
+
+      std::vector<visu::Data>          data;    // create data (not used)
+      const std::vector<visu::SubData> subdata; // create subdata to save soution at gauss point
+
+      size_t cell_i(0);
+      size_t nb_nodes(0);
+      for (auto& cl : m_msh) {
+         const vector_dynamic    x          = m_solution_data.at(cell_i++);
+         const auto              cell_nodes = visu::cell_nodes(m_msh, cl);
+         std::vector<visu::Node> new_nodes;
+
+         // loop on the nodes of the cell
+         for (size_t i = 0; i < cell_nodes.size(); i++) {
+            nb_nodes++;
+            const auto point_ids = cell_nodes[i];
+            const auto pt        = storage->points[point_ids];
+
+            const auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, pt);
+
+            std::vector<scalar_type> depl(3, scalar_type{0});
+            std::array<double, 3>    coor = {double{0.0}, double{0.0}, double{0.0}};
+
+            // Add a node
+            visu::init_coor(pt, coor);
+            const visu::Node tmp_node(coor, nb_nodes, 0);
+            new_nodes.push_back(tmp_node);
+            gmsh.addNode(tmp_node);
+
+            // Plot displacement at node
+            for (size_t i = 0; i < num_cell_dofs; i += dimension) {
+               for (size_t j = 0; j < dimension; j++) {
+                  depl[j] += phi[i + j](j) * x(i + j); // a voir
+               }
+            }
+
+            const visu::Data datatmp(nb_nodes, depl);
+            data.push_back(datatmp);
+         }
+         // Add new element
+         visu::add_element(gmsh, new_nodes);
+      }
+
+      // Create and init a nodedata view
+      visu::NodeData nodedata(3, 0.0, "depl_node", data, subdata);
+
+      // Save the view
+      nodedata.saveNodeData(filename, gmsh);
    }
 };

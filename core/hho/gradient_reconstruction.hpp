@@ -310,8 +310,9 @@ struct use_vector_container_and_gradient_full // false for scalar basis function
          const auto dphi_j = convert_to_vector(dphi);
 
          for (size_t j = 0; j < cell_basis_size; j++) {
+            const auto qp_dphi_j = mm_prod(qp.weight(), dphi_j[j]);
             for (size_t i = 0; i < grad_basis_size; i++) {
-               BG(i, j) += qp.weight() * mm_prod(gphi[i], dphi_j[j]);
+               BG(i, j) += mm_prod(gphi[i], qp_dphi_j);
             }
          }
       } // end qp
@@ -412,8 +413,9 @@ struct use_vector_container_and_gradient_full<true, BQData>
          assert(cell_basis_size == cdphi.size());
 
          for (size_t j = 0; j < cell_basis_size; j++) {
+            const auto qp_cdphi_j = mm_prod(qp.weight(), cdphi[j]);
             for (size_t i = 0; i < grad_basis_size; i++) {
-               BG(i, j) += qp.weight() * mm_prod(gphi[i], cdphi[j]);
+               BG(i, j) += mm_prod(gphi[i], qp_cdphi_j);
             }
          }
       } // end qp

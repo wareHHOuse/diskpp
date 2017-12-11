@@ -106,6 +106,8 @@ struct trace_matrix_F<
    typedef typename mesh_type::face        face_type;
    typedef dynamic_matrix<scalar_type>     matrix_type;
 
+   const static size_t dimension = mesh_type::dimension;
+
    static matrix_type
    impl(const mesh_type& msh,
         const cell_type& cl,
@@ -130,9 +132,12 @@ struct trace_matrix_F<
          const auto cphi = bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, cell_degree);
          assert(cphi.size() == cell_basis_size);
 
-         for (size_t j = 0; j < cell_basis_size; j++) {
-            for (size_t i = 0; i < face_basis_size; i++) {
-               mat(i, j) += qp.weight() * mm_prod(fphi[i], cphi[j]);
+         for (size_t j = 0; j < cell_basis_size; j += dimension) {
+            for (size_t col = 0; col < dimension; col++) {
+               const auto qp_cphi_j = mm_prod(qp.weight(), cphi[j + col]);
+               for (size_t i = col; i < face_basis_size; i += dimension) {
+                  mat(i, j + col) += mm_prod(fphi[i], qp_cphi_j);
+               }
             }
          }
       }

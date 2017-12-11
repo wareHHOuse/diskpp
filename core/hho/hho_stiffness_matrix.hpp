@@ -160,8 +160,9 @@ struct stiffness_matrix_cell_F<
          assert(dcphi.size() == cell_basis_size);
 
          for (size_t j = 0; j < cell_basis_size; j++) {
+            const auto qp_dcphi_j = mm_prod(qp.weight(), dcphi[j]);
             for (size_t i = j; i < cell_basis_size; i++) {
-               stiffness(i, j) += qp.weight() * mm_prod(dcphi[i], dcphi[j]);
+               stiffness(i, j) += mm_prod(dcphi[i], qp_dcphi_j);
             }
          }
       }
@@ -235,8 +236,9 @@ sym_stiffness_matrix(const typename BQData::mesh_type& msh,
       assert(dcphi.size() == cell_basis_size);
 
       for (size_t j = 0; j < cell_basis_size; j++) {
+         const auto qp_dcphi_j = mm_prod(qp.weight(), dcphi[j]);
          for (size_t i = j; i < cell_basis_size; i++) {
-            stiffness(i, j) += qp.weight() * mm_prod(dcphi[i], dcphi[j]);
+            stiffness(i, j) += mm_prod(dcphi[i], qp_dcphi_j);
          }
       }
    }

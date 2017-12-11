@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "common/eigen.hpp"
+#include <tuple>
 #include <vector>
 
 enum DirichletType : size_t
@@ -34,320 +34,230 @@ enum DirichletType : size_t
    DZ        = 4,
    DXDY      = 5,
    DXDZ      = 6,
-   DYDZ      = 7
+   DYDZ      = 7,
+   OTHER     = 8
 };
 
 enum NeumannType : size_t
 {
-   NEUMANN = 0,
-   FREE    = 1,
-   NDX     = 2,
-   NDY     = 3,
-   NDZ     = 4,
-   NDXDY   = 5,
-   NDXDZ   = 6,
-   NDYDZ   = 7
+   NEUMANN = 9,
+   FREE    = 10,
 };
 
-struct BoundaryType
-{
-   size_t id;
-   size_t boundary_type;
-};
-
+template<typename MeshType, typename Function>
 class BoundaryConditions
 {
+ public:
+   typedef MeshType mesh_type;
+   typedef Function function_type;
+
  private:
-   std::vector<BoundaryType>            m_neumann_conditions;
-   std::vector<BoundaryType>            m_dirichlet_conditions;
-   std::vector<std::pair<bool, size_t>> m_faces_dirichlet;
-   std::vector<std::array<size_t, 2>>   m_lagranges_info;
+   const mesh_type& m_msh;
 
-   dynamic_vector<bool>   m_faces_is_dirichlet, m_faces_is_neumann;
-   dynamic_vector<size_t> m_type_boundary_dirichlet;
+   std::vector<Function> m_dirichlet_func;
+   std::vector<Function> m_neumann_func;
 
-   size_t m_nb_faces_boundary;
-   size_t m_nb_faces_dirichlet;
-   size_t m_nb_faces_neumann;
-   size_t m_nb_lag;
+   std::vector<std::tuple<bool, size_t, size_t, size_t>> m_faces_is_dirichlet, m_faces_is_neumann;
 
-   template<typename TypeMesh>
-   void
-   find_dirichlet_faces(const TypeMesh& msh)
-   {
-      for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++) {
-         auto bfc = *itor;
-
-         const auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), bfc);
-         if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
-
-         const auto face_id                 = eid.second;
-         m_faces_is_dirichlet(face_id)      = true;
-         m_type_boundary_dirichlet(face_id) = DirichletType::DIRICHLET;
-      }
-   }
-
-   template<typename TypeMesh>
-   void
-   find_neumann_faces(const TypeMesh& msh)
-   {
-      m_faces_dirichlet.reserve(m_nb_faces_boundary);
-      // m_faces_dirichlet.assign(m_nb_faces_boundary, std::make_pair(true, OTHER));
-      m_nb_faces_dirichlet = m_nb_faces_boundary;
-      m_nb_faces_neumann   = 0;
-
-      if (!m_neumann_conditions.empty()) {
-         size_t face(0);
-         for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++) {
-            auto bfc = *itor;
-
-            const auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), bfc);
-            if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
-
-            const auto   face_id = eid.second;
-            const size_t b_id    = msh.boundary_id(face_id);
-
-            // Find if this face is a boundary face with Neumann Condition
-            for (auto& elem : m_neumann_conditions) {
-               if (b_id == elem.id) {
-                  m_faces_dirichlet[face] = std::make_pair(false, elem.boundary_type);
-                  m_nb_faces_dirichlet--;
-                  m_nb_faces_neumann++;
-                  m_faces_is_dirichlet(face_id) = false;
-                  m_faces_is_neumann(face_id)   = true;
-                  break;
-               }
-            }
-            face++;
-         }
-      }
-   }
-
-   template<typename TypeMesh>
-   void
-   number_of_lag_conditions(const TypeMesh& msh)
-   {
-      // By default all boundary faces are dirichlet faces
-      const size_t DIM = msh.dimension;
-      m_nb_lag         = 0;
-
-      size_t                face(0);
-      std::array<size_t, 2> info = {0, 0};
-      for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++) {
-         if (m_faces_dirichlet[face].first) {
-            auto bfc = *itor;
-
-            const auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), bfc);
-            if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
-
-            const auto face_id            = eid.second;
-            bool       dirichlet_standart = true;
-
-            if (!m_dirichlet_conditions.empty()) {
-               for (auto& elem : m_dirichlet_conditions) {
-                  if (msh.boundary_id(face_id) == elem.id) {
-
-                     switch (elem.boundary_type) {
-                        case CLAMPED:
-                           dirichlet_standart = false;
-                           info[0]            = m_nb_lag;
-                           info[1]            = DIM;
-                           m_lagranges_info.push_back(info);
-                           m_nb_lag += DIM;
-                           m_faces_dirichlet[face].second     = CLAMPED;
-                           m_type_boundary_dirichlet(face_id) = CLAMPED;
-                           break;
-                        // case DX:
-                        // dirichlet_standart = false;
-                        // info[0] = m_nb_lag; info[1] = 1;
-                        // m_lagranges_info.push_back(info);
-                        // m_nb_lag += 1;
-                        // m_faces_dirichlet[face].second = DX;
-                        // break;
-                        // case DY:
-                        // dirichlet_standart = false;
-                        // info[0] = m_nb_lag; info[1] = 1;
-                        // m_lagranges_info.push_back(info);
-                        // m_nb_lag += 1;
-                        // m_faces_dirichlet[face].second = DY;
-                        // break;
-                        // case DZ:
-                        // dirichlet_standart = false;
-                        // if( DIM != 3){
-                        //    std::cout << "Invalid condition for face:" << face_id << std::endl;
-                        //    throw std::invalid_argument(" ONLY DIM = 3 for this Dirichlet
-                        //    Conditions");
-                        // }
-                        // else{
-                        //    info[0] = m_nb_lag; info[1] = 1;
-                        //    m_lagranges_info.push_back(info);
-                        //    m_nb_lag += 1;
-                        //    m_faces_dirichlet[face].second = DZ;
-                        // }
-                        // break;
-                        // case DXDY:
-                        // dirichlet_standart = false;
-                        // if( DIM != 3){
-                        //    std::cout << "Invalid condition for face:" << face_id << std::endl;
-                        //    throw std::invalid_argument(" ONLY DIM = 3 for this Dirichlet
-                        //    Conditions");
-                        // }
-                        // else{
-                        //    info[0] = m_nb_lag; info[1] = 2;
-                        //    m_lagranges_info.push_back(info);
-                        //    m_nb_lag += 2;
-                        //    m_faces_dirichlet[face].second = DXDY;
-                        // }
-                        // break;
-                        // case DXDZ:
-                        // dirichlet_standart = false;
-                        // if( DIM != 3){
-                        //    std::cout << "Invalid condition for face:" << face_id << std::endl;
-                        //    throw std::invalid_argument(" ONLY DIM = 3 for this Dirichlet
-                        //    Conditions");
-                        // }
-                        // else{
-                        //    info[0] = m_nb_lag; info[1] = 2;
-                        //    m_lagranges_info.push_back(info);
-                        //    m_nb_lag += 2;
-                        //    m_faces_dirichlet[face].second = DXDZ;
-                        // }
-                        // break;
-                        // case DYDZ:
-                        // dirichlet_standart = false;
-                        // if( DIM != 3){
-                        //    std::cout << "Invalid condition for face:" << face_id << std::endl;
-                        //    throw std::invalid_argument(" ONLY DIM = 3 for this Dirichlet
-                        //    Conditions");
-                        // }
-                        // else{
-                        //    info[0] = m_nb_lag; info[1] = 2;
-                        //    m_lagranges_info.push_back(info);
-                        //    m_nb_lag += 2;
-                        //    m_faces_dirichlet[face].second = DYDZ;
-                        // }
-                        // break;
-                        default:
-                           std::cout << "Unknown Dirichlet Conditions" << std::endl;
-                           throw std::invalid_argument(" Unknown Dirichlet Conditions");
-                           break;
-                     }
-                     break;
-                  }
-               }
-            }
-
-            if (dirichlet_standart) {
-               info[0] = m_nb_lag;
-               info[1] = DIM;
-               m_lagranges_info.push_back(info);
-               m_nb_lag += DIM;
-            }
-         }
-         face++;
-      }
-   }
+   size_t m_dirichlet_faces, m_neumann_faces;
 
  public:
-   BoundaryConditions() :
-     m_nb_faces_boundary(0), m_nb_faces_dirichlet(0), m_nb_faces_neumann(0), m_nb_lag(0)
-   {}
+   BoundaryConditions() = delete;
 
-   template<typename MeshType>
-   BoundaryConditions(const MeshType&                  msh,
-                      const std::vector<BoundaryType>& neumann_conditions,
-                      const std::vector<BoundaryType>& dirichlet_conditions) :
-     m_nb_faces_boundary(msh.boundary_faces_size()),
-     m_neumann_conditions(neumann_conditions), m_dirichlet_conditions(dirichlet_conditions)
+   BoundaryConditions(const mesh_type& msh) : m_msh(msh), m_dirichlet_faces(0), m_neumann_faces(0)
    {
-      m_faces_is_dirichlet.resize(msh.faces_size());
-      m_faces_is_dirichlet.setConstant(false);
-      m_type_boundary_dirichlet.resize(msh.faces_size());
-      // m_type_boundary_dirichlet.setConstant(DirichletType::OTHER);
-      find_dirichlet_faces(msh);
+      m_faces_is_dirichlet.assign(m_msh.faces_size(), std::make_tuple(false, OTHER, 0, 0));
+      m_faces_is_neumann.assign(m_msh.faces_size(), std::make_tuple(false, FREE, 0, 0));
+   }
 
-      m_faces_is_neumann.resize(msh.faces_size());
-      m_faces_is_neumann.setConstant(false);
-      find_neumann_faces(msh);
-      number_of_lag_conditions(msh);
+   void
+   addDirichletEverywhere(const Function& bcf)
+   {
+      const size_t bcf_id = m_dirichlet_func.size();
+      m_dirichlet_func.push_back(bcf);
+
+      for (auto itor = m_msh.boundary_faces_begin(); itor != m_msh.boundary_faces_end(); itor++) {
+         const auto bfc = *itor;
+
+         const auto eid = find_element_id(m_msh.faces_begin(), m_msh.faces_end(), bfc);
+         if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+
+         const auto face_id = eid.second;
+
+         m_faces_is_dirichlet.at(face_id) = std::make_tuple(true, DIRICHLET, 0, bcf_id);
+         m_dirichlet_faces++;
+      }
+   }
+
+   void
+   addDirichletBC(const size_t& btype, const size_t& b_id, const Function& bcf)
+   {
+      const size_t bcf_id = m_dirichlet_func.size();
+      m_dirichlet_func.push_back(bcf);
+
+      for (auto itor = m_msh.boundary_faces_begin(); itor != m_msh.boundary_faces_end(); itor++) {
+         const auto bfc = *itor;
+
+         const auto eid = find_element_id(m_msh.faces_begin(), m_msh.faces_end(), bfc);
+         if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+
+         const auto face_id = eid.second;
+
+         if (m_msh.boundary_id(face_id) == b_id) {
+            m_faces_is_dirichlet.at(face_id) = std::make_tuple(true, btype, b_id, bcf_id);
+            m_dirichlet_faces++;
+         }
+      }
+   }
+
+   void
+   addNeumannBC(const size_t& btype, const size_t& b_id, const Function& bcf)
+   {
+      const size_t bcf_id = m_neumann_func.size();
+      m_neumann_func.push_back(bcf);
+
+      for (auto itor = m_msh.boundary_faces_begin(); itor != m_msh.boundary_faces_end(); itor++) {
+         const auto bfc = *itor;
+
+         const auto eid = find_element_id(m_msh.faces_begin(), m_msh.faces_end(), bfc);
+         if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+
+         const auto face_id = eid.second;
+
+         if (m_msh.boundary_id(face_id) == b_id) {
+            m_faces_is_neumann.at(face_id) = std::make_tuple(true, btype, b_id, bcf_id);
+            m_neumann_faces++;
+         }
+      }
    }
 
    size_t
    nb_faces_boundary() const
    {
-      return m_nb_faces_boundary;
+      return m_dirichlet_faces + m_neumann_faces;
    }
    size_t
    nb_faces_dirichlet() const
    {
-      return m_nb_faces_dirichlet;
+      return m_dirichlet_faces;
    }
    size_t
    nb_faces_neumann() const
    {
-      return m_nb_faces_neumann;
-   }
-   size_t
-   nb_lags() const
-   {
-      return m_nb_lag;
-   }
-
-   std::vector<BoundaryType>
-   boundary_neumann() const
-   {
-      return m_neumann_conditions;
-   }
-
-   bool
-   is_boundary_dirichlet(const size_t face_i) const
-   {
-      return m_faces_dirichlet[face_i].first;
+      return m_neumann_faces;
    }
 
    bool
    is_dirichlet_face(const size_t face_i) const
    {
-      return m_faces_is_dirichlet(face_i);
+      return std::get<0>(m_faces_is_dirichlet.at(face_i));
    }
 
    bool
    is_neumann_face(const size_t face_i) const
    {
-      return m_faces_is_neumann(face_i);
-   }
-
-   size_t
-   boundary_type(const size_t face_i) const
-   {
-      return m_faces_dirichlet[face_i].second;
+      return std::get<0>(m_faces_is_neumann.at(face_i));
    }
 
    size_t
    dirichlet_boundary_type(const size_t face_i) const
    {
-      return m_type_boundary_dirichlet(face_i);
+      return std::get<1>(m_faces_is_dirichlet.at(face_i));
    }
 
    size_t
-   nb_lag_conditions_faceI(const size_t face_i) const
+   neumann_boundary_type(const size_t face_i) const
    {
-      return m_lagranges_info[face_i][1];
+      return std::get<1>(m_faces_is_neumann.at(face_i));
    }
 
    size_t
-   begin_lag_conditions_faceI(const size_t face_i) const
+   dirichlet_boundary_id(const size_t face_i) const
    {
-      return m_lagranges_info[face_i][0];
+      return std::get<2>(m_faces_is_dirichlet.at(face_i));
+   }
+
+   size_t
+   neumann_boundary_id(const size_t face_i) const
+   {
+      return std::get<2>(m_faces_is_neumann.at(face_i));
+   }
+
+   Function
+   dirichlet_boundary_func(const size_t face_i) const
+   {
+      return m_dirichlet_func.at(std::get<3>(m_faces_is_dirichlet.at(face_i)));
+   }
+
+   Function
+   neumann_boundary_func(const size_t face_i) const
+   {
+      return m_neumann_func.at(std::get<3>(m_faces_is_neumann.at(face_i)));
    }
 
    void
    boundary_info() const
    {
-      std::cout << "Number of boundary faces: " << m_nb_faces_boundary << std::endl;
+      std::cout << "Number of boundary faces: " << nb_faces_boundary() << std::endl;
       std::cout << "including: " << std::endl;
-      std::cout << " - Number of Dirichlet faces: " << m_nb_faces_dirichlet << std::endl;
-      std::cout << " - Number of Neumann faces: " << m_nb_faces_neumann << std::endl;
-      std::cout << " - Number of Lagrangian conditions: " << m_nb_lag << std::endl;
+      std::cout << " - Number of Dirichlet faces: " << nb_faces_dirichlet() << std::endl;
+      std::cout << " - Number of Neumann faces: " << nb_faces_neumann() << std::endl;
+   }
+
+   template<typename BQData>
+   size_t
+   dirichlet_imposed_dofs(const BQData& bqd, const size_t& face_id) const
+   {
+      const size_t dimension     = mesh_type::dimension;
+      const size_t num_face_dofs = howmany_dofs(bqd.face_basis);
+      const size_t num_dim_dofs  = num_face_dofs / dimension;
+
+      if (is_dirichlet_face(face_id)) {
+         const size_t btype = dirichlet_boundary_type(face_id);
+
+         switch (btype) {
+            case DIRICHLET: {
+               return num_face_dofs;
+               break;
+            }
+            case CLAMPED: {
+               return num_face_dofs;
+               break;
+            }
+            case DX: {
+               return num_dim_dofs;
+               break;
+            }
+            case DY: {
+               return num_dim_dofs;
+               break;
+            }
+            case DZ: {
+               if (dimension == 3) throw std::invalid_argument("You are not in 3D");
+               return num_dim_dofs;
+               break;
+            }
+            case DXDY: {
+               return 2 * num_dim_dofs;
+               break;
+            }
+            case DXDZ: {
+               if (dimension == 3) throw std::invalid_argument("You are not in 3D");
+               return 2 * num_dim_dofs;
+               break;
+            }
+            case DYDZ: {
+               if (dimension == 3) throw std::invalid_argument("You are not in 3D");
+               return 2 * num_dim_dofs;
+               break;
+            }
+            default: {
+               if (dimension == 3) throw std::logic_error("Unknown Boundary condition");
+               break;
+            }
+         }
+      }
+
+      return 0;
    }
 };

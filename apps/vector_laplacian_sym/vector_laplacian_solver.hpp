@@ -325,7 +325,8 @@ class vector_laplacian_solver
          gradrec.compute(m_msh, cl);
          const dynamic_vector<scalar_type> RTu = gradrec.oper * x;
 
-         const dynamic_vector<scalar_type> true_dof = projk.projectGradOnCell(m_msh, cl, grad);
+         const dynamic_vector<scalar_type> true_dof =
+           projk.projectOnSymStiffnessSpace(m_msh, cl, grad);
          const dynamic_vector<scalar_type> comp_dof = RTu.block(0, 0, true_dof.size(), 1);
          const dynamic_vector<scalar_type> diff_dof = (true_dof - comp_dof);
          err_dof += diff_dof.dot(projk.grad_mm * diff_dof);

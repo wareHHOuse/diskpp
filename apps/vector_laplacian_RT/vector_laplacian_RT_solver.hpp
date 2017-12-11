@@ -73,6 +73,7 @@ class vector_laplacian_solver
 
    typedef disk::hho::basis_quadrature_data_full<mesh_type,
                                                  disk::scaled_monomial_vector_basis,
+                                                 // disk::scaled_monomial_matrix_basis,
                                                  disk::Raviart_Thomas_matrix_basis,
                                                  disk::quadrature>
      bqdata_type;

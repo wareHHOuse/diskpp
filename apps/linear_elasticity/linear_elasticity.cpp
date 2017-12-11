@@ -28,6 +28,7 @@
 
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
+#include "mechanics/BoundaryConditions.hpp"
 
 #include "timecounter.h"
 
@@ -69,16 +70,34 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>& msh,
       return result_type{fx, fy};
    };
 
-   linear_elasticity_solver<mesh_type> le(msh, rp.degree);
+   typedef BoundaryConditions<mesh_type, decltype(solution)> Bnd_type;
+   Bnd_type                                                  bnd(msh);
+
+   bnd.addDirichletEverywhere(solution);
+
+   //    auto b1 = [material_data](const point<T, 2>& p) -> result_type { return result_type{0, 0};
+   //    };
+
+   //    auto b2 = [material_data](const point<T, 2>& p) -> result_type { return result_type{0, 0};
+   //    };
+
+   //    auto b3 = [material_data](const point<T, 2>& p) -> result_type { return result_type{1, 1};
+   //    };
+
+   //    bnd.addDirichletBC(DX, 1, solution);
+   //    bnd.addDirichletBC(DY, 2, solution);
+   //    bnd.addDirichletBC(DXDY, 3, solution);
+
+   linear_elasticity_solver<mesh_type, Bnd_type> le(msh, bnd, material_data, rp.degree);
    le.verbose(rp.verbose);
 
    le.changeElasticityParameters(material_data);
 
-   assembly_info assembling_info = le.assemble(load, solution);
+   assembly_info assembling_info = le.assemble(load);
 
    solver_info solve_info = le.solve();
 
-   postprocess_info post_info = le.postprocess(load, solution);
+   postprocess_info post_info = le.postprocess(load);
 
    tc.toc();
 
@@ -104,7 +123,7 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>& msh,
    //    le.plot_solution_at_gausspoint("sol_elas_2d.msh");
    //    le.plot_l2error_at_gausspoint("error_gp_2d_.msh", solution_lin);
    //    le.compute_deformed("deforme2d.msh");
-   //    le.compute_discontinuous_solution("depl2d.msh");
+   le.compute_discontinuous_displacement("depl2d.msh");
 }
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
@@ -158,16 +177,21 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>& msh,
       return result_type{fx, fy, fz};
    };
 
-   linear_elasticity_solver<mesh_type> le(msh, rp.degree);
+   typedef BoundaryConditions<mesh_type, decltype(solution)> Bnd_type;
+   Bnd_type                                                  bnd(msh);
+
+   bnd.addDirichletEverywhere(solution);
+
+   linear_elasticity_solver<mesh_type, Bnd_type> le(msh, bnd, material_data, rp.degree);
    le.verbose(rp.verbose);
 
    le.changeElasticityParameters(material_data);
 
-   assembly_info assembling_info = le.assemble(load, solution);
+   assembly_info assembling_info = le.assemble(load);
 
    solver_info solve_info = le.solve();
 
-   postprocess_info post_info = le.postprocess(load, solution);
+   postprocess_info post_info = le.postprocess(load);
 
    tc.toc();
 
@@ -214,7 +238,7 @@ main(int argc, char** argv)
    ElasticityParameters material_data;
 
    material_data.mu     = 1.0;
-   material_data.lambda = 1.0;
+   material_data.lambda = 10E5;
 
    int ch;
 

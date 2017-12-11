@@ -37,6 +37,7 @@
 
 #include "bases/bases_ranges.hpp"
 #include "bases/monomial_generator.hpp"
+#include "mesh/point.hpp"
 
 namespace disk {
 
