@@ -61,6 +61,21 @@ eval(const dynamic_vector<T>& tab_coeff, const Eigen::Matrix<T, Eigen::Dynamic, 
    return ret;
 }
 
+// scalar case
+template<typename T>
+T
+eval(const dynamic_vector<T>& tab_coeff, const std::vector<T>& base)
+{
+   T ret = 0;
+   assert(tab_coeff.size() == base.size());
+
+   for (size_t i = 0; i < base.size(); i++) {
+      ret += tab_coeff(i) * base[i];
+   }
+
+   return ret;
+}
+
 // vectorial case
 template<typename T, int DIM>
 static_matrix<T, DIM, DIM>

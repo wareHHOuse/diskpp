@@ -17,36 +17,39 @@
 #ifndef GMSHDATA_H
 #define GMSHDATA_H
 
-#include<vector>
-#include<array>
-#include<string>
-#include<utility>
+#include <array>
+#include <string>
+#include <utility>
+#include <vector>
 
-namespace visu{
+#include "gmshElement.hpp"
+#include "gmshMesh.hpp"
+
+namespace gmsh {
 
 class Data
 {
-protected:
-   size_t m_index;
+ protected:
+   size_t              m_index;
    std::vector<double> m_data;
 
-public:
+ public:
    Data();
    Data(const size_t index, const std::vector<double>& data);
-   size_t getNbComposante() const;
+   size_t              getNbComposante() const;
    std::vector<double> getData() const;
-   size_t getIndex() const;
-   void changeData(const size_t indice, const double value);
-   void changeData(const std::vector<double>& data);
-   void changeIndex(const size_t index);
+   size_t              getIndex() const;
+   void                changeData(const size_t indice, const double value);
+   void                changeData(const std::vector<double>& data);
+   void                changeIndex(const size_t index);
 };
 
 class SubData : public Data
 {
-private:
+ private:
    Node m_node;
 
-public:
+ public:
    SubData();
    SubData(const std::vector<double>& data, const Node& node);
    SubData(const Data& data, const Node& node);
@@ -55,65 +58,69 @@ public:
    void changeIndex(const size_t index);
 };
 
-
 class GenericData
 {
-protected:
-   size_t m_composante;
-   double m_time_value;
-   std::string m_title;
+ protected:
+   size_t            m_composante;
+   double            m_time_value;
+   std::string       m_title;
    std::vector<Data> m_datas;
 
-public:
+ public:
    GenericData();
    GenericData(const size_t nbcompo, const std::vector<Data>& datas);
-   GenericData(const size_t nbcompo, const double time_value, const std::string title, const std::vector<Data>& datas);
+   GenericData(const size_t             nbcompo,
+               const double             time_value,
+               const std::string        title,
+               const std::vector<Data>& datas);
    std::vector<Data> getData() const;
-   double getTime() const;
-   std::string getTitle() const;
-   size_t getNbComposante() const;
-   void changeNbComposante(const size_t nbcompo);
-   void changeTime(const double time);
-   void changeTitle(const std::string title);
-   void addData(const Data& data);
-   void addData(const size_t index, const std::vector<double>& values);
+   double            getTime() const;
+   std::string       getTitle() const;
+   size_t            getNbComposante() const;
+   void              changeNbComposante(const size_t nbcompo);
+   void              changeTime(const double time);
+   void              changeTitle(const std::string title);
+   void              addData(const Data& data);
+   void              addData(const size_t index, const std::vector<double>& values);
 };
-
 
 class NodeData : public GenericData
 {
-private:
+ private:
    std::vector<SubData> m_subdatas;
-   void writeNodeData(const std::string name_mesh) const;
+   void                 writeNodeData(const std::string name_mesh) const;
 
-public:
+ public:
    NodeData();
-   NodeData(const size_t nbcompo, const double time_value, const std::string title,
-      const std::vector<Data>& datas, const std::vector<SubData>& subdatas);
-      void saveNodeData(const std::string name_mesh, const Gmesh& mesh);
-      std::vector<SubData> getSubData() const;
-      void addSubData(const Data& subdata, const Node& node);
-      void addSubData(const std::vector<double>& subdata, const Node& node);
-   };
+   NodeData(const size_t                nbcompo,
+            const double                time_value,
+            const std::string           title,
+            const std::vector<Data>&    datas,
+            const std::vector<SubData>& subdatas);
+   void                 saveNodeData(const std::string name_mesh, const Gmesh& mesh);
+   std::vector<SubData> getSubData() const;
+   void                 addSubData(const Data& subdata, const Node& node);
+   void                 addSubData(const std::vector<double>& subdata, const Node& node);
+};
 
 class ElementData : public GenericData
 {
-private:
+ private:
    void writeElementData(const std::string name_mesh) const;
 
-public:
+ public:
    void saveElementData(const std::string name_mesh, const Gmesh& mesh) const;
 };
 
 class ElementNodeData : public GenericData
 {
-private:
+ private:
    void writeElementNodeData(const std::string name_mesh) const;
 
-public:
+ public:
    void saveElementNodeData(const std::string name_mesh, const Gmesh& mesh) const;
 };
 
-} //visu
+} // gmsh
 
 #endif

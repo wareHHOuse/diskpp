@@ -30,38 +30,44 @@
 
 #include "../Informations.hpp"
 #include "../Parameters.hpp"
-#include "LerayLions_elementary_computation.hpp"
 #include "hho/assembler.hpp"
-#include "hho/gradient_reconstruction.hpp"
 #include "hho/hho_bq.hpp"
 #include "hho/stabilization.hpp"
 #include "hho/static_condensation.hpp"
+#include "hho/sym_gradient_reconstruction.hpp"
+#include "mechanics/BoundaryConditions.hpp"
+#include "nonlinear_elasticity_elementary_computation.hpp"
 
 #include "timecounter.h"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
 
+namespace NLE {
+
 template<typename BQData>
-class NewtonRaphson_step_leraylions
+class NewtonRaphson_step_nlelasticity
 {
    typedef typename BQData::mesh_type      mesh_type;
    typedef typename mesh_type::scalar_type scalar_type;
    typedef ParamRun<scalar_type>           param_type;
+   typedef MaterialParameters<scalar_type> data_type;
 
    typedef dynamic_matrix<scalar_type> matrix_dynamic;
    typedef dynamic_vector<scalar_type> vector_dynamic;
 
-   typedef disk::hho::gradient_reconstruction_bq<BQData>      gradrec_type;
-   typedef disk::hho::gradient_reconstruction_full_bq<BQData> gradrec_full_type;
-   typedef disk::hho::static_condensation_bq<BQData>          statcond_type;
-   typedef disk::hho::assembler_by_elimination_bq<BQData>     assembler_type;
+   typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
+
+   typedef disk::hho::sym_gradient_reconstruction_bq<BQData>                  gradrec_type;
+   typedef disk::hho::sym_gradient_reconstruction_full_bq<BQData>             gradrec_full_type;
+   typedef disk::hho::static_condensation_bq<BQData>                          statcond_type;
+   typedef disk::hho::assembler_by_elimination_mechanics_bq<BQData, Bnd_type> assembler_type;
 
    typedef disk::hho::hho_stabilization_bq<BQData>  hho_stab_type;
    typedef disk::hho::hdg_stabilization_bq<BQData>  hdg_stab_type;
    typedef disk::hho::pikF_stabilization_bq<BQData> pikF_stab_type;
 
-   typedef LerayLions::LerayLions<BQData> elem_type;
+   typedef nonlinear_elasticity<BQData> elem_type;
 
    typedef typename assembler_type::sparse_matrix_type sparse_matrix_type;
    typedef typename assembler_type::vector_type        vector_type;
@@ -80,6 +86,8 @@ class NewtonRaphson_step_leraylions
    const BQData&     m_bqd;
    const param_type& m_rp;
    const mesh_type&  m_msh;
+   const Bnd_type&   m_bnd;
+   const data_type&  m_data;
 
    std::vector<vector_dynamic> m_RT;
    std::vector<matrix_dynamic> m_KTT, m_KTF;
@@ -90,8 +98,13 @@ class NewtonRaphson_step_leraylions
    bool m_verbose;
 
  public:
-   NewtonRaphson_step_leraylions(const mesh_type& msh, const BQData& bqd, const param_type& rp) :
-     m_msh(msh), m_verbose(rp.m_verbose), m_rp(rp), m_bqd(bqd)
+   NewtonRaphson_step_nlelasticity(const mesh_type&  msh,
+                                   const BQData&     bqd,
+                                   const Bnd_type&   bnd,
+                                   const param_type& rp,
+                                   const data_type&  material_data) :
+     m_msh(msh),
+     m_verbose(rp.m_verbose), m_rp(rp), m_bqd(bqd), m_bnd(bnd), m_data(material_data)
    {
       m_RT.clear();
       m_RT.resize(m_msh.cells_size());
@@ -132,17 +145,15 @@ class NewtonRaphson_step_leraylions
       assert(m_msh.cells_size() == m_solution_data.size());
    }
 
-   template<typename LoadFunction, typename BoundaryConditionFunction>
+   template<typename LoadFunction>
    AssemblyInfo
-   assemble(const LoadFunction&                lf,
-            const BoundaryConditionFunction&   bcf,
-            const std::vector<matrix_dynamic>& gradient_precomputed)
+   assemble(const LoadFunction& lf, const std::vector<matrix_dynamic>& gradient_precomputed)
    {
       gradrec_type      gradrec(m_bqd);
       gradrec_full_type gradrec_full(m_bqd);
-      elem_type         elem(m_bqd);
+      elem_type         elem(m_bqd, m_data);
       statcond_type     statcond(m_bqd);
-      assembler_type    assembler(m_msh, m_bqd);
+      assembler_type    assembler(m_msh, m_bqd, m_bnd);
 
       hho_stab_type  stab_HHO(m_bqd);
       hdg_stab_type  stab_HDG(m_bqd);
@@ -203,7 +214,7 @@ class NewtonRaphson_step_leraylions
          // Mechanical Computation
 
          tc.tic();
-         elem.compute(m_msh, cl, lf, GT, m_solution_data.at(cell_i), m_rp.m_leray_param);
+         elem.compute(m_msh, cl, lf, GT, m_solution_data.at(cell_i));
 
          dynamic_matrix<scalar_type> lhs = elem.K_int;
          dynamic_vector<scalar_type> rhs = elem.RTF;
@@ -264,11 +275,12 @@ class NewtonRaphson_step_leraylions
          tc.toc();
          ai.m_time_statcond += tc.to_double();
 
-         assembler.assemble_nl(m_msh, cl, scnp, bcf, m_solution_faces);
+         assembler.assemble_nl(m_msh, cl, scnp, m_solution_faces);
 
          cell_i++;
       }
 
+      assembler.impose_neumann_boundary_conditions(m_msh);
       assembler.finalize(m_system_matrix, m_system_rhs);
 
       ttot.toc();
@@ -301,20 +313,18 @@ class NewtonRaphson_step_leraylions
       return SolveInfo(m_system_matrix.rows(), m_system_matrix.nonZeros(), tc.to_double());
    }
 
-   template<typename BoundaryConditionFunction>
    scalar_type
-   postprocess(const BoundaryConditionFunction& bcf)
+   postprocess()
    {
       timecounter tc;
       tc.tic();
 
-      assembler_type assembler(m_msh, m_bqd);
+      assembler_type assembler(m_msh, m_bqd, m_bnd);
 
       const size_t fbs = howmany_dofs(m_bqd.face_basis);
       const size_t cbs = howmany_dofs(m_bqd.cell_basis);
 
-      const auto solF =
-        assembler.expand_solution_nl(m_msh, m_system_solution, bcf, m_solution_faces);
+      const auto solF = assembler.expand_solution_nl(m_msh, m_system_solution, m_solution_faces);
 
       // Update  unknowns
       // Update face Uf^{i+1} = Uf^i + delta Uf^i
@@ -452,3 +462,5 @@ class NewtonRaphson_step_leraylions
       assert(m_solution_data.size() == solution.size());
    }
 };
+
+} // end NLE

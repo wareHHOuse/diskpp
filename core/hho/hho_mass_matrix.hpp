@@ -393,6 +393,66 @@ struct grad_mass_matrix_cell_F<
    }
 };
 
+template<typename BQData>
+struct grad_mass_matrix_cell_F<
+  BQData,
+  scaled_monomial_sym_matrix_basis<typename BQData::mesh_type, typename BQData::cell_type>>
+{
+   typedef typename BQData::mesh_type      mesh_type;
+   typedef typename mesh_type::scalar_type scalar_type;
+   typedef typename mesh_type::cell        cell_type;
+   typedef dynamic_matrix<scalar_type>     matrix_type;
+
+   const static size_t dimension = mesh_type::dimension;
+
+   static matrix_type
+   impl(const mesh_type& msh,
+        const cell_type& cl,
+        const BQData&    bqd,
+        const size_t&    min_degree,
+        const size_t&    max_degree)
+   {
+      static_assert(use_vector_container<typename BQData::grad_basis_type>::value,
+                    "cell basic function have to use vector container");
+      const auto grad_basis_size = bqd.grad_basis.range(min_degree, max_degree).size();
+
+      matrix_type mass = matrix_type::Zero(grad_basis_size, grad_basis_size);
+
+      const auto grad_quadpoints = bqd.grad_quadrature.integrate(msh, cl);
+      assert(2 * max_degree <= bqd.grad_quadrature.order());
+
+      size_t dec = 0;
+      if (dimension == 3) {
+         dec = 6;
+      } else if (dimension == 2) {
+         dec = 3;
+      } else
+         assert(false);
+
+      for (auto& qp : grad_quadpoints) {
+         const auto gphi =
+           bqd.grad_basis.eval_functions(msh, cl, qp.point(), min_degree, max_degree);
+         assert(gphi.size() == grad_basis_size);
+
+         for (size_t j = 0; j < grad_basis_size; j++) {
+            const auto qp_gphi_j = mm_prod(qp.weight(), gphi[j]);
+            for (size_t i = j; i < grad_basis_size; i += dec) {
+               mass(i, j) += mm_prod(gphi[i], qp_gphi_j);
+            }
+         }
+      }
+
+      // upper part
+      for (size_t j = 0; j < grad_basis_size; j++) {
+         for (size_t i = 0; i < j; i++) {
+            mass(i, j) = mass(j, i);
+         }
+      }
+
+      return mass;
+   }
+};
+
 } // end priv
 
 template<typename BQData>

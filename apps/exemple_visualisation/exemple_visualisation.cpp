@@ -1,6 +1,6 @@
 /*
- *       /\
- *      /__\       Matteo Cicuttin (C) 2016, 2017 - matteo.cicuttin@enpc.fr
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,8 +10,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 #include <iomanip>
@@ -20,20 +26,8 @@
 #include <sstream>
 #include <unistd.h>
 
-#include <map>
-
-#include "colormanip.h"
-
-#include "config.h"
-
-#ifdef HAVE_SOLVER_WRAPPERS
-#include "agmg/agmg.hpp"
-#endif
-
 #include "hho/hho.hpp"
 #include "loaders/loader.hpp"
-#include "output/gmshConvertMesh.hpp"
-#include "output/gmshDisk.hpp"
 
 #include "timecounter.h"
 
@@ -249,19 +243,8 @@ main(int argc, char** argv)
       std::cout << "Guessed mesh format: Medit format" << std::endl;
       auto msh = disk::load_medit_2d_mesh<RealType>(mesh_filename);
       run_diffusion_solver(msh, rp);
-      visu::Gmesh gmsh = visu::convertMesh(msh);
+      gmsh::Gmesh gmsh = disk::convertMesh(msh);
       gmsh.writeGmesh("test_M2.msh", 2);
       return 0;
    }
-
-   /* Medit 3d*/
-   //  if (std::regex_match(mesh_filename, std::regex(".*\\.medit3d$") ))
-   //  {
-   //     std::cout << "Guessed mesh format: Medit format" << std::endl;
-   //     auto msh = disk::load_medit_3d_mesh<RealType>(mesh_filename);
-   //     ///run_diffusion_solver(msh, rp);
-   //     visu::Gmesh gmsh = visu::convertMesh(msh);
-   //     gmsh.writeGmesh("test_M3.msh",2);
-   //     return 0;
-   //  }
 }

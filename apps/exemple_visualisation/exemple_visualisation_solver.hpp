@@ -1,6 +1,6 @@
 /*
- *       /\
- *      /__\       Matteo Cicuttin (C) 2016, 2017 - matteo.cicuttin@enpc.fr
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,18 +10,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 #include <iostream>
 #include <sstream>
-
-#include "config.h"
-
-#ifdef HAVE_SOLVER_WRAPPERS
-#include "agmg/agmg.hpp"
-#endif
 
 #include "hho/assembler.hpp"
 #include "hho/gradient_reconstruction.hpp"
@@ -88,9 +88,7 @@ class diffusion_solver
    typedef dynamic_vector<scalar_type> vector_dynamic;
 
  public:
-   diffusion_solver(const mesh_type& msh, size_t degree, int l = 0)
-     : m_msh(msh)
-     , m_verbose(false)
+   diffusion_solver(const mesh_type& msh, size_t degree, int l = 0) : m_msh(msh), m_verbose(false)
    {
       if (l < -1 or l > 1) {
          std::cout << "'l' should be -1, 0 or 1. Reverting to 0." << std::endl;
@@ -108,11 +106,20 @@ class diffusion_solver
       m_bqd = bqdata_type(m_cell_degree, m_face_degree);
    }
 
-   bool verbose(void) const { return m_verbose; }
-   void verbose(bool v) { m_verbose = v; }
+   bool
+   verbose(void) const
+   {
+      return m_verbose;
+   }
+   void
+   verbose(bool v)
+   {
+      m_verbose = v;
+   }
 
    template<typename LoadFunction, typename BoundaryConditionFunction>
-   assembly_info assemble(const LoadFunction& lf, const BoundaryConditionFunction& bcf)
+   assembly_info
+   assemble(const LoadFunction& lf, const BoundaryConditionFunction& bcf)
    {
       auto gradrec   = gradrec_type(m_bqd);
       auto stab      = stab_type(m_bqd);
@@ -152,7 +159,8 @@ class diffusion_solver
       return ai;
    }
 
-   solver_info solve(void)
+   solver_info
+   solve(void)
    {
 #ifdef HAVE_INTEL_MKL
       Eigen::PardisoLU<Eigen::SparseMatrix<scalar_type>> solver;
@@ -185,7 +193,8 @@ class diffusion_solver
    }
 
    template<typename LoadFunction>
-   postprocess_info postprocess(const LoadFunction& lf)
+   postprocess_info
+   postprocess(const LoadFunction& lf)
    {
       auto gradrec  = gradrec_type(m_bqd);
       auto stab     = stab_type(m_bqd);
@@ -232,7 +241,8 @@ class diffusion_solver
    }
 
    template<typename AnalyticalSolution>
-   scalar_type compute_l2_error(const AnalyticalSolution& as)
+   scalar_type
+   compute_l2_error(const AnalyticalSolution& as)
    {
       scalar_type err_dof = 0.0;
 
@@ -251,13 +261,14 @@ class diffusion_solver
    }
 
    template<typename AnalyticalSolution>
-   void plot_l2error_at_gausspoint(const std::string& filename, const AnalyticalSolution& as)
+   void
+   plot_l2error_at_gausspoint(const std::string& filename, const AnalyticalSolution& as)
    {
       std::cout << "Compute L2 error at Gauss points" << std::endl;
-      visu::Gmesh msh(m_msh.dimension); // creta a mesh
+      gmsh::Gmesh msh(m_msh.dimension); // creta a mesh
 
-      std::vector<visu::Data>    data;    // create data (not used)
-      std::vector<visu::SubData> subdata; // create subdata to save soution at gauss point
+      std::vector<gmsh::Data>    data;    // create data (not used)
+      std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
       size_t                     nb_node = msh.getNumberofNodes();
 
       size_t cell_i = 0;
@@ -275,27 +286,28 @@ class diffusion_solver
             const scalar_type true_pot = as(qp.point()); // a voir et projeté
 
             nb_node += 1;
-            const visu::Node snode =
-              visu::convertPoint(qp.point(), nb_node); // create a node at gauss point
+            const gmsh::Node snode =
+              disk::convertPoint(qp.point(), nb_node); // create a node at gauss point
             const std::vector<double> value = {
-              std::fabs(pot - true_pot)}; // save the solution at gauss point
-            const visu::SubData sdata(value, snode);
+              std::abs(pot - true_pot)}; // save the solution at gauss point
+            const gmsh::SubData sdata(value, snode);
             subdata.push_back(sdata); // add subdata
          }
       }
-      visu::NodeData nodedata(
+      gmsh::NodeData nodedata(
         1, 0.0, "sol_scalar", data, subdata); // create and init a nodedata view
 
       nodedata.saveNodeData(filename, msh); // save the view
    }
 
-   void plot_solution_at_gausspoint(const std::string& filename)
+   void
+   plot_solution_at_gausspoint(const std::string& filename)
    {
       std::cout << "Compute solution at Gauss points" << std::endl;
-      visu::Gmesh msh(m_msh.dimension); // creta a mesh
+      gmsh::Gmesh msh(m_msh.dimension); // creta a mesh
 
-      std::vector<visu::Data>    data;    // create data (not used)
-      std::vector<visu::SubData> subdata; // create subdata to save soution at gauss point
+      std::vector<gmsh::Data>    data;    // create data (not used)
+      std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
       size_t                     nb_node = msh.getNumberofNodes();
 
       size_t cell_i = 0;
@@ -310,23 +322,24 @@ class diffusion_solver
                pot += phi[i] * x(i);
 
             nb_node += 1;
-            visu::Node snode =
-              visu::convertPoint(qp.point(), nb_node); // create a node at gauss point
+            gmsh::Node snode =
+              disk::convertPoint(qp.point(), nb_node); // create a node at gauss point
             std::vector<double> value = {double(pot)}; // save the solution at gauss point
-            visu::SubData       sdata(value, snode);
+            gmsh::SubData       sdata(value, snode);
             subdata.push_back(sdata); // add subdata
          }
       }
 
-      visu::NodeData nodedata(
+      gmsh::NodeData nodedata(
         1, 0.0, "sol_scalar", data, subdata); // create and init a nodedata view
 
       nodedata.saveNodeData(filename, msh); // save the view
    }
 
-   void plot_conforme_solution(const std::string& filename)
+   void
+   plot_conforme_solution(const std::string& filename)
    {
-      visu::Gmesh gmsh    = visu::convertMesh(m_msh);
+      gmsh::Gmesh gmsh    = disk::convertMesh(m_msh);
       auto        storage = m_msh.backend_storage();
       size_t      nb_nodes(gmsh.getNumberofNodes());
 
@@ -336,8 +349,8 @@ class diffusion_solver
       size_t cell_i(0);
       for (auto& cl : m_msh) {
          vector_dynamic          x          = m_postprocess_data.at(cell_i++);
-         auto                    cell_nodes = visu::cell_nodes(m_msh, cl);
-         std::vector<visu::Node> new_nodes;
+         auto                    cell_nodes = disk::cell_nodes(m_msh, cl);
+         std::vector<gmsh::Node> new_nodes;
          for (size_t i = 0; i < cell_nodes.size(); i++) {
             nb_nodes++;
             auto point_ids = cell_nodes[i];
@@ -356,36 +369,37 @@ class diffusion_solver
          }
       }
 
-      std::vector<visu::Data>    data;    // create data
-      std::vector<visu::SubData> subdata; // create subdata
+      std::vector<gmsh::Data>    data;    // create data
+      std::vector<gmsh::SubData> subdata; // create subdata
       data.reserve(nb_nodes);             // data has a size of nb_node
 
       for (size_t i_node = 0; i_node < value.size(); i_node++) {
          std::vector<double> tmp_value(1, value[i_node].second / double(value[i_node].first));
-         visu::Data          tmp_data(i_node + 1, tmp_value);
+         gmsh::Data          tmp_data(i_node + 1, tmp_value);
          data.push_back(tmp_data); // add data
       }
 
-      visu::NodeData nodedata(1, 0.0, "sol_node", data, subdata); // create and init a nodedata view
+      gmsh::NodeData nodedata(1, 0.0, "sol_node", data, subdata); // create and init a nodedata view
 
       nodedata.saveNodeData(filename, gmsh); // save the view
    }
 
-   void plot_discontinuous_solution(const std::string& filename)
+   void
+   plot_discontinuous_solution(const std::string& filename)
    {
       const size_t dim = m_msh.dimension;
-      visu::Gmesh  gmsh(dim);
+      gmsh::Gmesh  gmsh(dim);
       auto         storage = m_msh.backend_storage();
 
-      std::vector<visu::Data>    data;    // create data (not used)
-      std::vector<visu::SubData> subdata; // create subdata to save soution at gauss point
+      std::vector<gmsh::Data>    data;    // create data (not used)
+      std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
 
       size_t cell_i(0);
       size_t nb_nodes(0);
       for (auto& cl : m_msh) {
          vector_dynamic          x          = m_postprocess_data.at(cell_i++);
-         auto                    cell_nodes = visu::cell_nodes(m_msh, cl);
-         std::vector<visu::Node> new_nodes;
+         auto                    cell_nodes = disk::cell_nodes(m_msh, cl);
+         std::vector<gmsh::Node> new_nodes;
          for (size_t i = 0; i < cell_nodes.size(); i++) {
             nb_nodes++;
             auto point_ids = cell_nodes[i];
@@ -395,8 +409,8 @@ class diffusion_solver
 
             std::array<double, 3> coor = {double{0.0}, double{0.0}, double{0.0}};
 
-            visu::init_coor(pt, coor);
-            visu::Node tmp_node(coor, nb_nodes, 0);
+            disk::init_coor(pt, coor);
+            gmsh::Node tmp_node(coor, nb_nodes, 0);
             new_nodes.push_back(tmp_node);
             gmsh.addNode(tmp_node);
 
@@ -407,25 +421,26 @@ class diffusion_solver
                pot += phi[i] * x(i);
 
             std::vector<double> value = {double(pot)};
-            visu::Data          datatmp(nb_nodes, value);
+            gmsh::Data          datatmp(nb_nodes, value);
             data.push_back(datatmp);
          }
          // add new element
-         visu::add_element(gmsh, new_nodes);
+         disk::add_element(gmsh, new_nodes);
       }
 
-      visu::NodeData nodedata(1, 0.0, "sol_node", data, subdata); // create and init a nodedata view
+      gmsh::NodeData nodedata(1, 0.0, "sol_node", data, subdata); // create and init a nodedata view
 
       nodedata.saveNodeData(filename, gmsh); // save the view
    }
 
-   void plot_deformed_conforme(const std::string& filename)
+   void
+   plot_deformed_conforme(const std::string& filename)
    {
       const size_t DIM = m_msh.dimension;
       if (DIM >= 3)
          std::cout << "Compute deformed only in 1D or 2D" << '\n';
       else {
-         visu::Gmesh gmsh    = visu::convertMesh(m_msh);
+         gmsh::Gmesh gmsh    = disk::convertMesh(m_msh);
          auto        storage = m_msh.backend_storage();
          size_t      nb_nodes(gmsh.getNumberofNodes());
 
@@ -436,8 +451,8 @@ class diffusion_solver
          size_t cell_i(0);
          for (auto& cl : m_msh) {
             vector_dynamic          x          = m_postprocess_data.at(cell_i++);
-            auto                    cell_nodes = visu::cell_nodes(m_msh, cl);
-            std::vector<visu::Node> new_nodes;
+            auto                    cell_nodes = disk::cell_nodes(m_msh, cl);
+            std::vector<gmsh::Node> new_nodes;
             for (size_t i = 0; i < cell_nodes.size(); i++) {
                nb_nodes++;
                auto point_ids = cell_nodes[i];
@@ -456,42 +471,43 @@ class diffusion_solver
             }
          }
 
-         std::vector<visu::Data>    data;    // create data
-         std::vector<visu::SubData> subdata; // create subdata
+         std::vector<gmsh::Data>    data;    // create data
+         std::vector<gmsh::SubData> subdata; // create subdata
          data.reserve(nb_nodes);             // data has a size of nb_node
 
          for (size_t i_node = 0; i_node < value.size(); i_node++) {
             std::vector<double> tmp_value(3, 0.0);
             tmp_value[DIM] = value[i_node].second / double(value[i_node].first);
-            visu::Data tmp_data(i_node + 1, tmp_value);
+            gmsh::Data tmp_data(i_node + 1, tmp_value);
             data.push_back(tmp_data); // add data
          }
 
-         visu::NodeData nodedata(
+         gmsh::NodeData nodedata(
            3, 0.0, "sol_node", data, subdata); // create and init a nodedata view
 
          nodedata.saveNodeData(filename, gmsh); // save the view
       }
    }
 
-   void plot_deformed_discontinuous(const std::string& filename)
+   void
+   plot_deformed_discontinuous(const std::string& filename)
    {
       const size_t DIM = m_msh.dimension;
       if (DIM >= 3)
          std::cout << "Compute deformed only in 1D or 2D" << '\n';
       else {
-         visu::Gmesh gmsh(DIM);
+         gmsh::Gmesh gmsh(DIM);
          auto        storage = m_msh.backend_storage();
 
-         std::vector<visu::Data>    data;    // create data (not used)
-         std::vector<visu::SubData> subdata; // create subdata to save soution at gauss point
+         std::vector<gmsh::Data>    data;    // create data (not used)
+         std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
 
          size_t cell_i(0);
          size_t nb_nodes(0);
          for (auto& cl : m_msh) {
             vector_dynamic          x          = m_postprocess_data.at(cell_i++);
-            auto                    cell_nodes = visu::cell_nodes(m_msh, cl);
-            std::vector<visu::Node> new_nodes;
+            auto                    cell_nodes = disk::cell_nodes(m_msh, cl);
+            std::vector<gmsh::Node> new_nodes;
             for (size_t i = 0; i < cell_nodes.size(); i++) {
                nb_nodes++;
                auto point_ids = cell_nodes[i];
@@ -501,8 +517,8 @@ class diffusion_solver
 
                std::array<double, 3> coor = {double{0.0}, double{0.0}, double{0.0}};
 
-               visu::init_coor(pt, coor);
-               visu::Node tmp_node(coor, nb_nodes, 0);
+               disk::init_coor(pt, coor);
+               gmsh::Node tmp_node(coor, nb_nodes, 0);
                new_nodes.push_back(tmp_node);
                gmsh.addNode(tmp_node);
 
@@ -514,24 +530,25 @@ class diffusion_solver
 
                std::vector<double> value(3, 0.0);
                value[DIM + 1 - 1] = {double(pot)};
-               visu::Data datatmp(nb_nodes, value);
+               gmsh::Data datatmp(nb_nodes, value);
 
                data.push_back(datatmp);
             }
             // add new element
-            visu::add_element(gmsh, new_nodes);
+            disk::add_element(gmsh, new_nodes);
          }
 
-         visu::NodeData nodedata(
+         gmsh::NodeData nodedata(
            3, 0.0, "sol_node_deformed", data, subdata); // create and init a nodedata view
 
          nodedata.saveNodeData(filename, gmsh); // save the view
       }
    }
 
-   void saveMesh(const std::string& filename)
+   void
+   saveMesh(const std::string& filename)
    {
-      visu::Gmesh gmsh = visu::convertMesh(m_msh);
+      gmsh::Gmesh gmsh = disk::convertMesh(m_msh);
       gmsh.writeGmesh(filename, 2);
    }
 };

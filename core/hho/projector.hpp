@@ -44,6 +44,63 @@ class projector_bq
 
    const BQData& m_bqd;
 
+   const static size_t dimension = mesh_type::dimension;
+
+   std::vector<static_matrix<scalar_type, dimension, dimension>>
+   compute_SS()
+   {
+      assert(dimension == 2 || dimension == 3);
+
+      std::vector<static_matrix<scalar_type, dimension, dimension>> ret;
+
+      if (dimension == 2) {
+         ret.reserve(1);
+         static_matrix<scalar_type, dimension, dimension> mat =
+           static_matrix<scalar_type, dimension, dimension>::Zero();
+
+         mat << 0., 1., -1., 0.;
+
+         ret.push_back(mat);
+      } else if (dimension == 3) {
+         ret.reserve(3);
+         static_matrix<scalar_type, dimension, dimension> mat =
+           static_matrix<scalar_type, dimension, dimension>::Zero();
+
+         mat(0, 2) = 1;
+         mat(2, 0) = -1;
+
+         ret.push_back(mat);
+
+         mat = static_matrix<scalar_type, dimension, dimension>::Zero();
+
+         mat(0, 1) = 1;
+         mat(1, 0) = -1;
+
+         ret.push_back(mat);
+
+         mat = static_matrix<scalar_type, dimension, dimension>::Zero();
+
+         mat(1, 2) = 1;
+         mat(2, 1) = -1;
+
+         ret.push_back(mat);
+      } else
+         throw std::logic_error("dimension have to be =2 or =3");
+
+      return ret;
+   }
+
+   size_t
+   num_lag()
+   {
+      if (dimension == 2)
+         return 1;
+      else if (dimension == 3)
+         return 3;
+
+      throw std::logic_error("dimension have to be =2 or =3");
+   }
+
  public:
    projector_bq(const BQData& bqd) : m_bqd(bqd) {}
 
@@ -85,6 +142,7 @@ class projector_bq
       return face_mm.llt().solve(rhs);
    }
 
+   // project gradient on  gradient space
    template<typename Function>
    vector_type
    projectOnStiffnessSpace(const mesh_type& msh,
@@ -100,6 +158,7 @@ class projector_bq
       grad_mm = stiffness_matrix(msh, cl, m_bqd, 1, degree);
       assert(grad_mm.rows() == grad_mm.cols() && grad_mm.rows() == grad_basis_size);
 
+      // RHS
       vector_type rhs = vector_type::Zero(grad_basis_size);
 
       const auto grad_quadpoints = m_bqd.cell_quadrature.integrate(msh, cl);
@@ -118,6 +177,7 @@ class projector_bq
       return grad_mm.llt().solve(rhs);
    }
 
+   // project gradient (! not the symetric gradient) on symetric gradient space
    template<typename Function>
    vector_type
    projectOnSymStiffnessSpace(const mesh_type& msh,
@@ -125,13 +185,41 @@ class projector_bq
                               const Function&  f,
                               int              degree = -1)
    {
+      typedef typename BQData::cell_basis_type::gradient_value_type gvt;
+
       if (degree < 0) degree = m_bqd.cell_degree() + 1;
       const auto grad_basis_size = m_bqd.cell_basis.range(1, degree).size();
 
       grad_mm = sym_stiffness_matrix(msh, cl, m_bqd, 1, degree);
       assert(grad_mm.rows() == grad_mm.cols() && grad_mm.rows() == grad_basis_size);
 
-      vector_type rhs = vector_type::Zero(grad_basis_size);
+      /* LHS: take basis functions derivatives from degree 1 to K+1 */
+      const auto  MG_rowcol_range                      = m_bqd.cell_basis.range(1, degree);
+      const auto  MG_size                              = MG_rowcol_range.size() + num_lag();
+      matrix_type MG                                   = matrix_type::Zero(MG_size, MG_size);
+      MG.block(0, 0, grad_basis_size, grad_basis_size) = grad_mm;
+
+      // LHS: impose zero_average condition for the skew-symetric part
+      const auto cell_quadpoints = m_bqd.cell_quadrature.integrate(msh, cl);
+      assert(2 * (degree - 1) <= m_bqd.cell_quadrature.order());
+
+      const auto SS = compute_SS();
+
+      for (auto& qp : cell_quadpoints) {
+         const auto c_dphi = m_bqd.cell_basis.eval_gradients(msh, cl, qp.point(), 1, degree);
+         assert(c_dphi.size() == MG_rowcol_range.size());
+
+         for (size_t j = 0; j < num_lag(); j++) {
+            for (size_t i = 0; i < MG_rowcol_range.size(); i++) {
+               const scalar_type qp_ss_cdphi = qp.weight() * mm_prod(SS[j], c_dphi[i]);
+               MG(i, MG_rowcol_range.size() + j) += qp_ss_cdphi;
+               MG(MG_rowcol_range.size() + j, i) += qp_ss_cdphi;
+            }
+         }
+      }
+
+      // RHS
+      vector_type rhs = vector_type::Zero(grad_basis_size + num_lag());
 
       const auto grad_quadpoints = m_bqd.cell_quadrature.integrate(msh, cl);
       assert(2 * degree <= m_bqd.cell_quadrature.order());
@@ -140,13 +228,17 @@ class projector_bq
          const auto gphi = m_bqd.cell_basis.eval_sgradients(msh, cl, qp.point(), 1, degree);
          assert(gphi.size() == grad_basis_size);
 
-         const auto f_qp = mm_prod(qp.weight(), f(qp.point()));
+         const gvt f_qp = qp.weight() * f(qp.point());
          for (size_t i = 0; i < grad_basis_size; i++) {
             rhs(i) += mm_prod(f_qp, gphi[i]);
          }
       }
 
-      return grad_mm.llt().solve(rhs);
+      Eigen::PartialPivLU<Eigen::MatrixXd> LU;
+
+      LU.compute(MG);
+
+      return LU.solve(rhs).head(grad_basis_size);
    }
 
    template<typename Function>

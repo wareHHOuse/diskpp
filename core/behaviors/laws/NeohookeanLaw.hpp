@@ -24,18 +24,16 @@
 
 #include <iostream>
 
+#include <math.h>
 #include <sstream>
 #include <string>
-#include <math.h>
 
+#include "behaviors/maths_tensor.hpp"
 #include "common/eigen.hpp"
-#include "BehaviorLaws/maths_tensor.hpp"
-#include <Eigen/LU>
-
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-
+namespace disk {
 /* Material: Neo-nookean
  * Energy :  W(F) = Wiso(F) + Wvol(F)
  *   - Wiso(F) =    mu / 2 *[tr(F^T * F) - d]
@@ -59,55 +57,51 @@
  * 6- U(J) = sqrt( ( J^2 -1 - 2 *ln(J)) /2)
  * */
 
-
 template<typename scalar_type>
 class NeoHookeanLaw
 {
    scalar_type m_mu;
    scalar_type m_lambda;
-   size_t m_type;
+   size_t      m_type;
 
    const size_t maxtype = 6;
 
    scalar_type
    compute_U(scalar_type J) const
    {
-      if(m_type == 1)
+      if (m_type == 1)
          return log(J);
-      else if(m_type == 2)
-         return ( J - 1.0);
-      else if(m_type == 3)
+      else if (m_type == 2)
+         return (J - 1.0);
+      else if (m_type == 3)
          return log10(J);
-      else if(m_type == 4)
-         return 1.0/(1.0-J);
-      else if(m_type == 5){
-         scalar_type J2 = J *J;
-         return (J2 -1.0);
-      }
-      else if(m_type == 6)
-         return sqrt( ( J*J -1.0 - 2.0 *log(J)) /2.0);
+      else if (m_type == 4)
+         return 1.0 / (1.0 - J);
+      else if (m_type == 5) {
+         scalar_type J2 = J * J;
+         return (J2 - 1.0);
+      } else if (m_type == 6)
+         return sqrt((J * J - 1.0 - 2.0 * log(J)) / 2.0);
       else
          throw std::invalid_argument("NeoHookeanLaw: m_type have to be <= 6");
    }
 
-
    scalar_type
    compute_T1(scalar_type J) const
    {
-      if(m_type == 1)
+      if (m_type == 1)
          return log(J);
-      else if(m_type == 2)
-         return J * ( J - 1.0);
-      else if(m_type == 3)
-         return log(J)/(log(10)*log(10));
-      else if(m_type == 4)
-         return (J - 1.0)/(J*J);
-      else if(m_type == 5){
-         scalar_type J2 = J *J;
-         return 2*J2*(J2 -1.0);
-      }
-      else if(m_type == 6)
-         return (J*J -1.0)/2.0;
+      else if (m_type == 2)
+         return J * (J - 1.0);
+      else if (m_type == 3)
+         return log(J) / (log(10) * log(10));
+      else if (m_type == 4)
+         return (J - 1.0) / (J * J);
+      else if (m_type == 5) {
+         scalar_type J2 = J * J;
+         return 2 * J2 * (J2 - 1.0);
+      } else if (m_type == 6)
+         return (J * J - 1.0) / 2.0;
       else
          throw std::invalid_argument("NeoHookeanLaw: m_type have to be <= 6");
    }
@@ -115,42 +109,37 @@ class NeoHookeanLaw
    scalar_type
    compute_T2(scalar_type J) const
    {
-      if(m_type == 1)
+      if (m_type == 1)
          return 1.0;
-      else if(m_type == 2)
-         return J * ( 2.0 * J - 1.0);
-      else if(m_type == 3)
-         return 1.0/(log(10)*log(10));
-      else if(m_type == 4)
-         return (2.0 - J)/(J*J);
-      else if(m_type == 5){
-         scalar_type J2 = J *J;
-         return J2*(8.0*J2 -4.0);
-      }
-      else if(m_type == 6)
-         return J*J;
+      else if (m_type == 2)
+         return J * (2.0 * J - 1.0);
+      else if (m_type == 3)
+         return 1.0 / (log(10) * log(10));
+      else if (m_type == 4)
+         return (2.0 - J) / (J * J);
+      else if (m_type == 5) {
+         scalar_type J2 = J * J;
+         return J2 * (8.0 * J2 - 4.0);
+      } else if (m_type == 6)
+         return J * J;
       else
          throw std::invalid_argument("NeoHookeanLaw: m_type have to be <= 6");
    }
 
-
-public:
-   NeoHookeanLaw()
-   : m_mu(0.0), m_lambda(0.0), m_type(1)
+ public:
+   NeoHookeanLaw() : m_mu(0.0), m_lambda(0.0), m_type(1)
    {
-      if(m_type <= 0 || m_type > maxtype)
-      {
+      if (m_type <= 0 || m_type > maxtype) {
          std::cout << "Unknown option for NeoNookean material" << '\n';
          std::cout << "We use U(J) = ln(J)" << '\n';
          m_type = 1;
       }
    }
 
-   NeoHookeanLaw(const scalar_type mu, const scalar_type lambda, const size_t type)
-   : m_mu(mu), m_lambda(lambda), m_type(type)
+   NeoHookeanLaw(const scalar_type mu, const scalar_type lambda, const size_t type) :
+     m_mu(mu), m_lambda(lambda), m_type(type)
    {
-      if(m_type <= 0 || m_type > maxtype)
-      {
+      if (m_type <= 0 || m_type > maxtype) {
          std::cout << "Unknown option for NeoNookean material" << '\n';
          std::cout << "We use U(J) = ln(J)" << '\n';
          m_type = 1;
@@ -173,8 +162,7 @@ public:
    setType(const size_t type)
    {
       m_type = type;
-      if(m_type <= 0 || m_type > maxtype)
-      {
+      if (m_type <= 0 || m_type > maxtype) {
          std::cout << "Unknown option for NeoNookean material" << '\n';
          std::cout << "We use U(J) = ln(J)" << '\n';
          m_type = 1;
@@ -182,94 +170,97 @@ public:
    }
 
    scalar_type
-   giveMu() const {return m_mu;}
+   giveMu() const
+   {
+      return m_mu;
+   }
 
    scalar_type
-   giveLambda() const {return m_lambda;}
+   giveLambda() const
+   {
+      return m_lambda;
+   }
 
-
-   template< int DIM>
+   template<int DIM>
    scalar_type
    compute_energy(const static_matrix<scalar_type, DIM, DIM>& F) const
    {
       const scalar_type J = F.determinant();
-      if(J <= 0.0){
+      if (J <= 0.0) {
          const std::string mess = "J= " + std::to_string(J) + " <= 0";
          throw std::invalid_argument(mess);
       }
 
-      const scalar_type Wiso = m_mu/2.0 * ((F.transpose() * F).trace() - DIM);
-      const scalar_type Wvol = m_lambda /2.0 * compute_U(J) * compute_U(J) - m_mu * log(J);
+      const scalar_type Wiso = m_mu / 2.0 * ((F.transpose() * F).trace() - DIM);
+      const scalar_type Wvol = m_lambda / 2.0 * compute_U(J) * compute_U(J) - m_mu * log(J);
 
-      return  Wiso + Wvol;
+      return Wiso + Wvol;
    }
 
-   template< int DIM>
+   template<int DIM>
    static_matrix<scalar_type, DIM, DIM>
    compute_PK1(const static_matrix<scalar_type, DIM, DIM>& F) const
    {
       const scalar_type J = F.determinant();
-      if(J <= 0.0){
+      if (J <= 0.0) {
          const std::string mess = "J= " + std::to_string(J) + " <= 0";
          throw std::invalid_argument(mess);
       }
 
       const static_matrix<scalar_type, DIM, DIM> invF = F.inverse();
-      const scalar_type T1 = compute_T1(J);
+      const scalar_type                          T1   = compute_T1(J);
 
-      return  m_mu * F + ( m_lambda * T1 - m_mu) * invF.transpose();
+      return m_mu * F + (m_lambda * T1 - m_mu) * invF.transpose();
    }
-
 
    template<int DIM>
    static_tensor<scalar_type, DIM>
    compute_tangent_moduli_A(const static_matrix<scalar_type, DIM, DIM>& F) const
    {
       const scalar_type J = F.determinant();
-      if(J <= 0.0){
+      if (J <= 0.0) {
          const std::string mess = "J= " + std::to_string(J) + " <= 0";
          throw std::invalid_argument(mess);
       }
 
-      const static_matrix<scalar_type, DIM, DIM> invF = F.inverse();
+      const static_matrix<scalar_type, DIM, DIM> invF  = F.inverse();
       const static_matrix<scalar_type, DIM, DIM> invFt = invF.transpose();
 
       const scalar_type T1 = compute_T1(J);
       const scalar_type T2 = compute_T2(J);
 
-      const static_tensor<scalar_type, DIM> I4 = compute_IdentityTensor<scalar_type,DIM>();
+      const static_tensor<scalar_type, DIM> I4         = compute_IdentityTensor<scalar_type, DIM>();
       const static_tensor<scalar_type, DIM> invFt_invF = computeProductInf(invFt, invF);
       const static_tensor<scalar_type, DIM> invFt_invFt = computeKroneckerProduct(invFt, invFt);
 
-      return m_mu * (I4 + invFt_invF) + m_lambda *( T2 * invFt_invFt - T1 * invFt_invF);
+      return m_mu * (I4 + invFt_invF) + m_lambda * (T2 * invFt_invFt - T1 * invFt_invF);
    }
 
-
    template<int DIM>
-   std::pair<static_matrix<scalar_type, DIM, DIM>, static_tensor<scalar_type, DIM> >
+   std::pair<static_matrix<scalar_type, DIM, DIM>, static_tensor<scalar_type, DIM>>
    compute_whole_PK1(const static_matrix<scalar_type, DIM, DIM>& F) const
    {
       const scalar_type J = F.determinant();
-      if(J <= 0.0){
+      if (J <= 0.0) {
          const std::string mess = "J= " + std::to_string(J) + " <= 0";
          throw std::invalid_argument(mess);
       }
 
-      const static_matrix<scalar_type, DIM, DIM> invF = F.inverse();
+      const static_matrix<scalar_type, DIM, DIM> invF  = F.inverse();
       const static_matrix<scalar_type, DIM, DIM> invFt = invF.transpose();
 
       const scalar_type T1 = compute_T1(J);
       const scalar_type T2 = compute_T2(J);
 
-      const static_tensor<scalar_type, DIM> I4 = compute_IdentityTensor<scalar_type,DIM>();
+      const static_tensor<scalar_type, DIM> I4         = compute_IdentityTensor<scalar_type, DIM>();
       const static_tensor<scalar_type, DIM> invFt_invF = computeProductInf(invFt, invF);
       const static_tensor<scalar_type, DIM> invFt_invFt = computeKroneckerProduct(invFt, invFt);
 
-      const auto PK1 = m_mu * F + ( m_lambda * T1 - m_mu) * invFt;
+      const auto PK1 = m_mu * F + (m_lambda * T1 - m_mu) * invFt;
 
-      const auto A = m_mu * (I4 + invFt_invF) + m_lambda *( T2 * invFt_invFt - T1 * invFt_invF);
+      const auto A = m_mu * (I4 + invFt_invF) + m_lambda * (T2 * invFt_invFt - T1 * invFt_invF);
 
       return std::make_pair(PK1, A);
    }
-
 };
+}

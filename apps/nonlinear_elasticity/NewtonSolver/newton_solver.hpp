@@ -31,6 +31,7 @@
 #include "../Informations.hpp"
 #include "../Parameters.hpp"
 #include "hho/hho_bq.hpp"
+#include "mechanics/BoundaryConditions.hpp"
 #include "newton_step.hpp"
 
 #include "timecounter.h"
@@ -38,17 +39,24 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
+namespace NLE {
+
 template<typename BQData>
-class NewtonRaphson_solver_leraylions
+class NewtonRaphson_solver_nlelasticity
 {
    typedef typename BQData::mesh_type      mesh_type;
    typedef typename mesh_type::scalar_type scalar_type;
    typedef ParamRun<scalar_type>           param_type;
+   typedef MaterialParameters<scalar_type> data_type;
 
    typedef dynamic_matrix<scalar_type> matrix_dynamic;
    typedef dynamic_vector<scalar_type> vector_dynamic;
 
-   const BQData& m_bqd;
+   typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
+
+   const BQData&    m_bqd;
+   const Bnd_type&  m_bnd;
+   const data_type& m_data;
 
    const mesh_type&  m_msh;
    const param_type& m_rp;
@@ -60,8 +68,14 @@ class NewtonRaphson_solver_leraylions
    bool m_convergence;
 
  public:
-   NewtonRaphson_solver_leraylions(const mesh_type& msh, const BQData& bqd, const param_type& rp) :
-     m_msh(msh), m_verbose(rp.m_verbose), m_convergence(false), m_rp(rp), m_bqd(bqd)
+   NewtonRaphson_solver_nlelasticity(const mesh_type&  msh,
+                                     const BQData&     bqd,
+                                     const Bnd_type&   bnd,
+                                     const param_type& rp,
+                                     const data_type&  material_data) :
+     m_msh(msh),
+     m_verbose(rp.m_verbose), m_convergence(false), m_rp(rp), m_bqd(bqd), m_bnd(bnd),
+     m_data(material_data)
    {}
 
    bool
@@ -93,18 +107,16 @@ class NewtonRaphson_solver_leraylions
       assert(m_msh.cells_size() == m_solution_data.size());
    }
 
-   template<typename LoadIncrement, typename BoundaryConditionFunction>
+   template<typename LoadIncrement>
    NewtonSolverInfo
-   compute(const LoadIncrement&               lf,
-           const BoundaryConditionFunction&   bf,
-           const std::vector<matrix_dynamic>& gradient_precomputed)
+   compute(const LoadIncrement& lf, const std::vector<matrix_dynamic>& gradient_precomputed)
    {
       NewtonSolverInfo ni;
       timecounter      tc;
       tc.tic();
 
       // initialise the NewtonRaphson_step
-      NewtonRaphson_step_leraylions<BQData> newton_step(m_msh, m_bqd, m_rp);
+      NewtonRaphson_step_nlelasticity<BQData> newton_step(m_msh, m_bqd, m_bnd, m_rp, m_data);
 
       newton_step.initialize(m_solution_cells, m_solution_faces, m_solution_data);
 
@@ -115,7 +127,7 @@ class NewtonRaphson_solver_leraylions
          // assemble lhs and rhs
          AssemblyInfo assembly_info;
          try {
-            assembly_info = newton_step.assemble(lf, bf, gradient_precomputed);
+            assembly_info = newton_step.assemble(lf, gradient_precomputed);
          } catch (const std::invalid_argument& ia) {
             std::cerr << "Invalid argument: " << ia.what() << std::endl;
             m_convergence = false;
@@ -133,7 +145,7 @@ class NewtonRaphson_solver_leraylions
          SolveInfo solve_info = newton_step.solve();
          ni.updateSolveInfo(solve_info);
          // update unknowns
-         ni.m_assembly_info.m_time_postpro += newton_step.postprocess(bf);
+         ni.m_assembly_info.m_time_postpro += newton_step.postprocess();
 
          ni.m_iter++;
       }
@@ -170,3 +182,5 @@ class NewtonRaphson_solver_leraylions
       assert(m_solution_data.size() == solution.size());
    }
 };
+
+} // end NLE

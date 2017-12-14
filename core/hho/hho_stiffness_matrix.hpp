@@ -147,7 +147,8 @@ struct stiffness_matrix_cell_F<
         const size_t&    min_degree,
         const size_t&    max_degree)
    {
-      const auto cell_basis_size = bqd.cell_basis.range(min_degree, max_degree).size();
+      const size_t dimension       = mesh_type::dimension;
+      const auto   cell_basis_size = bqd.cell_basis.range(min_degree, max_degree).size();
 
       matrix_type stiffness = matrix_type::Zero(cell_basis_size, cell_basis_size);
 
@@ -161,7 +162,7 @@ struct stiffness_matrix_cell_F<
 
          for (size_t j = 0; j < cell_basis_size; j++) {
             const auto qp_dcphi_j = mm_prod(qp.weight(), dcphi[j]);
-            for (size_t i = j; i < cell_basis_size; i++) {
+            for (size_t i = j; i < cell_basis_size; i += dimension) {
                stiffness(i, j) += mm_prod(dcphi[i], qp_dcphi_j);
             }
          }

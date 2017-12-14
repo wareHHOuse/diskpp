@@ -25,6 +25,12 @@
 #include <tuple>
 #include <vector>
 
+#include "bases/bases_utils.hpp"
+#include "mesh/point.hpp"
+
+namespace disk {
+namespace mechanics {
+
 enum DirichletType : size_t
 {
    DIRICHLET = 0,
@@ -35,7 +41,7 @@ enum DirichletType : size_t
    DXDY      = 5,
    DXDZ      = 6,
    DYDZ      = 7,
-   OTHER     = 8
+   NOTHING   = 8
 };
 
 enum NeumannType : size_t
@@ -44,32 +50,38 @@ enum NeumannType : size_t
    FREE    = 10,
 };
 
-template<typename MeshType, typename Function>
+template<typename MeshType>
 class BoundaryConditions
 {
  public:
-   typedef MeshType mesh_type;
-   typedef Function function_type;
+   typedef MeshType                                         mesh_type;
+   typedef typename mesh_type::scalar_type                  scalar_type;
+   typedef static_vector<scalar_type, mesh_type::dimension> function_type;
+   typedef point<scalar_type, mesh_type::dimension>         point_type;
 
  private:
    const mesh_type& m_msh;
 
-   std::vector<Function> m_dirichlet_func;
-   std::vector<Function> m_neumann_func;
+   std::vector<std::function<function_type(point_type)>> m_dirichlet_func;
+   std::vector<std::function<function_type(point_type)>> m_neumann_func;
 
    std::vector<std::tuple<bool, size_t, size_t, size_t>> m_faces_is_dirichlet, m_faces_is_neumann;
 
    size_t m_dirichlet_faces, m_neumann_faces;
 
+   scalar_type m_factor;
+
  public:
    BoundaryConditions() = delete;
 
-   BoundaryConditions(const mesh_type& msh) : m_msh(msh), m_dirichlet_faces(0), m_neumann_faces(0)
+   BoundaryConditions(const mesh_type& msh) :
+     m_msh(msh), m_dirichlet_faces(0), m_neumann_faces(0), m_factor(1)
    {
-      m_faces_is_dirichlet.assign(m_msh.faces_size(), std::make_tuple(false, OTHER, 0, 0));
+      m_faces_is_dirichlet.assign(m_msh.faces_size(), std::make_tuple(false, NOTHING, 0, 0));
       m_faces_is_neumann.assign(m_msh.faces_size(), std::make_tuple(false, FREE, 0, 0));
    }
 
+   template<typename Function>
    void
    addDirichletEverywhere(const Function& bcf)
    {
@@ -89,6 +101,7 @@ class BoundaryConditions
       }
    }
 
+   template<typename Function>
    void
    addDirichletBC(const size_t& btype, const size_t& b_id, const Function& bcf)
    {
@@ -110,6 +123,7 @@ class BoundaryConditions
       }
    }
 
+   template<typename Function>
    void
    addNeumannBC(const size_t& btype, const size_t& b_id, const Function& bcf)
    {
@@ -129,6 +143,12 @@ class BoundaryConditions
             m_neumann_faces++;
          }
       }
+   }
+
+   void
+   multiplyAllFunctionsOfAFactor(const scalar_type& factor)
+   {
+      m_factor = factor;
    }
 
    size_t
@@ -183,16 +203,42 @@ class BoundaryConditions
       return std::get<2>(m_faces_is_neumann.at(face_i));
    }
 
-   Function
+   auto
    dirichlet_boundary_func(const size_t face_i) const
    {
-      return m_dirichlet_func.at(std::get<3>(m_faces_is_dirichlet.at(face_i)));
+      if (!is_dirichlet_face(face_i)) {
+         throw std::logic_error(
+           "You want the Dirichlet function of face which is not a Dirichlet face");
+      }
+
+      const auto        func   = m_dirichlet_func.at(std::get<3>(m_faces_is_dirichlet.at(face_i)));
+      const scalar_type factor = m_factor;
+
+      auto rfunc = [ func, factor ](const point_type& p) -> auto
+      {
+         return disk::mm_prod(factor, func(p));
+      };
+
+      return rfunc;
    }
 
-   Function
+   auto
    neumann_boundary_func(const size_t face_i) const
    {
-      return m_neumann_func.at(std::get<3>(m_faces_is_neumann.at(face_i)));
+      if (!is_neumann_face(face_i)) {
+         throw std::logic_error(
+           "You want the Neumann function of face which is not a Neumann face");
+      }
+
+      const auto        func   = m_neumann_func.at(std::get<3>(m_faces_is_neumann.at(face_i)));
+      const scalar_type factor = m_factor;
+
+      auto rfunc = [ func, factor ](const point_type& p) -> auto
+      {
+         return disk::mm_prod(factor, func(p));
+      };
+
+      return rfunc;
    }
 
    void
@@ -251,8 +297,12 @@ class BoundaryConditions
                return 2 * num_dim_dofs;
                break;
             }
+            case NOTHING: {
+               return 0;
+               break;
+            }
             default: {
-               if (dimension == 3) throw std::logic_error("Unknown Boundary condition");
+               throw std::logic_error("Unknown Boundary condition");
                break;
             }
          }
@@ -261,3 +311,6 @@ class BoundaryConditions
       return 0;
    }
 };
+
+} // end mechanics
+} // end disk

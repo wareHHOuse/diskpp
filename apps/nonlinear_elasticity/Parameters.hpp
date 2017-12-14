@@ -44,8 +44,6 @@ class ParamRun
    size_t m_cell_degree; // cell_degree
    size_t m_grad_degree; // grad degree
 
-   size_t m_leray_param; // leray_paramater (p)
-
    std::vector<std::pair<T, size_t>> m_time_step; // number of time time_step
    size_t                            m_sublevel;  // number of sublevel if there are problems
    size_t                            m_iter_max;  // maximun nexton iteration
@@ -64,9 +62,9 @@ class ParamRun
    std::list<T> m_time_save;   // list of time where we save result;
 
    ParamRun() :
-     m_face_degree(1), m_cell_degree(1), m_grad_degree(1), m_leray_param(2), m_sublevel(1),
-     m_iter_max(20), m_epsilon(T(1E-6)), m_verbose(false), m_precomputation(false), m_stab(true),
-     m_beta(1), m_stab_type(HHO), m_n_time_save(0), m_pred(false)
+     m_face_degree(1), m_cell_degree(1), m_grad_degree(1), m_sublevel(1), m_iter_max(20),
+     m_epsilon(T(1E-6)), m_verbose(false), m_precomputation(false), m_stab(true), m_beta(1),
+     m_stab_type(HHO), m_n_time_save(0), m_pred(false)
    {
       m_time_step.push_back(std::make_pair(1.0, 10));
    }
@@ -78,8 +76,6 @@ class ParamRun
       std::cout << " - Face degree: " << m_face_degree << std::endl;
       std::cout << " - Cell degree: " << m_cell_degree << std::endl;
       std::cout << " - Grad degree: " << m_grad_degree << std::endl;
-      std::cout << " - LerayParam: " << m_leray_param << std::endl;
-      std::cout << " - Prediction (LerayParam =2): " << m_pred << std::endl;
       std::cout << " - Stabilization ?: " << m_stab << std::endl;
       std::cout << " - Type: " << m_stab_type << std::endl;
       std::cout << " - Beta: " << m_beta << std::endl;
@@ -120,9 +116,6 @@ class ParamRun
             line++;
          } else if (keyword == "GradDegree") {
             ifs >> m_grad_degree;
-            line++;
-         } else if (keyword == "LerayParam") {
-            ifs >> m_leray_param;
             line++;
          } else if (keyword == "Prediction") {
             std::string logical;

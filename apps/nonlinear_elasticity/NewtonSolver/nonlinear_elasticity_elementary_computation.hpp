@@ -26,15 +26,23 @@
 
 #include "bases/bases_utils.hpp"
 #include "behaviors/laws/behaviorlaws.hpp"
+#include "behaviors/maths_tensor.hpp"
 #include "common/eigen.hpp"
 #include "hho/hho_bq.hpp"
 #include "hho/hho_utils.hpp"
 #include "timecounter.h"
 
-namespace LerayLions {
+namespace NLE {
+
+template<typename T>
+struct MaterialParameters
+{
+   T lambda;
+   T mu;
+};
 
 template<typename BQData>
-class LerayLions
+class nonlinear_elasticity
 {
    typedef typename BQData::mesh_type      mesh_type;
    typedef typename mesh_type::scalar_type scalar_type;
@@ -45,23 +53,25 @@ class LerayLions
    typedef dynamic_matrix<scalar_type> matrix_type;
    typedef dynamic_vector<scalar_type> vector_type;
 
-   const BQData& m_bqd;
+   const BQData&                          m_bqd;
+   const MaterialParameters<scalar_type>& m_data;
 
  public:
    matrix_type K_int;
    vector_type RTF;
    double      time_law;
 
-   LerayLions(const BQData& bqd) : m_bqd(bqd) {}
+   nonlinear_elasticity(const BQData& bqd, const MaterialParameters<scalar_type>& material_data) :
+     m_bqd(bqd), m_data(material_data)
+   {}
 
    template<typename Function>
    void
    compute(const mesh_type&   msh,
            const cell_type&   cl,
            const Function&    load,
-           const matrix_type& GT,
-           const vector_type& uTF,
-           const scalar_type  leray_param)
+           const matrix_type& GsT,
+           const vector_type& uTF)
    {
       const size_t DIM         = msh.dimension;
       const size_t cell_degree = m_bqd.cell_degree();
@@ -83,12 +93,12 @@ class LerayLions
 
       RTF = vector_type::Zero(num_total_dofs);
 
-      assert(GT.cols() == uTF.rows());
-      assert(GT.rows() == grad_basis_size);
+      assert(GsT.cols() == uTF.rows());
+      assert(GsT.rows() == grad_basis_size);
 
-      const vector_type GT_uTF = GT * uTF;
+      const vector_type GsT_uTF = GsT * uTF;
 
-      disk::pLaplaceLaw<scalar_type> law(leray_param);
+      disk::LinearElasticityLaw<scalar_type> law(m_data.lambda, m_data.mu);
 
       const auto grad_quadpoints = m_bqd.grad_quadrature.integrate(msh, cl);
       assert(2 * grad_degree <= m_bqd.grad_quadrature.order());
@@ -100,16 +110,16 @@ class LerayLions
          assert(c_phi.size() == cell_basis_size && gphi.size() == grad_basis_size);
 
          // Compute local gradient and norm
-         const auto GT_iqn = disk::hho::eval(GT_uTF, gphi);
+         const auto GsT_iqn = disk::hho::eval(GsT_uTF, gphi);
 
          // Compute bahavior
          tc.tic();
-         const auto tensor_behavior = law.compute_whole(GT_iqn);
+         const auto tensor_behavior = law.compute_whole(GsT_iqn);
          tc.toc();
          time_law += tc.to_double();
 
          for (size_t j = 0; j < grad_basis_size; j++) {
-            const gvt Agphi_j = qp.weight() * disk::mm_prod(tensor_behavior.second, gphi[j]);
+            const gvt Agphi_j = qp.weight() * disk::tm_prod(tensor_behavior.second, gphi[j]);
             for (size_t i = j; i < grad_basis_size; i++) {
                // compute (Gkt v, A(u) : Gkt du)
                AT(i, j) += disk::mm_prod(gphi[i], Agphi_j);
@@ -130,8 +140,8 @@ class LerayLions
          for (size_t i = 0; i <= j; i++)
             AT(i, j) = AT(j, i);
 
-      K_int = GT.transpose() * AT * GT;
-      RTF -= GT.transpose() * aT;
+      K_int = GsT.transpose() * AT * GsT;
+      RTF -= GsT.transpose() * aT;
 
       assert(K_int.rows() == num_total_dofs);
       assert(K_int.cols() == num_total_dofs);
@@ -139,4 +149,4 @@ class LerayLions
    }
 };
 
-} // end namespace LerayLions
+} // end namespace NLE

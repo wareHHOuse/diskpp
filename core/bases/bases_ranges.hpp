@@ -33,29 +33,45 @@ class dof_range
    size_t m_min, m_max;
 
  public:
-   dof_range()
-     : m_min(0)
-     , m_max(0)
-   {}
+   dof_range() : m_min(0), m_max(0) {}
 
-   dof_range(size_t min, size_t max)
-     : m_min(min)
-     , m_max(max)
+   dof_range(size_t min, size_t max) : m_min(min), m_max(max) { assert(m_min <= m_max); }
+
+   size_t
+   from() const
    {
-      assert(m_min <= m_max);
+      return m_min;
    }
 
-   size_t from() const { return m_min; }
+   size_t
+   min() const
+   {
+      return m_min;
+   }
 
-   size_t min() const { return m_min; }
+   size_t
+   to() const
+   {
+      return m_max;
+   }
 
-   size_t to() const { return m_max; }
+   size_t
+   max() const
+   {
+      return m_max;
+   }
 
-   size_t max() const { return m_max; }
+   size_t
+   size() const
+   {
+      return m_max - m_min;
+   }
 
-   size_t size() const { return m_max - m_min; }
-
-   dof_range remove_offset() const { return dof_range(0, m_max - m_min); }
+   dof_range
+   remove_offset() const
+   {
+      return dof_range(0, m_max - m_min);
+   }
 
    bool operator<(const dof_range& other) // tell if this range is contained in other
    {
@@ -77,9 +93,7 @@ class dofspace_ranges
    size_t    m_num_faces;
 
  public:
-   dofspace_ranges()
-     : m_num_faces(0)
-   {}
+   dofspace_ranges() : m_num_faces(0) {}
 
    dofspace_ranges(size_t num_cell_dofs, size_t num_face_dofs, size_t num_faces)
    {
@@ -88,20 +102,14 @@ class dofspace_ranges
       m_num_faces  = num_faces;
    }
 
-   template<typename LocalData>
-   dofspace_ranges(const LocalData& ld)
+   dof_range
+   cell_range(void) const
    {
-      auto msh = ld.get_mesh();
-      auto cl  = ld.get_cell();
-
-      m_num_faces  = number_of_faces(msh, cl);
-      m_cell_range = dof_range(0, ld.num_cell_dofs());
-      m_face_range = dof_range(0, ld.num_face_dofs());
+      return m_cell_range;
    }
 
-   dof_range cell_range(void) const { return m_cell_range; }
-
-   dof_range face_range(size_t face) const
+   dof_range
+   face_range(size_t face) const
    {
       assert(face < m_num_faces);
       size_t face_offset     = m_cell_range.size();
@@ -110,16 +118,25 @@ class dofspace_ranges
                        face_offset + (face + 1) * face_range_size);
    }
 
-   dof_range all_faces_range(void) const
+   dof_range
+   all_faces_range(void) const
    {
       size_t face_start = m_cell_range.size();
       size_t face_end   = m_cell_range.size() + m_num_faces * m_face_range.size();
       return dof_range(face_start, face_end);
    }
 
-   size_t total_size(void) const { return m_cell_range.size() + m_num_faces * m_face_range.size(); }
+   size_t
+   total_size(void) const
+   {
+      return m_cell_range.size() + m_num_faces * m_face_range.size();
+   }
 
-   size_t num_faces(void) const { return m_num_faces; }
+   size_t
+   num_faces(void) const
+   {
+      return m_num_faces;
+   }
 };
 
 std::ostream&

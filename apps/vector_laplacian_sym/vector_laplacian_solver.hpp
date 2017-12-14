@@ -327,7 +327,8 @@ class vector_laplacian_solver
 
          const dynamic_vector<scalar_type> true_dof =
            projk.projectOnSymStiffnessSpace(m_msh, cl, grad);
-         const dynamic_vector<scalar_type> comp_dof = RTu.block(0, 0, true_dof.size(), 1);
+         const dynamic_vector<scalar_type> comp_dof = RTu;
+         assert(true_dof.size() == comp_dof.size());
          const dynamic_vector<scalar_type> diff_dof = (true_dof - comp_dof);
          err_dof += diff_dof.dot(projk.grad_mm * diff_dof);
       }

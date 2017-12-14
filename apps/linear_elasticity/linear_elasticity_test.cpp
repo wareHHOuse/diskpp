@@ -44,6 +44,7 @@ struct error_type
    double h;
    double error_depl;
    double error_grad;
+   double error_stress;
 };
 
 struct run_params
@@ -70,32 +71,106 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>& msh,
                              const run_params&          rp,
                              const ElasticityParameters material_data)
 {
-   typedef Mesh<T, 2, Storage> mesh_type;
-   typedef static_vector<T, 2> result_type;
+   typedef Mesh<T, 2, Storage>                            mesh_type;
+   typedef static_vector<T, 2>                            result_type;
+   typedef static_matrix<T, 2, 2>                         grad_type;
+   typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
 
    timecounter tc;
    tc.tic();
 
    auto load = [material_data](const point<T, 2>& p) -> result_type {
-      T fx = 2. * material_data.mu * M_PI * M_PI * sin(M_PI * p.x()) * sin(M_PI * p.y());
-      T fy = 2. * material_data.mu * M_PI * M_PI * cos(M_PI * p.x()) * cos(M_PI * p.y());
+      const T lambda = material_data.lambda;
+      const T mu     = material_data.mu;
 
-      return result_type{fx, fy};
+      T fx = lambda * cos(M_PI * (p.x() + p.y())) -
+             2.0 * mu *
+               ((4 * lambda + 4) * sin(2 * M_PI * p.y()) * cos(2 * M_PI * p.x()) +
+                sin(M_PI * p.x()) * sin(M_PI * p.y())) +
+             2.0 * mu *
+               (2.0 * lambda * sin(2 * M_PI * p.y()) + 2.0 * sin(2 * M_PI * p.y()) +
+                0.5 * cos(M_PI * (p.x() + p.y())));
+      T fy = lambda * cos(M_PI * (p.x() + p.y())) +
+             2.0 * mu *
+               ((4 * lambda + 4) * sin(2 * M_PI * p.x()) * cos(2 * M_PI * p.y()) -
+                sin(M_PI * p.x()) * sin(M_PI * p.y())) -
+             2.0 * mu *
+               (2.0 * lambda * sin(2 * M_PI * p.x()) + 2.0 * sin(2 * M_PI * p.x()) -
+                0.5 * cos(M_PI * (p.x() + p.y())));
+
+      return -M_PI * M_PI / (lambda + 1) * result_type{fx, fy};
    };
 
    auto solution = [material_data](const point<T, 2>& p) -> result_type {
-      T fx = sin(M_PI * p.x()) * sin(M_PI * p.y()) + 1.0 / (2.0 * material_data.lambda) * p.x();
-      T fy = cos(M_PI * p.x()) * cos(M_PI * p.y()) + 1.0 / (2.0 * material_data.lambda) * p.y();
+      T fx = sin(2 * M_PI * p.y()) * (cos(2 * M_PI * p.x()) - 1) +
+             1.0 / (1 + material_data.lambda) * sin(M_PI * p.x()) * sin(M_PI * p.y());
+      T fy = -sin(2 * M_PI * p.x()) * (cos(2 * M_PI * p.y()) - 1) +
+             1.0 / (1 + material_data.lambda) * sin(M_PI * p.x()) * sin(M_PI * p.y());
 
       return result_type{fx, fy};
    };
 
-   typedef BoundaryConditions<mesh_type, decltype(solution)> Bnd_type;
-   Bnd_type                                                  bnd(msh);
+   auto grad = [material_data](const point<T, 2>& p) -> grad_type {
 
+      const T lambda = material_data.lambda;
+
+      T g11 = -(2 * (lambda + 1) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) -
+                sin(M_PI * p.y()) * cos(M_PI * p.x()));
+      T g12 = (2 * lambda + 2) * (cos(2 * M_PI * p.x()) - 1) * cos(2 * M_PI * p.y()) +
+              sin(M_PI * p.x()) * cos(M_PI * p.y());
+
+      T g21 = (-2 * lambda + 2) * (cos(2 * M_PI * p.y()) - 1) * cos(2 * M_PI * p.x()) +
+              sin(M_PI * p.y()) * cos(M_PI * p.x());
+
+      T g22 = 2 * (lambda + 1) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) +
+              sin(M_PI * p.x()) * cos(M_PI * p.y());
+
+      grad_type g = grad_type::Zero();
+
+      g(0, 0) = g11;
+      g(0, 1) = g12;
+      g(1, 0) = g21;
+      g(1, 1) = g22;
+
+      return M_PI / (lambda + 1) * g;
+   };
+
+   auto sigma = [material_data](const point<T, 2>& p) -> grad_type {
+
+      const T lambda = material_data.lambda;
+      const T mu     = material_data.mu;
+
+      T g11 = -(2 * (lambda + 1) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) -
+                sin(M_PI * p.y()) * cos(M_PI * p.x()));
+      T g12 = (2 * lambda + 2) * (cos(2 * M_PI * p.x()) - 1) * cos(2 * M_PI * p.y()) +
+              sin(M_PI * p.x()) * cos(M_PI * p.y());
+
+      T g21 = (-2 * lambda + 2) * (cos(2 * M_PI * p.y()) - 1) * cos(2 * M_PI * p.x()) +
+              sin(M_PI * p.y()) * cos(M_PI * p.x());
+
+      T g22 = 2 * (lambda + 1) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) +
+              sin(M_PI * p.x()) * cos(M_PI * p.y());
+
+      grad_type g = grad_type::Zero();
+
+      g(0, 0) = g11;
+      g(0, 1) = g12;
+      g(1, 0) = g21;
+      g(1, 1) = g22;
+
+      g *= M_PI / (lambda + 1);
+
+      const grad_type gs = 0.5 * (g + g.transpose());
+
+      const T divu = gs.trace();
+
+      return 2 * mu * gs + lambda * divu * static_matrix<T, 2, 2>::Identity();
+   };
+
+   Bnd_type bnd(msh);
    bnd.addDirichletEverywhere(solution);
 
-   linear_elasticity_solver<mesh_type, Bnd_type> le(msh, bnd, material_data, rp.degree);
+   linear_elasticity_solver<mesh_type> le(msh, bnd, material_data, rp.degree);
    le.verbose(rp.verbose);
 
    le.changeElasticityParameters(material_data);
@@ -107,11 +182,12 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>& msh,
    postprocess_info post_info = le.postprocess(load);
 
    error_type error;
-   error.h          = average_diameter(msh);
-   error.degree     = rp.degree;
-   error.nb_dof     = le.getDofs();
-   error.error_depl = le.compute_l2_error(solution);
-   error.error_grad = 1; // le.compute_l2_gradient_error(gradient);
+   error.h            = average_diameter(msh);
+   error.degree       = rp.degree;
+   error.nb_dof       = le.getDofs();
+   error.error_depl   = le.compute_l2_displacement_error(solution);
+   error.error_grad   = le.compute_l2_gradient_error(grad);
+   error.error_stress = le.compute_l2_stress_error(sigma);
 
    return error;
 }
@@ -122,61 +198,106 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>&  msh,
                              const run_params&           rp,
                              const ElasticityParameters& material_data)
 {
-   typedef Mesh<T, 3, Storage> mesh_type;
-   typedef static_vector<T, 3> result_type;
+   typedef Mesh<T, 3, Storage>                            mesh_type;
+   typedef static_vector<T, 3>                            result_type;
+   typedef static_matrix<T, 3, 3>                         grad_type;
+   typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
 
    timecounter tc;
    tc.tic();
 
-   auto load = [material_data](const point<T, 3>& p) -> auto
-   {
-      const T mu     = material_data.mu;
+   auto load = [material_data](const point<T, 3>& p) -> result_type {
       const T lambda = material_data.lambda;
+      const T mu     = material_data.mu;
 
-      T fx =
-        M_PI * M_PI *
-        (12 * lambda * cos(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) * sin(2 * M_PI * p.z()) +
-         8 * (3 * cos(2 * M_PI * p.x()) - 1) * sin(2 * M_PI * p.y()) * sin(2 * M_PI * p.z()) -
-         cos(M_PI * p.x()) * sin(M_PI * (p.y() + p.z())) +
-         (1 + 3. / (1.0 + lambda)) * sin(M_PI * p.x()) * sin(M_PI * p.y()) * sin(M_PI * p.z()));
+      T fx = lambda * cos(M_PI * (p.x() + p.y())) -
+             2.0 * mu *
+               ((4 * lambda + 4) * sin(2 * M_PI * p.y()) * cos(2 * M_PI * p.x()) +
+                sin(M_PI * p.x()) * sin(M_PI * p.y())) +
+             2.0 * mu *
+               (2.0 * lambda * sin(2 * M_PI * p.y()) + 2.0 * sin(2 * M_PI * p.y()) +
+                0.5 * cos(M_PI * (p.x() + p.y())));
+      T fy = lambda * cos(M_PI * (p.x() + p.y())) +
+             2.0 * mu *
+               ((4 * lambda + 4) * sin(2 * M_PI * p.x()) * cos(2 * M_PI * p.y()) -
+                sin(M_PI * p.x()) * sin(M_PI * p.y())) -
+             2.0 * mu *
+               (2.0 * lambda * sin(2 * M_PI * p.x()) + 2.0 * sin(2 * M_PI * p.x()) -
+                0.5 * cos(M_PI * (p.x() + p.y())));
 
-      T fy =
-        M_PI * M_PI *
-        (12 * lambda * cos(2 * M_PI * p.y()) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.z()) +
-         8 * (3 * cos(2 * M_PI * p.y()) - 1) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.z()) -
-         cos(M_PI * p.y()) * sin(M_PI * (p.x() + p.z())) +
-         (1 + 3. / (1.0 + lambda)) * sin(M_PI * p.x()) * sin(M_PI * p.y()) * sin(M_PI * p.z()));
-
-      T fz =
-        M_PI * M_PI *
-        (12 * lambda * cos(2 * M_PI * p.z()) * sin(2 * M_PI * p.y()) * sin(2 * M_PI * p.x()) +
-         8 * (3 * cos(2 * M_PI * p.z()) - 1) * sin(2 * M_PI * p.y()) * sin(2 * M_PI * p.x()) -
-         cos(M_PI * p.z()) * sin(M_PI * (p.y() + p.x())) +
-         (1 + 3. / (1.0 + lambda)) * sin(M_PI * p.x()) * sin(M_PI * p.y()) * sin(M_PI * p.z()));
-
-      return result_type{fx, fy, fz};
+      return -M_PI * M_PI / (lambda + 1) * result_type{fx, fy, 0};
    };
 
-   auto solution = [material_data](const point<T, 3>& p) -> auto
-   {
-      const T mu     = material_data.mu;
-      const T lambda = material_data.lambda;
+   auto solution = [material_data](const point<T, 3>& p) -> result_type {
+      T fx = sin(2 * M_PI * p.y()) * (cos(2 * M_PI * p.x()) - 1) +
+             1.0 / (1 + material_data.lambda) * sin(M_PI * p.x()) * sin(M_PI * p.y());
+      T fy = -sin(2 * M_PI * p.x()) * (cos(2 * M_PI * p.y()) - 1) +
+             1.0 / (1 + material_data.lambda) * sin(M_PI * p.x()) * sin(M_PI * p.y());
 
-      T fx = sin(2 * M_PI * p.y()) * sin(2 * M_PI * p.z()) * (-1 + cos(2 * M_PI * p.x())) +
-             (1. / (1 + lambda)) * sin(M_PI * p.x()) * sin(M_PI * p.y()) * sin(M_PI * p.z());
-      T fy = sin(2 * M_PI * p.z()) * sin(2 * M_PI * p.x()) * (-1 + cos(2 * M_PI * p.y())) +
-             (1. / (1 + lambda)) * sin(M_PI * p.x()) * sin(M_PI * p.y()) * sin(M_PI * p.z());
-      T fz = sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) * (-1 + cos(2 * M_PI * p.z())) +
-             (1. / (1 + lambda)) * sin(M_PI * p.x()) * sin(M_PI * p.y()) * sin(M_PI * p.z());
-      return result_type{fx, fy, fz};
+      return result_type{fx, fy, 0};
    };
 
-   typedef BoundaryConditions<mesh_type, decltype(solution)> Bnd_type;
-   Bnd_type                                                  bnd(msh);
+   auto grad = [material_data](const point<T, 3>& p) -> grad_type {
 
+      const T lambda = material_data.lambda;
+
+      T g11 = -(2 * (lambda + 1) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) -
+                sin(M_PI * p.y()) * cos(M_PI * p.x()));
+      T g12 = (2 * lambda + 2) * (cos(2 * M_PI * p.x()) - 1) * cos(2 * M_PI * p.y()) +
+              sin(M_PI * p.x()) * cos(M_PI * p.y());
+
+      T g21 = (-2 * lambda + 2) * (cos(2 * M_PI * p.y()) - 1) * cos(2 * M_PI * p.x()) +
+              sin(M_PI * p.y()) * cos(M_PI * p.x());
+
+      T g22 = 2 * (lambda + 1) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) +
+              sin(M_PI * p.x()) * cos(M_PI * p.y());
+
+      grad_type g = grad_type::Zero();
+
+      g(0, 0) = g11;
+      g(0, 1) = g12;
+      g(1, 0) = g21;
+      g(1, 1) = g22;
+
+      return M_PI / (lambda + 1) * g;
+   };
+
+   auto sigma = [material_data](const point<T, 3>& p) -> grad_type {
+
+      const T lambda = material_data.lambda;
+      const T mu     = material_data.mu;
+
+      T g11 = -(2 * (lambda + 1) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) -
+                sin(M_PI * p.y()) * cos(M_PI * p.x()));
+      T g12 = (2 * lambda + 2) * (cos(2 * M_PI * p.x()) - 1) * cos(2 * M_PI * p.y()) +
+              sin(M_PI * p.x()) * cos(M_PI * p.y());
+
+      T g21 = (-2 * lambda + 2) * (cos(2 * M_PI * p.y()) - 1) * cos(2 * M_PI * p.x()) +
+              sin(M_PI * p.y()) * cos(M_PI * p.x());
+
+      T g22 = 2 * (lambda + 1) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) +
+              sin(M_PI * p.x()) * cos(M_PI * p.y());
+
+      grad_type g = grad_type::Zero();
+
+      g(0, 0) = g11;
+      g(0, 1) = g12;
+      g(1, 0) = g21;
+      g(1, 1) = g22;
+
+      g *= M_PI / (lambda + 1);
+
+      const grad_type gs = 0.5 * (g + g.transpose());
+
+      const T divu = gs.trace();
+
+      return 2 * mu * gs + lambda * divu * static_matrix<T, 3, 3>::Identity();
+   };
+
+   Bnd_type bnd(msh);
    bnd.addDirichletEverywhere(solution);
 
-   linear_elasticity_solver<mesh_type, Bnd_type> le(msh, bnd, material_data, rp.degree);
+   linear_elasticity_solver<mesh_type> le(msh, bnd, material_data, rp.degree);
    le.verbose(rp.verbose);
 
    le.changeElasticityParameters(material_data);
@@ -188,11 +309,12 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>&  msh,
    postprocess_info post_info = le.postprocess(load);
 
    error_type error;
-   error.h          = average_diameter(msh);
-   error.degree     = rp.degree;
-   error.nb_dof     = le.getDofs();
-   error.error_depl = le.compute_l2_error(solution);
-   error.error_grad = 0; // vl.compute_l2_gradient_error(gradient);
+   error.h            = average_diameter(msh);
+   error.degree       = rp.degree;
+   error.nb_dof       = le.getDofs();
+   error.error_depl   = le.compute_l2_displacement_error(solution);
+   error.error_grad   = le.compute_l2_gradient_error(grad);
+   error.error_stress = le.compute_l2_stress_error(sigma);
 
    return error;
 }
@@ -206,18 +328,18 @@ printResults(const std::vector<error_type>& error)
       std::cout.setf(std::iostream::scientific, std::iostream::floatfield);
 
       std::cout << "Convergence test for k = " << error[0].degree << std::endl;
-      std::cout
-        << "-----------------------------------------------------------------------------------"
-        << std::endl;
-      std::cout
-        << "| Size mesh  | Displacement | Convergence |  Gradient  | Convergence |    Total   |"
-        << std::endl;
-      std::cout
-        << "|    h       |   L2 error   |     rate    |  L2 error  |     rate    | faces DOF  |"
-        << std::endl;
-      std::cout
-        << "-----------------------------------------------------------------------------------"
-        << std::endl;
+      std::cout << "-------------------------------------------------------------------------------"
+                   "-------------------------------"
+                << std::endl;
+      std::cout << "| Size mesh  | Displacement | Convergence |  Gradient  | Convergence |  "
+                   "Stress    | Convergence |    Total   |"
+                << std::endl;
+      std::cout << "|    h       |   L2 error   |     rate    |  L2 error  |     rate    |  L2 "
+                   "error  |     rate    | faces DOF  |"
+                << std::endl;
+      std::cout << "-------------------------------------------------------------------------------"
+                   "-------------------------------"
+                << std::endl;
 
       std::string s_dof = " " + std::to_string(error[0].nb_dof) + "                  ";
       s_dof.resize(10);
@@ -225,6 +347,8 @@ printResults(const std::vector<error_type>& error)
       std::cout << "| " << error[0].h << " |  " << error[0].error_depl << "  | "
                 << "     -     "
                 << " | " << error[0].error_grad << " | "
+                << "     -     "
+                << " | " << error[0].error_stress << " | "
                 << "     -     "
                 << " | " << s_dof << " |" << std::endl;
 
@@ -235,15 +359,18 @@ printResults(const std::vector<error_type>& error)
                             (log10(error[i - 1].h) - log10(error[i].h));
          double rate_grad = (log10(error[i - 1].error_grad) - log10(error[i].error_grad)) /
                             (log10(error[i - 1].h) - log10(error[i].h));
+         double rate_stress = (log10(error[i - 1].error_stress) - log10(error[i].error_stress)) /
+                              (log10(error[i - 1].h) - log10(error[i].h));
 
          std::cout << "| " << error[i].h << " |  " << error[i].error_depl << "  |  " << rate_depl
-                   << " | " << error[i].error_grad << " |  " << rate_grad << " | " << s_dof << " |"
+                   << " | " << error[i].error_grad << " |  " << rate_grad << " | "
+                   << error[i].error_stress << " |  " << rate_stress << " | " << s_dof << " |"
                    << std::endl;
       }
 
-      std::cout
-        << "-----------------------------------------------------------------------------------"
-        << std::endl;
+      std::cout << "-------------------------------------------------------------------------------"
+                   "-------------------------------"
+                << std::endl;
       std::cout << "  " << std::endl;
       std::cout.flags(f);
    } else
@@ -509,7 +636,7 @@ main(int argc, char** argv)
    ElasticityParameters material_data;
 
    material_data.mu     = 1.0;
-   material_data.lambda = 1.0;
+   material_data.lambda = 10E5;
 
    int ch;
 
@@ -559,7 +686,7 @@ main(int argc, char** argv)
    if (dim == 3) {
       tc.tic();
       std::cout << "-Tetrahedras fvca6:" << std::endl;
-      // test_tetrahedra_fvca6<RealType>(rp, material_data);
+      test_tetrahedra_fvca6<RealType>(rp, material_data);
       tc.toc();
       std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
       std::cout << " " << std::endl;

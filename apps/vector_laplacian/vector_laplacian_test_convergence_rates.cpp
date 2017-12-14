@@ -607,7 +607,7 @@ main(int argc, char** argv)
    if (dim == 3) {
       tc.tic();
       std::cout << "-Tetrahedras fvca6:" << std::endl;
-      // test_tetrahedra_fvca6<RealType>(rp, material_data);
+      test_tetrahedra_fvca6<RealType>(rp, material_data);
       tc.toc();
       std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
       std::cout << " " << std::endl;

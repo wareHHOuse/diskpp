@@ -30,25 +30,20 @@
 
 namespace disk {
 
-/* Law for linear elasticity in small deformations
-Input : symetric stain tensor (Gs)
-
-Stress: sigma = 2*mu *Gs + lambda * trace(Gs) * Id
-Tangent Moduli: C = 2*mu * I4 + lambda * prod_Kronecker(Id , Id)
-
-*/
+/* Material: LinearLaw
+ * Stress :  Stress(Gs) = lambda * Gs
+ * Module :  A(Gs) = lambda * I4
+ */
 
 template<typename scalar_type>
-class LinearElasticityLaw
+class LinearLaw
 {
    scalar_type m_lambda;
-   scalar_type m_mu;
 
  public:
-   LinearElasticityLaw() : m_lambda(1.0), m_mu(1.0) {}
+   LinearLaw() : m_lambda(1.0) {}
 
-   LinearElasticityLaw(const scalar_type lambda, const scalar_type mu) : m_lambda(lambda), m_mu(mu)
-   {}
+   LinearLaw(const scalar_type lambda) : m_lambda(lambda) {}
 
    void
    setLambda(const scalar_type lambda)
@@ -62,44 +57,28 @@ class LinearElasticityLaw
       return m_lambda;
    }
 
-   void
-   setMu(const scalar_type mu)
-   {
-      m_mu = mu;
-   }
-
-   scalar_type
-   giveMu() const
-   {
-      return m_mu;
-   }
-
    template<int DIM>
    static_matrix<scalar_type, DIM, DIM>
    compute_stress(const static_matrix<scalar_type, DIM, DIM>& Gs) const
    {
-      const static_matrix<scalar_type, DIM, DIM> Id =
-        static_matrix<scalar_type, DIM, DIM>::Identity();
-
-      return 2 * m_mu * Gs + m_lambda * Gs.trace() * Id;
+      return m_lambda * Gs;
    }
 
    template<int DIM>
    static_tensor<scalar_type, DIM>
-   compute_tangent_moduli() const
+   compute_tangent_moduli(const static_matrix<scalar_type, DIM, DIM>& Gs) const
    {
-      return 2 * m_mu * compute_IdentityTensor<scalar_type, DIM>() +
-             m_lambda * compute_IxI<scalar_type, DIM>();
+      return m_lambda * compute_IdentityTensor<scalar_type, DIM>();
    }
 
    template<int DIM>
    std::pair<static_matrix<scalar_type, DIM, DIM>, static_tensor<scalar_type, DIM>>
    compute_whole(const static_matrix<scalar_type, DIM, DIM>& Gs) const
    {
-      const static_matrix<scalar_type, DIM, DIM> sigma = compute_stress(Gs);
-      const static_tensor<scalar_type, DIM>      C     = compute_tangent_moduli<DIM>();
+      const static_matrix<scalar_type, DIM, DIM> stress = compute_stress(Gs);
+      const static_tensor<scalar_type, DIM>      C      = compute_tangent_moduli(Gs);
 
-      return std::make_pair(sigma, C);
+      return std::make_pair(stress, C);
    }
 };
 }

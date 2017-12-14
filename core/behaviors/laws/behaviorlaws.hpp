@@ -24,10 +24,10 @@
 
 #define _BEHAVIOR_HPP_WAS_INCLUDED_
 
-#include "Laws/NeohookeanLaw.hpp"
-#include "Laws/MoonleyLaw.hpp"
-#include "Laws/CavitationLaw.hpp"
-#include "Laws/pLaplaceLaw.hpp"
-#include "Laws/LinearElasticityLaw.hpp"
+#include "CavitationLaw.hpp"
+#include "LinearElasticityLaw.hpp"
+#include "LinearLaw.hpp"
+#include "NeohookeanLaw.hpp"
+#include "pLaplaceLaw.hpp"
 
 #undef _BEHAVIOR_HPP_WAS_INCLUDED_

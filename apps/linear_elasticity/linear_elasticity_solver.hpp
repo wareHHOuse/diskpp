@@ -63,14 +63,14 @@ struct ElasticityParameters
    double mu;
 };
 
-template<typename Mesh, typename BCType>
+template<typename Mesh>
 class linear_elasticity_solver
 {
-   typedef Mesh                            mesh_type;
-   typedef typename mesh_type::scalar_type scalar_type;
-   typedef typename mesh_type::cell        cell_type;
-   typedef typename mesh_type::face        face_type;
-   typedef BCType                          bnd_type;
+   typedef Mesh                                           mesh_type;
+   typedef typename mesh_type::scalar_type                scalar_type;
+   typedef typename mesh_type::cell                       cell_type;
+   typedef typename mesh_type::face                       face_type;
+   typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
 
    typedef disk::hho::basis_quadrature_data_linear_elasticity<mesh_type,
                                                               disk::scaled_monomial_vector_basis,
@@ -303,7 +303,7 @@ class linear_elasticity_solver
 
    template<typename AnalyticalSolution>
    scalar_type
-   compute_l2_error(const AnalyticalSolution& as)
+   compute_l2_displacement_error(const AnalyticalSolution& as)
    {
       scalar_type err_dof = 0;
 
@@ -341,12 +341,61 @@ class linear_elasticity_solver
 
          const dynamic_vector<scalar_type> true_dof =
            projk.projectOnSymStiffnessSpace(m_msh, cl, grad);
-         const dynamic_vector<scalar_type> comp_dof = RTu.block(0, 0, true_dof.size(), 1);
+         const dynamic_vector<scalar_type> comp_dof = RTu;
+         assert(true_dof.size() == comp_dof.size());
          const dynamic_vector<scalar_type> diff_dof = (true_dof - comp_dof);
          err_dof += diff_dof.dot(projk.grad_mm * diff_dof);
       }
 
       return sqrt(err_dof);
+   }
+
+   template<typename AnalyticalSolution>
+   scalar_type
+   compute_l2_stress_error(const AnalyticalSolution& stress) const
+   {
+      auto sgradrec = sgradrec_type(m_bqd);
+      auto divrec   = divrec_type(m_bqd);
+
+      projector_type projk(m_bqd);
+
+      const auto cell_degree = m_bqd.cell_degree();
+
+      size_t      cell_i(0);
+      scalar_type error_stress(0.0);
+
+      for (auto& cl : m_msh) {
+         const auto x = m_solution_data.at(cell_i++);
+         sgradrec.compute(m_msh, cl);
+
+         const dynamic_vector<scalar_type> GTu = sgradrec.oper * x;
+
+         divrec.compute(m_msh, cl);
+
+         const dynamic_vector<scalar_type> divu = divrec.oper * x;
+
+         const auto cell_quadpoints = m_bqd.cell_quadrature.integrate(m_msh, cl);
+
+         for (auto& qp : cell_quadpoints) {
+            const auto gphi =
+              m_bqd.cell_basis.eval_sgradients(m_msh, cl, qp.point(), 1, cell_degree + 1);
+            const auto GT_iqn = disk::hho::eval(GTu, gphi);
+
+            const auto divphi =
+              m_bqd.div_cell_basis.eval_functions(m_msh, cl, qp.point(), 0, cell_degree);
+            const auto divu_iqn = disk::hho::eval(divu, divphi);
+
+            const auto sigma = 2.0 * m_elas_parameters.mu * GT_iqn +
+                               m_elas_parameters.lambda * divu_iqn *
+                                 static_matrix<scalar_type, dimension, dimension>::Identity();
+
+            const auto stress_diff = (stress(qp.point()) - sigma).eval();
+
+            error_stress += qp.weight() * disk::mm_prod(stress_diff, stress_diff);
+         }
+      }
+
+      return sqrt(error_stress);
    }
 
    void
@@ -355,18 +404,18 @@ class linear_elasticity_solver
       const size_t cell_degree   = m_bqd.cell_degree();
       const size_t num_cell_dofs = (m_bqd.cell_basis.range(0, cell_degree)).size();
 
-      visu::Gmesh gmsh(dimension);
+      gmsh::Gmesh gmsh(dimension);
       auto        storage = m_msh.backend_storage();
 
-      std::vector<visu::Data>          data;    // create data (not used)
-      const std::vector<visu::SubData> subdata; // create subdata to save soution at gauss point
+      std::vector<gmsh::Data>          data;    // create data (not used)
+      const std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
 
       size_t cell_i(0);
       size_t nb_nodes(0);
       for (auto& cl : m_msh) {
          const vector_dynamic    x          = m_solution_data.at(cell_i++);
-         const auto              cell_nodes = visu::cell_nodes(m_msh, cl);
-         std::vector<visu::Node> new_nodes;
+         const auto              cell_nodes = disk::cell_nodes(m_msh, cl);
+         std::vector<gmsh::Node> new_nodes;
 
          // loop on the nodes of the cell
          for (size_t i = 0; i < cell_nodes.size(); i++) {
@@ -380,8 +429,8 @@ class linear_elasticity_solver
             std::array<double, 3>    coor = {double{0.0}, double{0.0}, double{0.0}};
 
             // Add a node
-            visu::init_coor(pt, coor);
-            const visu::Node tmp_node(coor, nb_nodes, 0);
+            disk::init_coor(pt, coor);
+            const gmsh::Node tmp_node(coor, nb_nodes, 0);
             new_nodes.push_back(tmp_node);
             gmsh.addNode(tmp_node);
 
@@ -392,15 +441,15 @@ class linear_elasticity_solver
                }
             }
 
-            const visu::Data datatmp(nb_nodes, depl);
+            const gmsh::Data datatmp(nb_nodes, depl);
             data.push_back(datatmp);
          }
          // Add new element
-         visu::add_element(gmsh, new_nodes);
+         disk::add_element(gmsh, new_nodes);
       }
 
       // Create and init a nodedata view
-      visu::NodeData nodedata(3, 0.0, "depl_node", data, subdata);
+      gmsh::NodeData nodedata(3, 0.0, "depl_node", data, subdata);
 
       // Save the view
       nodedata.saveNodeData(filename, gmsh);

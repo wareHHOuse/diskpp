@@ -17,50 +17,54 @@
 #ifndef GMSHELEMENT_H
 #define GMSHELEMENT_H
 
-#include<vector>
-#include<array>
-#include<string>
+#include <array>
+#include <string>
+#include <vector>
 
-namespace visu{
+namespace gmsh {
 
 class Node
 {
-protected:
-   std::array<double, 3> m_coordinate{ {double{0.0}, double{0.0}, double{0.0}} };
-   size_t m_index;
-   size_t m_ref;
-public:
+ protected:
+   std::array<double, 3> m_coordinate{{double{0.0}, double{0.0}, double{0.0}}};
+   size_t                m_index;
+   size_t                m_ref;
+
+ public:
    Node();
    Node(const std::array<double, 3>& coor, const size_t index, const size_t ref);
-   void print() const;
+   void                  print() const;
    std::array<double, 3> getCoordinate() const;
-   size_t getRef() const;
-   size_t getIndex() const;
-   void changeIndex(const size_t index);
-   void changeRef(const size_t ref);
-   void changeCoordinates(const std::array<double, 3>& coor);
+   size_t                getRef() const;
+   size_t                getIndex() const;
+   void                  changeIndex(const size_t index);
+   void                  changeRef(const size_t ref);
+   void                  changeCoordinates(const std::array<double, 3>& coor);
 };
-
 
 class Element
 {
-protected:
+ protected:
    std::vector<size_t> _nodes;
-   size_t _index;
-   size_t _type_elem;
-   size_t _physical_entities;
-   size_t _elem_tag;
+   size_t              _index;
+   size_t              _type_elem;
+   size_t              _physical_entities;
+   size_t              _elem_tag;
 
-public:
+ public:
    Element();
    Element(const size_t type_elem);
-   Element(const std::vector<size_t>& nodes, const size_t index, const size_t type_elem, const size_t physical_entities, const  size_t elem_tag);
-   size_t getIndex() const;
-   size_t getTypeElem() const;
-   size_t getPhysicalEntities() const;
-   size_t getElemTag() const;
+   Element(const std::vector<size_t>& nodes,
+           const size_t               index,
+           const size_t               type_elem,
+           const size_t               physical_entities,
+           const size_t               elem_tag);
+   size_t              getIndex() const;
+   size_t              getTypeElem() const;
+   size_t              getPhysicalEntities() const;
+   size_t              getElemTag() const;
    std::vector<size_t> getNodes() const;
-   void print() const;
+   void                print() const;
 
    void changeNodes(const std::vector<size_t>& nodes);
    void changeNode(const size_t position, const size_t node);
@@ -72,77 +76,92 @@ public:
 
 class Vertice : public Element
 {
-private:
-
-public:
+ private:
+ public:
    Vertice();
-   Vertice(const size_t node, const size_t index, const size_t physical_entities, const  size_t elem_tag);
+   Vertice(const size_t node,
+           const size_t index,
+           const size_t physical_entities,
+           const size_t elem_tag);
 };
 
 class Edge : public Element
 {
-private:
-
-public:
+ private:
+ public:
    Edge();
-   Edge(const std::vector<size_t>& nodes, const size_t index, const size_t physical_entities, const  size_t elem_tag);
+   Edge(const std::vector<size_t>& nodes,
+        const size_t               index,
+        const size_t               physical_entities,
+        const size_t               elem_tag);
 };
 
 class Triangle : public Element
 {
-private:
-
-public:
+ private:
+ public:
    Triangle();
-   Triangle(const std::vector<size_t>& nodes, const size_t index, const size_t physical_entities, const  size_t elem_tag);
+   Triangle(const std::vector<size_t>& nodes,
+            const size_t               index,
+            const size_t               physical_entities,
+            const size_t               elem_tag);
 };
 
 class Quadrangle : public Element
 {
-private:
-
-public:
+ private:
+ public:
    Quadrangle();
-   Quadrangle(const std::vector<size_t>& nodes, const size_t index, const size_t physical_entities, const  size_t elem_tag);
+   Quadrangle(const std::vector<size_t>& nodes,
+              const size_t               index,
+              const size_t               physical_entities,
+              const size_t               elem_tag);
    size_t getNum();
 };
 
 class Tetrahedron : public Element
 {
-private:
-
-public:
+ private:
+ public:
    Tetrahedron();
-   Tetrahedron(const std::vector<size_t>& nodes, const size_t index, const size_t physical_entities, const  size_t elem_tag);
+   Tetrahedron(const std::vector<size_t>& nodes,
+               const size_t               index,
+               const size_t               physical_entities,
+               const size_t               elem_tag);
 };
 
 class Hexahedron : public Element
 {
-private:
-
-public:
+ private:
+ public:
    Hexahedron();
-   Hexahedron(const std::vector<size_t>& nodes, const size_t index, const size_t physical_entities, const  size_t elem_tag);
+   Hexahedron(const std::vector<size_t>& nodes,
+              const size_t               index,
+              const size_t               physical_entities,
+              const size_t               elem_tag);
 };
 
 class Prism : public Element
 {
-private:
-
-public:
+ private:
+ public:
    Prism();
-   Prism(const std::vector<size_t>& nodes, const size_t index, const size_t physical_entities, const  size_t elem_tag);
+   Prism(const std::vector<size_t>& nodes,
+         const size_t               index,
+         const size_t               physical_entities,
+         const size_t               elem_tag);
 };
 
 class Pyramid : public Element
 {
-private:
-
-public:
+ private:
+ public:
    Pyramid();
-   Pyramid(const std::vector<size_t>& nodes, const size_t index, const size_t physical_entities, const  size_t elem_tag);
+   Pyramid(const std::vector<size_t>& nodes,
+           const size_t               index,
+           const size_t               physical_entities,
+           const size_t               elem_tag);
 };
-
 }
 
 #endif

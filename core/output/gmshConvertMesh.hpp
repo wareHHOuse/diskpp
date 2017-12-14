@@ -1,22 +1,27 @@
 /*
- *       /\
- *      /__\       Nicolas Pignet (C) 2017
+ *       /\        Matteo Cicuttin (C) 2016, 2017
+ *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
- *   /__\  /__\    Gmsh tools
- *  /_\/_\/_\/_\
+ *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
+ *  /_\/_\/_\/_\   methods.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code for scientific publications, you are required to
- * cite it.
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
  */
 
 #pragma once
 
-#include <array>
 #include <array>
 #include <cassert>
 #include <string>
@@ -31,10 +36,10 @@
 #include "mesh/point.hpp"
 #include "output/gmshDisk.hpp"
 
-namespace visu {
+namespace disk {
 
 std::vector<size_t>
-sort_nodes_2D(const std::vector<Node>& list_nodes)
+sort_nodes_2D(const std::vector<gmsh::Node>& list_nodes)
 {
    // Works only for 2D case
    // compute barycenter
@@ -84,7 +89,7 @@ sort_nodes_2D(const std::vector<Node>& list_nodes)
 }
 
 std::vector<size_t>
-sort_nodes_3D(const std::vector<Node>& list_nodes)
+sort_nodes_3D(const std::vector<gmsh::Node>& list_nodes)
 {
    std::vector<size_t> ret(list_nodes.size(), 0);
    if (list_nodes.size() == 4) {
@@ -132,7 +137,7 @@ sort_nodes_3D(const std::vector<Node>& list_nodes)
 }
 
 void
-add_element(Gmesh& gmsh, const std::vector<Node>& list_nodes)
+add_element(gmsh::Gmesh& gmsh, const std::vector<gmsh::Node>& list_nodes)
 {
    size_t DIM = gmsh.getDim();
    if (DIM == 1) {
@@ -142,7 +147,7 @@ add_element(Gmesh& gmsh, const std::vector<Node>& list_nodes)
          index_nodes.push_back(list_nodes[i].getIndex());
       }
 
-      Edge edge(index_nodes, gmsh.getNumberofElements() + 1, 0, 0);
+      gmsh::Edge edge(index_nodes, gmsh.getNumberofElements() + 1, 0, 0);
       gmsh.addEdge(edge);
    } else if (DIM == 2) {
       assert(list_nodes.size() >= 3);
@@ -155,10 +160,10 @@ add_element(Gmesh& gmsh, const std::vector<Node>& list_nodes)
       }
 
       if (list_nodes.size() == 3) {
-         Triangle tri(index_nodes, gmsh.getNumberofElements() + 1, 0, 0);
+         gmsh::Triangle tri(index_nodes, gmsh.getNumberofElements() + 1, 0, 0);
          gmsh.addTriangle(tri);
       } else if (list_nodes.size() == 4) {
-         Quadrangle quad(index_nodes, gmsh.getNumberofElements() + 1, 0, 0);
+         gmsh::Quadrangle quad(index_nodes, gmsh.getNumberofElements() + 1, 0, 0);
          gmsh.addQuadrangle(quad);
       } else {
          std::vector<size_t> index_nodes_tri(3, 0);
@@ -167,7 +172,7 @@ add_element(Gmesh& gmsh, const std::vector<Node>& list_nodes)
          for (size_t i = 1; i < (list_nodes.size() - 1); i++) {
             index_nodes_tri[1] = index_nodes[i];
             index_nodes_tri[2] = index_nodes[i + 1];
-            Triangle tri(index_nodes_tri, gmsh.getNumberofElements() + 1, 0, 0);
+            gmsh::Triangle tri(index_nodes_tri, gmsh.getNumberofElements() + 1, 0, 0);
             gmsh.addTriangle(tri);
          }
       }
@@ -182,10 +187,10 @@ add_element(Gmesh& gmsh, const std::vector<Node>& list_nodes)
       }
 
       if (list_nodes.size() == 4) { // this is a tetrahedra
-         Tetrahedron new_tetra(index_nodes, gmsh.getNumberofElements() + 1, 0, 0);
+         gmsh::Tetrahedron new_tetra(index_nodes, gmsh.getNumberofElements() + 1, 0, 0);
          gmsh.addTetrahedron(new_tetra);
       } else if (list_nodes.size() == 8) { // this is a hexahedra
-         Hexahedron new_hexa(index_nodes, gmsh.getNumberofElements() + 1, 0, 0);
+         gmsh::Hexahedron new_hexa(index_nodes, gmsh.getNumberofElements() + 1, 0, 0);
          gmsh.addHexahedron(new_hexa);
       }
    } else
@@ -193,14 +198,14 @@ add_element(Gmesh& gmsh, const std::vector<Node>& list_nodes)
 }
 
 template<typename Mesh>
-Gmesh
+gmsh::Gmesh
 convertMesh(const Mesh& mesh)
 {
    // Find the dimension of the mesh
    size_t DIM = mesh.dimension;
 
-   Gmesh msh(DIM);
-   auto  storage = mesh.backend_storage();
+   gmsh::Gmesh msh(DIM);
+   auto        storage = mesh.backend_storage();
 
    // Fill the gmsh's mesh
    // conversion point in node
@@ -209,7 +214,7 @@ convertMesh(const Mesh& mesh)
       nb_node += 1;
       msh.addNode(convertPoint(point, nb_node));
 
-      Vertice vert(nb_node, nb_node, 0, 0);
+      gmsh::Vertice vert(nb_node, nb_node, 0, 0);
       msh.addVertice(vert);
    }
    assert(storage->points.size() == msh.getNumberofNodes());
@@ -225,14 +230,14 @@ convertMesh(const Mesh& mesh)
          index_nodes.push_back(list_nodes[i] + 1);
       }
 
-      Edge new_edge(index_nodes, msh.getNumberofElements() + 1, 0, 0);
+      gmsh::Edge new_edge(index_nodes, msh.getNumberofElements() + 1, 0, 0);
       msh.addEdge(new_edge);
    }
    assert(storage->edges.size() == msh.getEdges().size());
 
    for (auto& cl : mesh) {
-      auto              nodes_id = cell_nodes(mesh, cl);
-      std::vector<Node> list_nodes;
+      auto                    nodes_id = cell_nodes(mesh, cl);
+      std::vector<gmsh::Node> list_nodes;
       for (size_t i = 0; i < nodes_id.size(); i++) {
          list_nodes.push_back(msh.getNode(nodes_id[i]));
       }
@@ -244,11 +249,11 @@ convertMesh(const Mesh& mesh)
 }
 
 template<typename Mesh>
-Gmesh
+gmsh::Gmesh
 convertMesh1D(const Mesh& mesh)
 {
 
-   Gmesh msh;
+   gmsh::Gmesh msh;
 
    auto storage = mesh.backend_storage();
 
@@ -262,7 +267,7 @@ convertMesh1D(const Mesh& mesh)
       nb_node += 1;
       msh.addNode(convertPoint(point, nb_node));
 
-      Vertice vert(nb_node, nb_node, 0, 0);
+      gmsh::Vertice vert(nb_node, nb_node, 0, 0);
       msh.addVertice(vert);
    }
    assert(storage->points.size() == msh.getNumberofNodes());
@@ -278,7 +283,7 @@ convertMesh1D(const Mesh& mesh)
          index_nodes.push_back(list_nodes[i] + 1);
       }
 
-      Edge new_edge(index_nodes, msh.getNumberofElements() + 1, 0, 0);
+      gmsh::Edge new_edge(index_nodes, msh.getNumberofElements() + 1, 0, 0);
       msh.addEdge(new_edge);
    }
    assert(storage->edges.size() == msh.getEdges().size());
@@ -287,11 +292,11 @@ convertMesh1D(const Mesh& mesh)
 };
 
 template<typename Mesh>
-Gmesh
+gmsh::Gmesh
 convertMesh2D(const Mesh& mesh)
 {
 
-   Gmesh msh;
+   gmsh::Gmesh msh;
 
    auto storage = mesh.backend_storage();
 
@@ -305,7 +310,7 @@ convertMesh2D(const Mesh& mesh)
       nb_node += 1;
       msh.addNode(convertPoint(point, nb_node));
 
-      Vertice vert(nb_node, nb_node, 0, 0);
+      gmsh::Vertice vert(nb_node, nb_node, 0, 0);
       msh.addVertice(vert);
    }
    assert(storage->points.size() == msh.getNumberofNodes());
@@ -321,7 +326,7 @@ convertMesh2D(const Mesh& mesh)
          index_nodes.push_back(list_nodes[i] + 1);
       }
 
-      Edge new_edge(index_nodes, msh.getNumberofElements() + 1, 0, 0);
+      gmsh::Edge new_edge(index_nodes, msh.getNumberofElements() + 1, 0, 0);
       msh.addEdge(new_edge);
    }
    assert(storage->edges.size() == msh.getEdges().size());
@@ -331,8 +336,8 @@ convertMesh2D(const Mesh& mesh)
       size_t nb_surfaces(0);
       for (auto surface : storage->surfaces) {
          nb_surfaces += 1;
-         auto              list_nodes_index = surface.point_ids();
-         std::vector<Node> list_nodes;
+         auto                    list_nodes_index = surface.point_ids();
+         std::vector<gmsh::Node> list_nodes;
 
          // recup the coordinate of nodes
          for (size_t i = 0; i < list_nodes_index.size(); i++) {
@@ -343,7 +348,7 @@ convertMesh2D(const Mesh& mesh)
                coor[i] = double(pt.at(i));
             }
 
-            Node tmp_node(coor, i + 1, 0);
+            gmsh::Node tmp_node(coor, i + 1, 0);
             list_nodes.push_back(tmp_node);
          }
 
@@ -354,10 +359,10 @@ convertMesh2D(const Mesh& mesh)
          }
 
          if (list_nodes.size() == 3) {
-            Triangle new_tri(index_nodes, msh.getNumberofElements() + 1, 0, 0);
+            gmsh::Triangle new_tri(index_nodes, msh.getNumberofElements() + 1, 0, 0);
             msh.addTriangle(new_tri);
          } else if (list_nodes.size() == 4) {
-            Quadrangle new_quad(index_nodes, msh.getNumberofElements() + 1, 0, 0);
+            gmsh::Quadrangle new_quad(index_nodes, msh.getNumberofElements() + 1, 0, 0);
             msh.addQuadrangle(new_quad);
          } else {
             std::vector<size_t> index_nodes_tri(3, 0);
@@ -366,7 +371,7 @@ convertMesh2D(const Mesh& mesh)
             for (size_t i = 1; i < (list_nodes.size() - 1); i++) {
                index_nodes_tri[1] = index_nodes[i];
                index_nodes_tri[2] = index_nodes[i + 1];
-               Triangle new_tri(index_nodes_tri, msh.getNumberofElements() + 1, 0, 0);
+               gmsh::Triangle new_tri(index_nodes_tri, msh.getNumberofElements() + 1, 0, 0);
                msh.addTriangle(new_tri);
             }
          }
@@ -378,11 +383,11 @@ convertMesh2D(const Mesh& mesh)
 };
 
 template<typename Mesh>
-Gmesh
+gmsh::Gmesh
 convertMesh3D(const Mesh& mesh)
 {
 
-   Gmesh msh;
+   gmsh::Gmesh msh;
 
    auto storage = mesh.backend_storage();
 
@@ -398,7 +403,7 @@ convertMesh3D(const Mesh& mesh)
       nb_node += 1;
       msh.addNode(convertPoint(point, nb_node));
 
-      Vertice vert(nb_node, nb_node, 0, 0);
+      gmsh::Vertice vert(nb_node, nb_node, 0, 0);
       msh.addVertice(vert);
    }
    assert(storage->points.size() == msh.getNumberofNodes());
@@ -414,7 +419,7 @@ convertMesh3D(const Mesh& mesh)
          index_nodes.push_back(list_nodes[i] + 1);
       }
 
-      Edge new_edge(index_nodes, msh.getNumberofElements() + 1, 0, 0);
+      gmsh::Edge new_edge(index_nodes, msh.getNumberofElements() + 1, 0, 0);
       msh.addEdge(new_edge);
    }
    assert(storage->edges.size() == msh.getEdges().size());
@@ -424,8 +429,8 @@ convertMesh3D(const Mesh& mesh)
       size_t nb_volumes(0);
       for (auto volume : storage->volumes) {
          nb_volumes += 1;
-         auto              list_nodes_index = volume.point_ids();
-         std::vector<Node> list_nodes;
+         auto                    list_nodes_index = volume.point_ids();
+         std::vector<gmsh::Node> list_nodes;
 
          // recup the coordinate of nodes
          for (size_t i = 0; i < list_nodes_index.size(); i++) {
@@ -436,7 +441,7 @@ convertMesh3D(const Mesh& mesh)
                coor[i] = double(pt.at(i));
             }
 
-            Node tmp_node(coor, i + 1, 0);
+            gmsh::Node tmp_node(coor, i + 1, 0);
             list_nodes.push_back(tmp_node);
          }
 
@@ -447,10 +452,10 @@ convertMesh3D(const Mesh& mesh)
          }
 
          if (list_nodes.size() == 4) { // this is a tetrahedra
-            Tetrahedron new_tetra(index_nodes, msh.getNumberofElements() + 1, 0, 0);
+            gmsh::Tetrahedron new_tetra(index_nodes, msh.getNumberofElements() + 1, 0, 0);
             msh.addTetrahedron(new_tetra);
          } else if (list_nodes.size() == 8) { // this is a tetrahedra
-            Hexahedron new_hexa(index_nodes, msh.getNumberofElements() + 1, 0, 0);
+            gmsh::Hexahedron new_hexa(index_nodes, msh.getNumberofElements() + 1, 0, 0);
             msh.addHexahedron(new_hexa);
          }
       }
@@ -459,4 +464,4 @@ convertMesh3D(const Mesh& mesh)
    return msh;
 };
 
-} // visu
+} // disk

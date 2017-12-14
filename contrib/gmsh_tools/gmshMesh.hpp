@@ -17,107 +17,126 @@
 #ifndef GMSHMESH_H
 #define GMSHMESH_H
 
-#include<vector>
-#include<array>
-#include<string>
 #include "gmshElement.hpp"
+#include <array>
+#include <string>
+#include <vector>
 
-namespace visu{
+namespace gmsh {
 
 class Gmesh
 {
-   protected:
-      size_t _dim_topology;
-      std::vector<Node> _nodes;
-      std::vector<Vertice> _vertices;
-      std::vector<Edge> _edges;
-      std::vector<Triangle> _triangles;
-      std::vector<Quadrangle> _quadrangles;
-      std::vector<Tetrahedron> _tetrahedra;
-      std::vector<Hexahedron> _hexahedra;
-      std::vector<Prism> _prisms;
-      std::vector<Pyramid> _pyramids;
-      size_t _number_of_elements;
-      void readGmesh_MEDITformat(const std::string name_mesh);
-      void writeGmesh_MEDITformat(const std::string name_mesh) const;
-      void readGmesh_MSHformat(const std::string name_mesh);
-      void writeGmesh_MSHformat(const std::string name_mesh) const;
+ protected:
+   size_t                   _dim_topology;
+   std::vector<Node>        _nodes;
+   std::vector<Vertice>     _vertices;
+   std::vector<Edge>        _edges;
+   std::vector<Triangle>    _triangles;
+   std::vector<Quadrangle>  _quadrangles;
+   std::vector<Tetrahedron> _tetrahedra;
+   std::vector<Hexahedron>  _hexahedra;
+   std::vector<Prism>       _prisms;
+   std::vector<Pyramid>     _pyramids;
+   size_t                   _number_of_elements;
+   void                     readGmesh_MEDITformat(const std::string name_mesh);
+   void                     writeGmesh_MEDITformat(const std::string name_mesh) const;
+   void                     readGmesh_MSHformat(const std::string name_mesh);
+   void                     writeGmesh_MSHformat(const std::string name_mesh) const;
 
-      void convertInDiscontinuousMesh1();
-      void convertInDiscontinuousMesh2();
-      void convertInDiscontinuousMesh3();
+   void convertInDiscontinuousMesh1();
+   void convertInDiscontinuousMesh2();
+   void convertInDiscontinuousMesh3();
 
+ public:
+   Gmesh();
+   Gmesh(const size_t dim);
 
-   public:
-      Gmesh();
-      Gmesh(const size_t dim);
+   Gmesh(const size_t                dim,
+         const std::vector<Node>&    nodes,
+         const std::vector<Vertice>& vertices,
+         const std::vector<Edge>&    edges);
 
-      Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
-            const std::vector<Edge>& edges);
+   Gmesh(const size_t                   dim,
+         const std::vector<Node>&       nodes,
+         const std::vector<Vertice>&    vertices,
+         const std::vector<Edge>&       edges,
+         const std::vector<Triangle>&   triangles,
+         const std::vector<Quadrangle>& quadrangles);
 
-      Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
-            const std::vector<Edge>& edges, const std::vector<Triangle>& triangles,
-            const std::vector<Quadrangle>& quadrangles);
+   Gmesh(const size_t                    dim,
+         const std::vector<Node>&        nodes,
+         const std::vector<Vertice>&     vertices,
+         const std::vector<Edge>&        edges,
+         const std::vector<Triangle>&    triangles,
+         const std::vector<Quadrangle>&  quadrangles,
+         const std::vector<Tetrahedron>& tetrahedra,
+         const std::vector<Hexahedron>   hexahedra,
+         const std::vector<Prism>&       prisms,
+         const std::vector<Pyramid>&     pyramids);
 
-      Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
-            const std::vector<Edge>& edges, const std::vector<Triangle>& triangles,
-            const std::vector<Quadrangle>& quadrangles, const std::vector<Tetrahedron>& tetrahedra,
-            const std::vector<Hexahedron> hexahedra, const std::vector<Prism>& prisms,
-            const std::vector<Pyramid>& pyramids);
+   Gmesh(const size_t                    dim,
+         const std::vector<Node>&        nodes,
+         const std::vector<Vertice>&     vertices,
+         const std::vector<Edge>&        edges,
+         const std::vector<Triangle>&    triangles,
+         const std::vector<Quadrangle>&  quadrangles,
+         const std::vector<Tetrahedron>& tetrahedra,
+         const std::vector<Hexahedron>   hexahedra);
 
-      Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
-            const std::vector<Edge>& edges, const std::vector<Triangle>& triangles,
-            const std::vector<Quadrangle>& quadrangles, const std::vector<Tetrahedron>& tetrahedra,
-            const std::vector<Hexahedron> hexahedra);
+   Gmesh(const size_t                    dim,
+         const std::vector<Node>&        nodes,
+         const std::vector<Vertice>&     vertices,
+         const std::vector<Edge>&        edges,
+         const std::vector<Triangle>&    triangles,
+         const std::vector<Tetrahedron>& tetrahedra);
 
-      Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
-            const std::vector<Edge>& edges, const std::vector<Triangle>& triangles,
-            const std::vector<Tetrahedron>& tetrahedra);
+   Gmesh(const size_t                   dim,
+         const std::vector<Node>&       nodes,
+         const std::vector<Vertice>&    vertices,
+         const std::vector<Edge>&       edges,
+         const std::vector<Quadrangle>& quadrangles,
+         const std::vector<Hexahedron>& hexahedra);
 
-      Gmesh(const size_t dim, const std::vector<Node>& nodes, const std::vector<Vertice>& vertices,
-            const std::vector<Edge>& edges, const std::vector<Quadrangle>& quadrangles,
-            const std::vector<Hexahedron>& hexahedra);
+   void                     readGmesh(const std::string name_mesh);
+   void                     writeGmesh(const std::string name_mesh, const size_t format) const;
+   void                     getInfo() const;
+   size_t                   getDim() const;
+   size_t                   getNumberofNodes() const;
+   size_t                   getNumberofElements() const;
+   std::vector<Node>        getNodes() const;
+   std::vector<Vertice>     getVertices() const;
+   std::vector<Edge>        getEdges() const;
+   std::vector<Triangle>    getTriangles() const;
+   std::vector<Quadrangle>  getQuadrangles() const;
+   std::vector<Hexahedron>  getHexahedra() const;
+   std::vector<Tetrahedron> getTetrahedra() const;
+   std::vector<Prism>       getPrisms() const;
+   std::vector<Pyramid>     getPyramids() const;
 
-      void readGmesh(const std::string name_mesh);
-      void writeGmesh(const std::string name_mesh, const size_t format) const;
-      void getInfo() const;
-      size_t getDim() const;
-      size_t getNumberofNodes() const;
-      size_t getNumberofElements() const;
-      std::vector<Node> getNodes() const;
-      std::vector<Vertice> getVertices() const;
-      std::vector<Edge> getEdges() const;
-      std::vector<Triangle> getTriangles() const;
-      std::vector<Quadrangle> getQuadrangles() const;
-      std::vector<Hexahedron> getHexahedra() const;
-      std::vector<Tetrahedron> getTetrahedra() const;
-      std::vector<Prism> getPrisms() const;
-      std::vector<Pyramid> getPyramids() const;
+   Node        getNode(const size_t index) const;
+   Vertice     getVertice(const size_t index) const;
+   Edge        getEdge(const size_t index) const;
+   Triangle    getTriangle(const size_t index) const;
+   Quadrangle  getQuadrangle(const size_t index) const;
+   Hexahedron  getHexahedron(const size_t index) const;
+   Tetrahedron getTetrahedron(const size_t index) const;
+   Prism       getPrism(const size_t index) const;
+   Pyramid     getPyramid(const size_t index) const;
 
-      Node getNode(const size_t index) const;
-      Vertice getVertice(const size_t index) const;
-      Edge getEdge(const size_t index) const;
-      Triangle getTriangle(const size_t index) const;
-      Quadrangle getQuadrangle(const size_t index) const;
-      Hexahedron getHexahedron(const size_t index) const;
-      Tetrahedron getTetrahedron(const size_t index) const;
-      Prism getPrism(const size_t index) const;
-      Pyramid getPyramid(const size_t index) const;
+   void addNode(const Node& node);
+   void addVertice(const Vertice& vertice);
+   void addEdge(const Edge& edge);
+   void addTriangle(const Triangle& triangle);
+   void addQuadrangle(const Quadrangle& quad);
+   void addHexahedron(const Hexahedron& hexa);
+   void addTetrahedron(const Tetrahedron& tetra);
+   void addPrism(const Prism& prism);
+   void addPyramid(const Pyramid& pyramid);
 
-      void addNode(const Node& node);
-      void addVertice(const Vertice& vertice);
-      void addEdge(const Edge& edge);
-      void addTriangle(const Triangle& triangle);
-      void addQuadrangle(const Quadrangle& quad);
-      void addHexahedron(const Hexahedron& hexa);
-      void addTetrahedron(const Tetrahedron& tetra);
-      void addPrism(const Prism& prism);
-      void addPyramid(const Pyramid& pyramid);
-
-      void convertInDiscontinuousMesh();
-      void computeDeformed(const std::vector<Node>& newNodes);
+   void convertInDiscontinuousMesh();
+   void computeDeformed(const std::vector<Node>& newNodes);
 };
 
-} //visu
+} // gmsh
 
 #endif

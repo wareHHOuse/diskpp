@@ -567,26 +567,6 @@ main(int argc, char** argv)
       std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
       std::cout << " " << std::endl;
 
-      // tc.tic();
-      // std::cout << "-Hexahedras fvca6:" << std::endl;
-      // test_hexahedra_fvca6<RealType>(rp);
-      // tc.toc();
-      // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      // std::cout << " " << std::endl;
-
-      // tc.tic();
-      // std::cout << "-Hexahedras diskpp:" << std::endl;
-      // test_hexahedra_diskpp<RealType>(rp);
-      // tc.toc();
-      // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      // std::cout << " " << std::endl;
-
-      // tc.tic();
-      // std::cout << "-Polyhedra:" << std::endl;
-      // test_polyhedra_fvca6<RealType>(rp);
-      // tc.toc();
-      // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      // std::cout << " " << std::endl;
    } else if (dim == 2) {
 
       tc.tic();
@@ -603,33 +583,6 @@ main(int argc, char** argv)
       std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
       std::cout << " " << std::endl;
 
-      // tc.tic();
-      // std::cout << "-Quadrangles fvca5:" << std::endl;
-      // test_quads_fvca5<RealType>(rp);
-      // tc.toc();
-      // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      // std::cout << " " << std::endl;
-
-      // tc.tic();
-      // std::cout << "-Quadrangles diskpp:" << std::endl;
-      // test_quads_diskpp<RealType>(rp);
-      // tc.toc();
-      // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      // std::cout << " " << std::endl;
-
-      // tc.tic();
-      // std::cout << "-Hexagons:" << std::endl;
-      // test_hexagons<RealType>(rp);
-      // tc.toc();
-      // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      // std::cout << " " << std::endl;
-
-      // tc.tic();
-      // std::cout << "-Kershaws:" << std::endl;
-      // test_kershaws<RealType>(rp);
-      // tc.toc();
-      // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      // std::cout << " " << std::endl;
    } else {
       tc.tic();
       std::cout << "-Test 1D:" << std::endl;

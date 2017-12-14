@@ -36,6 +36,8 @@
 
 // Compute the condition number of real symetric matrix
 
+namespace disk {
+
 template<typename T>
 T
 condition_number(const Eigen::SparseMatrix<T>& mat)
@@ -45,7 +47,7 @@ condition_number(const Eigen::SparseMatrix<T>& mat)
 
    // Construct solver object, requesting the largest eigenvalues
    Spectra::SymEigsSolver<T, Spectra::LARGEST_MAGN, Spectra::SparseSymMatProd<T>> eigs_largest(
-     &op_largest, 1, 25);
+     &op_largest, 1, 5);
 
    // Initialize and compute
    eigs_largest.init();
@@ -58,7 +60,7 @@ condition_number(const Eigen::SparseMatrix<T>& mat)
 
    // Construct solver object, requesting the smallest eigenvalues
    Spectra::SymEigsShiftSolver<T, Spectra::LARGEST_MAGN, Spectra::SparseSymShiftSolve<T>>
-     eigs_smallest(&op_smallest, 1, 25, T(0));
+     eigs_smallest(&op_smallest, 1, 5, 0);
 
    eigs_smallest.init();
    eigs_smallest.compute();
@@ -67,8 +69,6 @@ condition_number(const Eigen::SparseMatrix<T>& mat)
       throw std::invalid_argument("Fail to compute smallest eigenvalue");
    }
    const auto eig_smallest = eigs_smallest.eigenvalues();
-
-   std::cout << "largest: " << eig_largest(0) << " smallest: " << eig_smallest(0) << std::endl;
 
    return std::abs(eig_largest(0) / eig_smallest(0));
 }
@@ -82,7 +82,7 @@ condition_number(const dynamic_matrix<T>& mat)
 
    // Construct solver object, requesting the largest eigenvalues
    Spectra::SymEigsSolver<T, Spectra::LARGEST_MAGN, Spectra::DenseSymMatProd<T>> eigs_largest(
-     &op_largest, 1, 25);
+     &op_largest, 1, 5);
 
    // Initialize and compute
    eigs_largest.init();
@@ -95,7 +95,7 @@ condition_number(const dynamic_matrix<T>& mat)
 
    // Construct solver object, requesting the smallest eigenvalues
    Spectra::SymEigsShiftSolver<T, Spectra::LARGEST_MAGN, Spectra::DenseSymShiftSolve<T>>
-     eigs_smallest(&op_smallest, 1, 25, T(0));
+     eigs_smallest(&op_smallest, 1, 5, T(0));
 
    eigs_smallest.init();
    eigs_smallest.compute();
@@ -117,7 +117,7 @@ condition_number(const static_matrix<T, N, N>& mat)
 
    // Construct solver object, requesting the largest eigenvalues
    Spectra::SymEigsSolver<T, Spectra::LARGEST_MAGN, Spectra::DenseSymMatProd<T>> eigs_largest(
-     &op_largest, 1, 25);
+     &op_largest, 1, N);
 
    // Initialize and compute
    eigs_largest.init();
@@ -164,4 +164,112 @@ largest_eigenvalue(const Eigen::SparseMatrix<T>& mat)
    const auto eig_largest = eigs_largest.eigenvalues();
 
    return eig_largest(0);
+}
+
+template<typename T>
+T
+largest_eigenvalue(const dynamic_matrix<T>& mat)
+{
+   Spectra::DenseSymMatProd<T> op_largest(mat);
+
+   // Construct solver object, requesting the largest eigenvalues
+   Spectra::SymEigsSolver<T, Spectra::LARGEST_MAGN, Spectra::DenseSymMatProd<T>> eigs_largest(
+     &op_largest, 1, 5);
+
+   // Initialize and compute
+   eigs_largest.init();
+   eigs_largest.compute();
+
+   if (eigs_largest.info() != Spectra::SUCCESSFUL) {
+      throw std::invalid_argument("Fail to compute largest eigenvalue");
+   }
+   const auto eig_largest = eigs_largest.eigenvalues();
+
+   return eig_largest(0);
+}
+
+template<typename T, size_t N>
+T
+largest_eigenvalue(const static_matrix<T, N, N>& mat)
+{
+   Spectra::DenseSymMatProd<T> op_largest(mat);
+
+   // Construct solver object, requesting the largest eigenvalues
+   Spectra::SymEigsSolver<T, Spectra::LARGEST_MAGN, Spectra::DenseSymMatProd<T>> eigs_largest(
+     &op_largest, 1, N);
+
+   // Initialize and compute
+   eigs_largest.init();
+   eigs_largest.compute();
+
+   if (eigs_largest.info() != Spectra::SUCCESSFUL) {
+      throw std::invalid_argument("Fail to compute largest eigenvalue");
+   }
+   const auto eig_largest = eigs_largest.eigenvalues();
+
+   return eig_largest(0);
+}
+
+template<typename T>
+T
+smallest_eigenvalue(const Eigen::SparseMatrix<T>& mat)
+{
+   Spectra::SparseSymShiftSolve<T> op_smallest(mat);
+
+   // Construct solver object, requesting the smallest eigenvalues
+   Spectra::SymEigsShiftSolver<T, Spectra::LARGEST_MAGN, Spectra::SparseSymShiftSolve<T>>
+     eigs_smallest(&op_smallest, 1, 5, 0);
+
+   eigs_smallest.init();
+   eigs_smallest.compute();
+
+   if (eigs_smallest.info() != Spectra::SUCCESSFUL) {
+      throw std::invalid_argument("Fail to compute smallest eigenvalue");
+   }
+   const auto eig_smallest = eigs_smallest.eigenvalues();
+
+   return eig_smallest(0);
+}
+
+template<typename T>
+T
+smallest_eigenvalue(const dynamic_matrix<T>& mat)
+{
+   Spectra::DenseSymShiftSolve<T> op_smallest(mat);
+
+   // Construct solver object, requesting the smallest eigenvalues
+   Spectra::SymEigsShiftSolver<T, Spectra::LARGEST_MAGN, Spectra::DenseSymShiftSolve<T>>
+     eigs_smallest(&op_smallest, 1, 5, T(0));
+
+   eigs_smallest.init();
+   eigs_smallest.compute();
+
+   if (eigs_smallest.info() != Spectra::SUCCESSFUL) {
+      throw std::invalid_argument("Fail to compute smallest eigenvalue");
+   }
+   const auto eig_smallest = eigs_smallest.eigenvalues();
+
+   return eig_smallest(0);
+}
+
+template<typename T, size_t N>
+T
+smallest_eigenvalue(const static_matrix<T, N, N>& mat)
+{
+   Spectra::DenseSymShiftSolve<T> op_smallest(mat);
+
+   // Construct solver object, requesting the smallest eigenvalues
+   Spectra::SymEigsShiftSolver<T, Spectra::LARGEST_MAGN, Spectra::DenseSymShiftSolve<T>>
+     eigs_smallest(&op_smallest, 1, 25, T(0));
+
+   eigs_smallest.init();
+   eigs_smallest.compute();
+
+   if (eigs_smallest.info() != Spectra::SUCCESSFUL) {
+      throw std::invalid_argument("Fail to compute smallest eigenvalue");
+   }
+   const auto eig_smallest = eigs_smallest.eigenvalues();
+
+   return eig_smallest(0);
+}
 }

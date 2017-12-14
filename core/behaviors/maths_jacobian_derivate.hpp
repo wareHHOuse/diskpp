@@ -26,6 +26,8 @@
 #include "common/eigen.hpp"
 #include "maths_tensor.hpp"
 
+namespace disk {
+
 // the fourth order tensor is stored like a Matrix
 // | A1111  A1112  A1211  A1212 |
 // | A1121  A1122  A1221  A1222 |
@@ -148,4 +150,5 @@ computeJacobianSecondDerivate(const static_matrix<T, 3, 3>& M)
    ret(7, 7) = M(0, 0);
 
    return ret;
+}
 }

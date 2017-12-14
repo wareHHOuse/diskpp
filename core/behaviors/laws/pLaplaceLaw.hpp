@@ -22,25 +22,9 @@
 
 #pragma once
 
-#include <iostream>
-
-#include <sstream>
-#include <string>
-
 #include "common/eigen.hpp"
-#include "BehaviorLaws/maths_tensor.hpp"
-#include "BehaviorLaws/maths_jacobian_derivate.hpp"
 
-
-#define _USE_MATH_DEFINES
-#include <cmath>
-
-/*
-Fichier pour gérer les lois de comportements
--faire une boite qui prends en entrée eps --> behaviorbox --> stress
--penser aux variables internes pour sauvegarder partie elastique
-- utilise t on des tenseur pour le module tangent
-*/
+namespace disk {
 
 /* Material: LaplaceLaw
  * Stress :  S(G) = norm(G)^{p-2} * G
@@ -52,62 +36,101 @@ class pLaplaceLaw
 {
    size_t m_p;
 
-   template< int DIM>
+   template<int DIM>
    static_matrix<scalar_type, DIM, DIM>
    compute_A(const static_vector<scalar_type, DIM>& G) const
    {
+      if (m_p == 2) return static_matrix<scalar_type, DIM, DIM>::Identity();
+
       const scalar_type norm_G = G.norm();
-      const scalar_type norm_G2 = std::pow(norm_G, m_p-2.0);
-      const scalar_type norm_G4 = std::pow(norm_G, m_p-4.0);
 
-      return norm_G2 * static_matrix<scalar_type, DIM, DIM>::Identity() + (m_p-2.0) * norm_G4 * G * G.transpose();
+      if (norm_G <= 10E-16 && m_p < 4) return static_matrix<scalar_type, DIM, DIM>::Identity();
 
+      const int pm2 = m_p - 2;
+      const int pm4 = m_p - 4;
+
+      const scalar_type norm_Gm2 = std::pow(norm_G, pm2);
+
+      scalar_type norm_Gm4 = 0;
+      if (pm4 == 0) {
+         norm_Gm4 = 1.0;
+      } else if (pm4 == -1) {
+         norm_Gm4 = 1.0 / norm_G;
+      } else {
+         norm_Gm4 = std::pow(norm_G, pm4);
+      }
+
+      return norm_Gm2 * static_matrix<scalar_type, DIM, DIM>::Identity() +
+             (pm2)*norm_Gm4 * G * G.transpose();
    }
 
-public:
+ public:
+   pLaplaceLaw() : m_p(2) {}
 
-   pLaplaceLaw()
-   : m_p(2) {}
-
-   pLaplaceLaw(const size_t p)
-   : m_p(p)
+   pLaplaceLaw(const size_t p) : m_p(p)
    {
-      if(m_p < 2)
-      {
+      if (m_p < 2) {
          throw std::invalid_argument("pLaplaceLaw: p have to be >= 2");
       }
    }
 
-
-   template< int DIM>
+   template<int DIM>
    static_vector<scalar_type, DIM>
-   compute_P(const static_vector<scalar_type, DIM>& G) const
+   compute_stress(const static_vector<scalar_type, DIM>& G) const
    {
-      if(m_p == 2)
+      if (m_p == 2)
          return G;
       else
-         return  std::pow(G.norm(), m_p-2.0) * G;
+         return std::pow(G.norm(), m_p - 2) * G;
+   }
+
+   scalar_type
+   compute_stress(const scalar_type& G) const
+   {
+      if (m_p == 2)
+         return G;
+      else
+         return std::pow(std::abs(G), m_p - 2) * G;
+   }
+
+   scalar_type
+   compute_tangent_moduli(const scalar_type& G) const
+   {
+      if (m_p == 2)
+         return 1;
+      else {
+         return (m_p - 1) * std::pow(std::abs(G), m_p - 2);
+      }
    }
 
    template<int DIM>
    static_matrix<scalar_type, DIM, DIM>
    compute_tangent_moduli(const static_vector<scalar_type, DIM>& G) const
    {
-      if(m_p == 2)
-         return static_matrix<scalar_type,DIM, DIM>::Identity();
+      if (m_p == 2)
+         return static_matrix<scalar_type, DIM, DIM>::Identity();
       else
          return compute_A(G);
    }
 
-
    template<int DIM>
-   std::pair<static_vector<scalar_type, DIM>, static_matrix<scalar_type, DIM, DIM> >
+   std::pair<static_vector<scalar_type, DIM>, static_matrix<scalar_type, DIM, DIM>>
    compute_whole(const static_vector<scalar_type, DIM>& G) const
    {
-      const auto P = compute_P(G);
+      const auto P = compute_stress(G);
       const auto A = compute_tangent_moduli(G);
 
       return std::make_pair(P, A);
    }
 
+   std::pair<scalar_type, scalar_type>
+   compute_whole(const scalar_type& G) const
+   {
+      const auto P = compute_stress(G);
+      const auto A = compute_tangent_moduli(G);
+
+      return std::make_pair(P, A);
+   }
 };
+
+} // end LerayLions

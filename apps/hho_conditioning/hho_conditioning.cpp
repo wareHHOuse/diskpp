@@ -87,11 +87,13 @@ estimate_element_cond(sol::state& lua, const Mesh& msh)
 
       auto cbs = bqd.cell_basis.size();
 
-      const dynamic_matrix<scalar_type> cloc = loc.block(0, 0, cbs, cbs);
-      const scalar_type                 cond(condition_number(cloc));
+      const dynamic_matrix<scalar_type> cloc        = loc.block(0, 0, cbs, cbs);
+      const scalar_type                 largest_ev  = disk::largest_eigenvalue(cloc);
+      const scalar_type                 smallest_ev = disk::smallest_eigenvalue(cloc);
+      const scalar_type                 cond        = largest_ev / smallest_ev;
       std::cout << "Condition number: " << cond << std::endl;
-      // std::cout << "Sigma max: " << sigma_max << std::endl;
-      // std::cout << "Sigma min: " << sigma_min << std::endl;
+      std::cout << "Sigma max: " << largest_ev << std::endl;
+      std::cout << "Sigma min: " << smallest_ev << std::endl;
    }
 
    return true;

@@ -25,6 +25,8 @@
 #include "bases/bases_utils.hpp"
 #include "common/eigen.hpp"
 
+namespace disk {
+
 // the fourth order tensor is stored like a Matrix
 // | A1111  A1112  A1211  A1212 |
 // | A1121  A1122  A1221  A1222 |
@@ -282,4 +284,5 @@ static_tensor<T, DIM>
 compute_IxI()
 {
    return static_tensor<T, DIM>::Identity();
+}
 }

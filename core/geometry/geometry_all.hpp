@@ -331,7 +331,7 @@ normal(const Mesh<T, 3, Storage>&                msh,
        const typename Mesh<T, 3, Storage>::face& fc)
 {
    const auto pts = points(msh, fc);
-   assert(pts.size() == 3);
+   assert(pts.size() >= 3);
 
    const auto v0 = (pts[1] - pts[0]).to_vector();
    const auto v1 = (pts[2] - pts[1]).to_vector();

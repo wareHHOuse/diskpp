@@ -28,12 +28,12 @@
 // F is the deformation gradient
 
 namespace disk {
-   
-namespace mechanics{
 
-// PK2 = F^{-1} * PK1 
+namespace mechanics {
 
-template<typename T, int  DIM>
+// PK2 = F^{-1} * PK1
+
+template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
 convertPK1toPK2(const static_matrix<T, DIM, DIM>& PK1, const static_matrix<T, DIM, DIM>& F)
 {
@@ -41,7 +41,7 @@ convertPK1toPK2(const static_matrix<T, DIM, DIM>& PK1, const static_matrix<T, DI
 }
 
 // PK1 = F * PK2
-template<typename T, int  DIM>
+template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
 convertPK2toPK1(const static_matrix<T, DIM, DIM>& PK2, const static_matrix<T, DIM, DIM>& F)
 {
@@ -49,15 +49,15 @@ convertPK2toPK1(const static_matrix<T, DIM, DIM>& PK2, const static_matrix<T, DI
 }
 
 // Cauchy = J^{-1} * P * F^{T}
-template<typename T, int  DIM>
+template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
 convertPK1toCauchy(const static_matrix<T, DIM, DIM>& PK1, const static_matrix<T, DIM, DIM>& F)
 {
-   return (PK1 * F.transpose())/ F.determinant();
+   return (PK1 * F.transpose()) / F.determinant();
 }
 
 // PK1 = J * Cauchy * F^{-T}
-template<typename T, int  DIM>
+template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
 convertCauchytoPK1(const static_matrix<T, DIM, DIM>& Cauchy, const static_matrix<T, DIM, DIM>& F)
 {
@@ -66,7 +66,7 @@ convertCauchytoPK1(const static_matrix<T, DIM, DIM>& Cauchy, const static_matrix
 }
 
 // PK2 = J  * F^{-1} * Cauchy * F^{-T}
-template<typename T, int  DIM>
+template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
 convertCauchytoPK2(const static_matrix<T, DIM, DIM>& Cauchy, const static_matrix<T, DIM, DIM>& F)
 {
@@ -74,14 +74,13 @@ convertCauchytoPK2(const static_matrix<T, DIM, DIM>& Cauchy, const static_matrix
    return F.determinant() * invF * Cauchy * invF.transpose();
 }
 
-
 // Cauchy = J^-1 * F * Cauchy * F^{T}
-template<typename T, int  DIM>
+template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
 convertPK2toCauchy(const static_matrix<T, DIM, DIM>& PK2, const static_matrix<T, DIM, DIM>& F)
 {
-   return  F * PK2 * F.transpose()/F.determinant();
+   return F * PK2 * F.transpose() / F.determinant();
 }
 
-}// end mechanics
-}//end namespace disk
+} // end mechanics
+} // end namespace disk

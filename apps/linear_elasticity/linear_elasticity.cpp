@@ -50,45 +50,48 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>& msh,
                              const run_params&          rp,
                              const ElasticityParameters material_data)
 {
-   typedef Mesh<T, 2, Storage> mesh_type;
-   typedef static_vector<T, 2> result_type;
+   typedef Mesh<T, 2, Storage>                            mesh_type;
+   typedef static_vector<T, 2>                            result_type;
+   typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
 
    timecounter tc;
    tc.tic();
 
    auto load = [material_data](const point<T, 2>& p) -> result_type {
-      T fx = 2. * material_data.mu * M_PI * M_PI * sin(M_PI * p.x()) * sin(M_PI * p.y());
-      T fy = 2. * material_data.mu * M_PI * M_PI * cos(M_PI * p.x()) * cos(M_PI * p.y());
+      const T lambda = material_data.lambda;
+      const T mu     = material_data.mu;
 
-      return result_type{fx, fy};
+      T fx = lambda * cos(M_PI * (p.x() + p.y())) -
+             2.0 * mu *
+               ((4 * lambda + 4) * sin(2 * M_PI * p.y()) * cos(2 * M_PI * p.x()) +
+                sin(M_PI * p.x()) * sin(M_PI * p.y())) +
+             2.0 * mu *
+               (2.0 * lambda * sin(2 * M_PI * p.y()) + 2.0 * sin(2 * M_PI * p.y()) +
+                0.5 * cos(M_PI * (p.x() + p.y())));
+      T fy = lambda * cos(M_PI * (p.x() + p.y())) +
+             2.0 * mu *
+               ((4 * lambda + 4) * sin(2 * M_PI * p.x()) * cos(2 * M_PI * p.y()) -
+                sin(M_PI * p.x()) * sin(M_PI * p.y())) -
+             2.0 * mu *
+               (2.0 * lambda * sin(2 * M_PI * p.x()) + 2.0 * sin(2 * M_PI * p.x()) -
+                0.5 * cos(M_PI * (p.x() + p.y())));
+
+      return -M_PI * M_PI / (lambda + 1) * result_type{fx, fy};
    };
 
    auto solution = [material_data](const point<T, 2>& p) -> result_type {
-      T fx = sin(M_PI * p.x()) * sin(M_PI * p.y()) + 1.0 / (2.0 * material_data.lambda) * p.x();
-      T fy = cos(M_PI * p.x()) * cos(M_PI * p.y()) + 1.0 / (2.0 * material_data.lambda) * p.y();
+      T fx = sin(2 * M_PI * p.y()) * (cos(2 * M_PI * p.x()) - 1) +
+             1.0 / (1 + material_data.lambda) * sin(M_PI * p.x()) * sin(M_PI * p.y());
+      T fy = -sin(2 * M_PI * p.x()) * (cos(2 * M_PI * p.y()) - 1) +
+             1.0 / (1 + material_data.lambda) * sin(M_PI * p.x()) * sin(M_PI * p.y());
 
       return result_type{fx, fy};
    };
 
-   typedef BoundaryConditions<mesh_type, decltype(solution)> Bnd_type;
-   Bnd_type                                                  bnd(msh);
-
+   Bnd_type bnd(msh);
    bnd.addDirichletEverywhere(solution);
 
-   //    auto b1 = [material_data](const point<T, 2>& p) -> result_type { return result_type{0, 0};
-   //    };
-
-   //    auto b2 = [material_data](const point<T, 2>& p) -> result_type { return result_type{0, 0};
-   //    };
-
-   //    auto b3 = [material_data](const point<T, 2>& p) -> result_type { return result_type{1, 1};
-   //    };
-
-   //    bnd.addDirichletBC(DX, 1, solution);
-   //    bnd.addDirichletBC(DY, 2, solution);
-   //    bnd.addDirichletBC(DXDY, 3, solution);
-
-   linear_elasticity_solver<mesh_type, Bnd_type> le(msh, bnd, material_data, rp.degree);
+   linear_elasticity_solver<mesh_type> le(msh, bnd, material_data, rp.degree);
    le.verbose(rp.verbose);
 
    le.changeElasticityParameters(material_data);
@@ -119,10 +122,8 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>& msh,
    }
 
    std::cout << "Discetisation h: " << disk::mesh_h(msh) << std::endl;
-   std::cout << "L2 error: " << le.compute_l2_error(solution) << std::endl;
-   //    le.plot_solution_at_gausspoint("sol_elas_2d.msh");
-   //    le.plot_l2error_at_gausspoint("error_gp_2d_.msh", solution_lin);
-   //    le.compute_deformed("deforme2d.msh");
+   std::cout << "L2 error: " << le.compute_l2_displacement_error(solution) << std::endl;
+
    le.compute_discontinuous_displacement("depl2d.msh");
 }
 
@@ -132,57 +133,48 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>& msh,
                              run_params&                rp,
                              ElasticityParameters       material_data)
 {
-   typedef Mesh<T, 3, Storage> mesh_type;
-   typedef static_vector<T, 3> result_type;
+   typedef Mesh<T, 3, Storage>                            mesh_type;
+   typedef static_vector<T, 3>                            result_type;
+   typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
 
    timecounter tc;
    tc.tic();
 
-   auto load = [material_data](const point<T, 3>& p) -> auto
-   {
-      const T mu     = material_data.mu;
+   auto load = [material_data](const point<T, 3>& p) -> result_type {
       const T lambda = material_data.lambda;
+      const T mu     = material_data.mu;
 
-      T fx = M_PI * M_PI *
-             (12 * lambda * cos(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) * sin(2 * M_PI * p.z()) +
-              8 * (3 * cos(2 * M_PI * p.x()) - 1) * sin(2 * M_PI * p.y()) * sin(2 * M_PI * p.z()) -
-              cos(M_PI * p.x()) * sin(M_PI * (p.y() + p.z())) +
-              (1 + 3. / (1 + lambda)) * sin(M_PI * p.x()) * sin(M_PI * p.y()) * sin(M_PI * p.z()));
+      T fx = lambda * cos(M_PI * (p.x() + p.y())) -
+             2.0 * mu *
+               ((4 * lambda + 4) * sin(2 * M_PI * p.y()) * cos(2 * M_PI * p.x()) +
+                sin(M_PI * p.x()) * sin(M_PI * p.y())) +
+             2.0 * mu *
+               (2.0 * lambda * sin(2 * M_PI * p.y()) + 2.0 * sin(2 * M_PI * p.y()) +
+                0.5 * cos(M_PI * (p.x() + p.y())));
+      T fy = lambda * cos(M_PI * (p.x() + p.y())) +
+             2.0 * mu *
+               ((4 * lambda + 4) * sin(2 * M_PI * p.x()) * cos(2 * M_PI * p.y()) -
+                sin(M_PI * p.x()) * sin(M_PI * p.y())) -
+             2.0 * mu *
+               (2.0 * lambda * sin(2 * M_PI * p.x()) + 2.0 * sin(2 * M_PI * p.x()) -
+                0.5 * cos(M_PI * (p.x() + p.y())));
 
-      T fy = M_PI * M_PI *
-             (12 * lambda * cos(2 * M_PI * p.y()) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.z()) +
-              8 * (3 * cos(2 * M_PI * p.y()) - 1) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.z()) -
-              cos(M_PI * p.y()) * sin(M_PI * (p.x() + p.z())) +
-              (1 + 3. / (1 + lambda)) * sin(M_PI * p.x()) * sin(M_PI * p.y()) * sin(M_PI * p.z()));
-
-      T fz = M_PI * M_PI *
-             (12 * lambda * cos(2 * M_PI * p.z()) * sin(2 * M_PI * p.y()) * sin(2 * M_PI * p.x()) +
-              8 * (3 * cos(2 * M_PI * p.z()) - 1) * sin(2 * M_PI * p.y()) * sin(2 * M_PI * p.x()) -
-              cos(M_PI * p.z()) * sin(M_PI * (p.y() + p.x())) +
-              (1 + 3. / (1 + lambda)) * sin(M_PI * p.x()) * sin(M_PI * p.y()) * sin(M_PI * p.z()));
-
-      return result_type{fx, fy, fz};
+      return -M_PI * M_PI / (lambda + 1) * result_type{fx, fy, 0};
    };
 
-   auto solution = [material_data](const point<T, 3>& p) -> auto
-   {
-      const T mu     = material_data.mu;
-      const T lambda = material_data.lambda;
-      T       fx = sin(2 * M_PI * p.y()) * sin(2 * M_PI * p.z()) * (-1 + cos(2 * M_PI * p.x())) +
-             (1. / (1 + lambda)) * sin(M_PI * p.x()) * sin(M_PI * p.y()) * sin(M_PI * p.z());
-      T fy = sin(2 * M_PI * p.z()) * sin(2 * M_PI * p.x()) * (-1 + cos(2 * M_PI * p.y())) +
-             (1. / (1 + lambda)) * sin(M_PI * p.x()) * sin(M_PI * p.y()) * sin(M_PI * p.z());
-      T fz = sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) * (-1 + cos(2 * M_PI * p.z())) +
-             (1. / (1 + lambda)) * sin(M_PI * p.x()) * sin(M_PI * p.y()) * sin(M_PI * p.z());
-      return result_type{fx, fy, fz};
+   auto solution = [material_data](const point<T, 3>& p) -> result_type {
+      T fx = sin(2 * M_PI * p.y()) * (cos(2 * M_PI * p.x()) - 1) +
+             1.0 / (1 + material_data.lambda) * sin(M_PI * p.x()) * sin(M_PI * p.y());
+      T fy = -sin(2 * M_PI * p.x()) * (cos(2 * M_PI * p.y()) - 1) +
+             1.0 / (1 + material_data.lambda) * sin(M_PI * p.x()) * sin(M_PI * p.y());
+
+      return result_type{fx, fy, 0};
    };
 
-   typedef BoundaryConditions<mesh_type, decltype(solution)> Bnd_type;
-   Bnd_type                                                  bnd(msh);
-
+   Bnd_type bnd(msh);
    bnd.addDirichletEverywhere(solution);
 
-   linear_elasticity_solver<mesh_type, Bnd_type> le(msh, bnd, material_data, rp.degree);
+   linear_elasticity_solver<mesh_type> le(msh, bnd, material_data, rp.degree);
    le.verbose(rp.verbose);
 
    le.changeElasticityParameters(material_data);
@@ -213,11 +205,9 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>& msh,
    }
 
    std::cout << "Discetisation h: " << disk::mesh_h(msh) << std::endl;
-   std::cout << "L2 error: " << le.compute_l2_error(solution) << std::endl;
-   //    le.plot_solution_at_gausspoint("sol_elas_3d.msh");
-   //    le.plot_l2error_at_gausspoint("error_gp_3d_.msh", solution);
-   //    le.compute_deformed("deforme3d.msh");
-   //    le.compute_discontinuous_solution("depl3d.msh");
+   std::cout << "L2 error: " << le.compute_l2_displacement_error(solution) << std::endl;
+
+   le.compute_discontinuous_displacement("sol_elas_3d.msh");
 }
 
 int
@@ -237,8 +227,8 @@ main(int argc, char** argv)
    // Elasticity Parameters
    ElasticityParameters material_data;
 
-   material_data.mu     = 1.0;
-   material_data.lambda = 10E5;
+   material_data.mu     = 0.375;
+   material_data.lambda = 7.5 * 10E6;
 
    int ch;
 
@@ -277,6 +267,14 @@ main(int argc, char** argv)
    if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$"))) {
       std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
       auto msh = disk::load_fvca5_2d_mesh<RealType>(mesh_filename);
+      run_linear_elasticity_solver(msh, rp, material_data);
+      return 0;
+   }
+
+   /* Medit 2d*/
+   if (std::regex_match(mesh_filename, std::regex(".*\\.medit2d$"))) {
+      std::cout << "Guessed mesh format: Medit format" << std::endl;
+      auto msh = disk::load_medit_2d_mesh<RealType>(mesh_filename);
       run_linear_elasticity_solver(msh, rp, material_data);
       return 0;
    }
