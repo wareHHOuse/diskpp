@@ -11,7 +11,7 @@ set(diskpp_VERSION_MINOR 0)
 set(diskpp_VERSION_PATCH 0)
 
 # Additional modules path for cmake
-set (CMAKE_MODULE_PATH 
+set (CMAKE_MODULE_PATH
      ${CMAKE_MODULE_PATH}
      ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -58,7 +58,7 @@ configure_file (
 include_directories("${PROJECT_BINARY_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}")
 
-include_directories(core contrib)
+include_directories(core contrib apps/exemple_visualisation/visualisation)
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     set(LINK_LIBS "${LINK_LIBS}" pthread)
@@ -70,6 +70,7 @@ endif()
 
 add_subdirectory(contrib)
 add_subdirectory(core)
+add_subdirectory(apps/exemple_visualisation/visualisation)
 
 add_library(diskpp SHARED ${diskpp_source})
 set(LINK_LIBS "${LINK_LIBS}" diskpp)
