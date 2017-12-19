@@ -1,4 +1,5 @@
 #pragma once
 
 #cmakedefine HAVE_INTEL_MKL
-#cmakedefine HAVE_SOLVER_WRAPPERS
+#cmakedefine HAVE_AGMG
+#cmakedefine HAVE_SILO
