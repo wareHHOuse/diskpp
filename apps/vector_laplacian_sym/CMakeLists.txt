@@ -1,6 +1,0 @@
-add_executable(vector_laplacian_sym vector_laplacian.cpp)
-target_link_libraries(vector_laplacian_sym ${LINK_LIBS})
-
-add_executable(vector_laplacian_test_sym vector_laplacian_test_convergence_rates.cpp)
-target_link_libraries(vector_laplacian_test_sym ${LINK_LIBS})
-install(TARGETS vector_laplacian_test_sym RUNTIME DESTINATION bin)

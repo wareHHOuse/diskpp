@@ -22,7 +22,6 @@
 
 #pragma once
 
-#include "bases/bases_utils.hpp"
 #include "common/eigen.hpp"
 
 namespace disk {
@@ -207,7 +206,7 @@ template<typename T, int DIM>
 static_tensor<T, DIM>
 computeKroneckerProduct(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DIM, DIM>& B)
 {
-   static_tensor<T, DIM> ret;
+   static_tensor<T, DIM> ret = static_tensor<T, DIM>::Zero();
 
    for (size_t j = 0; j < DIM; j++)
       for (size_t i = 0; i < DIM; i++)
@@ -222,7 +221,7 @@ template<typename T, int DIM>
 static_tensor<T, DIM>
 computeProductSup(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DIM, DIM>& B)
 {
-   static_tensor<T, DIM> ret;
+   static_tensor<T, DIM> ret = static_tensor<T, DIM>::Zero();
 
    for (size_t i = 0; i < DIM; i++)
       for (size_t j = 0; j < DIM; j++)
@@ -239,7 +238,7 @@ template<typename T, int DIM>
 static_tensor<T, DIM>
 computeProductInf(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DIM, DIM>& B)
 {
-   static_tensor<T, DIM> ret;
+   static_tensor<T, DIM> ret = static_tensor<T, DIM>::Zero();
 
    for (size_t i = 0; i < DIM; i++)
       for (size_t j = 0; j < DIM; j++)
@@ -257,8 +256,9 @@ compute_IdentityTensor()
    static_tensor<T, DIM> ret = static_tensor<T, DIM>::Zero();
    T                     one = T{1};
 
-   if (DIM == 1) ret(0, 0) = one; // I1111
-   if (DIM == 2) {
+   if (DIM == 1)
+      ret(0, 0) = one; // I1111
+   else if (DIM == 2) {
       ret(0, 0) = one; // I1111
       ret(0, 3) = one; // I1212
       ret(3, 0) = one; // I2121

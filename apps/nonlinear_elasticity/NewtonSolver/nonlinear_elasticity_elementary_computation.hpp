@@ -98,7 +98,7 @@ class nonlinear_elasticity
 
       const vector_type GsT_uTF = GsT * uTF;
 
-      disk::LinearElasticityLaw<scalar_type> law(m_data.lambda, m_data.mu);
+      disk::HenckyMisesLaw<scalar_type> law(m_data.lambda, m_data.mu);
 
       const auto grad_quadpoints = m_bqd.grad_quadrature.integrate(msh, cl);
       assert(2 * grad_degree <= m_bqd.grad_quadrature.order());

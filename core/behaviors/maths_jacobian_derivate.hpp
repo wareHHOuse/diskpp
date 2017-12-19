@@ -32,7 +32,7 @@ namespace disk {
 // | A1111  A1112  A1211  A1212 |
 // | A1121  A1122  A1221  A1222 |
 // | A2111  A2112  A2211  A2212 |
-// | A2112  A2122  A2221  A2222 |
+// | A2121  A2122  A2221  A2222 |
 
 // Compute \partial J / \partial M
 

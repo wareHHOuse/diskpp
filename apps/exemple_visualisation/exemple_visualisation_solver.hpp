@@ -264,6 +264,9 @@ class diffusion_solver
    void
    plot_l2error_at_gausspoint(const std::string& filename, const AnalyticalSolution& as)
    {
+      const size_t cbs         = disk::howmany_dofs(m_bqd.cell_basis);
+      const size_t cell_degree = m_bqd.cell_degree();
+
       std::cout << "Compute L2 error at Gauss points" << std::endl;
       gmsh::Gmesh msh(m_msh.dimension); // creta a mesh
 
@@ -273,15 +276,12 @@ class diffusion_solver
 
       size_t cell_i = 0;
       for (auto& cl : m_msh) {
-         const auto x   = m_postprocess_data.at(cell_i++);
-         const auto qps = m_bqd.cell_quadrature.integrate(m_msh, cl);
+         const vector_dynamic x   = m_postprocess_data.at(cell_i++).head(cbs);
+         const auto           qps = m_bqd.cell_quadrature.integrate(m_msh, cl);
          for (auto& qp : qps) {
-            const auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, qp.point());
+            const auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, qp.point(), 0, cell_degree);
 
-            scalar_type pot = 0.0;
-            for (size_t i = 0; i < m_bqd.cell_basis.range(0, m_cell_degree).size(); i++) {
-               pot += phi[i] * x(i);
-            }
+            const scalar_type pot = disk::hho::eval(x, phi);
 
             const scalar_type true_pot = as(qp.point()); // a voir et projeté
 
@@ -303,6 +303,9 @@ class diffusion_solver
    void
    plot_solution_at_gausspoint(const std::string& filename)
    {
+      const size_t cbs         = disk::howmany_dofs(m_bqd.cell_basis);
+      const size_t cell_degree = m_bqd.cell_degree();
+
       std::cout << "Compute solution at Gauss points" << std::endl;
       gmsh::Gmesh msh(m_msh.dimension); // creta a mesh
 
@@ -312,14 +315,12 @@ class diffusion_solver
 
       size_t cell_i = 0;
       for (auto& cl : m_msh) {
-         auto x   = m_postprocess_data.at(cell_i++);
-         auto qps = m_bqd.cell_quadrature.integrate(m_msh, cl);
+         const vector_dynamic x   = m_postprocess_data.at(cell_i++).head(cbs);
+         const auto           qps = m_bqd.cell_quadrature.integrate(m_msh, cl);
          for (auto& qp : qps) {
-            auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, qp.point());
+            const auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, qp.point(), 0, cell_degree);
 
-            scalar_type pot = 0.0;
-            for (size_t i = 0; i < m_bqd.cell_basis.range(0, m_cell_degree).size(); i++)
-               pot += phi[i] * x(i);
+            const scalar_type pot = disk::hho::eval(x, phi);
 
             nb_node += 1;
             gmsh::Node snode =
@@ -339,6 +340,9 @@ class diffusion_solver
    void
    plot_conforme_solution(const std::string& filename)
    {
+      const size_t cbs         = disk::howmany_dofs(m_bqd.cell_basis);
+      const size_t cell_degree = m_bqd.cell_degree();
+
       gmsh::Gmesh gmsh    = disk::convertMesh(m_msh);
       auto        storage = m_msh.backend_storage();
       size_t      nb_nodes(gmsh.getNumberofNodes());
@@ -348,21 +352,16 @@ class diffusion_solver
 
       size_t cell_i(0);
       for (auto& cl : m_msh) {
-         vector_dynamic          x          = m_postprocess_data.at(cell_i++);
-         auto                    cell_nodes = disk::cell_nodes(m_msh, cl);
+         const vector_dynamic    x          = m_postprocess_data.at(cell_i++).head(cbs);
+         const auto              cell_nodes = disk::cell_nodes(m_msh, cl);
          std::vector<gmsh::Node> new_nodes;
          for (size_t i = 0; i < cell_nodes.size(); i++) {
             nb_nodes++;
-            auto point_ids = cell_nodes[i];
-            auto pt        = storage->points[point_ids];
+            const auto point_ids = cell_nodes[i];
+            const auto pt        = storage->points[point_ids];
 
-            auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, pt);
-
-            scalar_type pot(0.0);
-
-            // compute solution at the node
-            for (size_t i = 0; i < m_bqd.cell_basis.range(0, m_cell_degree).size(); i++)
-               pot += phi[i] * x(i);
+            const auto        phi = m_bqd.cell_basis.eval_functions(m_msh, cl, pt, 0, cell_degree);
+            const scalar_type pot = disk::hho::eval(x, phi);
 
             value[point_ids].first += 1;
             value[point_ids].second += pot;
@@ -374,8 +373,8 @@ class diffusion_solver
       data.reserve(nb_nodes);             // data has a size of nb_node
 
       for (size_t i_node = 0; i_node < value.size(); i_node++) {
-         std::vector<double> tmp_value(1, value[i_node].second / double(value[i_node].first));
-         gmsh::Data          tmp_data(i_node + 1, tmp_value);
+         const std::vector<double> tmp_value(1, value[i_node].second / double(value[i_node].first));
+         const gmsh::Data          tmp_data(i_node + 1, tmp_value);
          data.push_back(tmp_data); // add data
       }
 
@@ -387,6 +386,9 @@ class diffusion_solver
    void
    plot_discontinuous_solution(const std::string& filename)
    {
+      const size_t cbs         = disk::howmany_dofs(m_bqd.cell_basis);
+      const size_t cell_degree = m_bqd.cell_degree();
+
       const size_t dim = m_msh.dimension;
       gmsh::Gmesh  gmsh(dim);
       auto         storage = m_msh.backend_storage();
@@ -397,31 +399,25 @@ class diffusion_solver
       size_t cell_i(0);
       size_t nb_nodes(0);
       for (auto& cl : m_msh) {
-         vector_dynamic          x          = m_postprocess_data.at(cell_i++);
-         auto                    cell_nodes = disk::cell_nodes(m_msh, cl);
+         const vector_dynamic    x          = m_postprocess_data.at(cell_i++).head(cbs);
+         const auto              cell_nodes = disk::cell_nodes(m_msh, cl);
          std::vector<gmsh::Node> new_nodes;
          for (size_t i = 0; i < cell_nodes.size(); i++) {
             nb_nodes++;
-            auto point_ids = cell_nodes[i];
-            auto pt        = storage->points[point_ids];
+            const auto point_ids = cell_nodes[i];
+            const auto pt        = storage->points[point_ids];
 
-            auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, pt);
+            const auto        phi = m_bqd.cell_basis.eval_functions(m_msh, cl, pt, 0, cell_degree);
+            const scalar_type pot = disk::hho::eval(x, phi);
 
-            std::array<double, 3> coor = {double{0.0}, double{0.0}, double{0.0}};
+            const std::array<double, 3> coor = disk::init_coor(pt);
 
-            disk::init_coor(pt, coor);
-            gmsh::Node tmp_node(coor, nb_nodes, 0);
+            const gmsh::Node tmp_node(coor, nb_nodes, 0);
             new_nodes.push_back(tmp_node);
             gmsh.addNode(tmp_node);
 
-            // plot magnitude at node
-            scalar_type pot(0.0);
-            for (size_t i = 0; i < m_bqd.cell_basis.range(0, m_cell_degree).size();
-                 i++) // compute solution at the node
-               pot += phi[i] * x(i);
-
-            std::vector<double> value = {double(pot)};
-            gmsh::Data          datatmp(nb_nodes, value);
+            const std::vector<double> value = {double(pot)};
+            const gmsh::Data          datatmp(nb_nodes, value);
             data.push_back(datatmp);
          }
          // add new element
@@ -436,113 +432,100 @@ class diffusion_solver
    void
    plot_deformed_conforme(const std::string& filename)
    {
-      const size_t DIM = m_msh.dimension;
-      if (DIM >= 3)
-         std::cout << "Compute deformed only in 1D or 2D" << '\n';
-      else {
-         gmsh::Gmesh gmsh    = disk::convertMesh(m_msh);
-         auto        storage = m_msh.backend_storage();
-         size_t      nb_nodes(gmsh.getNumberofNodes());
+      const size_t cbs         = disk::howmany_dofs(m_bqd.cell_basis);
+      const size_t cell_degree = m_bqd.cell_degree();
 
-         // first(number of data at this node), second(cumulated value)
-         std::vector<std::pair<size_t, scalar_type>> value(nb_nodes,
-                                                           std::make_pair(0, double(0.0)));
+      static_assert(mesh_type::dimension < 3, "dim<=3");
 
-         size_t cell_i(0);
-         for (auto& cl : m_msh) {
-            vector_dynamic          x          = m_postprocess_data.at(cell_i++);
-            auto                    cell_nodes = disk::cell_nodes(m_msh, cl);
-            std::vector<gmsh::Node> new_nodes;
-            for (size_t i = 0; i < cell_nodes.size(); i++) {
-               nb_nodes++;
-               auto point_ids = cell_nodes[i];
-               auto pt        = storage->points[point_ids];
+      gmsh::Gmesh gmsh    = disk::convertMesh(m_msh);
+      auto        storage = m_msh.backend_storage();
+      size_t      nb_nodes(gmsh.getNumberofNodes());
 
-               auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, pt);
+      // first(number of data at this node), second(cumulated value)
+      std::vector<std::pair<size_t, scalar_type>> value(nb_nodes, std::make_pair(0, double(0.0)));
 
-               scalar_type pot(0.0);
+      size_t cell_i(0);
+      for (auto& cl : m_msh) {
+         const vector_dynamic    x          = m_postprocess_data.at(cell_i++).head(cbs);
+         const auto              cell_nodes = disk::cell_nodes(m_msh, cl);
+         std::vector<gmsh::Node> new_nodes;
+         for (size_t i = 0; i < cell_nodes.size(); i++) {
+            nb_nodes++;
+            const auto point_ids = cell_nodes[i];
+            const auto pt        = storage->points[point_ids];
 
-               // compute solution at the node
-               for (size_t i = 0; i < m_bqd.cell_basis.range(0, m_cell_degree).size(); i++)
-                  pot += phi[i] * x(i);
+            const auto        phi = m_bqd.cell_basis.eval_functions(m_msh, cl, pt, 0, cell_degree);
+            const scalar_type pot = disk::hho::eval(x, phi);
 
-               value[point_ids].first += 1;
-               value[point_ids].second += pot;
-            }
+            value[point_ids].first += 1;
+            value[point_ids].second += pot;
          }
-
-         std::vector<gmsh::Data>    data;    // create data
-         std::vector<gmsh::SubData> subdata; // create subdata
-         data.reserve(nb_nodes);             // data has a size of nb_node
-
-         for (size_t i_node = 0; i_node < value.size(); i_node++) {
-            std::vector<double> tmp_value(3, 0.0);
-            tmp_value[DIM] = value[i_node].second / double(value[i_node].first);
-            gmsh::Data tmp_data(i_node + 1, tmp_value);
-            data.push_back(tmp_data); // add data
-         }
-
-         gmsh::NodeData nodedata(
-           3, 0.0, "sol_node", data, subdata); // create and init a nodedata view
-
-         nodedata.saveNodeData(filename, gmsh); // save the view
       }
+
+      std::vector<gmsh::Data>    data;    // create data
+      std::vector<gmsh::SubData> subdata; // create subdata
+      data.reserve(nb_nodes);             // data has a size of nb_node
+
+      for (size_t i_node = 0; i_node < value.size(); i_node++) {
+         std::vector<double> tmp_value(3, 0.0);
+         tmp_value[m_msh.dimension] = value[i_node].second / double(value[i_node].first);
+         const gmsh::Data tmp_data(i_node + 1, tmp_value);
+         data.push_back(tmp_data); // add data
+      }
+
+      gmsh::NodeData nodedata(3, 0.0, "sol_node", data, subdata); // create and init a nodedata view
+
+      nodedata.saveNodeData(filename, gmsh); // save the view
    }
 
    void
    plot_deformed_discontinuous(const std::string& filename)
    {
-      const size_t DIM = m_msh.dimension;
-      if (DIM >= 3)
-         std::cout << "Compute deformed only in 1D or 2D" << '\n';
-      else {
-         gmsh::Gmesh gmsh(DIM);
-         auto        storage = m_msh.backend_storage();
+      const size_t cbs         = disk::howmany_dofs(m_bqd.cell_basis);
+      const size_t cell_degree = m_bqd.cell_degree();
 
-         std::vector<gmsh::Data>    data;    // create data (not used)
-         std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
+      static_assert(mesh_type::dimension < 3, "dim<=3");
 
-         size_t cell_i(0);
-         size_t nb_nodes(0);
-         for (auto& cl : m_msh) {
-            vector_dynamic          x          = m_postprocess_data.at(cell_i++);
-            auto                    cell_nodes = disk::cell_nodes(m_msh, cl);
-            std::vector<gmsh::Node> new_nodes;
-            for (size_t i = 0; i < cell_nodes.size(); i++) {
-               nb_nodes++;
-               auto point_ids = cell_nodes[i];
-               auto pt        = storage->points[point_ids];
+      gmsh::Gmesh gmsh(m_msh.dimension);
+      auto        storage = m_msh.backend_storage();
 
-               auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, pt);
+      std::vector<gmsh::Data>    data;    // create data (not used)
+      std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
 
-               std::array<double, 3> coor = {double{0.0}, double{0.0}, double{0.0}};
+      size_t cell_i(0);
+      size_t nb_nodes(0);
+      for (auto& cl : m_msh) {
+         const vector_dynamic    x          = m_postprocess_data.at(cell_i++).head(cbs);
+         const auto              cell_nodes = disk::cell_nodes(m_msh, cl);
+         std::vector<gmsh::Node> new_nodes;
+         for (size_t i = 0; i < cell_nodes.size(); i++) {
+            nb_nodes++;
+            const auto point_ids = cell_nodes[i];
+            const auto pt        = storage->points[point_ids];
 
-               disk::init_coor(pt, coor);
-               gmsh::Node tmp_node(coor, nb_nodes, 0);
-               new_nodes.push_back(tmp_node);
-               gmsh.addNode(tmp_node);
+            const auto        phi = m_bqd.cell_basis.eval_functions(m_msh, cl, pt, 0, cell_degree);
+            const scalar_type pot = disk::hho::eval(x, phi);
 
-               // plot magnitude at node
-               scalar_type pot(0.0);
-               for (size_t i = 0; i < m_bqd.cell_basis.range(0, m_cell_degree).size();
-                    i++) // compute solution at the node
-                  pot += phi[i] * x(i);
+            const std::array<double, 3> coor = disk::init_coor(pt);
 
-               std::vector<double> value(3, 0.0);
-               value[DIM + 1 - 1] = {double(pot)};
-               gmsh::Data datatmp(nb_nodes, value);
+            const gmsh::Node tmp_node(coor, nb_nodes, 0);
+            new_nodes.push_back(tmp_node);
+            gmsh.addNode(tmp_node);
 
-               data.push_back(datatmp);
-            }
-            // add new element
-            disk::add_element(gmsh, new_nodes);
+            std::vector<double> value(3, 0.0);
+            value[m_msh.dimension + 1 - 1] = {double(pot)};
+            gmsh::Data datatmp(nb_nodes, value);
+
+            data.push_back(datatmp);
          }
-
-         gmsh::NodeData nodedata(
-           3, 0.0, "sol_node_deformed", data, subdata); // create and init a nodedata view
-
-         nodedata.saveNodeData(filename, gmsh); // save the view
+         // add new element
+         disk::add_element(gmsh, new_nodes);
       }
+
+      gmsh::NodeData nodedata(
+        3, 0.0, "sol_node_deformed", data, subdata); // create and init a nodedata view
+
+      nodedata.saveNodeData(filename, gmsh); // save the view
    }
 
    void

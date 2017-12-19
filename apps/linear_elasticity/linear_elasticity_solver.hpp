@@ -20,6 +20,13 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
+/* Solve the linear elasticity problem with HHO method
+ * A hybrid high-order locking-free method for linear elasticity on general meshes
+ * Di Pietro, Daniele A. and Ern, Alexandre.
+ * Comput. Methods Appl. Mech. Engrg. (2015)
+ *  DOI: 10.1016/j.cma.2014.09.009
+ */
+
 #include <iostream>
 #include <sstream>
 
@@ -398,11 +405,12 @@ class linear_elasticity_solver
       return sqrt(error_stress);
    }
 
+   // post-processing
    void
    compute_discontinuous_displacement(const std::string& filename) const
    {
-      const size_t cell_degree   = m_bqd.cell_degree();
-      const size_t num_cell_dofs = (m_bqd.cell_basis.range(0, cell_degree)).size();
+      const size_t cell_degree = m_bqd.cell_degree();
+      const size_t cbs         = disk::howmany_dofs(m_bqd.cell_basis);
 
       gmsh::Gmesh gmsh(dimension);
       auto        storage = m_msh.backend_storage();
@@ -410,10 +418,10 @@ class linear_elasticity_solver
       std::vector<gmsh::Data>          data;    // create data (not used)
       const std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
 
-      size_t cell_i(0);
-      size_t nb_nodes(0);
+      size_t cell_i   = 0;
+      size_t nb_nodes = 0;
       for (auto& cl : m_msh) {
-         const vector_dynamic    x          = m_solution_data.at(cell_i++);
+         const vector_dynamic    x          = m_solution_data.at(cell_i++).head(cbs);
          const auto              cell_nodes = disk::cell_nodes(m_msh, cl);
          std::vector<gmsh::Node> new_nodes;
 
@@ -423,25 +431,19 @@ class linear_elasticity_solver
             const auto point_ids = cell_nodes[i];
             const auto pt        = storage->points[point_ids];
 
-            const auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, pt);
+            const auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, pt, 0, cell_degree);
 
-            std::vector<scalar_type> depl(3, scalar_type{0});
-            std::array<double, 3>    coor = {double{0.0}, double{0.0}, double{0.0}};
+            const auto depl = disk::hho::eval(x, phi);
+
+            const std::vector<double>   deplv = disk::convertToVectorGmsh(depl);
+            const std::array<double, 3> coor  = disk::init_coor(pt);
 
             // Add a node
-            disk::init_coor(pt, coor);
             const gmsh::Node tmp_node(coor, nb_nodes, 0);
             new_nodes.push_back(tmp_node);
             gmsh.addNode(tmp_node);
 
-            // Plot displacement at node
-            for (size_t i = 0; i < num_cell_dofs; i += dimension) {
-               for (size_t j = 0; j < dimension; j++) {
-                  depl[j] += phi[i + j](j) * x(i + j); // a voir
-               }
-            }
-
-            const gmsh::Data datatmp(nb_nodes, depl);
+            const gmsh::Data datatmp(nb_nodes, deplv);
             data.push_back(datatmp);
          }
          // Add new element
@@ -450,6 +452,77 @@ class linear_elasticity_solver
 
       // Create and init a nodedata view
       gmsh::NodeData nodedata(3, 0.0, "depl_node", data, subdata);
+
+      // Save the view
+      nodedata.saveNodeData(filename, gmsh);
+   }
+
+   void
+   compute_discontinuous_stress(const std::string& filename) const
+   {
+      auto sgradrec = sgradrec_type(m_bqd);
+      auto divrec   = divrec_type(m_bqd);
+
+      const size_t cbs         = disk::howmany_dofs(m_bqd.cell_basis);
+      const size_t cell_degree = m_bqd.cell_degree();
+
+      gmsh::Gmesh gmsh(dimension);
+      auto        storage = m_msh.backend_storage();
+
+      std::vector<gmsh::Data>          data;    // create data (not used)
+      const std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
+
+      size_t cell_i   = 0;
+      size_t nb_nodes = 0;
+      for (auto& cl : m_msh) {
+         const auto x = m_solution_data.at(cell_i++).head(cbs);
+         sgradrec.compute(m_msh, cl);
+
+         const dynamic_vector<scalar_type> GsTu = sgradrec.oper * x;
+
+         divrec.compute(m_msh, cl);
+
+         const dynamic_vector<scalar_type> Divu = divrec.oper * x;
+
+         const auto              cell_nodes = disk::cell_nodes(m_msh, cl);
+         std::vector<gmsh::Node> new_nodes;
+
+         // loop on the nodes of the cell
+         for (size_t i = 0; i < cell_nodes.size(); i++) {
+            nb_nodes++;
+            const auto point_ids = cell_nodes[i];
+            const auto pt        = storage->points[point_ids];
+
+            const auto sdphi = m_bqd.cell_basis.eval_sgradients(m_msh, cl, pt, 0, cell_degree + 1);
+            const auto gsT   = disk::hho::eval(GsTu, sdphi);
+
+            const auto divphi = m_bqd.div_cell_basis.eval_functions(m_msh, cl, pt, 0, cell_degree);
+            const auto divu   = disk::hho::eval(Divu, divphi);
+
+            const static_matrix<scalar_type, dimension, dimension> stress =
+              2 * m_elas_parameters.mu * gsT +
+              m_elas_parameters.lambda * divu *
+                static_matrix<scalar_type, dimension, dimension>::Identity();
+
+            const std::vector<double>   tens = disk::convertToVectorGmsh(stress);
+            const std::array<double, 3> coor = disk::init_coor(pt);
+
+            // Add a node
+            const gmsh::Node tmp_node(coor, nb_nodes, 0);
+            new_nodes.push_back(tmp_node);
+            gmsh.addNode(tmp_node);
+
+            const gmsh::Data datatmp(nb_nodes, tens);
+            data.push_back(datatmp);
+         }
+
+         // Add new element
+         disk::add_element(gmsh, new_nodes);
+         cell_i++;
+      }
+
+      // Create and init a nodedata view
+      gmsh::NodeData nodedata(9, 0.0, "stress_node", data, subdata);
 
       // Save the view
       nodedata.saveNodeData(filename, gmsh);

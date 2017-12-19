@@ -125,6 +125,7 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>& msh,
    std::cout << "L2 error: " << le.compute_l2_displacement_error(solution) << std::endl;
 
    le.compute_discontinuous_displacement("depl2d.msh");
+   le.compute_discontinuous_stress("stress2d.msh");
 }
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
@@ -207,7 +208,8 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>& msh,
    std::cout << "Discetisation h: " << disk::mesh_h(msh) << std::endl;
    std::cout << "L2 error: " << le.compute_l2_displacement_error(solution) << std::endl;
 
-   le.compute_discontinuous_displacement("sol_elas_3d.msh");
+   le.compute_discontinuous_displacement("depl3d.msh");
+   le.compute_discontinuous_stress("stress3d.msh");
 }
 
 int

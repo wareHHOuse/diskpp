@@ -110,13 +110,13 @@ run_nl_elasticity_solver(const Mesh<T, 2, Storage>&        msh,
    Bnd_type bnd(msh);
    // bnd.addDirichletEverywhere(solution);
 
-   bnd.addDirichletBC(disk::mechanics::CLAMPED, 10, solution);
+   bnd.addDirichletBC(disk::mechanics::CLAMPED, 6, solution);
 
    auto neu = [material_data](const point<T, 2>& p) -> result_type {
-      return result_type{0, 1.0 / 16.0};
+      return result_type{4.5E4, 0.0};
    };
 
-   bnd.addNeumannBC(disk::mechanics::NEUMANN, 6, neu);
+   bnd.addNeumannBC(disk::mechanics::NEUMANN, 10, neu);
 
    nl_elasticity_solver<mesh_type> nl(msh, bnd, rp, material_data);
 
@@ -160,6 +160,7 @@ run_nl_elasticity_solver(const Mesh<T, 2, Storage>&        msh,
    }
 
    nl.compute_discontinuous_displacement("sol2D.msh");
+   nl.compute_discontinuous_stress("stress2D.msh");
 }
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
@@ -288,8 +289,8 @@ main(int argc, char** argv)
    // Elasticity Parameters
    NLE::MaterialParameters<RealType> material_data;
 
-   material_data.mu     = 0.375;
-   material_data.lambda = 7.5 * 10E6;
+   material_data.mu     = 82E4;
+   material_data.lambda = 11E5;
 
    int ch;
 

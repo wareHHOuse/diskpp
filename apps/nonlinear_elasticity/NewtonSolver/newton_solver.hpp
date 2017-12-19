@@ -109,7 +109,9 @@ class NewtonRaphson_solver_nlelasticity
 
    template<typename LoadIncrement>
    NewtonSolverInfo
-   compute(const LoadIncrement& lf, const std::vector<matrix_dynamic>& gradient_precomputed)
+   compute(const LoadIncrement&               lf,
+           const std::vector<matrix_dynamic>& gradient_precomputed,
+           const std::vector<matrix_dynamic>& stab_precomputed)
    {
       NewtonSolverInfo ni;
       timecounter      tc;
@@ -127,7 +129,7 @@ class NewtonRaphson_solver_nlelasticity
          // assemble lhs and rhs
          AssemblyInfo assembly_info;
          try {
-            assembly_info = newton_step.assemble(lf, gradient_precomputed);
+            assembly_info = newton_step.assemble(lf, gradient_precomputed, stab_precomputed);
          } catch (const std::invalid_argument& ia) {
             std::cerr << "Invalid argument: " << ia.what() << std::endl;
             m_convergence = false;

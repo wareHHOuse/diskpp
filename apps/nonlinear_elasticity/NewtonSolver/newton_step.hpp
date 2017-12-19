@@ -147,7 +147,9 @@ class NewtonRaphson_step_nlelasticity
 
    template<typename LoadFunction>
    AssemblyInfo
-   assemble(const LoadFunction& lf, const std::vector<matrix_dynamic>& gradient_precomputed)
+   assemble(const LoadFunction&                lf,
+            const std::vector<matrix_dynamic>& gradient_precomputed,
+            const std::vector<matrix_dynamic>& stab_precomputed)
    {
       gradrec_type      gradrec(m_bqd);
       gradrec_full_type gradrec_full(m_bqd);
@@ -179,35 +181,6 @@ class NewtonRaphson_step_nlelasticity
          tc.toc();
          ai.m_time_gradrec += tc.to_double();
 
-         // Stabilisation
-         tc.tic();
-         if (m_rp.m_stab) {
-            switch (m_rp.m_stab_type) {
-               case PIKF: {
-                  stab_PIKF.compute(m_msh, cl);
-
-                  break;
-               }
-               case HHO: {
-                  gradrec.compute(m_msh, cl);
-                  stab_HHO.compute(m_msh, cl, gradrec.oper);
-
-                  break;
-               }
-               case HDG: {
-                  stab_HDG.compute(m_msh, cl);
-
-                  break;
-               }
-               case NO: {
-                  break;
-               }
-               default: throw std::invalid_argument("Unknown stabilization");
-            }
-         }
-         tc.toc();
-         ai.m_time_stab += tc.to_double();
-
          // Begin Assembly
          // Build rhs and lhs
 
@@ -225,42 +198,59 @@ class NewtonRaphson_step_nlelasticity
 
          // Stabilisation Contribution
          tc.tic();
-         if (m_rp.m_stab) {
-            switch (m_rp.m_stab_type) {
-               case PIKF: {
-                  assert(elem.K_int.rows() == stab_PIKF.data.rows());
-                  assert(elem.K_int.cols() == stab_PIKF.data.cols());
-                  assert(elem.RTF.rows() == (stab_PIKF.data * m_solution_data.at(cell_i)).rows());
-                  assert(elem.RTF.cols() == (stab_PIKF.data * m_solution_data.at(cell_i)).cols());
+         if (m_rp.m_precomputation) {
+            const dynamic_matrix<scalar_type> stab = stab_precomputed.at(cell_i);
+            assert(elem.K_int.rows() == stab.rows());
+            assert(elem.K_int.cols() == stab.cols());
+            assert(elem.RTF.rows() == (stab * m_solution_data.at(cell_i)).rows());
+            assert(elem.RTF.cols() == (stab * m_solution_data.at(cell_i)).cols());
 
-                  lhs += m_rp.m_beta * stab_PIKF.data;
-                  rhs -= m_rp.m_beta * stab_PIKF.data * m_solution_data.at(cell_i);
-                  break;
-               }
-               case HHO: {
-                  assert(elem.K_int.rows() == stab_HHO.data.rows());
-                  assert(elem.K_int.cols() == stab_HHO.data.cols());
-                  assert(elem.RTF.rows() == (stab_HHO.data * m_solution_data.at(cell_i)).rows());
-                  assert(elem.RTF.cols() == (stab_HHO.data * m_solution_data.at(cell_i)).cols());
+            lhs += m_rp.m_beta * stab;
+            rhs -= m_rp.m_beta * stab * m_solution_data.at(cell_i);
+         } else {
+            if (m_rp.m_stab) {
+               switch (m_rp.m_stab_type) {
+                  case PIKF: {
+                     stab_PIKF.compute(m_msh, cl);
+                     assert(elem.K_int.rows() == stab_PIKF.data.rows());
+                     assert(elem.K_int.cols() == stab_PIKF.data.cols());
+                     assert(elem.RTF.rows() ==
+                            (stab_PIKF.data * m_solution_data.at(cell_i)).rows());
+                     assert(elem.RTF.cols() ==
+                            (stab_PIKF.data * m_solution_data.at(cell_i)).cols());
 
-                  lhs += m_rp.m_beta * stab_HHO.data;
-                  rhs -= m_rp.m_beta * stab_HHO.data * m_solution_data.at(cell_i);
-                  break;
-               }
-               case HDG: {
-                  assert(elem.K_int.rows() == stab_HDG.data.rows());
-                  assert(elem.K_int.cols() == stab_HDG.data.cols());
-                  assert(elem.RTF.rows() == (stab_HDG.data * m_solution_data.at(cell_i)).rows());
-                  assert(elem.RTF.cols() == (stab_HDG.data * m_solution_data.at(cell_i)).cols());
+                     lhs += m_rp.m_beta * stab_PIKF.data;
+                     rhs -= m_rp.m_beta * stab_PIKF.data * m_solution_data.at(cell_i);
+                     break;
+                  }
+                  case HHO: {
+                     gradrec.compute(m_msh, cl);
+                     stab_HHO.compute(m_msh, cl, gradrec.oper);
+                     assert(elem.K_int.rows() == stab_HHO.data.rows());
+                     assert(elem.K_int.cols() == stab_HHO.data.cols());
+                     assert(elem.RTF.rows() == (stab_HHO.data * m_solution_data.at(cell_i)).rows());
+                     assert(elem.RTF.cols() == (stab_HHO.data * m_solution_data.at(cell_i)).cols());
 
-                  lhs += m_rp.m_beta * stab_HDG.data;
-                  rhs -= m_rp.m_beta * stab_HDG.data * m_solution_data.at(cell_i);
-                  break;
+                     lhs += m_rp.m_beta * stab_HHO.data;
+                     rhs -= m_rp.m_beta * stab_HHO.data * m_solution_data.at(cell_i);
+                     break;
+                  }
+                  case HDG: {
+                     stab_HDG.compute(m_msh, cl);
+                     assert(elem.K_int.rows() == stab_HDG.data.rows());
+                     assert(elem.K_int.cols() == stab_HDG.data.cols());
+                     assert(elem.RTF.rows() == (stab_HDG.data * m_solution_data.at(cell_i)).rows());
+                     assert(elem.RTF.cols() == (stab_HDG.data * m_solution_data.at(cell_i)).cols());
+
+                     lhs += m_rp.m_beta * stab_HDG.data;
+                     rhs -= m_rp.m_beta * stab_HDG.data * m_solution_data.at(cell_i);
+                     break;
+                  }
+                  case NO: {
+                     break;
+                  }
+                  default: throw std::invalid_argument("Unknown stabilization");
                }
-               case NO: {
-                  break;
-               }
-               default: throw std::invalid_argument("Unknown stabilization");
             }
          }
          tc.toc();

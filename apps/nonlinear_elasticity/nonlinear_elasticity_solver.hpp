@@ -20,6 +20,13 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
+/* Solve the non-linear elasticity problem with HHO method
+ * A Hybrid High-Order method for nonlinear elasticity
+ * M. Botti, D. A. Di Pietro, and P. Sochala.
+ * SIAM J. Numer. Anal., 2017, 55(6):2687–2717
+ * DOI: 10.1137/16M1105943
+ */
+
 #include <iostream>
 #include <sstream>
 
@@ -30,6 +37,7 @@
 #include "hho/hho.hpp"
 #include "hho/hho_bq.hpp"
 #include "hho/projector.hpp"
+#include "hho/stabilization.hpp"
 
 #include "Informations.hpp"
 #include "NewtonSolver/newton_solver.hpp"
@@ -70,6 +78,10 @@ class nl_elasticity_solver
    typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
 
    typedef disk::hho::sym_gradient_reconstruction_full_bq<bqdata_type> gradrec_full_type;
+   typedef disk::hho::sym_gradient_reconstruction_bq<bqdata_type>      gradrec_type;
+   typedef disk::hho::hho_stabilization_bq<bqdata_type>                hho_stab_type;
+   typedef disk::hho::hdg_stabilization_bq<bqdata_type>                hdg_stab_type;
+   typedef disk::hho::pikF_stabilization_bq<bqdata_type>               pikF_stab_type;
    typedef disk::hho::projector_bq<bqdata_type>                        projector_type;
 
    bqdata_type      m_bqd;
@@ -79,7 +91,7 @@ class nl_elasticity_solver
 
    std::vector<vector_dynamic> m_solution_data;
    std::vector<vector_dynamic> m_solution_cells, m_solution_faces;
-   std::vector<matrix_dynamic> m_gradient_precomputed;
+   std::vector<matrix_dynamic> m_gradient_precomputed, m_stab_precomputed;
 
    bool m_verbose, m_convergence;
 
@@ -133,13 +145,47 @@ class nl_elasticity_solver
    {
       gradrec_full_type gradrec_full(m_bqd);
 
+      hho_stab_type  stab_HHO(m_bqd);
+      hdg_stab_type  stab_HDG(m_bqd);
+      pikF_stab_type stab_PIKF(m_bqd);
+
+      gradrec_type gradrec(m_bqd);
+
       m_gradient_precomputed.clear();
       m_gradient_precomputed.reserve(m_msh.cells_size());
+
+      m_stab_precomputed.clear();
+      m_stab_precomputed.reserve(m_msh.cells_size());
 
       for (auto& cl : m_msh) {
          /////// Gradient Reconstruction /////////
          gradrec_full.compute(m_msh, cl);
          m_gradient_precomputed.push_back(gradrec_full.oper);
+
+         if (m_rp.m_stab) {
+            switch (m_rp.m_stab_type) {
+               case PIKF: {
+                  stab_PIKF.compute(m_msh, cl);
+                  m_stab_precomputed.push_back(stab_PIKF.data);
+                  break;
+               }
+               case HHO: {
+                  gradrec.compute(m_msh, cl);
+                  stab_HHO.compute(m_msh, cl, gradrec.oper);
+                  m_stab_precomputed.push_back(stab_HHO.data);
+                  break;
+               }
+               case HDG: {
+                  stab_HDG.compute(m_msh, cl);
+                  m_stab_precomputed.push_back(stab_HDG.data);
+                  break;
+               }
+               case NO: {
+                  break;
+               }
+               default: throw std::invalid_argument("Unknown stabilization");
+            }
+         }
       }
    }
 
@@ -287,7 +333,8 @@ class nl_elasticity_solver
          m_bnd.multiplyAllFunctionsOfAFactor(current_time);
 
          // correction
-         NewtonSolverInfo newton_info = newton_solver.compute(rlf, m_gradient_precomputed);
+         NewtonSolverInfo newton_info =
+           newton_solver.compute(rlf, m_gradient_precomputed, m_stab_precomputed);
          si.updateInfo(newton_info);
 
          if (m_verbose) {
@@ -424,7 +471,7 @@ class nl_elasticity_solver
       gradrec_full_type gradrec_full(m_bqd);
       projector_type    projk(m_bqd);
 
-      disk::LinearElasticityLaw<scalar_type> law(m_data.lambda, m_data.mu);
+      disk::HenckyMisesLaw<scalar_type> law(m_data.lambda, m_data.mu);
 
       size_t      cell_i       = 0;
       scalar_type error_stress = 0;
@@ -465,8 +512,7 @@ class nl_elasticity_solver
    void
    compute_discontinuous_displacement(const std::string& filename) const
    {
-      const size_t cell_degree   = m_bqd.cell_degree();
-      const size_t num_cell_dofs = (m_bqd.cell_basis.range(0, cell_degree)).size();
+      const size_t cell_degree = m_bqd.cell_degree();
 
       gmsh::Gmesh gmsh(dimension);
       auto        storage = m_msh.backend_storage();
@@ -474,10 +520,10 @@ class nl_elasticity_solver
       std::vector<gmsh::Data>          data;    // create data (not used)
       const std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
 
-      size_t cell_i(0);
-      size_t nb_nodes(0);
+      size_t cell_i   = 0;
+      size_t nb_nodes = 0;
       for (auto& cl : m_msh) {
-         const vector_dynamic    x          = m_solution_data.at(cell_i++);
+         const vector_dynamic    x          = m_solution_cells.at(cell_i++);
          const auto              cell_nodes = disk::cell_nodes(m_msh, cl);
          std::vector<gmsh::Node> new_nodes;
 
@@ -487,25 +533,19 @@ class nl_elasticity_solver
             const auto point_ids = cell_nodes[i];
             const auto pt        = storage->points[point_ids];
 
-            const auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, pt);
+            const auto phi = m_bqd.cell_basis.eval_functions(m_msh, cl, pt, 0, cell_degree);
 
-            std::vector<scalar_type> depl(3, scalar_type{0});
-            std::array<double, 3>    coor = {double{0.0}, double{0.0}, double{0.0}};
+            const auto depl = disk::hho::eval(x, phi);
+
+            const std::vector<double>   deplv = disk::convertToVectorGmsh(depl);
+            const std::array<double, 3> coor  = disk::init_coor(pt);
 
             // Add a node
-            disk::init_coor(pt, coor);
             const gmsh::Node tmp_node(coor, nb_nodes, 0);
             new_nodes.push_back(tmp_node);
             gmsh.addNode(tmp_node);
 
-            // Plot displacement at node
-            for (size_t i = 0; i < num_cell_dofs; i += dimension) {
-               for (size_t j = 0; j < dimension; j++) {
-                  depl[j] += phi[i + j](j) * x(i + j); // a voir
-               }
-            }
-
-            const gmsh::Data datatmp(nb_nodes, depl);
+            const gmsh::Data datatmp(nb_nodes, deplv);
             data.push_back(datatmp);
          }
          // Add new element
@@ -514,6 +554,69 @@ class nl_elasticity_solver
 
       // Create and init a nodedata view
       gmsh::NodeData nodedata(3, 0.0, "depl_node", data, subdata);
+
+      // Save the view
+      nodedata.saveNodeData(filename, gmsh);
+   }
+
+   void
+   compute_discontinuous_stress(const std::string& filename) const
+   {
+      gradrec_full_type                 gradrec_full(m_bqd);
+      disk::HenckyMisesLaw<scalar_type> law(m_data.lambda, m_data.mu);
+
+      gmsh::Gmesh gmsh(dimension);
+      auto        storage = m_msh.backend_storage();
+
+      std::vector<gmsh::Data>          data;    // create data (not used)
+      const std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
+
+      size_t cell_i   = 0;
+      size_t nb_nodes = 0;
+      for (auto& cl : m_msh) {
+         const auto x = m_solution_data.at(cell_i);
+
+         matrix_dynamic GT;
+         if (m_rp.m_precomputation) {
+            GT = m_gradient_precomputed[cell_i];
+         } else {
+            gradrec_full.compute(m_msh, cl);
+            GT = gradrec_full.oper;
+         }
+         const dynamic_vector<scalar_type> GsTu       = GT * x;
+         const auto                        cell_nodes = disk::cell_nodes(m_msh, cl);
+         std::vector<gmsh::Node>           new_nodes;
+
+         // loop on the nodes of the cell
+         for (size_t i = 0; i < cell_nodes.size(); i++) {
+            nb_nodes++;
+            const auto point_ids = cell_nodes[i];
+            const auto pt        = storage->points[point_ids];
+
+            const auto gphi = m_bqd.grad_basis.eval_functions(m_msh, cl, pt);
+            const auto gsT  = disk::hho::eval(GsTu, gphi);
+
+            const auto stress = law.compute_stress(gsT);
+
+            const std::vector<double>   tens = disk::convertToVectorGmsh(stress);
+            const std::array<double, 3> coor = disk::init_coor(pt);
+
+            // Add a node
+            const gmsh::Node tmp_node(coor, nb_nodes, 0);
+            new_nodes.push_back(tmp_node);
+            gmsh.addNode(tmp_node);
+
+            const gmsh::Data datatmp(nb_nodes, tens);
+            data.push_back(datatmp);
+         }
+
+         // Add new element
+         disk::add_element(gmsh, new_nodes);
+         cell_i++;
+      }
+
+      // Create and init a nodedata view
+      gmsh::NodeData nodedata(9, 0.0, "stress_node", data, subdata);
 
       // Save the view
       nodedata.saveNodeData(filename, gmsh);

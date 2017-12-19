@@ -25,6 +25,7 @@
 #define _BEHAVIOR_HPP_WAS_INCLUDED_
 
 #include "CavitationLaw.hpp"
+#include "HenckyMisesLaw.hpp"
 #include "LinearElasticityLaw.hpp"
 #include "LinearLaw.hpp"
 #include "NeohookeanLaw.hpp"

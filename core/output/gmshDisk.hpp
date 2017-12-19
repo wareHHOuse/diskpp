@@ -142,6 +142,58 @@ convertHexahedron(const DiskHexa& hexahedron, const size_t index)
    return hexa;
 }
 
+template<typename T>
+std::vector<double>
+convertToVectorGmsh(const T& field)
+{
+   std::vector<double> ret(3, 0);
+
+   ret[0] = field;
+
+   return ret;
+}
+
+template<typename T, int DIM>
+std::vector<double>
+convertToVectorGmsh(const static_vector<T, DIM>& field)
+{
+   static_assert(DIM <= 3, "DIM has to be <=3");
+
+   std::vector<double> ret(3, 0);
+
+   for (size_t i = 0; i < DIM; i++) {
+      ret[i] = field(i);
+   }
+
+   return ret;
+}
+
+template<typename T, int DIM>
+std::vector<double>
+convertToVectorGmsh(const static_matrix<T, DIM, DIM>& field)
+{
+   static_assert(DIM <= 3, "DIM has to be <=3");
+
+   std::vector<double> ret(9, 0);
+
+   if (DIM == 3) {
+      for (size_t j = 0; j < DIM; j++) {
+         for (size_t i = 0; i < DIM; i++) {
+            ret[i + j * DIM] = field(i, j);
+         }
+      }
+   } else if (DIM == 2) {
+      ret[0] = field(0, 0);
+      ret[1] = field(1, 0);
+      ret[3] = field(0, 1);
+      ret[4] = field(1, 1);
+   } else {
+      ret[0] = field(0, 0);
+   }
+
+   return ret;
+}
+
 template<typename T, size_t DIM>
 void
 init_coor(const point<T, DIM>& point, std::array<double, 3>& coor)
@@ -149,6 +201,19 @@ init_coor(const point<T, DIM>& point, std::array<double, 3>& coor)
    for (size_t i = 0; i < DIM; i++) {
       coor[i] = double(point.at(i));
    }
+}
+
+template<typename T, size_t DIM>
+std::array<double, 3>
+init_coor(const point<T, DIM>& point)
+{
+   std::array<double, 3> coor = {double{0.0}, double{0.0}, double{0.0}};
+
+   for (size_t i = 0; i < DIM; i++) {
+      coor[i] = double(point.at(i));
+   }
+
+   return coor;
 }
 
 template<template<typename, size_t, typename> class Mesh,
