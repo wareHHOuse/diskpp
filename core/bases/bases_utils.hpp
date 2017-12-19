@@ -22,9 +22,9 @@
 
 #pragma once
 
+#include "bases/bases.hpp"
 #include "common/eigen.hpp"
 #include "quadratures/quadratures.hpp"
-#include "bases/bases.hpp"
 
 namespace disk {
 
@@ -32,54 +32,70 @@ template<typename T>
 T
 mm_prod(const T& a, const T& b)
 {
-    return a*b;
+   return a * b;
 }
 
 template<typename T, int N>
 T
-mm_prod(const static_vector<T,N>& a, const static_vector<T,N>& b)
+mm_prod(const static_vector<T, N>& a, const static_vector<T, N>& b)
 {
-    return a.dot(b);
+   return a.dot(b);
 }
 
 template<typename T, int N>
-static_vector<T,N>
-mm_prod(const static_vector<T,N>& a, const T& b)
+static_vector<T, N>
+mm_prod(const static_vector<T, N>& a, const T& b)
 {
-    return a * b;
+   return a * b;
 }
 
 template<typename T, int N>
-static_vector<T,N>
-mm_prod(const T& a, const static_vector<T,N>& b)
+static_vector<T, N>
+mm_prod(const T& a, const static_vector<T, N>& b)
 {
-    return a * b;
+   return a * b;
 }
 
 template<typename T, int N>
-static_vector<T,N>
-mm_prod(const static_matrix<T,N,N>& a, const static_vector<T,N>& b)
+static_vector<T, N>
+mm_prod(const static_matrix<T, N, N>& a, const static_vector<T, N>& b)
 {
-    return a * b;
+   return a * b;
 }
 
 template<typename T, int N>
 T
-mm_prod(const static_matrix<T,N,N>& a, const static_matrix<T,N,N>& b)
+mm_prod(const static_matrix<T, N, N>& a, const static_matrix<T, N, N>& b)
 {
-    return a.cwiseProduct(b).sum();
+   return a.cwiseProduct(b).sum();
+}
+
+template<typename T, int N>
+static_matrix<T, N, N>
+mm_prod(const T& a, const static_matrix<T, N, N>& b)
+{
+   return a * b;
+}
+
+template<typename T, int N>
+static_matrix<T, N, N>
+mm_prod(const static_matrix<T, N, N>& a, const T& b)
+{
+   return a * b;
 }
 
 template<typename T>
-size_t howmany_dofs(const T& basis)
+size_t
+howmany_dofs(const T& basis)
 {
-    return basis.size();
+   return basis.size();
 }
 
 template<typename T>
-size_t howmany_dofs(const T& basis, size_t min_degree, size_t max_degree)
+size_t
+howmany_dofs(const T& basis, size_t min_degree, size_t max_degree)
 {
-    return basis.range(min_degree, max_degree).size();
+   return basis.range(min_degree, max_degree).size();
 }
 
 } // namespace disk

@@ -1,0 +1,6 @@
+add_executable(vector_laplacian_RT vector_laplacian_RT.cpp)
+target_link_libraries(vector_laplacian_RT ${LINK_LIBS})
+
+add_executable(vector_laplacian_RT_test_convergence_rates vector_laplacian_RT_test_convergence_rates.cpp)
+target_link_libraries(vector_laplacian_RT_test_convergence_rates ${LINK_LIBS})
+install(TARGETS vector_laplacian_RT_test_convergence_rates RUNTIME DESTINATION bin)

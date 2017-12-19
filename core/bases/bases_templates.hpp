@@ -19,5 +19,5 @@
  * Journal of Computational and Applied Mathematics.
  * DOI: 10.1016/j.cam.2017.09.017
  */
-
+ 
 #error "This include file is deprecated"

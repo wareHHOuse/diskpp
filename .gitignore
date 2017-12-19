@@ -1,3 +1,5 @@
 .DS_Store
 config.h
-
+*.json
+contrib/Spectra/*
+contrib/gmsh_tools/*

@@ -1,6 +1,6 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
- *      /__\       matteo.cicuttin@enpc.fr
+ *       /\
+ *      /__\       Matteo Cicuttin (C) 2016 - matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
@@ -10,14 +10,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * If you use this code or parts of it for scientific publications, you
- * are required to cite it as following:
- *
- * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
- * polytopal meshes using generic programming.
- * M. Cicuttin, D. A. Di Pietro, A. Ern.
- * Journal of Computational and Applied Mathematics.
- * DOI: 10.1016/j.cam.2017.09.017
+ * If you use this code for scientific publications, you are required to
+ * cite it.
  */
 
 #pragma once
@@ -58,6 +52,10 @@ using material_tensor = static_matrix<T, M, N>;
 
 template<typename T>
 using sparse_matrix = Eigen::SparseMatrix<T>;
+
+//to mimic fourth order tensor
+template<typename T, size_t N>
+using static_tensor = Eigen::Matrix<T, N*N, N*N>;
 
 template<typename T>
 using triplet = Eigen::Triplet<T>;
