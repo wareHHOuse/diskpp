@@ -277,24 +277,25 @@ public:
     typedef Quadrature<mesh_type, cell_type>    cell_quad_type;
     typedef Quadrature<mesh_type, face_type>    face_quad_type;
 
-    cell_basis_type     cell_basis;
+    cell_basis_type     cell_basis, rec_basis;
     face_basis_type     face_basis;
     cell_quad_type      cell_quadrature;
     face_quad_type      face_quadrature;
 
 private:
-    size_t  m_cell_degree, m_face_degree;
+    size_t  m_rec_degree, m_cell_degree, m_face_degree;
 
     void init(void)
     {
-        cell_basis          = cell_basis_type(m_cell_degree, m_cell_degree+1);
+        rec_basis           = cell_basis_type(m_rec_degree);
+        cell_basis          = cell_basis_type(m_cell_degree);
         face_basis          = face_basis_type(m_face_degree);
-        cell_quadrature     = cell_quad_type(2*(m_cell_degree+1));
+        cell_quadrature     = cell_quad_type(2*(m_rec_degree+1));
         face_quadrature     = face_quad_type(2*m_face_degree);
     }
 
 public:
-    basis_quadrature_data() : m_cell_degree(1), m_face_degree(1)
+    basis_quadrature_data() : m_rec_degree(2), m_cell_degree(1), m_face_degree(1)
     {
         init();
     }
@@ -304,12 +305,14 @@ public:
         if ( (cell_degree + 1 < face_degree) or (cell_degree > face_degree + 1) )
             throw std::invalid_argument("Invalid cell degree");
 
+        m_rec_degree = face_degree+1;
         m_cell_degree = cell_degree;
         m_face_degree = face_degree;
 
         init();
     }
 
+    size_t reconstruction_degree(void) const { return m_rec_degree; }
     size_t cell_degree(void) const { return m_cell_degree; }
     size_t face_degree(void) const { return m_face_degree; }
 };
@@ -395,26 +398,28 @@ public:
     void compute(const mesh_type& msh, const cell_type& cl,
                  const TensorField& mtens)
     {
-        auto cell_basis_size = m_bqd.cell_basis.computed_size();
-        auto face_basis_size = m_bqd.face_basis.computed_size();
+        auto rec_basis_size = m_bqd.rec_basis.size();
+        auto cell_basis_size = m_bqd.cell_basis.size();
+        auto face_basis_size = m_bqd.face_basis.size();
+        auto rec_degree = m_bqd.reconstruction_degree();
         auto cell_degree = m_bqd.cell_degree();
         auto face_degree = m_bqd.face_degree();
 
-        matrix_type stiff_mat = matrix_type::Zero(cell_basis_size, cell_basis_size);
+        matrix_type stiff_mat = matrix_type::Zero(rec_basis_size, rec_basis_size);
 
         auto cell_quadpoints = m_bqd.cell_quadrature.integrate(msh, cl);
         for (auto& qp : cell_quadpoints)
         {
-            matrix_type dphi = m_bqd.cell_basis.eval_gradients(msh, cl, qp.point(), 0, cell_degree+1);
+            matrix_type dphi = m_bqd.rec_basis.eval_gradients(msh, cl, qp.point());
             stiff_mat += qp.weight() * dphi * (dphi * mtens(qp.point())).transpose();
         }
 
         /* LHS: take basis functions derivatives from degree 1 to K+1 */
-        auto MG_rowcol_range = m_bqd.cell_basis.range(1, cell_degree+1);
+        auto MG_rowcol_range = m_bqd.rec_basis.range(1, rec_degree);
         matrix_type MG = take(stiff_mat, MG_rowcol_range, MG_rowcol_range);
 
         /* RHS, volumetric part. */
-        auto BG_row_range = m_bqd.cell_basis.range(1, cell_degree+1);
+        auto BG_row_range = m_bqd.rec_basis.range(1, rec_degree);
         auto BG_col_range = m_bqd.cell_basis.range(0, cell_degree);
 
         auto fcs = faces(msh, cl);
@@ -442,7 +447,7 @@ public:
                 matrix_type c_phi =
                     m_bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, cell_degree);
                 matrix_type c_dphi =
-                    m_bqd.cell_basis.eval_gradients(msh, cl, qp.point(), 1, cell_degree+1);
+                    m_bqd.rec_basis.eval_gradients(msh, cl, qp.point(), 1, rec_degree);
 
                 matrix_type c_dphi_n = (c_dphi * mtens(qp.point()).transpose()) * n;
                 matrix_type T = qp.weight() * c_dphi_n * c_phi.transpose();
@@ -733,22 +738,24 @@ public:
 
     void compute(const mesh_type& msh, const cell_type& cl, const matrix_type& gradrec_oper)
     {
-        auto cell_basis_size = m_bqd.cell_basis.computed_size();
-        auto face_basis_size = m_bqd.face_basis.computed_size();
+        auto rec_basis_size = m_bqd.rec_basis.size();
+        auto cell_basis_size = m_bqd.cell_basis.size();
+        auto face_basis_size = m_bqd.face_basis.size();
+        auto rec_degree = m_bqd.reconstruction_degree();
         auto cell_degree = m_bqd.cell_degree();
         auto face_degree = m_bqd.face_degree();
 
-        matrix_type mass_mat = matrix_type::Zero(cell_basis_size, cell_basis_size);
+        matrix_type mass_mat = matrix_type::Zero(rec_basis_size, rec_basis_size);
 
         auto cell_quadpoints = m_bqd.cell_quadrature.integrate(msh, cl);
         for (auto& qp : cell_quadpoints)
         {
-            auto c_phi = m_bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, cell_degree+1);
+            auto c_phi = m_bqd.rec_basis.eval_functions(msh, cl, qp.point(), 0, rec_degree);
             mass_mat += qp.weight() * c_phi * c_phi.transpose();
         }
 
         auto zero_range         = m_bqd.cell_basis.range(0, cell_degree);
-        auto one_range          = m_bqd.cell_basis.range(1, cell_degree+1);
+        auto one_range          = m_bqd.rec_basis.range(1, rec_degree);
 
         // Build \pi_F^k (v_F - P_T^K v) equations (21) and (22)
 
@@ -780,13 +787,13 @@ public:
             auto fc = fcs[face_i];
 
             matrix_type face_mass_matrix    = matrix_type::Zero(fbs, fbs);
-            matrix_type face_trace_matrix   = matrix_type::Zero(fbs, cell_basis_size);
+            matrix_type face_trace_matrix   = matrix_type::Zero(fbs, rec_basis_size);
 
             auto face_quadpoints = m_bqd.face_quadrature.integrate(msh, fc);
             for (auto& qp : face_quadpoints)
             {
                 auto f_phi = m_bqd.face_basis.eval_functions(msh, fc, qp.point());
-                auto c_phi = m_bqd.cell_basis.eval_functions(msh, cl, qp.point(), 0, cell_degree+1);
+                auto c_phi = m_bqd.rec_basis.eval_functions(msh, cl, qp.point());
                 auto q_f_phi = qp.weight() * f_phi;
                 face_mass_matrix += q_f_phi * f_phi.transpose();
                 face_trace_matrix += q_f_phi * c_phi.transpose();

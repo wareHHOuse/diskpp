@@ -384,6 +384,8 @@ public:
 
     typedef typename priv::mesh_base<T, DIM, Storage>::cell         cell;
     typedef typename priv::mesh_base<T, DIM, Storage>::face         face;
+    typedef typename priv::mesh_base<T, DIM, Storage>::cell         cell_type;
+    typedef typename priv::mesh_base<T, DIM, Storage>::face         face_type;
 
     /* point iterators */
     typedef typename std::vector<point_type>::iterator              point_iterator;

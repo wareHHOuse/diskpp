@@ -43,8 +43,8 @@ make_material_tensor(const point<T,2>& pt)
 
     auto c = std::cos(M_PI * pt.x()/0.02);
     auto s = std::sin(M_PI * pt.y()/0.02);
-    auto e = std::exp( (pt.x()*pt.x() + pt.y()*pt.y())/2.0 );
-    return ret * (1 + 100*c*c*s*s + e);
+    //auto e = std::exp( (pt.x()*pt.x() + pt.y()*pt.y())/2.0 );
+    return ret * (1 + 100*c*c*s*s /*+ e*/);
 }
 
 template<typename T>
