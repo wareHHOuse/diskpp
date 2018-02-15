@@ -23,11 +23,17 @@
 #include <iostream>
 #include <regex>
 
+#include <unistd.h>
+
 #include "loaders/loader.hpp"
 #include "hho/hho.hpp"
 #include "solvers/solver.hpp"
 
 using namespace Eigen;
+
+
+//#define THREE_DIMENSIONS
+
 
 
 size_t basis_size(size_t k, size_t d)
@@ -48,18 +54,6 @@ size_t basis_size(size_t k, size_t d)
     }
 }
 
-/*
-    typedef Mesh                                       mesh_type;
-    typedef typename mesh_type::scalar_type            scalar_type;
-    typedef typename mesh_type::cell                   cell_type;
-    typedef typename mesh_type::face                   face_type;
-
-    typedef disk::quadrature<mesh_type, cell_type>      cell_quadrature_type;
-    typedef disk::quadrature<mesh_type, face_type>      face_quadrature_type;
-
-    typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
-    typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
-*/
 
 
 template<typename Mesh, typename T = typename Mesh::coordinate_type>
@@ -576,7 +570,7 @@ auto make_obstacle_assembler(const Mesh& msh, const std::vector<bool>& in_A, con
 
 template<typename Mesh>
 bool
-hho_solver(const Mesh& msh)
+hho_solver(const Mesh& msh, size_t degree)
 {
     typedef Mesh                                       mesh_type;
     typedef typename mesh_type::scalar_type            scalar_type;
@@ -598,7 +592,7 @@ hho_solver(const Mesh& msh)
     typedef disk::diffusion_like_stabilization_bq<bqdata_type>          stab_type;
     typedef disk::diffusion_like_static_condensation_bq<bqdata_type>    statcond_type;
 
-    size_t          degree      = 1;
+    //size_t          degree      = 1;
 
     auto bqd = bqdata_type(0, degree);
 
@@ -606,9 +600,11 @@ hho_solver(const Mesh& msh)
     auto stab       = stab_type(bqd);
     auto statcond   = statcond_type(bqd);
 
+    std::cout << "Mesh average h: " << mesh_h(msh) << std::endl;
 
     auto r0 = 0.7;
-/*
+
+#ifndef THREE_DIMENSIONS
     auto rhs_fun = [=](const typename Mesh::point_type& pt) -> scalar_type {
         auto r = sqrt( pt.x()*pt.x() + pt.y()*pt.y() );
 
@@ -632,8 +628,7 @@ hho_solver(const Mesh& msh)
     auto obstacle_fun = [&](const typename Mesh::point_type& pt) -> scalar_type {
         return 0.0;
     };
-*/
-
+#else
     auto rhs_fun = [=](const typename Mesh::point_type& pt) -> scalar_type {
         auto r = sqrt( pt.x()*pt.x() + pt.y()*pt.y() + pt.z()*pt.z() );
 
@@ -657,7 +652,7 @@ hho_solver(const Mesh& msh)
     auto obstacle_fun = [&](const typename Mesh::point_type& pt) -> scalar_type {
         return 0.0;
     };
-
+#endif
 
 
     auto num_cells = msh.cells_size();
@@ -712,21 +707,13 @@ hho_solver(const Mesh& msh)
             assembler.assemble(msh, cl, lc, f, gamma, bcs_fun);
         }
 
-        std::cout << std::endl;
-
-
         assembler.finalize();
 
         size_t systsz = assembler.LHS.rows();
         size_t nnz = assembler.LHS.nonZeros();
 
-        std::cout << "Starting linear solver..." << std::endl;
-        std::cout << " * Solving for " << systsz << " unknowns." << std::endl;
-        std::cout << " * Matrix fill: " << 100.0*double(nnz)/(systsz*systsz) << "%" << std::endl;
 
         dynamic_vector<scalar_type> sol = dynamic_vector<scalar_type>::Zero(systsz);
-
-
 
         disk::solvers::pardiso_params<scalar_type> pparams;
 
@@ -766,38 +753,47 @@ hho_solver(const Mesh& msh)
 
 
 
-
-
-
-
-
-
-template<typename MeshType>
-void
-process_mesh(const MeshType& msh)
-{
-    std::cout << "Mesh average h: " << mesh_h(msh) << std::endl;
-    hho_solver(msh);
-}
-
-
 int main(int argc, char **argv)
 {
     using RealType = double;
 
     char    *filename       = nullptr;
     int ch;
+    size_t degree = 1;
 
+    while ( (ch = getopt(argc, argv, "k:")) != -1 )
+    {
+        switch(ch)
+        {
+            case 'k':
+                degree = atoi(optarg);
+                if (degree != 0 && degree != 1)
+                {
+                    std::cout << "Degree can be 0 or 1. Falling back to 1" << std::endl;
+                    degree = 1;
+                }
+                break;
 
-    if (argc == 1)
+            case '?':
+            default:
+                std::cout << "wrong arguments" << std::endl;
+                exit(1);
+        }
+    }
+
+    argc -= optind;
+    argv += optind;
+
+    if (argc != 1)
     {
         std::cout << "Please specify a 2D or 3D mesh" << std::endl;
 
         return 0;
     }
 
-    filename = argv[1];
-/*
+    filename = argv[0];
+
+#ifndef THREE_DIMENSIONS
     if (std::regex_match(filename, std::regex(".*\\.typ1$") ))
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
@@ -822,7 +818,7 @@ int main(int argc, char **argv)
 
         msh.transform(tr);
 
-        process_mesh(msh);
+        hho_solver(msh, degree);
     }
 
     if (std::regex_match(filename, std::regex(".*\\.mesh2d$") ))
@@ -840,48 +836,9 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        process_mesh(msh);
+        hho_solver(msh, degree);
     }
 
-    if (std::regex_match(filename, std::regex(".*\\.msh$") ))
-    {
-        std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
-
-        typedef disk::generic_mesh<RealType, 3>   mesh_type;
-
-        mesh_type msh;
-        disk::fvca6_mesh_loader<RealType, 3> loader;
-
-
-        if (!loader.read_mesh(filename))
-        {
-            std::cout << "Problem loading mesh." << std::endl;
-            return 1;
-        }
-
-        loader.populate_mesh(msh);
-
-        process_mesh(msh);
-    }
-*/
-    if (std::regex_match(filename, std::regex(".*\\.mesh$") ))
-    {
-        std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-
-        typedef disk::simplicial_mesh<RealType, 3>   mesh_type;
-
-        mesh_type msh;
-        disk::netgen_mesh_loader<RealType, 3> loader;
-        if (!loader.read_mesh(filename))
-        {
-            std::cout << "Problem loading mesh." << std::endl;
-            return 1;
-        }
-        loader.populate_mesh(msh);
-
-        process_mesh(msh);
-    }
-/*
     if (std::regex_match(filename, std::regex(".*\\.quad$") ))
     {
         std::cout << "Guessed mesh format: Cartesian 2D" << std::endl;
@@ -906,9 +863,48 @@ int main(int argc, char **argv)
 
         msh.transform(tr);
 
-        process_mesh(msh);
+        hho_solver(msh, degree);
     }
-*/
+#else
+    if (std::regex_match(filename, std::regex(".*\\.msh$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
+
+        typedef disk::generic_mesh<RealType, 3>   mesh_type;
+
+        mesh_type msh;
+        disk::fvca6_mesh_loader<RealType, 3> loader;
+
+
+        if (!loader.read_mesh(filename))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            return 1;
+        }
+
+        loader.populate_mesh(msh);
+
+        hho_solver(msh, degree);
+    }
+
+    if (std::regex_match(filename, std::regex(".*\\.mesh$") ))
+    {
+        std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
+
+        typedef disk::simplicial_mesh<RealType, 3>   mesh_type;
+
+        mesh_type msh;
+        disk::netgen_mesh_loader<RealType, 3> loader;
+        if (!loader.read_mesh(filename))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            return 1;
+        }
+        loader.populate_mesh(msh);
+
+        hho_solver(msh, degree);
+    }
+
     if (std::regex_match(filename, std::regex(".*\\.hex$") ))
     {
         std::cout << "Guessed mesh format: Cartesian 3D" << std::endl;
@@ -924,8 +920,9 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        process_mesh(msh);
+        hho_solver(msh, degree);
     }
+#endif
 
     return 0;
 }
