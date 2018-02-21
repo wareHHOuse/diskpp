@@ -64,13 +64,13 @@ process_mesh(const MeshType& msh)
             intval_f3 += qp.weight() * f3(qp.point());
         }
 
-        /*
+        
         auto fcs = faces(msh, cl);
         for (auto& fc : fcs)
         {
             revolution::integrate(msh, fc, degree);
         }
-        */
+        
     }
 
     std::cout << "f(x,y) = x   : " << intval_f1 << std::endl;
