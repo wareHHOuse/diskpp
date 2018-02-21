@@ -23,6 +23,7 @@
 #include <regex>
 
 #include "core/bases/bases_final.hpp"
+#include "core/quadratures/quad_from_proton.hpp"
 #include "core/loaders/loader.hpp"
 #include "core/quadratures/quadratures.hpp"
 
@@ -39,21 +40,21 @@ test_bases(const Mesh& msh)
     typedef revolution::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
     typedef revolution::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
 
-    typedef disk::quadrature<mesh_type, cell_type>    cell_quadrature_type;
-    typedef disk::quadrature<mesh_type, face_type>    face_quadrature_type;
+    //typedef disk::quadrature<mesh_type, cell_type>    cell_quadrature_type;
+    //typedef disk::quadrature<mesh_type, face_type>    face_quadrature_type;
 
     typedef dynamic_matrix<scalar_type> matrix_type;
 
     size_t degree = 1;
 
-    cell_quadrature_type    cell_quad(2 * degree);
-    face_quadrature_type    face_quad(2 * degree);
+    //cell_quadrature_type    cell_quad(2 * degree);
+    //face_quadrature_type    face_quad(2 * degree);
     
     for(auto cl : msh)
     {
         cell_basis_type          cell_basis(msh, cl, degree);
 
-        auto qps = cell_quad.integrate(msh, cl);
+        auto qps = revolution::integrate(msh, cl, degree);
 
         matrix_type mass = matrix_type::Zero(cell_basis.size(), cell_basis.size());
         
@@ -74,6 +75,9 @@ test_bases(const Mesh& msh)
             stiff += qp.weight() * dphi * dphi.transpose();
         }
 
+        std::cout << "Cell stiffness matrix for " << cl << std::endl;
+        std::cout << stiff << std::endl;
+
         auto fcs = faces(msh, cl);
         
         for(auto fc : fcs)        
@@ -81,7 +85,7 @@ test_bases(const Mesh& msh)
             face_basis_type          face_basis(msh, fc, degree);
             matrix_type mass = matrix_type::Zero(face_basis.size(), face_basis.size());
     
-            auto qps = face_quad.integrate(msh, fc);
+            auto qps = revolution::integrate(msh, fc, degree);
             for (auto& qp : qps)
             {
                 auto phi = face_basis.eval_basis(msh, fc, qp.point());
@@ -94,7 +98,6 @@ test_bases(const Mesh& msh)
         }
             
     }
-   dump_to_matlab(msh, "test.m");
    
    
 }
@@ -145,7 +148,7 @@ int main(int argc, char **argv)
         test_bases(msh);
     }
 
-
+/*
     if (std::regex_match(filename, std::regex(".*\\.quad$") ))
     {
         std::cout << "Guessed mesh format: Cartesian 2D" << std::endl;
@@ -163,6 +166,7 @@ int main(int argc, char **argv)
 
         test_bases(msh);
     }
+    */
 
     return 0;
 }
