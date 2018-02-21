@@ -283,8 +283,6 @@ public:
 
         T *coords[] = {x_coords.data(), y_coords.data()};
 
-
-        std::map<int, int>  polygon_types;
         std::vector<int>    nodelist;
 
         for (auto& cl : msh)
@@ -293,27 +291,20 @@ public:
             auto ptids = cl.point_ids();
             auto size = ptids.size();
             assert(size > 2);
-            polygon_types[size]++;
             for (auto& ptid : ptids)
                 nodelist.push_back(ptid+1); // Silo wants 1-based indices
         }
 
-        std::cout << "*** " << polygon_types.size() << std::endl;
-        for (auto& pt : polygon_types)
-            std::cout << pt.first << ": " << pt.second << std::endl;
-
         int lnodelist       = nodelist.size();
-        int nshapetypes     = polygon_types.size();
+        int nshapetypes     = msh.cells_size();
 
         std::vector<int> shapesize, shapecount;
-        for (auto& pt : polygon_types)
+        for (auto& cl : msh)
         {
-            shapesize.push_back(pt.first);
-            shapecount.push_back(pt.second);
-        }
-
-        assert(shapesize.size() == nshapetypes);
-        assert(shapecount.size() == nshapetypes);
+            auto fcs = faces(msh, cl);
+            shapesize.push_back( fcs.size() );
+            shapecount.push_back(1);
+        };
 
         int nnodes = msh.points_size();
         int nzones = msh.cells_size();
@@ -352,6 +343,41 @@ public:
         else if (centering == nodal_variable_t)
         {
             DBPutUcdvar1(m_siloDb, var.name().c_str(), mesh_name.c_str(),
+                         var.data(),
+                         var.size(), NULL, 0, DB_DOUBLE,
+                         DB_NODECENT, NULL);
+        }
+        else
+            return false;
+
+        return true;
+    }
+
+        /* Scalar variable, REAL case */
+    template<typename T>
+    bool add_variable(const std::string& mesh_name,
+                      const std::string& var_name,
+                      const Eigen::Matrix<T, Eigen::Dynamic, 1>& var,
+                      variable_centering_t centering)
+    {
+        static_assert(std::is_same<T, double>::value, "Sorry, only double for now");
+
+        if (!m_siloDb)
+        {
+            std::cout << "Silo database not opened" << std::endl;
+            return false;
+        }
+
+        if (centering == zonal_variable_t)
+        {
+            DBPutUcdvar1(m_siloDb, var_name.c_str(), mesh_name.c_str(),
+                         var.data(),
+                         var.size(), NULL, 0, DB_DOUBLE,
+                         DB_ZONECENT, NULL);
+        }
+        else if (centering == nodal_variable_t)
+        {
+            DBPutUcdvar1(m_siloDb, var_name.c_str(), mesh_name.c_str(),
                          var.data(),
                          var.size(), NULL, 0, DB_DOUBLE,
                          DB_NODECENT, NULL);

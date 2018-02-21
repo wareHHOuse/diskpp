@@ -29,10 +29,12 @@
 #include "hho/hho.hpp"
 #include "solvers/solver.hpp"
 
+#include "output/silo.hpp"
+
 using namespace Eigen;
 
 
-//#define THREE_DIMENSIONS
+#define THREE_DIMENSIONS
 
 
 
@@ -635,7 +637,7 @@ hho_solver(const Mesh& msh, size_t degree)
         if ( r > r0 )
             return -4 * (2*r*r + 3*(r*r - r0*r0));
         else
-            return -8.0*r0*r0*(1 - r*r - r0*r0);
+            return -8.0*r0*r0*(1 - r*r + r0*r0);
     };
 
     auto sol_fun = [=](const typename Mesh::point_type& pt) -> scalar_type {
@@ -745,6 +747,19 @@ hho_solver(const Mesh& msh, size_t degree)
 
         error += diff.dot(lc*diff);
     }
+
+#ifndef THREE_DIMENSIONS
+    disk::silo_database silo;
+    silo.create("obstacle.silo");
+
+    silo.add_mesh(msh, "mesh");
+
+    Matrix<scalar_type, Dynamic, 1> data = alpha.head(msh.cells_size());
+
+    silo.add_variable("mesh", "alpha", data, disk::zonal_variable_t );
+
+    silo.close();
+#endif
     
     std::cout << "Error: " << std::sqrt(error) << std::endl;
     
