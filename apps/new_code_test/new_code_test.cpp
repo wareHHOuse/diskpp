@@ -25,6 +25,7 @@
 
 #include "revolution/bases"
 #include "revolution/quadratures"
+#include "revolution/methods/hho"
 
 #include "loaders/loader.hpp"
 

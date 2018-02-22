@@ -52,30 +52,23 @@ test_bases(const Mesh& msh)
     {
         auto cell_basis = revolution::make_scalar_monomial_basis(msh, cl, degree);
 
-        auto qps = revolution::integrate(msh, cl, 2*degree);
-
-        matrix_type mass = matrix_type::Zero(cell_basis.size(), cell_basis.size());
-        
-        for (auto& qp : qps)
-        {
-            auto phi = cell_basis.eval_functions(msh, cl, qp.point());
-            mass += qp.weight() * phi * phi.transpose();
-        }
+        matrix_type mass = revolution::make_mass_matrix(msh, cl, cell_basis);
 
         std::cout << "Cell mass matrix for " << cl << std::endl;
         std::cout << mass << std::endl;
 
+/*
         matrix_type stiff = matrix_type::Zero(cell_basis.size(), cell_basis.size());
 
         for (auto& qp : qps)
         {
-            auto dphi = cell_basis.eval_gradients(msh, cl, qp.point());
+            auto dphi = cell_basis.eval_gradients(qp.point());
             stiff += qp.weight() * dphi * dphi.transpose();
         }
 
         std::cout << "Cell stiffness matrix for " << cl << std::endl;
         std::cout << stiff << std::endl;
-
+*/
         auto fcs = faces(msh, cl);
         
         for(auto fc : fcs)        
@@ -86,7 +79,7 @@ test_bases(const Mesh& msh)
             auto qps = revolution::integrate(msh, fc, 2*degree);
             for (auto& qp : qps)
             {
-                auto phi = face_basis.eval_functions(msh, fc, qp.point());
+                auto phi = face_basis.eval_functions(qp.point());
                 mass += qp.weight() * phi * phi.transpose();
             }
 
