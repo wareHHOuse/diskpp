@@ -23,7 +23,9 @@
 #include <iostream>
 #include <regex>
 
-#include "core/quadratures/quad_from_proton.hpp"
+#include "revolution/bases"
+#include "revolution/quadratures"
+
 #include "loaders/loader.hpp"
 
 

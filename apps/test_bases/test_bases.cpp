@@ -1,10 +1,14 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
- *      /__\       matteo.cicuttin@enpc.fr
- *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
- *    /\    /\
- *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
- *  /_\/_\/_\/_\   methods.
+ *       /\         DISK++, a template library for DIscontinuous SKeletal      
+ *      /__\        methods.
+ *     /_\/_\      
+ *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
+ *   /__\  /__\     matteo.cicuttin@enpc.fr
+ *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
+ *
+ * This file is copyright of the following authors:
+ * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
+ * Karol Cascavita (C) 2018                     klcascavitam@unal.edu.co
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -19,13 +23,15 @@
  * Journal of Computational and Applied Mathematics.
  * DOI: 10.1016/j.cam.2017.09.017
  */
+
 #include <iostream>
 #include <regex>
 
-#include "core/bases/bases_final.hpp"
-#include "core/quadratures/quad_from_proton.hpp"
+#include "revolution/bases"
+#include "revolution/quadratures"
+
 #include "core/loaders/loader.hpp"
-#include "core/quadratures/quadratures.hpp"
+
 
 template<typename Mesh>
 void
@@ -33,28 +39,20 @@ test_bases(const Mesh& msh)
 {
     
     typedef Mesh mesh_type;
-    typedef typename mesh_type::cell  cell_type;
-    typedef typename mesh_type::face  face_type;
-    typedef typename mesh_type::scalar_type  scalar_type;    
+    typedef typename mesh_type::cell        cell_type;
+    typedef typename mesh_type::face        face_type;
+    typedef typename mesh_type::scalar_type scalar_type;    
 
-    typedef revolution::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
-    typedef revolution::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
-
-    //typedef disk::quadrature<mesh_type, cell_type>    cell_quadrature_type;
-    //typedef disk::quadrature<mesh_type, face_type>    face_quadrature_type;
-
-    typedef dynamic_matrix<scalar_type> matrix_type;
+    typedef dynamic_matrix<scalar_type>     matrix_type;
 
     size_t degree = 1;
 
-    //cell_quadrature_type    cell_quad(2 * degree);
-    //face_quadrature_type    face_quad(2 * degree);
     
     for(auto cl : msh)
     {
-        cell_basis_type          cell_basis(msh, cl, degree);
+        auto cell_basis = revolution::make_scalar_monomial_basis(msh, cl, degree);
 
-        auto qps = revolution::integrate(msh, cl, degree);
+        auto qps = revolution::integrate(msh, cl, 2*degree);
 
         matrix_type mass = matrix_type::Zero(cell_basis.size(), cell_basis.size());
         
@@ -82,13 +80,13 @@ test_bases(const Mesh& msh)
         
         for(auto fc : fcs)        
         {
-            face_basis_type          face_basis(msh, fc, degree);
+            auto face_basis = revolution::make_scalar_monomial_basis(msh, fc, degree);
             matrix_type mass = matrix_type::Zero(face_basis.size(), face_basis.size());
     
-            auto qps = revolution::integrate(msh, fc, degree);
+            auto qps = revolution::integrate(msh, fc, 2*degree);
             for (auto& qp : qps)
             {
-                auto phi = face_basis.eval_basis(msh, fc, qp.point());
+                auto phi = face_basis.eval_functions(msh, fc, qp.point());
                 mass += qp.weight() * phi * phi.transpose();
             }
 
