@@ -96,22 +96,24 @@ public:
         basis_size      = vector_basis_size(degree, 2, 2);
     }
 
-    auto
+    function_type
     eval_functions(const point_type& pt) const
     {
-        function_type ret = function_type::Zero(basis_size);
+        function_type ret = function_type::Zero(basis_size, 2);
 
         auto phi = scalar_basis.eval_functions(pt);
         auto dim = mesh_type::dimension;
 
-        for(size_t j = 0; j < dim; j++)
-            for(size_t i = 0; i < scalar_basis.size(); i++ )
-                ret(j, dim * i + j) = phi(i);
+        for (size_t i = 0; i < scalar_basis.size(); i++)
+        {
+            ret(2*i,   0) = phi(i);
+            ret(2*i+1, 1) = phi(i);
+        }
 
         return ret;
     }
 
-    auto
+    std::vector<gradient_type>
     eval_gradients(const point_type& pt) const
     {
         std::vector<gradient_type> ret;
@@ -182,16 +184,18 @@ public:
     auto
     eval_functions(const point_type& pt) const
     {
-        function_type ret = function_type::Zero(basis_size);
+        function_type ret = function_type::Zero(basis_size, 2);
 
         auto phi = scalar_basis.eval_functions(pt);
         auto dim = mesh_type::dimension;
 
-        for(size_t j = 0; j < dim; j++)
-            for(size_t i = 0; i < scalar_basis.size(); i++ )
-                ret(j, dim * i + j) = phi(i);
+        for (size_t i = 0; i < scalar_basis.size(); i++)
+        {
+            ret(2*i,   0) = phi(i);
+            ret(2*i+1, 1) = phi(i);
+        }
 
-        assert( 2 * scalar_basis == basis_size);
+        assert( 2 * scalar_basis.size() == basis_size);
         return ret;
     }
 

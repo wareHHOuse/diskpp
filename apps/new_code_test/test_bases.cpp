@@ -59,32 +59,37 @@ test_bases(const Mesh& msh)
         Matrix<scalar_type, 2, 1> ret;
         ret(0) = pt.x();
         ret(1) = 0;
+        return ret;
     };
 
     auto v2 = [](const point_type& pt) -> Matrix<scalar_type, 2, 1> {
         Matrix<scalar_type, 2, 1> ret;
         ret(0) = pt.y();
         ret(1) = 0;
+        return ret;
     };
 
+    typename revolution::hho_degree_info hdi(degree);
 
     for(auto cl : msh)
     {
         revolution::scaled_monomial_vector_basis<mesh_type, cell_type> vec_cell_basis(msh, cl, degree);
 
-        auto cell_basis = revolution::make_scalar_monomial_basis(msh, cl, degree);
+        auto cell_basis = revolution::make_vector_monomial_basis(msh, cl, degree);
 
         matrix_type mass = revolution::make_mass_matrix(msh, cl, cell_basis);
 
-        std::cout << "Cell mass matrix for " << cl << std::endl;
-        std::cout << mass << std::endl;
+        //std::cout << "Cell mass matrix for " << cl << std::endl;
+        //std::cout << mass << std::endl;
 
-
+        /*
         matrix_type stiff = revolution::make_stiffness_matrix(msh, cl, cell_basis);
 
         std::cout << "Cell stiffness matrix for " << cl << std::endl;
         std::cout << stiff << std::endl;
+        */
 
+        /*
         auto fcs = faces(msh, cl);
 
         for(auto fc : fcs)
@@ -98,18 +103,17 @@ test_bases(const Mesh& msh)
 
         }
 
-        typename revolution::hho_degree_info hdi(degree);
-
         project_function(msh, cl, hdi, f1);
 
         make_hho_scalar_laplacian(msh, cl, hdi);
+        */
 
     }
 
     scalar_type intval = 0.0;
     for (auto cl : msh)
     {
-        auto cell_basis = revolution::make_vector_monomial_basis(msh, cl, degree);
+        auto cb = revolution::make_vector_monomial_basis(msh, cl, degree);
         Matrix<scalar_type, Dynamic, Dynamic> mass = revolution::make_mass_matrix(msh, cl, cb);
         Matrix<scalar_type, Dynamic, 1> rhs1 = revolution::make_rhs(msh, cl, cb, v1);
         Matrix<scalar_type, Dynamic, 1> rhs2 = revolution::make_rhs(msh, cl, cb, v2);
@@ -120,6 +124,11 @@ test_bases(const Mesh& msh)
         Matrix<scalar_type, Dynamic, 1> dofs2 = massInv.solve(rhs2);
 
         intval += dofs1.dot(mass*dofs2);
+
+        Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, v1);
+
+        std::cout << p.transpose() << std::endl;
+        std::cout << dofs1.transpose() << std::endl;
     }
 
     std::cout << intval << std::endl;
