@@ -67,6 +67,20 @@ size_t scalar_basis_size(size_t k, size_t d)
     return num/den;
 }
 
+size_t vector_basis_size(size_t k, size_t sd, size_t vd)
+{
+    size_t num = 1;
+    size_t den = 1;
+
+    for (size_t i = 1; i <= sd; i++)
+    {
+        num *= k + i;
+        den *= i;
+    }
+
+    return (num/den)*vd;
+}
+
 /* Generic template for bases. */
 template<typename MeshType, typename Element>
 struct scaled_monomial_scalar_basis

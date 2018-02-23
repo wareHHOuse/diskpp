@@ -24,6 +24,30 @@
 
 namespace revolution {
 
+namespace priv {
+template<typename T, int N>
+Matrix<T, Dynamic, Dynamic>
+outer_product(const Matrix<T, Dynamic, N>& a, const Matrix<T, Dynamic, N>& b)
+{
+	return a * b.transpose();
+}
+
+template<typename T>
+Matrix<T, Dynamic, 1>
+inner_product(const T& a, const Matrix<T, Dynamic, 1> b)
+{
+	return a*b;
+}
+
+template<typename T, int N>
+Matrix<T, Dynamic, 1>
+inner_product(const Matrix<T, N, 1>& a, const Matrix<T, Dynamic, N> b)
+{
+	return b*a;
+}
+
+} // priv
+
 template<typename Mesh, typename Element, typename Basis>
 Matrix<typename Basis::scalar_type, Dynamic, Dynamic>
 make_mass_matrix(const Mesh& msh, const Element& elem, const Basis& basis, size_t di = 0)
@@ -40,7 +64,7 @@ make_mass_matrix(const Mesh& msh, const Element& elem, const Basis& basis, size_
     for (auto& qp : qps)
     {
         auto phi = basis.eval_functions(qp.point());
-        ret += qp.weight() * phi * phi.transpose();
+        ret += qp.weight() * priv::outer_product(phi, phi);
     }
 
     return ret;
@@ -62,7 +86,7 @@ make_stiffness_matrix(const Mesh& msh, const Element& elem, const Basis& basis, 
     for (auto& qp : qps)
     {
         auto dphi = basis.eval_gradients(qp.point());
-        ret += qp.weight() * dphi * dphi.transpose();
+        ret += qp.weight() * priv::outer_product(dphi, dphi);
     }
 
     return ret;
@@ -71,7 +95,7 @@ make_stiffness_matrix(const Mesh& msh, const Element& elem, const Basis& basis, 
 template<typename Mesh, typename Element, typename Basis, typename Function>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
 make_rhs(const Mesh& msh, const Element& elem,
-         const Basis& basis, const Function& f, size_t di = 0)
+         const Basis& basis, const Function& rhs_fun, size_t di = 0)
 {
     auto degree		= basis.degree();
     auto basis_size = basis.size();
@@ -85,7 +109,8 @@ make_rhs(const Mesh& msh, const Element& elem,
     for (auto& qp : qps)
     {
         auto phi = basis.eval_functions(qp.point());
-        ret += qp.weight() * phi * f(qp.point());
+        auto f = rhs_fun(qp.point()); 
+        ret += qp.weight() * priv::inner_product(f, phi);
     }
 
     return ret;
