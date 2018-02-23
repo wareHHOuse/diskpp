@@ -46,5 +46,53 @@ make_mass_matrix(const Mesh& msh, const Element& elem, const Basis& basis, size_
     return ret;
 }
 
+template<typename Mesh, typename Element, typename Basis>
+Matrix<typename Basis::scalar_type, Dynamic, Dynamic>
+make_stiffness_matrix(const Mesh& msh, const Element& elem, const Basis& basis, size_t di = 0)
+{
+	auto degree		= basis.degree();
+    auto basis_size = basis.size();
+
+    using T = typename Basis::scalar_type;
+
+    Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(basis_size, basis_size);
+
+    auto qps = integrate(msh, elem, 2*(degree+di));
+
+    for (auto& qp : qps)
+    {
+        auto dphi = basis.eval_gradients(qp.point());
+        ret += qp.weight() * dphi * dphi.transpose();
+    }
+
+    return ret;
+}
+
+template<typename Mesh, typename Element, typename Basis, typename Function>
+Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+make_rhs(const Mesh& msh, const Element& elem,
+         const Basis& basis, const Function& f, size_t di = 0)
+{
+    auto degree		= basis.degree();
+    auto basis_size = basis.size();
+
+    using T = typename Basis::scalar_type;
+
+    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(basis_size);
+
+    auto qps = integrate(msh, elem, 2*(degree+di));
+
+    for (auto& qp : qps)
+    {
+        auto phi = basis.eval_functions(qp.point());
+        ret += qp.weight() * phi * f(qp.point());
+    }
+
+    return ret;
+}
+
 
 } //revolution
+
+
+

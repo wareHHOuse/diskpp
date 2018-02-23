@@ -29,6 +29,7 @@
 
 #include "revolution/bases"
 #include "revolution/quadratures"
+#include "revolution/methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -45,9 +46,15 @@ test_bases(const Mesh& msh)
 
     typedef dynamic_matrix<scalar_type>     matrix_type;
 
+    using point_type = typename mesh_type::point_type;
+
     size_t degree = 1;
 
-    
+    auto f1 = [](const point_type& pt) -> scalar_type {
+        return pt.x();
+    };
+
+
     for(auto cl : msh)
     {
         auto cell_basis = revolution::make_scalar_monomial_basis(msh, cl, degree);
@@ -57,36 +64,28 @@ test_bases(const Mesh& msh)
         std::cout << "Cell mass matrix for " << cl << std::endl;
         std::cout << mass << std::endl;
 
-/*
-        matrix_type stiff = matrix_type::Zero(cell_basis.size(), cell_basis.size());
 
-        for (auto& qp : qps)
-        {
-            auto dphi = cell_basis.eval_gradients(qp.point());
-            stiff += qp.weight() * dphi * dphi.transpose();
-        }
+        matrix_type stiff = revolution::make_stiffness_matrix(msh, cl, cell_basis);
 
         std::cout << "Cell stiffness matrix for " << cl << std::endl;
         std::cout << stiff << std::endl;
-*/
+
         auto fcs = faces(msh, cl);
         
         for(auto fc : fcs)        
         {
-            auto face_basis = revolution::make_scalar_monomial_basis(msh, fc, degree);
-            matrix_type mass = matrix_type::Zero(face_basis.size(), face_basis.size());
+            matrix_type mass = revolution::make_mass_matrix(msh, fc, cell_basis);
     
-            auto qps = revolution::integrate(msh, fc, 2*degree);
-            for (auto& qp : qps)
-            {
-                auto phi = face_basis.eval_functions(qp.point());
-                mass += qp.weight() * phi * phi.transpose();
-            }
-
             std::cout << "Face mass matrix for " << fc << std::endl;
             std::cout << mass << std::endl;
         
         }
+
+        typename revolution::hho_degree_info hdi(degree);
+        
+        project_function(msh, cl, hdi, f1);
+
+        make_hho_scalar_laplacian(msh, cl, hdi);
             
     }
    
