@@ -1,7 +1,7 @@
 /*
- *       /\         DISK++, a template library for DIscontinuous SKeletal      
+ *       /\         DISK++, a template library for DIscontinuous SKeletal
  *      /__\        methods.
- *     /_\/_\      
+ *     /_\/_\
  *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
  *   /__\  /__\     matteo.cicuttin@enpc.fr
  *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
@@ -108,7 +108,7 @@ public:
     typedef typename mesh_type::point_type          point_type;
 
 
-private:    
+private:
     point_type          cell_bar;
     scalar_type         cell_h;
     size_t              basis_degree, basis_size;
@@ -164,7 +164,7 @@ public:
 
         return ret;
     }
-    
+
     Matrix<scalar_type, Dynamic, 2>
     eval_gradients(const point_type& pt) const
     {
@@ -215,7 +215,7 @@ public:
 
         return ret;
     }
-    
+
     size_t size() const
     {
         return basis_size;
@@ -245,7 +245,7 @@ private:
     point_type          base;
     scalar_type     face_h;
     size_t basis_degree, basis_size;
-    
+
 
 
 public:
@@ -289,4 +289,3 @@ public:
 };
 
 }
-

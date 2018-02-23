@@ -1,7 +1,7 @@
 /*
- *       /\         DISK++, a template library for DIscontinuous SKeletal      
+ *       /\         DISK++, a template library for DIscontinuous SKeletal
  *      /__\        methods.
- *     /_\/_\      
+ *     /_\/_\
  *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
  *   /__\  /__\     matteo.cicuttin@enpc.fr
  *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
@@ -38,11 +38,11 @@ template<typename Mesh>
 void
 test_bases(const Mesh& msh)
 {
-    
+
     typedef Mesh mesh_type;
     typedef typename mesh_type::cell        cell_type;
     typedef typename mesh_type::face        face_type;
-    typedef typename mesh_type::scalar_type scalar_type;    
+    typedef typename mesh_type::scalar_type scalar_type;
 
     typedef dynamic_matrix<scalar_type>     matrix_type;
 
@@ -70,6 +70,8 @@ test_bases(const Mesh& msh)
 
     for(auto cl : msh)
     {
+        revolution::scaled_monomial_vector_basis<mesh_type, cell_type> vec_cell_basis(msh, cl, degree);
+
         auto cell_basis = revolution::make_scalar_monomial_basis(msh, cl, degree);
 
         matrix_type mass = revolution::make_mass_matrix(msh, cl, cell_basis);
@@ -84,24 +86,25 @@ test_bases(const Mesh& msh)
         std::cout << stiff << std::endl;
 
         auto fcs = faces(msh, cl);
-        
-        for(auto fc : fcs)        
+
+        for(auto fc : fcs)
         {
+            revolution::scaled_monomial_vector_basis<mesh_type, face_type> vec_face_basis(msh, fc, degree);
+
             matrix_type mass = revolution::make_mass_matrix(msh, fc, cell_basis);
-    
+
             std::cout << "Face mass matrix for " << fc << std::endl;
             std::cout << mass << std::endl;
-        
+
         }
 
         typename revolution::hho_degree_info hdi(degree);
-        
+
         project_function(msh, cl, hdi, f1);
 
         make_hho_scalar_laplacian(msh, cl, hdi);
-            
-    }
 
+    }
 
     scalar_type intval = 0.0;
     for (auto cl : msh)
@@ -120,8 +123,6 @@ test_bases(const Mesh& msh)
     }
 
     std::cout << intval << std::endl;
-   
-   
 }
 
 int main(int argc, char **argv)
