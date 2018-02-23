@@ -97,7 +97,7 @@ make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     auto rbs = scalar_basis_size(recdeg, Mesh::dimension);
     auto cbs = scalar_basis_size(celdeg, Mesh::dimension);
-    auto fbs = scalar_basis_size(facdeg, Mesh::dimension);
+    auto fbs = scalar_basis_size(facdeg, Mesh::dimension-1);
 
     auto num_faces = howmany_faces(msh, cl);
 
@@ -152,7 +152,7 @@ make_hho_naive_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
     auto facdeg = di.face_degree();
 
     auto cbs = scalar_basis_size(celdeg, Mesh::dimension);
-    auto fbs = scalar_basis_size(facdeg, Mesh::dimension);
+    auto fbs = scalar_basis_size(facdeg, Mesh::dimension-1);
 
     auto num_faces = howmany_faces(msh, cl);
 
@@ -206,7 +206,7 @@ make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
 
     auto rbs = scalar_basis_size(recdeg, Mesh::dimension);
     auto cbs = scalar_basis_size(celdeg, Mesh::dimension);
-    auto fbs = scalar_basis_size(facdeg, Mesh::dimension);
+    auto fbs = scalar_basis_size(facdeg, Mesh::dimension-1);
 
     auto cb = make_scalar_monomial_basis(msh, cl, recdeg);
 
@@ -275,18 +275,33 @@ make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
     return data;
 }
 
-template<typename Mesh, typename Function>
+
+template<typename Mesh>
+using SRT = typename Mesh::coordinate_type;
+
+template<typename Mesh>
+using VRT = Matrix<typename Mesh::coordinate_type, Mesh::dimension, 1>;
+
+template<typename Mesh>
+using PT = typename Mesh::point_type;
+
+
+template<typename Mesh>
+using scalar_rhs_function = std::function<SRT<Mesh>(PT<Mesh>)>;
+
+template<typename Mesh>
+using vector_rhs_function = std::function<VRT<Mesh>(PT<Mesh>)>;
+
+template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
 project_function(const Mesh& msh, const typename Mesh::cell_type& cl,
                  const hho_degree_info& hdi,
-                 const Function& f, size_t di = 0)
+                 const scalar_rhs_function<Mesh>& f, size_t di = 0)
 {
     using T = typename Mesh::coordinate_type;
 
-
-
     auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
-    auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension);
+    auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
     auto num_faces = howmany_faces(msh, cl);
 
     Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs+num_faces*fbs);
@@ -301,6 +316,38 @@ project_function(const Mesh& msh, const typename Mesh::cell_type& cl,
     {
         auto fc = fcs[i];
         auto fb = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
+        Matrix<T, Dynamic, Dynamic> face_mm = make_mass_matrix(msh, fc, fb, di);
+        Matrix<T, Dynamic, 1> face_rhs = make_rhs(msh, fc, fb, f, di);
+        ret.block(cbs+i*fbs, 0, fbs, 1) = face_mm.llt().solve(face_rhs);
+    }
+
+    return ret;
+}
+
+template<typename Mesh>
+Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+project_function(const Mesh& msh, const typename Mesh::cell_type& cl,
+                 const hho_degree_info& hdi,
+                 const vector_rhs_function<Mesh>& f, size_t di = 0)
+{
+    using T = typename Mesh::coordinate_type;
+
+    auto cbs = vector_basis_size(hdi.cell_degree(), Mesh::dimension, Mesh::dimension);
+    auto fbs = vector_basis_size(hdi.face_degree(), Mesh::dimension-1, Mesh::dimension);
+    auto num_faces = howmany_faces(msh, cl);
+
+    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs+num_faces*fbs);
+
+    auto cb = make_vector_monomial_basis(msh, cl, hdi.cell_degree());
+    Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, cb, di);
+    Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, cb, f, di);
+    ret.block(0, 0, cbs, 1) = cell_mm.llt().solve(cell_rhs);
+
+    auto fcs = faces(msh, cl);
+    for (size_t i = 0; i < num_faces; i++)
+    {
+        auto fc = fcs[i];
+        auto fb = make_vector_monomial_basis(msh, fc, hdi.face_degree());
         Matrix<T, Dynamic, Dynamic> face_mm = make_mass_matrix(msh, fc, fb, di);
         Matrix<T, Dynamic, 1> face_rhs = make_rhs(msh, fc, fb, f, di);
         ret.block(cbs+i*fbs, 0, fbs, 1) = face_mm.llt().solve(face_rhs);

@@ -55,6 +55,19 @@ test_bases(const Mesh& msh)
     };
 
 
+    auto v1 = [](const point_type& pt) -> Matrix<scalar_type, 2, 1> {
+        Matrix<scalar_type, 2, 1> ret;
+        ret(0) = pt.x();
+        ret(1) = 0;
+    };
+
+    auto v2 = [](const point_type& pt) -> Matrix<scalar_type, 2, 1> {
+        Matrix<scalar_type, 2, 1> ret;
+        ret(0) = pt.y();
+        ret(1) = 0;
+    };
+
+
     for(auto cl : msh)
     {
         revolution::scaled_monomial_vector_basis<mesh_type, cell_type> vec_cell_basis(msh, cl, degree);
@@ -93,7 +106,23 @@ test_bases(const Mesh& msh)
 
     }
 
+    scalar_type intval = 0.0;
+    for (auto cl : msh)
+    {
+        auto cell_basis = revolution::make_vector_monomial_basis(msh, cl, degree);
+        Matrix<scalar_type, Dynamic, Dynamic> mass = revolution::make_mass_matrix(msh, cl, cb);
+        Matrix<scalar_type, Dynamic, 1> rhs1 = revolution::make_rhs(msh, cl, cb, v1);
+        Matrix<scalar_type, Dynamic, 1> rhs2 = revolution::make_rhs(msh, cl, cb, v2);
 
+        auto massInv = mass.llt();
+
+        Matrix<scalar_type, Dynamic, 1> dofs1 = massInv.solve(rhs1);
+        Matrix<scalar_type, Dynamic, 1> dofs2 = massInv.solve(rhs2);
+
+        intval += dofs1.dot(mass*dofs2);
+    }
+
+    std::cout << intval << std::endl;
 }
 
 int main(int argc, char **argv)
