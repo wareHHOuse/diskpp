@@ -276,6 +276,91 @@ make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
 }
 
 
+
+template<typename Mesh>
+Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+make_hho_fancy_stabilization_vector(const Mesh& msh, const typename Mesh::cell_type& cl,
+                      const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> reconstruction,
+                      const hho_degree_info& di)
+{
+    using T = typename Mesh::coordinate_type;
+
+    auto recdeg = di.reconstruction_degree();
+    auto celdeg = di.cell_degree();
+    auto facdeg = di.face_degree();
+
+    auto rbs = vector_basis_size(recdeg, Mesh::dimension, Mesh::dimension);
+    auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
+    auto fbs = vector_basis_size(facdeg, Mesh::dimension-1, Mesh::dimension);
+
+    auto cb = make_vector_monomial_basis(msh, cl, recdeg);
+
+    Matrix<T, Dynamic, Dynamic> mass_mat = Matrix<T, Dynamic, Dynamic>::Zero(rbs, rbs);
+    auto cell_quadpoints = integrate(msh, cl, 2*recdeg);
+    for (auto& qp : cell_quadpoints)
+    {
+        auto c_phi = cb.eval_functions(qp.point());
+        mass_mat += qp.weight() * priv::outer_product(c_phi, c_phi);
+    }
+
+    // Build \pi_F^k (v_F - P_T^K v) equations (21) and (22)
+
+    //Step 1: compute \pi_T^k p_T^k v (third term).
+    Matrix<T, Dynamic, Dynamic> M1 = mass_mat.block(0, 0, cbs, cbs);
+    Matrix<T, Dynamic, Dynamic> M2 = mass_mat.block(0, 2, cbs, rbs-2);
+    Matrix<T, Dynamic, Dynamic> proj1 = -M1.llt().solve(M2*reconstruction);
+
+    //Step 2: v_T - \pi_T^k p_T^k v (first term minus third term)
+    Matrix<T, Dynamic, Dynamic> I_T = Matrix<T, Dynamic, Dynamic>::Identity(cbs, cbs);
+    proj1.block(0, 0, cbs, cbs) += I_T;
+
+    auto fcs = faces(msh, cl);
+    auto num_faces = fcs.size();
+
+    Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(cbs+num_faces*fbs, cbs+num_faces*fbs);
+
+    // Step 3: project on faces (eqn. 21)
+    for (size_t face_i = 0; face_i < num_faces; face_i++)
+    {
+        auto h = diameter(msh, /*fcs[face_i]*/cl);
+        auto fc = fcs[face_i];
+        auto fb = make_vector_monomial_basis(msh, fc, facdeg);
+
+        Matrix<T, Dynamic, Dynamic> face_mass_matrix    = Matrix<T, Dynamic, Dynamic>::Zero(fbs, fbs);
+        Matrix<T, Dynamic, Dynamic> face_trace_matrix   = Matrix<T, Dynamic, Dynamic>::Zero(fbs, rbs);
+
+        auto face_quadpoints = integrate(msh, fc, 2*facdeg);
+        for (auto& qp : face_quadpoints)
+        {
+            auto f_phi = fb.eval_functions(qp.point());
+            auto c_phi = cb.eval_functions(qp.point());
+            Matrix<T, Dynamic, Mesh::dimension> q_f_phi = qp.weight() * f_phi;
+            face_mass_matrix += priv::outer_product(q_f_phi, f_phi);
+            face_trace_matrix += priv::outer_product(q_f_phi, c_phi);
+        }
+
+        LLT<Matrix<T, Dynamic, Dynamic>> piKF;
+        piKF.compute(face_mass_matrix);
+
+        // Step 3a: \pi_F^k( v_F - p_T^k v )
+        Matrix<T, Dynamic, Dynamic> MR1 = face_trace_matrix.block(0, 2, fbs, rbs-2);
+
+        Matrix<T, Dynamic, Dynamic> proj2 = piKF.solve(MR1*reconstruction);
+        Matrix<T, Dynamic, Dynamic> I_F = Matrix<T, Dynamic, Dynamic>::Identity(fbs, fbs);
+        proj2.block(0, cbs+face_i*fbs, fbs, fbs) -= I_F;
+
+        // Step 3b: \pi_F^k( v_T - \pi_T^k p_T^k v )
+        Matrix<T, Dynamic, Dynamic> MR2 = face_trace_matrix.block(0, 0, fbs, cbs);
+        Matrix<T, Dynamic, Dynamic> proj3 = piKF.solve(MR2*proj1);
+        Matrix<T, Dynamic, Dynamic> BRF = proj2 + proj3;
+
+        data += BRF.transpose() * face_mass_matrix * BRF / h;
+    }
+
+    return data;
+}
+
+
 template<typename Mesh>
 using SRT = typename Mesh::coordinate_type;
 

@@ -20,7 +20,12 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
+#pragma once 
+
+#include "common/eigen.hpp"
 #include "../quadratures"
+
+using namespace Eigen;
 
 namespace revolution {
 

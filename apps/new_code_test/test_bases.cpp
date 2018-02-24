@@ -69,6 +69,13 @@ test_bases(const Mesh& msh)
         return ret;
     };
 
+    auto v3 = [](const point_type& pt) -> Matrix<scalar_type, 2, 1> {
+        Matrix<scalar_type, 2, 1> ret;
+        ret(0) = std::sin(M_PI*pt.x());
+        ret(1) = std::sin(M_PI*pt.y());
+        return ret;
+    };
+
     typename revolution::hho_degree_info hdi(degree);
 
     for(auto cl : msh)
@@ -111,6 +118,7 @@ test_bases(const Mesh& msh)
     }
 
     scalar_type intval = 0.0;
+    scalar_type stab_error = 0.0;
     for (auto cl : msh)
     {
         auto cb = revolution::make_vector_monomial_basis(msh, cl, degree);
@@ -125,13 +133,17 @@ test_bases(const Mesh& msh)
 
         intval += dofs1.dot(mass*dofs2);
 
-        Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, v1);
+        Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, v3);
 
-        std::cout << p.transpose() << std::endl;
-        std::cout << dofs1.transpose() << std::endl;
+        Matrix<scalar_type, Dynamic, Dynamic> reconstr( revolution::vector_basis_size(degree+1, 2, 2)-2, p.rows() );
+        Matrix<scalar_type, Dynamic, Dynamic> stab;
+        stab = make_hho_fancy_stabilization_vector(msh, cl, reconstr, hdi);
+
+        stab_error += p.dot(stab*p);
     }
 
     std::cout << intval << std::endl;
+    std::cout << std::sqrt(stab_error) << std::endl;
 }
 
 int main(int argc, char **argv)

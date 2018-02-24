@@ -25,6 +25,6 @@
 
 #pragma once
 
+#include "implementation_bits/bases_utils.hpp"
 #include "implementation_bits/bases_2d_scalar.hpp"
 #include "implementation_bits/bases_2d_vector.hpp"
-#include "implementation_bits/bases_utils.hpp"
