@@ -82,12 +82,12 @@ test_bases(const Mesh& msh)
         //std::cout << "Cell mass matrix for " << cl << std::endl;
         //std::cout << mass << std::endl;
 
-        /*
+        
         matrix_type stiff = revolution::make_stiffness_matrix(msh, cl, cell_basis);
 
         std::cout << "Cell stiffness matrix for " << cl << std::endl;
         std::cout << stiff << std::endl;
-        */
+        
 
         /*
         auto fcs = faces(msh, cl);

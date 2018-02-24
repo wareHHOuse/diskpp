@@ -119,21 +119,21 @@ public:
         std::vector<gradient_type> ret;
         ret.reserve(basis_size);
 
-        auto dphi = scalar_basis.eval_functions(pt);
+        Matrix<scalar_type, Dynamic, 2> dphi = scalar_basis.eval_gradients(pt);
 
         size_t j = 0;
         for(size_t i = 0; i < scalar_basis.size(); i++)
         {
-            auto dphi_i = dphi.row(i);
-            gradient_type sg;
+            Matrix<scalar_type, 1, 2> dphi_i = dphi.row(i);
+            gradient_type g;
 
-            sg = gradient_type::Zero();
-            sg.row(0) = dphi_i;
-            ret.push_back(sg);
+            g = gradient_type::Zero();
+            g.row(0) = dphi_i;
+            ret.push_back(g);
 
-            sg = gradient_type::Zero();
-            sg.row(1) = dphi_i;
-            ret.push_back(sg);
+            g = gradient_type::Zero();
+            g.row(1) = dphi_i;
+            ret.push_back(g);
         }
         return ret;
     }
