@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include <iterator>
+
 #include "common/eigen.hpp"
 #include "revolution/bases"
 #include "revolution/quadratures"
@@ -116,11 +118,10 @@ make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
     gr_rhs.block(0, 0, rbs-1, cbs) = stiff.block(1, 0, rbs-1, cbs);
 
     auto fcs = faces(msh, cl);
-    auto ns = normals(msh, cl);
     for (size_t i = 0; i < fcs.size(); i++)
     {
         auto fc = fcs[i];
-        auto n = ns[i];
+        auto n = normal(msh, cl, fc);
         auto fb = make_scalar_monomial_basis(msh, fc, facdeg);
 
         auto qps_f = integrate(msh, fc, 2*facdeg);
@@ -157,9 +158,9 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     auto cb = make_vector_monomial_basis(msh, cl, recdeg);
 
-    auto rbs = vector_basis_size(recdeg, Mesh::dimension);
-    auto cbs = vector_basis_size(celdeg, Mesh::dimension);
-    auto fbs = vector_basis_size(facdeg, Mesh::dimension-1);
+    auto rbs = vector_basis_size(recdeg, Mesh::dimension, Mesh::dimension);
+    auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
+    auto fbs = vector_basis_size(facdeg, Mesh::dimension-1, Mesh::dimension);
 
     auto num_faces = howmany_faces(msh, cl);
 
@@ -182,32 +183,31 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
     gr_rhs.block(0, 0, rbs-2, cbs) = stiff.block(2, 0, rbs-2, cbs);
 
     auto fcs = faces(msh, cl);
-    auto ns = normals(msh, cl);
     for (size_t i = 0; i < fcs.size(); i++)
     {
         auto fc = fcs[i];
-        auto n = ns[i];
+        auto n = normal(msh, cl, fc);
         auto fb = make_vector_monomial_basis(msh, fc, facdeg);
 
         auto qps_f = integrate(msh, fc, 2*facdeg);
         for (auto& qp : qps_f)
         {
             function_type   c_phi_tmp = cb.eval_functions(qp.point());
-            function_type   c_phi = c_phi_tmp.head(cbs);
+            function_type   c_phi = c_phi_tmp.block(0, 0, cbs, 2);
 
             std::vector<gradient_type> c_dphi_tmp = cb.eval_gradients(qp.point());
 
-            auto begin_iter = std::advance(c_dphi_tmp.begin(), 2);
+            auto begin_iter = std::next(c_dphi_tmp.begin(), 2);
             std::vector<gradient_type> c_dphi(rbs - 2);
             std::copy(begin_iter, c_dphi_tmp.end(), c_dphi.begin());
 
             function_type   f_phi = fb.eval_functions(qp.point());
 
-            c_dphi_n = priv::outer_product(c_dphi, n);
+            Matrix<T, Dynamic, 2> c_dphi_n = priv::outer_product(c_dphi, n);
             gr_rhs.block(0, cbs + i*fbs, rbs-2, fbs) +=
-                    qp.weight() * priv::outer_product(c_dphi_n), f_phi);
+                    qp.weight() * priv::outer_product(f_phi, c_dphi_n);
             gr_rhs.block(0, 0, rbs-2, cbs) -=
-                    qp.weight() * priv::outer_product(c_dphi_n), c_phi);
+                    qp.weight() * priv::outer_product(c_phi, c_dphi_n);
         }
     }
 
@@ -410,8 +410,8 @@ make_hho_fancy_stabilization_vector(const Mesh& msh, const typename Mesh::cell_t
             auto f_phi = fb.eval_functions(qp.point());
             auto c_phi = cb.eval_functions(qp.point());
             Matrix<T, Dynamic, Mesh::dimension> q_f_phi = qp.weight() * f_phi;
-            face_mass_matrix += priv::outer_product(q_f_phi, f_phi);
-            face_trace_matrix += priv::outer_product(q_f_phi, c_phi);
+            face_mass_matrix += priv::outer_product(f_phi, q_f_phi);
+            face_trace_matrix += priv::outer_product(c_phi, q_f_phi);
         }
 
         LLT<Matrix<T, Dynamic, Dynamic>> piKF;

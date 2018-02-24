@@ -30,11 +30,25 @@ using namespace Eigen;
 namespace revolution {
 
 namespace priv {
-template<typename T, int N>
+template<typename T, int M, int N>
 Matrix<T, Dynamic, Dynamic>
-outer_product(const Matrix<T, Dynamic, N>& a, const Matrix<T, Dynamic, N>& b)
+outer_product(const Matrix<T, Dynamic, M>& a, const Matrix<T, Dynamic, N>& b)
 {
-	return a * b.transpose();
+	return b * a.transpose();
+}
+
+template<typename T, int N>
+Matrix<T, Dynamic, 2>
+outer_product(const std::vector<Matrix<T, N, N>>& a, const Matrix<T, N, 1>& b)
+{
+	Matrix<T, Dynamic, 2> ret(a.size(),2);
+	for (size_t i = 0; i < a.size(); i++)
+	{
+		Matrix<T, N, 1> t = a[i]*b;
+		ret.row(i) = t.transpose();
+	}
+
+	return ret;
 }
 
 template<typename T, int N>

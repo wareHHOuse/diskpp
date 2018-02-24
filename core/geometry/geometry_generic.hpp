@@ -262,31 +262,6 @@ normal(const generic_mesh<T,1>& msh,
 }
 
 
-template<typename Mesh>
-std::vector< Eigen::Matrix<typename Mesh::coordinate_type,2,1> >
-normals(const Mesh& msh, const typename Mesh::cell_type& cl)
-{
-    using T = typename Mesh::coordinate_type;
-    std::vector< Eigen::Matrix<T,2,1> > ret;
-
-    auto pts = points(msh, cl);
-
-    for (size_t i = 0; i < pts.size(); i++)
-    {
-        auto v = pts[(i+1)%pts.size()] - pts[i];
-        Eigen::Matrix<T,2,1> r;
-        r(0) = v.y();
-        r(1) = -v.x();
-        r = r/r.norm();
-        ret.push_back(r);
-    }
-
-    return ret;
-}
-
-
-
-
 } // namespace disk
 
 #endif

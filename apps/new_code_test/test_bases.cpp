@@ -51,7 +51,7 @@ test_bases(const Mesh& msh)
     size_t degree = 1;
 
     auto f1 = [](const point_type& pt) -> scalar_type {
-        return pt.x();
+        return std::sin(M_PI*pt.x()) * std::sin(M_PI*pt.y());
     };
 
 
@@ -80,20 +80,20 @@ test_bases(const Mesh& msh)
 
     for(auto cl : msh)
     {
-        revolution::scaled_monomial_vector_basis<mesh_type, cell_type> vec_cell_basis(msh, cl, degree);
+        //revolution::scaled_monomial_vector_basis<mesh_type, cell_type> vec_cell_basis(msh, cl, degree);
 
-        auto cell_basis = revolution::make_vector_monomial_basis(msh, cl, degree);
+        //auto cell_basis = revolution::make_vector_monomial_basis(msh, cl, degree);
 
-        matrix_type mass = revolution::make_mass_matrix(msh, cl, cell_basis);
+        //matrix_type mass = revolution::make_mass_matrix(msh, cl, cell_basis);
 
         //std::cout << "Cell mass matrix for " << cl << std::endl;
         //std::cout << mass << std::endl;
 
         
-        matrix_type stiff = revolution::make_stiffness_matrix(msh, cl, cell_basis);
+        //matrix_type stiff = revolution::make_stiffness_matrix(msh, cl, cell_basis);
 
-        std::cout << "Cell stiffness matrix for " << cl << std::endl;
-        std::cout << stiff << std::endl;
+        //std::cout << "Cell stiffness matrix for " << cl << std::endl;
+        //std::cout << stiff << std::endl;
         
 
         /*
@@ -121,23 +121,26 @@ test_bases(const Mesh& msh)
     scalar_type stab_error = 0.0;
     for (auto cl : msh)
     {
-        auto cb = revolution::make_vector_monomial_basis(msh, cl, degree);
-        Matrix<scalar_type, Dynamic, Dynamic> mass = revolution::make_mass_matrix(msh, cl, cb);
-        Matrix<scalar_type, Dynamic, 1> rhs1 = revolution::make_rhs(msh, cl, cb, v1);
-        Matrix<scalar_type, Dynamic, 1> rhs2 = revolution::make_rhs(msh, cl, cb, v2);
+        //auto cb = revolution::make_scalar_monomial_basis(msh, cl, degree);
+        //Matrix<scalar_type, Dynamic, Dynamic> mass = revolution::make_mass_matrix(msh, cl, cb);
+        //Matrix<scalar_type, Dynamic, 1> rhs1 = revolution::make_rhs(msh, cl, cb, v1);
+        //Matrix<scalar_type, Dynamic, 1> rhs2 = revolution::make_rhs(msh, cl, cb, v2);
 
-        auto massInv = mass.llt();
+        //auto massInv = mass.llt();
 
-        Matrix<scalar_type, Dynamic, 1> dofs1 = massInv.solve(rhs1);
-        Matrix<scalar_type, Dynamic, 1> dofs2 = massInv.solve(rhs2);
+        //Matrix<scalar_type, Dynamic, 1> dofs1 = massInv.solve(rhs1);
+        //Matrix<scalar_type, Dynamic, 1> dofs2 = massInv.solve(rhs2);
 
-        intval += dofs1.dot(mass*dofs2);
+        //intval += dofs1.dot(mass*dofs2);
 
         Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, v3);
 
-        Matrix<scalar_type, Dynamic, Dynamic> reconstr( revolution::vector_basis_size(degree+1, 2, 2)-2, p.rows() );
+        auto gr = make_hho_vector_laplacian(msh, cl, hdi);
+        ///std::cout << gr.second << std::endl << std::endl;
         Matrix<scalar_type, Dynamic, Dynamic> stab;
-        stab = make_hho_fancy_stabilization_vector(msh, cl, reconstr, hdi);
+
+        stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
+        //std::cout << stab << std::endl;
 
         stab_error += p.dot(stab*p);
     }

@@ -208,7 +208,6 @@ normal(const Mesh<T, 3, Storage>& msh,
     return n/n.norm();
 }
 
-
 } // namespace disk
 
 #endif /* _GEOMETRY_ALL_HPP_ */
