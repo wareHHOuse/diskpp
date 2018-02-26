@@ -274,4 +274,24 @@ public:
     }
 };
 
+
+
+template<typename Mesh, typename Element, typename Basis>
+Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+compute_averages(const Mesh& msh, const Element& elem, const Basis& basis)
+{
+    using T = typename Mesh::coordinate_type;
+    auto meas = measure(msh, elem);
+
+    Matrix<T, Dynamic, 1> avgs = Matrix<T, Dynamic, 1>::Zero(basis.size());
+
+    auto qps = integrate(msh, elem, basis.degree());
+    for (auto& qp : qps)
+        avgs += qp.weight() * basis.eval_functions(qp.point());
+
+    avgs(0) = 0;
+
+    return avgs * (1/meas);
+}
+
 }

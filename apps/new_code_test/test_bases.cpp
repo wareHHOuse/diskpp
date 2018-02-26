@@ -140,18 +140,13 @@ test_bases(const Mesh& msh)
         Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, v3);
 
         auto gr = make_hho_vector_laplacian(msh, cl, hdi);
-        ///std::cout << gr.second << std::endl << std::endl;
-        Matrix<scalar_type, Dynamic, Dynamic> stab;
 
+        Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
-        //std::cout << stab << std::endl;
+
 
         auto dr = make_hho_divergence_reconstruction(msh, cl, hdi);
-
         Matrix<scalar_type, Dynamic, 1> d = dr.first * p;
-
-        std::cout << d.transpose() << std::endl;
-        std::cout << project_function(msh, cl, hdi, f2).transpose() << std::endl;
 
         stab_error += p.dot(stab*p);
     }
