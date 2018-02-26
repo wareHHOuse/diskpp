@@ -181,7 +181,7 @@ public:
         basis_size      = vector_basis_size( degree, 1, 2);
     }
 
-    auto
+    function_type
     eval_functions(const point_type& pt) const
     {
         function_type ret = function_type::Zero(basis_size, 2);

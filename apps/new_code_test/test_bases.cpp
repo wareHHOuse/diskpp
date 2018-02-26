@@ -54,6 +54,10 @@ test_bases(const Mesh& msh)
         return std::sin(M_PI*pt.x()) * std::sin(M_PI*pt.y());
     };
 
+    auto f2 = [](const point_type& pt) -> scalar_type {
+        return M_PI * (std::cos(M_PI*pt.x()) + std::cos(M_PI*pt.y()));
+    };
+
 
     auto v1 = [](const point_type& pt) -> Matrix<scalar_type, 2, 1> {
         Matrix<scalar_type, 2, 1> ret;
@@ -141,6 +145,13 @@ test_bases(const Mesh& msh)
 
         stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
         //std::cout << stab << std::endl;
+
+        auto dr = make_hho_divergence_reconstruction(msh, cl, hdi);
+
+        Matrix<scalar_type, Dynamic, 1> d = dr.first * p;
+
+        std::cout << d.transpose() << std::endl;
+        std::cout << project_function(msh, cl, hdi, f2).transpose() << std::endl;
 
         stab_error += p.dot(stab*p);
     }
