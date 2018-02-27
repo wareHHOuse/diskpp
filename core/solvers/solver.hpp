@@ -217,6 +217,35 @@ mkl_pardiso(const pardiso_params<T>& params,
 
 template<typename T>
 bool
+mkl_pardiso_ldlt(const pardiso_params<T>& params,
+                 const Eigen::SparseMatrix<T>& A,
+                 const Eigen::Matrix<T, Eigen::Dynamic, 1>& b,
+                 Eigen::Matrix<T, Eigen::Dynamic, 1>& x)
+{
+    Eigen::PardisoLDLT<Eigen::SparseMatrix<T>>  solver;
+
+    if (params.out_of_core >= 0 && params.out_of_core <= 2)
+        solver.pardisoParameterArray()[59] = params.out_of_core;
+
+    if (params.report_factorization_Mflops)
+        solver.pardisoParameterArray()[18] = -1; //report flops
+
+    solver.analyzePattern(A);
+    solver.factorize(A);
+    x = solver.solve(b);
+
+    if (params.report_factorization_Mflops)
+    {
+        int mflops = solver.pardisoParameterArray()[18];
+        std::cout << "[PARDISO] Factorization Mflops: " << mflops << std::endl;
+    }
+
+    return true;
+}
+
+
+template<typename T>
+bool
 mkl_pardiso(sol::state& lua,
             const Eigen::SparseMatrix<T>& A,
             const Eigen::Matrix<T, Eigen::Dynamic, 1>& b,

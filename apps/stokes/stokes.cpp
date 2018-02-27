@@ -124,24 +124,8 @@ run_stokes(const Mesh& msh, size_t degree)
 
     dynamic_vector<scalar_type> sol = dynamic_vector<scalar_type>::Zero(systsz);
     
-    /*
     disk::solvers::pardiso_params<scalar_type> pparams;
-    mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
-    */
-
-
-    /*
-    disk::solvers::conjugated_gradient_params<scalar_type> cgp;
-    cgp.max_iter = systsz * 4;
-    conjugated_gradient(cgp, assembler.LHS, assembler.RHS, sol);
-    */
-
-
-    SparseLU<SparseMatrix<scalar_type>>  solver;
-
-    solver.analyzePattern(assembler.LHS);
-    solver.factorize(assembler.LHS);
-    sol = solver.solve(assembler.RHS);
+    mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);
 
     //std::ofstream ofs("velocity.dat");
 
@@ -186,7 +170,7 @@ void convergence_test_typ1(void)
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
 
-    for (size_t k = 0; k < 4; k++)
+    for (size_t k = 0; k < 5; k++)
     {
         std::cout << "DEGREE " << k << std::endl;
 
