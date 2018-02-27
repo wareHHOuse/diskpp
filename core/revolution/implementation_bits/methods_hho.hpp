@@ -150,7 +150,8 @@ std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
 make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
                           const hho_degree_info& di)
 {
-    using T = typename Mesh::coordinate_type;
+    using  T = typename Mesh::coordinate_type;
+    const size_t N = Mesh::dimension;
 
     auto recdeg = di.reconstruction_degree();
     auto celdeg = di.cell_degree();
@@ -165,8 +166,8 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
     auto num_faces = howmany_faces(msh, cl);
 
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
-    typedef Matrix<T, 2, 2>             gradient_type;
-    typedef Matrix<T, Dynamic, 2>       function_type;
+    typedef Matrix<T, N, N>             gradient_type;
+    typedef Matrix<T, Dynamic, N>       function_type;
 
     matrix_type stiff  = matrix_type::Zero(rbs, rbs);
     matrix_type gr_lhs = matrix_type::Zero(rbs-2, rbs-2);
@@ -203,7 +204,7 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
 
             function_type   f_phi = fb.eval_functions(qp.point());
 
-            Matrix<T, Dynamic, 2> c_dphi_n = priv::outer_product(c_dphi, n);
+            Matrix<T, Dynamic, N> c_dphi_n = priv::outer_product(c_dphi, n);
             gr_rhs.block(0, cbs + i*fbs, rbs-2, fbs) +=
                     qp.weight() * priv::outer_product(f_phi, c_dphi_n);
             gr_rhs.block(0, 0, rbs-2, cbs) -=
@@ -246,7 +247,7 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
     auto qps = integrate(msh, cl, 2*recdeg);
     for (auto& qp : qps)
     {
-        Matrix<T, Dynamic, 1> s_phi  = cbas_s.eval_functions(qp.point()) - avgs;
+        Matrix<T, Dynamic, 1> s_phi  = cbas_s.eval_functions(qp.point());
         auto s_dphi = cbas_s.eval_gradients(qp.point()); 
         auto v_phi  = cbas_v.eval_functions(qp.point());
 
@@ -264,7 +265,7 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
         auto qps_f = integrate(msh, fc, 2*facdeg);
         for (auto& qp : qps_f)
         {
-            Matrix<T, Dynamic, 1> s_phi = cbas_s.eval_functions(qp.point()) - avgs;
+            Matrix<T, Dynamic, 1> s_phi = cbas_s.eval_functions(qp.point());
             auto f_phi = fbas_v.eval_functions(qp.point());
 
             Matrix<T, Dynamic, 2> s_phi_n = (s_phi * n.transpose());//priv::outer_product(s_phi, n);
@@ -689,7 +690,7 @@ public:
         auto fbs_A = vector_basis_size(hdi.face_degree(), Mesh::dimension-1, Mesh::dimension);
         auto cbs_B = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
 
-        auto system_size = cbs_A * msh.cells_size() + fbs_A * num_other_faces + cbs_B * msh.cells_size();
+        auto system_size = cbs_A * msh.cells_size() + fbs_A * num_other_faces + cbs_B * msh.cells_size() + 1;
 
         LHS = SparseMatrix<T>( system_size, system_size );
         RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
@@ -712,12 +713,6 @@ public:
              const Matrix<T, Dynamic, 1>& rhs,
              const Function& dirichlet_bf)
     {
-        //auto celdeg = di.cell_degree();
-        //auto facdeg = di.face_degree();
-
-        //auto cbs = cell_basis<Mesh,T>::size(celdeg);
-        //auto fbs = face_basis<Mesh,T>::size(facdeg);
-
         auto cbs_A = vector_basis_size(di.cell_degree(), Mesh::dimension, Mesh::dimension);
         auto fbs_A = vector_basis_size(di.face_degree(), Mesh::dimension-1, Mesh::dimension);
         auto cbs_B = scalar_basis_size(di.cell_degree(), Mesh::dimension);
@@ -788,7 +783,7 @@ public:
                 //    RHS(asm_map[i]) -= lhs_B(i,j)*dirichlet_data(j);
             }
         }
-/*
+
         auto scalar_cell_basis = make_scalar_monomial_basis(msh, cl, di.cell_degree());
         auto qps = integrate(msh, cl, di.cell_degree());
         Matrix<T, Dynamic, 1> mult = Matrix<T, Dynamic, 1>::Zero( scalar_cell_basis.size() );
@@ -804,7 +799,7 @@ public:
             triplets.push_back( Triplet<T>(B_offset+i, mult_offset, mult(i)) );
             triplets.push_back( Triplet<T>(mult_offset, B_offset+i, mult(i)) );
         }
-*/
+
         RHS.block(cell_LHS_offset, 0, cbs_A, 1) += rhs.block(0, 0, cbs_A, 1);
         
     } // assemble()
