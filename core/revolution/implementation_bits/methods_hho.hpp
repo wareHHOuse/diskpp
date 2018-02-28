@@ -199,7 +199,9 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
             std::vector<gradient_type> c_dphi_tmp = cb.eval_gradients(qp.point());
 
             auto begin_iter = std::next(c_dphi_tmp.begin(), 2);
-            std::vector<gradient_type> c_dphi(rbs - 2);
+            std::vector<gradient_type> c_dphi;
+            c_dphi.resize(rbs - 2);
+            assert( std::distance(begin_iter, c_dphi_tmp.end()) == c_dphi.size() );
             std::copy(begin_iter, c_dphi_tmp.end(), c_dphi.begin());
 
             function_type   f_phi = fb.eval_functions(qp.point());

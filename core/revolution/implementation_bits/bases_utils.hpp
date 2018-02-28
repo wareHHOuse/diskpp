@@ -53,7 +53,7 @@ outer_product(const std::vector<Matrix<T, N, N>>& a, const Matrix<T, N, 1>& b)
 
 template<typename T, int N>
 Matrix<T, Dynamic, Dynamic>
-outer_product(const std::vector<Matrix<T, N, N>>& a, std::vector<Matrix<T, N, N>>& b)
+outer_product(const std::vector<Matrix<T, N, N>>& a, const std::vector<Matrix<T, N, N>>& b)
 {
 	Matrix<T, Dynamic, Dynamic> ret(a.size(), b.size());
 
