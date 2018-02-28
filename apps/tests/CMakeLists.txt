@@ -1,0 +1,2 @@
+add_executable(scalar_gradient_reconstruction scalar_gradient_reconstruction.cpp)
+target_link_libraries(scalar_gradient_reconstruction ${LINK_LIBS})
