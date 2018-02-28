@@ -613,12 +613,12 @@ make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
         Matrix<T, Dynamic, Dynamic> face_mass_matrix    = Matrix<T, Dynamic, Dynamic>::Zero(fbs, fbs);
         Matrix<T, Dynamic, Dynamic> face_trace_matrix   = Matrix<T, Dynamic, Dynamic>::Zero(fbs, rbs);
 
-        auto face_quadpoints = integrate(msh, fc, 2*facdeg);
+        auto face_quadpoints = integrate(msh, fc, 2*recdeg);
         for (auto& qp : face_quadpoints)
         {
             auto f_phi = fb.eval_functions(qp.point());
             auto c_phi = cb.eval_functions(qp.point());
-            auto q_f_phi = qp.weight() * f_phi;
+            Matrix<T, Dynamic, 1> q_f_phi = qp.weight() * f_phi;
             face_mass_matrix += q_f_phi * f_phi.transpose();
             face_trace_matrix += q_f_phi * c_phi.transpose();
         }
