@@ -75,8 +75,9 @@ public:
     typedef typename mesh_type::scalar_type         scalar_type;
     typedef typename mesh_type::cell                cell_type;
     typedef typename mesh_type::point_type          point_type;
-    typedef Matrix<scalar_type, 2, 2>               gradient_type;
+    typedef Matrix<scalar_type, Dynamic, 1>         vector_type;
     typedef Matrix<scalar_type, Dynamic, 2>         function_type;
+    typedef Matrix<scalar_type, 2, 2>               gradient_type;
 
 private:
     point_type          cell_bar;
@@ -146,7 +147,6 @@ public:
 
         Matrix<scalar_type, Dynamic, 2> dphi = scalar_basis.eval_gradients(pt);
 
-        size_t j = 0;
         for(size_t i = 0; i < scalar_basis.size(); i++)
         {
             Matrix<scalar_type, 1, 2> dphi_i = dphi.row(i);
@@ -159,6 +159,23 @@ public:
             g = gradient_type::Zero();
             g.row(1) = dphi_i;
             ret.push_back( 0.5 * (g + g.transpose()));
+        }
+        return ret;
+    }
+
+    vector_type
+    eval_curls(const point_type& pt) const
+    {
+        vector_type ret = vector_type::Zero(basis_size);
+
+        Matrix<scalar_type, Dynamic, 2> dphi = scalar_basis.eval_gradients(pt);
+
+        size_t j = 0;
+        for(size_t i = 0; i < scalar_basis.size(); i++)
+        {
+            Matrix<scalar_type, 1, 2> dphi_i = dphi.row(i);
+            ret(j++) = -dphi_i(1);
+            ret(j++) =  dphi_i(0);
         }
         return ret;
     }

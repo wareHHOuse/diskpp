@@ -58,19 +58,30 @@ run_stokes(const Mesh& msh, size_t degree)
         Matrix<scalar_type, 2, 1> ret;
 
         scalar_type x1 = p.x();
-        scalar_type x2 = std::pow(p.x(), 2.);
-        scalar_type x3 = std::pow(p.x(), 3.);
-        scalar_type x4 = std::pow(p.x(), 4.);
+        scalar_type x2 = x1 * x1;
+        scalar_type x3 = x2 * x1;
+        scalar_type x4 = x2 * x2;
         scalar_type y1 = p.y();
-        scalar_type y2 = std::pow(p.y(), 2.);
-        scalar_type y3 = std::pow(p.y(), 3.);
-        scalar_type y4 = std::pow(p.y(), 4.);
+        scalar_type y2 = y1 * y1;
+        scalar_type y3 = y2 * y1;
+        scalar_type y4 = y2 * y2;
 
-        ret(0) = -(12.* x2 - 12.* x1 + 2.) * ( 4. * y3 - 6. * y2 + 2.* y1 )
-                 -(x4 - 2. * x3 + x2 ) * (24. * y1 - 12.) + 5.* x4;
+        scalar_type cx = 12. * x2 - 12.* x1 + 2.;
+        scalar_type cy = 12. * y2 - 12.* y1 + 2.;
+        scalar_type ay =  4. * y3 - 6. * y2 + 2.* y1;
+        scalar_type ax =  4. * x3 - 6. * x2 + 2.* x1;
+        scalar_type bx = x4 - 2. * x3 + x2;
+        scalar_type by = y4 - 2. * y3 + y2;
+        scalar_type dx = 24. * x1 - 12.;
+        scalar_type dy = 24. * y1 - 12.;
 
-        ret(1) = +(12.* y2 - 12.* y1 + 2.) * ( 4. * x3 - 6. * x2 + 2.* x1 )
-                 +(y4 - 2. * y3 + y2 ) * (24. * x1 - 12.) +  5.* y4;
+        //laplacian
+        //ret(0) = - cx * ay - bx * dy + 5.* x4;
+        //ret(1) = + cy * ax + by * dx + 5.* y4;
+
+        //sym laplacian
+        ret(0) = - 0.5 * ( cx * ay + bx * dy ) + 5.* x4;
+        ret(1) = + 0.5 * ( cy * ax + by * dx ) + 5.* y4;
 
         return ret;
     };
@@ -79,13 +90,13 @@ run_stokes(const Mesh& msh, size_t degree)
         Matrix<scalar_type, 2, 1> ret;
 
         scalar_type x1 = p.x();
-        scalar_type x2 = std::pow(p.x(), 2.);
-        scalar_type x3 = std::pow(p.x(), 3.);
-        scalar_type x4 = std::pow(p.x(), 4.);
+        scalar_type x2 = x1 * x1;
+        scalar_type x3 = x2 * x1;
+        scalar_type x4 = x2 * x2;
         scalar_type y1 = p.y();
-        scalar_type y2 = std::pow(p.y(), 2.);
-        scalar_type y3 = std::pow(p.y(), 3.);
-        scalar_type y4 = std::pow(p.y(), 4.);
+        scalar_type y2 = y1 * y1;
+        scalar_type y3 = y2 * y1;
+        scalar_type y4 = y2 * y2;
 
         ret(0) =  (x4 - 2. * x3 + x2)  * ( 4. * y3 - 6. * y2 + 2.* y1 );
         ret(1) = -(y4 - 2. * y3 + y2 ) * ( 4. * x3 - 6. * x2 + 2.* x1 );
@@ -105,13 +116,9 @@ run_stokes(const Mesh& msh, size_t degree)
 
         Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
-
         auto dr = make_hho_divergence_reconstruction(msh, cl, hdi);
-
         auto face_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.face_degree());
-
         auto rhs = make_rhs(msh, cl, face_basis, rhs_fun);
-
         assembler.assemble(msh, cl, 2. * (gr.second + stab), -dr.first, rhs, sol_fun);
     }
 
@@ -164,13 +171,15 @@ void convergence_test_typ1(void)
     using T = double;
 
     std::vector<std::string> meshfiles;
+    //meshfiles.push_back("../diskpp/meshes/2D_trias/fvca5/meshk1_0.typ1");
+    //#if 0
     meshfiles.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_1.typ1");
     meshfiles.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_2.typ1");
     meshfiles.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_3.typ1");
     meshfiles.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
     meshfiles.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
-
-    for (size_t k = 0; k < 5; k++)
+    //#endif
+    for (size_t k = 1; k < 5; k++)
     {
         std::cout << "DEGREE " << k << std::endl;
 

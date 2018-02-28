@@ -218,11 +218,12 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     return std::make_pair(oper, data);
 }
-#if 0
+//#if 0
 template<typename Mesh>
 std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
              Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
-make_hho_vector_symmetric_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_hho_vector_symmetric_laplacian(const Mesh& msh,
+                          const typename Mesh::cell_type& cl,
                           const hho_degree_info& di)
 {
     using  T = typename Mesh::coordinate_type;
@@ -240,13 +241,16 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh, const typename Mesh::cell_t
 
     auto num_faces = howmany_faces(msh, cl);
 
+    typedef Matrix<T, Dynamic, 1> vector_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
     typedef Matrix<T, N, N>             gradient_type;
     typedef Matrix<T, Dynamic, N>       function_type;
 
+    size_t rbs_ho = rbs - Mesh::dimension;
+    size_t num_total_dofs = cbs + num_faces*fbs;
     matrix_type stiff  = matrix_type::Zero(rbs, rbs);
-    matrix_type gr_lhs = matrix_type::Zero(rbs-2, rbs-2);
-    matrix_type gr_rhs = matrix_type::Zero(rbs-2, cbs + num_faces*fbs);
+    matrix_type gr_lhs = matrix_type::Zero( rbs_ho + 1, rbs_ho + 1);
+    matrix_type gr_rhs = matrix_type::Zero( rbs_ho + 1, num_total_dofs);
 
     auto qps = integrate(msh, cl, 2*recdeg);
     for (auto& qp : qps)
@@ -255,8 +259,8 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh, const typename Mesh::cell_t
         stiff += qp.weight() * priv::outer_product(dphi, dphi);
     }
 
-    gr_lhs = stiff.block(2, 2, rbs-2, rbs-2);
-    gr_rhs.block(0, 0, rbs-2, cbs) = stiff.block(2, 0, rbs-2, cbs);
+    gr_lhs.block(0, 0, rbs_ho, rbs_ho) = stiff.block(2, 2, rbs_ho, rbs_ho);
+    gr_rhs.block(0, 0, rbs_ho, cbs) = stiff.block(2, 0, rbs_ho, cbs);
 
     auto fcs = faces(msh, cl);
     for (size_t i = 0; i < fcs.size(); i++)
@@ -274,35 +278,36 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh, const typename Mesh::cell_t
             std::vector<gradient_type> c_dphi_tmp = cb.eval_symmetric_gradients(qp.point());
 
             auto begin_iter = std::next(c_dphi_tmp.begin(), 2);
-            std::vector<gradient_type> c_dphi(rbs - 2);
+            std::vector<gradient_type> c_dphi(rbs_ho);
             std::copy(begin_iter, c_dphi_tmp.end(), c_dphi.begin());
 
-            function_type   f_phi = fb.eval_functions(qp.point());
-
-            Matrix<T, Dynamic, N> c_dphi_n = priv::outer_product(c_dphi, n);
-            gr_rhs.block(0, cbs + i*fbs, rbs-2, fbs) +=
+            function_type    f_phi = fb.eval_functions(qp.point());
+            function_type c_dphi_n = priv::outer_product(c_dphi, n);
+            gr_rhs.block(0, cbs + i*fbs, rbs_ho, fbs) +=
                     qp.weight() * priv::outer_product(f_phi, c_dphi_n);
-            gr_rhs.block(0, 0, rbs-2, cbs) -=
+            gr_rhs.block(0, 0, rbs_ho, cbs) -=
                     qp.weight() * priv::outer_product(c_phi, c_dphi_n);
         }
     }
 
-    vector_type rot = vector_type(rbs);
+    vector_type rot = vector_type::Zero(rbs);
     for (auto& qp : qps)
     {
-        auto dphi_ss = cb.eval_skew_sym_gradients(qp.point());
-        for(size_t i = 0; i < rbs; i++)
-            rot(i++)= qp.weight() * dphi_ss.at(i).sum();
+        auto rphi = cb.eval_curls(qp.point());
+        rot += qp.weight() * rphi;
     }
 
-    matrix_type gr_lhs
+    gr_lhs.block(0, rbs_ho, rbs_ho, 1 ) = rot.tail(rbs_ho);
+    gr_lhs.block(rbs_ho, 0, 1, rbs_ho ) = rot.tail(rbs_ho).transpose();
 
-    matrix_type oper = gr_lhs.llt().solve(gr_rhs);
-    matrix_type data = gr_rhs.transpose() * oper;
+    matrix_type sol  = gr_lhs.ldlt().solve(gr_rhs);
+    matrix_type oper = sol.block(0,0, rbs_ho, num_total_dofs);
+    //matrix_type mmmm = gr_rhs.block(0,0, rbs_ho, num_total_dofs);
+    //matrix_type data = mmm.transpose() * oper;
 
     return std::make_pair(oper, data);
 }
-#endif
+//#endif
 
 template<typename Mesh>
 std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
