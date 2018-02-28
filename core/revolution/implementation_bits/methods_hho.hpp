@@ -580,7 +580,7 @@ make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
     auto cb = make_scalar_monomial_basis(msh, cl, recdeg);
 
     Matrix<T, Dynamic, Dynamic> mass_mat = Matrix<T, Dynamic, Dynamic>::Zero(rbs, rbs);
-    auto cell_quadpoints = integrate(msh, cl, 2*recdeg);
+    auto cell_quadpoints = integrate(msh, cl, 2*recdeg+2);
     for (auto& qp : cell_quadpoints)
     {
         auto c_phi = cb.eval_functions(qp.point());
@@ -613,7 +613,7 @@ make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
         Matrix<T, Dynamic, Dynamic> face_mass_matrix    = Matrix<T, Dynamic, Dynamic>::Zero(fbs, fbs);
         Matrix<T, Dynamic, Dynamic> face_trace_matrix   = Matrix<T, Dynamic, Dynamic>::Zero(fbs, rbs);
 
-        auto face_quadpoints = integrate(msh, fc, 2*recdeg);
+        auto face_quadpoints = integrate(msh, fc, 2*recdeg+2);
         for (auto& qp : face_quadpoints)
         {
             auto f_phi = fb.eval_functions(qp.point());

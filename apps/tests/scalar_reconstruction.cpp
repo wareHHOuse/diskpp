@@ -91,7 +91,7 @@ int main(void)
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_4.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_5.typ1");
 
-    for (size_t k = 0; k < 5; k++)
+    for (size_t k = 0; k < 6; k++)
     {
         std::cout << "DEGREE " << k << std::endl;
 
