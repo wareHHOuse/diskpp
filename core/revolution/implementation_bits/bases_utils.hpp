@@ -20,7 +20,7 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-#pragma once 
+#pragma once
 
 #include "common/eigen.hpp"
 #include "../quadratures"
@@ -60,20 +60,41 @@ outer_product(const std::vector<Matrix<T, N, N>>& a, const std::vector<Matrix<T,
 	for (size_t i = 0; i < a.size(); i++)
 		for (size_t j = 0; j < b.size(); j++)
 			ret(i,j) = a[i].cwiseProduct(b[j]).sum();
-	
+
 	return ret;
 }
 
 template<typename T>
 Matrix<T, Dynamic, 1>
-inner_product(const T& a, const Matrix<T, Dynamic, 1> b)
+inner_product(const T& a, const Matrix<T, Dynamic, 1>& b)
 {
 	return a*b;
 }
 
 template<typename T, int N>
+Matrix<T, N, N>
+inner_product(const T& a, const Matrix<T, N, N>& b)
+{
+   return a * b;
+}
+
+template<typename T, int N>
+Matrix<T, N, N>
+inner_product(const Matrix<T, N, N>& b, const T& a)
+{
+   return a * b;
+}
+
+template<typename T, int N>
+T
+inner_product(const Matrix<T, N, N>& b, const Matrix<T, N, N>& a)
+{
+   return a.cwiseProduct(b).sum();
+}
+
+template<typename T, int N>
 Matrix<T, Dynamic, 1>
-inner_product(const Matrix<T, N, 1>& a, const Matrix<T, Dynamic, N> b)
+inner_product(const Matrix<T, N, 1>& a, const Matrix<T, Dynamic, N>& b)
 {
 	return b*a;
 }
@@ -141,7 +162,7 @@ make_rhs(const Mesh& msh, const Element& elem,
     for (auto& qp : qps)
     {
         auto phi = basis.eval_functions(qp.point());
-        auto f = rhs_fun(qp.point()); 
+        auto f = rhs_fun(qp.point());
         ret += qp.weight() * priv::inner_product(f, phi);
     }
 
