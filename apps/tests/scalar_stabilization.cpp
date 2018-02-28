@@ -49,7 +49,7 @@ run_test(const Mesh& msh, size_t degree)
 
 
     auto f = [&](const point_type& pt) -> scalar_type {
-        return std::sin(M_PI * pt.x()) + std::sin(M_PI * pt.y());
+        return std::sin(2. * M_PI * pt.x()) * std::sin(2. * M_PI * pt.y());
     };
 
     typename revolution::hho_degree_info hdi(degree);
@@ -76,19 +76,20 @@ int main(void)
     using T = double;
 
     std::vector<std::string> meshfiles;
-    /*
+    
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_1.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_2.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_3.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_4.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_5.typ1");
-    */
     
+    /*
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_1.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_2.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_3.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
+    */
 
     for (size_t k = 0; k < 5; k++)
     {
