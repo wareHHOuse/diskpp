@@ -138,6 +138,31 @@ public:
         return ret;
     }
 
+    std::vector<gradient_type>
+    eval_symmetric_gradients(const point_type& pt) const
+    {
+        std::vector<gradient_type> ret;
+        ret.reserve(basis_size);
+
+        Matrix<scalar_type, Dynamic, 2> dphi = scalar_basis.eval_gradients(pt);
+
+        size_t j = 0;
+        for(size_t i = 0; i < scalar_basis.size(); i++)
+        {
+            Matrix<scalar_type, 1, 2> dphi_i = dphi.row(i);
+            gradient_type g;
+
+            g = gradient_type::Zero();
+            g.row(0) = dphi_i;
+            ret.push_back( 0.5 * (g + g.transpose()));
+
+            g = gradient_type::Zero();
+            g.row(1) = dphi_i;
+            ret.push_back( 0.5 * (g + g.transpose()));
+        }
+        return ret;
+    }
+
     size_t size() const
     {
         return basis_size;

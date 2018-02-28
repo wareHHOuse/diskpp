@@ -96,23 +96,23 @@ run_stokes(const Mesh& msh, size_t degree)
 
     typename revolution::hho_degree_info hdi(degree);
 
-    auto assembler = make_stokes_assembler(msh, hdi);
+    auto assembler = revolution::make_stokes_assembler(msh, hdi);
 
     for (auto cl : msh)
     {
-        auto gr = make_hho_vector_laplacian(msh, cl, hdi);
+        auto gr = make_hho_vector_symmetric_laplacian(msh, cl, hdi);
+        //auto gr = make_hho_vector_laplacian(msh, cl, hdi);
 
         Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
 
         auto dr = make_hho_divergence_reconstruction(msh, cl, hdi);
-      
+
         auto face_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.face_degree());
 
         auto rhs = make_rhs(msh, cl, face_basis, rhs_fun);
 
-        assembler.assemble(msh, cl, (gr.second + stab), -dr.first, rhs, sol_fun);
-
+        assembler.assemble(msh, cl, 2. * (gr.second + stab), -dr.first, rhs, sol_fun);
     }
 
     assembler.finalize();
@@ -123,7 +123,7 @@ run_stokes(const Mesh& msh, size_t degree)
     size_t nnz = assembler.LHS.nonZeros();
 
     dynamic_vector<scalar_type> sol = dynamic_vector<scalar_type>::Zero(systsz);
-    
+
     disk::solvers::pardiso_params<scalar_type> pparams;
     mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);
 
@@ -164,11 +164,11 @@ void convergence_test_typ1(void)
     using T = double;
 
     std::vector<std::string> meshfiles;
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_1.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_2.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_3.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
+    meshfiles.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_1.typ1");
+    meshfiles.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_2.typ1");
+    meshfiles.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_3.typ1");
+    meshfiles.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
+    meshfiles.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
 
     for (size_t k = 0; k < 5; k++)
     {
@@ -206,7 +206,7 @@ void convergence_test_typ1(void)
             }
             else
             {
-                auto rate = std::log( l2_velocity_errors.at(i)/l2_velocity_errors.at(i-1) ) / 
+                auto rate = std::log( l2_velocity_errors.at(i)/l2_velocity_errors.at(i-1) ) /
                             std::log( mesh_hs.at(i)/mesh_hs.at(i-1) );
                 std::cout << "    ";
                 std::cout << std::scientific << std::setprecision(5) << mesh_hs.at(i) << "    ";
