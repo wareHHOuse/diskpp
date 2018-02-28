@@ -96,7 +96,7 @@ run_stokes(const Mesh& msh, size_t degree)
 
     typename revolution::hho_degree_info hdi(degree);
 
-    auto assembler = make_stokes_assembler(msh, hdi);
+    auto assembler = revolution::make_stokes_assembler(msh, hdi);
 
     for (auto cl : msh)
     {
@@ -106,7 +106,7 @@ run_stokes(const Mesh& msh, size_t degree)
         stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
 
         auto dr = make_hho_divergence_reconstruction(msh, cl, hdi);
-      
+
         auto face_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.face_degree());
 
         auto rhs = make_rhs(msh, cl, face_basis, rhs_fun);
@@ -123,7 +123,7 @@ run_stokes(const Mesh& msh, size_t degree)
     size_t nnz = assembler.LHS.nonZeros();
 
     dynamic_vector<scalar_type> sol = dynamic_vector<scalar_type>::Zero(systsz);
-    
+
     disk::solvers::pardiso_params<scalar_type> pparams;
     mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);
 
@@ -223,7 +223,7 @@ void convergence_test_typ1(void)
             }
             else
             {
-                auto rate = std::log( l2_velocity_errors.at(i)/l2_velocity_errors.at(i-1) ) / 
+                auto rate = std::log( l2_velocity_errors.at(i)/l2_velocity_errors.at(i-1) ) /
                             std::log( mesh_hs.at(i)/mesh_hs.at(i-1) );
                 std::cout << "    ";
                 std::cout << std::scientific << std::setprecision(5) << mesh_hs.at(i) << "    ";
