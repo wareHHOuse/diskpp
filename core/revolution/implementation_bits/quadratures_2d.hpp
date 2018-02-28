@@ -208,6 +208,74 @@ integrate_triangle(const Mesh<T,2,Storage>& msh,
     return ret;
 }
 
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename PtA>
+std::vector< disk::quadrature_point<T,2> >
+integrate_quadrangle_tens(const Mesh<T,2,Storage>& msh,
+                     const typename Mesh<T,2,Storage>::cell& cl,
+                     size_t degree,
+                     const PtA& pts)
+{
+    typedef Mesh<T,2,Storage>   mesh_type;
+
+    typedef typename mesh_type::point_type    point_type;
+
+    auto qps = proton::edge_quadrature<T>(degree);
+
+    auto v0 = pts[1] - pts[0];
+    auto v1 = pts[2] - pts[1];
+    auto v2 = pts[3] - pts[2];
+    auto v3 = pts[3] - pts[0];
+
+    auto meas = 0.5*(v0.x()*v3.y() - v0.y()*v3.x()) + 0.5*(v1.x()*v2.y() - v1.y()*v2.x());
+
+    std::vector< disk::quadrature_point<T,2> > ret;
+
+    auto P = [&](T xi, T eta) -> T {
+        return 0.25 * pts[0].x() * (1-xi)*(1-eta) +
+               0.25 * pts[1].x() * (1+xi)*(1-eta) +
+               0.25 * pts[2].x() * (1+xi)*(1+eta) +
+               0.25 * pts[3].x() * (1-xi)*(1+eta);
+    };
+
+    auto Q = [&](T xi, T eta) -> T {
+        return 0.25 * pts[0].y() * (1-xi)*(1-eta) +
+               0.25 * pts[1].y() * (1+xi)*(1-eta) +
+               0.25 * pts[2].y() * (1+xi)*(1+eta) +
+               0.25 * pts[3].y() * (1-xi)*(1+eta);
+    };
+
+    auto J = [&](T xi, T eta) -> T {
+        auto j11 = 0.25*((pts[1].x() - pts[0].x())*(1-eta) + (pts[2].x() - pts[3].x())*(1+eta));
+        auto j12 = 0.25*((pts[1].y() - pts[0].y())*(1-eta) + (pts[2].y() - pts[3].y())*(1+eta));
+        auto j21 = 0.25*((pts[3].x() - pts[0].x())*(1-xi) + (pts[2].x() - pts[1].x())*(1+xi));
+        auto j22 = 0.25*((pts[3].y() - pts[0].y())*(1-xi) + (pts[2].y() - pts[1].y())*(1+xi));
+
+        return std::abs(j11*j22 - j12*j21);
+    };
+
+    T sw = 0.0, swq = 0.0;
+    for (auto jtor = qps.begin(); jtor != qps.end(); jtor++)
+    {
+        for (auto itor = qps.begin(); itor != qps.end(); itor++)
+        {
+            auto qp_x = *itor;
+            auto qp_y = *jtor;
+
+            auto xi = qp_x.first.x();
+            auto eta = qp_y.first.x();
+
+            auto px = P(xi, eta);
+            auto py = Q(xi, eta);
+
+            auto w = qp_x.second * qp_y.second * J(xi, eta);
+
+            ret.push_back( disk::make_qp( point_type({px, py}), w ) );
+        }
+    }
+
+    return ret;
+}
+
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename PtA>
 std::vector< disk::quadrature_point<T,2> >
@@ -416,7 +484,7 @@ integrate(const disk::generic_mesh<T,2>& msh,
 			return priv::integrate_triangle(msh, cl, degree, pts);
 
 		case 4:
-			return priv::integrate_quadrangle(msh, cl, degree, pts);
+			return priv::integrate_quadrangle_tens(msh, cl, degree, pts);
 
 		default:
 			return priv::integrate_polygon(msh, cl, degree, pts);

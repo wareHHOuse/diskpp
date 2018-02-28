@@ -19,3 +19,5 @@ add_subdirectory(obstacle)
 #add_subdirectory(test_bases)
 add_subdirectory(new_code_test)
 add_subdirectory(stokes)
+add_subdirectory(tests)
+
