@@ -27,7 +27,7 @@
 
 #include "core/loaders/loader.hpp"
 
-const size_t MIN_TEST_DEGREE = 4;
+const size_t MIN_TEST_DEGREE = 0;
 const size_t MAX_TEST_DEGREE = 5;
 
 /*****************************************************************************************/

@@ -77,7 +77,9 @@ struct test_functor
 
             Matrix<scalar_type, Dynamic, 1> diff = reconstr - exp_reconstr;
 
-            error += diff.dot(mass*diff);
+            Matrix<scalar_type, Dynamic, Dynamic> stiffness = revolution::make_stiffness_matrix(msh, cl, cb);
+
+            error += diff.dot(stiffness*diff);
         }
 
         return std::sqrt(error);

@@ -688,8 +688,6 @@ make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
         mass_mat += qp.weight() * c_phi * c_phi.transpose();
     }
 
-    std::cout << "Cond Mt: " << estimate_conditioning(mass_mat) << std::endl;
-
     // Build \pi_F^k (v_F - P_T^K v) equations (21) and (22)
 
     //Step 1: compute \pi_T^k p_T^k v (third term).
@@ -725,8 +723,6 @@ make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
             face_mass_matrix += q_f_phi * f_phi.transpose();
             face_trace_matrix += q_f_phi * c_phi.transpose();
         }
-
-        std::cout << "Cond Mf: " << estimate_conditioning(face_mass_matrix) << std::endl;
 
         LLT<Matrix<T, Dynamic, Dynamic>> piKF;
         piKF.compute(face_mass_matrix);

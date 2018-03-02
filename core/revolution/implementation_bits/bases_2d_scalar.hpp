@@ -156,9 +156,9 @@ public:
     {
         Matrix<scalar_type, Dynamic, 2> ret = Matrix<scalar_type, Dynamic, 2>::Zero(basis_size, 2);
 
-        auto bx = (pt.x() - cell_bar.x()) / (0.5*cell_h);
-        auto by = (pt.y() - cell_bar.y()) / (0.5*cell_h);
         auto ih = 2.0/cell_h;
+        auto bx = (pt.x() - cell_bar.x()) * ih;
+        auto by = (pt.y() - cell_bar.y()) * ih;
 
 #ifdef POWER_CACHE
         if ( power_cache.size() != (basis_degree+1)*2 )

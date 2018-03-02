@@ -113,27 +113,32 @@ gauss_legendre(size_t degree)
             qw = 5.0/9.0;
             ret.push_back( std::make_pair(-qp, qw ) );
             ret.push_back( std::make_pair( qp, qw ) );
+
             qp = point<T,1>({0.0});
             qw = 8.0/9.0;
             ret.push_back( std::make_pair( qp, qw ) );
+            
             return ret;
 
         case 4:
-            a1 = 3.0/7.0;
-            a2 = 2.0*std::sqrt(6.0/5.0)/7.0;
-            qp = point<T,1>({ std::sqrt(a1 - a2) });
+            a1 = 15;
+            a2 = 2.0*std::sqrt(30.0);
+
+            qp = point<T,1>({ std::sqrt( (a1 - a2)/35.0 ) });
             qw = (18.0 + std::sqrt(30.0))/36.0;
             ret.push_back( std::make_pair(-qp, qw ) );
             ret.push_back( std::make_pair( qp, qw ) );
-            qp = point<T,1>({ std::sqrt(a1 + a2) });
+            
+            qp = point<T,1>({ std::sqrt( (a1 + a2)/35.0 ) });
             qw = (18.0 - std::sqrt(30.0))/36.0;
             ret.push_back( std::make_pair(-qp, qw ) );
             ret.push_back( std::make_pair( qp, qw ) );
+            
             return ret;
 
         case 5:
             qp = point<T,1>({ 0.0 });
-            qw = 128.0/255.0;
+            qw = 128.0/225.0;
             ret.push_back( std::make_pair( qp, qw ) );
 
             a1 = 5.0;
@@ -148,7 +153,7 @@ gauss_legendre(size_t degree)
             ret.push_back( std::make_pair(-qp, qw ) );
             ret.push_back( std::make_pair( qp, qw ) );
             return ret;
-
+            
         default:
             return golub_welsch<T>(degree);
 
