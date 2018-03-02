@@ -892,7 +892,8 @@ class netgen_mesh_loader<T,2> : public mesh_loader<simplicial_mesh<T,2>>
 
     std::vector<point_type>                         points;
     std::vector<node_type>                          nodes;
-    std::vector<edge_type>                          edges, boundary_edges;
+    std::vector<edge_type>                          edges;
+    std::vector<std::pair<edge_type, size_t>>       boundary_edges;
     std::vector<surface_type>                       surfaces;
 
     bool netgen_read(const std::string& filename)
@@ -1010,7 +1011,7 @@ class netgen_mesh_loader<T,2> : public mesh_loader<simplicial_mesh<T,2>>
 
             edge_type   edge( { p0, p1 } );
 
-            boundary_edges.push_back( edge );
+            boundary_edges.push_back( std::make_pair(edge, std::get<0>(t)) );
 
             linecount++;
         }
@@ -1068,14 +1069,14 @@ public:
         for (auto& be : boundary_edges)
         {
             auto position = find_element_id(storage->edges.begin(),
-                                            storage->edges.end(), be);
+                                            storage->edges.end(), be.first);
             if (position.first == false)
             {
                 std::cout << "Bad bug at " << __FILE__ << "("
                           << __LINE__ << ")" << std::endl;
                 return false;
             }
-            bnd_info bi{0, true};
+            bnd_info bi{be.second, true};
             storage->boundary_info.at(position.second) = bi;
         }
 

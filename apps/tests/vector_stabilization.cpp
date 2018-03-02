@@ -83,6 +83,7 @@ get_test_functor(const std::vector<Mesh>& meshes)
 
 void test_triangles(void)
 {
+    std::cout << "*** TESTING TRIANGLES ON GENERIC MESH ***" << std::endl;
     using T = double;
 
     auto meshes = get_triangle_generic_meshes<T>();
@@ -92,6 +93,7 @@ void test_triangles(void)
 
 void test_quads(void)
 {
+    std::cout << "*** TESTING QUADS ON GENERIC MESH ***" << std::endl;
     using T = double;
 
     auto meshes = get_quad_generic_meshes<T>();

@@ -30,6 +30,8 @@
 
 #include <unistd.h>
 
+#include <xmmintrin.h>
+
 #include "revolution/bases"
 #include "revolution/quadratures"
 #include "revolution/methods/hho"
@@ -91,6 +93,7 @@ get_test_functor(const std::vector<Mesh>& meshes)
 
 void test_triangles(void)
 {
+    std::cout << "*** TESTING TRIANGLES ON GENERIC MESH ***" << std::endl;
     using T = double;
 
     auto meshes = get_triangle_generic_meshes<T>();
@@ -100,6 +103,7 @@ void test_triangles(void)
 
 void test_quads(void)
 {
+    std::cout << "*** TESTING QUADS ON GENERIC MESH ***" << std::endl;
     using T = double;
 
     auto meshes = get_quad_generic_meshes<T>();
@@ -109,6 +113,7 @@ void test_quads(void)
 
 int main(void)
 {
+    _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
     
     test_triangles();
     test_quads();

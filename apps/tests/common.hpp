@@ -27,7 +27,7 @@
 
 #include "core/loaders/loader.hpp"
 
-const size_t MIN_TEST_DEGREE = 0;
+const size_t MIN_TEST_DEGREE = 4;
 const size_t MAX_TEST_DEGREE = 5;
 
 /*****************************************************************************************/
@@ -141,6 +141,18 @@ get_quad_generic_meshes(void)
             continue;
         }
         loader.populate_mesh(msh);
+
+        /*
+        // ADD A RANDOM TRANSFORM HERE
+        auto tr = [](const typename mesh_type::point_type& pt) -> auto {
+
+            auto px = -1 * ( 1-pt.x() ) + 1 * pt.x();
+            auto py = -1 * ( 1-pt.y() ) + 1 * pt.y();
+            return typename mesh_type::point_type({px, py});
+        };
+
+        msh.transform(tr);
+        */
 
         ret.push_back(msh);
     }
