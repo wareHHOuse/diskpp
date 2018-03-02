@@ -336,15 +336,33 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 
          g        = gradient_type::Zero();
          g.row(0) = dphi_i;
-         ret.push_back((g + g.transpose()) / scalar_type(2));
+         ret.push_back( 0.5 * (g + g.transpose()));
 
          g        = gradient_type::Zero();
          g.row(1) = dphi_i;
-         ret.push_back((g + g.transpose()) / scalar_type(2));
+         ret.push_back( 0.5 * (g + g.transpose()));
       }
       assert(ret.size() == basis_size);
 
       return ret;
+   }
+
+   Matrix<scalar_type, Dynamic, 1>
+   eval_curls(const point_type& pt) const
+   {
+       Matrix<scalar_type, Dynamic, 1> ret =
+                                Matrix<scalar_type, Dynamic, 1>::Zero(basis_size);
+
+       Matrix<scalar_type, Dynamic, 2> dphi = scalar_basis.eval_gradients(pt);
+
+       size_t j = 0;
+       for(size_t i = 0; i < scalar_basis.size(); i++)
+       {
+           Matrix<scalar_type, 1, 2> dphi_i = dphi.row(i);
+           ret(j++) = -dphi_i(1);
+           ret(j++) =  dphi_i(0);
+       }
+       return ret;
    }
 
    size_t
