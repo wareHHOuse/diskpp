@@ -1202,7 +1202,7 @@ public:
 template<typename Mesh>
 auto make_stokes_assembler(const Mesh& msh, hho_degree_info hdi)
 {
-    return stokes_assembler_temp<Mesh>(msh, hdi);
+    return stokes_assembler<Mesh>(msh, hdi);
 }
 
 
