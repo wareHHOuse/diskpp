@@ -20,4 +20,5 @@ add_subdirectory(obstacle)
 add_subdirectory(new_code_test)
 add_subdirectory(stokes)
 add_subdirectory(tests)
+add_subdirectory(netgen_bnd_test)
 

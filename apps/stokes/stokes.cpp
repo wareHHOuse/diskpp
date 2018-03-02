@@ -145,7 +145,7 @@ run_stokes(const Mesh& msh, size_t degree)
     	Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, sol_fun);
 
     	auto cbs = revolution::vector_basis_size(degree, Mesh::dimension, Mesh::dimension);
-        
+
     	auto cell_ofs = revolution::priv::offset(msh, cl);
     	Matrix<scalar_type, Dynamic, 1> s = sol.block(cell_ofs * cbs, 0, cbs, 1);
 

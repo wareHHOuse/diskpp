@@ -652,6 +652,16 @@ make_hho_naive_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
     return data;
 }
 
+template<typename T, int M, int N>
+T estimate_conditioning(const Matrix<T,M,N>& m)
+{
+    Eigen::JacobiSVD< Matrix<T,M,N> > svd(m);
+    T sigma_max = svd.singularValues()(0);
+    T sigma_min = svd.singularValues()(svd.singularValues().size()-1);
+    T cond =  sigma_max / sigma_min;
+    return cond;
+}
+
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
 make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl,
@@ -671,12 +681,14 @@ make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
     auto cb = make_scalar_monomial_basis(msh, cl, recdeg);
 
     Matrix<T, Dynamic, Dynamic> mass_mat = Matrix<T, Dynamic, Dynamic>::Zero(rbs, rbs);
-    auto cell_quadpoints = integrate(msh, cl, 2*recdeg+2);
+    auto cell_quadpoints = integrate(msh, cl, 2*recdeg);
     for (auto& qp : cell_quadpoints)
     {
         auto c_phi = cb.eval_functions(qp.point());
         mass_mat += qp.weight() * c_phi * c_phi.transpose();
     }
+
+    std::cout << "Cond Mt: " << estimate_conditioning(mass_mat) << std::endl;
 
     // Build \pi_F^k (v_F - P_T^K v) equations (21) and (22)
 
@@ -697,14 +709,14 @@ make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
     // Step 3: project on faces (eqn. 21)
     for (size_t face_i = 0; face_i < num_faces; face_i++)
     {
-        auto h = diameter(msh, /*fcs[face_i]*/cl);
+        auto h = diameter(msh, fcs[face_i]);
         auto fc = fcs[face_i];
         auto fb = make_scalar_monomial_basis(msh, fc, facdeg);
 
         Matrix<T, Dynamic, Dynamic> face_mass_matrix    = Matrix<T, Dynamic, Dynamic>::Zero(fbs, fbs);
         Matrix<T, Dynamic, Dynamic> face_trace_matrix   = Matrix<T, Dynamic, Dynamic>::Zero(fbs, rbs);
 
-        auto face_quadpoints = integrate(msh, fc, 2*recdeg+2);
+        auto face_quadpoints = integrate(msh, fc, 2*recdeg);
         for (auto& qp : face_quadpoints)
         {
             auto f_phi = fb.eval_functions(qp.point());
@@ -713,6 +725,8 @@ make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
             face_mass_matrix += q_f_phi * f_phi.transpose();
             face_trace_matrix += q_f_phi * c_phi.transpose();
         }
+
+        std::cout << "Cond Mf: " << estimate_conditioning(face_mass_matrix) << std::endl;
 
         LLT<Matrix<T, Dynamic, Dynamic>> piKF;
         piKF.compute(face_mass_matrix);
@@ -780,7 +794,7 @@ make_hho_fancy_stabilization_vector(const Mesh& msh, const typename Mesh::cell_t
     // Step 3: project on faces (eqn. 21)
     for (size_t face_i = 0; face_i < num_faces; face_i++)
     {
-        auto h = diameter(msh, /*fcs[face_i]*/cl);
+        auto h = diameter(msh, fcs[face_i]);
         auto fc = fcs[face_i];
         auto fb = make_vector_monomial_basis(msh, fc, facdeg);
 
