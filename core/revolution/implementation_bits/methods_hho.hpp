@@ -291,7 +291,7 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
     auto qps = integrate(msh, cl, 2*recdeg);
     for (auto& qp : qps)
     {
-        auto dphi = cb.eval_symmetric_gradients(qp.point());
+        auto dphi = cb.eval_sgradients(qp.point());
         stiff += qp.weight() * priv::outer_product(dphi, dphi);
     }
 
@@ -311,7 +311,7 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
             function_type   c_phi_tmp = cb.eval_functions(qp.point());
             function_type   c_phi = c_phi_tmp.block(0, 0, cbs, 2);
 
-            std::vector<gradient_type> c_dphi_tmp = cb.eval_symmetric_gradients(qp.point());
+            std::vector<gradient_type> c_dphi_tmp = cb.eval_sgradients(qp.point());
 
             auto begin_iter = std::next(c_dphi_tmp.begin(), 2);
             std::vector<gradient_type> c_dphi(rbs_ho);
@@ -338,8 +338,8 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
 
     matrix_type sol  = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type oper = sol.block(0,0, rbs_ho, num_total_dofs);
-    //matrix_type mmmm = gr_rhs.block(0,0, rbs_ho, num_total_dofs);
-    //matrix_type data = mmm.transpose() * oper;
+    matrix_type gr   = gr_rhs.block(0,0, rbs_ho, num_total_dofs);
+    matrix_type data = gr.transpose() * oper;
 
     return std::make_pair(oper, data);
 }
@@ -930,6 +930,7 @@ offset(const Mesh& msh, const typename Mesh::face_type& fc)
 
 
 
+
 template<typename Mesh>
 class stokes_assembler
 {
@@ -1004,7 +1005,6 @@ public:
             }
         }
 
-
         auto cbs_A = vector_basis_size(hdi.cell_degree(), Mesh::dimension, Mesh::dimension);
         auto fbs_A = vector_basis_size(hdi.face_degree(), Mesh::dimension-1, Mesh::dimension);
         auto cbs_B = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
@@ -1032,6 +1032,10 @@ public:
              const Matrix<T, Dynamic, 1>& rhs,
              const Function& dirichlet_bf)
     {
+        auto is_dirichlet = [&](const typename Mesh::face_type& fc) -> bool {
+            return msh.is_boundary(fc);
+        };
+
         auto cbs_A = vector_basis_size(di.cell_degree(), Mesh::dimension, Mesh::dimension);
         auto fbs_A = vector_basis_size(di.face_degree(), Mesh::dimension-1, Mesh::dimension);
         auto cbs_B = scalar_basis_size(di.cell_degree(), Mesh::dimension);
@@ -1051,23 +1055,24 @@ public:
 
         Matrix<T, Dynamic, 1> dirichlet_data = Matrix<T, Dynamic, 1>::Zero(cbs_A + fcs.size()*fbs_A);
 
-
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc = fcs[face_i];
             auto face_offset = priv::offset(msh, fc);
             auto face_LHS_offset = cbs_A * msh.cells_size() + compress_table.at(face_offset)*fbs_A;
 
-            bool dirichlet = msh.is_boundary(fc);
+            bool dirichlet = is_dirichlet(fc);
 
             for (size_t i = 0; i < fbs_A; i++)
                 asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
 
             if (dirichlet)
             {
-                //Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, facdeg);
-                //Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, facdeg, dirichlet_bf);
-                //dirichlet_data.block(cbs+face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
+                auto fb = make_vector_monomial_basis(msh, fc, di.face_degree());
+
+                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
+                dirichlet_data.block(cbs_A + face_i*fbs_A, 0, fbs_A, 1) = mass.llt().solve(rhs);
             }
         }
 
@@ -1083,7 +1088,7 @@ public:
                 if ( asm_map[j].assemble() )
                     triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs_A(i,j)) );
                 else
-                    RHS(asm_map[i]) -= lhs_A(i,j)*dirichlet_data(j);
+                    RHS(asm_map[i]) -= lhs_A(i,j) * dirichlet_data(j);
             }
         }
 
@@ -1098,8 +1103,8 @@ public:
                     triplets.push_back( Triplet<T>(global_i, global_j, lhs_B(i,j)) );
                     triplets.push_back( Triplet<T>(global_j, global_i, lhs_B(i,j)) );
                 }
-                //else
-                //    RHS(asm_map[i]) -= lhs_B(i,j)*dirichlet_data(j);
+                else
+                    RHS(global_i) -= lhs_B(i,j)*dirichlet_data(j);
             }
         }
 
@@ -1171,13 +1176,19 @@ public:
         LHS.setFromTriplets( triplets.begin(), triplets.end() );
         triplets.clear();
     }
+    size_t num_assembled_faces() const
+    {
+        return num_other_faces;
+    }
+
 };
+
 
 
 template<typename Mesh>
 auto make_stokes_assembler(const Mesh& msh, hho_degree_info hdi)
 {
-    return stokes_assembler<Mesh>(msh, hdi);
+    return stokes_assembler_temp<Mesh>(msh, hdi);
 }
 
 
