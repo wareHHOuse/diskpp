@@ -93,14 +93,46 @@ get_triangle_generic_meshes(void)
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_4.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_5.typ1");
 
+    typedef disk::generic_mesh<T, 2>  mesh_type;
 
-    std::vector< disk::generic_mesh<T, 2> > ret;
+    std::vector< mesh_type > ret;
     for (size_t i = 0; i < meshfiles.size(); i++)
     {
-        typedef disk::generic_mesh<T, 2>  mesh_type;
-
         mesh_type msh;
         disk::fvca5_mesh_loader<T, 2> loader;
+
+        if (!loader.read_mesh(meshfiles.at(i)))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            continue;
+        }
+        loader.populate_mesh(msh);
+
+        ret.push_back(msh);
+    }
+
+    return ret;
+}
+
+template<typename T>
+std::vector< disk::simplicial_mesh<T, 2> >
+get_triangle_netgen_meshes(void)
+{
+	std::vector<std::string> meshfiles;
+    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri01.mesh2d");
+    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri02.mesh2d");
+    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri03.mesh2d");
+    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri04.mesh2d");
+    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri05.mesh2d");
+
+
+    typedef disk::simplicial_mesh<T, 2>  mesh_type;
+
+    std::vector< mesh_type > ret;
+    for (size_t i = 0; i < meshfiles.size(); i++)
+    {
+        mesh_type msh;
+        disk::netgen_mesh_loader<T, 2> loader;
 
         if (!loader.read_mesh(meshfiles.at(i)))
         {
@@ -126,12 +158,11 @@ get_quad_generic_meshes(void)
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
 
+    typedef disk::generic_mesh<T, 2>  mesh_type;
 
-    std::vector< disk::generic_mesh<T, 2> > ret;
+    std::vector< mesh_type > ret;
     for (size_t i = 0; i < meshfiles.size(); i++)
     {
-        typedef disk::generic_mesh<T, 2>  mesh_type;
-
         mesh_type msh;
         disk::fvca5_mesh_loader<T, 2> loader;
 

@@ -797,7 +797,7 @@ make_hho_fancy_stabilization_vector(const Mesh& msh, const typename Mesh::cell_t
         Matrix<T, Dynamic, Dynamic> face_mass_matrix    = Matrix<T, Dynamic, Dynamic>::Zero(fbs, fbs);
         Matrix<T, Dynamic, Dynamic> face_trace_matrix   = Matrix<T, Dynamic, Dynamic>::Zero(fbs, rbs);
 
-        auto face_quadpoints = integrate(msh, fc, 2*facdeg);
+        auto face_quadpoints = integrate(msh, fc, 2*recdeg);
         for (auto& qp : face_quadpoints)
         {
             auto f_phi = fb.eval_functions(qp.point());

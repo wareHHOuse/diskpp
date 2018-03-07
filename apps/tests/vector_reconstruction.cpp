@@ -76,7 +76,9 @@ struct test_functor
 
             Matrix<scalar_type, Dynamic, 1> diff = reconstr - exp_reconstr;
 
-            error += diff.dot(mass*diff);
+            Matrix<scalar_type, Dynamic, Dynamic> stiffness = revolution::make_stiffness_matrix(msh, cl, cb);
+
+            error += diff.dot(stiffness*diff);
         }
 
         return std::sqrt(error);
@@ -91,13 +93,22 @@ get_test_functor(const std::vector<Mesh>& meshes)
     return test_functor<Mesh>();
 }
 
-
-void test_triangles(void)
+void test_triangles_generic(void)
 {
     std::cout << "*** TESTING TRIANGLES ON GENERIC MESH ***" << std::endl;
     using T = double;
 
     auto meshes = get_triangle_generic_meshes<T>();
+    auto tf = get_test_functor(meshes);
+    do_testing(meshes, tf);
+}
+
+void test_triangles_netgen(void)
+{
+    std::cout << "*** TESTING TRIANGLES ON NETGEN MESH ***" << std::endl;
+    using T = double;
+
+    auto meshes = get_triangle_netgen_meshes<T>();
     auto tf = get_test_functor(meshes);
     do_testing(meshes, tf);
 }
@@ -114,9 +125,12 @@ void test_quads(void)
 
 int main(void)
 {
+    _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
     
-    test_triangles();
+    //test_triangles_generic();
+    test_triangles_netgen();
     test_quads();
 
     return 0;
 }
+

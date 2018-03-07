@@ -38,7 +38,6 @@
 
 #include "solvers/solver.hpp"
 
-#include "output/silo.hpp"
 
 template<typename Mesh>
 typename Mesh::scalar_type
