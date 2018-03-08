@@ -37,20 +37,20 @@ struct scalar_testing_function;
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 struct scalar_testing_function< Mesh<T,2,Storage> >
 {
-	typedef Mesh<T,2,Storage> 				mesh_type;
+    typedef Mesh<T,2,Storage>               mesh_type;
     typedef typename mesh_type::scalar_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
     {
-    	return std::sin(2. * M_PI * pt.x()) * std::sin(2. * M_PI * pt.y());
+        return std::sin(M_PI * pt.x()) * std::sin(M_PI * pt.y());
     }
 };
 
 template<typename Mesh>
 auto make_scalar_testing_data(const Mesh& msh)
 {
-	return scalar_testing_function<Mesh>();
+    return scalar_testing_function<Mesh>();
 }
 
 /*****************************************************************************************/
@@ -232,4 +232,3 @@ do_testing(std::vector<Mesh>& meshes, const Function& run_test)
         }
     }
 }
-

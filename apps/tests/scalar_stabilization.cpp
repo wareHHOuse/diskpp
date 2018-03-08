@@ -60,11 +60,10 @@ struct test_functor
 
         scalar_type error = 0.0;
         for (auto& cl : msh)
-        {   
+        {
             auto gr = revolution::make_hho_scalar_laplacian(msh, cl, hdi);
             auto stab = revolution::make_hho_fancy_stabilization(msh, cl, gr.first, hdi);
-
-            size_t rec_size = revolution::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
+            //auto stab = revolution::make_hho_naive_stabilization(msh, cl, hdi);
 
             Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, hdi, f);
 
@@ -116,9 +115,9 @@ void test_quads(void)
 int main(void)
 {
     _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
-    
+
     //test_triangles_generic();
-    test_triangles_netgen();
+    //test_triangles_netgen();
     test_quads();
 
     return 0;

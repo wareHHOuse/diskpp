@@ -454,7 +454,7 @@ public:
 
 /* Specialization for 2D meshes, faces */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-class scaled_monomial_scalar_basis<Mesh<T,2,Storage>, typename Mesh<T,2,Storage>::face>
+class scaled_monomial_scalar_basis<Mesh<T,3,Storage>, typename Mesh<T,3,Storage>::face>
 {
 
 public:
