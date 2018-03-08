@@ -347,7 +347,7 @@ public:
         size_t pos = 0;
         ret(pos++) = 1.0;
 
-        for (size_t k = 1; k <= degree; k++)
+        for (size_t k = 1; k <= basis_degree; k++)
         {
             for (size_t pow_x = k, pow_y = 0; pow_y < k; pow_x--, pow_y++)
             {
