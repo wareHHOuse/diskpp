@@ -47,6 +47,19 @@ struct scalar_testing_function< Mesh<T,2,Storage> >
     }
 };
 
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+struct scalar_testing_function< Mesh<T,3,Storage> >
+{
+    typedef Mesh<T,3,Storage>               mesh_type;
+    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::point_type  point_type;
+
+    scalar_type operator()(const point_type& pt) const
+    {
+        return std::sin(M_PI * pt.x()) * std::sin(M_PI * pt.y()) * std::sin(M_PI * pt.z());
+    }
+};
+
 template<typename Mesh>
 auto make_scalar_testing_data(const Mesh& msh)
 {
@@ -133,6 +146,38 @@ get_triangle_netgen_meshes(void)
     {
         mesh_type msh;
         disk::netgen_mesh_loader<T, 2> loader;
+
+        if (!loader.read_mesh(meshfiles.at(i)))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            continue;
+        }
+        loader.populate_mesh(msh);
+
+        ret.push_back(msh);
+    }
+
+    return ret;
+}
+
+template<typename T>
+std::vector< disk::simplicial_mesh<T, 3> >
+get_tetrahedra_netgen_meshes(void)
+{
+    std::vector<std::string> meshfiles;
+    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/convt01.mesh");
+    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/convt02.mesh");
+    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/convt03.mesh");
+    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/convt04.mesh");
+
+
+    typedef disk::simplicial_mesh<T, 3>  mesh_type;
+
+    std::vector< mesh_type > ret;
+    for (size_t i = 0; i < meshfiles.size(); i++)
+    {
+        mesh_type msh;
+        disk::netgen_mesh_loader<T, 3> loader;
 
         if (!loader.read_mesh(meshfiles.at(i)))
         {

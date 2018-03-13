@@ -33,6 +33,8 @@
 #include "revolution/bases"
 #include "revolution/quadratures"
 
+#include "core/hho/hho.hpp"
+
 using namespace Eigen;
 
 namespace revolution
@@ -125,6 +127,7 @@ make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
                           const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
+    const size_t DIM = Mesh::dimension;
 
     auto recdeg = di.reconstruction_degree();
     auto celdeg = di.cell_degree();
@@ -142,6 +145,11 @@ make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
     Matrix<T, Dynamic, Dynamic> gr_lhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs-1, rbs-1);
     Matrix<T, Dynamic, Dynamic> gr_rhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs-1, cbs + num_faces*fbs);
 
+    //typedef disk::quadrature<Mesh, typename Mesh::cell>      cell_quadrature_type;
+    typedef disk::quadrature<Mesh, typename Mesh::face>      face_quadrature_type;
+
+    face_quadrature_type fq(2*recdeg);
+
     auto qps = integrate(msh, cl, 2*recdeg);
     for (auto& qp : qps)
     {
@@ -158,14 +166,14 @@ make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
         auto fc = fcs[i];
         auto n = normal(msh, cl, fc);
         auto fb = make_scalar_monomial_basis(msh, fc, facdeg);
-
-        auto qps_f = integrate(msh, fc, 2*facdeg);
+        auto qps_f = fq.integrate(msh, fc);
+        //auto qps_f = integrate(msh, fc, 2*facdeg);
         for (auto& qp : qps_f)
         {
             Matrix<T, Dynamic, 1> c_phi_tmp = cb.eval_functions(qp.point());
             Matrix<T, Dynamic, 1> c_phi = c_phi_tmp.head(cbs);
-            Matrix<T, Dynamic, 2> c_dphi_tmp = cb.eval_gradients(qp.point());
-            Matrix<T, Dynamic, 2> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, 2);
+            Matrix<T, Dynamic, DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
+            Matrix<T, Dynamic, DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
             Matrix<T, Dynamic, 1> f_phi = fb.eval_functions(qp.point());
             gr_rhs.block(0, cbs+i*fbs, rbs-1, fbs) += qp.weight() * (c_dphi * n) * f_phi.transpose();
             gr_rhs.block(0, 0, rbs-1, cbs) -= qp.weight() * (c_dphi * n) * c_phi.transpose();
