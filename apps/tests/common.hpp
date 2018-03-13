@@ -87,6 +87,24 @@ struct vector_testing_function< Mesh<T,2,Storage> >
     }
 };
 
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+struct vector_testing_function< Mesh<T,3,Storage> >
+{
+	typedef Mesh<T,3,Storage> 				mesh_type;
+    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::point_type  point_type;
+    typedef Matrix<scalar_type, 3, 1> 		ret_type;
+
+    ret_type operator()(const point_type& pt) const
+    {
+    	ret_type ret;
+        ret(0) = std::sin(2. * M_PI * pt.x());
+        ret(1) = std::sin(2. * M_PI * pt.y());
+        ret(2) = std::sin(2. * M_PI * pt.z());
+        return ret;
+    }
+};
+
 template<typename Mesh>
 auto make_vector_testing_data(const Mesh& msh)
 {

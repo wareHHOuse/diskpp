@@ -104,12 +104,12 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
    {
       function_type ret = function_type::Zero(basis_size, 3);
 
-      const auto phi = scalar_basis.eval_functions(pt);
+      auto phi = scalar_basis.eval_functions(pt);
 
       for (size_t i = 0; i < scalar_basis.size(); i++) {
-         ret(3 * i, 0)     = phi(i);
-         ret(3 * i + 1, 1) = phi(i);
-         ret(3 * i + 2, 1) = phi(i);
+         ret(3*i,   0) = phi(i);
+         ret(3*i+1, 1) = phi(i);
+         ret(3*i+2, 2) = phi(i);
       }
 
       return ret;
@@ -229,7 +229,7 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
       for (size_t i = 0; i < scalar_basis.size(); i++) {
          ret(3 * i, 0)     = phi(i);
          ret(3 * i + 1, 1) = phi(i);
-         ret(3 * i + 2, 1) = phi(i);
+         ret(3 * i + 2, 2) = phi(i);
       }
 
       assert(3 * scalar_basis.size() == basis_size);

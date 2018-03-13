@@ -1,7 +1,7 @@
 add_subdirectory(mesh_basic_tests)
 add_subdirectory(diffusion)
 add_subdirectory(timing_test)
-add_subdirectory(parallel_diffusion)
+#add_subdirectory(parallel_diffusion)
 add_subdirectory(app_template)
 add_subdirectory(fvca2netgen)
 add_subdirectory(multiscale)

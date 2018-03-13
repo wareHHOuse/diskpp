@@ -26,6 +26,8 @@
 
 #pragma once
 
+//#define POWER_CACHE
+
 #ifdef POWER_CACHE
     #define PC_OFS_2D_X(d) (2*d)
     #define PC_OFS_2D_Y(d) (2*d+1)
@@ -105,12 +107,14 @@ public:
     typedef typename mesh_type::cell                cell_type;
     typedef typename mesh_type::point_type          point_type;
 
-
 private:
     point_type          cell_bar;
     scalar_type         cell_h;
     size_t              basis_degree, basis_size;
 
+#ifdef POWER_CACHE
+    mutable std::vector<scalar_type>                power_cache;
+#endif
 
 public:
     scaled_monomial_scalar_basis(const mesh_type& msh, const cell_type& cl, size_t degree)
@@ -137,8 +141,8 @@ public:
         power_cache[1] = 1.0;
         for (size_t i = 1; i <= basis_degree; i++)
         {
-            power_cache[PC_OFS_2D_X(i)] = iexp_pow(bx, i);
-            power_cache[PC_OFS_2D_Y(i)] = iexp_pow(by, i);
+            power_cache[PC_OFS_2D_X(i)] = bx * power_cache[PC_OFS_2D_X(i-1)];
+            power_cache[PC_OFS_2D_Y(i)] = by * power_cache[PC_OFS_2D_Y(i-1)];
         }
 #endif
 
@@ -150,11 +154,13 @@ public:
                 auto pow_x = k-i;
                 auto pow_y = i;
 #ifdef POWER_CACHE
-                auto bv = power_cache[PC_OFS_2D_X(i)] * power_cache[PC_OFS_2D_Y(i)];
+                auto px = power_cache[PC_OFS_2D_X(pow_x)];
+                auto py = power_cache[PC_OFS_2D_Y(pow_y)];
 #else
-                auto bv = iexp_pow(bx, pow_x) * iexp_pow(by, pow_y);
+                auto px = iexp_pow(bx, pow_x);
+                auto py = iexp_pow(by, pow_y);
 #endif
-                ret(pos++) = bv;
+                ret(pos++) = px * py;
             }
         }
 
@@ -180,8 +186,8 @@ public:
         power_cache[1] = 1.0;
         for (size_t i = 1; i <= basis_degree; i++)
         {
-            power_cache[PC_OFS_2D_X(i)] = iexp_pow(bx, i);
-            power_cache[PC_OFS_2D_Y(i)] = iexp_pow(by, i);
+            power_cache[PC_OFS_2D_X(i)] = bx * power_cache[PC_OFS_2D_X(i-1)];
+            power_cache[PC_OFS_2D_Y(i)] = by * power_cache[PC_OFS_2D_Y(i-1)];
         }
 #endif
 
@@ -193,10 +199,10 @@ public:
                 auto pow_x = k-i;
                 auto pow_y = i;
 #ifdef POWER_CACHE
-                auto px = power_cache[PC_OFS_2D_X(i)];
-                auto py = power_cache[PC_OFS_2D_Y(i)];
-                auto dx = (pow_x == 0) ? 0 : pow_x*ih*power_cache[2*(pow_x-1)];
-                auto dy = (pow_y == 0) ? 0 : pow_y*ih*power_cache[2*(pow_y-1)+1];
+                auto px = power_cache[PC_OFS_2D_X(pow_x)];
+                auto py = power_cache[PC_OFS_2D_Y(pow_y)];
+                auto dx = (pow_x == 0) ? 0 : pow_x*ih*power_cache[PC_OFS_2D_X(pow_x-1)];
+                auto dy = (pow_y == 0) ? 0 : pow_y*ih*power_cache[PC_OFS_2D_Y(pow_y-1)];
 #else
                 auto px = iexp_pow(bx, pow_x);
                 auto py = iexp_pow(by, pow_y);
@@ -241,10 +247,12 @@ public:
 private:
     point_type          face_bar;
     point_type          base;
-    scalar_type     face_h;
+    scalar_type         face_h;
     size_t basis_degree, basis_size;
 
-
+#ifdef POWER_CACHE
+    mutable std::vector<scalar_type>                power_cache;
+#endif
 
 public:
     scaled_monomial_scalar_basis(const mesh_type& msh, const face_type& fc, size_t degree)
@@ -310,6 +318,10 @@ private:
     scalar_type         cell_h;
     size_t              basis_degree, basis_size;
 
+#ifdef POWER_CACHE
+    mutable std::vector<scalar_type>                power_cache;
+#endif
+
 
 public:
     scaled_monomial_scalar_basis(const mesh_type& msh, const cell_type& cl, size_t degree)
@@ -338,48 +350,31 @@ public:
         power_cache[2] = 1.0;
         for (size_t i = 1; i <= basis_degree; i++)
         {
-            power_cache[PC_OFS_3D_X(i)] = iexp_pow(bx, i);
-            power_cache[PC_OFS_3D_Y(i)] = iexp_pow(by, i);
-            power_cache[PC_OFS_3D_Z(i)] = iexp_pow(bz, i);
+            power_cache[PC_OFS_3D_X(i)] = bx * power_cache[PC_OFS_3D_X(i-1)];
+            power_cache[PC_OFS_3D_Y(i)] = by * power_cache[PC_OFS_3D_Y(i-1)];
+            power_cache[PC_OFS_3D_Z(i)] = bz * power_cache[PC_OFS_3D_Z(i-1)];
         }
 #endif
-
         size_t pos = 0;
-        ret(pos++) = 1.0;
-
-        for (size_t k = 1; k <= basis_degree; k++)
+        for (size_t k = 0; k <= basis_degree; k++)
         {
-            for (size_t pow_x = k, pow_y = 0; pow_y < k; pow_x--, pow_y++)
+            for (size_t pow_x = 0; pow_x <= k; pow_x++)
             {
+                for (size_t pow_y = 0, pow_z = k-pow_x; pow_y <= k-pow_x; pow_y++, pow_z--)
+                {
 #ifdef POWER_CACHE
-                auto bv = power_cache[PC_OFS_3D_X(pow_x)] * power_cache[PC_OFS_3D_Y(pow_y)];
+                    auto px = power_cache[PC_OFS_3D_X(pow_x)];
+                    auto py = power_cache[PC_OFS_3D_Y(pow_y)];
+                    auto pz = power_cache[PC_OFS_3D_Z(pow_z)];
 #else
-                auto bv = iexp_pow(bx, pow_x) * iexp_pow(by, pow_y);
+                    auto px = iexp_pow(bx, pow_x);
+                    auto py = iexp_pow(by, pow_y);
+                    auto pz = iexp_pow(bz, pow_z);
 #endif
-                ret(pos++) = bv;
-            }
-
-            for (size_t pow_y = k, pow_z = 0; pow_z < k; pow_y--, pow_z++)
-            {
-#ifdef POWER_CACHE
-                auto bv = power_cache[PC_OFS_3D_Y(pow_y)] * power_cache[PC_OFS_3D_Z(pow_z)];
-#else
-                auto bv = iexp_pow(by, pow_y) * iexp_pow(bz, pow_z);
-#endif
-                ret(pos++) = bv;
-            }
-
-            for (size_t pow_z = k, pow_x = 0; pow_x < k; pow_z--, pow_x++)
-            {
-#ifdef POWER_CACHE
-                auto bv = power_cache[PC_OFS_3D_X(pow_x)] * power_cache[PC_OFS_3D_Z(pow_z)];
-#else
-                auto bv = iexp_pow(bx, pow_x) * iexp_pow(bz, pow_z);
-#endif
-                ret(pos++) = bv;
+                    ret(pos++) = px*py*pz;
+                }
             }
         }
-
         assert(pos == basis_size);
 
         return ret;
@@ -405,74 +400,39 @@ public:
         power_cache[2] = 1.0;
         for (size_t i = 1; i <= basis_degree; i++)
         {
-            power_cache[PC_OFS_3D_X(i)] = iexp_pow(bx, i);
-            power_cache[PC_OFS_3D_Y(i)] = iexp_pow(by, i);
-            power_cache[PC_OFS_3D_Z(i)] = iexp_pow(bz, i);
+            power_cache[PC_OFS_3D_X(i)] = bx * power_cache[PC_OFS_3D_X(i-1)];
+            power_cache[PC_OFS_3D_Y(i)] = by * power_cache[PC_OFS_3D_Y(i-1)];
+            power_cache[PC_OFS_3D_Z(i)] = bz * power_cache[PC_OFS_3D_Z(i-1)];
         }
 #endif
 
-        ret(0,0) = 0.0;
-        ret(0,1) = 0.0;
-        ret(0,2) = 0.0;
-
-        size_t pos = 1;
-        for (size_t k = 1; k <= basis_degree; k++)
+        size_t pos = 0;
+        for (size_t k = 0; k <= basis_degree; k++)
         {
-            for (size_t pow_x = k, pow_y = 0; pow_y < k; pow_x--, pow_y++)
+            for (size_t pow_x = 0; pow_x <= k; pow_x++)
             {
+                for (size_t pow_y = 0, pow_z = k-pow_x; pow_y <= k-pow_x; pow_y++, pow_z--)
+                {
 #ifdef POWER_CACHE
-                auto px = power_cache[PC_OFS_3D_X(pow_x)];
-                auto py = power_cache[PC_OFS_3D_Y(pow_y)];
-                auto dx = (pow_x == 0) ? 0 : pow_x * ih * power_cache[PC_OFS_3D_X(pow_x-1)];
-                auto dy = (pow_y == 0) ? 0 : pow_y * ih * power_cache[PC_OFS_3D_Y(pow_y-1)];
+                    auto px = power_cache[PC_OFS_3D_X(pow_x)];
+                    auto py = power_cache[PC_OFS_3D_Y(pow_y)];
+                    auto pz = power_cache[PC_OFS_3D_Z(pow_z)];
+                    auto dx = (pow_x == 0) ? 0 : pow_x * ih * power_cache[PC_OFS_3D_X(pow_x-1)];
+                    auto dy = (pow_y == 0) ? 0 : pow_y * ih * power_cache[PC_OFS_3D_Y(pow_y-1)];
+                    auto dz = (pow_z == 0) ? 0 : pow_z * ih * power_cache[PC_OFS_3D_Z(pow_z-1)];
 #else
-                auto px = iexp_pow(bx, pow_x);
-                auto py = iexp_pow(by, pow_y);
-                auto dx = (pow_x == 0) ? 0 : pow_x * ih * iexp_pow(bx, pow_x-1);
-                auto dy = (pow_y == 0) ? 0 : pow_y * ih * iexp_pow(by, pow_y-1);
+                    auto px = iexp_pow(bx, pow_x);
+                    auto py = iexp_pow(by, pow_y);
+                    auto pz = iexp_pow(bz, pow_z);
+                    auto dx = (pow_x == 0) ? 0 : pow_x * ih * iexp_pow(bx, pow_x-1);
+                    auto dy = (pow_y == 0) ? 0 : pow_y * ih * iexp_pow(by, pow_y-1);
+                    auto dz = (pow_z == 0) ? 0 : pow_z * ih * iexp_pow(bz, pow_z-1);
 #endif
-                ret(pos,0) = dx * py;
-                ret(pos,1) = px * dy;
-                ret(pos,2) = 0.0;
-                pos++;
-            }
-
-            for (size_t pow_y = k, pow_z = 0; pow_z < k; pow_y--, pow_z++)
-            {
-#ifdef POWER_CACHE
-                auto py = power_cache[PC_OFS_3D_Y(pow_y)];
-                auto pz = power_cache[PC_OFS_3D_Z(pow_z)];
-                auto dy = (pow_y == 0) ? 0 : pow_y * ih * power_cache[PC_OFS_3D_Y(pow_y-1)];
-                auto dz = (pow_z == 0) ? 0 : pow_z * ih * power_cache[PC_OFS_3D_Z(pow_z-1)];
-#else
-                auto py = iexp_pow(by, pow_y);
-                auto pz = iexp_pow(bz, pow_z);
-                auto dy = (pow_y == 0) ? 0 : pow_y * ih * iexp_pow(by, pow_y-1);
-                auto dz = (pow_z == 0) ? 0 : pow_z * ih * iexp_pow(bz, pow_z-1);
-#endif
-                ret(pos,0) = 0.0;
-                ret(pos,1) = dy * pz;
-                ret(pos,2) = py * dz;
-                pos++;
-            }
-
-            for (size_t pow_z = k, pow_x = 0; pow_x < k; pow_z--, pow_x++)
-            {
-#ifdef POWER_CACHE
-                auto px = power_cache[PC_OFS_3D_X(pow_x)];
-                auto pz = power_cache[PC_OFS_3D_Z(pow_z)];
-                auto dx = (pow_x == 0) ? 0 : pow_x * ih * power_cache[PC_OFS_3D_X(pow_x-1)];
-                auto dz = (pow_z == 0) ? 0 : pow_z * ih * power_cache[PC_OFS_3D_Z(pow_z-1)];
-#else
-                auto px = iexp_pow(bx, pow_x);
-                auto pz = iexp_pow(bz, pow_z);
-                auto dx = (pow_x == 0) ? 0 : pow_x * ih * iexp_pow(bx, pow_x-1);
-                auto dz = (pow_z == 0) ? 0 : pow_z * ih * iexp_pow(bz, pow_z-1);
-#endif
-                ret(pos,0) = dx * pz;
-                ret(pos,1) = 0.0;
-                ret(pos,2) = px * dz;
-                pos++;
+                    ret(pos,0) = dx * py * pz;
+                    ret(pos,1) = px * dy * pz;
+                    ret(pos,2) = px * py * dz;
+                    pos++;
+                }
             }
         }
 
@@ -507,6 +467,10 @@ private:
     point_type      face_bar;
     scalar_type     face_h;
     size_t          basis_degree, basis_size;
+
+#ifdef POWER_CACHE
+    mutable std::vector<scalar_type>                power_cache;
+#endif
 
     typedef decltype( points(mesh_type(), face_type()) ) pts_type;
     pts_type        pts;
@@ -586,8 +550,8 @@ public:
         power_cache[1] = 1.0;
         for (size_t i = 1; i <= basis_degree; i++)
         {
-            power_cache[PC_OFS_2D_X(i)] = iexp_pow(bx, i);
-            power_cache[PC_OFS_2D_Y(i)] = iexp_pow(by, i);
+            power_cache[PC_OFS_2D_X(i)] = bx * power_cache[PC_OFS_2D_X(i-1)];
+            power_cache[PC_OFS_2D_Y(i)] = by * power_cache[PC_OFS_2D_Y(i-1)];
         }
 #endif
 
@@ -599,11 +563,13 @@ public:
                 auto pow_x = k-i;
                 auto pow_y = i;
 #ifdef POWER_CACHE
-                auto bv = power_cache[PC_OFS_2D_X(i)] * power_cache[PC_OFS_2D_Y(i)];
+                auto px = power_cache[PC_OFS_2D_X(pow_x)];
+                auto py = power_cache[PC_OFS_2D_Y(pow_y)];
 #else
-                auto bv = iexp_pow(bx, pow_x) * iexp_pow(by, pow_y);
+                auto px = iexp_pow(bx, pow_x);
+                auto py = iexp_pow(by, pow_y);
 #endif
-                ret(pos++) = bv;
+                ret(pos++) = px*py;
             }
         }
 

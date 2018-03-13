@@ -27,7 +27,7 @@
 
 #include "revolution/bases"
 #include "revolution/quadratures"
-#include "revolution/methods/hho"
+//#include "revolution/methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -44,7 +44,7 @@ int main(void)
     mesh_type msh;
     disk::netgen_mesh_loader<T, 3> loader;
 
-    if (!loader.read_mesh("../../../diskpp/meshes/3D_tetras/netgen/convt01.mesh"))
+    if (!loader.read_mesh("../../../diskpp/meshes/3D_tetras/netgen/basiccube.mesh"))
     {
         std::cout << "Problem loading mesh." << std::endl;
         return 1;
@@ -55,6 +55,13 @@ int main(void)
     {
     	auto cb = revolution::make_scalar_monomial_basis(msh, cl, 2);
     	auto qps = revolution::integrate(msh, cl, 4);
+
+        Matrix<T, Dynamic, 1> phi = Matrix<T, Dynamic, 1>::Zero(cb.size());
+
+        for (auto& qp : qps)
+            phi += qp.weight() * cb.eval_functions(qp.point());
+
+        std::cout << phi.transpose() << std::endl;
 
     	auto fcs = faces(msh, cl);
     	for (auto& fc : fcs)
