@@ -121,11 +121,11 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
       std::vector<gradient_type> ret;
       ret.reserve(basis_size);
 
-      const Matrix<scalar_type, Dynamic, 3> dphi = scalar_basis.eval_gradients(pt);
+      Matrix<scalar_type, Dynamic, 3> dphi = scalar_basis.eval_gradients(pt);
 
       size_t j = 0;
       for (size_t i = 0; i < scalar_basis.size(); i++) {
-         const Matrix<scalar_type, 1, 3> dphi_i = dphi.row(i);
+         Matrix<scalar_type, 1, 3> dphi_i = dphi.row(i);
          gradient_type                   g;
 
          g        = gradient_type::Zero();
@@ -151,7 +151,7 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
       std::vector<gradient_type> ret;
       ret.reserve(basis_size);
 
-      const Matrix<scalar_type, Dynamic, 3> dphi = scalar_basis.eval_gradients(pt);
+      Matrix<scalar_type, Dynamic, 3> dphi = scalar_basis.eval_gradients(pt);
 
       size_t j = 0;
       for (size_t i = 0; i < scalar_basis.size(); i++) {
