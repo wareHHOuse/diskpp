@@ -564,8 +564,6 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
     Matrix<T, Dynamic, Dynamic> dr_lhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs, rbs);
     Matrix<T, Dynamic, Dynamic> dr_rhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs, cbs + num_faces*fbs);
 
-    Matrix<T, Dynamic, 1> avgs = compute_averages(msh, cl, cbas_s);
-
     auto qps = integrate(msh, cl, 2*recdeg);
     for (auto& qp : qps)
     {

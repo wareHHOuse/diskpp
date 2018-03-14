@@ -710,7 +710,7 @@ public:
 };
 
 
-
+/*
 template<typename Mesh, typename Element, typename Basis>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
 compute_averages(const Mesh& msh, const Element& elem, const Basis& basis)
@@ -728,5 +728,5 @@ compute_averages(const Mesh& msh, const Element& elem, const Basis& basis)
 
     return avgs * (1/meas);
 }
-
+*/
 }
