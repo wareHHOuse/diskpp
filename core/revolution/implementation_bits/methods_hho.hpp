@@ -867,6 +867,8 @@ make_hho_fancy_stabilization_vector(const Mesh& msh, const typename Mesh::cell_t
     auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
     auto fbs = vector_basis_size(facdeg, Mesh::dimension-1, Mesh::dimension);
 
+    size_t N = Mesh::dimension;
+
     auto cb = make_vector_monomial_basis(msh, cl, recdeg);
 
     Matrix<T, Dynamic, Dynamic> mass_mat = Matrix<T, Dynamic, Dynamic>::Zero(rbs, rbs);
@@ -881,7 +883,7 @@ make_hho_fancy_stabilization_vector(const Mesh& msh, const typename Mesh::cell_t
 
     //Step 1: compute \pi_T^k p_T^k v (third term).
     Matrix<T, Dynamic, Dynamic> M1 = mass_mat.block(0, 0, cbs, cbs);
-    Matrix<T, Dynamic, Dynamic> M2 = mass_mat.block(0, 2, cbs, rbs-2);
+    Matrix<T, Dynamic, Dynamic> M2 = mass_mat.block(0, N, cbs, rbs-N);
     Matrix<T, Dynamic, Dynamic> proj1 = -M1.llt().solve(M2*reconstruction);
 
     //Step 2: v_T - \pi_T^k p_T^k v (first term minus third term)
@@ -917,7 +919,7 @@ make_hho_fancy_stabilization_vector(const Mesh& msh, const typename Mesh::cell_t
         piKF.compute(face_mass_matrix);
 
         // Step 3a: \pi_F^k( v_F - p_T^k v )
-        Matrix<T, Dynamic, Dynamic> MR1 = face_trace_matrix.block(0, 2, fbs, rbs-2);
+        Matrix<T, Dynamic, Dynamic> MR1 = face_trace_matrix.block(0, N, fbs, rbs-N);
 
         Matrix<T, Dynamic, Dynamic> proj2 = piKF.solve(MR1*reconstruction);
         Matrix<T, Dynamic, Dynamic> I_F = Matrix<T, Dynamic, Dynamic>::Identity(fbs, fbs);
