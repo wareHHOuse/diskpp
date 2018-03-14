@@ -39,7 +39,8 @@ outer_product(const Matrix<T, Dynamic, M>& a, const Matrix<T, Dynamic, N>& b)
 
 template<typename T, int N>
 Matrix<T, Dynamic, N>
-outer_product(const std::vector<Matrix<T, N, N>>& a, const Matrix<T, N, 1>& b)
+outer_product(const eigen_compatible_stdvector<Matrix<T, N, N>>& a,
+              const Matrix<T, N, 1>& b)
 {
 	Matrix<T, Dynamic, N> ret(a.size(),N);
 	for (size_t i = 0; i < a.size(); i++)
@@ -53,7 +54,8 @@ outer_product(const std::vector<Matrix<T, N, N>>& a, const Matrix<T, N, 1>& b)
 
 template<typename T, int N>
 Matrix<T, Dynamic, Dynamic>
-outer_product(const std::vector<Matrix<T, N, N>>& a, const std::vector<Matrix<T, N, N>>& b)
+outer_product(const eigen_compatible_stdvector<Matrix<T, N, N>>& a,
+              const eigen_compatible_stdvector<Matrix<T, N, N>>& b)
 {
 	Matrix<T, Dynamic, Dynamic> ret(a.size(), b.size());
 
@@ -192,7 +194,7 @@ project_function(const Mesh& msh, const Element& elem,
                  const scalar_rhs_function<Mesh>& f, size_t di = 0)
 {
     using T = typename Mesh::coordinate_type;
-    
+
     auto basis = make_scalar_monomial_basis(msh, elem, degree);
     Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, elem, basis, di);
     Matrix<T, Dynamic, 1> rhs = make_rhs(msh, elem, basis, f, di);
@@ -206,7 +208,7 @@ project_function(const Mesh& msh, const Element& elem,
                  const vector_rhs_function<Mesh>& f, size_t di = 0)
 {
     using T = typename Mesh::coordinate_type;
-    
+
     auto basis = make_vector_monomial_basis(msh, elem, degree);
     Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, elem, basis, di);
     Matrix<T, Dynamic, 1> rhs = make_rhs(msh, elem, basis, f, di);
@@ -214,6 +216,3 @@ project_function(const Mesh& msh, const Element& elem,
 }
 
 } //revolution
-
-
-

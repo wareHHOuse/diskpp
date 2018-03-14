@@ -232,10 +232,10 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
             function_type   c_phi_tmp = cb.eval_functions(qp.point());
             function_type   c_phi = c_phi_tmp.block(0, 0, cbs, N);
 
-            std::vector<gradient_type> c_dphi_tmp = cb.eval_gradients(qp.point());
+            eigen_compatible_stdvector<gradient_type> c_dphi_tmp = cb.eval_gradients(qp.point());
 
             auto begin_iter = std::next(c_dphi_tmp.begin(), N);
-            std::vector<gradient_type> c_dphi;
+            eigen_compatible_stdvector<gradient_type> c_dphi;
             c_dphi.resize(rbs - N);
             assert( std::distance(begin_iter, c_dphi_tmp.end()) == c_dphi.size() );
             std::copy(begin_iter, c_dphi_tmp.end(), c_dphi.begin());
@@ -315,7 +315,7 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
             std::vector<gradient_type> c_dphi_tmp = cb.eval_sgradients(qp.point());
 
             auto begin_iter = std::next(c_dphi_tmp.begin(), 2);
-            std::vector<gradient_type> c_dphi(rbs_ho);
+            eigen_compatible_stdvector<gradient_type> c_dphi(rbs_ho);
             std::copy(begin_iter, c_dphi_tmp.end(), c_dphi.begin());
 
             function_type    f_phi = fb.eval_functions(qp.point());

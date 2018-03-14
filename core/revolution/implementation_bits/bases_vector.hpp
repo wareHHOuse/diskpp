@@ -111,10 +111,10 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
       return ret;
    }
 
-   std::vector<gradient_type>
+   eigen_compatible_stdvector<gradient_type>
    eval_gradients(const point_type& pt) const
    {
-      std::vector<gradient_type> ret;
+      eigen_compatible_stdvector<gradient_type> ret;
       ret.reserve(basis_size);
 
       Matrix<scalar_type, Dynamic, 3> dphi = scalar_basis.eval_gradients(pt);
@@ -141,10 +141,10 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
       return ret;
    }
 
-   std::vector<gradient_type>
+   eigen_compatible_stdvector<gradient_type>
    eval_sgradients(const point_type& pt) const
    {
-      std::vector<gradient_type> ret;
+      eigen_compatible_stdvector<gradient_type> ret;
       ret.reserve(basis_size);
 
       Matrix<scalar_type, Dynamic, 3> dphi = scalar_basis.eval_gradients(pt);
@@ -272,7 +272,7 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
    {
       function_type ret = function_type::Zero(basis_size, 2);
 
-      const auto phi = scalar_basis.eval_functions(pt);
+      auto phi = scalar_basis.eval_functions(pt);
 
       for (size_t i = 0; i < scalar_basis.size(); i++) {
          ret(2 * i, 0)     = phi(i);
@@ -282,13 +282,13 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
       return ret;
    }
 
-   std::vector<gradient_type>
+   eigen_compatible_stdvector<gradient_type>
    eval_gradients(const point_type& pt) const
    {
-      std::vector<gradient_type> ret;
+      eigen_compatible_stdvector<gradient_type> ret;
       ret.reserve(basis_size);
 
-      const Matrix<scalar_type, Dynamic, 2> dphi = scalar_basis.eval_gradients(pt);
+      Matrix<scalar_type, Dynamic, 2> dphi = scalar_basis.eval_gradients(pt);
 
       size_t j = 0;
       for (size_t i = 0; i < scalar_basis.size(); i++) {
@@ -308,17 +308,17 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
       return ret;
    }
 
-   std::vector<gradient_type>
+   eigen_compatible_stdvector<gradient_type>
    eval_sgradients(const point_type& pt) const
    {
-      std::vector<gradient_type> ret;
+      eigen_compatible_stdvector<gradient_type> ret;
       ret.reserve(basis_size);
 
-      const Matrix<scalar_type, Dynamic, 2> dphi = scalar_basis.eval_gradients(pt);
+      Matrix<scalar_type, Dynamic, 2> dphi = scalar_basis.eval_gradients(pt);
 
       size_t j = 0;
       for (size_t i = 0; i < scalar_basis.size(); i++) {
-         const Matrix<scalar_type, 1, 2> dphi_i = dphi.row(i);
+         Matrix<scalar_type, 1, 2> dphi_i = dphi.row(i);
          gradient_type                   g;
 
          g        = gradient_type::Zero();

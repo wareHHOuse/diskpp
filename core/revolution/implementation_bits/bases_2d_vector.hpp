@@ -114,10 +114,10 @@ public:
         return ret;
     }
 
-    std::vector<gradient_type>
+    eigen_compatible_stdvector<gradient_type>
     eval_gradients(const point_type& pt) const
     {
-        std::vector<gradient_type> ret;
+        eigen_compatible_stdvector<gradient_type> ret;
         ret.reserve(basis_size);
 
         Matrix<scalar_type, Dynamic, 2> dphi = scalar_basis.eval_gradients(pt);
@@ -139,10 +139,10 @@ public:
         return ret;
     }
 
-    std::vector<gradient_type>
+    eigen_compatible_stdvector<gradient_type>
     eval_symmetric_gradients(const point_type& pt) const
     {
-        std::vector<gradient_type> ret;
+        eigen_compatible_stdvector<gradient_type> ret;
         ret.reserve(basis_size);
 
         Matrix<scalar_type, Dynamic, 2> dphi = scalar_basis.eval_gradients(pt);
