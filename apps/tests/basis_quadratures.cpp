@@ -27,49 +27,107 @@
 
 #include "revolution/bases"
 #include "revolution/quadratures"
-//#include "revolution/methods/hho"
-
 #include "core/loaders/loader.hpp"
+
+#include "common.hpp"
+
+template<typename Mesh>
+struct test_functor
+{
+    typename Mesh::scalar_type
+    operator()(const Mesh& msh, size_t degree) const
+    {
+        typedef Mesh mesh_type;
+        typedef typename mesh_type::cell        cell_type;
+        typedef typename mesh_type::face        face_type;
+        typedef typename mesh_type::scalar_type scalar_type;
+        typedef typename mesh_type::point_type  point_type;
+
+
+        auto f = make_scalar_testing_data(msh);
+
+        scalar_type error = 0.0;
+        for (auto& cl : msh)
+        {
+            auto cb = revolution::make_scalar_monomial_basis(msh, cl, degree);
+
+            Matrix<scalar_type, Dynamic, Dynamic> mass = make_mass_matrix(msh, cl, cb);
+            Matrix<scalar_type, Dynamic, 1> rhs = make_rhs(msh, cl, cb, f);
+            Matrix<scalar_type, Dynamic, 1> proj = mass.llt().solve(rhs); 
+
+            auto qps = revolution::integrate(msh, cl, 2*degree+4);
+            for (auto& qp : qps)
+            {
+                auto tv = f(qp.point());
+
+                auto phi = cb.eval_functions(qp.point());
+                auto pv = proj.dot(phi);
+
+                error += qp.weight() * (tv - pv) * (tv - pv);
+            }
+        }
+
+        return std::sqrt( error );
+    }
+};
+
+
+template<typename Mesh>
+test_functor<Mesh>
+get_test_functor(const std::vector<Mesh>& meshes)
+{
+    return test_functor<Mesh>();
+}
+
+void test_triangles_generic(void)
+{
+    std::cout << "*** TESTING TRIANGLES ON GENERIC MESH ***" << std::endl;
+    using T = double;
+
+    auto meshes = get_triangle_generic_meshes<T>();
+    auto tf = get_test_functor(meshes);
+    do_testing(meshes, tf);
+}
+
+void test_triangles_netgen(void)
+{
+    std::cout << "*** TESTING TRIANGLES ON NETGEN MESH ***" << std::endl;
+    using T = double;
+
+    auto meshes = get_triangle_netgen_meshes<T>();
+    auto tf = get_test_functor(meshes);
+    do_testing(meshes, tf);
+}
+
+void test_quads(void)
+{
+    std::cout << "*** TESTING QUADS ON GENERIC MESH ***" << std::endl;
+    using T = double;
+
+    auto meshes = get_quad_generic_meshes<T>();
+    auto tf = get_test_functor(meshes);
+    do_testing(meshes, tf);
+}
+
+void test_tetrahedra_netgen(void)
+{
+    std::cout << "*** TESTING TETRAHEDRONS ON NETGEN MESH ***" << std::endl;
+    using T = double;
+
+    auto meshes = get_tetrahedra_netgen_meshes<T>();
+    auto tf = get_test_functor(meshes);
+    do_testing(meshes, tf);
+}
 
 int main(void)
 {
     _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
 
-    using T = double;
-
-
-    typedef disk::simplicial_mesh<T, 3>  mesh_type;
-
-
-    mesh_type msh;
-    disk::netgen_mesh_loader<T, 3> loader;
-
-    if (!loader.read_mesh("../../../diskpp/meshes/3D_tetras/netgen/basiccube.mesh"))
-    {
-        std::cout << "Problem loading mesh." << std::endl;
-        return 1;
-    }
-    loader.populate_mesh(msh);
-
-    for (auto& cl : msh)
-    {
-    	auto cb = revolution::make_scalar_monomial_basis(msh, cl, 2);
-    	auto qps = revolution::integrate(msh, cl, 4);
-
-        Matrix<T, Dynamic, 1> phi = Matrix<T, Dynamic, 1>::Zero(cb.size());
-
-        for (auto& qp : qps)
-            phi += qp.weight() * cb.eval_functions(qp.point());
-
-        std::cout << phi.transpose() << std::endl;
-
-    	auto fcs = faces(msh, cl);
-    	for (auto& fc : fcs)
-    	{
-    		auto fb = revolution::make_scalar_monomial_basis(msh, fc, 2);
-    		auto qps = revolution::integrate(msh, fc, 4);
-    	}
-    }
+    //test_triangles_generic();
+    //test_triangles_netgen();
+    test_quads();
+    test_tetrahedra_netgen();
 
     return 0;
 }
+

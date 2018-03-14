@@ -206,8 +206,8 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
     typedef Matrix<T, Dynamic, N>       function_type;
 
     matrix_type stiff  = matrix_type::Zero(rbs, rbs);
-    matrix_type gr_lhs = matrix_type::Zero(rbs-2, rbs-2);
-    matrix_type gr_rhs = matrix_type::Zero(rbs-2, cbs + num_faces*fbs);
+    matrix_type gr_lhs = matrix_type::Zero(rbs-N, rbs-N);
+    matrix_type gr_rhs = matrix_type::Zero(rbs-N, cbs + num_faces*fbs);
 
     auto qps = integrate(msh, cl, 2*recdeg);
     for (auto& qp : qps)
@@ -216,8 +216,8 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
         stiff += qp.weight() * priv::outer_product(dphi, dphi);
     }
 
-    gr_lhs = stiff.block(2, 2, rbs-2, rbs-2);
-    gr_rhs.block(0, 0, rbs-2, cbs) = stiff.block(2, 0, rbs-2, cbs);
+    gr_lhs = stiff.block(N, N, rbs-N, rbs-N);
+    gr_rhs.block(0, 0, rbs-N, cbs) = stiff.block(N, 0, rbs-N, cbs);
 
     auto fcs = faces(msh, cl);
     for (size_t i = 0; i < fcs.size(); i++)
@@ -230,22 +230,22 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
         for (auto& qp : qps_f)
         {
             function_type   c_phi_tmp = cb.eval_functions(qp.point());
-            function_type   c_phi = c_phi_tmp.block(0, 0, cbs, 2);
+            function_type   c_phi = c_phi_tmp.block(0, 0, cbs, N);
 
             std::vector<gradient_type> c_dphi_tmp = cb.eval_gradients(qp.point());
 
-            auto begin_iter = std::next(c_dphi_tmp.begin(), 2);
+            auto begin_iter = std::next(c_dphi_tmp.begin(), N);
             std::vector<gradient_type> c_dphi;
-            c_dphi.resize(rbs - 2);
+            c_dphi.resize(rbs - N);
             assert( std::distance(begin_iter, c_dphi_tmp.end()) == c_dphi.size() );
             std::copy(begin_iter, c_dphi_tmp.end(), c_dphi.begin());
 
             function_type   f_phi = fb.eval_functions(qp.point());
 
             Matrix<T, Dynamic, N> c_dphi_n = priv::outer_product(c_dphi, n);
-            gr_rhs.block(0, cbs + i*fbs, rbs-2, fbs) +=
+            gr_rhs.block(0, cbs + i*fbs, rbs-N, fbs) +=
                     qp.weight() * priv::outer_product(f_phi, c_dphi_n);
-            gr_rhs.block(0, 0, rbs-2, cbs) -=
+            gr_rhs.block(0, 0, rbs-N, cbs) -=
                     qp.weight() * priv::outer_product(c_phi, c_dphi_n);
         }
     }

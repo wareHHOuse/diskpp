@@ -128,7 +128,7 @@ int main(void)
 
     //test_triangles_generic();
     //test_triangles_netgen();
-    //test_quads();
+    test_quads();
     test_tetrahedra_netgen();
 
     return 0;

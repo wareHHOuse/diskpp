@@ -65,9 +65,10 @@ struct test_functor
             size_t rec_size = revolution::vector_basis_size(hdi.reconstruction_degree(), Mesh::dimension, Mesh::dimension);
 
             Matrix<scalar_type, Dynamic, 1> reconstr = Matrix<scalar_type, Dynamic, 1>::Zero(rec_size);
-            reconstr.tail(rec_size-2) = gr.first * proj;
-            reconstr(0) = proj(0);
-            reconstr(1) = proj(1);
+            reconstr.tail(rec_size-Mesh::dimension) = gr.first * proj;
+
+            for (size_t i = 0; i < Mesh::dimension; i++)
+                reconstr(i) = proj(i);
 
             auto cb = revolution::make_vector_monomial_basis(msh, cl, hdi.reconstruction_degree());
             Matrix<scalar_type, Dynamic, Dynamic> mass = revolution::make_mass_matrix(msh, cl, cb);

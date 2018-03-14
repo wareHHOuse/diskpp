@@ -25,6 +25,8 @@
 
 #pragma once
 
+#include <iomanip>
+
 #include "core/loaders/loader.hpp"
 
 const size_t MIN_TEST_DEGREE = 0;
@@ -183,10 +185,11 @@ std::vector< disk::simplicial_mesh<T, 3> >
 get_tetrahedra_netgen_meshes(void)
 {
     std::vector<std::string> meshfiles;
-    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/convt01.mesh");
-    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/convt02.mesh");
-    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/convt03.mesh");
-    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/convt04.mesh");
+    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/cube1.mesh");
+    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/cube2.mesh");
+    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/cube3.mesh");
+    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/cube4.mesh");
+    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/cube5.mesh");
 
 
     typedef disk::simplicial_mesh<T, 3>  mesh_type;
