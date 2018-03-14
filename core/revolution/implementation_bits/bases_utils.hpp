@@ -169,6 +169,49 @@ make_rhs(const Mesh& msh, const Element& elem,
     return ret;
 }
 
+template<typename Mesh>
+using SRT = typename Mesh::coordinate_type;
+
+template<typename Mesh>
+using VRT = Matrix<typename Mesh::coordinate_type, Mesh::dimension, 1>;
+
+template<typename Mesh>
+using PT = typename Mesh::point_type;
+
+
+template<typename Mesh>
+using scalar_rhs_function = std::function<SRT<Mesh>(PT<Mesh>)>;
+
+template<typename Mesh>
+using vector_rhs_function = std::function<VRT<Mesh>(PT<Mesh>)>;
+
+template<typename Mesh, typename Element>
+Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+project_function(const Mesh& msh, const Element& elem,
+                 size_t degree,
+                 const scalar_rhs_function<Mesh>& f, size_t di = 0)
+{
+    using T = typename Mesh::coordinate_type;
+    
+    auto basis = make_scalar_monomial_basis(msh, elem, degree);
+    Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, elem, basis, di);
+    Matrix<T, Dynamic, 1> rhs = make_rhs(msh, elem, basis, f, di);
+    return mass.llt().solve(rhs);
+}
+
+template<typename Mesh, typename Element>
+Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+project_function(const Mesh& msh, const Element& elem,
+                 size_t degree,
+                 const vector_rhs_function<Mesh>& f, size_t di = 0)
+{
+    using T = typename Mesh::coordinate_type;
+    
+    auto basis = make_vector_monomial_basis(msh, elem, degree);
+    Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, elem, basis, di);
+    Matrix<T, Dynamic, 1> rhs = make_rhs(msh, elem, basis, f, di);
+    return mass.llt().solve(rhs);
+}
 
 } //revolution
 

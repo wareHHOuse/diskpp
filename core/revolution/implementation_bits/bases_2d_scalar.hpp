@@ -39,6 +39,7 @@
 #include <vector>
 
 #include "common/eigen.hpp"
+#include "mesh/mesh.hpp"
 
 using namespace Eigen;
 

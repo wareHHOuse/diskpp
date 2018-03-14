@@ -605,7 +605,7 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
 
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_hho_naive_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+make_hdg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
 
@@ -622,6 +622,7 @@ make_hho_naive_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
 
     auto cb = make_scalar_monomial_basis(msh, cl, celdeg);
     auto fcs = faces(msh, cl);
+
     auto h = measure(msh, cl);
 
     for (size_t i = 0; i < num_faces; i++)
@@ -650,7 +651,6 @@ make_hho_naive_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
         tr.block(0, 0, fbs, cbs) = trace;
 
         oper.block(0, 0, fbs, cbs) = mass.llt().solve(trace);
-
         data += oper.transpose() * tr * (1./h);
     }
 
@@ -668,10 +668,20 @@ T estimate_conditioning(const Matrix<T,M,N>& m)
 }
 
 template<typename Mesh>
+[[deprecated("Please use 'make_hho_scalar_stabilization()'")]]
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
 make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl,
                              const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> reconstruction,
                              const hho_degree_info& di)
+{
+    return make_hho_scalar_stabilization(msh, cl, reconstruction, di);
+}
+
+template<typename Mesh>
+Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+make_hho_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl,
+                              const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> reconstruction,
+                              const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
 
@@ -709,10 +719,11 @@ make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
 
     Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(cbs+num_faces*fbs, cbs+num_faces*fbs);
 
+    auto h = diameter(msh, cl);
+
     // Step 3: project on faces (eqn. 21)
     for (size_t face_i = 0; face_i < num_faces; face_i++)
     {
-        auto h = diameter(msh, fcs[face_i]);
         auto fc = fcs[face_i];
         auto fb = make_scalar_monomial_basis(msh, fc, facdeg);
 
@@ -753,9 +764,9 @@ make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
 
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_hho_fancy_stabilization_2(const Mesh& msh, const typename Mesh::cell_type& cl,
-                               const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> reconstruction,
-                               const hho_degree_info& di)
+make_hho_scalar_stabilization_2(const Mesh& msh, const typename Mesh::cell_type& cl,
+                                const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> reconstruction,
+                                const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
 
@@ -793,10 +804,11 @@ make_hho_fancy_stabilization_2(const Mesh& msh, const typename Mesh::cell_type& 
 
     Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(cbs+num_faces*fbs, cbs+num_faces*fbs);
 
+    auto h = diameter(msh, cl);
+
     // Step 3: project on faces (eqn. 21)
     for (size_t face_i = 0; face_i < num_faces; face_i++)
     {
-        auto h = diameter(msh, fcs[face_i]);
         auto fc = fcs[face_i];
         auto fb = make_scalar_monomial_basis(msh, fc, facdeg);
 
@@ -921,22 +933,6 @@ make_hho_fancy_stabilization_vector(const Mesh& msh, const typename Mesh::cell_t
 
     return data;
 }
-
-template<typename Mesh>
-using SRT = typename Mesh::coordinate_type;
-
-template<typename Mesh>
-using VRT = Matrix<typename Mesh::coordinate_type, Mesh::dimension, 1>;
-
-template<typename Mesh>
-using PT = typename Mesh::point_type;
-
-
-template<typename Mesh>
-using scalar_rhs_function = std::function<SRT<Mesh>(PT<Mesh>)>;
-
-template<typename Mesh>
-using vector_rhs_function = std::function<VRT<Mesh>(PT<Mesh>)>;
 
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
