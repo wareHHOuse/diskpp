@@ -76,7 +76,18 @@ class generic_element_base
 {
     typedef typename generic_element_traits<T>::subelement_type::id_type    sub_id_type;
     typedef point_identifier<generic_element_traits<T>::dimension>          point_id_type;
-protected:
+
+    void
+    set_point_ids()
+    {
+       m_pts_ptrs.clear();
+       m_pts_ptrs.reserve(m_sids_ptrs.size());
+
+       for (auto& sid : m_sids_ptrs)
+          m_pts_ptrs.push_back(point_id_type(sid));
+    }
+
+  protected:
     std::vector<sub_id_type>            m_sids_ptrs;
     std::vector<point_id_type>          m_pts_ptrs;
 
@@ -93,11 +104,15 @@ public:
 
     explicit generic_element_base(const std::vector<sub_id_type>& sids_ptrs)
         : m_sids_ptrs(sids_ptrs)
-    {}
+    {
+       set_point_ids();
+    }
 
     explicit generic_element_base(std::vector<sub_id_type>&& sids_ptrs)
         : m_sids_ptrs( std::move(sids_ptrs) )
-    {}
+    {
+       set_point_ids();
+    }
 
     template<typename Itor>
     void set_subelement_ids(const Itor e_begin, const Itor e_end)
