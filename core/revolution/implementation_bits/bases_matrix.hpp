@@ -342,7 +342,7 @@ sym_matrix_basis_size(size_t k, size_t sd, size_t vd)
    else
       std::logic_error("Expected 3 >= dim > 1");
 
-   return vd * (num / den);
+   return md * (num / den);
 }
 
 /* Generic template for bases. */
