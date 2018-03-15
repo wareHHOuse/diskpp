@@ -312,7 +312,7 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
             function_type   c_phi_tmp = cb.eval_functions(qp.point());
             function_type   c_phi = c_phi_tmp.block(0, 0, cbs, 2);
 
-            std::vector<gradient_type> c_dphi_tmp = cb.eval_sgradients(qp.point());
+            eigen_compatible_stdvector<gradient_type> c_dphi_tmp = cb.eval_sgradients(qp.point());
 
             auto begin_iter = std::next(c_dphi_tmp.begin(), 2);
             eigen_compatible_stdvector<gradient_type> c_dphi(rbs_ho);

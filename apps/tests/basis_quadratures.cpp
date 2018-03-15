@@ -47,25 +47,25 @@ struct test_functor
         auto f = make_scalar_testing_data(msh);
 
         scalar_type error = 0.0;
-        
-            for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++)
+
+        for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++)
+        {
+            auto fc = *itor;
+            auto basis = revolution::make_scalar_monomial_basis(msh, fc, degree);
+
+            Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, fc, degree, f);
+
+            auto qps = revolution::integrate(msh, fc, 2*degree+4);
+            for (auto& qp : qps)
             {
-                auto fc = *itor;
-                auto basis = revolution::make_scalar_monomial_basis(msh, fc, degree);
+                auto tv = f(qp.point());
 
-                Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, fc, degree, f); 
+                auto phi = basis.eval_functions(qp.point());
+                auto pv = proj.dot(phi);
 
-                auto qps = revolution::integrate(msh, fc, 2*degree+4);
-                for (auto& qp : qps)
-                {
-                    auto tv = f(qp.point());
-
-                    auto phi = basis.eval_functions(qp.point());
-                    auto pv = proj.dot(phi);
-
-                    error += qp.weight() * (tv - pv) * (tv - pv);
-                }
+                error += qp.weight() * (tv - pv) * (tv - pv);
             }
+        }
 
         return std::sqrt( error );
     }
@@ -130,4 +130,3 @@ int main(void)
 
     return 0;
 }
-
