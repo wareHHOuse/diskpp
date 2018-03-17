@@ -35,7 +35,7 @@ int main(void)
         return 3.0 * M_PI * M_PI * sin(M_PI*pt.x()) * sin(M_PI*pt.y()) * sin(M_PI*pt.z());
     };
 
-    const char *meshfile = "../../../diskpp/meshes/3D_tetras/netgen/cubecube.mesh";
+    const char *meshfile = "../../../diskpp/meshes/3D_tetras/netgen/cube5.mesh";
 
     typedef disk::simplicial_mesh<T, 3>  mesh_type;
 
@@ -119,6 +119,7 @@ int main(void)
     gA.setFromTriplets(triplets.begin(), triplets.end());
 
     disk::solvers::pardiso_params<T> pparams;
+    pparams.report_factorization_Mflops = true;
     mkl_pardiso(pparams, gA, gb, gx);
 
     dynamic_vector<T> sol = dynamic_vector<T>::Zero( msh.points_size() );

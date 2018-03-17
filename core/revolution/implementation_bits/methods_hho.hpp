@@ -665,6 +665,52 @@ T estimate_conditioning(const Matrix<T,M,N>& m)
     return cond;
 }
 
+
+template<typename Mesh, typename T>
+auto
+diffusion_static_condensation_compute(const Mesh& msh,
+        const typename Mesh::cell_type& cl, const hho_degree_info hdi,
+        const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& local_mat,
+        const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& cell_rhs)
+{
+    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+
+    auto cell_degree = hdi.cell_degree();
+    auto face_degree = hdi.face_degree();
+    auto num_cell_dofs = scalar_basis_size(cell_degree, Mesh::dimension);
+    auto num_face_dofs = scalar_basis_size(face_degree, Mesh::dimension-1);
+
+    auto fcs = faces(msh, cl);
+    auto num_faces = fcs.size();
+
+    size_t cell_size = num_cell_dofs;
+    size_t face_size = num_face_dofs * num_faces;
+
+    matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
+    matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
+    matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
+    matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
+
+    assert(K_TT.cols() == cell_size);
+    assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
+    assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
+    assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
+    assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
+
+    auto K_TT_ldlt = K_TT.llt();
+    matrix_type AL = K_TT_ldlt.solve(K_TF);
+    vector_type bL = K_TT_ldlt.solve(cell_rhs);
+
+    matrix_type AC = K_FF - K_FT * AL;
+    vector_type bC = /* no projection on faces, eqn. 26*/ - K_FT * bL;
+
+    return std::make_pair(AC, bC);
+}
+
+
+
+
 template<typename Mesh>
 [[deprecated("Please use 'make_hho_scalar_stabilization()'")]]
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
