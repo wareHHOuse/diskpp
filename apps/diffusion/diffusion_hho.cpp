@@ -11,6 +11,7 @@
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
 #include "revolution/methods/hho"
+#include "solvers/solver.hpp"
 
 /***************************************************************************/
 /* RHS definition */
@@ -111,6 +112,8 @@ run_hho_diffusion_solver(const Mesh& msh)
     auto rhs_fun = make_rhs_function(msh);
     auto sol_fun = make_solution_function(msh);
 
+    auto assembler = make_diffusion_assembler(msh, hdi);
+
     for (auto& cl : msh)
     {
         auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
@@ -118,7 +121,22 @@ run_hho_diffusion_solver(const Mesh& msh)
         auto rhs    = project_function(msh, cl, hdi.cell_degree(), rhs_fun);
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.first + stab;
         auto sc     = diffusion_static_condensation_compute(msh, cl, hdi, A, rhs);
+        assembler.assemble(msh, cl, sc.first, sc.second, sol_fun);
     }
+
+    assembler.finalize();
+
+    size_t systsz = assembler.LHS.rows();
+    size_t nnz = assembler.LHS.nonZeros();
+
+    std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
+    std::cout << "Dofs: " << systsz << std::endl;
+
+    dynamic_vector<T> sol = dynamic_vector<T>::Zero(systsz);
+
+    disk::solvers::pardiso_params<T> pparams;
+    pparams.report_factorization_Mflops = true;
+    mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
 }
 
 template<typename Mesh>

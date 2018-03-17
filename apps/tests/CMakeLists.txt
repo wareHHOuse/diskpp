@@ -18,6 +18,3 @@ target_link_libraries(perf ${LINK_LIBS})
 
 add_executable(basis_quadratures basis_quadratures.cpp)
 target_link_libraries(basis_quadratures ${LINK_LIBS})
-
-add_executable(dga dga.cpp)
-target_link_libraries(dga ${LINK_LIBS})

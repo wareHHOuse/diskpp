@@ -27,7 +27,7 @@
 #include "loaders/loader.hpp"
 #include "solvers/solver.hpp"
 
-int main(void)
+int main(int argc, char **argv)
 {
     using T = double;
 
@@ -35,7 +35,13 @@ int main(void)
         return 3.0 * M_PI * M_PI * sin(M_PI*pt.x()) * sin(M_PI*pt.y()) * sin(M_PI*pt.z());
     };
 
-    const char *meshfile = "../../../diskpp/meshes/3D_tetras/netgen/cube5.mesh";
+    if (argc != 2)
+    {
+        std::cout << "Please specify file name." << std::endl;
+        return 1;
+    }
+
+    char *meshfile = argv[1];
 
     typedef disk::simplicial_mesh<T, 3>  mesh_type;
 
@@ -117,6 +123,9 @@ int main(void)
     }
 
     gA.setFromTriplets(triplets.begin(), triplets.end());
+
+    std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
+    std::cout << "Dofs: " << gA.rows() << std::endl;
 
     disk::solvers::pardiso_params<T> pparams;
     pparams.report_factorization_Mflops = true;
