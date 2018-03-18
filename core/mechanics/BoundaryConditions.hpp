@@ -7,8 +7,6 @@
  *  /_\/_\/_\/_\   methods.
  *
  * This file is copyright of the following authors:
- * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Karol Cascavita (C) 2018                     klcascavitam@unal.edu.co
  * Nicolas Pignet (C) 2018                      nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
@@ -32,7 +30,7 @@
 
 #include "bases/bases_utils.hpp"
 #include "mesh/point.hpp"
-#include "revolution/methods_hho.hpp"
+#include "revolution/bases"
 
 namespace disk {
 namespace mechanics {
@@ -257,11 +255,12 @@ class BoundaryConditions
    }
 
    size_t
-   dirichlet_imposed_dofs(const size_t& face_id, const revolution::hho_degree_info& di) const
+   dirichlet_imposed_dofs(const size_t& face_id, const size_t face_degree) const
    {
-      const size_t dimension     = mesh_type::dimension;
-      const size_t num_face_dofs = vector_basis_size(di.face_degree() ,dimension-1, dimension);
-      const size_t num_dim_dofs  = num_face_dofs / dimension;
+      const size_t dimension = mesh_type::dimension;
+      const size_t num_face_dofs =
+        revolution::vector_basis_size(face_degree, dimension - 1, dimension);
+      const size_t num_dim_dofs = num_face_dofs / dimension;
 
       if (is_dirichlet_face(face_id)) {
          const size_t btype = dirichlet_boundary_type(face_id);
