@@ -225,6 +225,20 @@ eval(const dynamic_vector<T>& tab_coeff, const dynamic_vector<T>& base)
 }
 
 template<typename T, int DIM>
+static_vector<T, DIM>
+eval(const dynamic_vector<T>& tab_coeff, const Matrix<T, Dynamic, DIM>& base)
+{
+   static_vector<T, DIM> ret = static_vector<T, DIM>::Zero();
+   assert(tab_coeff.size() == (base.rows()));
+
+   for (size_t i = 0; i < tab_coeff.size(); i++) {
+      ret += tab_coeff(i) * (base.row(i)).transpose();
+   }
+
+   return ret;
+}
+
+template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
 eval(const dynamic_vector<T>&                                      tab_coeff,
      const eigen_compatible_stdvector<static_matrix<T, DIM, DIM>>& base,

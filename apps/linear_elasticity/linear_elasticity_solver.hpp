@@ -40,8 +40,9 @@
 
 #include "solvers/solver.hpp"
 
-// #include "output/gmshConvertMesh.hpp"
-// #include "output/gmshDisk.hpp"
+#include "output/gmshConvertMesh.hpp"
+#include "output/gmshDisk.hpp"
+#include "output/postMesh.hpp"
 
 #include "timecounter.h"
 
@@ -358,5 +359,65 @@ class linear_elasticity_solver
       }
 
       return sqrt(error_stress);
+   }
+
+   void
+   compute_continuous_displacement(const std::string& filename) const
+   {
+      const size_t cell_degree   = m_hdi.cell_degree();
+      const size_t cbs = revolution::vector_basis_size(cell_degree, dimension, dimension);
+
+      // compute mesh for post-processing
+      disk::PostMesh<mesh_type> post_mesh = disk::PostMesh<mesh_type>(m_msh);
+      gmsh::Gmesh gmsh    = disk::convertMesh(post_mesh);
+      auto        storage = post_mesh.mesh().backend_storage();
+
+      const static_vector<scalar_type, dimension> vzero =
+        static_vector<scalar_type, dimension>::Zero();
+
+      const size_t nb_nodes(gmsh.getNumberofNodes());
+
+      // first(number of data at this node), second(cumulated value)
+      std::vector<std::pair<size_t, static_vector<scalar_type, dimension>>> value(
+        nb_nodes, std::make_pair(0, vzero));
+
+      size_t cell_i = 0;
+      for (auto& cl : m_msh) {
+         vector_dynamic x          = m_solution_data.at(cell_i).head(cbs);
+         const auto     cell_nodes = post_mesh.nodes_cell(cell_i);
+         auto           cbas       = revolution::make_vector_monomial_basis(m_msh, cl, cell_degree);
+
+         // Loop on the nodes of the cell
+         for (auto& point_id : cell_nodes) {
+            const auto pt = storage->points[point_id];
+
+            const auto phi = cbas.eval_functions(pt);
+            assert(phi.rows() == cbs);
+            const auto depl = revolution::eval(x, phi);
+
+            // Add displacement at node
+            value[point_id].first++;
+            value[point_id].second += depl;
+         }
+         cell_i++;
+      }
+
+      std::vector<gmsh::Data>    data;    // create data
+      std::vector<gmsh::SubData> subdata; // create subdata
+      data.reserve(nb_nodes);             // data has a size of nb_node
+
+      // Compute the average value and save it
+      for (size_t i_node = 0; i_node < value.size(); i_node++) {
+         const static_vector<scalar_type, dimension> depl_avr =
+           value[i_node].second / double(value[i_node].first);
+
+         const gmsh::Data tmp_data(i_node + 1, disk::convertToVectorGmsh(depl_avr));
+         data.push_back(tmp_data);
+      }
+
+      // Create and init a nodedata view
+      gmsh::NodeData nodedata(3, 0.0, "depl_node_cont", data, subdata);
+      // Save the view
+      nodedata.saveNodeData(filename, gmsh);
    }
 };
