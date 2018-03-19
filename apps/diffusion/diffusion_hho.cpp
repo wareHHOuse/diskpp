@@ -105,7 +105,7 @@ run_hho_diffusion_solver(const Mesh& msh)
 {
     using T = typename Mesh::scalar_type;
 
-    size_t degree = 0;
+    size_t degree = 1;
 
     hho_degree_info hdi(degree);
 
@@ -116,10 +116,11 @@ run_hho_diffusion_solver(const Mesh& msh)
 
     for (auto& cl : msh)
     {
+        auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
         auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
         auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
-        auto rhs    = project_function(msh, cl, hdi.cell_degree(), rhs_fun);
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.first + stab;
+        auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
         auto sc     = diffusion_static_condensation_compute(msh, cl, hdi, A, rhs);
         assembler.assemble(msh, cl, sc.first, sc.second, sol_fun);
     }
@@ -130,6 +131,7 @@ run_hho_diffusion_solver(const Mesh& msh)
     size_t nnz = assembler.LHS.nonZeros();
 
     std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
+    std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
     std::cout << "Dofs: " << systsz << std::endl;
 
     dynamic_vector<T> sol = dynamic_vector<T>::Zero(systsz);
@@ -137,6 +139,41 @@ run_hho_diffusion_solver(const Mesh& msh)
     disk::solvers::pardiso_params<T> pparams;
     pparams.report_factorization_Mflops = true;
     mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+
+    T error = 0.0;
+
+    std::ofstream ofs("sol.dat");
+
+    for (auto& cl : msh)
+    {
+        auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
+        auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+        auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
+
+        Eigen::Matrix<T, Eigen::Dynamic, 1> locsol =
+            assembler.take_local_data(msh, cl, sol, sol_fun);
+
+        Eigen::Matrix<T, Eigen::Dynamic, 1> fullsol =
+            diffusion_static_condensation_recover(msh, cl, hdi, A, rhs, locsol);
+
+        Eigen::Matrix<T, Eigen::Dynamic, 1> realsol = project_function(msh, cl, hdi, sol_fun);
+
+        auto diff = realsol - fullsol;
+        error += diff.dot(A*diff);
+
+        auto bar = barycenter(msh, cl);
+
+        for (size_t i = 0; i < Mesh::dimension; i++)
+            ofs << bar[i] << " ";
+        ofs << fullsol(0) << std::endl;
+
+    }
+
+    std::cout << std::sqrt(error) << std::endl;
+
+    ofs.close();
 }
 
 template<typename Mesh>

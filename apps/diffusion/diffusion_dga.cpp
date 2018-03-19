@@ -35,6 +35,10 @@ int main(int argc, char **argv)
         return 3.0 * M_PI * M_PI * sin(M_PI*pt.x()) * sin(M_PI*pt.y()) * sin(M_PI*pt.z());
     };
 
+    auto sol_fun = [](const typename disk::simplicial_mesh<T, 3>::point_type& pt) -> auto {
+        return sin(M_PI*pt.x()) * sin(M_PI*pt.y()) * sin(M_PI*pt.z());
+    };
+
     if (argc != 2)
     {
         std::cout << "Please specify file name." << std::endl;
@@ -144,6 +148,35 @@ int main(int argc, char **argv)
     }
 
     ofs.close();
+
+    T error = 0.0;
+    for (auto& cl : msh)
+    {
+        auto G = grad_matrix(msh, cl);
+        auto E = edge_matrix(msh, cl, 1.0);
+        Eigen::Matrix<T,4,4> lapl = G.transpose() * E * G;
+
+        auto ptids = cl.point_ids();
+        auto pts = points(msh, cl);
+
+        Eigen::Matrix<T,4,1> realsol;
+        Eigen::Matrix<T,4,1> compsol;
+
+        for (size_t i = 0; i < 4; i++)
+        {
+            realsol(i) = sol_fun(pts[i]);
+            compsol(i) = sol(ptids[i]);
+        }
+
+        auto diff = realsol - compsol;
+        //std::cout << "***" << std::endl;
+        //std::cout << realsol.transpose() << std::endl;
+        //std::cout << compsol.transpose() << std::endl;
+
+        error += diff.dot(lapl*diff);
+    }
+
+    std::cout << std::sqrt(error) << std::endl;
 
     return 0;
 }
