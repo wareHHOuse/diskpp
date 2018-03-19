@@ -32,6 +32,7 @@
 #include "common/eigen.hpp"
 #include "revolution/bases"
 #include "revolution/quadratures"
+#include "mechanics/BoundaryConditions.hpp"
 
 using namespace Eigen;
 
@@ -70,8 +71,6 @@ public:
             reconstruction_deg  = fd+1;
             grad_deg            = fd;
         }
-
-        std::cout << cell_deg << " " << face_deg << " " << reconstruction_deg << std::endl;
     }
 
     hho_degree_info(size_t cd, size_t fd, size_t gd)
@@ -91,9 +90,6 @@ public:
           reconstruction_deg = fd + 1;
           grad_deg           = fd;
        }
-
-       std::cout << cell_deg << " " << face_deg << " " << reconstruction_deg << " "
-                 << grad_deg << std::endl;
     }
 
     size_t cell_degree() const
@@ -115,6 +111,13 @@ public:
     grad_degree() const
     {
        return grad_deg;
+    }
+
+    void
+    info_degree() const
+    {
+       std::cout << cell_deg << " " << face_deg << " " << reconstruction_deg << " " << grad_deg
+                 << std::endl;
     }
 };
 
@@ -256,6 +259,15 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
     return std::make_pair(oper, data);
 }
 //#if 0
+namespace priv{
+    size_t
+    nb_lag(const size_t dim)
+    {
+       size_t lag = 1;
+       if (dim == 3) lag = 3;
+       return lag;
+    }
+}
 template<typename Mesh>
 std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
              Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
@@ -272,9 +284,9 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
 
     auto cb = make_vector_monomial_basis(msh, cl, recdeg);
 
-    auto rbs = vector_basis_size(recdeg, Mesh::dimension, Mesh::dimension);
-    auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
-    auto fbs = vector_basis_size(facdeg, Mesh::dimension-1, Mesh::dimension);
+    auto rbs = vector_basis_size(recdeg, N, N);
+    auto cbs = vector_basis_size(celdeg, N, N);
+    auto fbs = vector_basis_size(facdeg, N-1, N);
 
     auto num_faces = howmany_faces(msh, cl);
 
@@ -283,11 +295,13 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
     typedef Matrix<T, N, N>             gradient_type;
     typedef Matrix<T, Dynamic, N>       function_type;
 
-    size_t rbs_ho = rbs - Mesh::dimension;
+    size_t rbs_ho = rbs - N;
     size_t num_total_dofs = cbs + num_faces*fbs;
-    matrix_type stiff  = matrix_type::Zero(rbs, rbs);
-    matrix_type gr_lhs = matrix_type::Zero( rbs_ho + 1, rbs_ho + 1);
-    matrix_type gr_rhs = matrix_type::Zero( rbs_ho + 1, num_total_dofs);
+    size_t nb_lag         = priv::nb_lag(N);
+
+    matrix_type stiff          = matrix_type::Zero(rbs, rbs);
+    matrix_type gr_lhs = matrix_type::Zero( rbs_ho + nb_lag, rbs_ho + nb_lag);
+    matrix_type gr_rhs = matrix_type::Zero( rbs_ho + nb_lag, num_total_dofs);
 
     auto qps = integrate(msh, cl, 2*recdeg);
     for (auto& qp : qps)
@@ -296,8 +310,8 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
         stiff += qp.weight() * priv::outer_product(dphi, dphi);
     }
 
-    gr_lhs.block(0, 0, rbs_ho, rbs_ho) = stiff.block(2, 2, rbs_ho, rbs_ho);
-    gr_rhs.block(0, 0, rbs_ho, cbs) = stiff.block(2, 0, rbs_ho, cbs);
+    gr_lhs.block(0, 0, rbs_ho, rbs_ho) = stiff.block(N, N, rbs_ho, rbs_ho);
+    gr_rhs.block(0, 0, rbs_ho, cbs)    = stiff.block(N, 0, rbs_ho, cbs);
 
     auto fcs = faces(msh, cl);
     for (size_t i = 0; i < fcs.size(); i++)
@@ -310,11 +324,11 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
         for (auto& qp : qps_f)
         {
             function_type   c_phi_tmp = cb.eval_functions(qp.point());
-            function_type   c_phi = c_phi_tmp.block(0, 0, cbs, 2);
+            function_type   c_phi     = c_phi_tmp.block(0, 0, cbs, N);
 
             eigen_compatible_stdvector<gradient_type> c_dphi_tmp = cb.eval_sgradients(qp.point());
 
-            auto begin_iter = std::next(c_dphi_tmp.begin(), 2);
+            auto begin_iter = std::next(c_dphi_tmp.begin(), N);
             eigen_compatible_stdvector<gradient_type> c_dphi(rbs_ho);
             std::copy(begin_iter, c_dphi_tmp.end(), c_dphi.begin());
 
@@ -334,10 +348,11 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
         rot += qp.weight() * rphi;
     }
 
-    gr_lhs.block(0, rbs_ho, rbs_ho, 1 ) = rot.tail(rbs_ho);
-    gr_lhs.block(rbs_ho, 0, 1, rbs_ho ) = rot.tail(rbs_ho).transpose();
+    gr_lhs.block(0, rbs_ho, rbs_ho, nb_lag ) = rot.tail(rbs_ho);
+    gr_lhs.block(rbs_ho, 0, nb_lag, rbs_ho ) = rot.tail(rbs_ho).transpose();
 
-    matrix_type sol  = gr_lhs.ldlt().solve(gr_rhs);
+    // use LU solver because lhs is only symmetric and positive
+    matrix_type sol  = gr_lhs.lu().solve(gr_rhs);
     matrix_type oper = sol.block(0,0, rbs_ho, num_total_dofs);
     matrix_type gr   = gr_rhs.block(0,0, rbs_ho, num_total_dofs);
     matrix_type data = gr.transpose() * oper;
@@ -548,14 +563,13 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
 {
     using T = typename Mesh::coordinate_type;
 
-    auto recdeg = di.cell_degree();
     auto celdeg = di.cell_degree();
     auto facdeg = di.face_degree();
 
     auto cbas_v = make_vector_monomial_basis(msh, cl, celdeg);
-    auto cbas_s = make_scalar_monomial_basis(msh, cl, recdeg);
+    auto cbas_s = make_scalar_monomial_basis(msh, cl, facdeg);
 
-    auto rbs = scalar_basis_size(recdeg, Mesh::dimension);
+    auto rbs = scalar_basis_size(facdeg, Mesh::dimension);
     auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
     auto fbs = vector_basis_size(facdeg, Mesh::dimension-1, Mesh::dimension);
 
@@ -564,7 +578,7 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
     Matrix<T, Dynamic, Dynamic> dr_lhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs, rbs);
     Matrix<T, Dynamic, Dynamic> dr_rhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs, cbs + num_faces*fbs);
 
-    auto qps = integrate(msh, cl, 2*recdeg);
+    auto qps = integrate(msh, cl, 2*facdeg);
     for (auto& qp : qps)
     {
         Matrix<T, Dynamic, 1> s_phi  = cbas_s.eval_functions(qp.point());
@@ -595,7 +609,7 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
         }
     }
 
-    Matrix<T, Dynamic, Dynamic> oper = dr_rhs;//dr_lhs.llt().solve(dr_rhs);
+    Matrix<T, Dynamic, Dynamic> oper = dr_lhs.llt().solve(dr_rhs);
     Matrix<T, Dynamic, Dynamic> data = dr_rhs.transpose() * oper;
 
     return std::make_pair(oper, data);
@@ -662,6 +676,90 @@ T estimate_conditioning(const Matrix<T,M,N>& m)
     T cond =  sigma_max / sigma_min;
     return cond;
 }
+
+
+template<typename Mesh, typename T>
+auto
+diffusion_static_condensation_compute(const Mesh& msh,
+        const typename Mesh::cell_type& cl, const hho_degree_info hdi,
+        const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& local_mat,
+        const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& cell_rhs)
+{
+    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+
+    auto cell_degree = hdi.cell_degree();
+    auto face_degree = hdi.face_degree();
+    auto num_cell_dofs = scalar_basis_size(cell_degree, Mesh::dimension);
+    auto num_face_dofs = scalar_basis_size(face_degree, Mesh::dimension-1);
+
+    auto fcs = faces(msh, cl);
+    auto num_faces = fcs.size();
+
+    assert(local_mat.rows() == local_mat.cols());
+    assert(local_mat.cols() == num_cell_dofs + num_faces*num_face_dofs);
+    assert(cell_rhs.rows() == num_cell_dofs);
+
+    size_t cell_size = num_cell_dofs;
+    size_t face_size = num_face_dofs * num_faces;
+
+    matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
+    matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
+    matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
+    matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
+
+    assert(K_TT.cols() == cell_size);
+    assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
+    assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
+    assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
+    assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
+
+    auto K_TT_ldlt = K_TT.llt();
+    matrix_type AL = K_TT_ldlt.solve(K_TF);
+    vector_type bL = K_TT_ldlt.solve(cell_rhs);
+
+    matrix_type AC = K_FF - K_FT * AL;
+    vector_type bC = /* no projection on faces, eqn. 26*/ - K_FT * bL;
+
+    return std::make_pair(AC, bC);
+}
+
+template<typename Mesh, typename T>
+Eigen::Matrix<T, Eigen::Dynamic, 1>
+diffusion_static_condensation_recover(const Mesh& msh,
+    const typename Mesh::cell_type& cl, const hho_degree_info hdi,
+    const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& local_mat,
+    const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& cell_rhs,
+    const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& solF)
+{
+    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+
+    auto cell_degree = hdi.cell_degree();
+    auto face_degree = hdi.face_degree();
+    auto num_cell_dofs = scalar_basis_size(cell_degree, Mesh::dimension);
+    auto num_face_dofs = scalar_basis_size(face_degree, Mesh::dimension-1);
+
+    auto fcs = faces(msh, cl);
+    auto num_faces = fcs.size();
+
+    size_t cell_size        = num_cell_dofs;
+    size_t all_faces_size   = num_face_dofs * num_faces;
+
+    vector_type ret( cell_size + all_faces_size );
+
+    matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
+    matrix_type K_TF = local_mat.topRightCorner(cell_size, all_faces_size);
+
+    vector_type solT = K_TT.llt().solve(cell_rhs - K_TF*solF);
+
+    ret.head(cell_size)         = solT;
+    ret.tail(all_faces_size)    = solF;
+
+    return ret;
+}
+
+
 
 template<typename Mesh>
 [[deprecated("Please use 'make_hho_scalar_stabilization()'")]]
@@ -996,7 +1094,27 @@ project_function(const Mesh& msh, const typename Mesh::cell_type& cl,
     return ret;
 }
 
+template<typename Mesh>
+Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+project_function(const Mesh&                      msh,
+                 const typename Mesh::face_type&  fc,
+                 const hho_degree_info&           hdi,
+                 const vector_rhs_function<Mesh>& f,
+                 size_t                           di = 0)
+{
+    using T = typename Mesh::coordinate_type;
 
+    auto fbs       = vector_basis_size(hdi.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+
+    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(fbs);
+
+    auto                        fb       = make_vector_monomial_basis(msh, fc, hdi.face_degree());
+    Matrix<T, Dynamic, Dynamic> face_mm  = make_mass_matrix(msh, fc, fb, di);
+    Matrix<T, Dynamic, 1>       face_rhs = make_rhs(msh, fc, fb, f, di);
+    ret.block(0, 0, fbs, 1)  = face_mm.llt().solve(face_rhs);
+
+   return ret;
+}
 
 namespace priv
 {
@@ -1025,6 +1143,248 @@ offset(const Mesh& msh, const typename Mesh::face_type& fc)
 
 
 } // priv
+
+
+template<typename Mesh>
+class diffusion_condensed_assembler
+{
+    using T = typename Mesh::coordinate_type;
+    std::vector<size_t>                 compress_table;
+    std::vector<size_t>                 expand_table;
+
+    hho_degree_info                     di;
+
+    std::vector< Triplet<T> >           triplets;
+
+    size_t      num_all_faces, num_dirichlet_faces, num_other_faces;
+
+    class assembly_index
+    {
+        size_t  idx;
+        bool    assem;
+
+    public:
+        assembly_index(size_t i, bool as)
+            : idx(i), assem(as)
+        {}
+
+        operator size_t() const
+        {
+            if (!assem)
+                throw std::logic_error("Invalid assembly_index");
+
+            return idx;
+        }
+
+        bool assemble() const
+        {
+            return assem;
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const assembly_index& as)
+        {
+            os << "(" << as.idx << "," << as.assem << ")";
+            return os;
+        }
+    };
+
+public:
+
+    SparseMatrix<T>         LHS;
+    Matrix<T, Dynamic, 1>   RHS;
+
+    diffusion_condensed_assembler(const Mesh& msh, hho_degree_info hdi)
+        : di(hdi)
+    {
+        auto is_dirichlet = [&](const typename Mesh::face_type& fc) -> bool {
+            return msh.is_boundary(fc);
+        };
+
+        num_all_faces = msh.faces_size();
+        num_dirichlet_faces = std::count_if(msh.faces_begin(), msh.faces_end(), is_dirichlet);
+        num_other_faces = num_all_faces - num_dirichlet_faces;
+
+        compress_table.resize( num_all_faces );
+        expand_table.resize( num_other_faces );
+
+        size_t compressed_offset = 0;
+        for (size_t i = 0; i < num_all_faces; i++)
+        {
+            auto fc = *std::next(msh.faces_begin(), i);
+            if ( !is_dirichlet(fc) )
+            {
+                compress_table.at(i) = compressed_offset;
+                expand_table.at(compressed_offset) = i;
+                compressed_offset++;
+            }
+        }
+
+        auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
+
+        auto system_size = fbs * num_other_faces;
+
+        LHS = SparseMatrix<T>( system_size, system_size );
+        RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
+    }
+
+#if 0
+    void dump_tables() const
+    {
+        std::cout << "Compress table: " << std::endl;
+        for (size_t i = 0; i < compress_table.size(); i++)
+            std::cout << i << " -> " << compress_table.at(i) << std::endl;
+    }
+#endif
+
+    template<typename Function>
+    void
+    assemble(const Mesh& msh, const typename Mesh::cell_type& cl,
+             const Matrix<T, Dynamic, Dynamic>& lhs,
+             const Matrix<T, Dynamic, 1>& rhs,
+             const Function& dirichlet_bf)
+    {
+        auto is_dirichlet = [&](const typename Mesh::face_type& fc) -> bool {
+            return msh.is_boundary(fc);
+        };
+
+        auto fbs = scalar_basis_size(di.face_degree(), Mesh::dimension-1);
+
+        auto fcs = faces(msh, cl);
+
+        std::vector<assembly_index> asm_map;
+        asm_map.reserve(fcs.size()*fbs);
+
+        Matrix<T, Dynamic, 1> dirichlet_data = Matrix<T, Dynamic, 1>::Zero(fcs.size()*fbs);
+
+        for (size_t face_i = 0; face_i < fcs.size(); face_i++)
+        {
+            auto fc = fcs[face_i];
+            auto face_offset = priv::offset(msh, fc);
+            auto face_LHS_offset = compress_table.at(face_offset)*fbs;
+
+            bool dirichlet = is_dirichlet(fc);
+
+            for (size_t i = 0; i < fbs; i++)
+                asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
+
+            if (dirichlet)
+            {
+                auto fb = make_scalar_monomial_basis(msh, fc, di.face_degree());
+
+                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
+                dirichlet_data.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
+            }
+        }
+
+        for (size_t i = 0; i < lhs.rows(); i++)
+        {
+            if (!asm_map[i].assemble())
+                continue;
+
+            for (size_t j = 0; j < lhs.cols(); j++)
+            {
+                if ( asm_map[j].assemble() )
+                    triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs(i,j)) );
+                else
+                    RHS(asm_map[i]) -= lhs(i,j) * dirichlet_data(j);
+            }
+
+            RHS(asm_map[i]) += rhs(i);
+        }
+    } // assemble()
+
+    template<typename Function>
+    Matrix<T, Dynamic, 1>
+    take_local_data(const Mesh& msh, const typename Mesh::cell_type& cl,
+    const Matrix<T, Dynamic, 1>& solution, const Function& dirichlet_bf)
+    {
+        auto facdeg = di.face_degree();
+        auto fbs = scalar_basis_size(di.face_degree(), Mesh::dimension-1);
+        auto fcs = faces(msh, cl);
+
+        auto num_faces = fcs.size();
+
+        Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(num_faces*fbs);
+
+        for (size_t face_i = 0; face_i < num_faces; face_i++)
+        {
+            auto fc = fcs[face_i];
+
+            auto is_dirichlet = [&](const typename Mesh::face_type& fc) -> bool {
+                return msh.is_boundary(fc);
+            };
+
+            bool dirichlet = is_dirichlet(fc);
+
+            if (dirichlet)
+            {
+                auto fb = make_scalar_monomial_basis(msh, fc, di.face_degree());
+
+                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
+                ret.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
+            }
+            else
+            {
+                auto face_offset = priv::offset(msh, fc);
+                auto face_SOL_offset = compress_table.at(face_offset)*fbs;
+                ret.block(face_i*fbs, 0, fbs, 1) = solution.block(face_SOL_offset, 0, fbs, 1);
+            }
+        }
+
+        return ret;
+    }
+
+    void finalize(void)
+    {
+        LHS.setFromTriplets( triplets.begin(), triplets.end() );
+        triplets.clear();
+
+        dump_sparse_matrix(LHS, "diff.dat");
+    }
+
+    size_t num_assembled_faces() const
+    {
+        return num_other_faces;
+    }
+
+};
+
+
+
+template<typename Mesh>
+auto make_diffusion_assembler(const Mesh& msh, hho_degree_info hdi)
+{
+    return diffusion_condensed_assembler<Mesh>(msh, hdi);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1289,6 +1649,540 @@ auto make_stokes_assembler(const Mesh& msh, hho_degree_info hdi)
     return stokes_assembler<Mesh>(msh, hdi);
 }
 
+template<typename Mesh>
+class assembler_mechanics
+{
+   typedef disk::mechanics::BoundaryConditions<Mesh>    bnd_type;
+   typedef Mesh                                         mesh_type;
+   typedef typename mesh_type::scalar_type              scalar_type;
+   typedef typename mesh_type::cell                     cell_type;
+   typedef typename mesh_type::face                     face_type;
 
+   typedef dynamic_matrix<scalar_type>  matrix_type;
+   typedef dynamic_vector<scalar_type>  vector_type;
+   typedef sparse_matrix<scalar_type>   sparse_type;
+   typedef triplet<scalar_type>         triplet_type;
+
+   const static size_t dimension = mesh_type::dimension;
+
+   std::vector<triplet_type> m_triplets;
+   size_t                    m_num_unknowns;
+   std::vector<size_t>       face_compress_map;
+   hho_degree_info           m_hdi;
+
+ public:
+
+   sparse_type         LHS;
+   vector_type         RHS;
+
+   assembler_mechanics(){}
+
+   assembler_mechanics(const mesh_type&       msh,
+                       const hho_degree_info& hdi,
+                       const bnd_type&        bnd) :
+     m_hdi(hdi)
+   {
+      const auto num_face_dofs = vector_basis_size(m_hdi.face_degree(), dimension-1, dimension);
+
+      face_compress_map.resize(msh.faces_size());
+
+      size_t total_dofs = 0;
+      for (size_t face_id = 0; face_id < msh.faces_size(); face_id++) {
+
+         face_compress_map.at(face_id) = total_dofs;
+         const auto free_dofs = num_face_dofs - bnd.dirichlet_imposed_dofs(face_id, m_hdi.face_degree());
+         total_dofs += free_dofs;
+      }
+      m_num_unknowns = total_dofs;
+      LHS            = sparse_type(m_num_unknowns, m_num_unknowns);
+      RHS            = vector_type::Zero(m_num_unknowns);
+   }
+
+   template<typename LocalContrib>
+   void
+   assemble(const mesh_type& msh, const cell_type& cl, const bnd_type& bnd, const LocalContrib& lc)
+   {
+      const size_t      face_degree   = m_hdi.face_degree();
+      const auto        num_face_dofs = vector_basis_size(face_degree, dimension - 1, dimension);
+      const scalar_type zero          = 0;
+
+      const auto          fcs = faces(msh, cl);
+      std::vector<size_t> l2g(fcs.size() * num_face_dofs);
+      vector_type         rhs_bc = vector_type::Zero(fcs.size() * num_face_dofs);
+
+      for (size_t face_i = 0; face_i < fcs.size(); face_i++) {
+         const auto fc = fcs[face_i];
+
+         auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+         if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+
+         const auto face_id                  = eid.second;
+         const bool fc_is_dirichlet_boundary = bnd.is_dirichlet_face(face_id);
+         const auto face_offset              = face_compress_map.at(face_id);
+         const auto pos                      = face_i * num_face_dofs;
+
+         if (!fc_is_dirichlet_boundary) {
+            for (size_t i = 0; i < num_face_dofs; i++) {
+               l2g.at(pos + i) = face_offset + i;
+            }
+         } else {
+            size_t ind_sol = 0;
+
+            vector_type proj_bcf =
+              project_function(msh, fc, face_degree, bnd.dirichlet_boundary_func(face_id));
+
+            bool ind_ok = false;
+            for (size_t face_j = 0; face_j < fcs.size(); face_j++) {
+               const auto fcj  = fcs[face_j];
+               auto       eidj = find_element_id(msh.faces_begin(), msh.faces_end(), fcj);
+               if (!eidj.first) throw std::invalid_argument("This is a bug: face not found");
+
+               const auto face_idj                  = eidj.second;
+               const bool fcj_is_dirichlet_boundary = bnd.is_dirichlet_face(face_idj);
+
+               matrix_type mat_Fj =
+                 lc.first.block(face_j * num_face_dofs, pos, num_face_dofs, num_face_dofs);
+
+               switch (bnd.dirichlet_boundary_type(face_id)) {
+                  case disk::mechanics::DIRICHLET: {
+                     if (!ind_ok) {
+                        for (size_t i = 0; i < num_face_dofs; i++) {
+                           l2g.at(pos + i) = 0xDEADBEEF;
+                        }
+                        ind_ok = true;
+                     }
+                     break;
+                  }
+                  case disk::mechanics::CLAMPED: {
+                     proj_bcf.setZero();
+                     mat_Fj.setZero();
+                     if (!ind_ok) {
+                        for (size_t i = 0; i < num_face_dofs; i++) {
+                           l2g.at(pos + i) = 0xDEADBEEF;
+                        }
+                        ind_ok = true;
+                     }
+                     break;
+                  }
+                  case disk::mechanics::DX: {
+                     for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                        mat_Fj.col(i + 1).setZero();
+                        proj_bcf(i + 1) = zero;
+                        if (dimension == 3) {
+                           mat_Fj.col(i + 2).setZero();
+                           proj_bcf(i + 2) = zero;
+                        }
+                        if (!ind_ok) {
+                           l2g.at(pos + i)     = 0xDEADBEEF;
+                           l2g.at(pos + i + 1) = face_offset + ind_sol++;
+                           if (dimension == 3) {
+                              l2g.at(pos + i + 2) = face_offset + ind_sol++;
+                           }
+                        }
+                     }
+                     ind_ok = true;
+                     break;
+                  }
+                  case disk::mechanics::DY: {
+                     for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                        mat_Fj.col(i).setZero();
+                        proj_bcf(i) = zero;
+                        if (dimension == 3) {
+                           mat_Fj.col(i + 2).setZero();
+                           proj_bcf(i + 2) = zero;
+                        }
+                        if (!ind_ok) {
+                           l2g.at(pos + i)     = face_offset + ind_sol++;
+                           l2g.at(pos + i + 1) = 0xDEADBEEF;
+                           if (dimension == 3) {
+                              l2g.at(pos + i + 2) = face_offset + ind_sol++;
+                           }
+                        }
+                     }
+                     ind_ok = true;
+                     break;
+                  }
+                  case disk::mechanics::DZ: {
+                     if (dimension != 3) throw std::invalid_argument("You are not in 3D");
+                     for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                        mat_Fj.col(i).setZero();
+                        proj_bcf(i) = zero;
+                        mat_Fj.col(i + 1).setZero();
+                        proj_bcf(i + 1) = zero;
+                        if (!ind_ok) {
+                           l2g.at(pos + i)     = face_offset + ind_sol++;
+                           l2g.at(pos + i + 1) = face_offset + ind_sol++;
+                           l2g.at(pos + i + 2) = 0xDEADBEEF;
+                        }
+                     }
+                     ind_ok = true;
+                     break;
+                  }
+                  case disk::mechanics::DXDY: {
+                     for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                        if (dimension == 3) {
+                           mat_Fj.col(i + 2).setZero();
+                           proj_bcf(i + 2) = zero;
+                        }
+                        if (!ind_ok) {
+                           l2g.at(pos + i)     = 0xDEADBEEF;
+                           l2g.at(pos + i + 1) = 0xDEADBEEF;
+                           if (dimension == 3) {
+                              l2g.at(pos + i + 2) = face_offset + ind_sol++;
+                           }
+                        }
+                     }
+                     ind_ok = true;
+                     break;
+                  }
+                  case disk::mechanics::DXDZ: {
+                     if (dimension != 3) throw std::invalid_argument("You are not in 3D");
+                     for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                        mat_Fj.col(i + 1).setZero();
+                        proj_bcf(i + 1) = zero;
+                        if (!ind_ok) {
+                           l2g.at(pos + i)     = 0xDEADBEEF;
+                           l2g.at(pos + i + 1) = face_offset + ind_sol++;
+                           l2g.at(pos + i + 2) = 0xDEADBEEF;
+                        }
+                     }
+                     ind_ok = true;
+                     break;
+                  }
+                  case disk::mechanics::DYDZ: {
+                     if (dimension != 3) throw std::invalid_argument("You are not in 3D");
+                     for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                        mat_Fj.col(i).setZero();
+                        proj_bcf(i) = zero;
+                        if (!ind_ok) {
+                           l2g.at(pos + i)     = face_offset + ind_sol++;
+                           l2g.at(pos + i + 1) = 0xDEADBEEF;
+                           l2g.at(pos + i + 2) = 0xDEADBEEF;
+                        }
+                     }
+                     ind_ok = true;
+                     break;
+                  }
+                  default: {
+                     throw std::logic_error("Unknown Dirichlet Conditions");
+                     break;
+                  }
+               }
+
+               rhs_bc.segment(face_j * num_face_dofs, num_face_dofs) += mat_Fj * proj_bcf;
+            }
+         }
+      }
+      assert(lc.first.rows() == lc.first.cols());
+      assert(lc.first.rows() == lc.second.size());
+      assert(lc.second.size() == l2g.size());
+      assert(lc.second.size() == rhs_bc.size());
+
+#ifdef FILL_COLMAJOR
+      for (size_t j = 0; j < lc.first.cols(); j++) {
+         if (l2g[j] == 0xDEADBEEF) continue;
+
+         for (size_t i = 0; i < lc.first.rows(); i++) {
+            if (l2g[i] == 0xDEADBEEF) continue;
+
+            m_triplets.push_back(triplet_type(l2g.at(i), l2g.at(j), lc.first(i, j)));
+         }
+         RHS(l2g.at(j)) += lc.second(j) - rhs_bc(j);
+      }
+#else
+      for (size_t i = 0; i < lc.first.rows(); i++) {
+         if (l2g[i] == 0xDEADBEEF) continue;
+
+         for (size_t j = 0; j < lc.first.cols(); j++) {
+            if (l2g[j] == 0xDEADBEEF) continue;
+
+            m_triplets.push_back(triplet_type(l2g.at(i), l2g.at(j), lc.first(i, j)));
+         }
+         RHS(l2g.at(i)) += lc.second(i) - rhs_bc(i);
+      }
+#endif
+   }
+
+   vector_type
+   expand_solution(const mesh_type& msh, const bnd_type& bnd, const vector_type& solution)
+   {
+      assert(solution.size() == m_num_unknowns);
+      const auto face_degree   = m_hdi.face_degree();
+      const auto num_face_dofs = vector_basis_size(face_degree, dimension-1, dimension);
+
+      vector_type ret = vector_type::Zero(num_face_dofs * msh.faces_size());
+
+      for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++) {
+         const auto bfc = *itor;
+         const auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), bfc);
+         if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+
+         const auto face_id         = eid.second;
+         const auto face_offset     = face_id * num_face_dofs;
+         const auto compress_offset = face_compress_map.at(face_id);
+
+         if (bnd.is_dirichlet_face(face_id)) {
+            size_t sol_ind = 0;
+
+            const vector_type proj_bcf =
+              project_function(msh, bfc, face_degree, bnd.dirichlet_boundary_func(face_id));
+
+            assert(proj_bcf.size() == num_face_dofs);
+
+            switch (bnd.dirichlet_boundary_type(face_id)) {
+               case disk::mechanics::DIRICHLET: {
+                  ret.segment(face_offset, num_face_dofs) = proj_bcf;
+                  break;
+               }
+               case disk::mechanics::CLAMPED: {
+                  ret.segment(face_offset, num_face_dofs).setZero();
+                  break;
+               }
+               case disk::mechanics::DX: {
+
+                  for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                     ret(face_offset + i)     = proj_bcf(i);
+                     ret(face_offset + i + 1) = solution(compress_offset + sol_ind++);
+                     if (dimension == 3) {
+                        ret(face_offset + i + 2) = solution(compress_offset + sol_ind++);
+                     }
+                  }
+                  break;
+               }
+               case disk::mechanics::DY: {
+                  for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                     ret(face_offset + i)     = solution(compress_offset + sol_ind++);
+                     ret(face_offset + i + 1) = proj_bcf(i + 1);
+                     if (dimension == 3) {
+                        ret(face_offset + i + 2) = solution(compress_offset + sol_ind++);
+                     }
+                  }
+                  break;
+               }
+               case disk::mechanics::DZ: {
+                  if (dimension != 3) throw std::invalid_argument("You are not in 3D");
+                  for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                     ret(face_offset + i)     = solution(compress_offset + sol_ind++);
+                     ret(face_offset + i + 1) = solution(compress_offset + sol_ind++);
+                     ret(face_offset + i + 2) = proj_bcf(i + 2);
+                  }
+                  break;
+               }
+               case disk::mechanics::DXDY: {
+                  for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                     ret(face_offset + i)     = proj_bcf(i);
+                     ret(face_offset + i + 1) = proj_bcf(i + 1);
+                     if (dimension == 3) {
+                        ret(face_offset + i + 2) = solution(compress_offset + sol_ind++);
+                     }
+                  }
+                  break;
+               }
+               case disk::mechanics::DXDZ: {
+                  if (dimension != 3) throw std::invalid_argument("You are not in 3D");
+                  for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                     ret(face_offset + i)     = proj_bcf(i);
+                     ret(face_offset + i + 1) = solution(compress_offset + sol_ind++);
+                     ret(face_offset + i + 2) = proj_bcf(i + 2);
+                  }
+                  break;
+               }
+               case disk::mechanics::DYDZ: {
+                  if (dimension != 3) throw std::invalid_argument("You are not in 3D");
+                  for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                     ret(face_offset + i)     = solution(compress_offset + sol_ind++);
+                     ret(face_offset + i + 1) = proj_bcf(i + 1);
+                     ret(face_offset + i + 2) = proj_bcf(i + 2);
+                  }
+                  break;
+               }
+               default: {
+                  throw std::logic_error("Unknown Dirichlet Conditions");
+                  break;
+               }
+            }
+         } else {
+            ret.segment(face_offset, num_face_dofs) =
+              solution.segment(compress_offset, num_face_dofs);
+         }
+      }
+
+      return ret;
+   }
+
+   void
+   impose_neumann_boundary_conditions(const mesh_type& msh, const bnd_type& bnd)
+   {
+      const auto face_degree   = m_hdi.face_degree();
+      const auto num_face_dofs = vector_basis_size(face_degree, dimension - 1, dimension);
+
+      if (bnd.nb_faces_neumann() > 0) {
+         for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++) {
+            const auto bfc = *itor;
+
+            const auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), bfc);
+            if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+
+            const auto face_id = eid.second;
+
+            if (bnd.is_neumann_face(face_id)) {
+               const size_t      face_offset = face_compress_map.at(face_id);
+               auto              fb = make_vector_monomial_basis(msh, bfc, face_degree);
+               const vector_type neumann =
+                 make_rhs(msh, bfc, fb, bnd.neumann_boundary_func(face_id));
+
+               assert(neumann.size() == num_face_dofs);
+
+               if (bnd.is_dirichlet_face(face_id)) {
+                  switch (bnd.dirichlet_boundary_type(face_id)) {
+                     case disk::mechanics::DIRICHLET: {
+                        throw std::invalid_argument("You tried to impose both Dirichlet and "
+                                                    "Neumann conditions on the same face");
+                        break;
+                     }
+                     case disk::mechanics::CLAMPED: {
+                        throw std::invalid_argument("You tried to impose both Dirichlet and "
+                                                    "Neumann conditions on the same face");
+                        break;
+                     }
+                     case disk::mechanics::DX: {
+                        for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                           RHS(face_offset + i + 1) += neumann(i + 1);
+                           if (dimension == 3) {
+                              RHS(face_offset + i + 2) += neumann(i + 2);
+                           }
+                        }
+                        break;
+                     }
+                     case disk::mechanics::DY: {
+                        for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                           RHS(face_offset + i) = neumann(i);
+                           if (dimension == 3) {
+                              RHS(face_offset + i + 2) += neumann(i + 2);
+                           }
+                        }
+
+                        break;
+                     }
+                     case disk::mechanics::DZ: {
+                        if (dimension != 3) throw std::invalid_argument("You are not in 3D");
+                        for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                           RHS(face_offset + i) += neumann(i);
+                           RHS(face_offset + i + 1) += neumann(i + 1);
+                        }
+                        break;
+                     }
+                     case disk::mechanics::DXDY: {
+                        for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                           if (dimension == 3) {
+                              RHS(face_offset + i + 2) += neumann(i + 2);
+                           }
+                        }
+                        break;
+                     }
+                     case disk::mechanics::DXDZ: {
+                        if (dimension != 3) throw std::invalid_argument("You are not in 3D");
+                        for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                           RHS(face_offset + i + 1) += neumann(i + 1);
+                        }
+                        break;
+                     }
+                     case disk::mechanics::DYDZ: {
+                        if (dimension != 3) throw std::invalid_argument("You are not in 3D");
+                        for (size_t i = 0; i < num_face_dofs; i += dimension) {
+                           RHS(face_offset + i) += neumann(i);
+                        }
+                        break;
+                     }
+                     default: {
+                        throw std::logic_error("Unknown Dirichlet Conditions");
+                        break;
+                     }
+                  }
+               } else {
+                  RHS.segment(face_offset, num_face_dofs) += neumann;
+               }
+            }
+         }
+      }
+   }
+
+   void
+   finalize()
+   {
+      LHS.setFromTriplets(m_triplets.begin(), m_triplets.end());
+      m_triplets.clear();
+   }
+};
+
+template<typename Mesh>
+auto
+make_mechanics_assembler( const Mesh&           msh,
+                          const hho_degree_info hdi,
+                          const disk::mechanics::BoundaryConditions<Mesh>& bnd)
+{
+   return assembler_mechanics<Mesh>(msh, hdi, bnd);
+}
+
+template<typename Mesh>
+class static_condensation_vector
+{
+   typedef Mesh                            mesh_type;
+   typedef typename mesh_type::scalar_type scalar_type;
+   typedef typename mesh_type::cell        cell_type;
+
+   typedef dynamic_matrix<scalar_type> matrix_type;
+   typedef dynamic_vector<scalar_type> vector_type;
+
+   const static size_t dimension = mesh_type::dimension;
+
+ public:
+   matrix_type AL;
+   vector_type bL;
+   static_condensation_vector() {}
+
+   std::pair<matrix_type, vector_type>
+   compute(const mesh_type&   msh,
+           const cell_type&   cl,
+           const matrix_type& local_mat,
+           const vector_type& cell_rhs,
+           const hho_degree_info hdi)
+   {
+      const size_t num_cell_dofs = vector_basis_size(hdi.cell_degree(), dimension, dimension);
+      const size_t num_face_dofs = vector_basis_size(hdi.face_degree(), dimension - 1, dimension);
+
+      const auto   fcs       = faces(msh, cl);
+      const size_t num_faces = fcs.size();
+
+      disk::dofspace_ranges dsr(num_cell_dofs, num_face_dofs, num_faces);
+
+      const size_t cell_size = dsr.cell_range().size();
+      const size_t face_size = dsr.all_faces_range().size();
+
+      assert(cell_size == cell_rhs.rows() && "wrong rhs dimension");
+      assert((cell_size + face_size) == local_mat.rows() && "wrong lhs rows dimension");
+      assert((cell_size + face_size) == local_mat.cols() && "wrong lhs cols dimension");
+
+      const matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
+      const matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
+      const matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
+      const matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
+
+      assert(K_TT.cols() == cell_size && "wrong K_TT dimension");
+      assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
+      assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
+      assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
+      assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
+
+      const auto K_TT_ldlt = K_TT.llt();
+      AL                   = K_TT_ldlt.solve(K_TF);
+      bL                   = K_TT_ldlt.solve(cell_rhs);
+
+      const matrix_type AC = K_FF - K_FT * AL;
+      const vector_type bC = /* no projection on faces, eqn. 26*/ -K_FT * bL;
+
+      return std::make_pair(AC, bC);
+   }
+};
 
 } // revolution
