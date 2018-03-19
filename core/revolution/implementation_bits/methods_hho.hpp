@@ -621,8 +621,6 @@ make_hdg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
     auto cb = make_scalar_monomial_basis(msh, cl, celdeg);
     auto fcs = faces(msh, cl);
 
-    auto h = measure(msh, cl);
-
     for (size_t i = 0; i < num_faces; i++)
     {
         auto fc = fcs[i];
@@ -647,7 +645,7 @@ make_hdg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
 
         tr.block(0, cbs+i*fbs, fbs, fbs) = -mass;
         tr.block(0, 0, fbs, cbs) = trace;
-
+        auto h = measure(msh, fc);
         oper.block(0, 0, fbs, cbs) = mass.llt().solve(trace);
         data += oper.transpose() * tr * (1./h);
     }
