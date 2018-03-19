@@ -259,6 +259,15 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
     return std::make_pair(oper, data);
 }
 //#if 0
+namespace priv{
+    size_t
+    nb_lag(const size_t dim)
+    {
+       size_t lag = 1;
+       if (dim == 3) lag = 3;
+       return lag;
+    }
+}
 template<typename Mesh>
 std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
              Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
@@ -275,9 +284,9 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
 
     auto cb = make_vector_monomial_basis(msh, cl, recdeg);
 
-    auto rbs = vector_basis_size(recdeg, Mesh::dimension, Mesh::dimension);
-    auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
-    auto fbs = vector_basis_size(facdeg, Mesh::dimension-1, Mesh::dimension);
+    auto rbs = vector_basis_size(recdeg, N, N);
+    auto cbs = vector_basis_size(celdeg, N, N);
+    auto fbs = vector_basis_size(facdeg, N-1, N);
 
     auto num_faces = howmany_faces(msh, cl);
 
@@ -286,11 +295,13 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
     typedef Matrix<T, N, N>             gradient_type;
     typedef Matrix<T, Dynamic, N>       function_type;
 
-    size_t rbs_ho = rbs - Mesh::dimension;
+    size_t rbs_ho = rbs - N;
     size_t num_total_dofs = cbs + num_faces*fbs;
-    matrix_type stiff  = matrix_type::Zero(rbs, rbs);
-    matrix_type gr_lhs = matrix_type::Zero( rbs_ho + 1, rbs_ho + 1);
-    matrix_type gr_rhs = matrix_type::Zero( rbs_ho + 1, num_total_dofs);
+    size_t nb_lag         = priv::nb_lag(N);
+
+    matrix_type stiff          = matrix_type::Zero(rbs, rbs);
+    matrix_type gr_lhs = matrix_type::Zero( rbs_ho + nb_lag, rbs_ho + nb_lag);
+    matrix_type gr_rhs = matrix_type::Zero( rbs_ho + nb_lag, num_total_dofs);
 
     auto qps = integrate(msh, cl, 2*recdeg);
     for (auto& qp : qps)
@@ -299,8 +310,8 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
         stiff += qp.weight() * priv::outer_product(dphi, dphi);
     }
 
-    gr_lhs.block(0, 0, rbs_ho, rbs_ho) = stiff.block(2, 2, rbs_ho, rbs_ho);
-    gr_rhs.block(0, 0, rbs_ho, cbs) = stiff.block(2, 0, rbs_ho, cbs);
+    gr_lhs.block(0, 0, rbs_ho, rbs_ho) = stiff.block(N, N, rbs_ho, rbs_ho);
+    gr_rhs.block(0, 0, rbs_ho, cbs)    = stiff.block(N, 0, rbs_ho, cbs);
 
     auto fcs = faces(msh, cl);
     for (size_t i = 0; i < fcs.size(); i++)
@@ -313,11 +324,11 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
         for (auto& qp : qps_f)
         {
             function_type   c_phi_tmp = cb.eval_functions(qp.point());
-            function_type   c_phi = c_phi_tmp.block(0, 0, cbs, 2);
+            function_type   c_phi     = c_phi_tmp.block(0, 0, cbs, N);
 
             eigen_compatible_stdvector<gradient_type> c_dphi_tmp = cb.eval_sgradients(qp.point());
 
-            auto begin_iter = std::next(c_dphi_tmp.begin(), 2);
+            auto begin_iter = std::next(c_dphi_tmp.begin(), N);
             eigen_compatible_stdvector<gradient_type> c_dphi(rbs_ho);
             std::copy(begin_iter, c_dphi_tmp.end(), c_dphi.begin());
 
@@ -337,8 +348,8 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
         rot += qp.weight() * rphi;
     }
 
-    gr_lhs.block(0, rbs_ho, rbs_ho, 1 ) = rot.tail(rbs_ho);
-    gr_lhs.block(rbs_ho, 0, 1, rbs_ho ) = rot.tail(rbs_ho).transpose();
+    gr_lhs.block(0, rbs_ho, rbs_ho, nb_lag ) = rot.tail(rbs_ho);
+    gr_lhs.block(rbs_ho, 0, nb_lag, rbs_ho ) = rot.tail(rbs_ho).transpose();
 
     // use LU solver because lhs is only symmetric and positive
     matrix_type sol  = gr_lhs.lu().solve(gr_rhs);
