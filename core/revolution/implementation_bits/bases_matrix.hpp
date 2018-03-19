@@ -94,10 +94,10 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
       basis_size   = matrix_basis_size(degree, 3, 3);
    }
 
-   std::vector<function_type>
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      std::vector<function_type> ret;
+      eigen_compatible_stdvector<function_type> ret;
       ret.reserve(basis_size);
 
       const auto phi = scalar_basis.eval_functions(pt);
@@ -158,10 +158,10 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
       basis_size   = matrix_basis_size(degree, 2, 3);
    }
 
-   std::vector<function_type>
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      std::vector<function_type> ret;
+      eigen_compatible_stdvector<function_type> ret;
       ret.reserve(basis_size);
 
       const auto phi = scalar_basis.eval_functions(pt);
@@ -221,10 +221,10 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
       basis_size   = matrix_basis_size(degree, 2, 2);
    }
 
-   std::vector<function_type>
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      std::vector<function_type> ret;
+      eigen_compatible_stdvector<function_type> ret;
       ret.reserve(basis_size);
 
       const auto phi = scalar_basis.eval_functions(pt);
@@ -285,10 +285,10 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
       basis_size   = matrix_basis_size(degree, 1, 2);
    }
 
-   std::vector<function_type>
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      std::vector<function_type> ret;
+      eigen_compatible_stdvector<function_type> ret;
       ret.reserve(basis_size);
 
       const auto phi = scalar_basis.eval_functions(pt);
@@ -390,10 +390,10 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
       basis_size   = sym_matrix_basis_size(degree, 3, 3);
    }
 
-   std::vector<function_type>
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      std::vector<function_type> ret;
+      eigen_compatible_stdvector<function_type> ret;
       ret.reserve(basis_size);
 
       const auto phi = scalar_basis.eval_functions(pt);
@@ -458,10 +458,10 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
       basis_size   = sym_matrix_basis_size(degree, 2, 3);
    }
 
-   std::vector<function_type>
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      std::vector<function_type> ret;
+      eigen_compatible_stdvector<function_type> ret;
       ret.reserve(basis_size);
 
       const auto phi = scalar_basis.eval_functions(pt);
@@ -525,10 +525,10 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
       basis_size   = sym_matrix_basis_size(degree, 2, 2);
    }
 
-   std::vector<function_type>
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      std::vector<function_type> ret;
+      eigen_compatible_stdvector<function_type> ret;
       ret.reserve(basis_size);
 
       const auto phi = scalar_basis.eval_functions(pt);
@@ -593,10 +593,10 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
       basis_size   = sym_matrix_basis_size(degree, 1, 2);
    }
 
-   std::vector<function_type>
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      std::vector<function_type> ret;
+      eigen_compatible_stdvector<function_type> ret;
       ret.reserve(basis_size);
 
       const auto phi = scalar_basis.eval_functions(pt);
