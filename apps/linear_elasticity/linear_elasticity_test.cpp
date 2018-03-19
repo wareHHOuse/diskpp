@@ -326,11 +326,11 @@ test_triangles_fvca5(const run_params& rp, const ElasticityParameters material_d
    size_t runs = 4;
 
    std::vector<std::string> paths;
-   paths.push_back("../meshes/2D_triangles/fvca5/mesh1_1.typ1");
-   paths.push_back("../meshes/2D_triangles/fvca5/mesh1_2.typ1");
-   paths.push_back("../meshes/2D_triangles/fvca5/mesh1_3.typ1");
-   paths.push_back("../meshes/2D_triangles/fvca5/mesh1_4.typ1");
-   paths.push_back("../meshes/2D_triangles/fvca5/mesh1_5.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_1.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_2.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_3.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_4.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_5.typ1");
 
    std::vector<error_type> error_sumup;
 
@@ -348,11 +348,11 @@ test_triangles_netgen(const run_params& rp, const ElasticityParameters material_
    size_t runs = 4;
 
    std::vector<std::string> paths;
-   paths.push_back("../diskpp/meshes/2D_triangles/netgen/tri01.mesh2d");
-   paths.push_back("../diskpp/meshes/2D_triangles/netgen/tri02.mesh2d");
-   paths.push_back("../diskpp/meshes/2D_triangles/netgen/tri03.mesh2d");
-   paths.push_back("../diskpp/meshes/2D_triangles/netgen/tri04.mesh2d");
-   paths.push_back("../diskpp/meshes/2D_triangles/netgen/tri05.mesh2d");
+   paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri01.mesh2d");
+   paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri02.mesh2d");
+   paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri03.mesh2d");
+   paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri04.mesh2d");
+   paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri05.mesh2d");
 
    std::vector<error_type> error_sumup;
 
@@ -370,11 +370,11 @@ test_hexagons(const run_params& rp, const ElasticityParameters material_data)
    size_t runs = 5;
 
    std::vector<std::string> paths;
-   paths.push_back("../diskpp/meshes/2D_hex/fvca5/hexagonal_1.typ1");
-   paths.push_back("../diskpp/meshes/2D_hex/fvca5/hexagonal_2.typ1");
-   paths.push_back("../diskpp/meshes/2D_hex/fvca5/hexagonal_3.typ1");
-   paths.push_back("../diskpp/meshes/2D_hex/fvca5/hexagonal_4.typ1");
-   paths.push_back("../diskpp/meshes/2D_hex/fvca5/hexagonal_5.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_1.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_2.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_3.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_4.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_5.typ1");
 
    std::vector<error_type> error_sumup;
 
@@ -392,11 +392,11 @@ test_kershaws(const run_params& rp, const ElasticityParameters material_data)
    size_t runs = 5;
 
    std::vector<std::string> paths;
-   paths.push_back("../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_1.typ1");
-   paths.push_back("../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_2.typ1");
-   paths.push_back("../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_3.typ1");
-   paths.push_back("../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_4.typ1");
-   paths.push_back("../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_5.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_1.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_2.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_3.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_4.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_5.typ1");
 
    std::vector<error_type> error_sumup;
 
@@ -414,11 +414,11 @@ test_quads_fvca5(const run_params& rp, const ElasticityParameters material_data)
    size_t runs = 5;
 
    std::vector<std::string> paths;
-   paths.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_1.typ1");
-   paths.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_2.typ1");
-   paths.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_3.typ1");
-   paths.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
-   paths.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_1.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_2.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_3.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
+   paths.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
 
    std::vector<error_type> error_sumup;
 
