@@ -298,6 +298,8 @@ class linear_elasticity_solver
       scalar_type err_dof = 0;
 
       const size_t cbs = revolution::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
+      const int    diff_deg = m_hdi.face_degree() - m_hdi.cell_degree();
+      const int    di       = std::max(diff_deg, 0);
 
       size_t cell_i = 0;
 
@@ -305,7 +307,7 @@ class linear_elasticity_solver
          const auto x = m_solution_data.at(cell_i++);
 
          const vector_dynamic true_dof =
-           revolution::project_function(m_msh, cl, m_hdi.cell_degree(), as);
+           revolution::project_function(m_msh, cl, m_hdi.cell_degree(), as, 2*di);
 
          auto cb = revolution::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
          const matrix_dynamic mass = revolution::make_mass_matrix(m_msh, cl, cb);
