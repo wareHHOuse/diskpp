@@ -82,8 +82,6 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
    typedef Matrix<scalar_type, Dynamic, 3> function_type;
 
  private:
-   point_type  cell_bar;
-   scalar_type cell_h;
    size_t      basis_degree, basis_size;
 
    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
@@ -93,8 +91,6 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
    scaled_monomial_vector_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
      scalar_basis(msh, cl, degree)
    {
-      cell_bar     = barycenter(msh, cl);
-      cell_h       = diameter(msh, cl);
       basis_degree = degree;
       basis_size   = vector_basis_size(degree, 3, 3);
    }
@@ -104,28 +100,28 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
    {
       function_type ret = function_type::Zero(basis_size, 3);
 
-      const auto phi = scalar_basis.eval_functions(pt);
+      auto phi = scalar_basis.eval_functions(pt);
 
       for (size_t i = 0; i < scalar_basis.size(); i++) {
-         ret(3 * i, 0)     = phi(i);
-         ret(3 * i + 1, 1) = phi(i);
-         ret(3 * i + 2, 1) = phi(i);
+         ret(3*i,   0) = phi(i);
+         ret(3*i+1, 1) = phi(i);
+         ret(3*i+2, 2) = phi(i);
       }
 
       return ret;
    }
 
-   std::vector<gradient_type>
+   eigen_compatible_stdvector<gradient_type>
    eval_gradients(const point_type& pt) const
    {
-      std::vector<gradient_type> ret;
+      eigen_compatible_stdvector<gradient_type> ret;
       ret.reserve(basis_size);
 
-      const Matrix<scalar_type, Dynamic, 3> dphi = scalar_basis.eval_gradients(pt);
+      Matrix<scalar_type, Dynamic, 3> dphi = scalar_basis.eval_gradients(pt);
 
       size_t j = 0;
       for (size_t i = 0; i < scalar_basis.size(); i++) {
-         const Matrix<scalar_type, 1, 3> dphi_i = dphi.row(i);
+         Matrix<scalar_type, 1, 3> dphi_i = dphi.row(i);
          gradient_type                   g;
 
          g        = gradient_type::Zero();
@@ -145,13 +141,13 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
       return ret;
    }
 
-   std::vector<gradient_type>
+   eigen_compatible_stdvector<gradient_type>
    eval_sgradients(const point_type& pt) const
    {
-      std::vector<gradient_type> ret;
+      eigen_compatible_stdvector<gradient_type> ret;
       ret.reserve(basis_size);
 
-      const Matrix<scalar_type, Dynamic, 3> dphi = scalar_basis.eval_gradients(pt);
+      Matrix<scalar_type, Dynamic, 3> dphi = scalar_basis.eval_gradients(pt);
 
       size_t j = 0;
       for (size_t i = 0; i < scalar_basis.size(); i++) {
@@ -201,9 +197,6 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
    typedef Matrix<scalar_type, Dynamic, 3> function_type;
 
  private:
-   point_type  face_bar;
-   point_type  base;
-   scalar_type face_h;
    size_t      basis_degree, basis_size;
 
    typedef scaled_monomial_scalar_basis<mesh_type, face_type> scalar_basis_type;
@@ -213,8 +206,6 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
    scaled_monomial_vector_basis(const mesh_type& msh, const face_type& fc, size_t degree) :
      scalar_basis(msh, fc, degree)
    {
-      face_bar     = barycenter(msh, fc);
-      face_h       = diameter(msh, fc);
       basis_degree = degree;
       basis_size   = vector_basis_size(degree, 2, 3);
    }
@@ -229,7 +220,7 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
       for (size_t i = 0; i < scalar_basis.size(); i++) {
          ret(3 * i, 0)     = phi(i);
          ret(3 * i + 1, 1) = phi(i);
-         ret(3 * i + 2, 1) = phi(i);
+         ret(3 * i + 2, 2) = phi(i);
       }
 
       assert(3 * scalar_basis.size() == basis_size);
@@ -263,8 +254,6 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
    typedef Matrix<scalar_type, Dynamic, 2> function_type;
 
  private:
-   point_type  cell_bar;
-   scalar_type cell_h;
    size_t      basis_degree, basis_size;
 
    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
@@ -274,8 +263,6 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
    scaled_monomial_vector_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
      scalar_basis(msh, cl, degree)
    {
-      cell_bar     = barycenter(msh, cl);
-      cell_h       = diameter(msh, cl);
       basis_degree = degree;
       basis_size   = vector_basis_size(degree, 2, 2);
    }
@@ -285,7 +272,7 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
    {
       function_type ret = function_type::Zero(basis_size, 2);
 
-      const auto phi = scalar_basis.eval_functions(pt);
+      auto phi = scalar_basis.eval_functions(pt);
 
       for (size_t i = 0; i < scalar_basis.size(); i++) {
          ret(2 * i, 0)     = phi(i);
@@ -295,13 +282,13 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
       return ret;
    }
 
-   std::vector<gradient_type>
+   eigen_compatible_stdvector<gradient_type>
    eval_gradients(const point_type& pt) const
    {
-      std::vector<gradient_type> ret;
+      eigen_compatible_stdvector<gradient_type> ret;
       ret.reserve(basis_size);
 
-      const Matrix<scalar_type, Dynamic, 2> dphi = scalar_basis.eval_gradients(pt);
+      Matrix<scalar_type, Dynamic, 2> dphi = scalar_basis.eval_gradients(pt);
 
       size_t j = 0;
       for (size_t i = 0; i < scalar_basis.size(); i++) {
@@ -321,17 +308,17 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
       return ret;
    }
 
-   std::vector<gradient_type>
+   eigen_compatible_stdvector<gradient_type>
    eval_sgradients(const point_type& pt) const
    {
-      std::vector<gradient_type> ret;
+      eigen_compatible_stdvector<gradient_type> ret;
       ret.reserve(basis_size);
 
-      const Matrix<scalar_type, Dynamic, 2> dphi = scalar_basis.eval_gradients(pt);
+      Matrix<scalar_type, Dynamic, 2> dphi = scalar_basis.eval_gradients(pt);
 
       size_t j = 0;
       for (size_t i = 0; i < scalar_basis.size(); i++) {
-         const Matrix<scalar_type, 1, 2> dphi_i = dphi.row(i);
+         Matrix<scalar_type, 1, 2> dphi_i = dphi.row(i);
          gradient_type                   g;
 
          g        = gradient_type::Zero();
@@ -391,9 +378,6 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
    typedef Matrix<scalar_type, Dynamic, 2> function_type;
 
  private:
-   point_type  face_bar;
-   point_type  base;
-   scalar_type face_h;
    size_t      basis_degree, basis_size;
 
    typedef scaled_monomial_scalar_basis<mesh_type, face_type> scalar_basis_type;
@@ -403,8 +387,6 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
    scaled_monomial_vector_basis(const mesh_type& msh, const face_type& fc, size_t degree) :
      scalar_basis(msh, fc, degree)
    {
-      face_bar     = barycenter(msh, fc);
-      face_h       = diameter(msh, fc);
       basis_degree = degree;
       basis_size   = vector_basis_size(degree, 1, 2);
    }

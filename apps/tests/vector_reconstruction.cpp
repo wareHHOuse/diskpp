@@ -41,6 +41,7 @@
 template<typename Mesh>
 struct test_functor
 {
+    /* Expect k+1 convergence */
     typename Mesh::scalar_type
     operator()(const Mesh& msh, size_t degree) const
     {
@@ -65,9 +66,10 @@ struct test_functor
             size_t rec_size = revolution::vector_basis_size(hdi.reconstruction_degree(), Mesh::dimension, Mesh::dimension);
 
             Matrix<scalar_type, Dynamic, 1> reconstr = Matrix<scalar_type, Dynamic, 1>::Zero(rec_size);
-            reconstr.tail(rec_size-2) = gr.first * proj;
-            reconstr(0) = proj(0);
-            reconstr(1) = proj(1);
+            reconstr.tail(rec_size-Mesh::dimension) = gr.first * proj;
+
+            for (size_t i = 0; i < Mesh::dimension; i++)
+                reconstr(i) = proj(i);
 
             auto cb = revolution::make_vector_monomial_basis(msh, cl, hdi.reconstruction_degree());
             Matrix<scalar_type, Dynamic, Dynamic> mass = revolution::make_mass_matrix(msh, cl, cb);
@@ -76,7 +78,9 @@ struct test_functor
 
             Matrix<scalar_type, Dynamic, 1> diff = reconstr - exp_reconstr;
 
-            error += diff.dot(mass*diff);
+            Matrix<scalar_type, Dynamic, Dynamic> stiffness = revolution::make_stiffness_matrix(msh, cl, cb);
+
+            error += diff.dot(stiffness*diff);
         }
 
         return std::sqrt(error);
@@ -91,13 +95,22 @@ get_test_functor(const std::vector<Mesh>& meshes)
     return test_functor<Mesh>();
 }
 
-
-void test_triangles(void)
+void test_triangles_generic(void)
 {
     std::cout << "*** TESTING TRIANGLES ON GENERIC MESH ***" << std::endl;
     using T = double;
 
     auto meshes = get_triangle_generic_meshes<T>();
+    auto tf = get_test_functor(meshes);
+    do_testing(meshes, tf);
+}
+
+void test_triangles_netgen(void)
+{
+    std::cout << "*** TESTING TRIANGLES ON NETGEN MESH ***" << std::endl;
+    using T = double;
+
+    auto meshes = get_triangle_netgen_meshes<T>();
     auto tf = get_test_functor(meshes);
     do_testing(meshes, tf);
 }
@@ -112,11 +125,22 @@ void test_quads(void)
     do_testing(meshes, tf);
 }
 
+void test_tetrahedra_netgen(void)
+{
+    std::cout << "*** TESTING TETRAHEDRONS ON NETGEN MESH ***" << std::endl;
+    using T = double;
+
+    auto meshes = get_tetrahedra_netgen_meshes<T>();
+    auto tf = get_test_functor(meshes);
+    do_testing(meshes, tf);
+}
+
 int main(void)
 {
-    
-    test_triangles();
-    test_quads();
+    _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
 
-    return 0;
+    //test_triangles_generic();
+    //test_triangles_netgen();
+    //test_quads();
+    test_tetrahedra_netgen();
 }

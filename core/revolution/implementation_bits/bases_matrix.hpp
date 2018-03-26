@@ -81,8 +81,6 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
    typedef static_matrix<scalar_type, 3, 3> function_type;
 
  private:
-   point_type  cell_bar;
-   scalar_type cell_h;
    size_t      basis_degree, basis_size;
 
    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
@@ -92,16 +90,14 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
    scaled_monomial_matrix_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
      scalar_basis(msh, cl, degree)
    {
-      cell_bar     = barycenter(msh, cl);
-      cell_h       = diameter(msh, cl);
       basis_degree = degree;
       basis_size   = matrix_basis_size(degree, 3, 3);
    }
 
-   std::vector<function_type>
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      std::vector<function_type> ret;
+      eigen_compatible_stdvector<function_type> ret;
       ret.reserve(basis_size);
 
       const auto phi = scalar_basis.eval_functions(pt);
@@ -149,9 +145,6 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
    typedef static_matrix<scalar_type, 3, 3> function_type;
 
  private:
-   point_type  face_bar;
-   point_type  base;
-   scalar_type face_h;
    size_t      basis_degree, basis_size;
 
    typedef scaled_monomial_scalar_basis<mesh_type, face_type> scalar_basis_type;
@@ -161,16 +154,14 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
    scaled_monomial_matrix_basis(const mesh_type& msh, const face_type& fc, size_t degree) :
      scalar_basis(msh, fc, degree)
    {
-      face_bar     = barycenter(msh, fc);
-      face_h       = diameter(msh, fc);
       basis_degree = degree;
       basis_size   = matrix_basis_size(degree, 2, 3);
    }
 
-   std::vector<function_type>
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      std::vector<function_type> ret;
+      eigen_compatible_stdvector<function_type> ret;
       ret.reserve(basis_size);
 
       const auto phi = scalar_basis.eval_functions(pt);
@@ -217,8 +208,6 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
    typedef static_matrix<scalar_type, 2, 2> function_type;
 
  private:
-   point_type  cell_bar;
-   scalar_type cell_h;
    size_t      basis_degree, basis_size;
 
    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
@@ -228,16 +217,14 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
    scaled_monomial_matrix_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
      scalar_basis(msh, cl, degree)
    {
-      cell_bar     = barycenter(msh, cl);
-      cell_h       = diameter(msh, cl);
       basis_degree = degree;
       basis_size   = matrix_basis_size(degree, 2, 2);
    }
 
-   std::vector<function_type>
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      std::vector<function_type> ret;
+      eigen_compatible_stdvector<function_type> ret;
       ret.reserve(basis_size);
 
       const auto phi = scalar_basis.eval_functions(pt);
@@ -285,9 +272,6 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
    typedef static_matrix<scalar_type, 2, 2> function_type;
 
  private:
-   point_type  face_bar;
-   point_type  base;
-   scalar_type face_h;
    size_t      basis_degree, basis_size;
 
    typedef scaled_monomial_scalar_basis<mesh_type, face_type> scalar_basis_type;
@@ -297,16 +281,14 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
    scaled_monomial_matrix_basis(const mesh_type& msh, const face_type& fc, size_t degree) :
      scalar_basis(msh, fc, degree)
    {
-      face_bar     = barycenter(msh, fc);
-      face_h       = diameter(msh, fc);
       basis_degree = degree;
       basis_size   = matrix_basis_size(degree, 1, 2);
    }
 
-   std::vector<function_type>
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      std::vector<function_type> ret;
+      eigen_compatible_stdvector<function_type> ret;
       ret.reserve(basis_size);
 
       const auto phi = scalar_basis.eval_functions(pt);
@@ -360,7 +342,7 @@ sym_matrix_basis_size(size_t k, size_t sd, size_t vd)
    else
       std::logic_error("Expected 3 >= dim > 1");
 
-   return vd * (num / den);
+   return md * (num / den);
 }
 
 /* Generic template for bases. */
@@ -395,8 +377,6 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
    typedef static_matrix<scalar_type, 3, 3> function_type;
 
  private:
-   point_type  cell_bar;
-   scalar_type cell_h;
    size_t      basis_degree, basis_size;
 
    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
@@ -406,16 +386,14 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
    scaled_monomial_sym_matrix_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
      scalar_basis(msh, cl, degree)
    {
-      cell_bar     = barycenter(msh, cl);
-      cell_h       = diameter(msh, cl);
       basis_degree = degree;
       basis_size   = sym_matrix_basis_size(degree, 3, 3);
    }
 
-   std::vector<function_type>
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      std::vector<function_type> ret;
+      eigen_compatible_stdvector<function_type> ret;
       ret.reserve(basis_size);
 
       const auto phi = scalar_basis.eval_functions(pt);
@@ -467,9 +445,6 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
    typedef static_matrix<scalar_type, 3, 3> function_type;
 
  private:
-   point_type  face_bar;
-   point_type  base;
-   scalar_type face_h;
    size_t      basis_degree, basis_size;
 
    typedef scaled_monomial_scalar_basis<mesh_type, face_type> scalar_basis_type;
@@ -479,16 +454,14 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
    scaled_monomial_sym_matrix_basis(const mesh_type& msh, const face_type& fc, size_t degree) :
      scalar_basis(msh, fc, degree)
    {
-      face_bar     = barycenter(msh, fc);
-      face_h       = diameter(msh, fc);
       basis_degree = degree;
       basis_size   = sym_matrix_basis_size(degree, 2, 3);
    }
 
-   std::vector<function_type>
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      std::vector<function_type> ret;
+      eigen_compatible_stdvector<function_type> ret;
       ret.reserve(basis_size);
 
       const auto phi = scalar_basis.eval_functions(pt);
@@ -539,47 +512,37 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
     typedef static_matrix<scalar_type, 2, 2> function_type;
 
  private:
-    point_type  cell_bar;
-    scalar_type cell_h;
-    size_t      basis_degree, basis_size;
+   size_t      basis_degree, basis_size;
 
     typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
  public:
-    scaled_monomial_sym_matrix_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
-        scalar_basis(msh, cl, degree)
-    {
-        cell_bar     = barycenter(msh, cl);
-        cell_h       = diameter(msh, cl);
-        basis_degree = degree;
-        basis_size   = sym_matrix_basis_size(degree, 2, 2);
-    }
+   scaled_monomial_sym_matrix_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
+     scalar_basis(msh, cl, degree)
+   {
+      basis_degree = degree;
+      basis_size   = sym_matrix_basis_size(degree, 2, 2);
+   }
 
-   std::vector<function_type>
+
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-        std::vector<function_type> ret;
-        ret.reserve(basis_size);
+      eigen_compatible_stdvector<function_type> ret;
+      ret.reserve(basis_size);
 
-        const auto phi = scalar_basis.eval_functions(pt);
+      const auto phi = scalar_basis.eval_functions(pt);
 
-        for (size_t k = 0; k < scalar_basis.size(); k++)
-        {
-            function_type fc;
+      for (size_t k = 0; k < scalar_basis.size(); k++) {
+         function_type fc;
 
-            for (size_t j = 0; j < 2; j++)
-            {
-                for (size_t i = 0; i < j; i++)
-                {
-                    fc       = function_type::Zero();
-                    fc(i, j) = phi(k);
-                    fc(j, i) = phi(k);
-                    ret.push_back(fc);
-                }
-                fc       = function_type::Zero();
-                fc(j, j) = phi(k);
-                ret.push_back(fc);
+         for (size_t j = 0; j < 2; j++) {
+            for (size_t i = 0; i < j; i++) {
+               fc       = function_type::Zero();
+               fc(i, j) = phi(k);
+               fc(j, i) = phi(k);
+               ret.push_back(fc);
             }
         }
 
@@ -614,9 +577,6 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
    typedef static_matrix<scalar_type, 2, 2> function_type;
 
  private:
-   point_type  face_bar;
-   point_type  base;
-   scalar_type face_h;
    size_t      basis_degree, basis_size;
 
    typedef scaled_monomial_scalar_basis<mesh_type, face_type> scalar_basis_type;
@@ -626,16 +586,14 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
    scaled_monomial_sym_matrix_basis(const mesh_type& msh, const face_type& fc, size_t degree) :
      scalar_basis(msh, fc, degree)
    {
-      face_bar     = barycenter(msh, fc);
-      face_h       = diameter(msh, fc);
       basis_degree = degree;
       basis_size   = sym_matrix_basis_size(degree, 1, 2);
    }
 
-   std::vector<function_type>
+   eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      std::vector<function_type> ret;
+      eigen_compatible_stdvector<function_type> ret;
       ret.reserve(basis_size);
 
       const auto phi = scalar_basis.eval_functions(pt);

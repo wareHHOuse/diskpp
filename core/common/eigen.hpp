@@ -39,6 +39,8 @@
 #include <Eigen/SparseLU>
 #include <unsupported/Eigen/SparseExtra>
 
+#include <Eigen/StdVector>
+
 #pragma clang diagnostic pop
 
 template<typename T>
@@ -61,6 +63,9 @@ using sparse_matrix = Eigen::SparseMatrix<T>;
 
 template<typename T>
 using triplet = Eigen::Triplet<T>;
+
+template<typename T>
+using eigen_compatible_stdvector = std::vector<T, Eigen::aligned_allocator<T>>;
 
 template<typename T>
 static_vector<T, 3>

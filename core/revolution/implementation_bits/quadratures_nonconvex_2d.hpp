@@ -23,9 +23,12 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-#pragma once
+#include "contrib/triangle/triangle_mesher.h"
 
-#include "implementation_bits/bases_2d_scalar.hpp"
-#include "implementation_bits/bases_vector.hpp"
-#include "implementation_bits/bases_matrix.hpp"
-#include "implementation_bits/bases_utils.hpp"
+template<typename T, typename Storage>
+void
+integrate_possibly_nonconvex(const generic_mesh<T, 2, Storage>& msh,
+							 const typename generic_mesh<T, 2, Storage>::cell_type& cl)
+{
+	
+}

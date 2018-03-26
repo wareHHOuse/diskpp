@@ -31,7 +31,7 @@
 #include <unistd.h>
 
 #include <xmmintrin.h>
-
+//#define EIGEN_USE_MKL_ALL
 #include "revolution/bases"
 #include "revolution/quadratures"
 #include "revolution/methods/hho"
@@ -44,6 +44,7 @@
 template<typename Mesh>
 struct test_functor
 {
+    /* Expect k+1 convergence */
     typename Mesh::scalar_type
     operator()(const Mesh& msh, size_t degree) const
     {
@@ -93,12 +94,22 @@ get_test_functor(const std::vector<Mesh>& meshes)
     return test_functor<Mesh>();
 }
 
-void test_triangles(void)
+void test_triangles_generic(void)
 {
     std::cout << "*** TESTING TRIANGLES ON GENERIC MESH ***" << std::endl;
     using T = double;
 
     auto meshes = get_triangle_generic_meshes<T>();
+    auto tf = get_test_functor(meshes);
+    do_testing(meshes, tf);
+}
+
+void test_triangles_netgen(void)
+{
+    std::cout << "*** TESTING TRIANGLES ON NETGEN MESH ***" << std::endl;
+    using T = double;
+
+    auto meshes = get_triangle_netgen_meshes<T>();
     auto tf = get_test_functor(meshes);
     do_testing(meshes, tf);
 }
@@ -113,12 +124,23 @@ void test_quads(void)
     do_testing(meshes, tf);
 }
 
+void test_tetrahedra_netgen(void)
+{
+    std::cout << "*** TESTING TETRAHEDRONS ON NETGEN MESH ***" << std::endl;
+    using T = double;
+
+    auto meshes = get_tetrahedra_netgen_meshes<T>();
+    auto tf = get_test_functor(meshes);
+    do_testing(meshes, tf);
+}
+
 int main(void)
 {
     _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
-    
-    test_triangles();
-    test_quads();
 
+    //test_triangles_generic();
+    //test_triangles_netgen();
+    test_quads();
+    test_tetrahedra_netgen();
     return 0;
 }

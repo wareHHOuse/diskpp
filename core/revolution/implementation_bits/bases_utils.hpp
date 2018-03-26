@@ -39,7 +39,8 @@ outer_product(const Matrix<T, Dynamic, M>& a, const Matrix<T, Dynamic, N>& b)
 
 template<typename T, int N>
 Matrix<T, Dynamic, N>
-outer_product(const std::vector<Matrix<T, N, N>>& a, const Matrix<T, N, 1>& b)
+outer_product(const eigen_compatible_stdvector<Matrix<T, N, N>>& a,
+              const Matrix<T, N, 1>& b)
 {
 	Matrix<T, Dynamic, N> ret(a.size(),N);
 	for (size_t i = 0; i < a.size(); i++)
@@ -53,7 +54,8 @@ outer_product(const std::vector<Matrix<T, N, N>>& a, const Matrix<T, N, 1>& b)
 
 template<typename T, int N>
 Matrix<T, Dynamic, Dynamic>
-outer_product(const std::vector<Matrix<T, N, N>>& a, const std::vector<Matrix<T, N, N>>& b)
+outer_product(const eigen_compatible_stdvector<Matrix<T, N, N>>& a,
+              const eigen_compatible_stdvector<Matrix<T, N, N>>& b)
 {
 	Matrix<T, Dynamic, Dynamic> ret(a.size(), b.size());
 
@@ -169,8 +171,87 @@ make_rhs(const Mesh& msh, const Element& elem,
     return ret;
 }
 
+template<typename Mesh>
+using SRT = typename Mesh::coordinate_type;
+
+template<typename Mesh>
+using VRT = Matrix<typename Mesh::coordinate_type, Mesh::dimension, 1>;
+
+template<typename Mesh>
+using PT = typename Mesh::point_type;
+
+
+template<typename Mesh>
+using scalar_rhs_function = std::function<SRT<Mesh>(PT<Mesh>)>;
+
+template<typename Mesh>
+using vector_rhs_function = std::function<VRT<Mesh>(PT<Mesh>)>;
+
+template<typename Mesh, typename Element>
+Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+project_function(const Mesh& msh, const Element& elem,
+                 size_t degree,
+                 const scalar_rhs_function<Mesh>& f, size_t di = 0)
+{
+    using T = typename Mesh::coordinate_type;
+
+    auto basis = make_scalar_monomial_basis(msh, elem, degree);
+    Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, elem, basis, di);
+    Matrix<T, Dynamic, 1> rhs = make_rhs(msh, elem, basis, f, di);
+    return mass.llt().solve(rhs);
+}
+
+template<typename Mesh, typename Element>
+Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+project_function(const Mesh& msh, const Element& elem,
+                 size_t degree,
+                 const vector_rhs_function<Mesh>& f, size_t di = 0)
+{
+    using T = typename Mesh::coordinate_type;
+
+    auto basis = make_vector_monomial_basis(msh, elem, degree);
+    Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, elem, basis, di);
+    Matrix<T, Dynamic, 1> rhs = make_rhs(msh, elem, basis, f, di);
+    return mass.llt().solve(rhs);
+}
+
+template<typename T>
+T
+eval(const dynamic_vector<T>& tab_coeff, const dynamic_vector<T>& base)
+{
+   assert(tab_coeff.rows() == base.rows());
+
+   return tab_coeff.dot(base);
+}
+
+template<typename T, int DIM>
+static_vector<T, DIM>
+eval(const dynamic_vector<T>& tab_coeff, const Matrix<T, Dynamic, DIM>& base)
+{
+   static_vector<T, DIM> ret = static_vector<T, DIM>::Zero();
+   assert(tab_coeff.size() == (base.rows()));
+
+   for (size_t i = 0; i < tab_coeff.size(); i++) {
+      ret += tab_coeff(i) * (base.row(i)).transpose();
+   }
+
+   return ret;
+}
+
+template<typename T, int DIM>
+static_matrix<T, DIM, DIM>
+eval(const dynamic_vector<T>&                                      tab_coeff,
+     const eigen_compatible_stdvector<static_matrix<T, DIM, DIM>>& base,
+     const size_t begin = 0)
+{
+   static_matrix<T, DIM, DIM> ret = static_matrix<T, DIM, DIM>::Zero();
+   assert(tab_coeff.size() == (base.size()-begin));
+
+   for (size_t i = 0; i < tab_coeff.size(); i++) {
+      ret += tab_coeff(i) * base[i+begin];
+   }
+
+   return ret;
+}
 
 } //revolution
-
-
-

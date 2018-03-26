@@ -12,3 +12,9 @@ target_link_libraries(vector_symmetric_reconstruction ${LINK_LIBS})
 
 add_executable(vector_stabilization vector_stabilization.cpp)
 target_link_libraries(vector_stabilization ${LINK_LIBS})
+
+add_executable(perf perf.cpp)
+target_link_libraries(perf ${LINK_LIBS})
+
+add_executable(basis_quadratures basis_quadratures.cpp)
+target_link_libraries(basis_quadratures ${LINK_LIBS})

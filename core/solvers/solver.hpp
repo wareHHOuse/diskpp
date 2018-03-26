@@ -204,7 +204,14 @@ mkl_pardiso(const pardiso_params<T>& params,
 
     solver.analyzePattern(A);
     solver.factorize(A);
+    if (solver.info() != Eigen::Success) {
+       std::cerr << "ERROR: Could not factorize the matrix" << std::endl;
+    }
+
     x = solver.solve(b);
+    if (solver.info() != Eigen::Success) {
+       std::cerr << "ERROR: Could not solve the linear system" << std::endl;
+    }
 
     if (params.report_factorization_Mflops)
     {
@@ -232,7 +239,14 @@ mkl_pardiso_ldlt(const pardiso_params<T>& params,
 
     solver.analyzePattern(A);
     solver.factorize(A);
+    if (solver.info() != Eigen::Success) {
+       std::cerr << "ERROR: Could not factorize the matrix" << std::endl;
+    }
+
     x = solver.solve(b);
+    if (solver.info() != Eigen::Success) {
+       std::cerr << "ERROR: Could not solve the linear system" << std::endl;
+    }
 
     if (params.report_factorization_Mflops)
     {

@@ -144,6 +144,13 @@ public:
     }
 };
 
+template<typename T>
+T
+det(const point<T,2>& p1, const point<T,2>& p2)
+{
+    return p1.x() * p2.y() - p1.y() * p2.x();
+}
+
 template<typename T, size_t DIM>
 std::ostream&
 operator<<(std::ostream& os, const point<T, DIM>& pt)

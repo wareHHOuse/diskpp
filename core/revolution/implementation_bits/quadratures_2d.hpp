@@ -178,16 +178,15 @@ edge_quadrature(size_t doe)
 namespace priv {
 
 
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename PtA>
+template<typename T, typename PtA>
 std::vector< disk::quadrature_point<T,2> >
-integrate_triangle(const Mesh<T,2,Storage>& msh,
-				   const typename Mesh<T,2,Storage>::cell& cl,
-				   size_t degree,
-                   const PtA& pts)
+integrate_triangle(size_t degree, const PtA& pts)
 {
 	assert(pts.size() == 3);
 
-	using mesh_type = Mesh<T,2,Storage>;
+    static_assert( std::is_same<typename PtA::value_type, point<T,2>>::value,
+                   "This function is for 2D points" );
+
 	using quadpoint_type = disk::quadrature_point<T,2>;
 
 	auto qps = disk::triangle_quadrature(degree);
@@ -213,17 +212,10 @@ integrate_triangle(const Mesh<T,2,Storage>& msh,
     return ret;
 }
 
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename PtA>
+template<typename T>
 std::vector< disk::quadrature_point<T,2> >
-integrate_quadrangle_tens(const Mesh<T,2,Storage>& msh,
-                     const typename Mesh<T,2,Storage>::cell& cl,
-                     size_t degree,
-                     const PtA& pts)
+integrate_quadrangle_tens(size_t degree, const std::vector< point<T,2> >& pts)
 {
-    typedef Mesh<T,2,Storage>   mesh_type;
-
-    typedef typename mesh_type::point_type    point_type;
-
     auto qps = proton::edge_quadrature<T>(degree);
 
     auto v0 = pts[1] - pts[0];
@@ -274,7 +266,7 @@ integrate_quadrangle_tens(const Mesh<T,2,Storage>& msh,
 
             auto w = qp_x.second * qp_y.second * J(xi, eta);
 
-            ret.push_back( disk::make_qp( point_type({px, py}), w ) );
+            ret.push_back( disk::make_qp( point<T,2>({px, py}), w ) );
         }
     }
 
@@ -325,6 +317,35 @@ integrate_quadrangle(const Mesh<T,2,Storage>& msh,
     return ret;
 }
 
+namespace priv {
+
+template<typename Iterator>
+auto
+barycenter(Iterator begin, Iterator end)
+{
+    typedef typename std::iterator_traits<Iterator>::value_type point_type;
+    typedef typename point_type::value_type T;
+
+    point_type  ret;
+    T           den = 0.0;
+
+    auto numpts = std::distance(begin, end);
+    auto p0 = *begin;
+
+    for (size_t i = 2; i < numpts; i++)
+    {
+        auto pprev  = *std::next(begin, i-1) - p0;
+        auto pcur   = *std::next(begin, i) - p0;
+        auto d      = det(pprev, pcur) / 2.0;
+        ret         = ret + (pprev + pcur) * d;
+        den         += d;
+    }
+
+    return p0 + ret/(den*3);
+}
+
+} // priv
+
 //#define OPTIMAL_TRIANGLE_NUMBER
 
     /* The 'optimal triangle number' version gives almost the same results
@@ -333,14 +354,10 @@ integrate_quadrangle(const Mesh<T,2,Storage>& msh,
      * triangles with a very bad aspect ratio and at the moment I don't know
      * if and how this can affect computations, so I leave it turned off.
      */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename PtA>
+template<typename T>
 std::vector< disk::quadrature_point<T,2> >
-integrate_polygon(const Mesh<T,2,Storage>& msh,
-				  const typename Mesh<T,2,Storage>::cell& cl,
-				  size_t degree,
-                  const PtA& pts)
+integrate_polygon(size_t degree, const std::vector< point<T,2> >& pts)
 {
-	using mesh_type = Mesh<T,2,Storage>;
 	using quadpoint_type = disk::quadrature_point<T,2>;
 
 	auto qps = disk::triangle_quadrature(degree);
@@ -374,7 +391,7 @@ integrate_polygon(const Mesh<T,2,Storage>& msh,
         std::transform(qps.begin(), qps.end(), retbegin, tr);
     }
 #else
-    auto c_center   = barycenter(msh, cl);
+    auto c_center   = priv::barycenter(pts.begin(), pts.end());
 
     /* Break the cell in triangles, compute the transformation matrix and
      * map quadrature data in the physical space. Edges of the triangle as
@@ -455,7 +472,7 @@ integrate(const disk::simplicial_mesh<T,2>& msh,
 		  size_t degree)
 {
     auto pts = points(msh, cl);
-    return priv::integrate_triangle(msh, cl, degree, pts);
+    return priv::integrate_triangle<T>(degree, pts);
 }
 
 
@@ -486,13 +503,13 @@ integrate(const disk::generic_mesh<T,2>& msh,
                                         "This looks like a nice bug.");
 
 		case 3:
-			return priv::integrate_triangle(msh, cl, degree, pts);
+			return priv::integrate_triangle<T>(degree, pts);
 
 		case 4:
-			return priv::integrate_quadrangle_tens(msh, cl, degree, pts);
+			return priv::integrate_quadrangle_tens(degree, pts);
 
 		default:
-			return priv::integrate_polygon(msh, cl, degree, pts);
+			return priv::integrate_polygon(degree, pts);
 	}
 }
 
@@ -504,6 +521,87 @@ integrate(const disk::generic_mesh<T,2>& msh,
 {
 	return priv::integrate_2D_face(msh, fc, degree);
 }
+
+
+namespace priv {
+
+template<typename T>
+point<T,3>
+map_to_physical(const disk::simplicial_mesh<T,3>& msh,
+                const typename disk::simplicial_mesh<T,3>::face& face,
+                const point<T,2>& pm)
+{
+    auto pts = points(msh, face);
+    return pts[0] + (pts[1]-pts[0])*pm.x() + (pts[2]-pts[0])*pm.y();
+}
+
+template<typename T>
+point<T,3>
+map_to_physical(const disk::simplicial_mesh<T,3>& msh,
+                const typename disk::simplicial_mesh<T,3>::cell& cell,
+                const point<T,3>& p)
+{
+    auto pts = points(msh, cell);
+
+    auto pp = (pts[1] - pts[0]) * p.x() +
+              (pts[2] - pts[0]) * p.y() +
+              (pts[3] - pts[0]) * p.z() +
+              pts[0];
+
+    return pp;
+}
+
+} // namespace priv
+
+template<typename T>
+std::vector< disk::quadrature_point<T,3> >
+integrate(const disk::simplicial_mesh<T,3>& msh,
+          const typename disk::simplicial_mesh<T,3>::cell& cl,
+          size_t degree)
+{
+    //auto pts = points(msh, cl);
+    //return priv::integrate_triangle<T>(degree, pts);
+    auto m_quadrature_data = disk::tetrahedron_quadrature(degree);
+
+    auto meas = measure(msh, cl);
+
+    auto tr = [&](const std::pair<point<T,3>, T>& qd) -> auto {
+        auto point = priv::map_to_physical(msh, cl, qd.first);
+        auto weight = qd.second * meas;
+        return disk::make_qp(point, weight);
+    };
+
+    std::vector<disk::quadrature_point<T,3>> ret(m_quadrature_data.size());
+    std::transform(m_quadrature_data.begin(), m_quadrature_data.end(),
+                   ret.begin(), tr);
+
+    return ret;
+}
+
+template<typename T>
+std::vector< disk::quadrature_point<T,3> >
+integrate(const disk::simplicial_mesh<T,3>& msh,
+          const typename disk::simplicial_mesh<T,3>::face& fc,
+          size_t degree)
+{
+    auto m_quadrature_data = disk::triangle_quadrature(degree);
+    auto meas = measure(msh, fc);
+
+    auto tr = [&](const std::pair<point<T,2>, T>& qd) -> auto {
+        auto point = priv::map_to_physical(msh, fc, qd.first);
+        auto weight = qd.second * meas;
+        return disk::make_qp(point, weight);
+    };
+
+    std::vector<disk::quadrature_point<T,3>> ret(m_quadrature_data.size());
+    std::transform(m_quadrature_data.begin(), m_quadrature_data.end(),
+                   ret.begin(), tr);
+
+    return ret;
+}
+
+
+
 
 
 } // revolution

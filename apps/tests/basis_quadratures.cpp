@@ -23,27 +23,18 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-
-#include <iostream>
-#include <iomanip>
-#include <regex>
-
-#include <unistd.h>
-
 #include <xmmintrin.h>
 
 #include "revolution/bases"
 #include "revolution/quadratures"
 #include "revolution/methods/hho"
 
-#include "core/loaders/loader.hpp"
-
 #include "common.hpp"
 
 template<typename Mesh>
 struct test_functor
 {
-    /* Expect k+1 convergence (hho stabilization) */
+    /* Expect k+1 convergence on the cells and k+0.5 on the faces. */
     typename Mesh::scalar_type
     operator()(const Mesh& msh, size_t degree) const
     {
@@ -56,18 +47,25 @@ struct test_functor
 
         auto f = make_scalar_testing_data(msh);
 
-        typename revolution::hho_degree_info hdi(degree);
-
         scalar_type error = 0.0;
-        for (auto& cl : msh)
+
+        for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++)
         {
-            //auto gr = revolution::make_hho_scalar_laplacian(msh, cl, hdi);
-            //auto stab = revolution::make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
-            auto stab = revolution::make_hdg_scalar_stabilization(msh, cl, hdi);
+            auto fc = *itor;
+            auto basis = revolution::make_scalar_monomial_basis(msh, fc, degree);
 
-            Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, hdi, f);
+            Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, fc, degree, f);
 
-            error += proj.dot(stab*proj);
+            auto qps = revolution::integrate(msh, fc, 2*degree+4);
+            for (auto& qp : qps)
+            {
+                auto tv = f(qp.point());
+
+                auto phi = basis.eval_functions(qp.point());
+                auto pv = proj.dot(phi);
+
+                error += qp.weight() * (tv - pv) * (tv - pv);
+            }
         }
 
         return std::sqrt( error );
@@ -124,7 +122,7 @@ void test_tetrahedra_netgen(void)
 
 int main(void)
 {
-    //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+    _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
 
     //test_triangles_generic();
     //test_triangles_netgen();
