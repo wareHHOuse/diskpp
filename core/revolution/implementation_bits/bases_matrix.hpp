@@ -606,7 +606,7 @@ public:
         eigen_compatible_stdvector<function_type> ret;
         ret.reserve(basis_size);
 
-        const phi = scalar_basis.eval_functions(pt);
+        auto phi = scalar_basis.eval_functions(pt);
 
         for (size_t k = 0; k < scalar_basis.size(); k++)
         {
