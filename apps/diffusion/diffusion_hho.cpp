@@ -105,7 +105,7 @@ run_hho_diffusion_solver(const Mesh& msh)
 {
     using T = typename Mesh::scalar_type;
 
-    size_t degree = 1;
+    size_t degree = 0;
 
     hho_degree_info hdi(degree);
 
