@@ -283,7 +283,12 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
     typedef Matrix<T, Dynamic, N>       function_type;
 
     size_t rbs_ho = rbs - Mesh::dimension;
-    size_t num_total_dofs = cbs + num_faces*fbs;
+    size_t num_total_dofs = cbs + num_faces * fbs;
+
+    //std::cout << "cbs: "<< cbs << std::endl;
+    //std::cout << "fbs: "<< fbs << std::endl;
+    //std::cout << "num_faces_n: "<< num_faces << std::endl;
+
     matrix_type stiff  = matrix_type::Zero(rbs, rbs);
     matrix_type gr_lhs = matrix_type::Zero( rbs_ho + 1, rbs_ho + 1);
     matrix_type gr_rhs = matrix_type::Zero( rbs_ho + 1, num_total_dofs);
@@ -326,15 +331,33 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
         }
     }
 
+    #if 0
     vector_type rot = vector_type::Zero(rbs);
     for (auto& qp : qps)
     {
         auto rphi = cb.eval_curls(qp.point());
         rot += qp.weight() * rphi;
     }
+    #endif
+    static_matrix<T, 2, 2> SS =  static_matrix<T, 2, 2>::Zero();
+    SS << 0., 1., -1., 0.;
 
-    gr_lhs.block(0, rbs_ho, rbs_ho, 1 ) = rot.tail(rbs_ho);
-    gr_lhs.block(rbs_ho, 0, 1, rbs_ho ) = rot.tail(rbs_ho).transpose();
+    for (auto& qp : qps)
+    {
+        const auto c_dphi = cb.eval_gradients(qp.point());
+        for (size_t j = 0; j < SS.size(); j++)
+        {
+            for (size_t i = 2; i < rbs; i++)
+            {
+                const T ss_cdphi = SS * c_dphi.at(i);
+                gr_lhs(i, rbs_ho + j) += qp.weight() * ss_cdphi;
+                gr_lhs(rbs_ho + j, i) += qp.weight() * ss_cdphi;
+            }
+        }
+    }
+
+    //gr_lhs.block(0, rbs_ho, rbs_ho, 1 ) = rot.tail(rbs_ho);
+    //gr_lhs.block(rbs_ho, 0, 1, rbs_ho ) = rot.tail(rbs_ho).transpose();
 
     matrix_type sol  = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type oper = sol.block(0,0, rbs_ho, num_total_dofs);
@@ -372,7 +395,6 @@ make_hho_gradrec_matrix(const Mesh&                     msh,
 
    matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);
    matrix_type gr_rhs = matrix_type::Zero(gbs, cbs + num_faces * fbs);
-
    const size_t dim2 = N * N;
 
     // this is very costly to build it
@@ -468,6 +490,10 @@ make_hho_sym_gradrec_matrix(const Mesh&                     msh,
 
    matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);
    matrix_type gr_rhs = matrix_type::Zero(gbs, cbs + num_faces * fbs);
+   std::cout << "gbs: "<< gbs << std::endl;
+   std::cout << "cbs: "<< cbs << std::endl;
+   std::cout << "fbs: "<< fbs << std::endl;
+   std::cout << "num_faces_n: "<< num_faces << std::endl;
 
    const size_t dim2 = N * N;
 
@@ -475,68 +501,70 @@ make_hho_sym_gradrec_matrix(const Mesh&                     msh,
    const auto qps = integrate(msh, cl, 2 * graddeg);
 
    size_t dec = 0;
-   if (N == 3) {
-      dec = 6;
-   } else if (N == 2) {
-      dec = 3;
-   } else
-      std::logic_error("Expected 3 >= dim > 1");
+    if (N == 3)
+        dec = 6;
+    else if (N == 2)
+        dec = 3;
+    else
+        std::logic_error("Expected 3 >= dim > 1");
 
-   for (auto& qp : qps) {
-      const auto gphi = gb.eval_functions(qp.point());
+    for (auto& qp : qps)
+    {
+        const auto gphi = gb.eval_functions(qp.point());
 
-      for (size_t j = 0; j < gbs; j++) {
-         const auto qp_gphi_j = priv::inner_product(qp.weight(), gphi[j]);
-         for (size_t i = j; i < gbs; i += dec) {
-            gr_lhs(i, j) += priv::inner_product(gphi[i], qp_gphi_j);
-         }
-      }
-   }
+        for (size_t j = 0; j < gbs; j++)
+        {
+            const auto qp_gphi_j = priv::inner_product(qp.weight(), gphi[j]);
+            for (size_t i = j; i < gbs; i += dec)
+                gr_lhs(i, j) += priv::inner_product(gphi[i], qp_gphi_j);
+        }
+    }
 
    // upper part
-   for (size_t j = 0; j < gbs; j++) {
-      for (size_t i = 0; i < j; i++) {
-         gr_lhs(i, j) = gr_lhs(j, i);
-      }
-   }
+    for (size_t j = 0; j < gbs; j++)
+        for (size_t i = 0; i < j; i++)
+            gr_lhs(i, j) = gr_lhs(j, i);
 
-   // compute rhs
-   const auto qpc = integrate(msh, cl, std::max(int(graddeg + celdeg) - 1, 0));
-   for (auto& qp : qpc) {
-      const auto gphi = gb.eval_functions(qp.point());
-      const auto dphi = cb.eval_sgradients(qp.point());
+    // compute rhs
+    const auto qpc = integrate(msh, cl, std::max(int(graddeg + celdeg) - 1, 0));
+    for (auto& qp : qpc)
+    {
+        const auto gphi = gb.eval_functions(qp.point());
+        const auto dphi = cb.eval_sgradients(qp.point());
 
-      for (size_t j = 0; j < cbs; j++) {
-         const auto qp_dphi_j = priv::inner_product(qp.weight(), dphi[j]);
-         for (size_t i = 0; i < gbs; i++) {
-            gr_rhs(i, j) += priv::inner_product(gphi[i], qp_dphi_j);
-         }
-      }
-   } // end qp
+        for (size_t j = 0; j < cbs; j++)
+        {
+            const auto qp_dphi_j = priv::inner_product(qp.weight(), dphi[j]);
+            for (size_t i = 0; i < gbs; i++)
+                gr_rhs(i, j) += priv::inner_product(gphi[i], qp_dphi_j);
+        }
+    } // end qp
 
-   const auto fcs = faces(msh, cl);
-   for (size_t i = 0; i < fcs.size(); i++) {
-      const auto fc = fcs[i];
-      const auto n  = normal(msh, cl, fc);
-      const auto fb = make_vector_monomial_basis(msh, fc, facdeg);
+    const auto fcs = faces(msh, cl);
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto fc = fcs[i];
+        const auto n  = normal(msh, cl, fc);
+        const auto fb = make_vector_monomial_basis(msh, fc, facdeg);
 
-      const auto qps_f = integrate(msh, fc, graddeg + std::max(celdeg, facdeg));
-      for (auto& qp : qps_f) {
-         const auto cphi = cb.eval_functions(qp.point());
-         const auto gphi = gb.eval_functions(qp.point());
-         const auto fphi = fb.eval_functions(qp.point());
+        const auto qps_f = integrate(msh, fc, graddeg + std::max(celdeg, facdeg));
+        for (auto& qp : qps_f)
+        {
+            const auto cphi = cb.eval_functions(qp.point());
+            const auto gphi = gb.eval_functions(qp.point());
+            const auto fphi = fb.eval_functions(qp.point());
 
-         const auto gphi_n = priv::outer_product(gphi, n);
-         gr_rhs.block(0, cbs + i * fbs, gbs, fbs) +=
-           qp.weight() * priv::outer_product(fphi, gphi_n);
-         gr_rhs.block(0, 0, gbs, cbs) -= qp.weight() * priv::outer_product(cphi, gphi_n);
-      }
-   }
+            const auto gphi_n = priv::outer_product(gphi, n);
+            gr_rhs.block(0, cbs + i * fbs, gbs, fbs) +=
+                                qp.weight() * priv::outer_product(fphi, gphi_n);
+            gr_rhs.block(0, 0, gbs, cbs) -= qp.weight() * priv::outer_product(cphi, gphi_n);
+        }
+    }
 
-   Matrix<T, Dynamic, Dynamic> oper = gr_lhs.llt().solve(gr_rhs);
-   Matrix<T, Dynamic, Dynamic> data = gr_rhs.transpose() * oper;
+    Matrix<T, Dynamic, Dynamic> oper = gr_lhs.llt().solve(gr_rhs);
+    Matrix<T, Dynamic, Dynamic> data = gr_rhs.transpose() * oper;
 
-   return std::make_pair(oper, data);
+    return std::make_pair(oper, data);
 }
 
 template<typename Mesh>

@@ -76,12 +76,12 @@ run_stokes(const Mesh& msh, size_t degree)
         scalar_type dy = 24. * y1 - 12.;
 
         //laplacian
-        //ret(0) = - cx * ay - bx * dy + 5.* x4;
-        //ret(1) = + cy * ax + by * dx + 5.* y4;
+        ret(0) = - cx * ay - bx * dy + 5.* x4;
+        ret(1) = + cy * ax + by * dx + 5.* y4;
 
         //sym laplacian
-        ret(0) = - 0.5 * ( cx * ay + bx * dy ) + 5.* x4;
-        ret(1) = + 0.5 * ( cy * ax + by * dx ) + 5.* y4;
+        //ret(0) = - 0.5 * ( cx * ay + bx * dy ) + 5.* x4;
+        //ret(1) = + 0.5 * ( cy * ax + by * dx ) + 5.* y4;
 
         return ret;
     };
@@ -111,8 +111,141 @@ run_stokes(const Mesh& msh, size_t degree)
 
     for (auto cl : msh)
     {
+        //auto gr = make_hho_vector_symmetric_laplacian(msh, cl, hdi);
+        auto gr = make_hho_vector_laplacian(msh, cl, hdi);
+
+        Matrix<scalar_type, Dynamic, Dynamic> stab;
+        stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
+        auto dr = make_hho_divergence_reconstruction(msh, cl, hdi);
+        auto face_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.face_degree());
+        auto rhs = make_rhs(msh, cl, face_basis, rhs_fun);
+        assembler.assemble(msh, cl,  (gr.second + stab), -dr.first, rhs, sol_fun);
+    }
+
+    assembler.finalize();
+
+    //dump_sparse_matrix(assembler.LHS, "stokes.txt");
+
+    size_t systsz = assembler.LHS.rows();
+    size_t nnz = assembler.LHS.nonZeros();
+
+    dynamic_vector<scalar_type> sol = dynamic_vector<scalar_type>::Zero(systsz);
+
+    disk::solvers::pardiso_params<scalar_type> pparams;
+    mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);
+
+    //std::ofstream ofs("velocity.dat");
+
+    scalar_type error = 0.0;
+
+    for (auto& cl : msh)
+    {
+    	auto bar = barycenter(msh, cl);
+
+    	Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, sol_fun);
+
+    	auto cbs = revolution::vector_basis_size(degree, Mesh::dimension, Mesh::dimension);
+
+    	auto cell_ofs = revolution::priv::offset(msh, cl);
+    	Matrix<scalar_type, Dynamic, 1> s = sol.block(cell_ofs * cbs, 0, cbs, 1);
+
+    	Matrix<scalar_type, Dynamic, 1> diff = s - p.head(cbs);
+
+    	auto cb = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
+
+    	Matrix<scalar_type, Dynamic, Dynamic> mm = revolution::make_mass_matrix(msh, cl, cb);
+
+    	error += diff.dot(mm*diff);
+
+    	//ofs << bar.x() << " " << bar.y() << " " << s(0) << " " << s(1) << std::endl;
+    }
+
+    //ofs.close();
+
+    return std::sqrt(error);
+
+}
+template<typename Mesh>
+typename Mesh::scalar_type
+run_stokes_symmetric(const Mesh& msh, size_t degree)
+{
+
+    typedef Mesh mesh_type;
+    typedef typename mesh_type::cell        cell_type;
+    typedef typename mesh_type::face        face_type;
+    typedef typename mesh_type::scalar_type scalar_type;
+
+    typedef dynamic_matrix<scalar_type>     matrix_type;
+
+    using point_type = typename mesh_type::point_type;
+
+    auto rhs_fun = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
+        Matrix<scalar_type, 2, 1> ret;
+
+        scalar_type x1 = p.x();
+        scalar_type x2 = x1 * x1;
+        scalar_type x3 = x2 * x1;
+        scalar_type x4 = x2 * x2;
+        scalar_type y1 = p.y();
+        scalar_type y2 = y1 * y1;
+        scalar_type y3 = y2 * y1;
+        scalar_type y4 = y2 * y2;
+
+        scalar_type cx = 12. * x2 - 12.* x1 + 2.;
+        scalar_type cy = 12. * y2 - 12.* y1 + 2.;
+        scalar_type ay =  4. * y3 - 6. * y2 + 2.* y1;
+        scalar_type ax =  4. * x3 - 6. * x2 + 2.* x1;
+        scalar_type bx = x4 - 2. * x3 + x2;
+        scalar_type by = y4 - 2. * y3 + y2;
+        scalar_type dx = 24. * x1 - 12.;
+        scalar_type dy = 24. * y1 - 12.;
+
+        //laplacian
+        //ret(0) = - cx * ay - bx * dy + 5.* x4;
+        //ret(1) = + cy * ax + by * dx + 5.* y4;
+
+        //sym laplacian
+        ret(0) = -  ( cx * ay + bx * dy ) + 5.* x4;
+        ret(1) = +  ( cy * ax + by * dx ) + 5.* y4;
+
+        return ret;
+    };
+
+    auto sol_fun = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
+        Matrix<scalar_type, 2, 1> ret;
+
+        scalar_type x1 = p.x();
+        scalar_type x2 = x1 * x1;
+        scalar_type x3 = x2 * x1;
+        scalar_type x4 = x2 * x2;
+        scalar_type y1 = p.y();
+        scalar_type y2 = y1 * y1;
+        scalar_type y3 = y2 * y1;
+        scalar_type y4 = y2 * y2;
+
+        scalar_type bx = x4 - 2. * x3 + x2;
+        scalar_type by = y4 - 2. * y3 + y2;
+        scalar_type ay =  4. * y3 - 6. * y2 + 2.* y1;
+        scalar_type ax =  4. * x3 - 6. * x2 + 2.* x1;
+
+        ret(0) =  bx * ay;
+        ret(1) = -by * ax;
+
+        return ret;
+    };
+
+
+    typename revolution::hho_degree_info hdi(degree);
+
+    auto assembler = revolution::make_stokes_assembler(msh, hdi);
+
+    for (auto cl : msh)
+    {
+
         auto gr = make_hho_vector_symmetric_laplacian(msh, cl, hdi);
-        //auto gr = make_hho_vector_laplacian(msh, cl, hdi);
+        //std::cout << "size gr_Rhs : "<< gr.first.rows() << " x "<< gr.first.cols() << std::endl;
+        //auto gr_2 = make_hho_sym_gradrec_matrix(msh, cl, hdi);
+        //std::cout << "size gr_Rhs : "<< gr_2.first.rows() << " x "<< gr_2.first.cols() << std::endl;
 
         Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
@@ -200,7 +333,7 @@ void convergence_test_typ1(void)
             }
             loader.populate_mesh(msh);
 
-            auto error = run_stokes(msh, k);
+            auto error = run_stokes_symmetric(msh, k);
             mesh_hs.push_back( disk::mesh_h(msh) );
             l2_velocity_errors.push_back(error);
         }
