@@ -299,7 +299,7 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
     size_t num_total_dofs = cbs + num_faces*fbs;
     size_t nb_lag         = priv::nb_lag(N);
 
-    matrix_type stiff          = matrix_type::Zero(rbs, rbs);
+    matrix_type stiff  = matrix_type::Zero(rbs, rbs);
     matrix_type gr_lhs = matrix_type::Zero( rbs_ho + nb_lag, rbs_ho + nb_lag);
     matrix_type gr_rhs = matrix_type::Zero( rbs_ho + nb_lag, num_total_dofs);
 
@@ -341,14 +341,15 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
         }
     }
 
-    #if 0
+    //#if 0
     vector_type rot = vector_type::Zero(rbs);
     for (auto& qp : qps)
     {
         auto rphi = cb.eval_curls(qp.point());
         rot += qp.weight() * rphi;
     }
-    #endif
+    //#endif
+    #if 0
     static_matrix<T, 2, 2> SS =  static_matrix<T, 2, 2>::Zero();
     SS << 0., 1., -1., 0.;
 
@@ -365,6 +366,7 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
             }
         }
     }
+    #endif
 
     gr_lhs.block(0, rbs_ho, rbs_ho, nb_lag ) = rot.tail(rbs_ho);
     gr_lhs.block(rbs_ho, 0, nb_lag, rbs_ho ) = rot.tail(rbs_ho).transpose();

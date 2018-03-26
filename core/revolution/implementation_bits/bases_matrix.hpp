@@ -526,26 +526,29 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
    }
 
 
-   eigen_compatible_stdvector<function_type>
-   eval_functions(const point_type& pt) const
-   {
-      eigen_compatible_stdvector<function_type> ret;
-      ret.reserve(basis_size);
+    eigen_compatible_stdvector<function_type>
+    eval_functions(const point_type& pt) const
+    {
+        eigen_compatible_stdvector<function_type> ret;
+        ret.reserve(basis_size);
 
-      const auto phi = scalar_basis.eval_functions(pt);
+        const auto phi = scalar_basis.eval_functions(pt);
 
-      for (size_t k = 0; k < scalar_basis.size(); k++) {
-         function_type fc;
+        for (size_t k = 0; k < scalar_basis.size(); k++)
+        {
+            function_type fc;
 
-         for (size_t j = 0; j < 2; j++) {
-            for (size_t i = 0; i < j; i++) {
-               fc       = function_type::Zero();
-               fc(i, j) = phi(k);
-               fc(j, i) = phi(k);
-               ret.push_back(fc);
+            for (size_t j = 0; j < 2; j++)
+            {
+                for (size_t i = 0; i < j; i++)
+                {
+                    fc       = function_type::Zero();
+                    fc(i, j) = phi(k);
+                    fc(j, i) = phi(k);
+                    ret.push_back(fc);
+                }
             }
         }
-
         assert(ret.size() == basis_size);
 
         return ret;
@@ -593,26 +596,29 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
    eigen_compatible_stdvector<function_type>
    eval_functions(const point_type& pt) const
    {
-      eigen_compatible_stdvector<function_type> ret;
-      ret.reserve(basis_size);
+        eigen_compatible_stdvector<function_type> ret;
+        ret.reserve(basis_size);
 
-      const auto phi = scalar_basis.eval_functions(pt);
+        const auto phi = scalar_basis.eval_functions(pt);
 
-      for (size_t k = 0; k < scalar_basis.size(); k++) {
-         function_type fc;
+        for (size_t k = 0; k < scalar_basis.size(); k++)
+        {
+           function_type fc;
 
-         for (size_t j = 0; j < 2; j++) {
-            for (size_t i = 0; i < j; i++) {
-               fc       = function_type::Zero();
-               fc(i, j) = phi(k);
-               fc(j, i) = phi(k);
-               ret.push_back(fc);
-            }
+            for (size_t j = 0; j < 2; j++)
+            {
+                for (size_t i = 0; i < j; i++)
+                {
+                   fc       = function_type::Zero();
+                   fc(i, j) = phi(k);
+                   fc(j, i) = phi(k);
+                   ret.push_back(fc);
+                }
             fc       = function_type::Zero();
             fc(j, j) = phi(k);
             ret.push_back(fc);
-         }
-      }
+            }
+        }
 
       assert(ret.size() == basis_size);
       return ret;

@@ -206,8 +206,8 @@ run_stokes_symmetric(const Mesh& msh, size_t degree)
         //ret(1) = + cy * ax + by * dx + 5.* y4;
 
         //sym laplacian
-        ret(0) = -  ( cx * ay + bx * dy ) + 5.* x4;
-        ret(1) = +  ( cy * ax + by * dx ) + 5.* y4;
+        ret(0) = -  0.5 * ( cx * ay + bx * dy ) + 5.* x4;
+        ret(1) = +  0.5 * ( cy * ax + by * dx ) + 5.* y4;
 
         return ret;
     };
@@ -243,9 +243,9 @@ run_stokes_symmetric(const Mesh& msh, size_t degree)
     for (auto cl : msh)
     {
 
-        auto gr = make_hho_vector_symmetric_laplacian(msh, cl, hdi);
+        //auto gr = make_hho_vector_symmetric_laplacian(msh, cl, hdi);
         //std::cout << "size gr_Rhs : "<< gr.first.rows() << " x "<< gr.first.cols() << std::endl;
-        //auto gr_2 = make_hho_sym_gradrec_matrix(msh, cl, hdi);
+        auto gr = make_hho_sym_gradrec_matrix(msh, cl, hdi);
         //std::cout << "size gr_Rhs : "<< gr_2.first.rows() << " x "<< gr_2.first.cols() << std::endl;
 
         Matrix<scalar_type, Dynamic, Dynamic> stab;
@@ -257,7 +257,7 @@ run_stokes_symmetric(const Mesh& msh, size_t degree)
 
         auto rhs = make_rhs(msh, cl, face_basis, rhs_fun);
 
-        assembler.assemble(msh, cl, (gr.second + stab), -dr.first, rhs, sol_fun);
+        assembler.assemble(msh, cl, 2. * (gr.second + stab), -dr.first, rhs, sol_fun);
 
     }
 
