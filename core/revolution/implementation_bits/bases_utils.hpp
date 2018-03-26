@@ -66,6 +66,19 @@ outer_product(const eigen_compatible_stdvector<Matrix<T, N, N>>& a,
 	return ret;
 }
 
+template<typename T, int N>
+Matrix<T, Dynamic, Dynamic>
+outer_product(const eigen_compatible_stdvector<Matrix<T, N, N>>& a,
+              const Matrix<T, N, N>& b)
+{
+	Matrix<T, Dynamic, 1> ret(a.size());
+
+	for (size_t i = 0; i < a.size(); i++)
+		ret(i) = a[i].cwiseProduct(b).sum();
+
+	return ret;
+}
+
 template<typename T>
 Matrix<T, Dynamic, 1>
 inner_product(const T& a, const Matrix<T, Dynamic, 1>& b)
@@ -178,6 +191,9 @@ template<typename Mesh>
 using VRT = Matrix<typename Mesh::coordinate_type, Mesh::dimension, 1>;
 
 template<typename Mesh>
+using MRT = Matrix<typename Mesh::coordinate_type, Mesh::dimension, Mesh::dimension>;
+
+template<typename Mesh>
 using PT = typename Mesh::point_type;
 
 
@@ -186,6 +202,9 @@ using scalar_rhs_function = std::function<SRT<Mesh>(PT<Mesh>)>;
 
 template<typename Mesh>
 using vector_rhs_function = std::function<VRT<Mesh>(PT<Mesh>)>;
+
+template<typename Mesh>
+using matrix_rhs_function = std::function<MRT<Mesh>(PT<Mesh>)>;
 
 template<typename Mesh, typename Element>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
@@ -213,6 +232,34 @@ project_function(const Mesh& msh, const Element& elem,
     Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, elem, basis, di);
     Matrix<T, Dynamic, 1> rhs = make_rhs(msh, elem, basis, f, di);
     return mass.llt().solve(rhs);
+}
+
+template<typename Mesh, typename Element>
+Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+project_gradient(const Mesh& msh, const Element& elem,
+                 size_t degree,
+                 const matrix_rhs_function<Mesh>& f, size_t di = 0)
+{
+    using T = typename Mesh::coordinate_type;
+
+    auto basis = make_vector_monomial_basis(msh, elem, degree);
+    size_t N = Mesh::dimension;
+
+    auto basis_size = vector_basis_size(degree, Mesh::dimension, Mesh::dimension);
+
+    Matrix<T, Dynamic, Dynamic> stiff = make_stiffness_matrix(msh, elem, basis, di);
+    Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(basis_size);
+
+    auto qps = integrate(msh, elem, 2*(degree+di));
+
+    for (auto& qp : qps)
+    {
+        auto dphi = basis.eval_gradients(qp.point());
+        auto rhs_func = f(qp.point());
+        rhs += qp.weight() * priv::outer_product(dphi, rhs_func);
+    }
+
+    return stiff.block(N,N, basis_size-N, basis_size-N).llt().solve(rhs.tail(basis_size-N));
 }
 
 template<typename T>

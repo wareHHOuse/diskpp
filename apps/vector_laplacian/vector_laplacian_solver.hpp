@@ -24,12 +24,7 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-/* Solve the linear elasticity problem with HHO method
- * A hybrid high-order locking-free method for linear elasticity on general meshes
- * Di Pietro, Daniele A. and Ern, Alexandre.
- * Comput. Methods Appl. Mech. Engrg. (2015)
- *  DOI: 10.1016/j.cma.2014.09.009
- */
+// Solve the vector laplacian problem with HHO method
 
 #include <iostream>
 #include <sstream>
@@ -65,14 +60,13 @@ struct postprocess_info
    double time_postprocess;
 };
 
-struct ElasticityParameters
+struct Parameters
 {
    double lambda;
-   double mu;
 };
 
 template<typename Mesh>
-class linear_elasticity_solver
+class vector_laplacian_solver
 {
    typedef Mesh                                           mesh_type;
    typedef typename mesh_type::scalar_type                scalar_type;
@@ -102,14 +96,14 @@ class linear_elasticity_solver
 
    bool m_verbose;
 
-   ElasticityParameters m_elas_parameters;
+   Parameters m_parameters;
 
  public:
-   linear_elasticity_solver(const mesh_type&           msh,
-                            const bnd_type&            bnd,
-                            const ElasticityParameters data,
-                            size_t                     degree,
-                            int                        l = 0) :
+   vector_laplacian_solver(const mesh_type& msh,
+                           const bnd_type&  bnd,
+                           const Parameters data,
+                           size_t           degree,
+                           int              l = 0) :
      m_msh(msh),
      m_verbose(false), m_bnd(bnd)
    {
@@ -126,8 +120,7 @@ class linear_elasticity_solver
       m_cell_degree = degree + l;
       m_face_degree = degree;
 
-      m_elas_parameters.mu     = data.mu;
-      m_elas_parameters.lambda = data.lambda;
+      m_parameters.lambda = data.lambda;
 
       m_hdi       = revolution::hho_degree_info(m_cell_degree, m_face_degree);
       m_assembler = revolution::make_mechanics_assembler(m_msh, m_hdi, m_bnd);
@@ -141,10 +134,9 @@ class linear_elasticity_solver
    }
 
    void
-   changeElasticityParameters(const ElasticityParameters data)
+   changeParameters(const Parameters data)
    {
-      m_elas_parameters.mu     = data.mu;
-      m_elas_parameters.lambda = data.lambda;
+      m_parameters.lambda = data.lambda;
    }
 
    bool
@@ -178,26 +170,20 @@ class linear_elasticity_solver
 
       for (auto& cl : m_msh) {
          tc.tic();
-         const auto sgr = make_hho_vector_symmetric_laplacian(m_msh, cl, m_hdi);
+         const auto gr = make_hho_vector_laplacian(m_msh, cl, m_hdi);
          tc.toc();
          ai.time_gradrec += tc.to_double();
 
          tc.tic();
-         const auto dr = make_hho_divergence_reconstruction(m_msh, cl, m_hdi);
-         tc.toc();
-         ai.time_divrec += tc.to_double();
-
-         tc.tic();
-         const auto stab = make_hho_fancy_stabilization_vector(m_msh, cl, sgr.first, m_hdi);
+         const auto stab = make_hho_fancy_stabilization_vector(m_msh, cl, gr.first, m_hdi);
          tc.toc();
          ai.time_stab += tc.to_double();
 
          tc.tic();
          auto       cb = revolution::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
-         const auto cell_rhs = make_rhs(m_msh, cl, cb, lf);
-         const matrix_dynamic loc =
-           2.0 * m_elas_parameters.mu * (sgr.second + stab) + m_elas_parameters.lambda * dr.second;
-         const auto scnp = statcond.compute(m_msh, cl, loc, cell_rhs, m_hdi);
+         const auto cell_rhs       = make_rhs(m_msh, cl, cb, lf);
+         const matrix_dynamic loc  = m_parameters.lambda * (gr.second + stab);
+         const auto           scnp = statcond.compute(m_msh, cl, loc, cell_rhs, m_hdi);
 
          m_AL.push_back(statcond.AL);
          m_bL.push_back(statcond.bL);
@@ -307,7 +293,7 @@ class linear_elasticity_solver
          const auto x = m_solution_data.at(cell_i++);
 
          const vector_dynamic true_dof =
-           revolution::project_function(m_msh, cl, m_hdi.cell_degree(), as, 2*di);
+           revolution::project_function(m_msh, cl, m_hdi.cell_degree(), as, 2 * di);
 
          auto cb = revolution::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
          const matrix_dynamic mass = revolution::make_mass_matrix(m_msh, cl, cb);
@@ -323,56 +309,45 @@ class linear_elasticity_solver
 
    template<typename AnalyticalSolution>
    scalar_type
-   compute_l2_stress_error(const AnalyticalSolution& stress) const
+   compute_l2_gradient_error(const AnalyticalSolution& as)
    {
-      const auto face_degree = m_hdi.face_degree();
-      const auto rec_degree  = m_hdi.reconstruction_degree();
+      scalar_type  err_dof = 0;
+      const size_t recdeg  = m_hdi.reconstruction_degree();
 
-      size_t      cell_i = 0;
-      scalar_type error_stress(0.0);
+      const size_t rbs    = revolution::vector_basis_size(recdeg, dimension, dimension);
+      const size_t N      = dimension;
+      size_t       cell_i = 0;
 
       for (auto& cl : m_msh) {
-         const auto           x   = m_solution_data.at(cell_i++);
-         const auto           sgr = make_hho_vector_symmetric_laplacian(m_msh, cl, m_hdi);
-         const vector_dynamic GTu = sgr.first * x;
+         const auto x   = m_solution_data.at(cell_i++);
+         const auto gr  = revolution::make_hho_vector_laplacian(m_msh, cl, m_hdi);
+         const auto RTu = gr.first * x;
 
-         const auto           dr   = make_hho_divergence_reconstruction(m_msh, cl, m_hdi);
-         const vector_dynamic divu = dr.first * x;
+         const vector_dynamic true_dof = revolution::project_gradient(m_msh, cl, recdeg, as);
 
-         auto cbas_v = revolution::make_vector_monomial_basis(m_msh, cl, rec_degree);
-         auto cbas_s = revolution::make_scalar_monomial_basis(m_msh, cl, face_degree);
+         auto cb = revolution::make_vector_monomial_basis(m_msh, cl, recdeg);
 
-         auto qps = revolution::integrate(m_msh, cl, 2 * face_degree);
-         for (auto& qp : qps) {
-            const auto gphi   = cbas_v.eval_sgradients(qp.point());
-            const auto GT_iqn = revolution::eval(GTu, gphi, dimension);
+         const vector_dynamic diff_dof = (true_dof - RTu);
+         assert(RTu.size() == true_dof.size());
 
-            const auto divphi   = cbas_s.eval_functions(qp.point());
-            const auto divu_iqn = revolution::eval(divu, divphi);
+         const auto stiff = revolution::make_stiffness_matrix(m_msh, cl, cb);
 
-            const auto sigma = 2.0 * m_elas_parameters.mu * GT_iqn +
-                               m_elas_parameters.lambda * divu_iqn *
-                                 static_matrix<scalar_type, dimension, dimension>::Identity();
-
-            const auto stress_diff = (stress(qp.point()) - sigma).eval();
-
-            error_stress += qp.weight() * disk::mm_prod(stress_diff, stress_diff);
-         }
+         err_dof += diff_dof.dot(stiff.block(N, N, rbs - N, rbs - N) * diff_dof);
       }
 
-      return sqrt(error_stress);
+      return sqrt(err_dof);
    }
 
    void
-   compute_continuous_displacement(const std::string& filename) const
+   compute_continuous_solution(const std::string& filename) const
    {
-      const size_t cell_degree   = m_hdi.cell_degree();
-      const size_t cbs = revolution::vector_basis_size(cell_degree, dimension, dimension);
+      const size_t cell_degree = m_hdi.cell_degree();
+      const size_t cbs         = revolution::vector_basis_size(cell_degree, dimension, dimension);
 
       // compute mesh for post-processing
       disk::PostMesh<mesh_type> post_mesh = disk::PostMesh<mesh_type>(m_msh);
-      gmsh::Gmesh gmsh    = disk::convertMesh(post_mesh);
-      auto        storage = post_mesh.mesh().backend_storage();
+      gmsh::Gmesh               gmsh      = disk::convertMesh(post_mesh);
+      auto                      storage   = post_mesh.mesh().backend_storage();
 
       const static_vector<scalar_type, dimension> vzero =
         static_vector<scalar_type, dimension>::Zero();
@@ -418,7 +393,7 @@ class linear_elasticity_solver
       }
 
       // Create and init a nodedata view
-      gmsh::NodeData nodedata(3, 0.0, "depl_node_cont", data, subdata);
+      gmsh::NodeData nodedata(3, 0.0, "sol_node_cont", data, subdata);
       // Save the view
       nodedata.saveNodeData(filename, gmsh);
    }

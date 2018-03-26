@@ -212,7 +212,7 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
     matrix_type gr_lhs = matrix_type::Zero(rbs-N, rbs-N);
     matrix_type gr_rhs = matrix_type::Zero(rbs-N, cbs + num_faces*fbs);
 
-    auto qps = integrate(msh, cl, 2*recdeg);
+    auto qps = integrate(msh, cl, 2*(recdeg-1));
     for (auto& qp : qps)
     {
         auto dphi = cb.eval_gradients(qp.point());
@@ -229,7 +229,7 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
         auto n  = normal(msh, cl, fc);
         auto fb = make_vector_monomial_basis(msh, fc, facdeg);
 
-        auto qps_f = integrate(msh, fc, 2*facdeg);
+        auto qps_f = integrate(msh, fc, std::max(facdeg, celdeg) + recdeg-1);
         for (auto& qp : qps_f)
         {
             function_type   c_phi_tmp = cb.eval_functions(qp.point());
