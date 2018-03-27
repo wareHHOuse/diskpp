@@ -177,6 +177,7 @@ public:
             ret(j++) =   dphi_i(1);
             ret(j++) = - dphi_i(0);
         }
+        assert(j == basis_size - 1);
         return ret;
     }
 
