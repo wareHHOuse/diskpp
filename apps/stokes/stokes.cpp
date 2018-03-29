@@ -40,136 +40,88 @@
 
 #include "output/silo.hpp"
 
-template<typename Mesh>
-typename Mesh::scalar_type
-run_stokes(const Mesh& msh, size_t degree)
+template<typename Mesh, typename Velocity, typename Pressure, typename Assembler>
+auto
+compute_errors(const Mesh& msh,
+                const dynamic_vector<typename Mesh::scalar_type>& sol,
+                const typename revolution::hho_degree_info & hdi,
+                const Velocity& velocity,
+                const Pressure& pressure,
+                const Assembler& assembler,
+                const bool& use_sym_grad)
 {
-
     typedef Mesh mesh_type;
-    typedef typename mesh_type::cell        cell_type;
-    typedef typename mesh_type::face        face_type;
     typedef typename mesh_type::scalar_type scalar_type;
 
-    typedef dynamic_matrix<scalar_type>     matrix_type;
+    auto dim =  Mesh::dimension;
 
-    using point_type = typename mesh_type::point_type;
+    scalar_type factor = (use_sym_grad)? 2. : 1.;
 
-    auto rhs_fun = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
-        Matrix<scalar_type, 2, 1> ret;
-
-        scalar_type x1 = p.x();
-        scalar_type x2 = std::pow(p.x(), 2.);
-        scalar_type x3 = std::pow(p.x(), 3.);
-        scalar_type x4 = std::pow(p.x(), 4.);
-        scalar_type y1 = p.y();
-
-        scalar_type y2 = y1 * y1;
-        scalar_type y3 = y2 * y1;
-        scalar_type y4 = y2 * y2;
-
-        scalar_type cx = 12. * x2 - 12.* x1 + 2.;
-        scalar_type cy = 12. * y2 - 12.* y1 + 2.;
-        scalar_type ay =  4. * y3 - 6. * y2 + 2.* y1;
-        scalar_type ax =  4. * x3 - 6. * x2 + 2.* x1;
-        scalar_type bx = x4 - 2. * x3 + x2;
-        scalar_type by = y4 - 2. * y3 + y2;
-        scalar_type dx = 24. * x1 - 12.;
-        scalar_type dy = 24. * y1 - 12.;
-
-        //laplacian
-        ret(0) = - cx * ay - bx * dy + 5.* x4;
-        ret(1) = + cy * ax + by * dx + 5.* y4;
-
-        //sym laplacian
-        //ret(0) = - 0.5 * ( cx * ay + bx * dy ) + 5.* x4;
-        //ret(1) = + 0.5 * ( cy * ax + by * dx ) + 5.* y4;
-
-        return ret;
-    };
-
-    auto sol_fun = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
-        Matrix<scalar_type, 2, 1> ret;
-
-        scalar_type x1 = p.x();
-        scalar_type x2 = std::pow(p.x(), 2.);
-        scalar_type x3 = std::pow(p.x(), 3.);
-        scalar_type x4 = std::pow(p.x(), 4.);
-        scalar_type y1 = p.y();
-        scalar_type y2 = std::pow(p.y(), 2.);
-        scalar_type y3 = std::pow(p.y(), 3.);
-        scalar_type y4 = std::pow(p.y(), 4.);
-
-        ret(0) =  (x4 - 2. * x3 + x2)  * ( 4. * y3 - 6. * y2 + 2.* y1 );
-        ret(1) = -(y4 - 2. * y3 + y2 ) * ( 4. * x3 - 6. * x2 + 2.* x1 );
-
-        return ret;
-    };
-
-
-    typename revolution::hho_degree_info hdi(degree);
-
-    auto assembler = revolution::make_stokes_assembler(msh, hdi);
-
-    for (auto cl : msh)
-    {
-        auto gr = make_hho_vector_laplacian(msh, cl, hdi);
-
-        Matrix<scalar_type, Dynamic, Dynamic> stab;
-        stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
-        auto dr = make_hho_divergence_reconstruction(msh, cl, hdi);
-        auto face_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.face_degree());
-        auto rhs = make_rhs(msh, cl, face_basis, rhs_fun);
-        assembler.assemble(msh, cl,  (gr.second + stab), -dr.first, rhs, sol_fun);
-    }
-
-    assembler.finalize();
-
-    //dump_sparse_matrix(assembler.LHS, "stokes.txt");
-
-    size_t systsz = assembler.LHS.rows();
-    size_t nnz = assembler.LHS.nonZeros();
-
-    dynamic_vector<scalar_type> sol = dynamic_vector<scalar_type>::Zero(systsz);
-
-    disk::solvers::pardiso_params<scalar_type> pparams;
-    mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);
-
-    //std::ofstream ofs("velocity.dat");
-
-    scalar_type error = 0.0;
+    scalar_type error(0), error_vel(0), error_pres(0);
 
     for (auto& cl : msh)
     {
     	auto bar = barycenter(msh, cl);
-
-    	Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, sol_fun);
-
-    	auto cbs = revolution::vector_basis_size(degree, Mesh::dimension, Mesh::dimension);
-
+    	Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, velocity);
+    	auto cbs = revolution::vector_basis_size(hdi.cell_degree(), dim, dim);
     	auto cell_ofs = revolution::priv::offset(msh, cl);
     	Matrix<scalar_type, Dynamic, 1> s = sol.block(cell_ofs * cbs, 0, cbs, 1);
-
     	Matrix<scalar_type, Dynamic, 1> diff = s - p.head(cbs);
-
     	auto cb = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
-
     	Matrix<scalar_type, Dynamic, Dynamic> mm = revolution::make_mass_matrix(msh, cl, cb);
-
     	error += diff.dot(mm*diff);
-
     	//ofs << bar.x() << " " << bar.y() << " " << s(0) << " " << s(1) << std::endl;
+
+        //pressure error
+        Matrix<scalar_type, Dynamic, 1> ppres = project_function(msh, cl, hdi, pressure);
+        auto fbs = revolution::vector_basis_size(hdi.face_degree(), dim - 1, dim);
+        auto pbs = revolution::scalar_basis_size(hdi.cell_degree(), dim);
+        auto pb  = revolution::make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        auto num_other_faces = assembler.num_assembled_faces();
+        auto pres_ofs = cbs * msh.cells_size() + fbs * num_other_faces + pbs * cell_ofs;
+
+        Matrix<scalar_type, Dynamic, 1> spres = sol.block(pres_ofs, 0, pbs, 1);
+    	Matrix<scalar_type, Dynamic, 1> diff_pres = spres - ppres.head(pbs);
+    	Matrix<scalar_type, Dynamic, Dynamic> scalar_mm = revolution::make_mass_matrix(msh, cl, pb);
+    	error_pres += diff_pres.dot(scalar_mm*diff_pres);
+
+        //energy error
+        auto num_faces = howmany_faces(msh, cl);
+        Matrix<scalar_type, Dynamic, 1> svel(cbs + num_faces * fbs );
+        svel.block(0, 0, cbs, 1) = sol.block(cell_ofs * cbs, 0, cbs, 1);
+        auto fcs = faces(msh, cl);
+        for (size_t i = 0; i < fcs.size(); i++)
+        {
+            auto fc = fcs[i];
+
+            if (msh.is_boundary(fc))
+            {
+                auto fb = revolution::make_vector_monomial_basis(msh, fc, hdi.face_degree());
+                Matrix<scalar_type, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, hdi.face_degree());
+                Matrix<scalar_type, Dynamic, 1> rhs = make_rhs(msh, fc, fb, velocity, hdi.face_degree());
+                svel.block(cbs + i * fbs, 0, fbs, 1) = mass.llt().solve(rhs);
+            }
+            else
+            {
+                auto face_offset = assembler.global_face_offset(msh, fc);
+                svel.block(cbs + i*fbs, 0, fbs, 1) = sol.block(face_offset, 0, fbs, 1);
+            }
+        }
+        Matrix<scalar_type, Dynamic, 1> diff_vel = svel - p;
+        auto gr = make_hho_stokes(msh, cl, hdi, use_sym_grad);
+        Matrix<scalar_type, Dynamic, Dynamic> stab;
+        stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
+        error_vel += diff_vel.dot(factor * (gr.second + stab)*diff_vel);
     }
 
     //ofs.close();
-
-    return std::sqrt(error);
-
+    return std::make_pair(std::sqrt(error_vel), std::sqrt(error_pres));
 }
-template<typename Mesh>
-typename Mesh::scalar_type
-run_stokes_symmetric(const Mesh& msh, size_t degree)
-{
 
+template<typename Mesh>
+auto
+run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
+{
     typedef Mesh mesh_type;
     typedef typename mesh_type::cell        cell_type;
     typedef typename mesh_type::face        face_type;
@@ -184,79 +136,56 @@ run_stokes_symmetric(const Mesh& msh, size_t degree)
 
         scalar_type x1 = p.x();
         scalar_type x2 = x1 * x1;
-        scalar_type x3 = x2 * x1;
-        scalar_type x4 = x2 * x2;
         scalar_type y1 = p.y();
         scalar_type y2 = y1 * y1;
-        scalar_type y3 = y2 * y1;
-        scalar_type y4 = y2 * y2;
 
+        scalar_type ax =  x2 * (x2 - 2. * x1 + 1.);
+        scalar_type ay =  y2 * (y2 - 2. * y1 + 1.);
+        scalar_type bx =  x1 * (4. * x2 - 6. * x1 + 2.);
+        scalar_type by =  y1 * (4. * y2 - 6. * y1 + 2.);
         scalar_type cx = 12. * x2 - 12.* x1 + 2.;
         scalar_type cy = 12. * y2 - 12.* y1 + 2.;
-        scalar_type ay =  4. * y3 - 6. * y2 + 2.* y1;
-        scalar_type ax =  4. * x3 - 6. * x2 + 2.* x1;
-        scalar_type bx = x4 - 2. * x3 + x2;
-        scalar_type by = y4 - 2. * y3 + y2;
         scalar_type dx = 24. * x1 - 12.;
         scalar_type dy = 24. * y1 - 12.;
 
-        //laplacian
-        //ret(0) = - cx * ay - bx * dy + 5.* x4;
-        //ret(1) = + cy * ax + by * dx + 5.* y4;
-
-        //sym laplacian
-        ret(0) = -   ( cx * ay + bx * dy ) + 5.* x4;
-        ret(1) = +   ( cy * ax + by * dx ) + 5.* y4;
+        ret(0) = - cx * by - ax * dy + 5.* x2 * x2;
+        ret(1) = + cy * bx + ay * dx + 5.* y2 * y2;
 
         return ret;
     };
 
-    auto sol_fun = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
+    auto velocity = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
         Matrix<scalar_type, 2, 1> ret;
 
         scalar_type x1 = p.x();
         scalar_type x2 = x1 * x1;
-        scalar_type x3 = x2 * x1;
-        scalar_type x4 = x2 * x2;
         scalar_type y1 = p.y();
         scalar_type y2 = y1 * y1;
-        scalar_type y3 = y2 * y1;
-        scalar_type y4 = y2 * y2;
 
-        scalar_type bx = x4 - 2. * x3 + x2;
-        scalar_type by = y4 - 2. * y3 + y2;
-        scalar_type ay = 4. * y3 - 6. * y2 + 2.* y1;
-        scalar_type ax = 4. * x3 - 6. * x2 + 2.* x1;
-
-        ret(0) =  bx * ay;
-        ret(1) = -by * ax;
+        ret(0) =  x2 * (x2 - 2. * x1 + 1.)  * y1 * (4. * y2 - 6. * y1 + 2.);
+        ret(1) = -y2 * (y2 - 2. * y1 + 1. ) * x1 * (4. * x2 - 6. * x1 + 2.);
 
         return ret;
     };
+    auto pressure =  [](const point_type& p) -> scalar_type {
+        return std::pow(p.x(), 5.)  +  std::pow(p.y(), 5.)  - 1./3.;
+    };
 
-    typename revolution::hho_degree_info hdi(degree);
+    typename revolution::hho_degree_info hdi(degree + 1, degree);
 
     auto assembler = revolution::make_stokes_assembler(msh, hdi);
 
+    scalar_type factor = (use_sym_grad)? 2. : 1.;
+
     for (auto cl : msh)
     {
-
-        auto gr = make_hho_vector_symmetric_laplacian(msh, cl, hdi);
-        //std::cout << "size gr_Rhs : "<< gr.first.rows() << " x "<< gr.first.cols() << std::endl;
-        //auto gr = make_hho_sym_gradrec_matrix(msh, cl, hdi);
-        //std::cout << "size gr_Rhs : "<< gr_2.first.rows() << " x "<< gr_2.first.cols() << std::endl;
-
+        auto gr = make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
-
-        auto dr = make_hho_divergence_reconstruction(msh, cl, hdi);
-
-        auto face_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.face_degree());
-
-        auto rhs = make_rhs(msh, cl, face_basis, rhs_fun);
-
-        assembler.assemble(msh, cl, 2. * (gr.second + stab), -dr.first, rhs, sol_fun);
-
+        auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, hdi);
+        auto cell_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
+        auto rhs = make_rhs(msh, cl, cell_basis, rhs_fun);
+        assembler.assemble(msh, cl, factor * (gr.second + stab), -dr, rhs, velocity);
     }
 
     assembler.finalize();
@@ -270,43 +199,17 @@ run_stokes_symmetric(const Mesh& msh, size_t degree)
 
     disk::solvers::pardiso_params<scalar_type> pparams;
     mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);
-
     //std::ofstream ofs("velocity.dat");
 
-    scalar_type error = 0.0;
+    auto error = compute_errors(msh, sol, hdi, velocity, pressure, assembler, use_sym_grad);
 
-    for (auto& cl : msh)
-    {
-    	auto bar = barycenter(msh, cl);
-
-    	Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, sol_fun);
-
-    	auto cbs = revolution::vector_basis_size(degree, Mesh::dimension, Mesh::dimension);
-
-    	auto cell_ofs = revolution::priv::offset(msh, cl);
-    	Matrix<scalar_type, Dynamic, 1> s = sol.block(cell_ofs * cbs, 0, cbs, 1);
-
-    	Matrix<scalar_type, Dynamic, 1> diff = s - p.head(cbs);
-
-    	auto cb = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
-
-    	Matrix<scalar_type, Dynamic, Dynamic> mm = revolution::make_mass_matrix(msh, cl, cb);
-
-    	error += diff.dot(mm*diff);
-
-    	//ofs << bar.x() << " " << bar.y() << " " << s(0) << " " << s(1) << std::endl;
-    }
-
-    //ofs.close();
-
-    return std::sqrt(error);
-
+    return error;
 }
 
 void convergence_test_typ1(void)
 {
     using T = double;
-
+    bool use_sym_grad = true;
     std::vector<std::string> meshfiles;
     /*
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_1.typ1");
@@ -317,13 +220,11 @@ void convergence_test_typ1(void)
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_6.typ1");
     */
 
-
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_1.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_2.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_3.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
-
 
     /*
     meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_1.typ1");
@@ -332,13 +233,15 @@ void convergence_test_typ1(void)
     meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_4.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_5.typ1");
     */
+    std::cout << "                   velocity H1-error";
+    std::cout << "    -     pressure L2-error "<< std::endl;
 
     for (size_t k = 0; k < 5; k++)
     {
         std::cout << "DEGREE " << k << std::endl;
 
         std::vector<T> mesh_hs;
-        std::vector<T> l2_velocity_errors;
+        std::vector<std::pair<T,T>> errors;
 
         for (size_t i = 0; i < meshfiles.size(); i++)
         {
@@ -353,9 +256,10 @@ void convergence_test_typ1(void)
             }
             loader.populate_mesh(msh);
 
-            auto error = run_stokes(msh, k);
+            auto error = run_stokes(msh, k, use_sym_grad);
+
             mesh_hs.push_back( disk::mesh_h(msh) );
-            l2_velocity_errors.push_back(error);
+            errors.push_back(error);
         }
 
         for (size_t i = 0; i < mesh_hs.size(); i++)
@@ -363,18 +267,25 @@ void convergence_test_typ1(void)
             if (i == 0)
             {
                 std::cout << "    ";
-                std::cout << std::scientific << std::setprecision(5) << mesh_hs.at(i) << "    ";
-                std::cout << std::scientific << std::setprecision(5) << l2_velocity_errors.at(i);
+                std::cout << std::scientific << std::setprecision(4) << mesh_hs.at(i) << "    ";
+                std::cout << std::scientific << std::setprecision(4) << errors.at(i).first;
+                std::cout << "     -- " << "          ";
+                std::cout << std::scientific << std::setprecision(4) << errors.at(i).second;
                 std::cout << "     -- " << std::endl;
             }
             else
             {
-                auto rate = std::log( l2_velocity_errors.at(i)/l2_velocity_errors.at(i-1) ) /
+                auto rate = std::log( errors.at(i).first/errors.at(i-1).first ) /
                             std::log( mesh_hs.at(i)/mesh_hs.at(i-1) );
                 std::cout << "    ";
-                std::cout << std::scientific << std::setprecision(5) << mesh_hs.at(i) << "    ";
-                std::cout << std::scientific << std::setprecision(5) << l2_velocity_errors.at(i) << "    ";
-                std::cout << std::defaultfloat << std::setprecision(3) << rate << std::endl;
+                std::cout << std::scientific  << std::setprecision(4) << mesh_hs.at(i) << "    ";
+                std::cout << std::scientific  << std::setprecision(4) << errors.at(i).first << "    ";
+                std::cout << std::fixed<< std::setprecision(2) << rate << "          ";
+
+                auto pres_rate = std::log( errors.at(i).second/errors.at(i-1).second ) /
+                            std::log( mesh_hs.at(i)/mesh_hs.at(i-1) );
+                std::cout << std::scientific  << std::setprecision(4) << errors.at(i).second << "    ";
+                std::cout << std::fixed << std::setprecision(2) << pres_rate << std::endl;
             }
         }
     }

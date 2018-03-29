@@ -1467,10 +1467,17 @@ auto make_diffusion_assembler(const Mesh& msh, hho_degree_info hdi)
 
 
 
-
-
-
-
+template<typename Mesh>
+auto
+make_hho_stokes(const Mesh& msh, const typename Mesh::cell_type& cl,
+                const hho_degree_info& hdi, const bool& use_sym_grad)
+{
+    if(use_sym_grad)
+        return make_hho_vector_symmetric_laplacian(msh, cl, hdi);
+    else
+        return make_hho_vector_laplacian(msh, cl, hdi);
+    //auto gr = make_hho_sym_gradrec_matrix(msh, cl, hdi);
+}
 
 template<typename Mesh>
 class stokes_assembler
@@ -1721,7 +1728,26 @@ public:
     {
         return num_other_faces;
     }
+    auto
+    global_face_offset(const Mesh& msh, const typename Mesh::face_type& fc )
+    {
+        auto cbs_A = vector_basis_size(di.cell_degree(), Mesh::dimension, Mesh::dimension);
+        auto fbs_A = vector_basis_size(di.face_degree(), Mesh::dimension-1, Mesh::dimension);
+        auto cbs_B = scalar_basis_size(di.cell_degree(), Mesh::dimension);
 
+        auto face_offset = priv::offset(msh, fc);
+        return cbs_A * msh.cells_size() + compress_table.at(face_offset)*fbs_A;
+    }
+    auto
+    global_face_offset(const Mesh& msh, const typename Mesh::face_type& fc ) const
+    {
+        auto cbs_A = vector_basis_size(di.cell_degree(), Mesh::dimension, Mesh::dimension);
+        auto fbs_A = vector_basis_size(di.face_degree(), Mesh::dimension-1, Mesh::dimension);
+        auto cbs_B = scalar_basis_size(di.cell_degree(), Mesh::dimension);
+
+        auto face_offset = priv::offset(msh, fc);
+        return cbs_A * msh.cells_size() + compress_table.at(face_offset)*fbs_A;
+    }
 };
 
 

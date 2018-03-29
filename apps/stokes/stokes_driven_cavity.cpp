@@ -77,10 +77,10 @@ run_stokes(const Mesh& msh, size_t degree)
 
         Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
-        auto dr = make_hho_divergence_reconstruction(msh, cl, hdi);
+        auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, hdi);
         auto face_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.face_degree());
         auto rhs = make_rhs(msh, cl, face_basis, rhs_fun);
-        assembler.assemble(msh, cl, (gr.second + stab), -dr.first, rhs, sol_fun);
+        assembler.assemble(msh, cl, (gr.second + stab), -dr, rhs, sol_fun);
     }
 
     assembler.finalize();
