@@ -108,7 +108,7 @@ compute_errors(const Mesh& msh,
             }
         }
         Matrix<scalar_type, Dynamic, 1> diff_vel = svel - p;
-        auto gr = make_hho_stokes(msh, cl, hdi, use_sym_grad);
+        auto gr = revolution::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
         error_vel += diff_vel.dot(factor * (gr.second + stab)*diff_vel);
@@ -128,6 +128,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     typedef typename mesh_type::scalar_type scalar_type;
 
     typedef dynamic_matrix<scalar_type>     matrix_type;
+    typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
 
     using point_type = typename mesh_type::point_type;
 
@@ -172,20 +173,22 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     };
 
     typename revolution::hho_degree_info hdi(degree + 1, degree);
+    boundary_type bnd(msh);
+    bnd.addDirichletEverywhere(velocity);
 
-    auto assembler = revolution::make_stokes_assembler(msh, hdi);
+    auto assembler = revolution::make_stokes_assembler(msh, hdi, bnd);
 
     scalar_type factor = (use_sym_grad)? 2. : 1.;
 
     for (auto cl : msh)
     {
-        auto gr = make_hho_stokes(msh, cl, hdi, use_sym_grad);
+        auto gr = revolution::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
         auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, hdi);
         auto cell_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
         auto rhs = make_rhs(msh, cl, cell_basis, rhs_fun);
-        assembler.assemble(msh, cl, factor * (gr.second + stab), -dr, rhs, velocity);
+        assembler.assemble(msh, cl, factor * (gr.second + stab), -dr, rhs);
     }
 
     assembler.finalize();
@@ -209,7 +212,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 void convergence_test_typ1(void)
 {
     using T = double;
-    bool use_sym_grad = true;
+    bool use_sym_grad = false;
     std::vector<std::string> meshfiles;
     /*
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_1.typ1");

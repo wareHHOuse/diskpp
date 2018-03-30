@@ -1483,11 +1483,13 @@ template<typename Mesh>
 class stokes_assembler
 {
     using T = typename Mesh::coordinate_type;
+    typedef disk::mechanics::BoundaryConditions<Mesh>    bnd_type;
+
     std::vector<size_t>                 compress_table;
     std::vector<size_t>                 expand_table;
 
+    bnd_type                            m_bnd;
     hho_degree_info                     di;
-
     std::vector< Triplet<T> >           triplets;
 
     size_t      num_all_faces, num_dirichlet_faces, num_other_faces;
@@ -1527,8 +1529,8 @@ public:
     SparseMatrix<T>         LHS;
     Matrix<T, Dynamic, 1>   RHS;
 
-    stokes_assembler(const Mesh& msh, hho_degree_info hdi)
-        : di(hdi)
+    stokes_assembler(const Mesh& msh, hho_degree_info hdi, const bnd_type& bnd)
+        : di(hdi), m_bnd(bnd)
     {
         auto is_dirichlet = [&](const typename Mesh::face_type& fc) -> bool {
             return msh.is_boundary(fc);
@@ -1553,14 +1555,22 @@ public:
             }
         }
 
-        auto cbs_A = vector_basis_size(hdi.cell_degree(), Mesh::dimension, Mesh::dimension);
-        auto fbs_A = vector_basis_size(hdi.face_degree(), Mesh::dimension-1, Mesh::dimension);
-        auto cbs_B = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+        auto cbs_A = vector_basis_size(di.cell_degree(), Mesh::dimension, Mesh::dimension);
+        auto fbs_A = vector_basis_size(di.face_degree(), Mesh::dimension-1, Mesh::dimension);
+        auto cbs_B = scalar_basis_size(di.cell_degree(), Mesh::dimension);
 
         auto system_size = cbs_A * msh.cells_size() + fbs_A * num_other_faces + cbs_B * msh.cells_size() + 1;
 
         LHS = SparseMatrix<T>( system_size, system_size );
         RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
+
+        // testing Boundary module of Nicolas
+        auto num_face_dofs = vector_basis_size(di.face_degree(), Mesh::dimension-1, Mesh::dimension);
+        size_t face_dofs = 0;
+        for (size_t face_id = 0; face_id < msh.faces_size(); face_id++)
+           face_dofs += num_face_dofs - m_bnd.dirichlet_imposed_dofs(face_id, di.face_degree());
+
+        assert(face_dofs == fbs_A * num_other_faces);
     }
 
 #if 0
@@ -1572,13 +1582,11 @@ public:
     }
 #endif
 
-    template<typename Function>
     void
     assemble(const Mesh& msh, const typename Mesh::cell_type& cl,
              const Matrix<T, Dynamic, Dynamic>& lhs_A,
              const Matrix<T, Dynamic, Dynamic>& lhs_B,
-             const Matrix<T, Dynamic, 1>& rhs,
-             const Function& dirichlet_bf)
+             const Matrix<T, Dynamic, 1>& rhs)
     {
         auto is_dirichlet = [&](const typename Mesh::face_type& fc) -> bool {
             return msh.is_boundary(fc);
@@ -1617,9 +1625,15 @@ public:
             if (dirichlet)
             {
                 auto fb = make_vector_monomial_basis(msh, fc, di.face_degree());
+                auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+                if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+
+                const auto face_id                  = eid.second;
+
+                auto dirichlet_fun  = m_bnd.dirichlet_boundary_func(face_id);
 
                 Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
-                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
+                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_fun, di.face_degree());
                 dirichlet_data.block(cbs_A + face_i*fbs_A, 0, fbs_A, 1) = mass.llt().solve(rhs);
             }
         }
@@ -1753,9 +1767,10 @@ public:
 
 
 template<typename Mesh>
-auto make_stokes_assembler(const Mesh& msh, hho_degree_info hdi)
+auto make_stokes_assembler(const Mesh& msh, hho_degree_info hdi,
+                            const  disk::mechanics::BoundaryConditions<Mesh>& bnd)
 {
-    return stokes_assembler<Mesh>(msh, hdi);
+    return stokes_assembler<Mesh>(msh, hdi, bnd);
 }
 
 template<typename Mesh>

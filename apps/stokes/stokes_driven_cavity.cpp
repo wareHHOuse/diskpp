@@ -38,19 +38,97 @@
 
 #include "solvers/solver.hpp"
 
+#include "output/gmshConvertMesh.hpp"
+#include "output/gmshDisk.hpp"
+#include "output/postMesh.hpp"
+
 #include "output/silo.hpp"
 
 template<typename Mesh>
-typename Mesh::scalar_type
-run_stokes(const Mesh& msh, size_t degree)
+void
+compute_discontinuous_velocity(const Mesh& msh,
+                        const dynamic_vector< typename Mesh::scalar_type>& sol,
+                        const typename revolution::hho_degree_info& hdi,
+                        const std::string& filename)
 {
+    typedef Mesh mesh_type;
+    typedef typename Mesh::scalar_type scalar_type;
+    const size_t cell_degree   = hdi.cell_degree();
+    const size_t cbs = revolution::vector_basis_size(cell_degree,
+                                    Mesh::dimension, Mesh::dimension);
+    // compute mesh for post-processing
+    disk::PostMesh<mesh_type> post_mesh = disk::PostMesh<mesh_type>(msh);
+    gmsh::Gmesh gmsh    = disk::convertMesh(post_mesh);
+    auto        storage = post_mesh.mesh().backend_storage();
 
+    const static_vector<scalar_type, Mesh::dimension> vzero =
+                            static_vector<scalar_type, Mesh::dimension>::Zero();
+
+    const size_t nb_nodes(gmsh.getNumberofNodes());
+
+    // first(number of data at this node), second(cumulated value)
+    std::vector<std::pair<size_t, static_vector<scalar_type, Mesh::dimension>>>
+                                    value(nb_nodes, std::make_pair(0, vzero));
+
+    size_t cell_i = 0;
+
+    for (auto& cl : msh)
+    {
+        auto cell_ofs = revolution::priv::offset(msh, cl);
+        Matrix<scalar_type, Dynamic, 1> x = sol.block(cell_ofs * cbs, 0, cbs, 1);
+
+        const auto cell_nodes = post_mesh.nodes_cell(cell_i);
+        auto  cbas = revolution::make_vector_monomial_basis(msh, cl, cell_degree);
+
+       // Loop on the nodes of the cell
+        for (auto& point_id : cell_nodes)
+        {
+            const auto pt = storage->points[point_id];
+
+            const auto phi = cbas.eval_functions(pt);
+            assert(phi.rows() == cbs);
+            const auto depl = revolution::eval(x, phi);
+
+            // Add displacement at node
+            value[point_id].first++;
+            value[point_id].second += depl;
+        }
+        cell_i++;
+    }
+
+    std::vector<gmsh::Data>    data;    // create data
+    std::vector<gmsh::SubData> subdata; // create subdata
+    data.reserve(nb_nodes);             // data has a size of nb_node
+
+    // Compute the average value and save it
+    for (size_t i_node = 0; i_node < value.size(); i_node++)
+    {
+        const static_vector<scalar_type, Mesh::dimension> depl_avr =
+                            value[i_node].second / double(value[i_node].first);
+
+        const gmsh::Data tmp_data(i_node + 1, disk::convertToVectorGmsh(depl_avr));
+        data.push_back(tmp_data);
+    }
+
+    // Create and init a nodedata view
+    gmsh::NodeData nodedata(3, 0.0, "depl_node_cont", data, subdata);
+    // Save the view
+    nodedata.saveNodeData(filename, gmsh);
+
+    return;
+}
+
+template<typename Mesh>
+auto
+run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
+{
     typedef Mesh mesh_type;
     typedef typename mesh_type::cell        cell_type;
     typedef typename mesh_type::face        face_type;
     typedef typename mesh_type::scalar_type scalar_type;
 
     typedef dynamic_matrix<scalar_type>     matrix_type;
+    typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
 
     using point_type = typename mesh_type::point_type;
 
@@ -58,29 +136,34 @@ run_stokes(const Mesh& msh, size_t degree)
         return Matrix<scalar_type, 2, 1>::Zero();
     };
 
-    auto sol_fun = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
-        if(std::abs(p.y() - 1.) <= 1.e-4)
-            return  Matrix<scalar_type, 2, 1>{1,0};
-        else
-            return Matrix<scalar_type, 2, 1>::Zero();
+    auto wall = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
+        return Matrix<scalar_type, 2, 1>::Zero();
+    };
+    auto movingWall = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
+        return Matrix<scalar_type, 2, 1>{1,0};
     };
 
+    typename revolution::hho_degree_info hdi(degree, degree);
+    boundary_type bnd(msh);
 
-    typename revolution::hho_degree_info hdi(degree);
+    bnd.addDirichletBC(0, 1, movingWall);
+    bnd.addDirichletBC(0, 2, wall);
+    bnd.addDirichletBC(0, 3, wall);
+    bnd.addDirichletBC(0, 4, wall);
 
-    auto assembler = revolution::make_stokes_assembler(msh, hdi);
+    auto assembler = revolution::make_stokes_assembler(msh, hdi, bnd);
+
+    scalar_type factor = (use_sym_grad)? 2. : 1.;
 
     for (auto cl : msh)
     {
-        //auto gr = make_hho_vector_symmetric_laplacian(msh, cl, hdi);
-        auto gr = make_hho_vector_laplacian(msh, cl, hdi);
-
+        auto gr = revolution::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
         auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, hdi);
-        auto face_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.face_degree());
-        auto rhs = make_rhs(msh, cl, face_basis, rhs_fun);
-        assembler.assemble(msh, cl, (gr.second + stab), -dr, rhs, sol_fun);
+        auto cb = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
+        auto rhs = make_rhs(msh, cl, cb, rhs_fun);
+        assembler.assemble(msh, cl, factor * (gr.second + stab), -dr, rhs);
     }
 
     assembler.finalize();
@@ -96,117 +179,53 @@ run_stokes(const Mesh& msh, size_t degree)
     mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);
 
     std::ofstream ofs("velocity.dat");
-
-    scalar_type error = 0.0;
-
     for (auto& cl : msh)
     {
-    	auto bar = barycenter(msh, cl);
-
-    	Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, sol_fun);
-
-    	auto cbs   = revolution::vector_basis_size(degree, Mesh::dimension, Mesh::dimension);
+        auto cbs   = revolution::vector_basis_size(degree, Mesh::dimension, Mesh::dimension);
         auto fbs   = revolution::vector_basis_size(degree, Mesh::dimension - 1, Mesh::dimension);
         auto cbs_B = revolution::scalar_basis_size(degree, Mesh::dimension);
 
-    	auto cell_ofs = revolution::priv::offset(msh, cl);
+        auto cell_ofs = revolution::priv::offset(msh, cl);
         auto num_other_faces = assembler.num_assembled_faces();
         auto offset_B = cbs * msh.cells_size() + fbs * num_other_faces + cbs_B * cell_ofs;
 
         Matrix<scalar_type, Dynamic, 1> s = sol.block(cell_ofs * cbs, 0, cbs, 1);
         Matrix<scalar_type, Dynamic, 1> press = sol.block( offset_B, 0, cbs_B, 1);
-
-    	Matrix<scalar_type, Dynamic, 1> diff = s - p.head(cbs);
-
-    	auto cb = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
-        auto cb_B = revolution::make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-
-    	Matrix<scalar_type, Dynamic, Dynamic> mm = revolution::make_mass_matrix(msh, cl, cb);
-
-    	error += diff.dot(mm*diff);
-
-    	ofs << bar.x() << " " << bar.y() << " " << s(0) << " " << s(1)<< " ";
+        auto bar = barycenter(msh, cl);
+        ofs << bar.x() << " " << bar.y() << " " << s(0) << " " << s(1)<< " ";
         ofs << press(0) << std::endl;
+        #if 0
+        auto fcs = faces(msh, cl);
+        for (size_t i = 0; i < fcs.size(); i++)
+        {
+            auto fc = fcs[i];
+            if (msh.is_boundary(fc))
+            {
+                auto face_offset = assembler.global_face_offset(msh, fc);
+                Matrix<scalar_type, Dynamic, 1> s = sol.block(face_offset, 0, fbs, 1);
+
+                auto bar = barycenter(msh, fc);
+                ofs << bar.x() << " " << bar.y() << " " << s(0) << " " << s(1)<< " ";
+                std::cout << bar.x() << " " << bar.y() << " " << s(0) << " " << s(1)<< " " << std::endl;
+                ofs << press(0) << std::endl;
+            }
+        }
+        #endif
     }
 
     ofs.close();
 
-    return std::sqrt(error);
+    compute_discontinuous_displacement( msh, sol, hdi, "depl2d.msh");
+
+    return;
 
 }
-
-void convergence_test_typ1(void)
-{
-    using T = double;
-
-    std::vector<std::string> meshfiles;
-
-    //meshfiles.push_back("../diskpp/meshes/2D_trias/fvca5/meshk1_0.typ1");
-    //#if 0
-    meshfiles.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_1.typ1");
-    meshfiles.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_2.typ1");
-    meshfiles.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_3.typ1");
-    meshfiles.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
-    meshfiles.push_back("../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
-    //#endif
-    for (size_t k = 0; k < 5; k++)
-    {
-        std::cout << "DEGREE " << k << std::endl;
-
-        std::vector<T> mesh_hs;
-        std::vector<T> l2_velocity_errors;
-
-        for (size_t i = 0; i < meshfiles.size(); i++)
-        {
-            typedef disk::generic_mesh<T, 2>  mesh_type;
-
-            mesh_type msh;
-            disk::fvca5_mesh_loader<T, 2> loader;
-            if (!loader.read_mesh(meshfiles.at(i)))
-            {
-                std::cout << "Problem loading mesh." << std::endl;
-                continue;
-            }
-            loader.populate_mesh(msh);
-
-            auto error = run_stokes(msh, k);
-            mesh_hs.push_back( disk::mesh_h(msh) );
-            l2_velocity_errors.push_back(error);
-        }
-
-        for (size_t i = 0; i < mesh_hs.size(); i++)
-        {
-            if (i == 0)
-            {
-                std::cout << "    ";
-                std::cout << std::scientific << std::setprecision(5) << mesh_hs.at(i) << "    ";
-                std::cout << std::scientific << std::setprecision(5) << l2_velocity_errors.at(i);
-                std::cout << "     -- " << std::endl;
-            }
-            else
-            {
-                auto rate = std::log( l2_velocity_errors.at(i)/l2_velocity_errors.at(i-1) ) /
-                            std::log( mesh_hs.at(i)/mesh_hs.at(i-1) );
-                std::cout << "    ";
-                std::cout << std::scientific << std::setprecision(5) << mesh_hs.at(i) << "    ";
-                std::cout << std::scientific << std::setprecision(5) << l2_velocity_errors.at(i) << "    ";
-                std::cout << std::defaultfloat << std::setprecision(3) << rate << std::endl;
-            }
-        }
-    }
-}
-
-#if 0
-int main(void)
-{
-    convergence_test_typ1();
-}
-#endif
 
 //#if 0
 int main(int argc, char **argv)
 {
     using RealType = double;
+    bool use_sym_grad = false;
 
     char    *filename       = nullptr;
     int ch;
@@ -254,7 +273,7 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        run_stokes(msh, degree);
+        run_stokes(msh, degree, use_sym_grad);
         std::cout << "fini" << std::endl;
     }
 
@@ -273,28 +292,8 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        run_stokes(msh, degree);
+        run_stokes(msh, degree, use_sym_grad);
     }
-
-/*
-    if (std::regex_match(filename, std::regex(".*\\.quad$") ))
-    {
-        std::cout << "Guessed mesh format: Cartesian 2D" << std::endl;
-
-        typedef disk::cartesian_mesh<RealType, 2>   mesh_type;
-
-        mesh_type msh;
-        disk::cartesian_mesh_loader<RealType, 2> loader;
-        if (!loader.read_mesh(filename))
-        {
-            std::cout << "Problem loading mesh." << std::endl;
-            return 1;
-        }
-        loader.populate_mesh(msh);
-
-        test_bases(msh);
-    }
-    */
 
     return 0;
 }

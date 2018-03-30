@@ -58,192 +58,199 @@ template<typename MeshType>
 class BoundaryConditions
 {
  public:
-   typedef MeshType                                         mesh_type;
-   typedef typename mesh_type::scalar_type                  scalar_type;
-   typedef static_vector<scalar_type, mesh_type::dimension> function_type;
-   typedef point<scalar_type, mesh_type::dimension>         point_type;
+    typedef MeshType                                         mesh_type;
+    typedef typename mesh_type::scalar_type                  scalar_type;
+    typedef static_vector<scalar_type, mesh_type::dimension> function_type;
+    typedef point<scalar_type, mesh_type::dimension>         point_type;
 
  private:
-   const mesh_type& m_msh;
+    const mesh_type& m_msh;
 
-   std::vector<std::function<function_type(point_type)>> m_dirichlet_func;
-   std::vector<std::function<function_type(point_type)>> m_neumann_func;
+    std::vector<std::function<function_type(point_type)>> m_dirichlet_func;
+    std::vector<std::function<function_type(point_type)>> m_neumann_func;
 
-   std::vector<std::tuple<bool, size_t, size_t, size_t>> m_faces_is_dirichlet, m_faces_is_neumann;
+    std::vector<std::tuple<bool, size_t, size_t, size_t>> m_faces_is_dirichlet, m_faces_is_neumann;
 
-   size_t m_dirichlet_faces, m_neumann_faces;
+    size_t m_dirichlet_faces, m_neumann_faces;
 
-   scalar_type m_factor;
+    scalar_type m_factor;
 
  public:
-   BoundaryConditions() = delete;
+    BoundaryConditions() = delete;
 
-   BoundaryConditions(const mesh_type& msh) :
-     m_msh(msh), m_dirichlet_faces(0), m_neumann_faces(0), m_factor(1)
-   {
-      m_faces_is_dirichlet.assign(m_msh.faces_size(), std::make_tuple(false, NOTHING, 0, 0));
-      m_faces_is_neumann.assign(m_msh.faces_size(), std::make_tuple(false, FREE, 0, 0));
-   }
+    BoundaryConditions(const mesh_type& msh) :
+        m_msh(msh), m_dirichlet_faces(0), m_neumann_faces(0), m_factor(1)
+    {
+        m_faces_is_dirichlet.assign(m_msh.faces_size(), std::make_tuple(false, NOTHING, 0, 0));
+        m_faces_is_neumann.assign(m_msh.faces_size(), std::make_tuple(false, FREE, 0, 0));
+    }
 
    template<typename Function>
    void
    addDirichletEverywhere(const Function& bcf)
    {
-      const size_t bcf_id = m_dirichlet_func.size();
-      m_dirichlet_func.push_back(bcf);
+        const size_t bcf_id = m_dirichlet_func.size();
+        m_dirichlet_func.push_back(bcf);
 
-      for (auto itor = m_msh.boundary_faces_begin(); itor != m_msh.boundary_faces_end(); itor++) {
-         const auto bfc = *itor;
+        for (auto itor = m_msh.boundary_faces_begin(); itor != m_msh.boundary_faces_end(); itor++)
+        {
+            const auto bfc = *itor;
 
-         const auto eid = find_element_id(m_msh.faces_begin(), m_msh.faces_end(), bfc);
-         if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+            const auto eid = find_element_id(m_msh.faces_begin(), m_msh.faces_end(), bfc);
+            if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
 
-         const auto face_id = eid.second;
+            const auto face_id = eid.second;
 
-         m_faces_is_dirichlet.at(face_id) = std::make_tuple(true, DIRICHLET, 0, bcf_id);
-         m_dirichlet_faces++;
-      }
-   }
-
-   template<typename Function>
-   void
-   addDirichletBC(const size_t& btype, const size_t& b_id, const Function& bcf)
-   {
-      const size_t bcf_id = m_dirichlet_func.size();
-      m_dirichlet_func.push_back(bcf);
-
-      for (auto itor = m_msh.boundary_faces_begin(); itor != m_msh.boundary_faces_end(); itor++) {
-         const auto bfc = *itor;
-
-         const auto eid = find_element_id(m_msh.faces_begin(), m_msh.faces_end(), bfc);
-         if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
-
-         const auto face_id = eid.second;
-
-         if (m_msh.boundary_id(face_id) == b_id) {
-            m_faces_is_dirichlet.at(face_id) = std::make_tuple(true, btype, b_id, bcf_id);
+            m_faces_is_dirichlet.at(face_id) = std::make_tuple(true, DIRICHLET, 0, bcf_id);
             m_dirichlet_faces++;
-         }
-      }
-   }
+        }
+    }
 
-   template<typename Function>
-   void
-   addNeumannBC(const size_t& btype, const size_t& b_id, const Function& bcf)
-   {
-      const size_t bcf_id = m_neumann_func.size();
-      m_neumann_func.push_back(bcf);
+    template<typename Function>
+    void
+    addDirichletBC(const size_t& btype, const size_t& b_id, const Function& bcf)
+    {
+        const size_t bcf_id = m_dirichlet_func.size();
+        m_dirichlet_func.push_back(bcf);
 
-      for (auto itor = m_msh.boundary_faces_begin(); itor != m_msh.boundary_faces_end(); itor++) {
-         const auto bfc = *itor;
+        for (auto itor = m_msh.boundary_faces_begin(); itor != m_msh.boundary_faces_end(); itor++)
+        {
+            const auto bfc = *itor;
 
-         const auto eid = find_element_id(m_msh.faces_begin(), m_msh.faces_end(), bfc);
-         if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+            const auto eid = find_element_id(m_msh.faces_begin(), m_msh.faces_end(), bfc);
+            if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
 
-         const auto face_id = eid.second;
+            const auto face_id = eid.second;
 
-         if (m_msh.boundary_id(face_id) == b_id) {
-            m_faces_is_neumann.at(face_id) = std::make_tuple(true, btype, b_id, bcf_id);
-            m_neumann_faces++;
-         }
-      }
-   }
+            if (m_msh.boundary_id(face_id) == b_id)
+            {
+                m_faces_is_dirichlet.at(face_id) = std::make_tuple(true, btype, b_id, bcf_id);
+                m_dirichlet_faces++;
+            }
+        }
+    }
 
-   void
-   multiplyAllFunctionsOfAFactor(const scalar_type& factor)
-   {
-      m_factor = factor;
-   }
+    template<typename Function>
+    void
+    addNeumannBC(const size_t& btype, const size_t& b_id, const Function& bcf)
+    {
+        const size_t bcf_id = m_neumann_func.size();
+        m_neumann_func.push_back(bcf);
 
-   size_t
-   nb_faces_boundary() const
-   {
-      return m_dirichlet_faces + m_neumann_faces;
-   }
-   size_t
-   nb_faces_dirichlet() const
-   {
-      return m_dirichlet_faces;
-   }
-   size_t
-   nb_faces_neumann() const
-   {
-      return m_neumann_faces;
-   }
+        for (auto itor = m_msh.boundary_faces_begin(); itor != m_msh.boundary_faces_end(); itor++)
+        {
+            const auto bfc = *itor;
 
-   bool
-   is_dirichlet_face(const size_t face_i) const
-   {
-      return std::get<0>(m_faces_is_dirichlet.at(face_i));
-   }
+            const auto eid = find_element_id(m_msh.faces_begin(), m_msh.faces_end(), bfc);
+            if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
 
-   bool
-   is_neumann_face(const size_t face_i) const
-   {
-      return std::get<0>(m_faces_is_neumann.at(face_i));
-   }
+            const auto face_id = eid.second;
 
-   size_t
-   dirichlet_boundary_type(const size_t face_i) const
-   {
-      return std::get<1>(m_faces_is_dirichlet.at(face_i));
-   }
+            if (m_msh.boundary_id(face_id) == b_id)
+            {
+                m_faces_is_neumann.at(face_id) = std::make_tuple(true, btype, b_id, bcf_id);
+                m_neumann_faces++;
+            }
+        }
+    }
 
-   size_t
-   neumann_boundary_type(const size_t face_i) const
-   {
-      return std::get<1>(m_faces_is_neumann.at(face_i));
-   }
+    void
+    multiplyAllFunctionsOfAFactor(const scalar_type& factor)
+    {
+       m_factor = factor;
+    }
 
-   size_t
-   dirichlet_boundary_id(const size_t face_i) const
-   {
-      return std::get<2>(m_faces_is_dirichlet.at(face_i));
-   }
+    size_t
+    nb_faces_boundary() const
+    {
+       return m_dirichlet_faces + m_neumann_faces;
+    }
+    size_t
+    nb_faces_dirichlet() const
+    {
+       return m_dirichlet_faces;
+    }
+    size_t
+    nb_faces_neumann() const
+    {
+       return m_neumann_faces;
+    }
 
-   size_t
-   neumann_boundary_id(const size_t face_i) const
-   {
-      return std::get<2>(m_faces_is_neumann.at(face_i));
-   }
+    bool
+    is_dirichlet_face(const size_t face_i) const
+    {
+       return std::get<0>(m_faces_is_dirichlet.at(face_i));
+    }
 
-   auto
-   dirichlet_boundary_func(const size_t face_i) const
-   {
-      if (!is_dirichlet_face(face_i)) {
-         throw std::logic_error(
-           "You want the Dirichlet function of face which is not a Dirichlet face");
-      }
+    bool
+    is_neumann_face(const size_t face_i) const
+    {
+       return std::get<0>(m_faces_is_neumann.at(face_i));
+    }
 
-      const auto        func   = m_dirichlet_func.at(std::get<3>(m_faces_is_dirichlet.at(face_i)));
-      const scalar_type factor = m_factor;
+    size_t
+    dirichlet_boundary_type(const size_t face_i) const
+    {
+       return std::get<1>(m_faces_is_dirichlet.at(face_i));
+    }
 
-      auto rfunc = [ func, factor ](const point_type& p) -> auto
-      {
-         return disk::mm_prod(factor, func(p));
-      };
+    size_t
+    neumann_boundary_type(const size_t face_i) const
+    {
+       return std::get<1>(m_faces_is_neumann.at(face_i));
+    }
 
-      return rfunc;
-   }
+    size_t
+    dirichlet_boundary_id(const size_t face_i) const
+    {
+        return std::get<2>(m_faces_is_dirichlet.at(face_i));
+    }
 
-   auto
-   neumann_boundary_func(const size_t face_i) const
-   {
-      if (!is_neumann_face(face_i)) {
-         throw std::logic_error(
+    size_t
+    neumann_boundary_id(const size_t face_i) const
+    {
+        return std::get<2>(m_faces_is_neumann.at(face_i));
+    }
+
+    auto
+    dirichlet_boundary_func(const size_t face_i) const
+    {
+        if (!is_dirichlet_face(face_i))
+        {
+            throw std::logic_error(
+                "You want the Dirichlet function of face which is not a Dirichlet face");
+        }
+
+        const auto        func   = m_dirichlet_func.at(std::get<3>(m_faces_is_dirichlet.at(face_i)));
+        const scalar_type factor = m_factor;
+
+        auto rfunc = [ func, factor ](const point_type& p) -> auto
+        {
+          return disk::mm_prod(factor, func(p));
+        };
+
+        return rfunc;
+    }
+
+    auto
+    neumann_boundary_func(const size_t face_i) const
+    {
+        if (!is_neumann_face(face_i))
+        {
+            throw std::logic_error(
            "You want the Neumann function of face which is not a Neumann face");
-      }
+        }
 
-      const auto        func   = m_neumann_func.at(std::get<3>(m_faces_is_neumann.at(face_i)));
-      const scalar_type factor = m_factor;
+        const auto        func   = m_neumann_func.at(std::get<3>(m_faces_is_neumann.at(face_i)));
+        const scalar_type factor = m_factor;
 
-      auto rfunc = [ func, factor ](const point_type& p) -> auto
-      {
-         return disk::mm_prod(factor, func(p));
-      };
+        auto rfunc = [ func, factor ](const point_type& p) -> auto
+        {
+            return disk::mm_prod(factor, func(p));
+        };
 
-      return rfunc;
-   }
+        return rfunc;
+    }
 
    void
    boundary_info() const
@@ -257,63 +264,56 @@ class BoundaryConditions
    size_t
    dirichlet_imposed_dofs(const size_t& face_id, const size_t face_degree) const
    {
-      const size_t dimension = mesh_type::dimension;
-      const size_t num_face_dofs =
-        revolution::vector_basis_size(face_degree, dimension - 1, dimension);
-      const size_t num_dim_dofs = num_face_dofs / dimension;
+        const size_t dimension = mesh_type::dimension;
+        const size_t num_face_dofs =
+                revolution::vector_basis_size(face_degree, dimension - 1, dimension);
+        const size_t num_dim_dofs = num_face_dofs / dimension;
 
-      if (is_dirichlet_face(face_id)) {
-         const size_t btype = dirichlet_boundary_type(face_id);
+        if (is_dirichlet_face(face_id)) {
+            const size_t btype = dirichlet_boundary_type(face_id);
 
-         switch (btype) {
-            case DIRICHLET: {
-               return num_face_dofs;
-               break;
+            switch (btype)
+            {
+                case DIRICHLET:
+                    return num_face_dofs;
+                    break;
+                #if 0
+                case CLAMPED:
+                    return num_face_dofs;
+                    break;
+                case DX:
+                    return num_dim_dofs;
+                    break;
+                case DY:
+                    return num_dim_dofs;
+                    break;
+                case DZ:
+                    if (dimension != 3) throw std::invalid_argument("You are not in 3D");
+                    return num_dim_dofs;
+                    break;
+                case DXDY:
+                    return 2 * num_dim_dofs;
+                    break;
+                case DXDZ:
+                    if (dimension != 3) throw std::invalid_argument("You are not in 3D");
+                    return 2 * num_dim_dofs;
+                    break;
+                case DYDZ:
+                    if (dimension != 3) throw std::invalid_argument("You are not in 3D");
+                    return 2 * num_dim_dofs;
+                    break;
+                case NOTHING:
+                    return 0;
+                    break;
+                #endif
+                default:
+                    throw std::logic_error("Unknown Boundary condition");
+                    break;
             }
-            case CLAMPED: {
-               return num_face_dofs;
-               break;
-            }
-            case DX: {
-               return num_dim_dofs;
-               break;
-            }
-            case DY: {
-               return num_dim_dofs;
-               break;
-            }
-            case DZ: {
-               if (dimension != 3) throw std::invalid_argument("You are not in 3D");
-               return num_dim_dofs;
-               break;
-            }
-            case DXDY: {
-               return 2 * num_dim_dofs;
-               break;
-            }
-            case DXDZ: {
-               if (dimension != 3) throw std::invalid_argument("You are not in 3D");
-               return 2 * num_dim_dofs;
-               break;
-            }
-            case DYDZ: {
-               if (dimension != 3) throw std::invalid_argument("You are not in 3D");
-               return 2 * num_dim_dofs;
-               break;
-            }
-            case NOTHING: {
-               return 0;
-               break;
-            }
-            default: {
-               throw std::logic_error("Unknown Boundary condition");
-               break;
-            }
-         }
-      }
+        }
 
-      return 0;
-   }
+        return 0;
+    }
 };
 
 } // end mechanics
