@@ -55,6 +55,10 @@ using static_matrix = Eigen::Matrix<T, M, N>;
 template<typename T, size_t N>
 using static_vector = Eigen::Matrix<T, N, 1>;
 
+// to mimic fourth order tensor
+template<typename T, size_t N>
+using static_tensor = Eigen::Matrix<T, N * N, N * N>;
+
 template<typename T, size_t M, size_t N>
 using material_tensor = static_matrix<T, M, N>;
 
