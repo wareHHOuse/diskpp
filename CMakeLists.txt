@@ -18,7 +18,7 @@ set (CMAKE_MODULE_PATH
 include(safeguards)
 include(agmg)
 
-set(CMAKE_CXX_FLAGS_DEBUG "-std=c++14 -g -fpermissive")
+set(CMAKE_CXX_FLAGS_DEBUG "-std=c++14 -g -fpermissive -fsanitize=address")
 set(CMAKE_CXX_FLAGS_RELEASE "-std=c++14 -O3 -mavx -g -fpermissive -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASEASSERT "-std=c++14 -O3 -mavx -g -fpermissive")
 

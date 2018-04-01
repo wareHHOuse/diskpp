@@ -261,6 +261,7 @@ normal(const generic_mesh<T,1>& msh,
     throw std::logic_error("shouldn't have arrived here");
 }
 
+
 } // namespace disk
 
 #endif

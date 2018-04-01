@@ -23,47 +23,62 @@
 #include <iostream>
 #include <regex>
 
-#include "loaders/loader.hpp"
-//#include "hho/hho.hpp"
+#include "revolution/bases"
+#include "revolution/quadratures"
+#include "revolution/methods/hho"
 
-#include "core/bases/bases.hpp"
-#include "core/quadratures/quadratures.hpp"
+#include "loaders/loader.hpp"
 
 
 template<typename MeshType>
 void
 process_mesh(const MeshType& msh)
 {
-    typedef MeshType                            mesh_type;
-    typedef typename mesh_type::cell            cell_type;
-    typedef typename mesh_type::face            face_type;
-    typedef typename mesh_type::scalar_type     scalar_type;
-    typedef disk::quadrature<mesh_type, cell_type>    cell_quadrature_type;
-    typedef disk::quadrature<mesh_type, face_type>    face_quadrature_type;
+    size_t degree = 2;
 
-    typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>  cell_basis_type;
+    using mesh_type = MeshType;
+    using point_type = typename mesh_type::point_type;
+    using coordinate_type = typename mesh_type::coordinate_type;
 
-    cell_basis_type         cell_basis(1);
-    cell_quadrature_type    cell_quadrature(2);
+    auto f1 = [](const point_type& pt) -> coordinate_type {
+        return pt.x();
+    };
+
+    auto f2 = [](const point_type& pt) -> coordinate_type {
+        return pt.y();
+    };
+
+    auto f3 = [](const point_type& pt) -> coordinate_type {
+        return pt.x() * pt.y();
+    };
+
+    coordinate_type intval_f1 = 0.0;
+    coordinate_type intval_f2 = 0.0;
+    coordinate_type intval_f3 = 0.0;
 
     for (auto& cl : msh)
     {
-        std::cout << "Diameter: " << diameter(msh, cl) << std::endl;
-        std::cout << "Measure:  " << measure(msh, cl) << std::endl;
+        auto qps = revolution::integrate(msh, cl, degree);
 
-        dynamic_matrix<scalar_type> stiff =
-            dynamic_matrix<scalar_type>::Zero(cell_basis.size(), cell_basis.size());
-
-        auto qps = cell_quadrature.integrate(msh, cl);
         for (auto& qp : qps)
         {
-            auto dphi = cell_basis.eval_gradients(msh, cl, qp.point());
-            stiff += qp.weight() * dphi * dphi.transpose();
+            intval_f1 += qp.weight() * f1(qp.point());
+            intval_f2 += qp.weight() * f2(qp.point());
+            intval_f3 += qp.weight() * f3(qp.point());
         }
 
-        std::cout << "Stiffness matrix for " << cl << std::endl;
-        std::cout << stiff << std::endl;
+        
+        auto fcs = faces(msh, cl);
+        for (auto& fc : fcs)
+        {
+            revolution::integrate(msh, fc, degree);
+        }
+        
     }
+
+    std::cout << "f(x,y) = x   : " << intval_f1 << std::endl;
+    std::cout << "f(x,y) = y   : " << intval_f2 << std::endl;
+    std::cout << "f(x,y) = x*y : " << intval_f3 << std::endl;
 }
 
 
@@ -75,7 +90,13 @@ int main(int argc, char **argv)
     int     elems_1d        = 8;
     int ch;
 
+    if (argc != 2)
+    {
+        std::cout << "Filename plz" << std::endl;
+        return 0;
+    }
 
+/*
     if (argc == 1)
     {
         std::cout << "Mesh format: 1D uniform" << std::endl;
@@ -90,8 +111,9 @@ int main(int argc, char **argv)
 
         return 0;
     }
-
+*/
     filename = argv[1];
+
 
     if (std::regex_match(filename, std::regex(".*\\.typ1$") ))
     {
@@ -130,7 +152,7 @@ int main(int argc, char **argv)
 
         process_mesh(msh);
     }
-
+/*
     if (std::regex_match(filename, std::regex(".*\\.msh$") ))
     {
         std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
@@ -205,6 +227,6 @@ int main(int argc, char **argv)
 
         process_mesh(msh);
     }
-
+    */
     return 0;
 }
