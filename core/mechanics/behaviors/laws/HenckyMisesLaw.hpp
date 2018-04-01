@@ -25,14 +25,15 @@
 
 #pragma once
 
+#include "common/eigen.hpp"
 #include "mechanics/behaviors/maths_tensor.hpp"
 #include "mechanics/behaviors/maths_utils.hpp"
-#include "common/eigen.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-namespace disk {
+namespace disk
+{
 
 /* Law for Hencky-von Mises model in small deformations
 Input : symetric stain tensor (Gs)
@@ -50,114 +51,112 @@ Tangent Moduli: C = 2*mu * I4 + lambda * prod_Kronecker(Id , Id) /it is the elas
 template<typename scalar_type>
 class HenckyMisesLaw
 {
-   scalar_type m_lambda;
-   scalar_type m_mu;
+    scalar_type m_lambda;
+    scalar_type m_mu;
 
-   scalar_type
-   tildemu(const scalar_type& normL2dev) const
-   {
-      return m_mu * (1 + 1.0 / std::sqrt(1 + normL2dev * normL2dev));
-   }
+    scalar_type
+    tildemu(const scalar_type& normL2dev) const
+    {
+        return m_mu * (1 + 1.0 / std::sqrt(1 + normL2dev * normL2dev));
+    }
 
-   scalar_type
-   tildelambda(const scalar_type& normL2dev) const
-   {
-      return (m_lambda + m_mu / 2.0) - m_mu / (2.0 * std::sqrt(1 + normL2dev * normL2dev));
-   }
+    scalar_type
+    tildelambda(const scalar_type& normL2dev) const
+    {
+        return (m_lambda + m_mu / 2.0) - m_mu / (2.0 * std::sqrt(1 + normL2dev * normL2dev));
+    }
 
-   scalar_type
-   derivativetildemu(const scalar_type& normL2dev) const
-   {
-      const auto term3_2 = (1 + normL2dev * normL2dev) * std::sqrt(1 + normL2dev * normL2dev);
+    scalar_type
+    derivativetildemu(const scalar_type& normL2dev) const
+    {
+        const auto term3_2 = (1 + normL2dev * normL2dev) * std::sqrt(1 + normL2dev * normL2dev);
 
-      return -m_mu * normL2dev / term3_2;
-   }
+        return -m_mu * normL2dev / term3_2;
+    }
 
-   scalar_type
-   derivativetildelambda(const scalar_type& normL2dev) const
-   {
-      return derivativetildemu(normL2dev) / scalar_type(2);
-   }
+    scalar_type
+    derivativetildelambda(const scalar_type& normL2dev) const
+    {
+        return derivativetildemu(normL2dev) / scalar_type(2);
+    }
 
- public:
-   HenckyMisesLaw() : m_lambda(1.0), m_mu(1.0) {}
+  public:
+    HenckyMisesLaw() : m_lambda(1.0), m_mu(1.0) {}
 
-   HenckyMisesLaw(const scalar_type lambda, const scalar_type mu) : m_lambda(lambda), m_mu(mu) {}
+    HenckyMisesLaw(const scalar_type lambda, const scalar_type mu) : m_lambda(lambda), m_mu(mu) {}
 
-   void
-   setLambda(const scalar_type lambda)
-   {
-      m_lambda = lambda;
-   }
+    void
+    setLambda(const scalar_type lambda)
+    {
+        m_lambda = lambda;
+    }
 
-   scalar_type
-   giveLambda() const
-   {
-      return m_lambda;
-   }
+    scalar_type
+    giveLambda() const
+    {
+        return m_lambda;
+    }
 
-   void
-   setMu(const scalar_type mu)
-   {
-      m_mu = mu;
-   }
+    void
+    setMu(const scalar_type mu)
+    {
+        m_mu = mu;
+    }
 
-   scalar_type
-   giveMu() const
-   {
-      return m_mu;
-   }
+    scalar_type
+    giveMu() const
+    {
+        return m_mu;
+    }
 
-   template<int DIM>
-   static_matrix<scalar_type, DIM, DIM>
-   compute_stress(const static_matrix<scalar_type, DIM, DIM>& Gs) const
-   {
-      const static_matrix<scalar_type, DIM, DIM> Id =
-        static_matrix<scalar_type, DIM, DIM>::Identity();
+    template<int DIM>
+    static_matrix<scalar_type, DIM, DIM>
+    compute_stress(const static_matrix<scalar_type, DIM, DIM>& Gs) const
+    {
+        const static_matrix<scalar_type, DIM, DIM> Id = static_matrix<scalar_type, DIM, DIM>::Identity();
 
-      const scalar_type normFrodev = deviator(Gs).norm();
+        const scalar_type normFrodev = deviator(Gs).norm();
 
-      return tildemu(normFrodev) * Gs + tildelambda(normFrodev) * Gs.trace() * Id;
-   }
+        return tildemu(normFrodev) * Gs + tildelambda(normFrodev) * Gs.trace() * Id;
+    }
 
-   template<int DIM>
-   static_tensor<scalar_type, DIM>
-   compute_tangent_moduli(const static_matrix<scalar_type, DIM, DIM>& Gs) const
-   {
-      return 2 * m_mu * compute_IdentityTensor<scalar_type, DIM>() +
-             m_lambda * compute_IxI<scalar_type, DIM>();
+    template<int DIM>
+    static_tensor<scalar_type, DIM>
+    compute_tangent_moduli(const static_matrix<scalar_type, DIM, DIM>& Gs) const
+    {
+        return 2 * m_mu * compute_IdentityTensor<scalar_type, DIM>() + m_lambda * compute_IxI<scalar_type, DIM>();
 
-      // const auto dev        = deviator(Gs);
-      // const auto normFrodev = dev.norm();
+        // const auto dev        = deviator(Gs);
+        // const auto normFrodev = dev.norm();
 
-      // if (normFrodev == scalar_type(0)) {
-      //    return 2 * m_mu * compute_IdentityTensor<scalar_type, DIM>() +
-      //           m_lambda * compute_IxI<scalar_type, DIM>();
-      // }
+        // if (normFrodev == scalar_type(0)) {
+        //    return 2 * m_mu * compute_IdentityTensor<scalar_type, DIM>() +
+        //           m_lambda * compute_IxI<scalar_type, DIM>();
+        // }
 
-      // const auto devFirstDerivative = computeNormFroFirstDerivate(dev);
-      // // const static_matrix<scalar_type, DIM, DIM> Id =
-      // //   static_matrix<scalar_type, DIM, DIM>::Identity();
+        // const auto devFirstDerivative = computeNormFroFirstDerivate(dev);
+        // // const static_matrix<scalar_type, DIM, DIM> Id =
+        // //   static_matrix<scalar_type, DIM, DIM>::Identity();
 
-      // const auto term1 = tildemu(normFrodev) * compute_IdentityTensor<scalar_type, DIM>();
-      // const auto term2 = tildelambda(normFrodev) * compute_IxI<scalar_type, DIM>();
+        // const auto term1 = tildemu(normFrodev) * compute_IdentityTensor<scalar_type, DIM>();
+        // const auto term2 = tildelambda(normFrodev) * compute_IxI<scalar_type, DIM>();
 
-      // const auto term3 =
-      //   derivativetildemu(normFrodev) * computeKroneckerProduct(devFirstDerivative, Gs);
-      // const auto term4 = Gs.trace() * derivativetildelambda(normFrodev) *
-      //                    computeKroneckerProduct(devFirstDerivative, Id);
+        // const auto term3 =
+        //   derivativetildemu(normFrodev) * computeKroneckerProduct(devFirstDerivative, Gs);
+        // const auto term4 = Gs.trace() * derivativetildelambda(normFrodev) *
+        //                    computeKroneckerProduct(devFirstDerivative, Id);
 
-      // return term1 + term2 + term3 + term4;
-   }
+        // return term1 + term2 + term3 + term4;
+    }
 
-   template<int DIM>
-   std::pair<static_matrix<scalar_type, DIM, DIM>, static_tensor<scalar_type, DIM>>
-   compute_whole(const static_matrix<scalar_type, DIM, DIM>& Gs) const
-   {
-      const static_matrix<scalar_type, DIM, DIM> sigma = compute_stress(Gs);
-      const static_tensor<scalar_type, DIM>      C     = compute_tangent_moduli<DIM>(Gs);
+    template<int DIM>
+    std::pair<static_matrix<scalar_type, DIM, DIM>, static_tensor<scalar_type, DIM>>
+    compute_whole(const static_matrix<scalar_type, DIM, DIM>& Gs) const
+    {
+        const static_matrix<scalar_type, DIM, DIM> sigma = compute_stress(Gs);
+        const static_tensor<scalar_type, DIM>      C     = compute_tangent_moduli<DIM>(Gs);
 
-      return std::make_pair(sigma, C);
-   }
+        return std::make_pair(sigma, C);
+    }
 };
 }

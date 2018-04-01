@@ -25,17 +25,18 @@
 
 #pragma once
 
-#include "mechanics/behaviors/maths_tensor.hpp"
 #include "common/eigen.hpp"
+#include "mechanics/behaviors/maths_tensor.hpp"
 
-namespace disk {
+namespace disk
+{
 
 // deviatoric part of mat
 template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
 deviator(const static_matrix<T, DIM, DIM> mat)
 {
-   return mat - mat.trace() / T(DIM) * static_matrix<T, DIM, DIM>::Identity();
+    return mat - mat.trace() / T(DIM) * static_matrix<T, DIM, DIM>::Identity();
 }
 
 // spheric part of mat
@@ -43,7 +44,7 @@ template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
 spheric(const static_matrix<T, DIM, DIM> mat)
 {
-   return mat.trace() / T(DIM) * static_matrix<T, DIM, DIM>::Identity();
+    return mat.trace() / T(DIM) * static_matrix<T, DIM, DIM>::Identity();
 }
 
 // compute the first derivate of the Frobenius-norm of the deviatoric part of a matrix
@@ -51,13 +52,13 @@ template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
 computeNormFroFirstDerivate(const static_matrix<T, DIM, DIM>& dev)
 {
-   const T normFrodev    = dev.norm();
-   const T normFrodev3_2 = normFrodev * std::sqrt(normFrodev);
+    const T normFrodev    = dev.norm();
+    const T normFrodev3_2 = normFrodev * std::sqrt(normFrodev);
 
-   auto mat = dev;
-   mat.diagonal() *= (1 - 1.0 / T(DIM));
+    auto mat = dev;
+    mat.diagonal() *= (1 - 1.0 / T(DIM));
 
-   return -mat / normFrodev3_2;
+    return -mat / normFrodev3_2;
 }
 
 } // end disk

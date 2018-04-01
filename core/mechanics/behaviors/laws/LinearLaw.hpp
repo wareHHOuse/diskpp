@@ -25,13 +25,14 @@
 
 #pragma once
 
-#include "mechanics/behaviors/maths_tensor.hpp"
 #include "common/eigen.hpp"
+#include "mechanics/behaviors/maths_tensor.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-namespace disk {
+namespace disk
+{
 
 /* Material: LinearLaw
  * Stress :  Stress(Gs) = lambda * Gs
@@ -41,47 +42,47 @@ namespace disk {
 template<typename scalar_type>
 class LinearLaw
 {
-   scalar_type m_lambda;
+    scalar_type m_lambda;
 
- public:
-   LinearLaw() : m_lambda(1.0) {}
+  public:
+    LinearLaw() : m_lambda(1.0) {}
 
-   LinearLaw(const scalar_type lambda) : m_lambda(lambda) {}
+    LinearLaw(const scalar_type lambda) : m_lambda(lambda) {}
 
-   void
-   setLambda(const scalar_type lambda)
-   {
-      m_lambda = lambda;
-   }
+    void
+    setLambda(const scalar_type lambda)
+    {
+        m_lambda = lambda;
+    }
 
-   scalar_type
-   giveLambda() const
-   {
-      return m_lambda;
-   }
+    scalar_type
+    giveLambda() const
+    {
+        return m_lambda;
+    }
 
-   template<int DIM>
-   static_matrix<scalar_type, DIM, DIM>
-   compute_stress(const static_matrix<scalar_type, DIM, DIM>& Gs) const
-   {
-      return m_lambda * Gs;
-   }
+    template<int DIM>
+    static_matrix<scalar_type, DIM, DIM>
+    compute_stress(const static_matrix<scalar_type, DIM, DIM>& Gs) const
+    {
+        return m_lambda * Gs;
+    }
 
-   template<int DIM>
-   static_tensor<scalar_type, DIM>
-   compute_tangent_moduli(const static_matrix<scalar_type, DIM, DIM>& Gs) const
-   {
-      return m_lambda * compute_IdentityTensor<scalar_type, DIM>();
-   }
+    template<int DIM>
+    static_tensor<scalar_type, DIM>
+    compute_tangent_moduli(const static_matrix<scalar_type, DIM, DIM>& Gs) const
+    {
+        return m_lambda * compute_IdentityTensor<scalar_type, DIM>();
+    }
 
-   template<int DIM>
-   std::pair<static_matrix<scalar_type, DIM, DIM>, static_tensor<scalar_type, DIM>>
-   compute_whole(const static_matrix<scalar_type, DIM, DIM>& Gs) const
-   {
-      const static_matrix<scalar_type, DIM, DIM> stress = compute_stress(Gs);
-      const static_tensor<scalar_type, DIM>      C      = compute_tangent_moduli(Gs);
+    template<int DIM>
+    std::pair<static_matrix<scalar_type, DIM, DIM>, static_tensor<scalar_type, DIM>>
+    compute_whole(const static_matrix<scalar_type, DIM, DIM>& Gs) const
+    {
+        const static_matrix<scalar_type, DIM, DIM> stress = compute_stress(Gs);
+        const static_tensor<scalar_type, DIM>      C      = compute_tangent_moduli(Gs);
 
-      return std::make_pair(stress, C);
-   }
+        return std::make_pair(stress, C);
+    }
 };
 }
