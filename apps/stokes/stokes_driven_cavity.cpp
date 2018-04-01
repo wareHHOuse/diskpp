@@ -8,7 +8,7 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Karol Cascavita (C) 2018                     klcascavitam@unal.edu.co
+ * Karol Cascavita (C) 2018                     karol.cascavita@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -43,6 +43,158 @@
 #include "output/postMesh.hpp"
 
 #include "output/silo.hpp"
+
+
+// Return polar angle of p with respect to origin o
+template<typename T>
+auto
+to_angle(const point<T,2>& p, const point<T,2>& o)
+{
+  return atan2(p.y() - o.y(), p.x() - o.x());
+}
+template<typename Mesh, typename Points>
+auto
+sort_by_polar_angle(const Mesh & msh,
+                    const typename Mesh::cell &  cl,
+                    const Points& pts)
+{
+    typedef point<typename Mesh::scalar_type,2> point_type;
+    //Warningn this may work only on convex polygons
+    auto h = barycenter(msh, cl);
+    auto sorted_pts = pts;
+
+    std::sort( sorted_pts.begin(), sorted_pts.end(),
+                            [&](const point<typename Mesh::scalar_type,2>& va, const point_type& vb )
+        {
+            auto theta_a = to_angle(va, h);
+            auto theta_b = to_angle(vb, h);
+            return (theta_a < theta_b);
+        }
+    );
+    return sorted_pts;
+}
+/*
+* Copyright 2000 softSurfer, 2012 Dan Sunday
+* This code may be freely used and modified for any purpose
+* providing that this copyright notice is included with it.
+* SoftSurfer makes no warranty for this code, and cannot be held
+* liable for any real or imagined damage resulting from its use.
+* Users of this code must verify correctness for their application.
+*===================================================================
+* isLeft(): tests if a point is Left|On|Right of an infinite line.
+*    Input:  three points P0, P1, and P2
+*    Return: >0 for P2 left of the line through P0 and P1
+*            =0 for P2  on the line
+*            <0 for P2  right of the line
+*    See: Algorithm 1 "Area of Triangles and Polygons"
+*===================================================================
+*/
+template<typename T>
+auto
+isLeft( const point<T,2>& P0, const point<T,2>& P1, const point<T,2>& P2 )
+{
+    auto ret = ( (P1.x() - P0.x()) * (P2.y() - P0.y())
+            - (P2.x() -  P0.x()) * (P1.y() - P0.y()) );
+    return ret;
+}
+/*===================================================================
+* wn_PnPoly(): winding number test for a point in a polygon
+*      Input:   P = a point,
+*               vts = vertex points of a polygon vts[n+1] with vts[n]=V[0]
+*      Return:  the winding number (= 0 only when P is outside)
+*===================================================================
+*/
+template<typename Mesh>
+bool
+wn_PnPoly(const Mesh& msh,
+          const typename Mesh::cell& cl,
+          const point<typename Mesh::scalar_type,2>& P)
+{
+    auto vts = points(msh, cl);
+
+    typedef  typename Mesh::scalar_type scalar_type;
+
+    std::vector< point<scalar_type,2>> svts(vts.size()+1);
+    auto svts_temp = sort_by_polar_angle(msh, cl, vts);
+    std::copy(std::begin(svts_temp), std::end(svts_temp), std::begin(svts));
+    svts[vts.size()] = svts_temp[0];
+
+    int winding_number = 0;
+
+    for (int i = 0 ; i < svts.size() - 1; i++)
+    {
+        if (svts.at(i).y() <= P.y() )
+        {
+            auto upward_crossing = svts[i+1].y()  > P.y();
+            if (upward_crossing)
+            {
+                auto P_on_left = isLeft( svts[i], svts[i+1], P) > scalar_type(0);
+                if (P_on_left)
+                    ++winding_number; //valid up intersect
+            }
+        }
+        else
+        {
+            // start y > P.y (no test needed)
+            auto downward_crossing = svts[i+1].y()  <= P.y();
+            if (downward_crossing)
+            {
+                auto P_on_right = isLeft( svts[i], svts[i+1], P) < scalar_type(0);
+                if (P_on_right)
+                    --winding_number;  //valid down intersect
+            }
+        }
+    }
+    if(winding_number != 0)
+        return true;
+    return false;
+}
+template<typename Mesh>
+void
+plot_over_line(const Mesh    & msh,
+                const std::pair<point<typename Mesh::scalar_type,2>,
+                                point<typename Mesh::scalar_type,2>>   & e,
+                const Matrix<typename Mesh::scalar_type, Dynamic, 1> & sol,
+                const typename revolution::hho_degree_info& hdi,
+                const std::string & filename)
+{
+    typedef Matrix<typename Mesh::scalar_type, Dynamic, 1>  vector_type;
+    typedef point<typename Mesh::scalar_type,2>             point_type;
+
+    std::ofstream pfs(filename);
+    if(!pfs.is_open())
+        std::cout << "Error opening file :"<< filename <<std::endl;
+
+    auto N = 400;
+    auto h = (e.second - e.first)/N;
+    size_t i = 0 ;
+    auto pts = std::vector<point_type>(N);
+    auto dim = Mesh::dimension;
+    for(auto& p: pts)
+    {
+        p = e.first + i * h;
+
+        for(auto cl: msh)
+        {
+            if(wn_PnPoly( msh, cl, p))
+            {
+                auto cbs   = revolution::vector_basis_size(hdi.cell_degree(), dim, dim);
+                auto cell_ofs = revolution::priv::offset(msh, cl);
+
+                vector_type s = sol.block(cell_ofs * cbs, 0, cbs, 1);
+                auto cb = revolution::make_vector_monomial_basis(msh,
+                                                        cl, hdi.cell_degree());
+                auto phi = cb.eval_functions(p);
+                vector_type vel = phi.transpose() * s;
+                pfs<< p.x() << " "<< p.y() << " "<< vel(0) << " "<< vel(1)<< std::endl;
+            }
+        }
+        i++;
+    }
+    pfs.close();
+    return;
+}
+
 
 template<typename Mesh>
 void
@@ -126,6 +278,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     typedef typename mesh_type::cell        cell_type;
     typedef typename mesh_type::face        face_type;
     typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::point_type  point_type;
 
     typedef dynamic_matrix<scalar_type>     matrix_type;
     typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
@@ -153,7 +306,8 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 
     auto assembler = revolution::make_stokes_assembler(msh, hdi, bnd);
 
-    scalar_type factor = (use_sym_grad)? 2. : 1.;
+    auto viscosity = scalar_type(100);
+    scalar_type factor = (use_sym_grad)? 2. * viscosity : viscosity;
 
     for (auto cl : msh)
     {
@@ -215,7 +369,11 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 
     ofs.close();
 
-    compute_discontinuous_displacement( msh, sol, hdi, "depl2d.msh");
+    compute_discontinuous_velocity( msh, sol, hdi, "depl2d.msh");
+    auto p_x = std::make_pair(point_type({0.0, 0.5}), point_type({1.0, 0.5}));
+    auto p_y = std::make_pair(point_type({0.5, 0.0}), point_type({0.5, 1.0}));
+    plot_over_line(msh, p_x, sol, hdi, "plot_over_line_x.data");
+    plot_over_line(msh, p_y, sol, hdi, "plot_over_line_y.data");
 
     return;
 
