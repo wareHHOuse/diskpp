@@ -419,7 +419,7 @@ public:
                     fc(j, i) = phi(k);
                     ret.push_back(fc);
                 }
-            
+
                 fc       = function_type::Zero();
                 fc(j, j) = phi(k);
                 ret.push_back(fc);
@@ -497,7 +497,7 @@ public:
         assert(ret.size() == basis_size);
         return ret;
     }
-   
+
     size_t
     size() const {
         return basis_size;
@@ -554,7 +554,7 @@ private:
                     fc(j, i) = phi(k);
                     ret.push_back(fc);
                 }
-            
+
                 fc       = function_type::Zero();
                 fc(j, j) = phi(k);
                 ret.push_back(fc);

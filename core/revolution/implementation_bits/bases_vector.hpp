@@ -346,8 +346,8 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
        for(size_t i = 0; i < scalar_basis.size(); i++)
        {
            Matrix<scalar_type, 1, 2> dphi_i = dphi.row(i);
-           ret(j++) = -dphi_i(1);
-           ret(j++) =  dphi_i(0);
+           ret(j++) =   dphi_i(1);
+           ret(j++) =  -dphi_i(0);
        }
        return ret;
    }
