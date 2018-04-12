@@ -14,3 +14,11 @@ install(TARGETS diffusion_hho RUNTIME DESTINATION bin)
 add_executable(diffusion_dga diffusion_dga.cpp)
 target_link_libraries(diffusion_dga ${LINK_LIBS})
 install(TARGETS diffusion_dga RUNTIME DESTINATION bin)
+
+add_executable(diffusion_alg diffusion_alg.cpp)
+target_link_libraries(diffusion_alg ${LINK_LIBS})
+install(TARGETS diffusion_alg RUNTIME DESTINATION bin)
+
+add_executable(diffusion_low_grad diffusion_low_grad.cpp)
+target_link_libraries(diffusion_low_grad ${LINK_LIBS})
+install(TARGETS diffusion_low_grad RUNTIME DESTINATION bin)
