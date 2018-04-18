@@ -381,11 +381,12 @@ quiver( const Mesh& msh, const dynamic_vector<T>& sol, const Assembler& assemble
 
 template<typename Mesh>
 auto
-run_alg_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
+run_alg_stokes(const Mesh& msh, size_t degree, std::ofstream & ofs,
+                bool use_sym_grad = true)
 {
     using T = typename Mesh::coordinate_type;
-    T tolerance = 10.e-8, Ninf = 10.e+10;
-    size_t max_iters = 10000;
+    T tolerance = 1.e-9, Ninf = 10.e+5;
+    size_t max_iters = 50000;
 
     typename revolution::hho_degree_info hdi(degree +1, degree);
     augmented_lagrangian_stokes<Mesh> als(msh, hdi, use_sym_grad);
@@ -393,7 +394,8 @@ run_alg_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     auto assembler = als.define_assembler(msh);
     als.initialize(msh, assembler);
 
-    //for(size_t i = 0; i < 700; i++)
+    T error_old = 0.;
+
     for(size_t i = 0; i < max_iters; i++)
     {
 
@@ -402,15 +404,24 @@ run_alg_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
         auto error = als.compute_errors(msh, assembler);
         auto convergence = std::sqrt(als.convergence);
 
-        std::cout << "  i : "<< i<<"  " << convergence<< " ------  ";
-        std::cout << std::scientific << std::setprecision(4) << error.first;
-        std::cout << "     -- " << "          ";
-        std::cout << std::scientific << std::setprecision(4) << error.second;
-        std::cout << "     -- " << std::endl;
+        ofs << "  i : "<< i<<"  " << convergence<< " ------  ";
+        ofs << std::scientific << std::setprecision(4) << error.first;
+        ofs << "     -- " << "          ";
+        ofs << std::scientific << std::setprecision(4) << error.second;
+        ofs << "     -- " << std::endl;
 
         assert(convergence < Ninf);
         if( convergence < tolerance)
             break;
+            //#if 0
+        if(std::abs(error.first - error_old)/error.first < 10.e-8 && i > 1)
+        {
+            std::cout << "Break by convergence of velocity error : ";
+            std::cout << std::abs(error.first - error_old)/error.first << std::endl;
+            break;
+        }
+        error_old = error.first;
+
     }
 
     auto error_2 = als.compute_errors(msh, assembler);
@@ -448,9 +459,13 @@ void convergence_test_typ1(void)
     std::cout << "                   velocity H1-error";
     std::cout << "    -     pressure L2-error "<< std::endl;
 
-    for (size_t k = 0; k < 3; k++)
+    for (size_t k = 0; k < 5; k++)
     {
         std::cout << "DEGREE " << k << std::endl;
+
+        std::ofstream ofs("errors_k" + tostr(k) + ".data");
+        if (!ofs.is_open())
+            std::cout << "Error opening errors "<<std::endl;
 
         std::vector<T> mesh_hs;
         std::vector<std::pair<T,T>> errors;
@@ -470,11 +485,14 @@ void convergence_test_typ1(void)
             }
             loader.populate_mesh(msh);
 
-            auto error = run_alg_stokes(msh, k, use_sym_grad);
+            auto error = run_alg_stokes(msh, k, ofs, use_sym_grad);
 
             mesh_hs.push_back( disk::mesh_h(msh) );
             errors.push_back(error);
+            ofs << " " << std::endl;
         }
+
+        ofs.close();
 
         for (size_t i = 0; i < mesh_hs.size(); i++)
         {
