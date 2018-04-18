@@ -108,11 +108,13 @@ compute_errors(const Mesh& msh,
                 svel.block(cbs + i*fbs, 0, fbs, 1) = sol.block(face_offset, 0, fbs, 1);
             }
         }
+
         Matrix<scalar_type, Dynamic, 1> diff_vel = svel - p;
+        auto G = make_hlow_vector_laplacian(msh, cl, hdi);
         auto gr = revolution::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
-        error_vel += diff_vel.dot(factor * (gr.second + stab)*diff_vel);
+        error_vel += diff_vel.dot(factor * (G.second + stab)*diff_vel);
     }
 
     //ofs.close();
@@ -172,7 +174,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
         return std::pow(p.x(), 5.)  +  std::pow(p.y(), 5.)  - 1./3.;
     };
 
-    typename revolution::hho_degree_info hdi(degree + 1, degree);
+    typename revolution::hho_degree_info hdi(degree, degree);
     boundary_type bnd(msh);
     bnd.addDirichletEverywhere(velocity);
 
@@ -182,13 +184,14 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 
     for (auto cl : msh)
     {
+        auto G = make_hlow_vector_laplacian(msh, cl, hdi);
         auto gr = revolution::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
         auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, hdi);
         auto cell_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
         auto rhs = make_rhs(msh, cl, cell_basis, rhs_fun);
-        assembler.assemble(msh, cl, factor * (gr.second + stab), -dr.second, rhs);
+        assembler.assemble(msh, cl, factor * (G.second + stab), -dr.second, rhs);
     }
 
     assembler.finalize();
@@ -212,7 +215,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 void convergence_test_typ1(void)
 {
     using T = double;
-    bool use_sym_grad = true;
+    bool use_sym_grad = false;
     std::vector<std::string> meshfiles;
 
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_1.typ1");
