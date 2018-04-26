@@ -1,5 +1,5 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
+ *       /\        Matteo Cicuttin (C) 2016, 2017, 2018
  *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
@@ -125,7 +125,7 @@ class LinearIsotropicAndKinematicHardening_Data
     }
 };
 
-template<typename scalar_type, size_t DIM>
+template<typename scalar_type, int DIM>
 class LinearIsotropicAndKinematicHardening_qp
 {
     typedef static_matrix<scalar_type, DIM, DIM>                   static_matrix_type;

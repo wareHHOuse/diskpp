@@ -57,18 +57,11 @@ class LinearIsotropicAndKinematicHardening_cell
 
     const static size_t dimension = mesh_type::dimension;
 
-    // basis for p
-    // typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
-
     std::vector<LinearIsotropicAndKinematicHardening_qp<scalar_type, dimension>> m_list_qp;
 
   public:
-    // scalar_basis_type scalar_basis;
-
-    LinearIsotropicAndKinematicHardening_cell(const mesh_type& msh, const cell_type& cl, const size_t degree)
+    LinearIsotropicAndKinematicHardening_cell(const mesh_type& msh, const cell_type& cl, const int degree)
     {
-        // scalar_basis = scalar_basis_type(bqd.grad_degree());
-
         const auto qps = revolution::integrate(msh, cl, degree);
 
         m_list_qp.clear();
@@ -82,7 +75,7 @@ class LinearIsotropicAndKinematicHardening_cell
         }
     }
 
-    size_t
+    int
     getNumberOfQP() const
     {
         return m_list_qp.size();
@@ -109,82 +102,93 @@ class LinearIsotropicAndKinematicHardening_cell
         return m_list_qp;
     }
 
-    //  vector_type
-    //  projectStressOnCell(const BQData&        bqd,
-    //                      const mesh_type&     msh,
-    //                      const cell_type&     cl,
-    //                      const material_type& material_data) const
-    //  {
-    //     const size_t grad_degree     = bqd.grad_degree();
-    //     const auto   grad_basis_size = howmany_dofs(bqd.grad_basis);
+    vector_type
+    projectStressOnCell(const mesh_type&                   msh,
+                        const cell_type&                   cl,
+                        const revolution::hho_degree_info& hdi,
+                        const material_type&               material_data) const
+    {
+        const auto grad_degree     = hdi.grad_degree();
+        const int  grad_basis_size = revolution::sym_matrix_basis_size(grad_degree, dimension, dimension);
+        auto       gb              = revolution::make_sym_matrix_monomial_basis(msh, cl, grad_degree);
 
-    //     matrix_type mass = matrix_type::Zero(grad_basis_size, grad_basis_size);
-    //     vector_type rhs  = vector_type::Zero(grad_basis_size);
+        matrix_type mass = matrix_type::Zero(grad_basis_size, grad_basis_size);
+        vector_type rhs  = vector_type::Zero(grad_basis_size);
 
-    //     for (auto& qp : m_list_qp) {
-    //        const auto gphi = bqd.grad_basis.eval_functions(msh, cl, qp.point(), 0, grad_degree);
-    //        assert(gphi.size() == grad_basis_size);
+        for (auto& qp : m_list_qp)
+        {
+            const auto gphi = gb.eval_functions(qp.point());
+            assert(gphi.size() == grad_basis_size);
 
-    //        for (size_t j = 0; j < grad_basis_size; j++) {
-    //           const auto qp_gphi_j = mm_prod(qp.weight(), gphi[j]);
-    //           for (size_t i = j; i < grad_basis_size; i++) {
-    //              mass(i, j) += mm_prod(gphi[i], qp_gphi_j);
-    //           }
+            for (int j = 0; j < grad_basis_size; j++)
+            {
+                const auto qp_gphi_j = revolution::priv::inner_product(qp.weight(), gphi[j]);
+                for (int i = j; i < grad_basis_size; i++)
+                {
+                    mass(i, j) += revolution::priv::inner_product(gphi[i], qp_gphi_j);
+                }
 
-    //           rhs(j) += mm_prod(qp.compute_stress(material_data), qp_gphi_j);
-    //        }
-    //     }
+                rhs(j) += revolution::priv::inner_product(qp.compute_stress(material_data), qp_gphi_j);
+            }
+        }
 
-    //     // lower part
-    //     for (size_t j = 0; j < grad_basis_size; j++) {
-    //        for (size_t i = 0; i < j; i++) {
-    //           mass(i, j) = mass(j, i);
-    //        }
-    //     }
+        // lower part
+        for (int j = 0; j < grad_basis_size; j++)
+        {
+            for (int i = 0; i < j; i++)
+            {
+                mass(i, j) = mass(j, i);
+            }
+        }
 
-    //     return mass.llt().solve(rhs);
-    //  }
+        return mass.llt().solve(rhs);
+    }
 
-    //  vector_type
-    //  projectPOnCell(const BQData& bqd, const mesh_type& msh, const cell_type& cl) const
-    //  {
-    //     const size_t grad_degree  = bqd.grad_degree();
-    //     const auto   p_basis_size = scalar_basis.range(0, grad_degree).size();
+    vector_type
+    projectPOnCell(const mesh_type& msh, const cell_type& cl, const revolution::hho_degree_info& hdi) const
+    {
+        const auto grad_degree = hdi.grad_degree();
+        auto       pb          = revolution::make_scalar_monomial_basis(msh, cl, grad_degree);
+        const int  pbs         = revolution::scalar_basis_size(grad_degree, dimension);
 
-    //     matrix_type mass = matrix_type::Zero(p_basis_size, p_basis_size);
-    //     vector_type rhs  = vector_type::Zero(p_basis_size);
+        matrix_type mass = matrix_type::Zero(pbs, pbs);
+        vector_type rhs  = vector_type::Zero(pbs);
 
-    //     for (auto& qp : m_list_qp) {
-    //        const auto pphi = scalar_basis.eval_functions(msh, cl, qp.point(), 0, grad_degree);
-    //        assert(pphi.size() == p_basis_size);
+        for (auto& qp : m_list_qp)
+        {
+            const auto pphi = pb.eval_functions(qp.point());
+            assert(pphi.size() == pbs);
 
-    //        mass += qp.weight() * pphi * pphi.transpose();
-    //        rhs += qp.weight() * qp.getAccumulatedPlasticStrain() * pphi;
-    //     }
+            mass += qp.weight() * revolution::priv::outer_product(pphi, pphi);
+            rhs += qp.weight() * qp.getAccumulatedPlasticStrain() * pphi;
+        }
 
-    //     return mass.llt().solve(rhs);
-    //  }
+        return mass.llt().solve(rhs);
+    }
 
-    //  vector_type
-    //  projectStateOnCell(const BQData& bqd, const mesh_type& msh, const cell_type& cl) const
-    //  {
-    //     const size_t grad_degree  = bqd.grad_degree();
-    //     const auto   p_basis_size = scalar_basis.range(0, grad_degree).size();
+    vector_type
+    projectStateOnCell(const mesh_type& msh, const cell_type& cl, const revolution::hho_degree_info& hdi) const
+    {
+        const auto grad_degree = hdi.grad_degree();
+        auto       pb          = revolution::make_scalar_monomial_basis(msh, cl, grad_degree);
+        const int  pbs         = revolution::scalar_basis_size(grad_degree, dimension);
 
-    //     matrix_type mass = matrix_type::Zero(p_basis_size, p_basis_size);
-    //     vector_type rhs  = vector_type::Zero(p_basis_size);
+        matrix_type mass = matrix_type::Zero(pbs, pbs);
+        vector_type rhs  = vector_type::Zero(pbs);
 
-    //     for (auto& qp : m_list_qp) {
-    //        const auto pphi = scalar_basis.eval_functions(msh, cl, qp.point(), 0, grad_degree);
-    //        assert(pphi.size() == p_basis_size);
+        for (auto& qp : m_list_qp)
+        {
+            const auto pphi = pb.eval_functions(qp.point());
+            assert(pphi.size() == pbs);
 
-    //        mass += qp.weight() * pphi * pphi.transpose();
-    //        if (qp.is_plastic()) {
-    //           rhs += qp.weight() * pphi;
-    //        }
-    //     }
+            mass += qp.weight() * revolution::priv::outer_product(pphi, pphi);
+            if (qp.is_plastic())
+            {
+                rhs += qp.weight() * pphi;
+            }
+        }
 
-    //     return mass.llt().solve(rhs);
-    //  }
+        return mass.llt().solve(rhs);
+    }
 };
 }

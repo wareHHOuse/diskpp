@@ -58,7 +58,7 @@ class NewtonRaphson_step_plasticity
     typedef typename revolution::hho_degree_info           hdi_type;
     typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
 
-    const static size_t dimension = mesh_type::dimension;
+    const static int dimension = mesh_type::dimension;
 
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
@@ -144,13 +144,16 @@ class NewtonRaphson_step_plasticity
         elem_type    elem(m_msh, m_hdi);
         AssemblyInfo ai;
 
+        // set RHS to zero
+        m_assembler.setZeroRhs();
+
         const auto material_data = law.getMaterialData();
         m_F_int                  = 0.0;
 
         timecounter tc, ttot;
 
         ttot.tic();
-        size_t cell_i = 0;
+        int cell_i = 0;
 
         for (auto& cl : m_msh)
         {
@@ -287,20 +290,20 @@ class NewtonRaphson_step_plasticity
         timecounter tc;
         tc.tic();
 
-        const size_t fbs = revolution::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
-        const size_t cbs = revolution::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
+        const int fbs = revolution::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
+        const int cbs = revolution::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
 
         const auto solF = m_assembler.expand_solution_nl(m_msh, m_bnd, m_system_solution, m_solution_faces);
 
         // Update  unknowns
         // Update face Uf^{i+1} = Uf^i + delta Uf^i
-        for (size_t i = 0; i < m_solution_faces.size(); i++)
+        for (int i = 0; i < m_solution_faces.size(); i++)
         {
             assert(m_solution_faces.at(i).size() == fbs);
             m_solution_faces.at(i) += solF.segment(i * fbs, fbs);
         }
         // Update cell
-        size_t cell_i = 0;
+        int cell_i = 0;
         for (auto& cl : m_msh)
         {
             // Extract the solution
@@ -310,7 +313,7 @@ class NewtonRaphson_step_plasticity
 
             vector_dynamic xFs = vector_dynamic::Zero(total_faces_dof);
 
-            for (size_t face_i = 0; face_i < num_faces; face_i++)
+            for (int face_i = 0; face_i < num_faces; face_i++)
             {
                 const auto fc  = fcs[face_i];
                 const auto eid = find_element_id(m_msh.faces_begin(), m_msh.faces_end(), fc);
@@ -342,11 +345,11 @@ class NewtonRaphson_step_plasticity
     }
 
     bool
-    test_convergence(const size_t iter)
+    test_convergence(const int iter)
     {
         // norm of the solution
         scalar_type error_un = 0;
-        for (size_t i = 0; i < m_solution_faces.size(); i++)
+        for (int i = 0; i < m_solution_faces.size(); i++)
         {
             scalar_type norm = m_solution_faces[i].norm();
             error_un += norm * norm;
@@ -362,14 +365,13 @@ class NewtonRaphson_step_plasticity
         // norm of the rhs
         const scalar_type residual  = m_assembler.RHS.norm();
         scalar_type       max_error = 0.0;
-        for (size_t i = 0; i < m_assembler.RHS.size(); i++)
+        for (int i = 0; i < m_assembler.RHS.size(); i++)
             max_error = std::max(max_error, std::abs(m_assembler.RHS(i)));
 
         // norm of the increment
-        const scalar_type error_incr = m_system_solution.norm();
-
-        scalar_type relative_displ = error_incr / error_un;
-        scalar_type relative_error = residual / m_F_int;
+        const scalar_type error_incr     = m_system_solution.norm();
+        scalar_type       relative_displ = error_incr / error_un;
+        scalar_type       relative_error = residual / m_F_int;
 
         if (iter == 0)
         {

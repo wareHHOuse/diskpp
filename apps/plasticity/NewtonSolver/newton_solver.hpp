@@ -128,9 +128,8 @@ class NewtonRaphson_solver_plasticity
         m_convergence           = false;
         bool elastic_prediction = true;
 
-        for (size_t iter = 0; iter < m_rp.m_iter_max; iter++)
+        for (int iter = 0; iter < m_rp.m_iter_max; iter++)
         {
-
             // assemble lhs and rhs
             AssemblyInfo assembly_info;
             try

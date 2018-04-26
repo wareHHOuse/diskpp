@@ -75,7 +75,7 @@ class plasticity
     typedef typename mesh_type::cell             cell_type;
     typedef typename revolution::hho_degree_info hdi_type;
 
-    const static size_t dimension = mesh_type::dimension;
+    const static int dimension = mesh_type::dimension;
 
     typedef static_matrix<scalar_type, dimension, dimension> gvt;
 
@@ -87,7 +87,7 @@ class plasticity
 
     bool two_dim;
 
-    size_t
+    int
     num_dofs_dim() const
     {
         if (two_dim)
@@ -122,21 +122,21 @@ class plasticity
             const LawData&     material_data,
             bool               elatic_modulus)
     {
-        const size_t cell_degree = m_hdi.cell_degree();
-        const size_t grad_degree = m_hdi.grad_degree();
-        const size_t face_degree = m_hdi.face_degree();
+        const auto cell_degree = m_hdi.cell_degree();
+        const auto grad_degree = m_hdi.grad_degree();
+        const auto face_degree = m_hdi.face_degree();
 
-        const size_t cell_basis_size = revolution::vector_basis_size(cell_degree, dimension, dimension);
-        const size_t grad_basis_size = revolution::sym_matrix_basis_size(grad_degree, dimension, dimension);
-        const size_t face_basis_size = revolution::vector_basis_size(face_degree, dimension - 1, dimension);
+        const auto cell_basis_size = revolution::vector_basis_size(cell_degree, dimension, dimension);
+        const auto grad_basis_size = revolution::sym_matrix_basis_size(grad_degree, dimension, dimension);
+        const auto face_basis_size = revolution::vector_basis_size(face_degree, dimension - 1, dimension);
 
         time_law = 0.0;
         timecounter tc;
 
-        const auto   fcs            = faces(m_msh, cl);
-        const size_t num_faces      = fcs.size();
-        const size_t num_total_dofs = cell_basis_size + num_faces * face_basis_size;
-        const size_t dim_dofs       = num_dofs_dim();
+        const auto fcs            = faces(m_msh, cl);
+        const auto num_faces      = fcs.size();
+        const auto num_total_dofs = cell_basis_size + num_faces * face_basis_size;
+        const auto dim_dofs       = num_dofs_dim();
 
         matrix_type AT = matrix_type::Zero(grad_basis_size, grad_basis_size);
         vector_type aT = vector_type::Zero(grad_basis_size);
@@ -170,10 +170,10 @@ class plasticity
             tc.toc();
             time_law += tc.to_double();
 
-            for (size_t j = 0; j < grad_basis_size; j++)
+            for (int j = 0; j < grad_basis_size; j++)
             {
                 const gvt Agphi_j = qp.weight() * disk::tm_prod(tensor_behavior.second, gphi[j]);
-                for (size_t i = 0; i <= j; i += dim_dofs)
+                for (int i = 0; i <= j; i += dim_dofs)
                 {
                     // compute (Gkt v, A(u) : Gkt du)
                     if (two_dim)
@@ -198,7 +198,7 @@ class plasticity
             // compute (PK1(u), G^k_T v)_T
             const auto stress_qp = revolution::priv::inner_product(qp.weight(), tensor_behavior.first);
 
-            for (size_t i = 0; i < grad_basis_size; i += dim_dofs)
+            for (int i = 0; i < grad_basis_size; i += dim_dofs)
             {
                 if (two_dim)
                 {
@@ -223,8 +223,8 @@ class plasticity
         RTF.segment(0, cell_basis_size) = make_rhs(m_msh, cl, cb, load);
 
         // lower part AT
-        for (size_t j = 0; j < grad_basis_size; j++)
-            for (size_t i = j; i < grad_basis_size; i++)
+        for (int j = 0; j < grad_basis_size; j++)
+            for (int i = j; i < grad_basis_size; i++)
                 AT(i, j) = AT(j, i);
 
         K_int = GsT.transpose() * AT * GsT;

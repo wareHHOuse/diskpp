@@ -1,5 +1,5 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
+ *       /\        Matteo Cicuttin (C) 2016, 2017, 2018
  *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
@@ -55,7 +55,7 @@ class LinearIsotropicAndKinematicHardening
   public:
     LinearIsotropicAndKinematicHardening() : m_nb_qp(0){};
 
-    LinearIsotropicAndKinematicHardening(const mesh_type& msh, const size_t degree)
+    LinearIsotropicAndKinematicHardening(const mesh_type& msh, const int degree)
     {
         m_nb_qp = 0;
         m_list_cell_qp.clear();
@@ -86,7 +86,7 @@ class LinearIsotropicAndKinematicHardening
         return m_data;
     }
 
-    size_t
+    int
     getNumberOfQP() const
     {
         return m_nb_qp;
@@ -102,13 +102,13 @@ class LinearIsotropicAndKinematicHardening
     }
 
     LinearIsotropicAndKinematicHardening_cell<mesh_type>&
-    getCellQPs(const size_t cell_id)
+    getCellQPs(const int cell_id)
     {
         return m_list_cell_qp.at(cell_id);
     }
 
     LinearIsotropicAndKinematicHardening_cell<mesh_type>
-    getCellIVs(const size_t cell_id) const
+    getCellIVs(const int cell_id) const
     {
         return m_list_cell_qp.at(cell_id);
     }

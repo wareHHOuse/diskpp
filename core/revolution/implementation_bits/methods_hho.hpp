@@ -617,10 +617,6 @@ make_hho_sym_gradrec_matrix(const Mesh&                     msh,
 
    matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);
    matrix_type gr_rhs = matrix_type::Zero(gbs, cbs + num_faces * fbs);
-   std::cout << "gbs: "<< gbs << std::endl;
-   std::cout << "cbs: "<< cbs << std::endl;
-   std::cout << "fbs: "<< fbs << std::endl;
-   std::cout << "num_faces_n: "<< num_faces << std::endl;
 
    const size_t dim2 = N * N;
 
@@ -708,7 +704,7 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
     auto cbas_v = make_vector_monomial_basis(msh, cl, celdeg);
     auto cbas_s = make_scalar_monomial_basis(msh, cl, facdeg);
 
-    auto rbs = scalar_basis_size(facdeg, Mesh::dimension);
+    auto rbs = scalar_basis_size(celdeg, Mesh::dimension);
     auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
     auto fbs = vector_basis_size(facdeg, Mesh::dimension-1, Mesh::dimension);
 
@@ -745,7 +741,7 @@ make_hho_divergence_reconstruction_stokes_rhs(const Mesh& msh, const typename Me
     auto cbas_v = make_vector_monomial_basis(msh, cl, celdeg);
     auto cbas_s = make_scalar_monomial_basis(msh, cl, facdeg);
 
-    auto rbs = scalar_basis_size(facdeg, Mesh::dimension);
+    auto rbs = scalar_basis_size(celdeg, Mesh::dimension);
     auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
     auto fbs = vector_basis_size(facdeg, Mesh::dimension-1, Mesh::dimension);
 
@@ -2485,6 +2481,13 @@ class assembler_mechanics
       RHS            = vector_type::Zero(m_num_unknowns);
    }
 
+    // don't forget to reset RHS at each Newton iteration
+   void
+   setZeroRhs()
+   {
+       RHS.setZero();
+   }
+
    template<typename LocalContrib>
    void
    assemble(const mesh_type& msh, const cell_type& cl, const bnd_type& bnd, const LocalContrib& lc)
@@ -2663,7 +2666,7 @@ class assembler_mechanics
                      break;
                   }
                   default: {
-                     throw std::logic_error("Unknown Dirichlet Conditions");
+                     throw std::logic_error("Unknown Dirichlet Conditions (assembler)");
                      break;
                   }
                }
@@ -2796,7 +2799,7 @@ class assembler_mechanics
                   break;
                }
                default: {
-                  throw std::logic_error("Unknown Dirichlet Conditions");
+                  throw std::logic_error("Unknown Dirichlet Conditions (assembler)");
                   break;
                }
             }
@@ -3319,11 +3322,11 @@ class static_condensation_vector
    }
 
    std::pair<matrix_type, vector_type>
-   compute_rhsfull(const mesh_type&      msh,
-           const cell_type&      cl,
-           const matrix_type&    local_mat,
-           const vector_type&    rhs,
-           const hho_degree_info hdi)
+   compute_rhsfull( const mesh_type&      msh,
+                    const cell_type&      cl,
+                    const matrix_type&    local_mat,
+                    const vector_type&    rhs,
+                    const hho_degree_info hdi)
    {
       const size_t num_cell_dofs = vector_basis_size(hdi.cell_degree(), dimension, dimension);
       const size_t num_face_dofs = vector_basis_size(hdi.face_degree(), dimension - 1, dimension);

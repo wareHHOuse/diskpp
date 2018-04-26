@@ -1,5 +1,5 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
+ *       /\        Matteo Cicuttin (C) 2016, 2017, 2018
  *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
@@ -61,24 +61,6 @@ run_plasticity_solver(const Mesh<T, 2, Storage>&        msh,
     auto gradient = [material_data](const point<T, 2>& p) -> result_grad_type { return result_grad_type::Zero(); };
 
     Bnd_type bnd(msh);
-    // bnd.addDirichletEverywhere(solution);
-    // bnd.addDirichletBC(disk::mechanics::CLAMPED, 6, solution);
-    //    auto neu = [material_data](const point<T, 2>& p) -> result_type {
-    //       return result_type{0.0, 4.5E9};
-    //    };
-    // bnd.addNeumannBC(disk::mechanics::NEUMANN, 10, neu);
-
-    //    // Plaque with triangles
-    //    auto zero = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0,
-    //    0}; };
-
-    //    auto trac = [material_data](const point<T, 2>& p) -> result_type {
-    //       return result_type{0.0, 10};
-    //    };
-
-    //    bnd.addDirichletBC(disk::mechanics::DX, 3, zero);
-    //    bnd.addDirichletBC(disk::mechanics::DY, 10, zero);
-    //    bnd.addDirichletBC(disk::mechanics::DY, 6, trac);
 
     // Plaque with quadrilaterals
     // auto zero = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
@@ -140,18 +122,18 @@ run_plasticity_solver(const Mesh<T, 2, Storage>&        msh,
         std::cout << "energy mechanic: " << nl.energy_mechanic() << std::endl;
     }
 
-    // nl.compute_discontinuous_displacement("depl2D_disc.msh");
-    // nl.compute_continuous_displacement("depl2D_const.msh");
-    // nl.compute_discontinuous_stress("stress2D_disc.msh");
-    // nl.compute_continuous_stress("stress2D_cont.msh");
-    // nl.compute_stress_GP("stress2D_GP.msh");
-    // nl.compute_discontinuous_equivalent_plastic_strain("p2D_disc.msh");
-    // nl.compute_continuous_equivalent_plastic_strain("p2D_cont.msh");
-    // nl.compute_equivalent_plastic_strain_GP("p2D_GP.msh");
-    // nl.compute_is_plastic_GP("state2D_GP.msh");
-    // nl.compute_is_plastic_continuous("state2D_cont.msh");
-    // nl.compute_continuous_deformed("deformed2D_cont.msh");
-    // nl.compute_discontinuous_deformed("deformed2D_disc.msh");
+    nl.compute_discontinuous_displacement("depl2D_disc.msh");
+    nl.compute_continuous_displacement("depl2D_const.msh");
+    nl.compute_discontinuous_stress("stress2D_disc.msh");
+    nl.compute_continuous_stress("stress2D_cont.msh");
+    nl.compute_stress_GP("stress2D_GP.msh");
+    nl.compute_discontinuous_equivalent_plastic_strain("p2D_disc.msh");
+    nl.compute_continuous_equivalent_plastic_strain("p2D_cont.msh");
+    nl.compute_equivalent_plastic_strain_GP("p2D_GP.msh");
+    nl.compute_is_plastic_GP("state2D_GP.msh");
+    nl.compute_is_plastic_continuous("state2D_cont.msh");
+    nl.compute_continuous_deformed("deformed2D_cont.msh");
+    nl.compute_discontinuous_deformed("deformed2D_disc.msh");
 }
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
@@ -258,20 +240,18 @@ run_plasticity_solver(const Mesh<T, 3, Storage>&        msh,
         // std::cout << "l2 error: " << nl.compute_l2_error(solution) << std::endl;
     }
 
-    // nl.compute_discontinuous_displacement("depl3D_disc.msh");
-    // nl.compute_continuous_displacement("depl3D_const.msh");
-    // nl.compute_discontinuous_stress("stress3D_disc.msh");
-    // nl.compute_continuous_stress("stress3D_cont.msh");
-    // nl.compute_stress_GP("stress3D_GP.msh");
-    // nl.compute_discontinuous_equivalent_plastic_strain("p3D_disc.msh");
-    // nl.compute_continuous_equivalent_plastic_strain("p3D_cont.msh");
-    // nl.compute_equivalent_plastic_strain_GP("p3D_GP.msh");
-    // nl.compute_is_plastic_GP("state3D_GP.msh");
-    // nl.compute_is_plastic_continuous("state3D_cont.msh");
-    // nl.compute_continuous_deformed("deformed3D_cont.msh");
-    // nl.compute_discontinuous_deformed("deformed3D_disc.msh");
-
-    // nl.compute_sphere("resu_sphere.dat");
+    nl.compute_discontinuous_displacement("depl3D_disc.msh");
+    nl.compute_continuous_displacement("depl3D_const.msh");
+    nl.compute_discontinuous_stress("stress3D_disc.msh");
+    nl.compute_continuous_stress("stress3D_cont.msh");
+    nl.compute_stress_GP("stress3D_GP.msh");
+    nl.compute_discontinuous_equivalent_plastic_strain("p3D_disc.msh");
+    nl.compute_continuous_equivalent_plastic_strain("p3D_cont.msh");
+    nl.compute_equivalent_plastic_strain_GP("p3D_GP.msh");
+    nl.compute_is_plastic_GP("state3D_GP.msh");
+    nl.compute_is_plastic_continuous("state3D_cont.msh");
+    nl.compute_continuous_deformed("deformed3D_cont.msh");
+    nl.compute_discontinuous_deformed("deformed3D_disc.msh");
 }
 
 int
@@ -337,18 +317,6 @@ main(int argc, char** argv)
 
     // material_data.sigma_y0 = 0.8;
 
-    //    // Patch Parameters (mm, MPa, N)
-    //    RealType E  = 1;
-    //    RealType nu = 0.499;
-
-    //    material_data.mu     = material_data.converttomu(E, nu);
-    //    material_data.lambda = material_data.converttolambda(E, nu);
-
-    //    material_data.K = 0;
-    //    material_data.H = 0;
-
-    //    material_data.sigma_y0 = 0.01;
-
     // Cube Parameters (mm, MPa, N)
     //    RealType E  = 200000;
     //    RealType ET = 0;
@@ -387,21 +355,23 @@ main(int argc, char** argv)
 
     mesh_filename = argv[0];
 
-    // /* FVCA5 2D */
-    // if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$"))) {
-    //    std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
-    //    auto msh = disk::load_fvca5_2d_mesh<RealType>(mesh_filename);
-    //    run_plasticity_solver(msh, rp, material_data);
-    //    return 0;
-    // }
+    /* FVCA5 2D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$")))
+    {
+        std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
+        auto msh = disk::load_fvca5_2d_mesh<RealType>(mesh_filename);
+        run_plasticity_solver(msh, rp, material_data);
+        return 0;
+    }
 
-    //    /* Netgen 2D */
-    //    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$"))) {
-    //       std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
-    //       auto msh = disk::load_netgen_2d_mesh<RealType>(mesh_filename);
-    //       run_plasticity_solver(msh, rp, material_data);
-    //       return 0;
-    //    }
+    /* Netgen 2D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$")))
+    {
+        std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
+        auto msh = disk::load_netgen_2d_mesh<RealType>(mesh_filename);
+        run_plasticity_solver(msh, rp, material_data);
+        return 0;
+    }
 
     // /* DiSk++ cartesian 2D */
     // if (std::regex_match(mesh_filename, std::regex(".*\\.quad$"))) {
