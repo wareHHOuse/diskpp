@@ -61,9 +61,9 @@ struct test_functor
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            //auto gr = revolution::make_hho_scalar_laplacian(msh, cl, hdi);
-            //auto stab = revolution::make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
-            auto stab = revolution::make_hdg_scalar_stabilization(msh, cl, hdi);
+            auto gr = revolution::make_hho_scalar_laplacian(msh, cl, hdi);
+            auto stab = revolution::make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+            //auto stab = revolution::make_hdg_scalar_stabilization(msh, cl, hdi);
 
             Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, hdi, f);
 
