@@ -1,5 +1,5 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
+ *       /\        Matteo Cicuttin (C) 2016, 2017, 2018
  *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
@@ -122,14 +122,14 @@ changeFormatRowTensor(const static_matrix<T, DIM2, DIM2>& tens)
 
     static_matrix<T, DIM2, DIM2> ret = static_matrix<T, DIM2, DIM2>::Zero();
 
-    for (size_t i = 0; i < DIM; i++)
+    for (int i = 0; i < DIM; i++)
     {
-        for (size_t j = 0; j < DIM; j++)
+        for (int j = 0; j < DIM; j++)
         {
-            const size_t row = i * DIM + j;
-            for (size_t k = 0; k < DIM; k++)
+            const int row = i * DIM + j;
+            for (int k = 0; k < DIM; k++)
             {
-                for (size_t l = 0; l < DIM; l++)
+                for (int l = 0; l < DIM; l++)
                 {
                     ret(row, k * DIM + l) = tens(i * DIM + k, j * DIM + l);
                 }
@@ -145,7 +145,7 @@ changeFormatRowTensor(const static_matrix<T, DIM2, DIM2>& tens)
     return ret;
 }
 
-template<typename T, size_t DIM2>
+template<typename T, int DIM2>
 static_matrix<T, DIM2, DIM2>
 changeFormatColTensor(const static_matrix<T, DIM2, DIM2>& tens)
 {
@@ -160,24 +160,31 @@ tm_prod(const static_tensor<T, DIM>& tens, const static_matrix<T, DIM, DIM>& mat
 {
     static_matrix<T, DIM, DIM> ret;
 
-    for (size_t i = 0; i < DIM; i++)
-        for (size_t j = 0; j < DIM; j++)
+    for (int i = 0; i < DIM; i++)
+    {
+        for (int j = 0; j < DIM; j++)
+        {
             ret(i, j) = (tens.block(i * DIM, j * DIM, DIM, DIM).cwiseProduct(mat)).sum();
-
+        }
+    }
     return ret;
 }
 
 // optimization mat(row,col) neq 0, 0 else
 template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
-tm_prod(const static_tensor<T, DIM>& tens, const static_matrix<T, DIM, DIM>& mat, const size_t row, const size_t col)
+tm_prod(const static_tensor<T, DIM>& tens, const static_matrix<T, DIM, DIM>& mat, const int row, const int col)
 {
     static_matrix<T, DIM, DIM> ret;
     ret.setConstant(mat(row, col));
 
-    for (size_t i = 0; i < DIM; i++)
-        for (size_t j = 0; j < DIM; j++)
+    for (int i = 0; i < DIM; i++)
+    {
+        for (int j = 0; j < DIM; j++)
+        {
             ret(i, j) *= tens(i * DIM + row, j * DIM + col);
+        }
+    }
 
     return ret;
 }
@@ -206,10 +213,13 @@ computeKroneckerProduct(const static_matrix<T, DIM, DIM>& A, const static_matrix
 {
     static_tensor<T, DIM> ret = static_tensor<T, DIM>::Zero();
 
-    for (size_t j = 0; j < DIM; j++)
-        for (size_t i = 0; i < DIM; i++)
+    for (int j = 0; j < DIM; j++)
+    {
+        for (int i = 0; i < DIM; i++)
+        {
             ret.block(i * DIM, j * DIM, DIM, DIM) = A(i, j) * B;
-
+        }
+    }
     return ret;
 }
 
@@ -221,11 +231,19 @@ computeProductSup(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DI
 {
     static_tensor<T, DIM> ret = static_tensor<T, DIM>::Zero();
 
-    for (size_t i = 0; i < DIM; i++)
-        for (size_t j = 0; j < DIM; j++)
-            for (size_t k = 0; k < DIM; k++)
-                for (size_t l = 0; l < DIM; l++)
+    for (int i = 0; i < DIM; i++)
+    {
+        for (int j = 0; j < DIM; j++)
+        {
+            for (int k = 0; k < DIM; k++)
+            {
+                for (int l = 0; l < DIM; l++)
+                {
                     ret(i * DIM + k, j * DIM + l) = A(i, k) * B(j, l);
+                }
+            }
+        }
+    }
 
     return ret;
 }
@@ -238,12 +256,19 @@ computeProductInf(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DI
 {
     static_tensor<T, DIM> ret = static_tensor<T, DIM>::Zero();
 
-    for (size_t i = 0; i < DIM; i++)
-        for (size_t j = 0; j < DIM; j++)
-            for (size_t k = 0; k < DIM; k++)
-                for (size_t l = 0; l < DIM; l++)
+    for (int i = 0; i < DIM; i++)
+    {
+        for (int j = 0; j < DIM; j++)
+        {
+            for (int k = 0; k < DIM; k++)
+            {
+                for (int l = 0; l < DIM; l++)
+                {
                     ret(i * DIM + k, j * DIM + l) = A(i, l) * B(j, k);
-
+                }
+            }
+        }
+    }
     return ret;
 }
 

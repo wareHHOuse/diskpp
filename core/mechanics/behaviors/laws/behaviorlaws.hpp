@@ -1,5 +1,5 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
+ *       /\        Matteo Cicuttin (C) 2016, 2017, 2018
  *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
@@ -28,8 +28,7 @@
 #define _BEHAVIOR_HPP_WAS_INCLUDED_
 
 #include "CavitationLaw.hpp"
-#include "HenckyMisesLaw.hpp"
-#include "LinearElasticityLaw.hpp"
+#include "HenckyMises/HenckyMises.hpp"
 #include "LinearIsotropicAndKinematicHardening/LinearIsotropicAndKinematicHardening.hpp"
 #include "LinearLaw.hpp"
 #include "NeohookeanLaw.hpp"
