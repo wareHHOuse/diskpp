@@ -277,7 +277,6 @@ class BoundaryConditions
                 case DIRICHLET:
                     return num_face_dofs;
                     break;
-                #if 0
                 case CLAMPED:
                     return num_face_dofs;
                     break;
@@ -305,7 +304,6 @@ class BoundaryConditions
                 case NOTHING:
                     return 0;
                     break;
-                #endif
                 default:
                     throw std::logic_error("Unknown Boundary condition");
                     break;

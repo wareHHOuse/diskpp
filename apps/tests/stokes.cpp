@@ -50,6 +50,7 @@ run_stokes(const Mesh& msh, size_t degree)
     typedef typename mesh_type::scalar_type scalar_type;
 
     typedef dynamic_matrix<scalar_type>     matrix_type;
+    typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
 
     using point_type = typename mesh_type::point_type;
 
@@ -92,10 +93,11 @@ run_stokes(const Mesh& msh, size_t degree)
         return ret;
     };
 
-
     typename revolution::hho_degree_info hdi(degree);
+    boundary_type bnd(msh);
+    bnd.addDirichletEverywhere(sol_fun);
 
-    auto assembler = revolution::make_stokes_assembler(msh, hdi);
+    auto assembler = revolution::make_stokes_assembler(msh, hdi, bnd);
 
     for (auto cl : msh)
     {
@@ -110,8 +112,7 @@ run_stokes(const Mesh& msh, size_t degree)
 
         auto rhs = make_rhs(msh, cl, face_basis, rhs_fun);
 
-        assembler.assemble(msh, cl, (gr.second + stab), -dr, rhs, sol_fun);
-
+        assembler.assemble(msh, cl, (gr.second + stab), -dr, rhs);
     }
 
     assembler.finalize();
@@ -172,13 +173,13 @@ void convergence_test_typ1(void)
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_6.typ1");
     */
 
-    
+
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_1.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_2.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_3.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
-    
+
 
     /*
     meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_1.typ1");
