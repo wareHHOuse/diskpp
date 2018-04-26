@@ -103,13 +103,13 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 
         const auto phi = scalar_basis.eval_functions(pt);
 
-        for (size_t k = 0; k < scalar_basis.size(); k++)
+        for (int k = 0; k < scalar_basis.size(); k++)
         {
             function_type fc;
 
-            for (size_t j = 0; j < 3; j++)
+            for (int j = 0; j < 3; j++)
             {
-                for (size_t i = 0; i < 3; i++)
+                for (int i = 0; i < 3; i++)
                 {
                     fc       = function_type::Zero();
                     fc(i, j) = phi(k);
@@ -170,13 +170,13 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 
         const auto phi = scalar_basis.eval_functions(pt);
 
-        for (size_t k = 0; k < scalar_basis.size(); k++)
+        for (int k = 0; k < scalar_basis.size(); k++)
         {
             function_type fc;
 
-            for (size_t j = 0; j < 3; j++)
+            for (int j = 0; j < 3; j++)
             {
-                for (size_t i = 0; i < 3; i++)
+                for (int i = 0; i < 3; i++)
                 {
                     fc       = function_type::Zero();
                     fc(i, j) = phi(k);
@@ -236,13 +236,13 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 
         const auto phi = scalar_basis.eval_functions(pt);
 
-        for (size_t k = 0; k < scalar_basis.size(); k++)
+        for (int k = 0; k < scalar_basis.size(); k++)
         {
             function_type fc;
 
-            for (size_t j = 0; j < 2; j++)
+            for (int j = 0; j < 2; j++)
             {
-                for (size_t i = 0; i < 2; i++)
+                for (int i = 0; i < 2; i++)
                 {
                     fc       = function_type::Zero();
                     fc(i, j) = phi(k);
@@ -303,13 +303,13 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 
         const auto phi = scalar_basis.eval_functions(pt);
 
-        for (size_t k = 0; k < scalar_basis.size(); k++)
+        for (int k = 0; k < scalar_basis.size(); k++)
         {
             function_type fc;
 
-            for (size_t j = 0; j < 2; j++)
+            for (int j = 0; j < 2; j++)
             {
-                for (size_t i = 0; i < 2; i++)
+                for (int i = 0; i < 2; i++)
                 {
                     fc       = function_type::Zero();
                     fc(i, j) = phi(k);
@@ -415,18 +415,19 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
         ret.reserve(basis_size);
 
         auto phi = scalar_basis.eval_functions(pt);
+        const scalar_type invrac2 = 1.0 / std::sqrt(2.0);
 
-        for (size_t k = 0; k < scalar_basis.size(); k++)
+        for (int k = 0; k < scalar_basis.size(); k++)
         {
             function_type fc;
 
-            for (size_t j = 0; j < 3; j++)
+            for (int j = 0; j < 3; j++)
             {
-                for (size_t i = 0; i < j; i++)
+                for (int i = 0; i < j; i++)
                 {
                     fc       = function_type::Zero();
-                    fc(i, j) = phi(k);
-                    fc(j, i) = phi(k);
+                    fc(i, j) = phi(k) / invrac2;
+                    fc(j, i) = phi(k) / invrac2;
                     ret.push_back(fc);
                 }
 
@@ -486,18 +487,19 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
         ret.reserve(basis_size);
 
         auto phi = scalar_basis.eval_functions(pt);
+        const scalar_type invrac2 = 1.0 / std::sqrt(2.0);
 
-        for (size_t k = 0; k < scalar_basis.size(); k++)
+        for (int k = 0; k < scalar_basis.size(); k++)
         {
             function_type fc;
 
-            for (size_t j = 0; j < 3; j++)
+            for (int j = 0; j < 3; j++)
             {
-                for (size_t i = 0; i < j; i++)
+                for (int i = 0; i < j; i++)
                 {
                     fc       = function_type::Zero();
-                    fc(i, j) = phi(k);
-                    fc(j, i) = phi(k);
+                    fc(i, j) = phi(k) / invrac2;
+                    fc(j, i) = phi(k) / invrac2;
                     ret.push_back(fc);
                 }
                 fc       = function_type::Zero();
@@ -555,18 +557,19 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
         ret.reserve(basis_size);
 
         auto phi = scalar_basis.eval_functions(pt);
+        const scalar_type invrac2 = 1.0 / std::sqrt(2.0);
 
-        for (size_t k = 0; k < scalar_basis.size(); k++)
+        for (int k = 0; k < scalar_basis.size(); k++)
         {
             function_type fc;
 
-            for (size_t j = 0; j < 2; j++)
+            for (int j = 0; j < 2; j++)
             {
-                for (size_t i = 0; i < j; i++)
+                for (int i = 0; i < j; i++)
                 {
                     fc       = function_type::Zero();
-                    fc(i, j) = phi(k);
-                    fc(j, i) = phi(k);
+                    fc(i, j) = phi(k) / invrac2;
+                    fc(j, i) = phi(k) / invrac2;
                     ret.push_back(fc);
                 }
 
@@ -625,18 +628,19 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
         ret.reserve(basis_size);
 
         auto phi = scalar_basis.eval_functions(pt);
+        const scalar_type invrac2 = 1.0 / std::sqrt(2.0);
 
-        for (size_t k = 0; k < scalar_basis.size(); k++)
+        for (int k = 0; k < scalar_basis.size(); k++)
         {
             function_type fc;
 
-            for (size_t j = 0; j < 2; j++)
+            for (int j = 0; j < 2; j++)
             {
-                for (size_t i = 0; i < j; i++)
+                for (int i = 0; i < j; i++)
                 {
                     fc       = function_type::Zero();
-                    fc(i, j) = phi(k);
-                    fc(j, i) = phi(k);
+                    fc(i, j) = phi(k) / invrac2;
+                    fc(j, i) = phi(k) / invrac2;
                     ret.push_back(fc);
                 }
                 fc       = function_type::Zero();
