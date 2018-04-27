@@ -429,27 +429,27 @@ test_quads_fvca5(const run_params& rp, const ElasticityParameters material_data)
    printResults(error_sumup);
 }
 
-// template<typename T>
-// void
-// test_quads_diskpp(const run_params& rp, const ElasticityParameters material_data)
-// {
-//    size_t runs = 4;
+template<typename T>
+void
+test_quads_diskpp(const run_params& rp, const ElasticityParameters material_data)
+{
+   size_t runs = 4;
 
-//    std::vector<std::string> paths;
-//    paths.push_back("../diskpp/meshes/2D_quads/diskpp/testmesh-4-4.quad");
-//    paths.push_back("../diskpp/meshes/2D_quads/diskpp/testmesh-8-8.quad");
-//    paths.push_back("../diskpp/meshes/2D_quads/diskpp/testmesh-16-16.quad");
-//    paths.push_back("../diskpp/meshes/2D_quads/diskpp/testmesh-32-32.quad");
-//    paths.push_back("../diskpp/meshes/2D_quads/diskpp/testmesh-256-256.quad");
+   std::vector<std::string> paths;
+   paths.push_back("../diskpp/meshes/2D_quads/diskpp/testmesh-4-4.quad");
+   paths.push_back("../diskpp/meshes/2D_quads/diskpp/testmesh-8-8.quad");
+   paths.push_back("../diskpp/meshes/2D_quads/diskpp/testmesh-16-16.quad");
+   paths.push_back("../diskpp/meshes/2D_quads/diskpp/testmesh-32-32.quad");
+   paths.push_back("../diskpp/meshes/2D_quads/diskpp/testmesh-256-256.quad");
 
-//    std::vector<error_type> error_sumup;
+   std::vector<error_type> error_sumup;
 
-//    for (size_t i = 0; i < runs; i++) {
-//       auto msh = disk::load_cartesian_2d_mesh<T>(paths[i].c_str());
-//       error_sumup.push_back(run_linear_elasticity_solver(msh, rp, material_data));
-//    }
-//    printResults(error_sumup);
-// }
+   for (size_t i = 0; i < runs; i++) {
+      auto msh = disk::load_cartesian_2d_mesh<T>(paths[i].c_str());
+      error_sumup.push_back(run_linear_elasticity_solver(msh, rp, material_data));
+   }
+   printResults(error_sumup);
+}
 
 // template<typename T>
 // void
@@ -683,12 +683,12 @@ main(int argc, char** argv)
       std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
       std::cout << " " << std::endl;
 
-      //       tc.tic();
-      //       std::cout << "-Quadrangles diskpp:" << std::endl;
-      //       test_quads_diskpp<RealType>(rp, material_data);
-      //       tc.toc();
-      //       std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      //       std::cout << " " << std::endl;
+      tc.tic();
+      std::cout << "-Quadrangles diskpp:" << std::endl;
+      test_quads_diskpp<RealType>(rp, material_data);
+      tc.toc();
+      std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+      std::cout << " " << std::endl;
 
       tc.tic();
       std::cout << "-Hexagons:" << std::endl;

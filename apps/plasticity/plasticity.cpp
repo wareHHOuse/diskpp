@@ -373,13 +373,13 @@ main(int argc, char** argv)
         return 0;
     }
 
-    // /* DiSk++ cartesian 2D */
-    // if (std::regex_match(mesh_filename, std::regex(".*\\.quad$"))) {
-    //    std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
-    //    auto msh = disk::load_cartesian_2d_mesh<RealType>(mesh_filename);
-    //    run_plasticity_solver(msh, rp, material_data);
-    //    return 0;
-    // }
+    /* DiSk++ cartesian 2D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.quad$"))) {
+       std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
+       auto msh = disk::load_cartesian_2d_mesh<RealType>(mesh_filename);
+       run_plasticity_solver(msh, rp, material_data);
+       return 0;
+    }
 
     /* Medit 2d*/
     if (std::regex_match(mesh_filename, std::regex(".*\\.medit2d$")))
