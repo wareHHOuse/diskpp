@@ -1,7 +1,7 @@
 /*
- *       /\         DISK++, a template library for DIscontinuous SKeletal      
+ *       /\         DISK++, a template library for DIscontinuous SKeletal
  *      /__\        methods.
- *     /_\/_\      
+ *     /_\/_\
  *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
  *   /__\  /__\     matteo.cicuttin@enpc.fr
  *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
@@ -117,7 +117,7 @@ gauss_legendre(size_t degree)
             qp = point<T,1>({0.0});
             qw = 8.0/9.0;
             ret.push_back( std::make_pair( qp, qw ) );
-            
+
             return ret;
 
         case 4:
@@ -128,12 +128,12 @@ gauss_legendre(size_t degree)
             qw = (18.0 + std::sqrt(30.0))/36.0;
             ret.push_back( std::make_pair(-qp, qw ) );
             ret.push_back( std::make_pair( qp, qw ) );
-            
+
             qp = point<T,1>({ std::sqrt( (a1 + a2)/35.0 ) });
             qw = (18.0 - std::sqrt(30.0))/36.0;
             ret.push_back( std::make_pair(-qp, qw ) );
             ret.push_back( std::make_pair( qp, qw ) );
-            
+
             return ret;
 
         case 5:
@@ -153,7 +153,7 @@ gauss_legendre(size_t degree)
             ret.push_back( std::make_pair(-qp, qw ) );
             ret.push_back( std::make_pair( qp, qw ) );
             return ret;
-            
+
         default:
             return golub_welsch<T>(degree);
 
@@ -313,7 +313,7 @@ integrate_quadrangle(const Mesh<T,2,Storage>& msh,
 
         std::transform(qps.begin(), qps.end(), retbegin, tr);
     }
-    
+
     return ret;
 }
 
@@ -424,11 +424,6 @@ integrate_polygon(size_t degree, const std::vector< point<T,2> >& pts)
 
 
 
-
-
-
-
-
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 std::vector< disk::quadrature_point<T,2> >
 integrate_2D_face(const Mesh<T,2,Storage>& msh,
@@ -462,9 +457,6 @@ integrate_2D_face(const Mesh<T,2,Storage>& msh,
 } //priv
 
 
-
-
-
 template<typename T>
 std::vector< disk::quadrature_point<T,2> >
 integrate(const disk::simplicial_mesh<T,2>& msh,
@@ -476,7 +468,6 @@ integrate(const disk::simplicial_mesh<T,2>& msh,
 }
 
 
-
 template<typename T>
 std::vector< disk::quadrature_point<T,2> >
 integrate(const disk::simplicial_mesh<T,2>& msh,
@@ -486,6 +477,28 @@ integrate(const disk::simplicial_mesh<T,2>& msh,
 	return priv::integrate_2D_face(msh, fc, degree);
 }
 
+template<typename T>
+std::vector< disk::quadrature_point<T,2> >
+integrate(const disk::cartesian_mesh<T,2>& msh,
+		  const typename disk::cartesian_mesh<T,2>::cell& cl,
+		  size_t degree)
+{
+    auto pts = points(msh, cl);
+    // transform arry to vector
+    std::vector< point<T,2> > ptsv{pts[0], pts[1], pts[3], pts[2]};
+    return priv::integrate_quadrangle_tens(degree, ptsv);
+}
+
+
+
+template<typename T>
+std::vector< disk::quadrature_point<T,2> >
+integrate(const disk::cartesian_mesh<T,2>& msh,
+		  const typename disk::cartesian_mesh<T,2>::face& fc,
+		  size_t degree)
+{
+	return priv::integrate_2D_face(msh, fc, degree);
+}
 
 template<typename T>
 std::vector< disk::quadrature_point<T,2> >

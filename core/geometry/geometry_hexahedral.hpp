@@ -80,33 +80,17 @@ points(const cartesian_mesh<T, DIM>& msh, const cartesian_element<DIM, CODIM>& e
     return pts;
 }
 
-
 /* Return the number of elements of the specified cell */
-template<typename T, size_t DIM, size_t CODIM>
+template<typename T, size_t DIM>
 constexpr size_t
-number_of_faces(const cartesian_mesh<T, DIM>& msh, const cartesian_element<DIM, CODIM>& e)
+howmany_faces(const cartesian_mesh<T,DIM>& msh, const typename cartesian_mesh<T,DIM>::cell& cl)
 {
-    static_assert(DIM == 2 or DIM == 3, "Wrong dimension for cartesian mesh");
-
-    if (DIM == 2)
+    static_assert(DIM == 1 or DIM == 2 or DIM == 3, "wrong dimension");
+    switch(DIM)
     {
-        switch(CODIM)
-        {
-            case 0: return 4;
-            case 1: return 2;
-            case 2: return 0;
-        }
-    }
-
-    if (DIM == 3)
-    {
-        switch(CODIM)
-        {
-            case 0: return 6;
-            case 1: return 4;
-            case 2: return 2;
-            case 3: return 0;
-        }
+        case 1: return 2;
+        case 2: return 4;
+        case 3: return 6;
     }
     /* NOTREACHED */
 }

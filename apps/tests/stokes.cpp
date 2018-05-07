@@ -93,8 +93,9 @@ run_stokes(const Mesh& msh, size_t degree)
         return ret;
     };
 
+
     typename revolution::hho_degree_info hdi(degree);
-    boundary_type bnd(msh);
+    boundary_type                        bnd(msh);
     bnd.addDirichletEverywhere(sol_fun);
 
     auto assembler = revolution::make_stokes_assembler(msh, hdi, bnd);
@@ -113,6 +114,7 @@ run_stokes(const Mesh& msh, size_t degree)
         auto rhs = make_rhs(msh, cl, face_basis, rhs_fun);
 
         assembler.assemble(msh, cl, (gr.second + stab), -dr, rhs);
+
     }
 
     assembler.finalize();
