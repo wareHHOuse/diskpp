@@ -45,6 +45,7 @@ namespace disk {
 
 /* Compute an estimate of the mesh discretization step 'h' */
 template<typename Mesh>
+[[deprecated("Use average_diameter(). This is not the correct way to compute h.")]]
 typename Mesh::scalar_type
 mesh_h(const Mesh& msh)
 {
