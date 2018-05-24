@@ -287,7 +287,6 @@ public:
 
         for (auto& cl : msh)
         {
-            std::cout << cl << std::endl;
             auto ptids = cl.point_ids();
             auto size = ptids.size();
             assert(size > 2);
