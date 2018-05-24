@@ -426,8 +426,8 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
                 for (int i = 0; i < j; i++)
                 {
                     fc       = function_type::Zero();
-                    fc(i, j) = phi(k) / invrac2;
-                    fc(j, i) = phi(k) / invrac2;
+                    fc(i, j) = phi(k) * invrac2;
+                    fc(j, i) = phi(k) * invrac2;
                     ret.push_back(fc);
                 }
 
@@ -498,8 +498,8 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
                 for (int i = 0; i < j; i++)
                 {
                     fc       = function_type::Zero();
-                    fc(i, j) = phi(k) / invrac2;
-                    fc(j, i) = phi(k) / invrac2;
+                    fc(i, j) = phi(k) * invrac2;
+                    fc(j, i) = phi(k) * invrac2;
                     ret.push_back(fc);
                 }
                 fc       = function_type::Zero();
@@ -568,8 +568,8 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
                 for (int i = 0; i < j; i++)
                 {
                     fc       = function_type::Zero();
-                    fc(i, j) = phi(k) / invrac2;
-                    fc(j, i) = phi(k) / invrac2;
+                    fc(i, j) = phi(k) * invrac2;
+                    fc(j, i) = phi(k) * invrac2;
                     ret.push_back(fc);
                 }
 
@@ -639,8 +639,8 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
                 for (int i = 0; i < j; i++)
                 {
                     fc       = function_type::Zero();
-                    fc(i, j) = phi(k) / invrac2;
-                    fc(j, i) = phi(k) / invrac2;
+                    fc(i, j) = phi(k) * invrac2;
+                    fc(j, i) = phi(k) * invrac2;
                     ret.push_back(fc);
                 }
                 fc       = function_type::Zero();
