@@ -442,48 +442,48 @@ test_tetrahedra_netgen(const run_params& rp, const Parameters material_data)
    printResults(error_sumup);
 }
 
-// template<typename T>
-// void
-// test_polyhedra_fvca6(const run_params& rp, const Parameters material_data)
-// {
-//    size_t runs = 3;
+template<typename T>
+void
+test_polyhedra_fvca6(const run_params& rp, const Parameters material_data)
+{
+   size_t runs = 3;
 
-//    std::vector<std::string> paths;
-//    paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_10.msh");
-//    paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_20.msh");
-//    paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_30.msh");
-//    paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_40.msh");
+   std::vector<std::string> paths;
+   paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_10.msh");
+   paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_20.msh");
+   paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_30.msh");
+   paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_40.msh");
 
-//    std::vector<error_type> error_sumup;
+   std::vector<error_type> error_sumup;
 
-//    for (int i = 0; i < runs; i++) {
-//       auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
-//       error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
-//    }
-//    printResults(error_sumup);
-// }
+   for (int i = 0; i < runs; i++) {
+      auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
+      error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
+   }
+   printResults(error_sumup);
+}
 
-// template<typename T>
-// void
-// test_tetrahedra_fvca6(const run_params& rp, const Parameters material_data)
-// {
-//    size_t runs = 4;
+template<typename T>
+void
+test_tetrahedra_fvca6(const run_params& rp, const Parameters material_data)
+{
+   size_t runs = 4;
 
-//    std::vector<std::string> paths;
-//    paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.0.msh");
-//    paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.1.msh");
-//    paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.2.msh");
-//    paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.3.msh");
-//    paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.4.msh");
+   std::vector<std::string> paths;
+   paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.0.msh");
+   paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.1.msh");
+   paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.2.msh");
+   paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.3.msh");
+   paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.4.msh");
 
-//    std::vector<error_type> error_sumup;
+   std::vector<error_type> error_sumup;
 
-//    for (int i = 0; i < runs; i++) {
-//       auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
-//       error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
-//    }
-//    printResults(error_sumup);
-// }
+   for (int i = 0; i < runs; i++) {
+      auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
+      error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
+   }
+   printResults(error_sumup);
+}
 
 int
 main(int argc, char** argv)
@@ -550,12 +550,12 @@ main(int argc, char** argv)
    std::cout << " " << std::endl;
 
    if (dim == 3) {
-      //       tc.tic();
-      //       std::cout << "-Tetrahedras fvca6:" << std::endl;
-      //       test_tetrahedra_fvca6<RealType>(rp, material_data);
-      //       tc.toc();
-      //       std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      //       std::cout << " " << std::endl;
+            tc.tic();
+            std::cout << "-Tetrahedras fvca6:" << std::endl;
+            test_tetrahedra_fvca6<RealType>(rp, material_data);
+            tc.toc();
+            std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+            std::cout << " " << std::endl;
 
             tc.tic();
             std::cout << "-Tetrahedras netgen:" << std::endl;
@@ -578,12 +578,12 @@ main(int argc, char** argv)
       //       std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
       //       std::cout << " " << std::endl;
 
-      //       tc.tic();
-      //       std::cout << "-Polyhedra:" << std::endl;
-      //       test_polyhedra_fvca6<RealType>(rp, material_data);
-      //       tc.toc();
-      //       std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      //       std::cout << " " << std::endl;
+            tc.tic();
+            std::cout << "-Polyhedra:" << std::endl;
+            test_polyhedra_fvca6<RealType>(rp, material_data);
+            tc.toc();
+            std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+            std::cout << " " << std::endl;
    } else if (dim == 2) {
 
       tc.tic();
