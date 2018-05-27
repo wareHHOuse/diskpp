@@ -211,7 +211,7 @@ public:
         DBPutZonelist(m_siloDb, "zonelist", nzones, ndims, nodelist.data(), lnodelist,
             1, shapesize, shapecounts, nshapetypes);
 
-        DBPutUcdmesh(m_siloDb, "mesh", ndims, NULL, coords, nnodes, nzones,
+        DBPutUcdmesh(m_siloDb, name.c_str(), ndims, NULL, coords, nnodes, nzones,
             "zonelist", NULL, DB_DOUBLE, NULL);
 
         return true;
@@ -259,7 +259,7 @@ public:
         DBPutZonelist(m_siloDb, "zonelist", nzones, ndims, nodelist.data(), lnodelist,
             1, shapesize, shapecounts, nshapetypes);
 
-        DBPutUcdmesh(m_siloDb, "mesh", ndims, NULL, coords, nnodes, nzones,
+        DBPutUcdmesh(m_siloDb, name.c_str(), ndims, NULL, coords, nnodes, nzones,
             "zonelist", NULL, DB_DOUBLE, NULL);
 
         return true;

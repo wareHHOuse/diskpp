@@ -426,9 +426,11 @@ public:
         throw std::invalid_argument("point not found");
     }
 
-    auto meshes_begin() const { return meshes.begin(); }
-    auto meshes_end()   const { return meshes.end(); }
-    auto meshes_size()  const { return meshes.size(); }
+    auto meshes_begin()     const { return meshes.begin(); }
+    auto meshes_end()       const { return meshes.end(); }
+    auto coarsest_mesh()    const { return meshes.front(); }
+    auto finest_mesh()      const { return meshes.back(); }
+    auto meshes_size()      const { return meshes.size(); }
 };
 
 
