@@ -398,27 +398,27 @@ test_quads_diskpp(const run_params& rp, const Parameters material_data)
 //    printResults(error_sumup);
 // }
 
-// template<typename T>
-// void
-// test_hexahedra_fvca6(const run_params& rp, const Parameters material_data)
-// {
-//    size_t runs = 4;
+template<typename T>
+void
+test_hexahedra_fvca6(const run_params& rp, const Parameters material_data)
+{
+   size_t runs = 4;
 
-//    std::vector<std::string> paths;
-//    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_2x2x2.msh");
-//    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_4x4x4.msh");
-//    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_8x8x8.msh");
-//    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_16x16x16.msh");
-//    paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_32x32x32.hex");
+   std::vector<std::string> paths;
+   paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_2x2x2.msh");
+   paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_4x4x4.msh");
+   paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_8x8x8.msh");
+   paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_16x16x16.msh");
+   paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_32x32x32.hex");
 
-//    std::vector<error_type> error_sumup;
+   std::vector<error_type> error_sumup;
 
-//    for (int i = 0; i < runs; i++) {
-//       auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
-//       error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
-//    }
-//    printResults(error_sumup);
-// }
+   for (int i = 0; i < runs; i++) {
+      auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
+      error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
+   }
+   printResults(error_sumup);
+}
 
 template<typename T>
 void
@@ -446,7 +446,7 @@ template<typename T>
 void
 test_polyhedra_fvca6(const run_params& rp, const Parameters material_data)
 {
-   size_t runs = 3;
+   size_t runs = 2;
 
    std::vector<std::string> paths;
    paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_10.msh");
@@ -564,12 +564,12 @@ main(int argc, char** argv)
             std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
             std::cout << " " << std::endl;
 
-      //       tc.tic();
-      //       std::cout << "-Hexahedras fvca6:" << std::endl;
-      //       test_hexahedra_fvca6<RealType>(rp, material_data);
-      //       tc.toc();
-      //       std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-      //       std::cout << " " << std::endl;
+            tc.tic();
+            std::cout << "-Hexahedras fvca6:" << std::endl;
+            test_hexahedra_fvca6<RealType>(rp, material_data);
+            tc.toc();
+            std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+            std::cout << " " << std::endl;
 
       //       tc.tic();
       //       std::cout << "-Hexahedras diskpp:" << std::endl;
