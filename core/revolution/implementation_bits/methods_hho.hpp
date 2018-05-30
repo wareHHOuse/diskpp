@@ -402,6 +402,86 @@ namespace priv{
        return lag;
     }
 }
+#if 0
+template<typename Mesh>
+std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
+             Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
+make_hlow_vector_symmetric_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
+                          const hho_degree_info& di)
+{
+    using T = typename Mesh::coordinate_type;
+    const size_t N = Mesh::dimension;
+
+    auto celdeg = di.cell_degree();
+    auto facdeg = di.face_degree();
+
+    auto cb = make_vector_monomial_basis(msh, cl, celdeg);
+    auto sb = make_sym_matrix_monomial_basis(msh, cl, facdeg);
+
+    auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
+    auto fbs = vector_basis_size(facdeg, Mesh::dimension-1, Mesh::dimension);
+    auto sbs = sym_matrix_basis_size(facdeg, Mesh::dimension, Mesh::dimension);
+
+    auto num_faces = howmany_faces(msh, cl);
+    auto num_total_dofs = cbs + num_faces*fbs;
+    size_t nb_lag       = priv::nb_lag(N);
+
+    Matrix<T, Dynamic, Dynamic> mass = revolution::make_mass_matrix(msh, cl, sb);
+    Matrix<T, Dynamic, Dynamic> gr_lhs = Matrix<T, Dynamic, Dynamic>::Zero(sbs + nb_lag, sbs + nb_lag);
+    Matrix<T, Dynamic, Dynamic> gr_rhs = Matrix<T, Dynamic, Dynamic>::Zero(sbs + nb_lag, num_total_dofs);
+
+
+    gr_lhs.block(0,0, sbs, sbs) = mass;
+
+    auto qps = integrate(msh, cl, 2*celdeg);
+    for(auto& qp : qps)
+    {
+        auto c_dphi = cb.eval_sgradients(qp.point());
+        auto s_phi  = sb.eval_functions(qp.point());
+
+        auto cdphi_sphi =  priv::outer_product(s_phi, c_dphi);
+
+        assert(cdphi_sphi.rows() == sbs  && cdphi_sphi.cols() == cbs);
+
+        gr_rhs.block(0, 0, sbs, cbs) +=  qp.weight() * cdphi_sphi;
+    }
+
+    auto fcs = faces(msh, cl);
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        auto fc = fcs[i];
+        auto n  = normal(msh, cl, fc);
+        auto fb = make_vector_monomial_basis(msh, fc, facdeg);
+
+        size_t N = Mesh::dimension;
+        auto qps_f = integrate(msh, fc, 2* std::max(facdeg, celdeg));
+        for (auto& qp : qps_f)
+        {
+            Matrix<T, Dynamic, 2>   c_phi  = cb.eval_functions(qp.point());
+            Matrix<T, Dynamic, 2>   f_phi  = fb.eval_functions(qp.point());
+            eigen_compatible_stdvector<Matrix<T, 2, 2>> s_phi  = sb.eval_functions(qp.point());
+
+            Matrix<T, Dynamic, 2> s_phi_n  =  priv::outer_product( s_phi, n);
+            gr_rhs.block(0, cbs+i*fbs, sbs, fbs) +=
+                        qp.weight() * s_phi_n * f_phi.transpose();
+            gr_rhs.block(0, 0, sbs, cbs) -=
+                        qp.weight() * s_phi_n * c_phi.transpose();
+        }
+    }
+
+    Matrix<T, Dynamic, Dynamic> oper = gr_lhs.llt().solve(gr_rhs);
+    Matrix<T, Dynamic, Dynamic> data = gr_rhs.transpose() * oper;
+
+    // use LU solver because lhs is only symmetric and positive
+    matrix_type sol  = gr_lhs.lu().solve(gr_rhs);
+    matrix_type oper = sol.block(0,0, sbs, num_total_dofs);
+    matrix_type gr   = gr_rhs.block(0,0, sbs, num_total_dofs);
+    matrix_type data = gr.transpose() * oper;
+
+    return std::make_pair(oper, data);
+}
+
+#endif
 template<typename Mesh>
 std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
              Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
@@ -617,10 +697,6 @@ make_hho_sym_gradrec_matrix(const Mesh&                     msh,
 
    matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);
    matrix_type gr_rhs = matrix_type::Zero(gbs, cbs + num_faces * fbs);
-   std::cout << "gbs: "<< gbs << std::endl;
-   std::cout << "cbs: "<< cbs << std::endl;
-   std::cout << "fbs: "<< fbs << std::endl;
-   std::cout << "num_faces_n: "<< num_faces << std::endl;
 
    const size_t dim2 = N * N;
 
@@ -693,6 +769,107 @@ make_hho_sym_gradrec_matrix(const Mesh&                     msh,
 
     return std::make_pair(oper, data);
 }
+
+template<typename Mesh>
+std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
+          Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+make_hlow_vector_symmetric_laplacian(const Mesh&                     msh,
+                        const typename Mesh::cell_type& cl,
+                        const hho_degree_info&          di)
+{
+   using T        = typename Mesh::coordinate_type;
+   const size_t N = Mesh::dimension;
+
+   const auto graddeg = di.face_degree();
+   const auto celdeg  = di.cell_degree();
+   const auto facdeg  = di.face_degree();
+
+   const auto gb = make_sym_matrix_monomial_basis(msh, cl, graddeg);
+   const auto cb = make_vector_monomial_basis(msh, cl, celdeg);
+
+   const auto gbs = sym_matrix_basis_size(graddeg, Mesh::dimension, Mesh::dimension);
+   const auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
+   const auto fbs = vector_basis_size(facdeg, Mesh::dimension - 1, Mesh::dimension);
+
+   const auto num_faces = howmany_faces(msh, cl);
+
+   typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+
+   matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);
+   matrix_type gr_rhs = matrix_type::Zero(gbs, cbs + num_faces * fbs);
+
+   const size_t dim2 = N * N;
+
+   // this is very costly to build it
+   const auto qps = integrate(msh, cl, 2 * graddeg);
+
+   size_t dec = 0;
+    if (N == 3)
+        dec = 6;
+    else if (N == 2)
+        dec = 3;
+    else
+        std::logic_error("Expected 3 >= dim > 1");
+
+    for (auto& qp : qps)
+    {
+        const auto gphi = gb.eval_functions(qp.point());
+
+        for (size_t j = 0; j < gbs; j++)
+        {
+            const auto qp_gphi_j = priv::inner_product(qp.weight(), gphi[j]);
+            for (size_t i = j; i < gbs; i += dec)
+                gr_lhs(i, j) += priv::inner_product(gphi[i], qp_gphi_j);
+        }
+    }
+
+   // upper part
+    for (size_t j = 0; j < gbs; j++)
+        for (size_t i = 0; i < j; i++)
+            gr_lhs(i, j) = gr_lhs(j, i);
+
+    // compute rhs
+    const auto qpc = integrate(msh, cl, std::max(int(graddeg + celdeg) - 1, 0));
+    for (auto& qp : qpc)
+    {
+        const auto gphi = gb.eval_functions(qp.point());
+        const auto dphi = cb.eval_sgradients(qp.point());
+
+        for (size_t j = 0; j < cbs; j++)
+        {
+            const auto qp_dphi_j = priv::inner_product(qp.weight(), dphi[j]);
+            for (size_t i = 0; i < gbs; i++)
+                gr_rhs(i, j) += priv::inner_product(gphi[i], qp_dphi_j);
+        }
+    } // end qp
+
+    const auto fcs = faces(msh, cl);
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto fc = fcs[i];
+        const auto n  = normal(msh, cl, fc);
+        const auto fb = make_vector_monomial_basis(msh, fc, facdeg);
+
+        const auto qps_f = integrate(msh, fc, graddeg + std::max(celdeg, facdeg));
+        for (auto& qp : qps_f)
+        {
+            const auto cphi = cb.eval_functions(qp.point());
+            const auto gphi = gb.eval_functions(qp.point());
+            const auto fphi = fb.eval_functions(qp.point());
+
+            const auto gphi_n = priv::outer_product(gphi, n);
+            gr_rhs.block(0, cbs + i * fbs, gbs, fbs) +=
+                                qp.weight() * priv::outer_product(fphi, gphi_n);
+            gr_rhs.block(0, 0, gbs, cbs) -= qp.weight() * priv::outer_product(cphi, gphi_n);
+        }
+    }
+
+    Matrix<T, Dynamic, Dynamic> oper = gr_lhs.llt().solve(gr_rhs);
+    Matrix<T, Dynamic, Dynamic> data = gr_rhs.transpose() * oper;
+
+    return std::make_pair(oper, data);
+}
+
 
 template<typename Mesh>
 [[deprecated("Do we need to return three matrices or what?")]]
@@ -1363,6 +1540,92 @@ make_hho_fancy_stabilization_vector(const Mesh& msh, const typename Mesh::cell_t
     return data;
 }
 
+#if 0
+template<typename Mesh>
+Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+make_hho_simple_stabilization_vector(const Mesh& msh, const typename Mesh::cell_type& cl,
+                      const hho_degree_info& di)
+{
+    using T = typename Mesh::coordinate_type;
+
+    auto recdeg = di.reconstruction_degree();
+    auto celdeg = di.cell_degree();
+    auto facdeg = di.face_degree();
+
+    auto rbs = vector_basis_size(recdeg, Mesh::dimension, Mesh::dimension);
+    auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
+    auto fbs = vector_basis_size(facdeg, Mesh::dimension-1, Mesh::dimension);
+
+    size_t N = Mesh::dimension;
+
+    auto cb = make_vector_monomial_basis(msh, cl, recdeg);
+
+    Matrix<T, Dynamic, Dynamic> mass_mat = Matrix<T, Dynamic, Dynamic>::Zero(rbs, rbs);
+    auto cell_quadpoints = integrate(msh, cl, 2*recdeg);
+    for (auto& qp : cell_quadpoints)
+    {
+        auto c_phi = cb.eval_functions(qp.point());
+        mass_mat += qp.weight() * priv::outer_product(c_phi, c_phi);
+    }
+
+    // Build \pi_F^k (v_F - P_T^K v) equations (21) and (22)
+
+    //Step 1: compute \pi_T^k p_T^k v (third term).
+    Matrix<T, Dynamic, Dynamic> M1 = mass_mat.block(0, 0, cbs, cbs);
+    Matrix<T, Dynamic, Dynamic> M2 = mass_mat.block(0, N, cbs, rbs-N);
+    Matrix<T, Dynamic, Dynamic> proj1 = -M1.llt().solve(M2*reconstruction);
+
+    //Step 2: v_T - \pi_T^k p_T^k v (first term minus third term)
+    Matrix<T, Dynamic, Dynamic> I_T = Matrix<T, Dynamic, Dynamic>::Identity(cbs, cbs);
+    proj1.block(0, 0, cbs, cbs) += I_T;
+
+    auto fcs = faces(msh, cl);
+    auto num_faces = fcs.size();
+
+    Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(cbs+num_faces*fbs, cbs+num_faces*fbs);
+
+    // Step 3: project on faces (eqn. 21)
+    for (size_t face_i = 0; face_i < num_faces; face_i++)
+    {
+        auto h = diameter(msh, fcs[face_i]);
+        auto fc = fcs[face_i];
+        auto fb = make_vector_monomial_basis(msh, fc, facdeg);
+
+        Matrix<T, Dynamic, Dynamic> face_mass_matrix    = Matrix<T, Dynamic, Dynamic>::Zero(fbs, fbs);
+        Matrix<T, Dynamic, Dynamic> face_trace_matrix   = Matrix<T, Dynamic, Dynamic>::Zero(fbs, rbs);
+
+        auto face_quadpoints = integrate(msh, fc, 2*recdeg);
+        for (auto& qp : face_quadpoints)
+        {
+            auto f_phi = fb.eval_functions(qp.point());
+            auto c_phi = cb.eval_functions(qp.point());
+            Matrix<T, Dynamic, Mesh::dimension> q_f_phi = qp.weight() * f_phi;
+            face_mass_matrix += priv::outer_product(f_phi, q_f_phi);
+            face_trace_matrix += priv::outer_product(c_phi, q_f_phi);
+        }
+
+        LLT<Matrix<T, Dynamic, Dynamic>> piKF;
+        piKF.compute(face_mass_matrix);
+
+        // Step 3a: \pi_F^k( v_F - p_T^k v )
+        Matrix<T, Dynamic, Dynamic> MR1 = face_trace_matrix.block(0, N, fbs, rbs-N);
+
+        Matrix<T, Dynamic, Dynamic> proj2 = piKF.solve(MR1*reconstruction);
+        Matrix<T, Dynamic, Dynamic> I_F = Matrix<T, Dynamic, Dynamic>::Identity(fbs, fbs);
+        proj2.block(0, cbs+face_i*fbs, fbs, fbs) -= I_F;
+
+        // Step 3b: \pi_F^k( v_T - \pi_T^k p_T^k v )
+        Matrix<T, Dynamic, Dynamic> MR2   = face_trace_matrix.block(0, 0, fbs, cbs);
+        Matrix<T, Dynamic, Dynamic> proj3 = piKF.solve(MR2*proj1);
+        Matrix<T, Dynamic, Dynamic> BRF   = proj2 + proj3;
+
+        data += BRF.transpose() * face_mass_matrix * BRF / h;
+    }
+
+    return data;
+}
+#endif
+
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
 project_function(const Mesh& msh, const typename Mesh::cell_type& cl,
@@ -2005,8 +2268,21 @@ make_hho_stokes(const Mesh& msh, const typename Mesh::cell_type& cl,
         return make_hho_vector_symmetric_laplacian(msh, cl, hdi);
     else
         return make_hho_vector_laplacian(msh, cl, hdi);
+}
+
+
+template<typename Mesh>
+auto
+make_hlow_stokes(const Mesh& msh, const typename Mesh::cell_type& cl,
+                const hho_degree_info& hdi, const bool& use_sym_grad)
+{
+    if(use_sym_grad)
+        return make_hlow_vector_symmetric_laplacian(msh, cl, hdi);
+    else
+        return make_hlow_vector_laplacian(msh, cl, hdi);
     //auto gr = make_hho_sym_gradrec_matrix(msh, cl, hdi);
 }
+
 
 template<typename Mesh>
 class stokes_assembler

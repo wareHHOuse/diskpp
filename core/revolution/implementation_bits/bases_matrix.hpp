@@ -214,37 +214,40 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
    scalar_basis_type                                          scalar_basis;
 
  public:
-   scaled_monomial_matrix_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
-     scalar_basis(msh, cl, degree)
-   {
-      basis_degree = degree;
-      basis_size   = matrix_basis_size(degree, 2, 2);
-   }
+    scaled_monomial_matrix_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
+    scalar_basis(msh, cl, degree)
+    {
+        basis_degree = degree;
+        basis_size   = matrix_basis_size(degree, 2, 2);
+    }
 
-   eigen_compatible_stdvector<function_type>
-   eval_functions(const point_type& pt) const
-   {
-      eigen_compatible_stdvector<function_type> ret;
-      ret.reserve(basis_size);
+    eigen_compatible_stdvector<function_type>
+    eval_functions(const point_type& pt) const
+    {
+        eigen_compatible_stdvector<function_type> ret;
+        ret.reserve(basis_size);
 
-      const auto phi = scalar_basis.eval_functions(pt);
+        const auto phi = scalar_basis.eval_functions(pt);
 
-      for (size_t k = 0; k < scalar_basis.size(); k++) {
-         function_type fc;
+        for (size_t k = 0; k < scalar_basis.size(); k++)
+        {
+            function_type fc;
 
-         for (size_t j = 0; j < 2; j++) {
-            for (size_t i = 0; i < 2; i++) {
-               fc       = function_type::Zero();
-               fc(i, j) = phi(k);
-               ret.push_back(fc);
+            for (size_t j = 0; j < 2; j++)
+            {
+                for (size_t i = 0; i < 2; i++)
+                {
+                    fc       = function_type::Zero();
+                    fc(i, j) = phi(k);
+                    ret.push_back(fc);
+                }
             }
-         }
-      }
+        }
 
-      assert(ret.size() == basis_size);
+        assert(ret.size() == basis_size);
 
-      return ret;
-   }
+        return ret;
+    }
 
    size_t
    size() const
@@ -405,6 +408,7 @@ public:
         ret.reserve(basis_size);
 
         auto phi = scalar_basis.eval_functions(pt);
+        const scalar_type invrac2 = 1.0 / std::sqrt(2.0);
 
         for (size_t k = 0; k < scalar_basis.size(); k++)
         {
@@ -415,8 +419,8 @@ public:
                 for (size_t i = 0; i < j; i++)
                 {
                     fc       = function_type::Zero();
-                    fc(i, j) = phi(k);
-                    fc(j, i) = phi(k);
+                    fc(i, j) = phi(k) * invrac2;
+                    fc(j, i) = phi(k) * invrac2;
                     ret.push_back(fc);
                 }
 
@@ -474,6 +478,7 @@ public:
         ret.reserve(basis_size);
 
         auto phi = scalar_basis.eval_functions(pt);
+        const scalar_type invrac2 = 1.0 / std::sqrt(2.0);
 
         for (size_t k = 0; k < scalar_basis.size(); k++)
         {
@@ -484,8 +489,8 @@ public:
                 for (size_t i = 0; i < j; i++)
                 {
                     fc       = function_type::Zero();
-                    fc(i, j) = phi(k);
-                    fc(j, i) = phi(k);
+                    fc(i, j) = phi(k) * invrac2;
+                    fc(j, i) = phi(k) * invrac2;
                     ret.push_back(fc);
                 }
                 fc       = function_type::Zero();
@@ -540,6 +545,7 @@ private:
         ret.reserve(basis_size);
 
         auto phi = scalar_basis.eval_functions(pt);
+        const scalar_type invrac2 = 1.0 / std::sqrt(2.0);
 
         for (size_t k = 0; k < scalar_basis.size(); k++)
         {
@@ -550,8 +556,8 @@ private:
                 for (size_t i = 0; i < j; i++)
                 {
                     fc       = function_type::Zero();
-                    fc(i, j) = phi(k);
-                    fc(j, i) = phi(k);
+                    fc(i, j) = phi(k) * invrac2;
+                    fc(j, i) = phi(k) * invrac2;
                     ret.push_back(fc);
                 }
 
@@ -607,6 +613,7 @@ public:
         ret.reserve(basis_size);
 
         auto phi = scalar_basis.eval_functions(pt);
+        const scalar_type invrac2 = 1.0 / std::sqrt(2.0);
 
         for (size_t k = 0; k < scalar_basis.size(); k++)
         {
@@ -617,8 +624,8 @@ public:
                 for (size_t i = 0; i < j; i++)
                 {
                     fc       = function_type::Zero();
-                    fc(i, j) = phi(k);
-                    fc(j, i) = phi(k);
+                    fc(i, j) = phi(k) * invrac2;
+                    fc(j, i) = phi(k) * invrac2;
                     ret.push_back(fc);
                 }
                 fc       = function_type::Zero();

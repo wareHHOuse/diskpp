@@ -42,24 +42,45 @@
 
 #include "output/silo.hpp"
 
-
 #include "viscoplasticity_solver.hpp"
 template<typename Mesh>
 auto
 run_viscoplasticity(const Mesh& msh, size_t degree,
                     const typename Mesh::scalar_type & alpha,
-                    std::ofstream & ofs)
+                    const problem_type& problem)
 {
     using T = typename Mesh::coordinate_type;
-    T tolerance = 1.e-8, Ninf = 10.e+5;
-    size_t max_iters = 50000;
+    T tolerance = 1.e-10, Ninf = 10.e+5;
+    size_t max_iters = 100000;
+
+    std::string name;
+    switch (problem)
+    {
+        case DRIVEN:
+            name = "driven";
+            break;
+        case COUETTE:
+            name = "couette";
+            break;
+        case POISEUILLE:
+            name = "poiseuille";
+            break;
+        default:
+            std::cout << "wrong arguments" << std::endl;
+            exit(1);
+    }
+
+    std::string info = name + "_k" + tostr(degree) + "_a" + tostr(alpha) + "_Bi2mu2_tol-10_100_100";
+    std::ofstream ofs("errors_" + info + ".data");
+
+    if (!ofs.is_open())
+        std::cout << "Error opening errors "<<std::endl;
 
     typename revolution::hho_degree_info hdi(degree, degree);
     augmented_lagrangian_viscoplasticity<Mesh> als(msh, hdi, alpha);
-    auto assembler = als.define_problem(msh);
-    als.initialize(msh, assembler);
 
-    T error_old = 0.;
+    auto assembler = als.define_problem(msh, problem);
+    als.initialize(msh, assembler);
 
     for(size_t i = 0; i < max_iters; i++)
     {
@@ -69,68 +90,23 @@ run_viscoplasticity(const Mesh& msh, size_t degree,
 
         T cvg_total (0.), cvg_stress(0.), cvg_gamma(0.);
         std::tie(cvg_total, cvg_stress, cvg_gamma) = als.convergence;
+        //ofs << std::sqrt(cvg_total)<< " "<< std::sqrt(cvg_stress) <<" ";
+        //ofs << std::sqrt(cvg_gamma)<< " "<< error.first << " " <<error.second <<std::endl;
 
-        ofs << std::sqrt(cvg_total)<< " "<< std::sqrt(cvg_stress) <<" ";
-        ofs << std::sqrt(cvg_gamma)<< " "<< error.first << " " <<error.second <<std::endl;
+        if(i % 100 == 0)
+            std::cout << "  i : "<< i<<"  - " << std::sqrt(cvg_total)<<std::endl;
+
         assert(std::sqrt(cvg_total) < Ninf);
         if( std::sqrt(cvg_total)  < tolerance)
             break;
         //if(error.first < 10.e-9 && i > 1)
         //    break;
     }
+    ofs.close();
 
     auto final_error = als.compute_errors(msh, assembler, true);
+    als.post_processing( msh, assembler, info, problem);
 
-    //post-processing
-    auto dim = Mesh::dimension;
-    auto rbs   = revolution::vector_basis_size(hdi.reconstruction_degree(), dim, dim);
-    auto cbs   = revolution::vector_basis_size(hdi.cell_degree(), dim, dim);
-    Matrix< T, Dynamic, 1> cell_sol(cbs * msh.cells_size());
-    Matrix< T, Dynamic, 1> cell_rec_sol(rbs * msh.cells_size());
-    Matrix< T, Dynamic, 1> press_vec(msh.cells_size());
-
-    size_t cl_count = 0;
-    for(auto cl : msh)
-    {
-        auto gr  = revolution::make_hho_stokes(msh, cl, hdi, als.use_sym_grad);
-        auto cell_ofs = revolution::priv::offset(msh, cl);
-        Matrix<T, Dynamic, 1> svel =  assembler.take_velocity(msh, cl, als.sol);
-        cell_rec_sol.block(cell_ofs * rbs + dim, 0, rbs - dim, 1) = gr.first * svel;
-        cell_rec_sol.block(cell_ofs * rbs, 0, dim, 1) = svel.block(0,0, dim, 1);
-        cell_sol.block(cell_ofs * cbs, 0, cbs, 1) = svel.block(0,0, cbs, 1);
-
-        //this is only for k = 0, since there is only one velocity;
-        auto bar = barycenter(msh, cl);
-        Matrix<T, Dynamic, 1> spress =  assembler.take_pressure(msh, cl, als.sol);
-        auto pb  = revolution::make_scalar_monomial_basis(msh, cl, hdi.face_degree());
-        auto p_phi = pb.eval_functions(bar);
-        press_vec(cl_count++) =  p_phi.dot(spress);
-    }
-
-    typedef point<T,2>             point_type;
-
-    std::string info = "_k" + tostr(hdi.face_degree()) + "_a"+ tostr(alpha);
-    compute_discontinuous_velocity( msh, cell_sol, hdi, "driven_veclocity2d_quad_B0_h01" + info +".msh");
-
-    std::pair<point_type, point_type> p_x, p_y;
-
-    switch(als.problem_num)  //Do this with enum "driven")
-    {
-        case 1:
-            p_x = std::make_pair(point_type({0.0, 0.5}), point_type({1.0, 0.5}));
-            p_y = std::make_pair(point_type({0.5, 0.0}), point_type({0.5, 1.0}));
-            plot_over_line(msh, p_x, cell_rec_sol, hdi.reconstruction_degree(), "plot_over_line_x_alg_quad_B0_h01.data");
-            plot_over_line(msh, p_y, cell_rec_sol, hdi.reconstruction_degree(), "plot_over_line_y_alg_quad_B0_h01.data");
-            break;
-        case 2:
-            p_x = std::make_pair(point_type({0., 0.}), point_type({0.866, 0.5}));
-            plot_over_line(msh, p_x, cell_sol, hdi.cell_degree(), "plot_over_line_x_alg"+ info +".data");
-            break;
-    }
-    save_coords(msh, "Coords.data");
-    save_data(press_vec, "pressure.data");
-
-    //quiver( msh, als.sol, assembler, hdi);
     return final_error;
 }
 
@@ -245,7 +221,9 @@ int main(int argc, char **argv)
     size_t degree = 0;
     RealType alpha = 1.;
 
-    while ( (ch = getopt(argc, argv, "k:a:")) != -1 )
+    problem_type problem = DRIVEN;
+
+    while ( (ch = getopt(argc, argv, "k:a:dcp")) != -1 )
     {
         switch(ch)
         {
@@ -260,6 +238,16 @@ int main(int argc, char **argv)
                     std::cout << "alpha must be >=0. Falling back to 1." << std::endl;
                     alpha = 1.;
                 }
+            case 'd':
+                problem = DRIVEN;
+                break;
+
+            case 'c':
+                problem = COUETTE;
+                break;
+
+            case 'p':
+                problem = POISEUILLE;
                 break;
             case '?':
             default:
@@ -267,6 +255,7 @@ int main(int argc, char **argv)
                 exit(1);
         }
     }
+
 
     argc -= optind;
     argv += optind;
@@ -280,9 +269,6 @@ int main(int argc, char **argv)
 
     filename = argv[0];
 
-    std::ofstream ofs("errors_k" + tostr(degree) + "_a" + tostr(alpha)+"_quad_B0_h01.data");
-    if (!ofs.is_open())
-        std::cout << "Error opening errors "<<std::endl;
 
     if (std::regex_match(filename, std::regex(".*\\.typ1$") ))
     {
@@ -299,7 +285,7 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        run_viscoplasticity(msh, degree, alpha, ofs);
+        run_viscoplasticity(msh, degree, alpha, problem);
     }
 
     if (std::regex_match(filename, std::regex(".*\\.mesh2d$") ))
@@ -317,7 +303,7 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        run_viscoplasticity(msh, degree, alpha, ofs);
+        run_viscoplasticity(msh, degree, alpha, problem);
     }
 
     /* Medit 2d*/
@@ -326,10 +312,10 @@ int main(int argc, char **argv)
         std::cout << "Guessed mesh format: Medit format" << std::endl;
         typedef disk::generic_mesh<RealType, 2>  mesh_type;
         mesh_type msh = disk::load_medit_2d_mesh<RealType>(filename);
-        run_viscoplasticity(msh, degree, alpha, ofs);
+        run_viscoplasticity(msh, degree, alpha, problem);
     }
 
-    #if 0
+    //#if 0
     if (std::regex_match(filename, std::regex(".*\\.quad$") ))
     {
         std::cout << "Guessed mesh format: Cartesian 2D" << std::endl;
@@ -345,10 +331,10 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        test_bases(msh);
+        run_viscoplasticity(msh, degree, alpha, problem);
     }
-    #endif
-    ofs.close();
+    //#endif
+
     return 0;
 }
 //#endif
