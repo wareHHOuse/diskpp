@@ -2509,6 +2509,21 @@ load_fvca5_2d_mesh(const char *filename)
     return msh;
 }
 
+/* Helper to load 3D meshes in FVCA6 format */
+template<typename T>
+disk::generic_mesh<T, 3>
+load_fvca6_3d_mesh(const char* filename)
+{
+    typedef disk::generic_mesh<T, 3> mesh_type;
+
+    mesh_type                     msh;
+    disk::fvca6_mesh_loader<T, 3> loader;
+    loader.read_mesh(filename);
+    loader.populate_mesh(msh);
+
+    return msh;
+}
+
 /* Helper to load 2D meshes in Netgen format */
 template<typename T>
 disk::simplicial_mesh<T, 2>
