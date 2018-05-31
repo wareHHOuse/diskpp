@@ -58,7 +58,21 @@ save_data(const Matrix< T, Dynamic, 1>  & vec,
         ofs << vec(i) <<std::endl;
     ofs.close();
 };
+template <typename T>
+void
+save_data(const std::vector<T>  & vec,
+          const std::string     & filename)
+{
+    std::ofstream ofs(filename);
+    if (!ofs.is_open())
+        std::cout << "Error opening file"<<std::endl;
 
+    ofs << vec.size()<<std::endl;
+
+    for(auto& v :  vec)
+        ofs << v <<std::endl;
+    ofs.close();
+};
 template<typename Mesh>
 void
 save_coords(const Mesh& msh,
@@ -969,7 +983,7 @@ public:
                         const Assembler& assembler,
                         const vector_type& velocity_dofs)
     {
-        auto u_TF  = assembler.take_velocity(msh, cl, velocity_dofs);
+        Matrix<T, Dynamic, 1> u_TF  = assembler.take_velocity(msh, cl, velocity_dofs);
         auto value = 1./(factor * (viscosity + alpha));
         auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
 
@@ -992,7 +1006,7 @@ public:
 
         //Gamma
         // A. Solid
-        if(theta_norm <=  std::sqrt(2) * yield )
+        if(theta_norm <=  std::sqrt(2) * yield ||  std::abs(theta_norm - std::sqrt(2) * yield) < 1.e-8)
             return  Matrix<T, Dynamic, 1>::Zero(sbs);
         else  // B. liquid
             return  value * theta * (1. - std::sqrt(2) *(yield/theta_norm));
@@ -1009,7 +1023,7 @@ public:
 
         for(auto cl: msh)
         {
-            auto u_TF = assembler.take_velocity(msh, cl, sol);
+            Matrix<T, Dynamic, 1> u_TF = assembler.take_velocity(msh, cl, sol);
             auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
             auto cell_ofs = revolution::priv::offset(msh, cl);
 
@@ -1048,8 +1062,8 @@ public:
         auto cell_ofs =  revolution::priv::offset(msh, cl);
         auto num_faces = howmany_faces(msh, cl);
 
-        auto stress = multiplier.block( sbs * cell_ofs,  0, sbs, 1);
-        auto gamma  = compute_auxiliar( msh,  cl, assembler, sol_old); //or sol at this point it's the same
+        Matrix<T, Dynamic, 1> stress = multiplier.block( sbs * cell_ofs,  0, sbs, 1);
+        Matrix<T, Dynamic, 1> gamma  = compute_auxiliar( msh,  cl, assembler, sol_old); //or sol at this point it's the same
         auxiliar.block(cell_ofs * sbs, 0, sbs, 1) = gamma;
 
         vector_type str_agam = stress - factor * alpha * gamma;
@@ -1182,6 +1196,43 @@ public:
         compute_discontinuous_velocity( msh, cell_sol, di, "velocity_" + info +".msh");
         save_coords(msh, "Coords_"+ info + ".data");
         save_data(press_vec, "pressure_" + info + ".data");
+
+        auto marks_sigma = std::vector<size_t>(msh.cells_size());
+        auto marks_theta = std::vector<size_t>(msh.cells_size());
+
+        size_t id = 0;
+        for(auto & cl : msh)
+        {
+            Matrix<T, Dynamic, 1> svel =  assembler.take_velocity(msh, cl, sol);
+            auto value = 1./(factor * (viscosity + alpha));
+            auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
+
+            auto cell_ofs    = revolution::priv::offset(msh, cl);
+            Matrix<T, Dynamic, 1> Gu = G.first * svel;
+            Matrix<T, Dynamic, 1> stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
+
+            auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
+            //barycenter only for k = 0; fix this for higher orders
+            auto bar = barycenter(msh, cl);
+            auto s_phi  = sb.eval_functions(bar);
+
+            Matrix<T, Dynamic, 1>  theta  = stress  +  factor * alpha * Gu;
+            Matrix<T, Mesh::dimension, Mesh::dimension> theta_eval = revolution::eval(theta, s_phi);
+            T theta_norm  = std::sqrt((theta_eval.cwiseProduct(theta_eval)).sum());
+
+            Matrix<T, Mesh::dimension, Mesh::dimension> sigma_eval = revolution::eval(stress, s_phi);
+            T sigma_norm  = std::sqrt((sigma_eval.cwiseProduct(sigma_eval)).sum());
+
+            if(theta_norm <=  std::sqrt(2) * yield ||  std::abs(theta_norm - std::sqrt(2) * yield) < 1.e-8)
+                marks_theta.at(id++) = 1;
+            if(sigma_norm <=  std::sqrt(2) * yield ||  std::abs(sigma_norm - std::sqrt(2) * yield) < 1.e-8)
+                marks_sigma.at(id++) = 1;
+
+        }
+
+        save_data(marks_theta, "criterion_theta_"+ info + ".data");
+        save_data(marks_sigma, "criterion_sigma_"+ info + ".data");
+
         quiver( msh, sol, assembler, di, "quiver_"+ info + ".data");
         return;
     }

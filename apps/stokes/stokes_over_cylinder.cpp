@@ -292,17 +292,28 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     auto wall = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
         return Matrix<scalar_type, 2, 1>::Zero();
     };
-    auto movingWall = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
+    auto flow_inlet = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
         return Matrix<scalar_type, 2, 1>{1,0};
     };
+    auto free_output = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
+        return Matrix<scalar_type, 2, 1>{0,0};
+    };
+
 
     typename revolution::hho_degree_info hdi(degree, degree);
     boundary_type bnd(msh);
 
-    bnd.addDirichletBC(0, 1, movingWall);
+    bnd.addNeumannBC(10, 1, free_output);
+    //bnd.addDirichletBC(9, 1, wall);
+
+    bnd.addDirichletBC(0, 3, flow_inlet);
+
     bnd.addDirichletBC(0, 2, wall);
-    bnd.addDirichletBC(0, 3, wall);
     bnd.addDirichletBC(0, 4, wall);
+    bnd.addDirichletBC(0, 5, wall);
+    bnd.addDirichletBC(0, 6, wall);
+    bnd.addDirichletBC(0, 7, wall);
+    bnd.addDirichletBC(0, 8, wall);
 
     auto assembler = revolution::make_stokes_assembler(msh, hdi, bnd);
 
@@ -369,11 +380,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 
     ofs.close();
 
-    compute_discontinuous_velocity( msh, sol, hdi, "depl2d.msh");
-    auto p_x = std::make_pair(point_type({0.0, 0.5}), point_type({1.0, 0.5}));
-    auto p_y = std::make_pair(point_type({0.5, 0.0}), point_type({0.5, 1.0}));
-    plot_over_line(msh, p_x, sol, hdi, "plot_over_line_x.data");
-    plot_over_line(msh, p_y, sol, hdi, "plot_over_line_y.data");
+    compute_discontinuous_velocity( msh, sol, hdi, "flow_over_cylinder2d.msh");
 
     return;
 
@@ -387,7 +394,7 @@ int main(int argc, char **argv)
 
     char    *filename       = nullptr;
     int ch;
-    size_t degree = 0;
+    size_t degree = 1;
 
     while ( (ch = getopt(argc, argv, "k:")) != -1 )
     {
@@ -450,15 +457,6 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        run_stokes(msh, degree, use_sym_grad);
-    }
-
-    /* Medit 2d*/
-    if (std::regex_match(filename, std::regex(".*\\.medit2d$")))
-    {
-        std::cout << "Guessed mesh format: Medit format" << std::endl;
-        typedef disk::generic_mesh<RealType, 2>  mesh_type;
-        mesh_type msh = disk::load_medit_2d_mesh<RealType>(filename);
         run_stokes(msh, degree, use_sym_grad);
     }
 

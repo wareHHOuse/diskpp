@@ -321,7 +321,7 @@ public:
 
         factor = 1.;//(use_sym_grad)? 2. : 1.;
         viscosity = 100;
-        alpha = 1;
+        alpha = 0.1;
         convergence = 0.;
         auto dim =  Mesh::dimension;
 
@@ -388,9 +388,9 @@ public:
             auto gr = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
             Matrix<scalar_type, Dynamic, Dynamic> stab;
             stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, di);
-            auto G = make_hlow_vector_laplacian(msh, cl, di);
+            auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
 
-            Matrix<scalar_type, Dynamic, Dynamic> B = (viscosity*G.second + viscosity*stab);
+            Matrix<scalar_type, Dynamic, Dynamic> B = factor * viscosity * (G.second + stab);
 
             error_vel += diff_vel.dot(B * diff_vel);
         }
@@ -418,13 +418,13 @@ public:
                         const Assembler& assembler)
     {
         auto u_TF  = assembler.take_velocity(msh, cl, sol_old);
-        auto value = 1./(viscosity + alpha);
-        auto G = make_hlow_vector_laplacian(msh, cl, di);
+        auto value = 1./ (factor *(viscosity + alpha));
+        auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
 
         auto cell_ofs    = revolution::priv::offset(msh, cl);
         Matrix<scalar_type, Dynamic, 1> Gu = G.first * u_TF;
         Matrix<scalar_type, Dynamic, 1> stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
-        Matrix<scalar_type, Dynamic, 1> gamma = value * (stress +  alpha * Gu);
+        Matrix<scalar_type, Dynamic, 1> gamma = value * (stress +  factor * alpha * Gu);
 
         return gamma;
     }
@@ -439,14 +439,14 @@ public:
         for(auto cl: msh)
         {
             auto u_TF = assembler.take_velocity(msh, cl, sol);
-            auto G  = make_hlow_vector_laplacian(msh, cl, di);
+            auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
             auto cell_ofs = revolution::priv::offset(msh, cl);
 
             Matrix<scalar_type, Dynamic, 1> Gu = G.first * u_TF;
             Matrix<scalar_type, Dynamic, 1> gamma = compute_auxiliar( msh,  cl, assembler);
             Matrix<scalar_type, Dynamic, 1> gamma_old = auxiliar.block(cell_ofs *sbs, 0, sbs, 1);
 
-            Matrix<scalar_type, Dynamic, 1> diff_stress = alpha * (Gu - gamma);
+            Matrix<scalar_type, Dynamic, 1> diff_stress = factor * alpha * (Gu - gamma);
             Matrix<scalar_type, Dynamic, 1> diff_gamma  = alpha * (gamma - gamma_old);
 
             auto sb =  revolution::make_matrix_monomial_basis(msh, cl, di.face_degree());
@@ -454,7 +454,7 @@ public:
 
             convergence += diff_stress.dot(mass * diff_stress);// + diff_gamma.dot(mass * diff_gamma);
 
-            multiplier.block(cell_ofs * sbs, 0, sbs, 1) += alpha * diff_stress;
+            multiplier.block(cell_ofs * sbs, 0, sbs, 1) +=   diff_stress;
         }
 
         return;
@@ -466,7 +466,7 @@ public:
                     const cell_type& cl,
                     const Assembler& assembler)
     {
-        auto G = make_hlow_vector_laplacian(msh, cl, di);
+        auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
         auto cb = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
         auto sb = revolution::make_matrix_monomial_basis(msh, cl, di.face_degree());
         auto cell_ofs =  revolution::priv::offset(msh, cl);
@@ -474,7 +474,7 @@ public:
 
         auto stress = multiplier.block( sbs * cell_ofs,  0, sbs, 1);
         auto gamma  = compute_auxiliar( msh,  cl, assembler);
-        vector_type str_agam = stress - alpha * gamma;
+        vector_type str_agam = stress - factor * alpha * gamma;
 
         Matrix<scalar_type, Dynamic, Dynamic> mm = revolution::make_mass_matrix(msh, cl, sb);
 
@@ -484,7 +484,7 @@ public:
         //(f, v_T)
         rhs.block( 0, 0, cbs, 1) = make_rhs(msh, cl, cb, rhs_fun);
 
-        //(stress - alpha * gamma, Gv)
+        //(stress - factor * alpha * gamma, Gv)
         rhs -=  G.first.transpose() * mm * str_agam;
 
         return rhs;
@@ -520,13 +520,13 @@ public:
         for (auto cl : msh)
         {
             auto cb  = revolution::make_vector_monomial_basis(msh, cl, celdeg);
-            auto G   = make_hlow_vector_laplacian(msh, cl, di);
+            auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
             auto gr  = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
             Matrix<scalar_type, Dynamic, Dynamic> stab;
             stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, di);
             auto dr  = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
 
-            Matrix<scalar_type, Dynamic, Dynamic> A = (alpha * G.second + viscosity * stab);
+            Matrix<scalar_type, Dynamic, Dynamic> A = factor * (alpha * G.second + viscosity * stab);
 
             assembler.assemble_lhs(msh, cl, A, -dr.second);
         }
@@ -606,13 +606,13 @@ tostr(const T & var)
 template<typename Mesh>
 auto
 run_alg_stokes(const Mesh& msh, size_t degree,// std::ofstream & ofs,
-                bool use_sym_grad = true)
+                bool use_sym_grad)
 {
     using T = typename Mesh::coordinate_type;
     T tolerance = 1.e-9, Ninf = 10.e+10;
     size_t max_iters = 50000;
 
-    typename revolution::hho_degree_info hdi(degree +1, degree);
+    typename revolution::hho_degree_info hdi(degree, degree);
     augmented_lagrangian_stokes<Mesh> als(msh, hdi, use_sym_grad);
 
     auto assembler = als.define_assembler(msh);
@@ -627,7 +627,7 @@ run_alg_stokes(const Mesh& msh, size_t degree,// std::ofstream & ofs,
         auto error = als.compute_errors(msh, assembler);
         auto convergence = std::sqrt(als.convergence);
 
-        if(i % 20 == 0)
+        if(i % 25 == 0)
             std::cout << "  i : "<< i<<"  - " << convergence<<std::endl;
         assert(convergence < Ninf);
         if( convergence < tolerance)
@@ -765,7 +765,7 @@ int main(void)
 int main(int argc, char **argv)
 {
     using RealType = double;
-    bool use_sym_grad = false;
+    bool use_sym_grad = true;
 
     char    *filename       = nullptr;
     int ch;

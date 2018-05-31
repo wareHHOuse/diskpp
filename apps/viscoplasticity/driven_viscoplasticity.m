@@ -19,17 +19,49 @@ sol = [1       1           1       1
 0.15	-0.00356	0.3     -0.00038
 0.1     -0.00058	0.2     -0.00021
 0.05	-0.00027	0.1     -0.0001
-0           0       0       0 ]
+0           0       0       0 ];
 
-e_y = load('plot_over_line_y_alg_B50_h3.data');
-e_x = load('plot_over_line_x_alg_B50_h3.data');
 
 figure(11)
 hold on;
+e_y = load('plot_over_y_driven_k0_a1_Bi2mu1_J_50_50.data');
 plot(e_y(:,2), e_y(:,3))
-plot(sol(:,3), sol(:,4), '*');
+e_y = load('plot_over_y_driven_k0_a1_Bi2mu1_J_50_50.data');
+plot(e_y(:,2), e_y(:,3))
+e_y = load('plot_over_y_driven_k0_a1_Bi50mu1_J_50_50.data');
+plot(e_y(:,2), e_y(:,3))
+
+
+e_y = load('plot_over_y_driven_k0_a1_Bi2mu1_J_tri_h00125.data');
+plot(e_y(:,2), e_y(:,3))
+e_y = load('plot_over_y_driven_k0_a1_Bi2mu2_J_tri_h00125.data');
+plot(e_y(:,2), e_y(:,3))
+e
+
+plot(sol(:,1), sol(:,2), '*');
 set(gca,'box','on'); set(gcf,'color','w');
 set(gca,'fontsize',20);
 xlabel('x','FontSize',20);
 ylabel('u','FontSize',20);
+
+figure(12)
+
+e_y1 = load("plot_over_y_driven_k0_a1_Bi2mu1_20_20.data"); 
+e_y2 = load("plot_over_y_driven_k0_a1_Bi2mu1_40_40.data"); 
+e_y3 = load("plot_over_y_driven_k0_a1_Bi2mu1_80_80.data");
+e_y4 = load("plot_over_y_driven_k0_a1_Bi2mu1_100_100.data");
+
+plot(e_y1(:,2), e_y1(:,3), 'b',e_y2(:,2), e_y2(:,3), 'k', e_y3(:,2), e_y3(:,3),'r', e_y4(:,2), e_y4(:,3),'g');
+
+legend("20x20","40x40", "80x80","100x100");
+
+figure(14)
+e_y1 = load("plot_over_y_driven_k0_a1_Bi2mu1_80_80.data");
+e_y2 = load("plot_over_y_driven_k0_a1_Bi2mu2_80_80.data");
+e_y3 = load("plot_over_y_driven_k0_a1_Bi2mu1_tol-10_100_100.data");
+e_y4 = load("plot_over_y_driven_k0_a1_Bi2mu2_tol-10_100_100.data");
+
+plot(e_y1(:,2), e_y1(:,3), 'b',e_y2(:,2), e_y2(:,3), 'k', e_y3(:,2), e_y3(:,3),'r', e_y4(:,2), e_y4(:,3),'g');
+
+legend("\mu = 1, \sigma_0 = 2","\mu = 2, \sigma_0 = 4", "\mu = 1, \sigma_0 = 2","\mu = 2, \sigma_0 = 4");
 

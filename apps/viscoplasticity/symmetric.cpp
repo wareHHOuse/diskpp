@@ -50,27 +50,21 @@ run_viscoplasticity(const Mesh& msh, size_t degree,
                     const problem_type& problem)
 {
     using T = typename Mesh::coordinate_type;
-    T tolerance = 1.e-10, Ninf = 10.e+5;
-    size_t max_iters = 50000;
+    T tolerance = 1.e-8, Ninf = 10.e+5;
+    size_t max_iters = 100000;
 
     std::string name;
     switch (problem)
-    {
+     {
         case DRIVEN:
             name = "driven";
             break;
         case COUETTE:
             name = "couette";
             break;
-        case POISEUILLE:
-            name = "poiseuille";
-            break;
-        default:
-            std::cout << "wrong arguments" << std::endl;
-            exit(1);
     }
 
-    std::string info = name + "_k" + tostr(degree) + "_a" + tostr(alpha) + "_Bi2mu2_tol-10_100_100";
+    std::string info = name + "_k" + tostr(degree) + "_a" + tostr(alpha) + "_tri_h0025";
     std::ofstream ofs("errors_" + info + ".data");
 
     if (!ofs.is_open())
@@ -90,11 +84,8 @@ run_viscoplasticity(const Mesh& msh, size_t degree,
 
         T cvg_total (0.), cvg_stress(0.), cvg_gamma(0.);
         std::tie(cvg_total, cvg_stress, cvg_gamma) = als.convergence;
-        //ofs << std::sqrt(cvg_total)<< " "<< std::sqrt(cvg_stress) <<" ";
-        //ofs << std::sqrt(cvg_gamma)<< " "<< error.first << " " <<error.second <<std::endl;
-
-        if(i % 100 == 0)
-            std::cout << "  i : "<< i<<"  - " << std::sqrt(cvg_total)<<std::endl;
+        ofs << std::sqrt(cvg_total)<< " "<< std::sqrt(cvg_stress) <<" ";
+        ofs << std::sqrt(cvg_gamma)<< " "<< error.first << " " <<error.second <<std::endl;
 
         assert(std::sqrt(cvg_total) < Ninf);
         if( std::sqrt(cvg_total)  < tolerance)
@@ -110,106 +101,6 @@ run_viscoplasticity(const Mesh& msh, size_t degree,
     return final_error;
 }
 
-#if 0
-void convergence_test_typ1(void)
-{
-    using T = double;
-    bool use_sym_grad = false;
-    std::vector<std::string> meshfiles;
-
-    //meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_1.typ1");
-    //meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_2.typ1");
-    //meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_3.typ1");
-    //meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_4.typ1");
-    //meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_5.typ1");
-    //meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_6.typ1");
-
-    /*
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_1.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_2.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_3.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
-    */
-    /*
-    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_1.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_2.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_3.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_4.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_5.typ1");
-    */
-    std::cout << "                   velocity H1-error";
-    std::cout << "    -     pressure L2-error "<< std::endl;
-
-    for (size_t k = 2; k < 3; k++)
-    {
-        std::cout << "DEGREE " << k << std::endl;
-
-        std::ofstream ofs("errors_k" + tostr(k) + ".data");
-        if (!ofs.is_open())
-            std::cout << "Error opening errors "<<std::endl;
-
-        std::vector<T> mesh_hs;
-        std::vector<std::pair<T,T>> errors;
-
-        //for (size_t i = 0; i < 1; i++)
-        for (size_t i = 0; i < meshfiles.size(); i++)
-        {
-            typedef disk::generic_mesh<T, 2>  mesh_type;
-
-            std::cout << " Mesh : "<< i << std::endl;
-            mesh_type msh;
-            disk::fvca5_mesh_loader<T, 2> loader;
-            if (!loader.read_mesh(meshfiles.at(i)))
-            {
-                std::cout << "Problem loading mesh." << std::endl;
-                continue;
-            }
-            loader.populate_mesh(msh);
-
-            auto error = run_alg_stokes(msh, k, ofs, use_sym_grad);
-
-            mesh_hs.push_back( disk::mesh_h(msh) );
-            errors.push_back(error);
-            ofs << " " << std::endl;
-        }
-        ofs.close();
-
-        for (size_t i = 0; i < mesh_hs.size(); i++)
-        {
-            if (i == 0)
-            {
-                std::cout << "    ";
-                std::cout << std::scientific << std::setprecision(4) << mesh_hs.at(i) << "    ";
-                std::cout << std::scientific << std::setprecision(4) << errors.at(i).first;
-                std::cout << "     -- " << "          ";
-                std::cout << std::scientific << std::setprecision(4) << errors.at(i).second;
-                std::cout << "     -- " << std::endl;
-            }
-            else
-            {
-                auto rate = std::log( errors.at(i).first/errors.at(i-1).first ) /
-                            std::log( mesh_hs.at(i)/mesh_hs.at(i-1) );
-                std::cout << "    ";
-                std::cout << std::scientific  << std::setprecision(4) << mesh_hs.at(i) << "    ";
-                std::cout << std::scientific  << std::setprecision(4) << errors.at(i).first << "    ";
-                std::cout << std::fixed<< std::setprecision(2) << rate << "          ";
-
-                auto pres_rate = std::log( errors.at(i).second/errors.at(i-1).second ) /
-                            std::log( mesh_hs.at(i)/mesh_hs.at(i-1) );
-                std::cout << std::scientific  << std::setprecision(4) << errors.at(i).second << "    ";
-                std::cout << std::fixed << std::setprecision(2) << pres_rate << std::endl;
-            }
-        }
-    }
-}
-
-int main(void)
-{
-    convergence_test_typ1();
-}
-#endif
-
 //#if 0
 
 int main(int argc, char **argv)
@@ -223,7 +114,7 @@ int main(int argc, char **argv)
 
     problem_type problem = DRIVEN;
 
-    while ( (ch = getopt(argc, argv, "k:a:dcp")) != -1 )
+    while ( (ch = getopt(argc, argv, "k:a:dc")) != -1 )
     {
         switch(ch)
         {
@@ -244,10 +135,6 @@ int main(int argc, char **argv)
 
             case 'c':
                 problem = COUETTE;
-                break;
-
-            case 'p':
-                problem = POISEUILLE;
                 break;
             case '?':
             default:
@@ -315,7 +202,7 @@ int main(int argc, char **argv)
         run_viscoplasticity(msh, degree, alpha, problem);
     }
 
-    //#if 0
+    #if 0
     if (std::regex_match(filename, std::regex(".*\\.quad$") ))
     {
         std::cout << "Guessed mesh format: Cartesian 2D" << std::endl;
@@ -331,9 +218,9 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        run_viscoplasticity(msh, degree, alpha, problem);
+        test_bases(msh);
     }
-    //#endif
+    #endif
 
     return 0;
 }

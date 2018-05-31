@@ -108,9 +108,8 @@ compute_errors(const Mesh& msh,
                 svel.block(cbs + i*fbs, 0, fbs, 1) = sol.block(face_offset, 0, fbs, 1);
             }
         }
-
         Matrix<scalar_type, Dynamic, 1> diff_vel = svel - p;
-        auto G = make_hlow_vector_laplacian(msh, cl, hdi);
+	    auto G = revolution::make_hlow_stokes(msh, cl, hdi, use_sym_grad);
         auto gr = revolution::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
@@ -184,7 +183,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 
     for (auto cl : msh)
     {
-        auto G = make_hlow_vector_laplacian(msh, cl, hdi);
+	    auto G = revolution::make_hlow_stokes(msh, cl, hdi, use_sym_grad);
         auto gr = revolution::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
@@ -215,7 +214,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 void convergence_test_typ1(void)
 {
     using T = double;
-    bool use_sym_grad = false;
+    bool use_sym_grad = true;
     std::vector<std::string> meshfiles;
 
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_1.typ1");

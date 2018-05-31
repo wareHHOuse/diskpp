@@ -119,7 +119,7 @@ public:
             return std::pow(p.x(), 5.)  +  std::pow(p.y(), 5.)  - 1./3.;
         };
 
-        factor = 1.;//(use_sym_grad)? 2. : 1.;
+        factor = (use_sym_grad)? 2. : 1.;
         viscosity = 1;
         alpha = 0.1;
         convergence = 0.;
@@ -191,9 +191,9 @@ public:
             auto gr = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
             Matrix<scalar_type, Dynamic, Dynamic> stab;
             stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, di);
-            auto G = make_hlow_vector_laplacian(msh, cl, di);
+            auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
 
-            Matrix<scalar_type, Dynamic, Dynamic> B = (viscosity*G.second + viscosity*stab);
+            Matrix<scalar_type, Dynamic, Dynamic> B = factor * (viscosity*G.second + viscosity*stab);
 
             error_vel += diff_vel.dot(B * diff_vel);
         }
@@ -221,13 +221,13 @@ public:
                         const Assembler& assembler)
     {
         auto u_TF  = assembler.take_velocity(msh, cl, sol_old);
-        auto value = 1./(viscosity + alpha);
-        auto G = make_hlow_vector_laplacian(msh, cl, di);
+        auto value = 1./(factor*(viscosity + alpha));
+        auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
 
         auto cell_ofs    = revolution::priv::offset(msh, cl);
         Matrix<scalar_type, Dynamic, 1> Gu = G.first * u_TF;
         Matrix<scalar_type, Dynamic, 1> stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
-        Matrix<scalar_type, Dynamic, 1> gamma = value * (stress +  alpha * Gu);
+        Matrix<scalar_type, Dynamic, 1> gamma = value * (stress +  factor * alpha * Gu);
 
         return gamma;
     }
@@ -242,22 +242,22 @@ public:
         for(auto cl: msh)
         {
             auto u_TF = assembler.take_velocity(msh, cl, sol);
-            auto G  = make_hlow_vector_laplacian(msh, cl, di);
+            auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
             auto cell_ofs = revolution::priv::offset(msh, cl);
 
             Matrix<scalar_type, Dynamic, 1> Gu = G.first * u_TF;
             Matrix<scalar_type, Dynamic, 1> gamma = compute_auxiliar( msh,  cl, assembler);
             Matrix<scalar_type, Dynamic, 1> gamma_old = auxiliar.block(cell_ofs *sbs, 0, sbs, 1);
 
-            Matrix<scalar_type, Dynamic, 1> diff_stress = alpha * (Gu - gamma);
+            Matrix<scalar_type, Dynamic, 1> diff_stress = factor * alpha * (Gu - gamma);
             Matrix<scalar_type, Dynamic, 1> diff_gamma  = alpha * (gamma - gamma_old);
 
             auto sb =  revolution::make_matrix_monomial_basis(msh, cl, di.face_degree());
             Matrix<scalar_type, Dynamic, Dynamic> mass = make_mass_matrix(msh, cl, sb);
 
-            convergence += diff_stress.dot(mass * diff_stress) + diff_gamma.dot(mass * diff_gamma);
+            convergence += diff_stress.dot(mass * diff_stress);//+ diff_gamma.dot(mass * diff_gamma);
 
-            multiplier.block(cell_ofs * sbs, 0, sbs, 1) += alpha * diff_stress;
+            multiplier.block(cell_ofs * sbs, 0, sbs, 1) +=  diff_stress;
         }
 
         return;
@@ -269,7 +269,7 @@ public:
                     const cell_type& cl,
                     const Assembler& assembler)
     {
-        auto G = make_hlow_vector_laplacian(msh, cl, di);
+        auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
         auto cb = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
         auto sb = revolution::make_matrix_monomial_basis(msh, cl, di.face_degree());
         auto cell_ofs =  revolution::priv::offset(msh, cl);
@@ -277,7 +277,7 @@ public:
 
         auto stress = multiplier.block( sbs * cell_ofs,  0, sbs, 1);
         auto gamma  = compute_auxiliar( msh,  cl, assembler);
-        vector_type str_agam = stress - alpha * gamma;
+        vector_type str_agam = stress - factor * alpha * gamma;
 
         Matrix<scalar_type, Dynamic, Dynamic> mm = revolution::make_mass_matrix(msh, cl, sb);
 
@@ -306,7 +306,7 @@ public:
         for (auto cl : msh)
         {
             auto cb  = revolution::make_vector_monomial_basis(msh, cl, celdeg);
-            auto G   = make_hlow_vector_laplacian(msh, cl, di);
+            auto G   = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
             auto gr  = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
             Matrix<scalar_type, Dynamic, Dynamic> stab;
             stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, di);
@@ -316,7 +316,7 @@ public:
                 Matrix<scalar_type, Dynamic, 1>::Zero(cbs + fbs * howmany_faces(msh,cl));
             local_rhs = make_rhs_alg(msh, cl, assembler);
 
-            Matrix<scalar_type, Dynamic, Dynamic> A = (alpha * G.second + viscosity * stab);
+            Matrix<scalar_type, Dynamic, Dynamic> A = factor * (alpha * G.second + viscosity * stab);
 
             assembler.assemble_alg(msh, cl, A, -dr.second, local_rhs);
 
@@ -382,13 +382,13 @@ quiver( const Mesh& msh, const dynamic_vector<T>& sol, const Assembler& assemble
 template<typename Mesh>
 auto
 run_alg_stokes(const Mesh& msh, size_t degree, std::ofstream & ofs,
-                bool use_sym_grad = true)
+                bool use_sym_grad )
 {
     using T = typename Mesh::coordinate_type;
     T tolerance = 1.e-9, Ninf = 10.e+5;
     size_t max_iters = 50000;
 
-    typename revolution::hho_degree_info hdi(degree +1, degree);
+    typename revolution::hho_degree_info hdi(degree, degree);
     augmented_lagrangian_stokes<Mesh> als(msh, hdi, use_sym_grad);
 
     auto assembler = als.define_assembler(msh);
@@ -404,12 +404,14 @@ run_alg_stokes(const Mesh& msh, size_t degree, std::ofstream & ofs,
         auto error = als.compute_errors(msh, assembler);
         auto convergence = std::sqrt(als.convergence);
 
-        ofs << "  i : "<< i<<"  " << convergence<< " ------  ";
-        ofs << std::scientific << std::setprecision(4) << error.first;
-        ofs << "     -- " << "          ";
-        ofs << std::scientific << std::setprecision(4) << error.second;
-        ofs << "     -- " << std::endl;
+        //ofs << "  i : "<< i<<"  " << convergence<< " ------  ";
+        //ofs << std::scientific << std::setprecision(4) << error.first;
+        //ofs << "     -- " << "          ";
+        //ofs << std::scientific << std::setprecision(4) << error.second;
+        //ofs << "     -- " << std::endl;
 
+        if(i % 100 == 0)
+            std::cout << "  i : "<< i<<"  - " << convergence<<std::endl;
         assert(convergence < Ninf);
         if( convergence < tolerance)
             break;
@@ -429,26 +431,36 @@ run_alg_stokes(const Mesh& msh, size_t degree, std::ofstream & ofs,
     return error_2;
 }
 
+template< typename T>
+std::string
+tostr(const T & var)
+{
+    std::ostringstream  ostr;
+    ostr << var;
+    return ostr.str();
+}
+
 void convergence_test_typ1(void)
 {
     using T = double;
-    bool use_sym_grad = false;
+    bool use_sym_grad = true;
     std::vector<std::string> meshfiles;
 
+    /*
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_1.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_2.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_3.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_4.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_5.typ1");
     //meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_6.typ1");
+    */
 
-    /*
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_1.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_2.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_3.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
-    */
+
     /*
     meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_1.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_2.typ1");
@@ -459,7 +471,7 @@ void convergence_test_typ1(void)
     std::cout << "                   velocity H1-error";
     std::cout << "    -     pressure L2-error "<< std::endl;
 
-    for (size_t k = 0; k < 5; k++)
+    for (size_t k = 0; k < 3; k++)
     {
         std::cout << "DEGREE " << k << std::endl;
 
