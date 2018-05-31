@@ -52,16 +52,16 @@ struct test_functor
 
 
         typedef Matrix<scalar_type, Mesh::dimension, 1> ret_type;
-        
+
         auto f = make_vector_testing_data(msh);
 
         typename revolution::hho_degree_info hdi(degree);
 
         scalar_type error = 0.0;
         for (auto& cl : msh)
-        {   
+        {
             auto gr = revolution::make_hho_vector_laplacian(msh, cl, hdi);
-            auto stab = revolution::make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
+            auto stab = revolution::make_hho_vector_stabilization(msh, cl, gr.first, hdi);
 
             size_t rec_size = revolution::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
 

@@ -155,14 +155,14 @@ class plasticity_solver
                     case HHO:
                     {
                         const auto recons   = make_hho_vector_symmetric_laplacian(m_msh, cl, m_hdi);
-                        const auto stab_HHO = make_hho_fancy_stabilization_vector(m_msh, cl, recons.first, m_hdi);
+                        const auto stab_HHO = make_hho_vector_stabilization(m_msh, cl, recons.first, m_hdi);
                         m_stab_precomputed.push_back(stab_HHO);
                         break;
                     }
                     case HDG:
                     {
-                        // stab_HDG.compute(m_msh, cl);
-                        // m_stab_precomputed.push_back(stab_HDG.data);
+                        const auto stab_HDG = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
+                        m_stab_precomputed.push_back(stab_HDG);
                         break;
                     }
                     case NO: { break;
@@ -178,7 +178,7 @@ class plasticity_solver
       m_msh(msh), m_verbose(rp.m_verbose), m_convergence(false), m_rp(rp), m_bnd(bnd)
     {
         int face_degree = rp.m_face_degree;
-        if (rp.m_face_degree <= 0)
+        if (rp.m_face_degree < 0)
         {
             std::cout << "'face_degree' should be > 0. Reverting to 1." << std::endl;
             face_degree = 1;
@@ -403,6 +403,17 @@ class plasticity_solver
     getDofs()
     {
         return total_dof_depl_static;
+    }
+
+    void printSolutionCell() const
+    {
+        int cell_i = 0;
+        std::cout << "Solution at the cells:" << std::endl;
+        for (auto& cl : m_msh)
+        {
+            std::cout << "cell " << cell_i << ": " << std::endl;
+            std::cout << m_solution_cells.at(cell_i++) << std::endl;
+        }
     }
 
     // compute l2 error

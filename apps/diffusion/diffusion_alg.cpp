@@ -148,7 +148,7 @@ public:
             Matrix<scalar_type, Dynamic, 1> diff_vel = svel - p;
             Matrix<scalar_type, Dynamic, Dynamic> stab;
             auto gr    = make_hho_scalar_laplacian(msh, cl, di);
-            stab = make_hho_fancy_stabilization(msh, cl, gr.first, di);
+            stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
             auto G    = make_hlow_scalar_laplacian(msh, cl, di);
             error_vel += diff_vel.dot( viscosity * (G.second + stab)*diff_vel);
         }
