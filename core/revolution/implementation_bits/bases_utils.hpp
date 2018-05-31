@@ -101,6 +101,27 @@ inner_product(const Matrix<T, N, N>& b, const T& a)
 }
 
 template<typename T, int N>
+Matrix<T, N, 1>
+inner_product(const Matrix<T, N, 1>& b, const T& a)
+{
+    return a * b;
+}
+
+template<typename T, int N>
+Matrix<T, N, 1>
+inner_product(const T& a, const Matrix<T, N, 1>& b)
+{
+    return a * b;
+}
+
+template<typename T, int N>
+T
+inner_product(const Matrix<T, N, 1>& a, const Matrix<T, N, 1>& b)
+{
+    return a.dot(b);
+}
+
+template<typename T, int N>
 T
 inner_product(const Matrix<T, N, N>& b, const Matrix<T, N, N>& a)
 {
@@ -278,7 +299,7 @@ eval(const dynamic_vector<T>& tab_coeff, const Matrix<T, Dynamic, DIM>& base)
    static_vector<T, DIM> ret = static_vector<T, DIM>::Zero();
    assert(tab_coeff.size() == (base.rows()));
 
-   for (size_t i = 0; i < tab_coeff.size(); i++) {
+   for (int i = 0; i < tab_coeff.size(); i++) {
       ret += tab_coeff(i) * (base.row(i)).transpose();
    }
 
@@ -294,7 +315,7 @@ eval(const dynamic_vector<T>&                                      tab_coeff,
    static_matrix<T, DIM, DIM> ret = static_matrix<T, DIM, DIM>::Zero();
    assert(tab_coeff.size() == (base.size()-begin));
 
-   for (size_t i = 0; i < tab_coeff.size(); i++) {
+   for (int i = 0; i < tab_coeff.size(); i++) {
       ret += tab_coeff(i) * base[i+begin];
    }
 

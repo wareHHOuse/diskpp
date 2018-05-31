@@ -217,7 +217,6 @@ int main(int argc, char **argv)
     }
 
     /* DiSk++ cartesian 2D */
-    /*
     if (std::regex_match(mesh_filename, std::regex(".*\\.quad$") ))
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
@@ -225,7 +224,7 @@ int main(int argc, char **argv)
         run_diffusion_solver(msh);
         return 0;
     }
-    */
+
 
     /* Netgen 3D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$") ))

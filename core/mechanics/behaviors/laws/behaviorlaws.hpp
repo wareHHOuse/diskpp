@@ -1,13 +1,12 @@
 /*
- *       /\         DISK++, a template library for DIscontinuous SKeletal
- *      /__\        methods.
- *     /_\/_\
- *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
- *   /__\  /__\     matteo.cicuttin@enpc.fr
- *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
+ *       /\        Matteo Cicuttin (C) 2016, 2017, 2018
+ *      /__\       matteo.cicuttin@enpc.fr
+ *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
+ *    /\    /\
+ *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
+ *  /_\/_\/_\/_\   methods.
  *
  * This file is copyright of the following authors:
- * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
  * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
@@ -26,7 +25,13 @@
 
 #pragma once
 
-#include "implementation_bits/bases_scalar.hpp"
-#include "implementation_bits/bases_vector.hpp"
-#include "implementation_bits/bases_matrix.hpp"
-#include "implementation_bits/bases_utils.hpp"
+#define _BEHAVIOR_HPP_WAS_INCLUDED_
+
+#include "CavitationLaw.hpp"
+#include "HenckyMises/HenckyMises.hpp"
+#include "LinearIsotropicAndKinematicHardening/LinearIsotropicAndKinematicHardening.hpp"
+#include "LinearLaw.hpp"
+#include "NeohookeanLaw.hpp"
+#include "pLaplaceLaw.hpp"
+
+#undef _BEHAVIOR_HPP_WAS_INCLUDED_

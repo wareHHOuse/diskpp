@@ -23,4 +23,5 @@ add_subdirectory(stokes)
 add_subdirectory(tests)
 add_subdirectory(netgen_bnd_test)
 add_subdirectory(vector_laplacian)
+add_subdirectory(plasticity)
 

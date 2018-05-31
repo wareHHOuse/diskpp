@@ -283,30 +283,30 @@ main(int argc, char** argv)
       return 0;
    }
 
-   //  /* DiSk++ cartesian 2D */
-   //  if (std::regex_match(mesh_filename, std::regex(".*\\.quad$"))) {
-   //     std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
-   //     auto msh = disk::load_cartesian_2d_mesh<RealType>(mesh_filename);
-   //     run_vector_laplacian_solver(msh, rp, material_data);
-   //     return 0;
-   //  }
+    /* DiSk++ cartesian 2D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.quad$"))) {
+       std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
+       auto msh = disk::load_cartesian_2d_mesh<RealType>(mesh_filename);
+       run_vector_laplacian_solver(msh, rp, material_data);
+       return 0;
+    }
 
-   //  /* Netgen 3D */
-   //  if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$"))) {
-   //     std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-   //     auto msh = disk::load_netgen_3d_mesh<RealType>(mesh_filename);
-   //     run_vector_laplacian_solver(msh, rp, material_data);
-   //     return 0;
-   //  }
+    /* Netgen 3D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$"))) {
+       std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
+       auto msh = disk::load_netgen_3d_mesh<RealType>(mesh_filename);
+       run_vector_laplacian_solver(msh, rp, material_data);
+       return 0;
+    }
 
-   //  /* DiSk++ cartesian 3D */
-   //  if (std::regex_match(mesh_filename, std::regex(".*\\.hex$"))) {
-   //     std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
-   //     auto msh = disk::load_cartesian_3d_mesh<RealType>(mesh_filename);
-   //     run_vector_laplacian_solver(msh, rp, material_data);
-   //     return 0;
-   //  }
+    //  /* DiSk++ cartesian 3D */
+    //  if (std::regex_match(mesh_filename, std::regex(".*\\.hex$"))) {
+    //     std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
+    //     auto msh = disk::load_cartesian_3d_mesh<RealType>(mesh_filename);
+    //     run_vector_laplacian_solver(msh, rp, material_data);
+    //     return 0;
+    //  }
 
-   std::cout << "Unkwnon mesh format" << std::endl;
-   return 0;
+    std::cout << "Unkwnon mesh format" << std::endl;
+    return 0;
 }

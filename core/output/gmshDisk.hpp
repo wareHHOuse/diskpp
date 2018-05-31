@@ -163,7 +163,7 @@ convertToVectorGmsh(const static_vector<T, DIM>& field)
 
    std::vector<double> ret(3, 0);
 
-   for (size_t i = 0; i < DIM; i++) {
+   for (int i = 0; i < DIM; i++) {
       ret[i] = field(i);
    }
 
@@ -179,8 +179,8 @@ convertToVectorGmsh(const static_matrix<T, DIM, DIM>& field)
    std::vector<double> ret(9, 0);
 
    if (DIM == 3) {
-      for (size_t j = 0; j < DIM; j++) {
-         for (size_t i = 0; i < DIM; i++) {
+      for (int j = 0; j < DIM; j++) {
+         for (int i = 0; i < DIM; i++) {
             ret[i + j * DIM] = field(i, j);
          }
       }
@@ -202,7 +202,7 @@ init_coor(const point<T, DIM>& point)
 {
    std::array<double, 3> coor = {double{0.0}, double{0.0}, double{0.0}};
 
-   for (size_t i = 0; i < DIM; i++) {
+   for (int i = 0; i < DIM; i++) {
       coor[i] = double(point.at(i));
    }
 

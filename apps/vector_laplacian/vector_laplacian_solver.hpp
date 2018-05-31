@@ -175,7 +175,8 @@ class vector_laplacian_solver
          ai.time_gradrec += tc.to_double();
 
          tc.tic();
-         const auto stab = make_hho_fancy_stabilization_vector(m_msh, cl, gr.first, m_hdi);
+         const auto stab = make_hho_vector_stabilization(m_msh, cl, gr.first, m_hdi);
+         //const auto stab = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
          tc.toc();
          ai.time_stab += tc.to_double();
 

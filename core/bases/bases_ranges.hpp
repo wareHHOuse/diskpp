@@ -101,7 +101,7 @@ public:
         auto msh        = ld.get_mesh();
         auto cl         = ld.get_cell();
 
-        m_num_faces = number_of_faces(msh, cl);
+        m_num_faces = howmany_faces(msh, cl);
         m_cell_range = dof_range(0, ld.num_cell_dofs());
         m_face_range = dof_range(0, ld.num_face_dofs());
     }

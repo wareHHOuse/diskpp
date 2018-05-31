@@ -1,7 +1,7 @@
 /*
- *       /\         DISK++, a template library for DIscontinuous SKeletal      
+ *       /\         DISK++, a template library for DIscontinuous SKeletal
  *      /__\        methods.
- *     /_\/_\      
+ *     /_\/_\
  *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
  *   /__\  /__\     matteo.cicuttin@enpc.fr
  *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
@@ -117,7 +117,7 @@ gauss_legendre(size_t degree)
             qp = point<T,1>({0.0});
             qw = 8.0/9.0;
             ret.push_back( std::make_pair( qp, qw ) );
-            
+
             return ret;
 
         case 4:
@@ -128,12 +128,12 @@ gauss_legendre(size_t degree)
             qw = (18.0 + std::sqrt(30.0))/36.0;
             ret.push_back( std::make_pair(-qp, qw ) );
             ret.push_back( std::make_pair( qp, qw ) );
-            
+
             qp = point<T,1>({ std::sqrt( (a1 + a2)/35.0 ) });
             qw = (18.0 - std::sqrt(30.0))/36.0;
             ret.push_back( std::make_pair(-qp, qw ) );
             ret.push_back( std::make_pair( qp, qw ) );
-            
+
             return ret;
 
         case 5:
@@ -153,7 +153,7 @@ gauss_legendre(size_t degree)
             ret.push_back( std::make_pair(-qp, qw ) );
             ret.push_back( std::make_pair( qp, qw ) );
             return ret;
-            
+
         default:
             return golub_welsch<T>(degree);
 
@@ -169,7 +169,68 @@ edge_quadrature(size_t doe)
     return gauss_legendre<T>(doe);
 }
 
+template<typename T>
+std::vector<std::pair<point<T,3>, T>>
+tetrahedron_codeaster(size_t degree)
+{
 
+    size_t order = 0;
+    size_t reqd_nodes = 0;
+    switch(degree)
+    {
+        case 0:
+            order = 1;
+            reqd_nodes = 1;
+        case 1:
+            order = 1;
+            reqd_nodes = 1;
+        case 2:
+            order = 2;
+            reqd_nodes = 4;
+    }
+
+
+    std::vector< std::pair<point<T,3>, T> > ret;
+    ret.reserve(reqd_nodes);
+
+    point<T,3>  qp;
+    T           qw;
+
+    switch(order)
+    {
+        case 1:
+        {
+            qp = point<T,3>({0.25, 0.25, 0.25});
+            qw = 1.0/6.0;
+            ret.push_back( std::make_pair(qp, qw) );
+            return ret;
+        }
+        case 2:
+        {
+            const T a = (5.0 - sqrt(5.0)) / 20.0;
+            const T b = (5.0 + 3.0 * sqrt(5.0)) / 20.0;
+            qw = 1.0/24.0;
+
+            qp = point<T,3>({a, a, a});
+            ret.push_back( std::make_pair(qp, qw));
+
+            qp = point<T,3>({a, a, b});
+            ret.push_back( std::make_pair(qp, qw));
+
+            qp = point<T,3>({a, b, a});
+            ret.push_back( std::make_pair(qp, qw));
+
+            qp = point<T,3>({b, a, a});
+            ret.push_back( std::make_pair(qp, qw));
+            return ret;
+        }
+        default:
+            return disk::tetrahedron_quadrature(degree);
+
+    }
+
+    return ret;
+}
 
 } //proton
 
@@ -218,12 +279,12 @@ integrate_quadrangle_tens(size_t degree, const std::vector< point<T,2> >& pts)
 {
     auto qps = proton::edge_quadrature<T>(degree);
 
-    auto v0 = pts[1] - pts[0];
-    auto v1 = pts[2] - pts[1];
-    auto v2 = pts[3] - pts[2];
-    auto v3 = pts[3] - pts[0];
+    // auto v0 = pts[1] - pts[0];
+    // auto v1 = pts[2] - pts[1];
+    // auto v2 = pts[3] - pts[2];
+    // auto v3 = pts[3] - pts[0];
 
-    auto meas = 0.5*(v0.x()*v3.y() - v0.y()*v3.x()) + 0.5*(v1.x()*v2.y() - v1.y()*v2.x());
+    // auto meas = 0.5*(v0.x()*v3.y() - v0.y()*v3.x()) + 0.5*(v1.x()*v2.y() - v1.y()*v2.x());
 
     std::vector< disk::quadrature_point<T,2> > ret;
 
@@ -313,7 +374,7 @@ integrate_quadrangle(const Mesh<T,2,Storage>& msh,
 
         std::transform(qps.begin(), qps.end(), retbegin, tr);
     }
-    
+
     return ret;
 }
 
@@ -342,6 +403,126 @@ barycenter(Iterator begin, Iterator end)
     }
 
     return p0 + ret/(den*3);
+}
+
+template<typename T>
+std::vector< disk::quadrature_point<T,3> >
+integrate_hexahedron_tens(int degree, const std::array< point<T,3>, 8>& pts)
+{
+    assert(degree >= 0);
+    auto qps = proton::edge_quadrature<T>(degree);
+
+    std::vector< disk::quadrature_point<T,3> > ret;
+
+    auto P = [&](T xi, T eta, T zeta) -> T {
+        return 0.125 * pts[0].x() * (1 - xi) * (1 - eta) * (1 - zeta) +
+               0.125 * pts[1].x() * (1 + xi) * (1 - eta) * (1 - zeta) +
+               0.125 * pts[2].x() * (1 + xi) * (1 + eta) * (1 - zeta) +
+               0.125 * pts[3].x() * (1 - xi) * (1 + eta) * (1 - zeta) +
+               0.125 * pts[4].x() * (1 - xi) * (1 - eta) * (1 + zeta) +
+               0.125 * pts[5].x() * (1 + xi) * (1 - eta) * (1 + zeta) +
+               0.125 * pts[6].x() * (1 + xi) * (1 + eta) * (1 + zeta) +
+               0.125 * pts[7].x() * (1 - xi) * (1 + eta) * (1 + zeta);
+    };
+
+    auto Q = [&](T xi, T eta, T zeta) -> T {
+        return 0.125 * pts[0].y() * (1 - xi) * (1 - eta) * (1 - zeta) +
+               0.125 * pts[1].y() * (1 + xi) * (1 - eta) * (1 - zeta) +
+               0.125 * pts[2].y() * (1 + xi) * (1 + eta) * (1 - zeta) +
+               0.125 * pts[3].y() * (1 - xi) * (1 + eta) * (1 - zeta) +
+               0.125 * pts[4].y() * (1 - xi) * (1 - eta) * (1 + zeta) +
+               0.125 * pts[5].y() * (1 + xi) * (1 - eta) * (1 + zeta) +
+               0.125 * pts[6].y() * (1 + xi) * (1 + eta) * (1 + zeta) +
+               0.125 * pts[7].y() * (1 - xi) * (1 + eta) * (1 + zeta);
+    };
+
+    auto R = [&](T xi, T eta, T zeta) -> T {
+        return 0.125 * pts[0].z() * (1 - xi) * (1 - eta) * (1 - zeta) +
+               0.125 * pts[1].z() * (1 + xi) * (1 - eta) * (1 - zeta) +
+               0.125 * pts[2].z() * (1 + xi) * (1 + eta) * (1 - zeta) +
+               0.125 * pts[3].z() * (1 - xi) * (1 + eta) * (1 - zeta) +
+               0.125 * pts[4].z() * (1 - xi) * (1 - eta) * (1 + zeta) +
+               0.125 * pts[5].z() * (1 + xi) * (1 - eta) * (1 + zeta) +
+               0.125 * pts[6].z() * (1 + xi) * (1 + eta) * (1 + zeta) +
+               0.125 * pts[7].z() * (1 - xi) * (1 + eta) * (1 + zeta);
+    };
+
+    auto J = [&](T xi, T eta, T zeta) -> T {
+        auto j11 = -0.125 * pts[0].x() * (1 - eta) * (1 - zeta) + 0.125 * pts[1].x() * (1 - eta) * (1 - zeta) +
+                   0.125 * pts[2].x() * (1 + eta) * (1 - zeta) - 0.125 * pts[3].x() * (1 + eta) * (1 - zeta) -
+                   0.125 * pts[4].x() * (1 - eta) * (1 + zeta) + 0.125 * pts[5].x() * (1 - eta) * (1 + zeta) +
+                   0.125 * pts[6].x() * (1 + eta) * (1 + zeta) - 0.125 * pts[7].x() * (1 + eta) * (1 + zeta);
+
+        auto j12 = -0.125 * pts[0].y() * (1 - eta) * (1 - zeta) + 0.125 * pts[1].y() * (1 - eta) * (1 - zeta) +
+                   0.125 * pts[2].y() * (1 + eta) * (1 - zeta) - 0.125 * pts[3].y() * (1 + eta) * (1 - zeta) -
+                   0.125 * pts[4].y() * (1 - eta) * (1 + zeta) + 0.125 * pts[5].y() * (1 - eta) * (1 + zeta) +
+                   0.125 * pts[6].y() * (1 + eta) * (1 + zeta) - 0.125 * pts[7].y() * (1 + eta) * (1 + zeta);
+
+        auto j13 = -0.125 * pts[0].z() * (1 - eta) * (1 - zeta) + 0.125 * pts[1].z() * (1 - eta) * (1 - zeta) +
+                   0.125 * pts[2].z() * (1 + eta) * (1 - zeta) - 0.125 * pts[3].z() * (1 + eta) * (1 - zeta) -
+                   0.125 * pts[4].z() * (1 - eta) * (1 + zeta) + 0.125 * pts[5].z() * (1 - eta) * (1 + zeta) +
+                   0.125 * pts[6].z() * (1 + eta) * (1 + zeta) - 0.125 * pts[7].z() * (1 + eta) * (1 + zeta);
+
+        auto j21 = -0.125 * pts[0].x() * (1 - xi) * (1 - zeta) + 0.125 * pts[1].x() * (1 + xi) * (1 - zeta) +
+                   0.125 * pts[2].x() * (1 + xi) * (1 - zeta) - 0.125 * pts[3].x() * (1 - xi) * (1 - zeta) -
+                   0.125 * pts[4].x() * (1 - xi) * (1 + zeta) + 0.125 * pts[5].x() * (1 + xi) * (1 + zeta) +
+                   0.125 * pts[6].x() * (1 + xi) * (1 + zeta) - 0.125 * pts[7].x() * (1 - xi) * (1 + zeta);
+
+        auto j22 = -0.125 * pts[0].y() * (1 - xi) * (1 - zeta) + 0.125 * pts[1].y() * (1 + xi) * (1 - zeta) +
+                   0.125 * pts[2].y() * (1 + xi) * (1 - zeta) - 0.125 * pts[3].y() * (1 - xi) * (1 - zeta) -
+                   0.125 * pts[4].y() * (1 - xi) * (1 + zeta) + 0.125 * pts[5].y() * (1 + xi) * (1 + zeta) +
+                   0.125 * pts[6].y() * (1 + xi) * (1 + zeta) - 0.125 * pts[7].y() * (1 - xi) * (1 + zeta);
+
+        auto j23 = -0.125 * pts[0].z() * (1 - xi) * (1 - zeta) + 0.125 * pts[1].z() * (1 + xi) * (1 - zeta) +
+                   0.125 * pts[2].z() * (1 + xi) * (1 - zeta) - 0.125 * pts[3].z() * (1 - xi) * (1 - zeta) -
+                   0.125 * pts[4].z() * (1 - xi) * (1 + zeta) + 0.125 * pts[5].z() * (1 + xi) * (1 + zeta) +
+                   0.125 * pts[6].z() * (1 + xi) * (1 + zeta) - 0.125 * pts[7].z() * (1 - xi) * (1 + zeta);
+
+        auto j31 = -0.125 * pts[0].x() * (1 - xi) * (1 - eta) - 0.125 * pts[1].x() * (1 + xi) * (1 - eta) -
+                   0.125 * pts[2].x() * (1 + xi) * (1 + eta) - 0.125 * pts[3].x() * (1 - xi) * (1 + eta) -
+                   0.125 * pts[4].x() * (1 - xi) * (1 - eta) + 0.125 * pts[5].x() * (1 + xi) * (1 - eta) +
+                   0.125 * pts[6].x() * (1 + xi) * (1 + eta) + 0.125 * pts[7].x() * (1 - xi) * (1 + eta);
+
+        auto j32 = -0.125 * pts[0].y() * (1 - xi) * (1 - eta) - 0.125 * pts[1].y() * (1 + xi) * (1 - eta) -
+                   0.125 * pts[2].y() * (1 + xi) * (1 + eta) - 0.125 * pts[3].y() * (1 - xi) * (1 + eta) -
+                   0.125 * pts[4].y() * (1 - xi) * (1 - eta) + 0.125 * pts[5].y() * (1 + xi) * (1 - eta) +
+                   0.125 * pts[6].y() * (1 + xi) * (1 + eta) + 0.125 * pts[7].y() * (1 - xi) * (1 + eta);
+
+        auto j33 = -0.125 * pts[0].z() * (1 - xi) * (1 - eta) - 0.125 * pts[1].z() * (1 + xi) * (1 - eta) -
+                   0.125 * pts[2].z() * (1 + xi) * (1 + eta) - 0.125 * pts[3].z() * (1 - xi) * (1 + eta) -
+                   0.125 * pts[4].z() * (1 - xi) * (1 - eta) + 0.125 * pts[5].z() * (1 + xi) * (1 - eta) +
+                   0.125 * pts[6].z() * (1 + xi) * (1 + eta) + 0.125 * pts[7].z() * (1 - xi) * (1 + eta);
+
+        return std::abs(j11*j22 - j12*j21);
+    };
+
+    T sw = 0.0, swq = 0.0;
+    for (auto jtor = qps.begin(); jtor != qps.end(); jtor++)
+    {
+        for (auto itor = qps.begin(); itor != qps.end(); itor++)
+        {
+            for (auto ktor = qps.begin(); ktor != qps.end(); ktor++)
+            {
+                auto qp_x = *itor;
+                auto qp_y = *jtor;
+                auto qp_z = *ktor;
+
+                auto xi = qp_x.first.x();
+                auto eta = qp_y.first.x();
+                auto zeta = qp_z.first.x();
+
+                auto px = P(xi, eta, zeta);
+                auto py = Q(xi, eta, zeta);
+                auto pz = R(xi, eta, zeta);
+
+                auto w = qp_x.second * qp_y.second * qp_z.second * J(xi, eta, zeta);
+
+                ret.push_back( disk::make_qp( point<T,3>({px, py, pz}), w ) );
+            }
+        }
+    }
+
+    return ret;
 }
 
 } // priv
@@ -424,11 +605,6 @@ integrate_polygon(size_t degree, const std::vector< point<T,2> >& pts)
 
 
 
-
-
-
-
-
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 std::vector< disk::quadrature_point<T,2> >
 integrate_2D_face(const Mesh<T,2,Storage>& msh,
@@ -459,10 +635,85 @@ integrate_2D_face(const Mesh<T,2,Storage>& msh,
     return ret;
 }
 
+template<typename T>
+point<T, 3>
+map_to_physical(const raw_simplex<point<T, 3>, 3>& rs, const point<T, 3>& p)
+{
+    auto pts = rs.points();
+    assert(pts.size() == 4);
+
+    auto pp = (pts[1] - pts[0]) * p.x() + (pts[2] - pts[0]) * p.y() + (pts[3] - pts[0]) * p.z() + pts[0];
+
+    return pp;
+}
+
+template<typename T>
+point<T, 3>
+map_to_physical(const raw_simplex<point<T, 3>, 2>& rs, const point<T, 2>& p)
+{
+    auto pts = rs.points();
+    assert(pts.size() == 3);
+
+    auto pp = (pts[1] - pts[0]) * p.x() + (pts[2] - pts[0]) * p.y() + pts[0];
+
+    return pp;
+}
+
+template<typename T>
+std::vector<disk::quadrature_point<T, 3>>
+integrate_polyhedron(const disk::generic_mesh<T, 3>&                msh,
+                     const typename disk::generic_mesh<T, 3>::cell& cl,
+                     size_t                                         degree)
+{
+    using quadpoint_type = disk::quadrature_point<T, 3>;
+
+    const auto m_quadrature_data = disk::tetrahedron_quadrature(degree);
+
+    auto rss = split_in_raw_tetrahedra(msh, cl);
+
+    std::vector<quadpoint_type> ret;
+    for (auto& rs : rss)
+    {
+        auto meas = measure(rs);
+        for (auto& qd : m_quadrature_data)
+        {
+            auto point  = map_to_physical(rs, qd.first);
+            auto weight = qd.second * meas;
+            ret.push_back(disk::make_qp(point, weight));
+        }
+    }
+
+    return ret;
+}
+
+template<typename T>
+std::vector<disk::quadrature_point<T, 3>>
+integrate_polyhedron_face(const disk::generic_mesh<T, 3>&                msh,
+                     const typename disk::generic_mesh<T, 3>::face& fc,
+                     size_t                                         degree)
+{
+    using quadpoint_type = disk::quadrature_point<T, 3>;
+
+    const auto m_quadrature_data = disk::triangle_quadrature(degree);
+
+    auto rss = split_in_raw_triangles(msh, fc);
+
+    std::vector<quadpoint_type> ret;
+    for (auto& rs : rss)
+    {
+        auto meas = measure(rs);
+        for (auto& qd : m_quadrature_data)
+        {
+            auto point  = map_to_physical(rs, qd.first);
+            auto weight = qd.second * meas;
+            ret.push_back(disk::make_qp(point, weight));
+        }
+    }
+
+    return ret;
+}
+
 } //priv
-
-
-
 
 
 template<typename T>
@@ -476,7 +727,6 @@ integrate(const disk::simplicial_mesh<T,2>& msh,
 }
 
 
-
 template<typename T>
 std::vector< disk::quadrature_point<T,2> >
 integrate(const disk::simplicial_mesh<T,2>& msh,
@@ -486,6 +736,28 @@ integrate(const disk::simplicial_mesh<T,2>& msh,
 	return priv::integrate_2D_face(msh, fc, degree);
 }
 
+template<typename T>
+std::vector< disk::quadrature_point<T,2> >
+integrate(const disk::cartesian_mesh<T,2>& msh,
+		  const typename disk::cartesian_mesh<T,2>::cell& cl,
+		  size_t degree)
+{
+    auto pts = points(msh, cl);
+    // transform arry to vector
+    std::vector< point<T,2> > ptsv{pts[0], pts[1], pts[3], pts[2]};
+    return priv::integrate_quadrangle_tens(degree, ptsv);
+}
+
+
+
+template<typename T>
+std::vector< disk::quadrature_point<T,2> >
+integrate(const disk::cartesian_mesh<T,2>& msh,
+		  const typename disk::cartesian_mesh<T,2>::face& fc,
+		  size_t degree)
+{
+	return priv::integrate_2D_face(msh, fc, degree);
+}
 
 template<typename T>
 std::vector< disk::quadrature_point<T,2> >
@@ -551,6 +823,8 @@ map_to_physical(const disk::simplicial_mesh<T,3>& msh,
     return pp;
 }
 
+
+
 } // namespace priv
 
 template<typename T>
@@ -600,9 +874,80 @@ integrate(const disk::simplicial_mesh<T,3>& msh,
     return ret;
 }
 
+template<typename T>
+std::vector<disk::quadrature_point<T, 3>>
+integrate(const disk::generic_mesh<T, 3>& msh, const typename disk::generic_mesh<T, 3>::cell& cl, size_t degree)
+{
+    auto pts = points(msh, cl);
+    switch (pts.size())
+    {
+        case 0:
+        case 1:
+        case 2:
+        case 3:
+            throw std::invalid_argument("A 3D cell cannot have less than four points. "
+                                        "This looks like a nice bug.");
 
+        //case 4:  return priv::integrate_tetr(degree, pts);
 
+        default: return priv::integrate_polyhedron(msh, cl, degree);
+    }
+}
 
+template<typename T>
+std::vector<disk::quadrature_point<T, 3>>
+integrate(const disk::generic_mesh<T, 3>& msh, const typename disk::generic_mesh<T, 3>::face& fc, size_t degree)
+{
+    auto pts = points(msh, fc);
+    switch (pts.size())
+    {
+        case 0:
+        case 1:
+        case 2:
+            throw std::invalid_argument("A 3D face cannot have less than three points. "
+                                        "This looks like a nice bug.");
+
+            // case 3:  return priv::integrate_triangle(degree, pts);
+
+        default: return priv::integrate_polyhedron_face(msh, fc, degree);
+    }
+}
+
+template<typename T>
+std::vector< disk::quadrature_point<T,3> >
+integrate(const disk::cartesian_mesh<T,3>& msh,
+		  const typename disk::cartesian_mesh<T,3>::cell& cl,
+		  size_t degree)
+{
+    auto pts = points(msh, cl);
+    // transform arry to vector
+    std::array< point<T,3>, 8 > ptsv{pts[0], pts[1], pts[3], pts[2], pts[4], pts[5], pts[7], pts[6]};
+    return integrate_hexahedron_tens(degree, ptsv);
+}
+
+// template<typename T>
+// std::vector< disk::quadrature_point<T,3> >
+// integrate(const disk::cartesian_mesh<T,3>& msh,
+//           const typename disk::cartesian_mesh<T,3>::face& fc,
+//           size_t degree)
+// {
+//     auto pts = points(msh, cl);
+//     // transform arry to vector porjeter
+//     auto m_quadrature_data = priv::integrate_quadrature_tense(degree);
+//     auto meas = measure(msh, fc);
+
+//     auto tr = [&](const std::pair<point<T,2>, T>& qd) -> auto {
+//         auto point = priv::map_to_physical(msh, fc, qd.first);
+//         auto weight = qd.second * meas;
+//         return disk::make_qp(point, weight);
+//     };
+
+//     std::vector<disk::quadrature_point<T,3>> ret(m_quadrature_data.size());
+//     std::transform(m_quadrature_data.begin(), m_quadrature_data.end(),
+//                    ret.begin(), tr);
+
+//     return ret;
+// }
 
 } // revolution
 
