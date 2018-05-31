@@ -183,6 +183,28 @@ make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
 }
 
 template<typename Mesh>
+Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+make_hho_eigval_mass_matrix(const Mesh& msh, const typename Mesh::cell_type& cl,
+                            size_t degree)
+{
+    using scalar_type = typename Mesh::coordinate_type;
+    auto cb = make_scalar_monomial_basis(msh, cl, degree);
+    auto cbs = scalar_basis_size(degree, Mesh::dimension);
+
+    Matrix<scalar_type, Dynamic, Dynamic> data =
+        Matrix<scalar_type, Dynamic, Dynamic>::Zero(cbs, cbs);
+
+    auto qps = integrate(msh, cl, 2*degree);
+    for (auto& qp : qps)
+    {
+        auto phi = cb.eval_functions(qp.point());
+        data += qp.weight() * phi * phi.transpose();
+    }
+
+    return data;
+}
+
+template<typename Mesh>
 std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
              Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
 make_hlow_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,

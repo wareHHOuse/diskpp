@@ -40,6 +40,7 @@
 
 #include "contrib/sol2/sol.hpp"
 #include "contrib/timecounter.h"
+#include "contrib/colormanip.h"
 
 template<typename T>
 class hierarchical_eigval_solver
@@ -57,6 +58,10 @@ class hierarchical_eigval_solver
 
     feast_eigensolver_params<T> fep;
 
+    disk::silo_database silo_db;
+
+    std::vector<size_t> fem_compress_map, fem_expand_map;
+
     bool
     cfem_eigenvalue_solver(const disk::simplicial_mesh<T, 2>& msh)
     {
@@ -72,10 +77,10 @@ class hierarchical_eigval_solver
             dirichlet_nodes.at(ptids[1]) = true;
         }
 
-        std::vector<size_t> compress_map, expand_map;
-        compress_map.resize( msh.points_size() );
+
+        fem_compress_map.resize( msh.points_size() );
         size_t system_size = std::count_if(dirichlet_nodes.begin(), dirichlet_nodes.end(), [](bool d) -> bool {return !d;});
-        expand_map.resize( system_size );
+        fem_expand_map.resize( system_size );
 
         auto nnum = 0;
         for (size_t i = 0; i < msh.points_size(); i++)
@@ -83,8 +88,8 @@ class hierarchical_eigval_solver
             if ( dirichlet_nodes.at(i) )
                 continue;
 
-            expand_map.at(nnum) = i;
-            compress_map.at(i) = nnum++;
+            fem_expand_map.at(nnum) = i;
+            fem_compress_map.at(i) = nnum++;
         }
 
         sparse_matrix_type  gK(system_size, system_size);
@@ -115,12 +120,12 @@ class hierarchical_eigval_solver
                     if ( dirichlet_nodes.at(ptids[j]) )
                         continue;
 
-                    gtK.push_back( triplet_type(compress_map.at(ptids[i]),
-                                                compress_map.at(ptids[j]),
+                    gtK.push_back( triplet_type(fem_compress_map.at(ptids[i]),
+                                                fem_compress_map.at(ptids[j]),
                                                 K(i,j)) );
 
-                    gtM.push_back( triplet_type(compress_map.at(ptids[i]),
-                                                compress_map.at(ptids[j]),
+                    gtM.push_back( triplet_type(fem_compress_map.at(ptids[i]),
+                                                fem_compress_map.at(ptids[j]),
                                                 M(i,j)) );
                 }
             }
@@ -143,12 +148,7 @@ class hierarchical_eigval_solver
         std::cout << "Eigensolver time: " << tc << " seconds (" << gK.rows() << " DoFs)" << std::endl;
 
         /* Output solutions via silo */
-        std::string visit_output_filename = "hier_eigs.silo";
-
-        disk::silo_database silo_db;
-        silo_db.create(visit_output_filename);
         silo_db.add_mesh(msh, "refmesh");
-
         for (size_t i = 0; i < fep.eigvals_found; i++)
         {
             std::vector<T> solution_vals;
@@ -156,22 +156,25 @@ class hierarchical_eigval_solver
 
             dynamic_vector<T> gx = fem_eigvecs.block(0,i,fem_eigvecs.rows(),1);
             for (size_t i = 0; i < gx.size(); i++)
-                solution_vals.at( expand_map.at(i) ) = gx(i);
+                solution_vals.at( fem_expand_map.at(i) ) = gx(i);
 
             std::stringstream ss;
-            ss << "u" << i;
+            ss << "u_ref" << i;
 
             disk::silo_nodal_variable<T> u(ss.str(), solution_vals);
             silo_db.add_variable("refmesh", u);
         }
 
-        silo_db.close();
-
         /* Dump actual eigenvalues */
         std::string fname = "ref_eigenvalues.txt";
         std::ofstream ofs(fname);
         for (size_t i = 0; i < fep.eigvals_found; i++)
-            ofs << std::setprecision(10) << fem_eigvals(i) << std::endl;
+        {
+            ofs << std::setprecision(10) << fem_eigvals(i) << " ";
+
+            dynamic_vector<T> gx = fem_eigvecs.block(0,i,fem_eigvecs.rows(),1);
+            ofs << gx.dot(gM*gx) << std::endl;
+        }
         ofs.close();
 
     }
@@ -180,39 +183,14 @@ class hierarchical_eigval_solver
     bool
     hho_eigenvalue_solver(const Mesh& msh, size_t degree)
     {
-        typedef Mesh                                       mesh_type;
-        typedef typename mesh_type::scalar_type            scalar_type;
-        typedef typename mesh_type::cell                   cell_type;
-        typedef typename mesh_type::face                   face_type;
+        using namespace revolution;
 
-        typedef disk::quadrature<mesh_type, cell_type>      cell_quadrature_type;
-        typedef disk::quadrature<mesh_type, face_type>      face_quadrature_type;
-
-        typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
-        typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
-
-        typedef
-        disk::basis_quadrature_data<mesh_type,
-                                    disk::scaled_monomial_scalar_basis,
-                                    disk::quadrature> bqdata_type;
-
-        typedef disk::gradient_reconstruction_bq<bqdata_type>               gradrec_type;
-        typedef disk::diffusion_like_stabilization_bq<bqdata_type>          stab_type;
-        typedef disk::eigval_mass_matrix_bq<bqdata_type>                    mass_type;
-
-        typedef Eigen::Triplet<scalar_type>                                 triplet_type;
-
-
-        auto bqd = bqdata_type(degree, degree);
-
-        auto gradrec    = gradrec_type(bqd);
-        auto stab       = stab_type(bqd);
-        auto mass       = mass_type(bqd);
+        typedef Eigen::Triplet<T> triplet_type;
 
         std::cout << "Assembly" << std::endl;
 
-        size_t num_cell_dofs = howmany_dofs(bqd.cell_basis);
-        size_t num_face_dofs = howmany_dofs(bqd.face_basis);
+        size_t num_cell_dofs = scalar_basis_size(degree, Mesh::dimension);
+        size_t num_face_dofs = scalar_basis_size(degree, Mesh::dimension-1);
         size_t num_global_cell_dofs = msh.cells_size() * num_cell_dofs;
         size_t num_global_face_dofs = msh.internal_faces_size() * num_face_dofs;
         size_t num_global_dofs = num_global_cell_dofs + num_global_face_dofs;
@@ -239,22 +217,23 @@ class hierarchical_eigval_solver
             face_i++;
         }
 
-        sparse_matrix<scalar_type> gK(num_global_dofs, num_global_dofs);
-        sparse_matrix<scalar_type> gM(num_global_dofs, num_global_dofs);
+        sparse_matrix<T> gK(num_global_dofs, num_global_dofs);
+        sparse_matrix<T> gM(num_global_dofs, num_global_dofs);
 
         std::vector<triplet_type> gtK, gtM;
 
-        scalar_type stab_weight = 1.0;
+        hho_degree_info hdi(degree);
+        T stab_weight = 1.0;
 
         size_t elem_i = 0;
         for (auto& cl : msh)
         {
-            gradrec.compute(msh, cl);
-            stab.compute(msh, cl, gradrec.oper);
-            mass.compute(msh, cl);
+            auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
+            dynamic_matrix<T> stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+            dynamic_matrix<T> mass   = make_hho_eigval_mass_matrix(msh, cl, hdi.cell_degree());
 
-            auto K = gradrec.data + stab_weight * stab.data;
-            auto M = mass.data;
+            dynamic_matrix<T> K = gr.second + stab_weight * stab;
+            dynamic_matrix<T> M = mass;
 
             auto fcs = faces(msh, cl);
             auto num_faces = fcs.size();
@@ -324,13 +303,32 @@ class hierarchical_eigval_solver
 
         generalized_eigenvalue_solver(fep, gK, gM, hho_eigvecs, hho_eigvals);
 
-        std::string fname = "sol_eigenvalues.txt";
-
-        std::ofstream ofs(fname);
-
+        silo_db.add_mesh(msh, "solmesh");
         for (size_t i = 0; i < fep.eigvals_found; i++)
-            ofs << std::setprecision(10) << hho_eigvals(i) << std::endl;
+        {
+            std::vector<T> solution_vals;
+            solution_vals.resize(msh.cells_size());
 
+            dynamic_vector<T> gx = hho_eigvecs.block(0,i,hho_eigvecs.rows(),1);
+            for (size_t i = 0; i < msh.cells_size(); i++)
+                solution_vals.at(i) = gx(i*num_cell_dofs);
+
+            std::stringstream ss;
+            ss << "u" << i;
+
+            disk::silo_zonal_variable<T> u(ss.str(), solution_vals);
+            silo_db.add_variable("solmesh", u);
+        }
+
+        std::string fname = "sol_eigenvalues.txt";
+        std::ofstream ofs(fname);
+        for (size_t i = 0; i < fep.eigvals_found; i++)
+        {
+            ofs << std::setprecision(10) << hho_eigvals(i) << " ";
+
+            dynamic_vector<T> gx = hho_eigvecs.block(0,i,hho_eigvecs.rows(),1);
+            ofs << gx.dot(gM*gx) << std::endl;
+        }
         ofs.close();
     }
 
@@ -401,12 +399,72 @@ public:
     void
     run_computations()
     {
+        using namespace revolution;
+
+        size_t hho_degree = 1;
+        size_t which_eigvec = 0;
+        size_t which_level = 0;
+
         auto ref_msh = mesh_hier.finest_mesh();
+        auto sol_msh = *std::next(mesh_hier.meshes_begin(), which_level);
 
-        auto sol_msh = mesh_hier.coarsest_mesh();
-
+        std::string visit_output_filename = "hier_eigs.silo";
+        silo_db.create(visit_output_filename);
+        std::cout << green << "Reference solution, FEM" << reset << std::endl;
+        std::cout << "Mesh size: " << mesh_h(ref_msh) << std::endl;
         cfem_eigenvalue_solver(ref_msh);
-        hho_eigenvalue_solver(sol_msh, 0);
+        std::cout << green << "Computed solution, HHO" << reset << std::endl;
+        std::cout << "Mesh size: " << mesh_h(sol_msh) << std::endl;
+        hho_eigenvalue_solver(sol_msh, hho_degree);
+
+
+
+        T H1_error = 0.0;
+
+        for (auto& ref_cl : ref_msh)
+        {
+            dynamic_vector<T> fem_evec = fem_eigvecs.block(0,which_eigvec,fem_eigvecs.rows(),1);
+
+            dynamic_vector<T> e_fem_evec = dynamic_vector<T>::Zero(ref_msh.points_size());
+
+            for (size_t i = 0; i < fem_evec.size(); i++)
+                e_fem_evec( fem_expand_map.at(i) ) = fem_evec(i);
+
+
+            auto cfem_dphi = disk::cfem::eval_basis_grad(ref_msh, ref_cl);
+            auto ptids = ref_cl.point_ids();
+
+            Eigen::Matrix<T,1,2> fem_grad = Eigen::Matrix<T,1,2>::Zero();
+            for (size_t i = 0; i < 3; i++)
+                fem_grad += e_fem_evec(ptids[i]) * cfem_dphi.block(i,0,1,2);
+
+            /* find parent cell */
+            auto bar = barycenter(ref_msh, ref_cl);
+            size_t sol_cl_ofs = mesh_hier.locate_point(bar, which_level);
+            auto sol_cl = *std::next(sol_msh.cells_begin(), sol_cl_ofs);
+
+            dynamic_vector<T> hho_evec = hho_eigvecs.block(0,which_eigvec,hho_eigvecs.rows(),1);
+
+            auto sol_cb = make_scalar_monomial_basis(sol_msh, sol_cl, hho_degree);
+            auto qps = integrate(ref_msh, ref_cl, 2*hho_degree+2);
+            for (auto& qp : qps)
+            {
+                auto hho_dphi = sol_cb.eval_gradients(qp.point());
+
+                Eigen::Matrix<T,1,2> hho_grad = Eigen::Matrix<T,1,2>::Zero();
+                for (size_t i = 0; i < sol_cb.size(); i++)
+                    hho_grad += hho_evec(i*sol_cb.size()) * hho_dphi.block(i,0,1,2);
+
+                auto diff = hho_grad - fem_grad;
+
+                H1_error += qp.weight() * diff.dot(diff);
+            }
+
+        }
+
+        std::cout << "H1 error: " << std::sqrt(H1_error) << std::endl;
+
+        silo_db.close();
     }
 
 };
