@@ -110,7 +110,7 @@ compute_errors(const Mesh& msh,
         Matrix<scalar_type, Dynamic, 1> diff_vel = svel - p;
         auto gr = revolution::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
-        stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
+        stab = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
         error_vel += diff_vel.dot(factor * (gr.second + stab)*diff_vel);
     }
 
@@ -184,7 +184,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     {
         auto gr = revolution::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
-        stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
+        stab = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
         auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, hdi);
         auto cell_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
         auto rhs = make_rhs(msh, cl, cell_basis, rhs_fun);

@@ -1058,17 +1058,6 @@ diffusion_static_condensation_recover_vector(const Mesh& msh,
     return ret;
 }
 
-
-template<typename Mesh>
-[[deprecated("Please use 'make_hho_scalar_stabilization()'")]]
-Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_hho_fancy_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl,
-                             const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> reconstruction,
-                             const hho_degree_info& di)
-{
-    return make_hho_scalar_stabilization(msh, cl, reconstruction, di);
-}
-
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
 make_hho_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl,
@@ -1245,9 +1234,9 @@ make_hho_scalar_stabilization_2(const Mesh& msh, const typename Mesh::cell_type&
 
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_hho_fancy_stabilization_vector(const Mesh& msh, const typename Mesh::cell_type& cl,
-                      const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> reconstruction,
-                      const hho_degree_info& di)
+make_hho_vector_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl,
+                              const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> reconstruction,
+                              const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
 
@@ -1323,6 +1312,60 @@ make_hho_fancy_stabilization_vector(const Mesh& msh, const typename Mesh::cell_t
         Matrix<T, Dynamic, Dynamic> BRF = proj2 + proj3;
 
         data += BRF.transpose() * face_mass_matrix * BRF / h;
+    }
+
+    return data;
+}
+
+template<typename Mesh>
+Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+make_hdg_vector_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+{
+    using T = typename Mesh::coordinate_type;
+
+    const auto celdeg = di.cell_degree();
+    const auto facdeg = di.face_degree();
+
+    const auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
+    const auto fbs = vector_basis_size(facdeg, Mesh::dimension - 1, Mesh::dimension);
+
+    auto       fcs       = faces(msh, cl);
+    const auto num_faces = fcs.size();
+    auto       cb        = make_vector_monomial_basis(msh, cl, celdeg);
+
+    Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(cbs + num_faces * fbs, cbs + num_faces * fbs);
+    Matrix<T, Dynamic, Dynamic> If   = Matrix<T, Dynamic, Dynamic>::Identity(fbs, fbs);
+
+    for (size_t face_i = 0; face_i < num_faces; face_i++)
+    {
+        auto h  = diameter(msh, fcs[face_i]);
+        auto fc = fcs[face_i];
+        auto fb = make_vector_monomial_basis(msh, fc, facdeg);
+
+        Matrix<T, Dynamic, Dynamic> oper  = Matrix<T, Dynamic, Dynamic>::Zero(fbs, cbs + num_faces * fbs);
+        Matrix<T, Dynamic, Dynamic> tr    = Matrix<T, Dynamic, Dynamic>::Zero(fbs, cbs + num_faces * fbs);
+        Matrix<T, Dynamic, Dynamic> mass  = Matrix<T, Dynamic, Dynamic>::Zero(fbs, fbs);
+        Matrix<T, Dynamic, Dynamic> trace = Matrix<T, Dynamic, Dynamic>::Zero(fbs, cbs);
+
+        oper.block(0, cbs + face_i * fbs, fbs, fbs) = -If;
+
+        auto face_quadpoints = integrate(msh, fc, 2 * facdeg);
+        for (auto& qp : face_quadpoints)
+        {
+            auto                                f_phi   = fb.eval_functions(qp.point());
+            auto                                c_phi   = cb.eval_functions(qp.point());
+            Matrix<T, Dynamic, Mesh::dimension> q_f_phi = qp.weight() * f_phi;
+
+            mass += priv::outer_product(f_phi, q_f_phi);
+            trace += priv::outer_product(c_phi, q_f_phi);
+        }
+
+        tr.block(0, cbs + face_i * fbs, fbs, fbs) = -mass;
+        tr.block(0, 0, fbs, cbs)             = trace;
+
+        oper.block(0, 0, fbs, cbs) = mass.llt().solve(trace);
+
+        data += oper.transpose() * tr / h;
     }
 
     return data;

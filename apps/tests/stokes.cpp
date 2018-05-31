@@ -105,7 +105,7 @@ run_stokes(const Mesh& msh, size_t degree)
         auto gr = make_hho_vector_laplacian(msh, cl, hdi);
 
         Matrix<scalar_type, Dynamic, Dynamic> stab;
-        stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
+        stab = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
 
         auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, hdi);
 

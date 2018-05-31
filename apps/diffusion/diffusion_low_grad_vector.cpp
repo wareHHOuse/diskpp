@@ -157,7 +157,7 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
         auto cb = make_vector_monomial_basis(msh, cl, hdi.cell_degree());
         auto G      = make_hlow_vector_laplacian(msh, cl, hdi);
         auto gr     = make_hho_vector_laplacian(msh, cl, hdi);
-        auto stab   = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
+        auto stab   = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
         auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = G.second + stab;
         //Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
@@ -190,7 +190,7 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
         auto cb     = make_vector_monomial_basis(msh, cl, hdi.cell_degree());
         auto G      = make_hlow_vector_laplacian(msh, cl, hdi);
         auto gr     = make_hho_vector_laplacian(msh, cl, hdi);
-        auto stab   = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
+        auto stab   = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
         auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = G.second + stab;
         //Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;

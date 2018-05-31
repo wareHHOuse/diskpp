@@ -93,12 +93,12 @@ test_bases(const Mesh& msh)
         //std::cout << "Cell mass matrix for " << cl << std::endl;
         //std::cout << mass << std::endl;
 
-        
+
         //matrix_type stiff = revolution::make_stiffness_matrix(msh, cl, cell_basis);
 
         //std::cout << "Cell stiffness matrix for " << cl << std::endl;
         //std::cout << stiff << std::endl;
-        
+
 
         /*
         auto fcs = faces(msh, cl);
@@ -142,7 +142,7 @@ test_bases(const Mesh& msh)
         auto gr = make_hho_vector_laplacian(msh, cl, hdi);
 
         Matrix<scalar_type, Dynamic, Dynamic> stab;
-        stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
+        stab = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
 
 
         auto dr = make_hho_divergence_reconstruction(msh, cl, hdi);
