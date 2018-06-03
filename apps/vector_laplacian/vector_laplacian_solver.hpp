@@ -183,18 +183,25 @@ class vector_laplacian_solver
           ai.time_gradrec += tc.to_double();
 
           tc.tic();
+          matrix_dynamic stab;
+          if(m_hdi.cell_degree() == (m_hdi.face_degree() + 1))
+          {
+              stab = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
+          }
+          else
+          {
 #ifdef USE_OPTIM
-          const auto stab = make_hho_vector_stabilization_optim(m_msh, cl, gr_scalar.first, m_hdi);
+          stab = make_hho_vector_stabilization_optim(m_msh, cl, gr_scalar.first, m_hdi);
 #else
-          const auto stab = make_hho_vector_stabilization(m_msh, cl, gr.first, m_hdi);
-          // const auto stab = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
+          stab = make_hho_vector_stabilization(m_msh, cl, gr.first, m_hdi);
 #endif
+          }
           tc.toc();
           ai.time_stab += tc.to_double();
 
           tc.tic();
           auto                 cb       = revolution::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
-          const auto           cell_rhs = make_rhs(m_msh, cl, cb, lf);
+          const auto           cell_rhs = make_rhs(m_msh, cl, cb, lf, 2);
           const matrix_dynamic loc      = m_parameters.lambda * (gr.second + stab);
           const auto           scnp     = statcond.compute(m_msh, cl, loc, cell_rhs, m_hdi);
 
