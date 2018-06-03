@@ -65,3 +65,27 @@ plot(e_y1(:,2), e_y1(:,3), 'b',e_y2(:,2), e_y2(:,3), 'k', e_y3(:,2), e_y3(:,3),'
 
 legend("\mu = 1, \sigma_0 = 2","\mu = 2, \sigma_0 = 4", "\mu = 1, \sigma_0 = 2","\mu = 2, \sigma_0 = 4");
 
+
+
+
+
+
+CoordsFileName = sprintf('Coords_N%d_A%d_R%d.data', mesh, alpha, k);
+    Coords = load("Coords_driven_k0_a1_Bi2mu2_tol-10_100_100.data");
+    sc = size(Coords);
+    NROWS = sc(2); NCELLS = sc(1);
+    NV = NROWS/2;
+
+    X = [Coords(:, 1 : 2 ) Coords(:, 4) Coords(:, 3)];
+    Y = Coords(:, NV + 1: 2*NV);
+
+ 
+    fig = figure;
+    F = load("criterion_theta_driven_k0_a1_Bi2mu2_tol-10_100_100.data");   
+    F(1, :) = [];
+    hp = patch(X', Y', F','EdgeAlpha','none');
+        
+    figure;
+    F = load("criterion_sigma_driven_k0_a1_Bi2mu2_tol-10_100_100.data");
+    F(1, :) = [];
+    hp = patch(X', Y', F','EdgeAlpha','none');

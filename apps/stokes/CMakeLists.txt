@@ -13,8 +13,8 @@ target_link_libraries(stokes_alg ${LINK_LIBS})
 add_executable(stokes_alg_sym stokes_alg_sym.cpp)
 target_link_libraries(stokes_alg_sym ${LINK_LIBS})
 
-add_executable(stokes_alg_no_div stokes_alg_no_div.cpp)
-target_link_libraries(stokes_alg_no_div ${LINK_LIBS})
+#add_executable(stokes_alg_no_div stokes_alg_no_div.cpp)
+#target_link_libraries(stokes_alg_no_div ${LINK_LIBS})
 
 add_executable(stokes_cylinder stokes_over_cylinder.cpp)
 target_link_libraries(stokes_cylinder ${LINK_LIBS})

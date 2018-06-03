@@ -290,7 +290,7 @@ public:
         	//ofs << bar.x() << " " << bar.y() << " " << s(0) << " " << s(1) << std::endl;
 
             //pressure error
-            Matrix<scalar_type, Dynamic, 1> ppres = revolution::project_function(msh, cl, pressure, di.face_degree());
+            Matrix<scalar_type, Dynamic, 1> ppres = revolution::project_function(msh, cl, di.face_degree(), pressure);
             auto pb  = revolution::make_scalar_monomial_basis(msh, cl, di.face_degree());
 
             Matrix<scalar_type, Dynamic, 1> spres = assembler.take_pressure(msh, cl, sol);
@@ -303,7 +303,7 @@ public:
             Matrix<scalar_type, Dynamic, 1> diff_vel = svel - p;
             auto gr = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
             Matrix<scalar_type, Dynamic, Dynamic> stab;
-            stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, di);
+            stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
             auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
 
             Matrix<scalar_type, Dynamic, Dynamic> B = factor * (viscosity*G.second + viscosity*stab);
@@ -423,7 +423,7 @@ public:
             auto G   = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
             auto gr  = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
             Matrix<scalar_type, Dynamic, Dynamic> stab;
-            stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, di);
+            stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
             auto dr  = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
 
             Matrix<scalar_type, Dynamic, 1> local_rhs =
@@ -432,7 +432,7 @@ public:
 
             Matrix<scalar_type, Dynamic, Dynamic> A = factor * (alpha * G.second + viscosity * stab);
 
-            assembler.assemble_alg(msh, cl, A, -dr.second, local_rhs);
+            assembler.assemble_alg(msh, cl, A, -dr, local_rhs);
 
             save_auxiliar(msh, cl, assembler);
         }

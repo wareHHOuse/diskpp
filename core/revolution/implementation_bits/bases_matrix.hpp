@@ -207,24 +207,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell>
 {
 
-<<<<<<< HEAD
- public:
-   typedef Mesh<T, 2, Storage>              mesh_type;
-   typedef typename mesh_type::scalar_type  scalar_type;
-   typedef typename mesh_type::cell         cell_type;
-   typedef typename mesh_type::point_type   point_type;
-   typedef static_matrix<scalar_type, 2, 2> function_type;
 
- private:
-   size_t      basis_degree, basis_size;
-
-   typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
-   scalar_basis_type                                          scalar_basis;
-
- public:
-    scaled_monomial_matrix_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
-    scalar_basis(msh, cl, degree)
-=======
   public:
     typedef Mesh<T, 2, Storage>              mesh_type;
     typedef typename mesh_type::scalar_type  scalar_type;
@@ -241,7 +224,6 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
   public:
     scaled_monomial_matrix_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
       scalar_basis(msh, cl, degree)
->>>>>>> upstream/revolution
     {
         basis_degree = degree;
         basis_size   = matrix_basis_size(degree, 2, 2);
@@ -255,15 +237,6 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 
         const auto phi = scalar_basis.eval_functions(pt);
 
-<<<<<<< HEAD
-        for (size_t k = 0; k < scalar_basis.size(); k++)
-        {
-            function_type fc;
-
-            for (size_t j = 0; j < 2; j++)
-            {
-                for (size_t i = 0; i < 2; i++)
-=======
         for (int k = 0; k < scalar_basis.size(); k++)
         {
             function_type fc;
@@ -271,7 +244,6 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
             for (int j = 0; j < 2; j++)
             {
                 for (int i = 0; i < 2; i++)
->>>>>>> upstream/revolution
                 {
                     fc       = function_type::Zero();
                     fc(i, j) = phi(k);

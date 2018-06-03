@@ -959,7 +959,7 @@ public:
             Matrix<T, Dynamic, 1> diff_vel = svel - pvel;
             auto gr = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
             Matrix<T, Dynamic, Dynamic> stab;
-            stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, di);
+            stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
             auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
 
             Matrix<T, Dynamic, Dynamic> B = factor * (viscosity*G.second + viscosity*stab);
@@ -1110,12 +1110,12 @@ public:
             auto G  = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
             auto gr = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
             Matrix<T, Dynamic, Dynamic> stab;
-            stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, di);
+            stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
             auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
 
             Matrix<T, Dynamic, Dynamic> A = factor *(alpha * G.second + viscosity * stab);
 
-            assembler.assemble_lhs(msh, cl, A, -dr.second);
+            assembler.assemble_lhs(msh, cl, A, -dr);
         }
 
         assembler.finalize_lhs();
@@ -1200,7 +1200,7 @@ public:
         auto marks_sigma = std::vector<size_t>(msh.cells_size());
         auto marks_theta = std::vector<size_t>(msh.cells_size());
 
-        size_t id = 0;
+        size_t id1 = 0; size_t id2 = 0;
         for(auto & cl : msh)
         {
             Matrix<T, Dynamic, 1> svel =  assembler.take_velocity(msh, cl, sol);
@@ -1224,10 +1224,9 @@ public:
             T sigma_norm  = std::sqrt((sigma_eval.cwiseProduct(sigma_eval)).sum());
 
             if(theta_norm <=  std::sqrt(2) * yield ||  std::abs(theta_norm - std::sqrt(2) * yield) < 1.e-8)
-                marks_theta.at(id++) = 1;
+                marks_theta.at(id1++) = 1;
             if(sigma_norm <=  std::sqrt(2) * yield ||  std::abs(sigma_norm - std::sqrt(2) * yield) < 1.e-8)
-                marks_sigma.at(id++) = 1;
-
+                marks_sigma.at(id2++) = 1;
         }
 
         save_data(marks_theta, "criterion_theta_"+ info + ".data");

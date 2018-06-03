@@ -387,7 +387,7 @@ public:
             Matrix<scalar_type, Dynamic, 1> diff_vel = svel - svel_old;
             auto gr = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
             Matrix<scalar_type, Dynamic, Dynamic> stab;
-            stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, di);
+            stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
             auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
 
             Matrix<scalar_type, Dynamic, Dynamic> B = factor * viscosity * (G.second + stab);
@@ -523,12 +523,12 @@ public:
             auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
             auto gr  = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
             Matrix<scalar_type, Dynamic, Dynamic> stab;
-            stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, di);
+            stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
             auto dr  = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
 
             Matrix<scalar_type, Dynamic, Dynamic> A = factor * (alpha * G.second + viscosity * stab);
 
-            assembler.assemble_lhs(msh, cl, A, -dr.second);
+            assembler.assemble_lhs(msh, cl, A, -dr);
         }
 
         assembler.finalize_lhs();

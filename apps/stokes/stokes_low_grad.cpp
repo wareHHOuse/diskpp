@@ -73,8 +73,7 @@ compute_errors(const Mesh& msh,
     	//ofs << bar.x() << " " << bar.y() << " " << s(0) << " " << s(1) << std::endl;
 
         //pressure error
-        //Matrix<scalar_type, Dynamic, 1> ppres = project_function(msh, cl, hdi, pressure);
-        Matrix<scalar_type, Dynamic, 1> ppres = revolution::project_function(msh, cl, pressure, hdi.face_degree());
+        Matrix<scalar_type, Dynamic, 1> ppres = revolution::project_function(msh, cl, hdi.face_degree(), pressure);
         auto fbs = revolution::vector_basis_size(hdi.face_degree(), dim - 1, dim);
         auto pbs = revolution::scalar_basis_size(hdi.face_degree(), dim);
         auto pb  = revolution::make_scalar_monomial_basis(msh, cl, hdi.face_degree());
@@ -112,7 +111,7 @@ compute_errors(const Mesh& msh,
 	    auto G = revolution::make_hlow_stokes(msh, cl, hdi, use_sym_grad);
         auto gr = revolution::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
-        stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
+        stab = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
         error_vel += diff_vel.dot(factor * (G.second + stab)*diff_vel);
     }
 
@@ -186,11 +185,11 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 	    auto G = revolution::make_hlow_stokes(msh, cl, hdi, use_sym_grad);
         auto gr = revolution::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
-        stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, hdi);
+        stab = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
         auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, hdi);
         auto cell_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
         auto rhs = make_rhs(msh, cl, cell_basis, rhs_fun);
-        assembler.assemble(msh, cl, factor * (G.second + stab), -dr.second, rhs);
+        assembler.assemble(msh, cl, factor * (G.second + stab), -dr, rhs);
     }
 
     assembler.finalize();

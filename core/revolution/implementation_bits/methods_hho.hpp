@@ -2545,12 +2545,15 @@ public:
         for (size_t i = 0; i < fcs.size(); i++)
         {
             auto fc = fcs[i];
+            auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+            if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+            const auto face_id                  = eid.second;
 
-            if (m_bnd.is_dirichlet_face(msh, fc) )
+            if (m_bnd.is_dirichlet_face( face_id))
             {
                 auto fb = revolution::make_vector_monomial_basis(msh, fc, di.face_degree());
                 Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
-                auto velocity = m_bnd.dirichlet_boundary_func(msh, fc);
+                auto velocity = m_bnd.dirichlet_boundary_func(face_id);
                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, velocity, di.face_degree());
                 svel.block(cbs_A + i * fbs_A, 0, fbs_A, 1) = mass.llt().solve(rhs);
             }
@@ -2892,12 +2895,16 @@ public:
         for (size_t i = 0; i < fcs.size(); i++)
         {
             auto fc = fcs[i];
+            auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+            if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
 
-            if (m_bnd.is_dirichlet_face(msh, fc) )
+            const auto face_id                  = eid.second;
+
+            if (m_bnd.is_dirichlet_face(face_id) )
             {
                 auto fb = revolution::make_vector_monomial_basis(msh, fc, di.face_degree());
                 Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
-                auto velocity = m_bnd.dirichlet_boundary_func(msh, fc);
+                auto velocity = m_bnd.dirichlet_boundary_func(face_id);
                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, velocity, di.face_degree());
                 svel.block(cbs_A + i * fbs_A, 0, fbs_A, 1) = mass.llt().solve(rhs);
             }

@@ -179,7 +179,7 @@ public:
             Matrix<scalar_type, Dynamic, 1> diff_vel = svel - p;
             Matrix<scalar_type, Dynamic, Dynamic> stab;
             auto gr    = make_hho_scalar_laplacian(msh, cl, di);
-            stab = make_hho_fancy_stabilization(msh, cl, gr.first, di);
+            stab = make_hho_scalar_stabilization(msh, cl, gr.first, di);
             auto G    = make_hlow_vector_laplacian(msh, cl, di);
             error_vel += diff_vel.dot( viscosity * (G.second + stab)*diff_vel);
         }
@@ -339,7 +339,7 @@ public:
             auto cb = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
             auto G    = make_hlow_vector_laplacian(msh, cl, di);
             auto gr   = make_hho_vector_laplacian(msh, cl, di);
-            auto stab = make_hho_fancy_stabilization_vector(msh, cl, gr.first, di);
+            auto stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
 
             Matrix<scalar_type, Dynamic, 1> local_rhs =
                 Matrix<scalar_type, Dynamic, 1>::Zero(cbs + fbs * howmany_faces(msh,cl));

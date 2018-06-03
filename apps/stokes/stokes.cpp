@@ -73,8 +73,7 @@ compute_errors(const Mesh& msh,
     	//ofs << bar.x() << " " << bar.y() << " " << s(0) << " " << s(1) << std::endl;
 
         //pressure error
-        //Matrix<scalar_type, Dynamic, 1> ppres = project_function(msh, cl, hdi, pressure);
-        Matrix<scalar_type, Dynamic, 1> ppres = revolution::project_function(msh, cl, pressure, hdi.face_degree());
+        Matrix<scalar_type, Dynamic, 1> ppres = revolution::project_function(msh, cl, hdi.face_degree(), pressure);
         auto fbs = revolution::vector_basis_size(hdi.face_degree(), dim - 1, dim);
         auto pbs = revolution::scalar_basis_size(hdi.face_degree(), dim);
         auto pb  = revolution::make_scalar_monomial_basis(msh, cl, hdi.face_degree());
@@ -188,7 +187,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
         auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, hdi);
         auto cell_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
         auto rhs = make_rhs(msh, cl, cell_basis, rhs_fun);
-        assembler.assemble(msh, cl, factor * (gr.second + stab), -dr.second, rhs);
+        assembler.assemble(msh, cl, factor * (gr.second + stab), -dr, rhs);
     }
 
     assembler.finalize();
