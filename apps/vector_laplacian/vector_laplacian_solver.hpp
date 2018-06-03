@@ -44,6 +44,8 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
+#define USE_OPTIM
+
 struct assembly_info
 {
    size_t linear_system_size;
@@ -169,29 +171,39 @@ class vector_laplacian_solver
       timecounter tc;
 
       for (auto& cl : m_msh) {
-         tc.tic();
-         const auto gr = make_hho_vector_laplacian(m_msh, cl, m_hdi);
-         tc.toc();
-         ai.time_gradrec += tc.to_double();
 
-         tc.tic();
-         const auto stab = make_hho_vector_stabilization(m_msh, cl, gr.first, m_hdi);
-         //const auto stab = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
-         tc.toc();
-         ai.time_stab += tc.to_double();
+          tc.tic();
+#ifdef USE_OPTIM
+          const auto gr_scalar = make_hho_scalar_laplacian(m_msh, cl, m_hdi);
+          const auto gr    = make_hho_vector_laplacian(m_msh, cl, m_hdi, gr_scalar);
+#else
+          const auto gr = make_hho_vector_laplacian(m_msh, cl, m_hdi);
+#endif
+          tc.toc();
+          ai.time_gradrec += tc.to_double();
 
-         tc.tic();
-         auto       cb = revolution::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
-         const auto cell_rhs       = make_rhs(m_msh, cl, cb, lf);
-         const matrix_dynamic loc  = m_parameters.lambda * (gr.second + stab);
-         const auto           scnp = statcond.compute(m_msh, cl, loc, cell_rhs, m_hdi);
+          tc.tic();
+#ifdef USE_OPTIM
+          const auto stab = make_hho_vector_stabilization_optim(m_msh, cl, gr_scalar.first, m_hdi);
+#else
+          const auto stab = make_hho_vector_stabilization(m_msh, cl, gr.first, m_hdi);
+          // const auto stab = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
+#endif
+          tc.toc();
+          ai.time_stab += tc.to_double();
 
-         m_AL.push_back(statcond.AL);
-         m_bL.push_back(statcond.bL);
-         tc.toc();
-         ai.time_statcond += tc.to_double();
+          tc.tic();
+          auto                 cb       = revolution::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
+          const auto           cell_rhs = make_rhs(m_msh, cl, cb, lf);
+          const matrix_dynamic loc      = m_parameters.lambda * (gr.second + stab);
+          const auto           scnp     = statcond.compute(m_msh, cl, loc, cell_rhs, m_hdi);
 
-         m_assembler.assemble(m_msh, cl, m_bnd, scnp);
+          m_AL.push_back(statcond.AL);
+          m_bL.push_back(statcond.bL);
+          tc.toc();
+          ai.time_statcond += tc.to_double();
+
+          m_assembler.assemble(m_msh, cl, m_bnd, scnp);
       }
 
       m_assembler.impose_neumann_boundary_conditions(m_msh, m_bnd);
@@ -286,7 +298,7 @@ class vector_laplacian_solver
 
       const size_t cbs = revolution::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
       const int    diff_deg = m_hdi.face_degree() - m_hdi.cell_degree();
-      const int    di       = std::max(diff_deg, 0);
+      const int    di       = std::max(diff_deg, 1);
 
       size_t cell_i = 0;
 
@@ -321,7 +333,12 @@ class vector_laplacian_solver
 
       for (auto& cl : m_msh) {
          const auto x   = m_solution_data.at(cell_i++);
-         const auto gr  = revolution::make_hho_vector_laplacian(m_msh, cl, m_hdi);
+#ifdef USE_OPTIM
+         const auto gr_scalar = make_hho_scalar_laplacian(m_msh, cl, m_hdi);
+         const auto gr        = make_hho_vector_laplacian(m_msh, cl, m_hdi, gr_scalar);
+#else
+         const auto gr = make_hho_vector_laplacian(m_msh, cl, m_hdi);
+#endif
          const auto RTu = gr.first * x;
 
          const vector_dynamic true_dof = revolution::project_gradient(m_msh, cl, recdeg, as);
