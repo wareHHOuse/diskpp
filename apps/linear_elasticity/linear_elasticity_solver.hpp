@@ -205,7 +205,7 @@ class linear_elasticity_solver
 
             tc.tic();
             auto                 cb       = revolution::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
-            const auto           cell_rhs = make_rhs(m_msh, cl, cb, lf);
+            const auto           cell_rhs = make_rhs(m_msh, cl, cb, lf, 5);
             const matrix_dynamic loc =
               2.0 * m_elas_parameters.mu * (sgr.second + stab) + m_elas_parameters.lambda * dr.second;
             const auto scnp = statcond.compute(m_msh, cl, loc, cell_rhs, m_hdi);
@@ -339,6 +339,7 @@ class linear_elasticity_solver
     compute_l2_stress_error(const AnalyticalSolution& stress) const
     {
         const auto face_degree = m_hdi.face_degree();
+        const auto cell_degree = m_hdi.cell_degree();
         const auto rec_degree  = m_hdi.reconstruction_degree();
 
         size_t      cell_i = 0;
@@ -354,9 +355,9 @@ class linear_elasticity_solver
             const vector_dynamic divu = dr.first * x;
 
             auto cbas_v = revolution::make_vector_monomial_basis(m_msh, cl, rec_degree);
-            auto cbas_s = revolution::make_scalar_monomial_basis(m_msh, cl, face_degree);
+            auto cbas_s = revolution::make_scalar_monomial_basis(m_msh, cl, cell_degree);
 
-            auto qps = revolution::integrate(m_msh, cl, 2 * face_degree);
+            auto qps = revolution::integrate(m_msh, cl, 2 * rec_degree);
             for (auto& qp : qps)
             {
                 const auto gphi   = cbas_v.eval_sgradients(qp.point());

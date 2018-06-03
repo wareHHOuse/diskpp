@@ -724,8 +724,7 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
     auto celdeg = di.cell_degree();
     auto facdeg = di.face_degree();
 
-    auto cbas_v = make_vector_monomial_basis(msh, cl, celdeg);
-    auto cbas_s = make_scalar_monomial_basis(msh, cl, facdeg);
+    auto cbas_s = make_scalar_monomial_basis(msh, cl, celdeg);
 
     auto rbs = scalar_basis_size(celdeg, Mesh::dimension);
     auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
@@ -733,17 +732,11 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
 
     auto num_faces = howmany_faces(msh, cl);
 
-    Matrix<T, Dynamic, Dynamic> dr_lhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs, rbs);
-    Matrix<T, Dynamic, Dynamic> dr_rhs = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
+    const auto dr_lhs = make_mass_matrix(msh, cl, cbas_s);
+    const auto dr_rhs = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
 
-    auto qps = integrate(msh, cl, 2 * facdeg);
-    for (auto& qp : qps)
-    {
-        Matrix<T, Dynamic, 1> s_phi  = cbas_s.eval_functions(qp.point());
-        auto s_dphi = cbas_s.eval_gradients(qp.point());
-
-        dr_lhs += qp.weight() * priv::outer_product(s_phi, s_phi);
-    }
+    assert(dr_lhs.rows() == rbs && dr_lhs.cols() == rbs);
+    assert(dr_rhs.rows() == rbs && dr_rhs.cols() == cbs + num_faces * fbs);
 
     Matrix<T, Dynamic, Dynamic> oper = dr_lhs.llt().solve(dr_rhs);
     Matrix<T, Dynamic, Dynamic> data = dr_rhs.transpose() * oper;
@@ -762,7 +755,7 @@ make_hho_divergence_reconstruction_stokes_rhs(const Mesh& msh, const typename Me
     auto facdeg = di.face_degree();
 
     auto cbas_v = make_vector_monomial_basis(msh, cl, celdeg);
-    auto cbas_s = make_scalar_monomial_basis(msh, cl, facdeg);
+    auto cbas_s = make_scalar_monomial_basis(msh, cl, celdeg);
 
     auto rbs = scalar_basis_size(celdeg, Mesh::dimension);
     auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
@@ -770,17 +763,14 @@ make_hho_divergence_reconstruction_stokes_rhs(const Mesh& msh, const typename Me
 
     auto num_faces = howmany_faces(msh, cl);
 
-    //Matrix<T, Dynamic, Dynamic> dr_lhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs, rbs);
     Matrix<T, Dynamic, Dynamic> dr_rhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs, cbs + num_faces*fbs);
 
-    auto qps = integrate(msh, cl, 2*facdeg);
+    auto qps = integrate(msh, cl, 2 * celdeg - 1);
     for (auto& qp : qps)
     {
-        Matrix<T, Dynamic, 1> s_phi  = cbas_s.eval_functions(qp.point());
         auto s_dphi = cbas_s.eval_gradients(qp.point());
         auto v_phi  = cbas_v.eval_functions(qp.point());
 
-        //dr_lhs += qp.weight() * priv::outer_product(s_phi, s_phi);
         dr_rhs.block(0, 0, rbs, cbs) -= qp.weight() * priv::outer_product(v_phi, s_dphi);
     }
 
@@ -791,13 +781,13 @@ make_hho_divergence_reconstruction_stokes_rhs(const Mesh& msh, const typename Me
         auto n = normal(msh, cl, fc);
         auto fbas_v = make_vector_monomial_basis(msh, fc, facdeg);
 
-        auto qps_f = integrate(msh, fc, 2*facdeg);
+        auto qps_f = integrate(msh, fc, facdeg + celdeg);
         for (auto& qp : qps_f)
         {
-            Matrix<T, Dynamic, 1> s_phi = cbas_s.eval_functions(qp.point());
-            auto f_phi = fbas_v.eval_functions(qp.point());
+            const auto s_phi = cbas_s.eval_functions(qp.point());
+            const auto f_phi = fbas_v.eval_functions(qp.point());
 
-            Matrix<T, Dynamic, Mesh::dimension> s_phi_n = (s_phi * n.transpose());//priv::outer_product(s_phi, n);
+            const Matrix<T, Dynamic, Mesh::dimension> s_phi_n = (s_phi * n.transpose());
             dr_rhs.block(0, cbs + i*fbs, rbs, fbs) +=
                     qp.weight() * priv::outer_product(f_phi, s_phi_n);
         }
@@ -3522,7 +3512,7 @@ template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
 make_hdg_vector_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
-    const auto hdg_scalar_stab = make_hdg_vector_stabilization(msh, cl, di);
+    const auto hdg_scalar_stab = make_hdg_scalar_stabilization(msh, cl, di);
 
     return priv::compute_lhs_vector(msh, cl, di, hdg_scalar_stab);
 }
