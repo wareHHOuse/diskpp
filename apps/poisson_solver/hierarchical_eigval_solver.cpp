@@ -63,6 +63,7 @@ class hierarchical_eigval_solver
     std::vector<size_t> fem_compress_map, fem_expand_map;
     std::vector<size_t> hho_compress_map, hho_expand_map;
 
+    T       stab_weight;
     size_t  hho_degree;
     size_t  hierarchy_levels;
     size_t  which_eigvec;
@@ -227,7 +228,6 @@ class hierarchical_eigval_solver
         std::vector<triplet_type> gtK, gtM;
 
         hho_degree_info hdi(degree);
-        T stab_weight = 1.0;
 
         size_t elem_i = 0;
         for (auto& cl : msh)
@@ -362,6 +362,7 @@ class hierarchical_eigval_solver
         hierarchy_levels    = lua["hs"]["levels"].get_or(4);
         which_eigvec        = lua["hs"]["eigvec"].get_or(0);
         which_level         = lua["hs"]["sol_level"].get_or(0);
+        stab_weight         = lua["hs"]["stab_weight"].get_or(1);
 
 
 
@@ -456,6 +457,32 @@ public:
                 hho_eigvecs.block(face_comp_ofs, which_eigvec, num_face_dofs, 1);
         }
 
+
+
+        std::vector<dynamic_vector<T>> rec_sols;
+
+        size_t sol_cell_i = 0;
+        for (auto& sol_cl : sol_msh)
+        {
+            hho_degree_info hdi(hho_degree);
+            auto gr = make_hho_scalar_laplacian(sol_msh, sol_cl, hdi);
+
+            dynamic_vector<T> hho_evec = dynamic_vector<T>::Zero(num_cell_dofs + 3*num_face_dofs);
+            hho_evec.head(num_cell_dofs) = hho_exp_sol.block(sol_cell_i*num_cell_dofs, 0, num_cell_dofs, 1);
+            auto sol_fcs = faces(sol_msh, sol_cl);
+            for (size_t i = 0; i < sol_fcs.size(); i++)
+            {
+                auto fc = sol_fcs[i];
+                auto fc_num = sol_msh.lookup(fc);
+                auto fc_ofs = num_cell_dofs * sol_msh.cells_size() + fc_num * num_face_dofs;
+                hho_evec.block(num_cell_dofs+i*num_face_dofs, 0, num_face_dofs, 1) =
+                    hho_exp_sol.block(fc_ofs, 0, num_face_dofs, 1);
+            }
+
+            rec_sols.push_back( gr.first * hho_evec );
+            sol_cell_i++;
+        }
+
         T H1_error = 0.0;
         T H1_ierror = 0.0;
         size_t cell_i = 0;
@@ -484,23 +511,7 @@ public:
             size_t sol_cl_ofs = mesh_hier.locate_point(bar, which_level);
             auto sol_cl = *std::next(sol_msh.cells_begin(), sol_cl_ofs);
 
-            dynamic_vector<T> hho_evec = dynamic_vector<T>::Zero(num_cell_dofs + 3*num_face_dofs);
-            hho_evec.head(num_cell_dofs) = hho_exp_sol.block(sol_cl_ofs*num_cell_dofs, 0, num_cell_dofs, 1);
-            auto sol_fcs = faces(sol_msh, sol_cl);
-            for (size_t i = 0; i < sol_fcs.size(); i++)
-            {
-                auto fc = sol_fcs[i];
-                auto fc_num = sol_msh.lookup(fc);
-                auto fc_ofs = num_cell_dofs * sol_msh.cells_size() + fc_num * num_face_dofs;
-                hho_evec.block(num_cell_dofs+i*num_face_dofs, 0, num_face_dofs, 1) =
-                    hho_exp_sol.block(fc_ofs, 0, num_face_dofs, 1);
-            }
-
-            hho_degree_info hdi(hho_degree);
-            auto gr = make_hho_scalar_laplacian(sol_msh, sol_cl, hdi);
-
-            dynamic_vector<T> rec_sol = gr.first * hho_evec;
-
+            dynamic_vector<T> rec_sol = rec_sols.at(sol_cl_ofs);
 
             auto sol_cb = make_scalar_monomial_basis(sol_msh, sol_cl, hho_degree+1);
             auto qps = integrate(ref_msh, ref_cl, hho_degree+2);
