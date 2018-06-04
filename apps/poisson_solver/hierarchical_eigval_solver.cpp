@@ -483,19 +483,16 @@ public:
             sol_cell_i++;
         }
 
+        dynamic_vector<T> fem_evec = fem_eigvecs.block(0,which_eigvec,fem_eigvecs.rows(),1);
+        dynamic_vector<T> e_fem_evec = dynamic_vector<T>::Zero(ref_msh.points_size());
+        for (size_t i = 0; i < fem_evec.size(); i++)
+            e_fem_evec( fem_expand_map.at(i) ) = fem_evec(i);
+
         T H1_error = 0.0;
         T H1_ierror = 0.0;
         size_t cell_i = 0;
         for (auto& ref_cl : ref_msh)
         {
-            dynamic_vector<T> fem_evec = fem_eigvecs.block(0,which_eigvec,fem_eigvecs.rows(),1);
-
-            dynamic_vector<T> e_fem_evec = dynamic_vector<T>::Zero(ref_msh.points_size());
-
-            for (size_t i = 0; i < fem_evec.size(); i++)
-                e_fem_evec( fem_expand_map.at(i) ) = fem_evec(i);
-
-
             auto cfem_dphi = disk::cfem::eval_basis_grad(ref_msh, ref_cl);
             auto ptids = ref_cl.point_ids();
 
