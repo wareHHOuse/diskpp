@@ -47,7 +47,8 @@ template<typename Mesh>
 auto
 run_viscoplasticity(const Mesh& msh, size_t degree,
                     const typename Mesh::scalar_type & alpha,
-                    const problem_type& problem)
+                    const problem_type& problem,
+                    const std::string & other_info)
 {
     using T = typename Mesh::coordinate_type;
     T tolerance = 1.e-10, Ninf = 10.e+5;
@@ -70,7 +71,7 @@ run_viscoplasticity(const Mesh& msh, size_t degree,
             exit(1);
     }
 
-    std::string info = name + "_k" + tostr(degree) + "_a" + tostr(alpha) + "_Bi2mu2_tol-10_100_100";
+    std::string info = name + "_k" + tostr(degree) + "_a" + tostr(alpha) + other_info;
     std::ofstream ofs("errors_" + info + ".data");
 
     if (!ofs.is_open())
@@ -256,19 +257,25 @@ int main(int argc, char **argv)
         }
     }
 
-
     argc -= optind;
     argv += optind;
 
-    if (argc != 1)
-    {
-        std::cout << "Please specify a 2D mesh" << std::endl;
-
-        return 0;
-    }
-
     filename = argv[0];
 
+    if (filename == nullptr)
+    {
+        std::cout << "Please specified a 2D mesh" << std::endl;
+        return 1;
+    }
+
+    char *word   = nullptr;
+    word = argv[1];
+
+    if (word == nullptr)
+    {
+        std::cout << "no word specified" << std::endl;
+        return 1;
+    }
 
     if (std::regex_match(filename, std::regex(".*\\.typ1$") ))
     {
@@ -285,7 +292,7 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        run_viscoplasticity(msh, degree, alpha, problem);
+        run_viscoplasticity(msh, degree, alpha, problem, word);
     }
 
     if (std::regex_match(filename, std::regex(".*\\.mesh2d$") ))
@@ -303,7 +310,7 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        run_viscoplasticity(msh, degree, alpha, problem);
+        run_viscoplasticity(msh, degree, alpha, problem, word);
     }
 
     /* Medit 2d*/
@@ -312,7 +319,7 @@ int main(int argc, char **argv)
         std::cout << "Guessed mesh format: Medit format" << std::endl;
         typedef disk::generic_mesh<RealType, 2>  mesh_type;
         mesh_type msh = disk::load_medit_2d_mesh<RealType>(filename);
-        run_viscoplasticity(msh, degree, alpha, problem);
+        run_viscoplasticity(msh, degree, alpha, problem, word);
     }
 
     //#if 0
@@ -331,7 +338,7 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        run_viscoplasticity(msh, degree, alpha, problem);
+        run_viscoplasticity(msh, degree, alpha, problem, word);
     }
     //#endif
 

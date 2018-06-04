@@ -776,7 +776,7 @@ public:
     {
         use_sym_grad = true;
         factor = (use_sym_grad)? 2. : 1.;
-        viscosity = 2.;
+        viscosity = 1.;
         auto omegaExt = 2;
         T f = 1;
         T Lref = 1.;
