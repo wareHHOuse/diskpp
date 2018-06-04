@@ -42,6 +42,8 @@
 #include "contrib/timecounter.h"
 #include "contrib/colormanip.h"
 
+#include "core/output/hdf5_io.hpp"
+
 template<typename T>
 class hierarchical_eigval_solver
 {
@@ -66,8 +68,8 @@ class hierarchical_eigval_solver
     T       stab_weight;
     size_t  hho_degree;
     size_t  hierarchy_levels;
+    size_t  sol_level_min, sol_level_max;
     size_t  which_eigvec;
-    size_t  which_level;
 
     bool
     cfem_eigenvalue_solver(const disk::simplicial_mesh<T, 2>& msh)
@@ -307,7 +309,10 @@ class hierarchical_eigval_solver
 
         generalized_eigenvalue_solver(fep, gK, gM, hho_eigvecs, hho_eigvals);
 
-        silo_db.add_mesh(msh, "solmesh");
+        std::stringstream ss;
+        ss << "solmesh_" << msh.cells_size();
+        std::string mesh_name = ss.str();
+        silo_db.add_mesh(msh, mesh_name.c_str());
         for (size_t i = 0; i < fep.eigvals_found; i++)
         {
             std::vector<T> solution_vals;
@@ -318,10 +323,10 @@ class hierarchical_eigval_solver
                 solution_vals.at(i) = gx(i*num_cell_dofs);
 
             std::stringstream ss;
-            ss << "u" << i;
+            ss << "u_" << msh.cells_size() << "_" << i;
 
             disk::silo_zonal_variable<T> u(ss.str(), solution_vals);
-            silo_db.add_variable("solmesh", u);
+            silo_db.add_variable(mesh_name.c_str(), u);
         }
 
         std::string fname = "sol_eigenvalues.txt";
@@ -361,7 +366,8 @@ class hierarchical_eigval_solver
 
         hierarchy_levels    = lua["hs"]["levels"].get_or(4);
         which_eigvec        = lua["hs"]["eigvec"].get_or(0);
-        which_level         = lua["hs"]["sol_level"].get_or(0);
+        sol_level_min       = lua["hs"]["sol_level_min"].get_or(0);
+        sol_level_max       = lua["hs"]["sol_level_max"].get_or(0);
         stab_weight         = lua["hs"]["stab_weight"].get_or(1);
 
 
@@ -410,22 +416,15 @@ public:
 		init(config_fn);
 	}
 
-    void
-    run_computations()
+    void run_hho(size_t degree, size_t level,
+                 const disk::simplicial_mesh<T,2>& ref_msh,
+                 const disk::simplicial_mesh<T,2>& sol_msh)
     {
         using namespace revolution;
 
-        auto ref_msh = mesh_hier.finest_mesh();
-        auto sol_msh = *std::next(mesh_hier.meshes_begin(), which_level);
-
-        std::string visit_output_filename = "hier_eigs.silo";
-        silo_db.create(visit_output_filename);
-        std::cout << green << "Reference solution, FEM" << reset << std::endl;
-        std::cout << "Mesh size: " << mesh_h(ref_msh) << std::endl;
-        cfem_eigenvalue_solver(ref_msh);
         std::cout << green << "Computed solution, HHO" << reset << std::endl;
         std::cout << "Mesh size: " << mesh_h(sol_msh) << std::endl;
-        hho_eigenvalue_solver(sol_msh, hho_degree);
+        hho_eigenvalue_solver(sol_msh, degree);
 
 
 
@@ -435,8 +434,8 @@ public:
         hho_grad_x.reserve( ref_msh.cells_size() );
         hho_grad_y.reserve( ref_msh.cells_size() );
 
-        size_t num_cell_dofs = scalar_basis_size(hho_degree, 2);
-        size_t num_face_dofs = scalar_basis_size(hho_degree, 1);
+        size_t num_cell_dofs = scalar_basis_size(degree, 2);
+        size_t num_face_dofs = scalar_basis_size(degree, 1);
 
         auto exp_sol_size = num_cell_dofs * sol_msh.cells_size() +
                             num_face_dofs * sol_msh.faces_size();
@@ -464,7 +463,7 @@ public:
         size_t sol_cell_i = 0;
         for (auto& sol_cl : sol_msh)
         {
-            hho_degree_info hdi(hho_degree);
+            hho_degree_info hdi(degree);
             auto gr = make_hho_scalar_laplacian(sol_msh, sol_cl, hdi);
 
             dynamic_vector<T> hho_evec = dynamic_vector<T>::Zero(num_cell_dofs + 3*num_face_dofs);
@@ -505,13 +504,13 @@ public:
 
             /* find parent cell */
             auto bar = barycenter(ref_msh, ref_cl);
-            size_t sol_cl_ofs = mesh_hier.locate_point(bar, which_level);
+            size_t sol_cl_ofs = mesh_hier.locate_point(bar, level);
             auto sol_cl = *std::next(sol_msh.cells_begin(), sol_cl_ofs);
 
             dynamic_vector<T> rec_sol = rec_sols.at(sol_cl_ofs);
 
-            auto sol_cb = make_scalar_monomial_basis(sol_msh, sol_cl, hho_degree+1);
-            auto qps = integrate(ref_msh, ref_cl, hho_degree+2);
+            auto sol_cb = make_scalar_monomial_basis(sol_msh, sol_cl, degree+1);
+            auto qps = integrate(ref_msh, ref_cl, degree+2);
             for (auto& qp : qps)
             {
                 auto hho_dphi = sol_cb.eval_gradients(qp.point());
@@ -553,6 +552,24 @@ public:
 
         std::cout << "H1 error: " << std::sqrt(H1_error) << std::endl;
         std::cout << "H1 error: " << std::sqrt(H1_ierror) << std::endl;
+    }
+
+    void
+    run_computations()
+    {
+        auto ref_msh = mesh_hier.finest_mesh();
+
+        std::string visit_output_filename = "hier_eigs.silo";
+        silo_db.create(visit_output_filename);
+        std::cout << green << "Reference solution, FEM" << reset << std::endl;
+        std::cout << "Mesh size: " << mesh_h(ref_msh) << std::endl;
+        cfem_eigenvalue_solver(ref_msh);
+
+        for (size_t level = sol_level_min; level <= sol_level_max; level++)
+        {
+            auto sol_msh = *std::next(mesh_hier.meshes_begin(), level);
+            run_hho(hho_degree, level, ref_msh, sol_msh);
+        }
 
         silo_db.close();
     }
