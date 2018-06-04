@@ -149,20 +149,26 @@ class plasticity
 
         const vector_type GsT_uTF = GsT * uTF;
 
+        std::cout << "ET: " << GsT.norm() << std::endl;
+        std::cout << GsT << std::endl;
+
         auto& law_quadpoints = law.getQPs();
 
         auto gb = revolution::make_sym_matrix_monomial_basis(m_msh, cl, grad_degree);
 
+        std::cout << "nb: " << law_quadpoints.size() << std::endl;
         for (auto& qp : law_quadpoints)
         {
-
+            std::cout << "qp: " << qp.point() << std::endl;
             const auto gphi = gb.eval_functions(qp.point());
 
             assert(gphi.size() == grad_basis_size);
 
             // Compute local gradient and norm
+            //std::cout << "GT_utf: " << GsT_uTF << std::endl;
             const auto GsT_iqn     = revolution::eval(GsT_uTF, gphi);
             const gvt  incr_strain = GsT_iqn - qp.getTotalStrainPrev();
+            std::cout << incr_strain << std::endl;
 
             // Compute bahavior
             tc.tic();
@@ -170,9 +176,14 @@ class plasticity
             tc.toc();
             time_law += tc.to_double();
 
+            std::cout << "module " << tensor_behavior.second << std::endl;
+
             for (int j = 0; j < grad_basis_size; j++)
             {
                 const gvt Agphi_j = qp.weight() * disk::tm_prod(tensor_behavior.second, gphi[j]);
+                // std::cout << j << std::endl;
+                // std::cout << gphi[j] << std::endl;
+                // std::cout << Agphi_j << std::endl;
                 for (int i = 0; i <= j; i += dim_dofs)
                 {
                     // compute (Gkt v, A(u) : Gkt du)
@@ -227,9 +238,17 @@ class plasticity
             for (int i = j; i < grad_basis_size; i++)
                 AT(i, j) = AT(j, i);
 
+        std::cout << "AT: " << AT.norm() << std::endl;
+        std::cout << AT << std::endl;
+        std::cout << "at: " << aT.norm() << std::endl;
+
         K_int = GsT.transpose() * AT * GsT;
         F_int = GsT.transpose() * aT;
         RTF -= F_int;
+
+        std::cout << "K: " << K_int.norm() << std::endl;
+        std::cout << K_int << std::endl;
+        std::cout << "F: " << F_int.norm() << std::endl;
 
         assert(K_int.rows() == num_total_dofs);
         assert(K_int.cols() == num_total_dofs);

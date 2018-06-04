@@ -76,9 +76,11 @@ run_plasticity_solver(const Mesh<T, 2, Storage>&        msh,
     auto zero = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
 
     auto trac = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0.1125}; };
+    auto depltest = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 10}; };
 
     bnd.addDirichletBC(disk::mechanics::CLAMPED, 3, zero);
-    bnd.addNeumannBC(disk::mechanics::NEUMANN, 8, trac);
+    //bnd.addNeumannBC(disk::mechanics::NEUMANN, 8, trac);
+    bnd.addDirichletBC(disk::mechanics::DY, 8, depltest);
 
     plasticity_solver<mesh_type> nl(msh, bnd, rp, material_data);
 
@@ -122,8 +124,9 @@ run_plasticity_solver(const Mesh<T, 2, Storage>&        msh,
         std::cout << "energy mechanic: " << nl.energy_mechanic() << std::endl;
     }
 
+    nl.printSolutionCell();
     nl.compute_discontinuous_displacement("depl2D_disc.msh");
-    nl.compute_continuous_displacement("depl2D_const.msh");
+    nl.compute_continuous_displacement("depl2D_cont.msh");
     nl.compute_discontinuous_stress("stress2D_disc.msh");
     nl.compute_continuous_stress("stress2D_cont.msh");
     nl.compute_stress_GP("stress2D_GP.msh");
@@ -241,7 +244,7 @@ run_plasticity_solver(const Mesh<T, 3, Storage>&        msh,
     }
 
     nl.compute_discontinuous_displacement("depl3D_disc.msh");
-    nl.compute_continuous_displacement("depl3D_const.msh");
+    nl.compute_continuous_displacement("depl3D_cont.msh");
     nl.compute_discontinuous_stress("stress3D_disc.msh");
     nl.compute_continuous_stress("stress3D_cont.msh");
     nl.compute_stress_GP("stress3D_GP.msh");
@@ -280,17 +283,17 @@ main(int argc, char** argv)
 
     //    material_data.sigma_y0 = 400;
 
-    // Cook Parameters (mm, GPa, kN)
-    RealType E  = 70;
-    RealType nu = 0.4999;
+    // // Cook Parameters (mm, GPa, kN)
+    // RealType E  = 70;
+    // RealType nu = 0.4999;
 
-    material_data.mu     = material_data.converttomu(E, nu);
-    material_data.lambda = material_data.converttolambda(E, nu);
+    // material_data.mu     = material_data.converttomu(E, nu);
+    // material_data.lambda = material_data.converttolambda(E, nu);
 
-    material_data.K = 0.0;
-    material_data.H = 0.135;
+    // material_data.K = 0.0;
+    // material_data.H = 0.135;
 
-    material_data.sigma_y0 = 0.243;
+    // material_data.sigma_y0 = 0.243;
 
     //    // Sphere Parameters (mm, GPa, kN)
     // RealType E  = 210000;
@@ -329,6 +332,18 @@ main(int argc, char** argv)
     //    material_data.H = material_data.converttoH(E, ET, material_data.K);
 
     //    material_data.sigma_y0 = 150;
+
+    // Test aster Parameters (mm, GPa, kN)
+    RealType E  = 70;
+    RealType nu = 0.4999;
+
+    material_data.mu     = material_data.converttomu(E, nu);
+    material_data.lambda = material_data.converttolambda(E, nu);
+
+    material_data.K = 0.0;
+    material_data.H = 70;
+
+    material_data.sigma_y0 = 10E6;
 
     int ch;
 
