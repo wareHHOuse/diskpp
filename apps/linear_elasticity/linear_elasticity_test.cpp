@@ -43,8 +43,8 @@
 
 struct error_type
 {
-    size_t degree;
-    size_t nb_dof;
+    int degree;
+    int nb_dof;
     double h;
     double error_depl;
     double error_stress;
@@ -52,7 +52,7 @@ struct error_type
 
 struct run_params
 {
-    size_t degree;
+    int degree;
     int    l;
     bool   verbose;
 };
@@ -286,7 +286,7 @@ printResults(const std::vector<error_type>& error)
                   << "     -     "
                   << " | " << s_dof << " |" << std::endl;
 
-        for (size_t i = 1; i < error.size(); i++)
+        for (int i = 1; i < error.size(); i++)
         {
             s_dof = " " + std::to_string(error[i].nb_dof) + "                  ";
             s_dof.resize(10);
@@ -311,7 +311,7 @@ template<typename T>
 void
 test_triangles_fvca5(const run_params& rp, const ElasticityParameters material_data)
 {
-    size_t runs = 4;
+    int runs = 4;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_1.typ1");
@@ -322,7 +322,7 @@ test_triangles_fvca5(const run_params& rp, const ElasticityParameters material_d
 
     std::vector<error_type> error_sumup;
 
-    for (size_t i = 0; i < runs; i++)
+    for (int i = 0; i < runs; i++)
     {
         auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
         error_sumup.push_back(run_linear_elasticity_solver(msh, rp, material_data));
@@ -334,7 +334,7 @@ template<typename T>
 void
 test_triangles_netgen(const run_params& rp, const ElasticityParameters material_data)
 {
-    size_t runs = 4;
+    int runs = 4;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri01.mesh2d");
@@ -345,7 +345,7 @@ test_triangles_netgen(const run_params& rp, const ElasticityParameters material_
 
     std::vector<error_type> error_sumup;
 
-    for (size_t i = 0; i < runs; i++)
+    for (int i = 0; i < runs; i++)
     {
         auto msh = disk::load_netgen_2d_mesh<T>(paths[i].c_str());
         error_sumup.push_back(run_linear_elasticity_solver(msh, rp, material_data));
@@ -357,7 +357,7 @@ template<typename T>
 void
 test_hexagons(const run_params& rp, const ElasticityParameters material_data)
 {
-    size_t runs = 5;
+    int runs = 5;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_1.typ1");
@@ -368,7 +368,7 @@ test_hexagons(const run_params& rp, const ElasticityParameters material_data)
 
     std::vector<error_type> error_sumup;
 
-    for (size_t i = 0; i < runs; i++)
+    for (int i = 0; i < runs; i++)
     {
         auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
         error_sumup.push_back(run_linear_elasticity_solver(msh, rp, material_data));
@@ -380,7 +380,7 @@ template<typename T>
 void
 test_kershaws(const run_params& rp, const ElasticityParameters material_data)
 {
-    size_t runs = 5;
+    int runs = 5;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_1.typ1");
@@ -391,7 +391,7 @@ test_kershaws(const run_params& rp, const ElasticityParameters material_data)
 
     std::vector<error_type> error_sumup;
 
-    for (size_t i = 0; i < runs; i++)
+    for (int i = 0; i < runs; i++)
     {
         auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
         error_sumup.push_back(run_linear_elasticity_solver(msh, rp, material_data));
@@ -403,7 +403,7 @@ template<typename T>
 void
 test_quads_fvca5(const run_params& rp, const ElasticityParameters material_data)
 {
-    size_t runs = 5;
+    int runs = 5;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_1.typ1");
@@ -414,7 +414,7 @@ test_quads_fvca5(const run_params& rp, const ElasticityParameters material_data)
 
     std::vector<error_type> error_sumup;
 
-    for (size_t i = 0; i < runs; i++)
+    for (int i = 0; i < runs; i++)
     {
         auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
         error_sumup.push_back(run_linear_elasticity_solver(msh, rp, material_data));
@@ -426,7 +426,7 @@ template<typename T>
 void
 test_quads_diskpp(const run_params& rp, const ElasticityParameters material_data)
 {
-    size_t runs = 4;
+    int runs = 4;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-4-4.quad");
@@ -437,7 +437,7 @@ test_quads_diskpp(const run_params& rp, const ElasticityParameters material_data
 
     std::vector<error_type> error_sumup;
 
-    for (size_t i = 0; i < runs; i++)
+    for (int i = 0; i < runs; i++)
     {
         auto msh = disk::load_cartesian_2d_mesh<T>(paths[i].c_str());
         error_sumup.push_back(run_linear_elasticity_solver(msh, rp, material_data));
@@ -449,7 +449,7 @@ template<typename T>
 void
 test_hexahedra_diskpp(const run_params& rp, const ElasticityParameters material_data)
 {
-    size_t runs = 4;
+    int runs = 4;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-2-2-2.hex");
@@ -472,7 +472,7 @@ template<typename T>
 void
 test_hexahedra_fvca6(const run_params& rp, const ElasticityParameters material_data)
 {
-    size_t runs = 4;
+    int runs = 4;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/3D_hexa/fvca6/hexa_2x2x2.msh");
@@ -495,7 +495,7 @@ template<typename T>
 void
 test_tetrahedra_netgen(const run_params& rp, const ElasticityParameters material_data)
 {
-    size_t runs = 4;
+    int runs = 4;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/3D_tetras/netgen/fvca6_tet0.mesh");
@@ -518,7 +518,7 @@ template<typename T>
 void
 test_polyhedra_fvca6(const run_params& rp, const ElasticityParameters material_data)
 {
-    size_t runs = 3;
+    int runs = 3;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_10.msh");
@@ -540,7 +540,7 @@ template<typename T>
 void
 test_tetrahedra_fvca6(const run_params& rp, const ElasticityParameters material_data)
 {
-    size_t runs = 4;
+    int runs = 4;
 
     std::vector<std::string> paths;
     paths.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.0.msh");
@@ -566,7 +566,7 @@ main(int argc, char** argv)
 
     int    degree = 1;
     int    l      = 0;
-    size_t dim    = 2;
+    int dim    = 2;
 
     run_params rp;
     rp.degree  = 1;
@@ -637,26 +637,26 @@ main(int argc, char** argv)
         std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
         std::cout << " " << std::endl;
 
-        tc.tic();
-        std::cout << "-Tetrahedras netgen:" << std::endl;
-        test_tetrahedra_netgen<RealType>(rp, material_data);
-        tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-        std::cout << " " << std::endl;
+        // tc.tic();
+        // std::cout << "-Tetrahedras netgen:" << std::endl;
+        // test_tetrahedra_netgen<RealType>(rp, material_data);
+        // tc.toc();
+        // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        // std::cout << " " << std::endl;
 
-        tc.tic();
-        std::cout << "-Hexahedras fvca6:" << std::endl;
-        test_hexahedra_fvca6<RealType>(rp, material_data);
-        tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-        std::cout << " " << std::endl;
+        // tc.tic();
+        // std::cout << "-Hexahedras fvca6:" << std::endl;
+        // test_hexahedra_fvca6<RealType>(rp, material_data);
+        // tc.toc();
+        // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        // std::cout << " " << std::endl;
 
-        tc.tic();
-        std::cout << "-Hexahedras diskpp:" << std::endl;
-        test_hexahedra_diskpp<RealType>(rp, material_data);
-        tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-        std::cout << " " << std::endl;
+        // tc.tic();
+        // std::cout << "-Hexahedras diskpp:" << std::endl;
+        // test_hexahedra_diskpp<RealType>(rp, material_data);
+        // tc.toc();
+        // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        // std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Polyhedra:" << std::endl;

@@ -108,7 +108,7 @@ class linear_elasticity_solver
     linear_elasticity_solver(const mesh_type&           msh,
                              const bnd_type&            bnd,
                              const ElasticityParameters data,
-                             size_t                     degree,
+                             int                        degree,
                              int                        l = 0) :
       m_msh(msh),
       m_verbose(false), m_bnd(bnd)
@@ -182,6 +182,7 @@ class linear_elasticity_solver
         {
             tc.tic();
             const auto sgr = make_hho_vector_symmetric_laplacian(m_msh, cl, m_hdi);
+            const auto sg  = make_hho_sym_gradrec_matrix(m_msh, cl, m_hdi);
             tc.toc();
             ai.time_gradrec += tc.to_double();
 
@@ -194,7 +195,8 @@ class linear_elasticity_solver
             matrix_dynamic stab;
             if (m_hdi.cell_degree() == (m_hdi.face_degree() + 1))
             {
-                stab = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
+                //stab = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
+                stab = make_hho_vector_stabilization(m_msh, cl, sgr.first, m_hdi);
             }
             else
             {
@@ -205,9 +207,9 @@ class linear_elasticity_solver
 
             tc.tic();
             auto                 cb       = revolution::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
-            const auto           cell_rhs = make_rhs(m_msh, cl, cb, lf, 5);
+            const auto           cell_rhs = make_rhs(m_msh, cl, cb, lf, 1);
             const matrix_dynamic loc =
-              2.0 * m_elas_parameters.mu * (sgr.second + stab) + m_elas_parameters.lambda * dr.second;
+              2.0 * m_elas_parameters.mu * (sg.second + stab) + m_elas_parameters.lambda * dr.second;
             const auto scnp = statcond.compute(m_msh, cl, loc, cell_rhs, m_hdi);
 
             m_AL.push_back(statcond.AL);
@@ -259,8 +261,8 @@ class linear_elasticity_solver
     postprocess_info
     postprocess(const LoadFunction& lf)
     {
-        const size_t fbs = revolution::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
-        const size_t cbs = revolution::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
+        const auto   fbs = revolution::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
+        const auto   cbs = revolution::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
 
         postprocess_info pi;
 
@@ -320,7 +322,7 @@ class linear_elasticity_solver
         {
             const auto x = m_solution_data.at(cell_i++);
 
-            const vector_dynamic true_dof = revolution::project_function(m_msh, cl, m_hdi.cell_degree(), as, 2 * di);
+            const vector_dynamic true_dof = revolution::project_function(m_msh, cl, m_hdi.cell_degree(), as, di);
 
             auto                 cb   = revolution::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
             const matrix_dynamic mass = revolution::make_mass_matrix(m_msh, cl, cb);
