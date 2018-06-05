@@ -208,11 +208,15 @@ public:
         int nzones = msh.cells_size();
         int ndims = 2;
 
-        DBPutZonelist(m_siloDb, "zonelist", nzones, ndims, nodelist.data(), lnodelist,
-            1, shapesize, shapecounts, nshapetypes);
+        std::stringstream zlname;
+        zlname << "zonelist_" << name;
+        std::string zonelist_name = zlname.str();
 
-        DBPutUcdmesh(m_siloDb, "mesh", ndims, NULL, coords, nnodes, nzones,
-            "zonelist", NULL, DB_DOUBLE, NULL);
+        DBPutZonelist(m_siloDb, zonelist_name.c_str(), nzones, ndims,
+            nodelist.data(), lnodelist, 1, shapesize, shapecounts, nshapetypes);
+
+        DBPutUcdmesh(m_siloDb, name.c_str(), ndims, NULL, coords, nnodes, nzones,
+            zonelist_name.c_str(), NULL, DB_DOUBLE, NULL);
 
         return true;
     }
@@ -256,11 +260,15 @@ public:
         int nzones = msh.cells_size();
         int ndims = 2;
 
-        DBPutZonelist(m_siloDb, "zonelist", nzones, ndims, nodelist.data(), lnodelist,
-            1, shapesize, shapecounts, nshapetypes);
+        std::stringstream zlname;
+        zlname << "zonelist_" << name;
+        std::string zonelist_name = zlname.str();
 
-        DBPutUcdmesh(m_siloDb, "mesh", ndims, NULL, coords, nnodes, nzones,
-            "zonelist", NULL, DB_DOUBLE, NULL);
+        DBPutZonelist(m_siloDb, zonelist_name.c_str(), nzones, ndims,
+                      nodelist.data(), lnodelist, 1, shapesize, shapecounts, nshapetypes);
+
+        DBPutUcdmesh(m_siloDb, name.c_str(), ndims, NULL, coords, nnodes, nzones,
+            zonelist_name.c_str(), NULL, DB_DOUBLE, NULL);
 
         return true;
     }
@@ -287,7 +295,6 @@ public:
 
         for (auto& cl : msh)
         {
-            std::cout << cl << std::endl;
             auto ptids = cl.point_ids();
             auto size = ptids.size();
             assert(size > 2);
@@ -310,11 +317,15 @@ public:
         int nzones = msh.cells_size();
         int ndims = 2;
 
-        DBPutZonelist(m_siloDb, "zonelist", nzones, ndims, nodelist.data(), lnodelist,
-            1, shapesize.data(), shapecount.data(), nshapetypes);
+        std::stringstream zlname;
+        zlname << "zonelist_" << name;
+        std::string zonelist_name = zlname.str();
+
+        DBPutZonelist(m_siloDb, zonelist_name.c_str(), nzones, ndims,
+            nodelist.data(), lnodelist, 1, shapesize.data(), shapecount.data(), nshapetypes);
 
         DBPutUcdmesh(m_siloDb, name.c_str(), ndims, NULL, coords, nnodes, nzones,
-            "zonelist", NULL, DB_DOUBLE, NULL);
+            zonelist_name.c_str(), NULL, DB_DOUBLE, NULL);
 
         return true;
     }
