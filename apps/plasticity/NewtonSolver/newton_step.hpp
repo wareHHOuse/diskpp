@@ -212,7 +212,7 @@ class NewtonRaphson_step_plasticity
                         case HHO:
                         {
                             const auto recons   = make_hho_vector_symmetric_laplacian(m_msh, cl, m_hdi);
-                            const auto stab_HHO = make_hho_fancy_stabilization_vector(m_msh, cl, recons.first, m_hdi);
+                            const auto stab_HHO = make_hho_vector_stabilization(m_msh, cl, recons.first, m_hdi);
                             assert(elem.K_int.rows() == stab_HHO.rows());
                             assert(elem.K_int.cols() == stab_HHO.cols());
                             assert(elem.RTF.rows() == (stab_HHO * m_solution_data.at(cell_i)).rows());
@@ -222,18 +222,17 @@ class NewtonRaphson_step_plasticity
                             rhs -= m_rp.m_beta * stab_HHO * m_solution_data.at(cell_i);
                             break;
                         }
-                        // case HDG: {
-                        //    stab_HDG.compute(m_msh, cl);
-                        //    assert(elem.K_int.rows() == stab_HDG.data.rows());
-                        //    assert(elem.K_int.cols() == stab_HDG.data.cols());
-                        //    assert(elem.RTF.rows() == (stab_HDG.data *
-                        //    m_solution_data.at(cell_i)).rows()); assert(elem.RTF.cols() ==
-                        //    (stab_HDG.data * m_solution_data.at(cell_i)).cols());
+                        case HDG: {
+                            const auto stab_HDG = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
+                            assert(elem.K_int.rows() == stab_HDG.rows());
+                            assert(elem.K_int.cols() == stab_HDG.cols());
+                            assert(elem.RTF.rows() == (stab_HDG * m_solution_data.at(cell_i)).rows());
+                            assert(elem.RTF.cols() == (stab_HDG * m_solution_data.at(cell_i)).cols());
 
-                        //    lhs += m_rp.m_beta * stab_HDG.data;
-                        //    rhs -= m_rp.m_beta * stab_HDG.data * m_solution_data.at(cell_i);
-                        //    break;
-                        // }
+                            lhs += m_rp.m_beta * stab_HDG;
+                            rhs -= m_rp.m_beta * stab_HDG * m_solution_data.at(cell_i);
+                            break;
+                        }
                         case NO: { break;
                         }
                         default: throw std::invalid_argument("Unknown stabilization");

@@ -188,7 +188,7 @@ class linear_elasticity_solver
          ai.time_divrec += tc.to_double();
 
          tc.tic();
-         const auto stab = make_hho_fancy_stabilization_vector(m_msh, cl, sgr.first, m_hdi);
+         const auto stab = make_hho_vector_stabilization(m_msh, cl, sgr.first, m_hdi);
          tc.toc();
          ai.time_stab += tc.to_double();
 
