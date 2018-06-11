@@ -443,8 +443,6 @@ integrate_2D_face(const Mesh<T,2,Storage>& msh,
     auto qps = proton::edge_quadrature<T>(degree);
     auto pts = points(msh, fc);
 
-    assert(pt.size() == 2);
-
     auto scale = (pts[1] - pts[0]);
     auto meas = scale.to_vector().norm();
 
