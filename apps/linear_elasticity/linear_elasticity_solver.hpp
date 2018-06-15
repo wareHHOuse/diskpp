@@ -217,7 +217,7 @@ class linear_elasticity_solver
             tc.toc();
             ai.time_statcond += tc.to_double();
 
-            m_assembler.assemble(m_msh, cl, m_bnd, scnp);
+            m_assembler.assemble(m_msh, cl, m_bnd, scnp, 2);
         }
 
         m_assembler.impose_neumann_boundary_conditions(m_msh, m_bnd);
@@ -268,7 +268,7 @@ class linear_elasticity_solver
 
         m_solution_data.reserve(m_msh.cells_size());
 
-        const auto solF = m_assembler.expand_solution(m_msh, m_bnd, m_system_solution);
+        const auto solF = m_assembler.expand_solution(m_msh, m_bnd, m_system_solution, 2);
 
         timecounter tc;
         tc.tic();
@@ -357,7 +357,7 @@ class linear_elasticity_solver
             const vector_dynamic divu = dr.first * x;
 
             auto cbas_v = revolution::make_vector_monomial_basis(m_msh, cl, rec_degree);
-            auto cbas_s = revolution::make_scalar_monomial_basis(m_msh, cl, cell_degree);
+            auto cbas_s = revolution::make_scalar_monomial_basis(m_msh, cl, face_degree);
 
             auto qps = revolution::integrate(m_msh, cl, 2 * rec_degree);
             for (auto& qp : qps)

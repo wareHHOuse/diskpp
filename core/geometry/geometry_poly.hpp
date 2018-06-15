@@ -167,13 +167,10 @@ measure(const Mesh& msh, const triangle<CODIM, UserData>& t)
 
     if (Mesh::dimension == 2)
         return std::abs( (v1(0)*v2(1) - v2(0)*v1(1)) / 2.0 );
-#if 0
-    if (DIM == 3)
-        return std::abs( (v1.cross(v2)).norm() / 2.0 );
-#endif
-
-    if (Mesh::dimension > 2)
+    else if (Mesh::dimension > 2)
         return v1.norm() * v2.norm() / 2.0;
+    else
+        throw std::logic_error("invalid dimension");
 }
 
 template<typename Mesh, size_t CODIM, typename UserData>
@@ -214,6 +211,7 @@ faces(const Mesh& msh,
                                    polytope_traits<typename Mesh::cell_type>::storage_size>;
 
     return_type ret;
+    throw std::logic_error("You should not be here");
 
     return ret;
 }
@@ -224,7 +222,7 @@ faces(const Mesh& msh,
         typename std::enable_if<!is_fixed_storage<typename Mesh::cell_type>::value,
                                 const typename Mesh::cell_type>::type& cl)
 {
-
+    throw std::logic_error("You should not be here");
 }
 
 } //namespace mesh_v2

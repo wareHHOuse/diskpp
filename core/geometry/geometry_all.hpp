@@ -112,7 +112,7 @@ template<typename Mesh, typename Element>
 typename Mesh::scalar_type
 diameter(const Mesh& msh, const Element& elem)
 {
-    auto pts = points(msh, elem);
+    const auto pts = points(msh, elem);
 
     typename Mesh::scalar_type diam = 0.;
 
@@ -156,7 +156,7 @@ has_faces_on_boundary(const Mesh& msh, const typename Mesh::cell& cl)
     bool has_bnd = false;
     for (auto& fc : fcs)
         if ( msh.is_boundary(fc) )
-            has_bnd = true;
+            return true;
 
     return has_bnd;
 }

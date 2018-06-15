@@ -723,10 +723,11 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
 
     const auto celdeg = di.cell_degree();
     const auto facdeg = di.face_degree();
+    const auto recdeg = di.face_degree();
 
-    auto cbas_s = make_scalar_monomial_basis(msh, cl, celdeg);
+    auto cbas_s = make_scalar_monomial_basis(msh, cl, recdeg);
 
-    const auto rbs = scalar_basis_size(celdeg, Mesh::dimension);
+    const auto rbs = scalar_basis_size(recdeg, Mesh::dimension);
     const auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
     const auto fbs = vector_basis_size(facdeg, Mesh::dimension - 1, Mesh::dimension);
 
@@ -753,11 +754,12 @@ make_hho_divergence_reconstruction_stokes_rhs(const Mesh& msh, const typename Me
 
     const auto celdeg = di.cell_degree();
     const auto facdeg = di.face_degree();
+    const auto recdeg = di.face_degree();
 
     const auto cbas_v = make_vector_monomial_basis(msh, cl, celdeg);
-    const auto cbas_s = make_scalar_monomial_basis(msh, cl, celdeg);
+    const auto cbas_s = make_scalar_monomial_basis(msh, cl, recdeg);
 
-    const auto rbs = scalar_basis_size(celdeg, Mesh::dimension);
+    const auto rbs = scalar_basis_size(recdeg, Mesh::dimension);
     const auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
     const auto fbs = vector_basis_size(facdeg, Mesh::dimension - 1, Mesh::dimension);
 
@@ -765,7 +767,7 @@ make_hho_divergence_reconstruction_stokes_rhs(const Mesh& msh, const typename Me
 
     Matrix<T, Dynamic, Dynamic> dr_rhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs, cbs + num_faces*fbs);
 
-    const auto qps = integrate(msh, cl, std::max(2 * int(celdeg) - 1, 0));
+    const auto qps = integrate(msh, cl, std::max(int(celdeg) + int(recdeg) - 1, 0));
     for (auto& qp : qps)
     {
         const auto s_dphi = cbas_s.eval_gradients(qp.point());
@@ -781,7 +783,7 @@ make_hho_divergence_reconstruction_stokes_rhs(const Mesh& msh, const typename Me
         const auto n      = normal(msh, cl, fc);
         const auto fbas_v = make_vector_monomial_basis(msh, fc, facdeg);
 
-        const auto qps_f = integrate(msh, fc, facdeg + celdeg);
+        const auto qps_f = integrate(msh, fc, facdeg + recdeg);
         for (auto& qp : qps_f)
         {
             const auto s_phi = cbas_s.eval_functions(qp.point());
@@ -1106,6 +1108,8 @@ make_hho_scalar_stabilization(const Mesh&                                       
     const matrix_type M2    = mass_mat.block(0, 1, cbs, rbs - 1);
     matrix_type       proj1 = -M1.llt().solve(M2 * reconstruction);
 
+    assert(M2.cols() == reconstruction.rows());
+
     // Step 2: v_T - \pi_T^k p_T^k v (first term minus third term)
     proj1.block(0, 0, cbs, cbs) += matrix_type::Identity(cbs, cbs);
 
@@ -1271,6 +1275,8 @@ make_hho_vector_stabilization(const Mesh&                                       
     const matrix_type M1    = mass_mat.block(0, 0, cbs, cbs);
     const matrix_type M2    = mass_mat.block(0, N, cbs, rbs - N);
     matrix_type       proj1 = -M1.llt().solve(M2 * reconstruction);
+
+    assert(M2.cols() == reconstruction.rows());
 
     // Step 2: v_T - \pi_T^k p_T^k v (first term minus third term)
     proj1.block(0, 0, cbs, cbs) += matrix_type::Identity(cbs, cbs);
@@ -2482,7 +2488,7 @@ class assembler_mechanics
 
    template<typename LocalContrib>
    void
-   assemble(const mesh_type& msh, const cell_type& cl, const bnd_type& bnd, const LocalContrib& lc)
+   assemble(const mesh_type& msh, const cell_type& cl, const bnd_type& bnd, const LocalContrib& lc, int di = 0)
    {
       const size_t      face_degree   = m_hdi.face_degree();
       const auto        num_face_dofs = vector_basis_size(face_degree, dimension - 1, dimension);
@@ -2512,7 +2518,7 @@ class assembler_mechanics
             size_t ind_sol = 0;
 
             vector_type proj_bcf =
-              project_function(msh, fc, face_degree, bnd.dirichlet_boundary_func(face_id));
+              project_function(msh, fc, face_degree, bnd.dirichlet_boundary_func(face_id), di);
 
             bool ind_ok = false;
             for (size_t face_j = 0; face_j < fcs.size(); face_j++) {
@@ -2698,7 +2704,7 @@ class assembler_mechanics
    }
 
    vector_type
-   expand_solution(const mesh_type& msh, const bnd_type& bnd, const vector_type& solution)
+   expand_solution(const mesh_type& msh, const bnd_type& bnd, const vector_type& solution, int di = 0)
    {
       assert(solution.size() == m_num_unknowns);
       const auto face_degree   = m_hdi.face_degree();
@@ -2719,7 +2725,7 @@ class assembler_mechanics
             size_t sol_ind = 0;
 
             const vector_type proj_bcf =
-              project_function(msh, bfc, face_degree, bnd.dirichlet_boundary_func(face_id));
+              project_function(msh, bfc, face_degree, bnd.dirichlet_boundary_func(face_id), di);
 
             assert(proj_bcf.size() == num_face_dofs);
 
@@ -2810,7 +2816,8 @@ class assembler_mechanics
                const cell_type&                cl,
                const bnd_type&                 bnd,
                const LocalContrib&             lc,
-               const std::vector<vector_type>& sol_F)
+               const std::vector<vector_type>& sol_F,
+               int di = 0)
    {
       assert(sol_F.size() == msh.faces_size());
       const size_t      face_degree   = m_hdi.face_degree();
@@ -2841,7 +2848,7 @@ class assembler_mechanics
             size_t ind_sol = 0;
 
             const vector_type proj_bcf =
-              project_function(msh, fc, face_degree, bnd.dirichlet_boundary_func(face_id));
+              project_function(msh, fc, face_degree, bnd.dirichlet_boundary_func(face_id), di);
             assert(proj_bcf.size() == sol_F[face_id].size());
 
             vector_type incr   = proj_bcf - sol_F[face_id];
@@ -3031,7 +3038,8 @@ class assembler_mechanics
    expand_solution_nl(const mesh_type&                msh,
                       const bnd_type&                 bnd,
                       const vector_type&              solution,
-                      const std::vector<vector_type>& sol_F)
+                      const std::vector<vector_type>& sol_F,
+                      int di = 0)
    {
       assert(solution.size() == m_num_unknowns);
       assert(sol_F.size() == msh.faces_size());
@@ -3053,7 +3061,7 @@ class assembler_mechanics
             size_t sol_ind = 0;
 
             const vector_type proj_bcf =
-              project_function(msh, bfc, face_degree, bnd.dirichlet_boundary_func(face_id));
+              project_function(msh, bfc, face_degree, bnd.dirichlet_boundary_func(face_id), di);
             vector_type incr = proj_bcf - sol_F[face_id];
             assert(proj_bcf.size() == num_face_dofs);
 
