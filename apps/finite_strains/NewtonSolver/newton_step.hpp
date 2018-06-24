@@ -33,8 +33,8 @@
 
 #include "../Informations.hpp"
 #include "../Parameters.hpp"
+#include "finite_strains_elementary_computation.hpp"
 #include "mechanics/BoundaryConditions.hpp"
-#include "plasticity_elementary_computation.hpp"
 #include "revolution/bases"
 #include "revolution/methods/hho"
 #include "revolution/quadratures"
@@ -50,7 +50,7 @@ namespace NLE
 {
 
 template<typename MeshType>
-class NewtonRaphson_step_plasticity
+class NewtonRaphson_step_finite_strains
 {
     typedef MeshType                                       mesh_type;
     typedef typename mesh_type::scalar_type                scalar_type;
@@ -65,7 +65,7 @@ class NewtonRaphson_step_plasticity
 
     typedef revolution::assembler_mechanics<mesh_type> assembler_type;
 
-    typedef plasticity<mesh_type> elem_type;
+    typedef finite_strains<mesh_type> elem_type;
 
     vector_dynamic m_system_solution;
 
@@ -86,10 +86,10 @@ class NewtonRaphson_step_plasticity
     bool m_verbose;
 
   public:
-    NewtonRaphson_step_plasticity(const mesh_type&  msh,
-                                  const hdi_type&   hdi,
-                                  const bnd_type&   bnd,
-                                  const param_type& rp) :
+    NewtonRaphson_step_finite_strains(const mesh_type&  msh,
+                                      const hdi_type&   hdi,
+                                      const bnd_type&   bnd,
+                                      const param_type& rp) :
       m_msh(msh),
       m_verbose(rp.m_verbose), m_rp(rp), m_hdi(hdi), m_bnd(bnd)
     {
@@ -166,7 +166,7 @@ class NewtonRaphson_step_plasticity
             }
             else
             {
-                const auto gradrec_full = make_hho_sym_gradrec_matrix(m_msh, cl, m_hdi);
+                const auto gradrec_full = make_hho_gradrec_matrix(m_msh, cl, m_hdi);
                 GT                      = gradrec_full.first;
             }
             tc.toc();
@@ -199,8 +199,8 @@ class NewtonRaphson_step_plasticity
                     const matrix_dynamic stab = stab_precomputed.at(cell_i);
                     assert(elem.K_int.rows() == stab.rows());
                     assert(elem.K_int.cols() == stab.cols());
-                    assert(elem.RTF.rows() == (stab * m_solution_data.at(cell_i)).rows());
-                    assert(elem.RTF.cols() == (stab * m_solution_data.at(cell_i)).cols());
+                    assert(elem.RTF.rows() == stab.rows());
+                    assert(elem.RTF.cols() == m_solution_data.at(cell_i).cols());
 
                     lhs += m_rp.m_beta * stab;
                     rhs -= m_rp.m_beta * stab * m_solution_data.at(cell_i);
@@ -211,12 +211,13 @@ class NewtonRaphson_step_plasticity
                     {
                         case HHO:
                         {
-                            const auto recons   = make_hho_vector_symmetric_laplacian(m_msh, cl, m_hdi);
-                            const auto stab_HHO = make_hho_vector_stabilization(m_msh, cl, recons.first, m_hdi);
+                            const auto recons_scalar = make_hho_scalar_laplacian(m_msh, cl, m_hdi);
+                            const auto stab_HHO =
+                              make_hho_vector_stabilization_optim(m_msh, cl, recons_scalar.first, m_hdi);
                             assert(elem.K_int.rows() == stab_HHO.rows());
                             assert(elem.K_int.cols() == stab_HHO.cols());
-                            assert(elem.RTF.rows() == (stab_HHO * m_solution_data.at(cell_i)).rows());
-                            assert(elem.RTF.cols() == (stab_HHO * m_solution_data.at(cell_i)).cols());
+                            assert(elem.RTF.rows() == stab_HHO.rows());
+                            assert(elem.RTF.cols() == m_solution_data.at(cell_i).cols());
 
                             lhs += m_rp.m_beta * stab_HHO;
                             rhs -= m_rp.m_beta * stab_HHO * m_solution_data.at(cell_i);
@@ -226,8 +227,8 @@ class NewtonRaphson_step_plasticity
                             const auto stab_HDG = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
                             assert(elem.K_int.rows() == stab_HDG.rows());
                             assert(elem.K_int.cols() == stab_HDG.cols());
-                            assert(elem.RTF.rows() == (stab_HDG * m_solution_data.at(cell_i)).rows());
-                            assert(elem.RTF.cols() == (stab_HDG * m_solution_data.at(cell_i)).cols());
+                            assert(elem.RTF.rows() == stab_HDG.rows());
+                            assert(elem.RTF.cols() == m_solution_data.at(cell_i).cols());
 
                             lhs += m_rp.m_beta * stab_HDG;
                             rhs -= m_rp.m_beta * stab_HDG * m_solution_data.at(cell_i);
