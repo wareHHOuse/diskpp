@@ -124,7 +124,7 @@ public:
 
 template <typename Mesh>
 Matrix< typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_contact_unnamed_term(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_contact_unnamed(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> rec,
             const size_t& gamma_N,
@@ -227,7 +227,7 @@ make_lhs_t2 (const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degr
 
 template <typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
-make_contact_negative_term(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_contact_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> rec,
             const size_t& gamma_N,
@@ -343,9 +343,6 @@ make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     return std::make_pair(oper, data);
 }
-
-
-
 
 template<typename Mesh>
 std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
@@ -1055,6 +1052,55 @@ diffusion_static_condensation_compute(const Mesh& msh,
 
     matrix_type AC = K_FF - K_FT * AL;
     vector_type bC = /* no projection on faces, eqn. 26*/ - K_FT * bL;
+
+    return std::make_pair(AC, bC);
+}
+
+template<typename Mesh, typename T>
+auto
+diffusion_static_condensation_compute_full(const Mesh& msh,
+        const typename Mesh::cell_type& cl, const hho_degree_info hdi,
+        const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& local_mat,
+        const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& rhs)
+{
+    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+
+    auto cell_degree = hdi.cell_degree();
+    auto face_degree = hdi.face_degree();
+    auto num_cell_dofs = scalar_basis_size(cell_degree, Mesh::dimension);
+    auto num_face_dofs = scalar_basis_size(face_degree, Mesh::dimension-1);
+
+    auto fcs = faces(msh, cl);
+    auto num_faces = fcs.size();
+
+    assert(local_mat.rows() == local_mat.cols());
+    assert(local_mat.cols() == num_cell_dofs + num_faces*num_face_dofs);
+    assert(rhs.rows() == num_cell_dofs + num_faces*num_face_dofs);
+
+    size_t cell_size = num_cell_dofs;
+    size_t face_size = num_face_dofs * num_faces;
+
+    matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
+    matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
+    matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
+    matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
+
+    assert(K_TT.cols() == cell_size);
+    assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
+    assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
+    assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
+    assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
+
+    vector_type cell_rhs = rhs.block(0, 0, num_cell_dofs, 1);
+    vector_type face_rhs = rhs.block(num_cell_dofs, 0, num_faces*num_face_dofs, 1);
+
+    auto K_TT_ldlt = K_TT.llt();
+    matrix_type AL = K_TT_ldlt.solve(K_TF);
+    vector_type bL = K_TT_ldlt.solve(cell_rhs);
+
+    matrix_type AC = K_FF - K_FT * AL;
+    vector_type bC = /* no projection on faces, eqn. 26*/face_rhs - K_FT * bL;
 
     return std::make_pair(AC, bC);
 }

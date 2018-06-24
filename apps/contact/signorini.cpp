@@ -116,7 +116,25 @@ using namespace revolution;
 
 template<typename Mesh>
 auto
-solve_fix_point(const Mesh& msh, const hho_degree_info& hdi,
+full_offset(const Mesh& msh, const hho_degree_info& hdi)
+{
+    size_t  i = 1, dofs = 0;
+    auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
+    auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+    std::vector<size_t> vec(msh.cells_size());
+    for (auto itor = msh.cells_begin(); itor != msh.cells_end() -1; itor++)
+    {
+        auto cl = *itor;
+        auto fcs = faces(msh, cl);
+        dofs += fcs.size() * fbs + cbs;
+        vec.at(i++) = dofs;
+    }
+    return vec;
+}
+
+template<typename Mesh>
+auto
+fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
                 const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
                 const std::vector<size_t>& is_contact_vector)
 {
@@ -127,44 +145,47 @@ solve_fix_point(const Mesh& msh, const hho_degree_info& hdi,
     auto tol = 1.e-6;
     auto rhs_fun = make_rhs_function(msh);
 
-    // 1. need to know # total dofs (do in assembler, lookk alg viscoplasticity)
-    // 2. create full_sol, full_sol_old
-    // 3. offset for  local u_full 
-    auto num_total_dofs = cbs + num_faces * fbs;
-    dynamic_vector<T> full_sol_old = dynamic_vector<T>::Zero(msh.cells_size() * num_total_dofs);
-    //
+    auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
+    auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+
+    auto num_total_dofs = cbs*msh.cells_size() + 2 * fbs*msh.boundary_faces_size()
+                                        - fbs*msh.boundary_faces_size() ;
+    dynamic_vector<T> full_sol_old = dynamic_vector<T>::Zero(num_total_dofs);
+    dynamic_vector<T> full_sol = dynamic_vector<T>::Zero(num_total_dofs);
+    auto offset_vector = full_offset(msh, hdi);
 
     for(size_t iter = 0; iter < max_iter; iter++)
     {
-        auto i = 0;
+        auto cl_count = 0;
         full_sol_old = full_sol;
         auto assembler = make_diffusion_assembler2(msh, hdi, bnd);
         for (auto& cl : msh)
         {
+            auto fcs = faces(msh, cl);
+            auto num_dofs = cbs + fcs.size() *fbs;
             auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
             auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
             auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
-            auto rhs    = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
-            Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
+            auto rhs_f  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
+            Matrix<T, Dynamic, Dynamic> A = gr.second + stab;
+            Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>(num_dofs);
+            rhs.block(0, 0, cbs, 1) = rhs_f;
 
-            if (is_contact_vector.at(i++))
+            if (is_contact_vector.at(cl_count))
             {
-                //
-                auto cell_offset = offset(msh,cl);
-                auto
+                auto ofs = offset_vector.at(cl_count);
+                Matrix<T, Dynamic,1> u_full = full_sol_old.block(ofs, 0, num_dofs, 1);
 
-                Matrix<T, Dynamic,1> u_full = full_sol_old.block(ofs, 0, num_total_dofs, 1);
-                //
+            	auto A_cont = make_contact_unnamed(msh, cl, hdi, gr.first, gamma_N, bnd);
+                auto rhs_cont = make_contact_negative(msh, cl, hdi, gr.first, gamma_N, bnd, u_full);
 
-            	auto A_cont = make_contact_unnamed_term(msh, cl, hdi, gr.first, gamma_N, bnd);
                 A -= A_cont;
-
-                auto rhs_cont = make_contact_negative_term(msh, cl, hdi, gr.first, gamma_N, bnd, u_full);
                 rhs -=  rhs_cont;
             }
 
-            auto sc = diffusion_static_condensation_compute(msh, cl, hdi, A, rhs);
+            auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, rhs);
             assembler.assemble(msh, cl, sc.first, sc.second);
+            cl_count++;
         }
 
         assembler.neumann_boundary_function(msh, bnd);
@@ -189,23 +210,27 @@ solve_fix_point(const Mesh& msh, const hho_degree_info& hdi,
         if(!ofs.is_open())
             std::cout<< "Error opening file"<<std::endl;
 
+        cl_count = 0;
         for (auto& cl : msh)
         {
+            auto fcs = faces(msh, cl);
+            auto num_dofs = cbs + fcs.size() *fbs;
             auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
             auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
             auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
-            auto rhs    = make_rhs(msh, cl, cb, rhs_fun,hdi.cell_degree());
-            Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
+            auto rhs  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
+            Matrix<T, Dynamic, Dynamic> A = gr.second + stab;
 
-            if (is_contact_vector.at(i++))
+            if (is_contact_vector.at(cl_count))
             {
-                Matrix<T, Dynamic,1> uloc = assembler.take_local_data(msh, cl, sol_old);
+                auto ofs = offset_vector.at(cl_count);
+                Matrix<T, Dynamic,1> u_full = full_sol_old.block(ofs, 0, num_dofs, 1);
 
-            	auto A_cont = make_contact_unnamed_term(msh, cl, hdi, gr.first, gamma_N, bnd );
+            	auto A_cont = make_contact_unnamed(msh, cl, hdi, gr.first, gamma_N, bnd );
+                auto rhs_cont = make_contact_negative(msh, cl, hdi, gr.first, gamma_N, bnd, u_full);
+
                 A -= A_cont;
-
-                auto rhs_cont = make_contact_negative_term(msh, cl, hdi, gr.first, gamma_N, bnd, uloc);
-                rhs -=  rhs_cont;
+                rhs -=  rhs_cont.block(0, 0, cbs, 1);
             }
 
             Eigen::Matrix<T, Eigen::Dynamic, 1> locsol =
@@ -213,15 +238,16 @@ solve_fix_point(const Mesh& msh, const hho_degree_info& hdi,
             Eigen::Matrix<T, Eigen::Dynamic, 1> locsol_old =
                                         assembler.take_local_data(msh, cl, sol);
 
-            Eigen::Matrix<T, Eigen::Dynamic, 1> fullsol =
+            Eigen::Matrix<T, Eigen::Dynamic, 1> full_sol =
                 diffusion_static_condensation_recover(msh, cl, hdi, A, rhs, locsol);
-            Eigen::Matrix<T, Eigen::Dynamic, 1> fullsol_old =
+            Eigen::Matrix<T, Eigen::Dynamic, 1> full_sol_old =
                 diffusion_static_condensation_recover(msh, cl, hdi, A, rhs, locsol_old);
 
-            auto diff = fullsol - fullsol_old;
+            auto diff = full_sol - full_sol_old;
             error += diff.dot(A*diff);
 
             auto bar = barycenter(msh, cl);
+            cl_count++;
         }
         std::cout<<"L'erreur: "<<std::endl;
         std::cout << std::sqrt(error) << std::endl;
@@ -233,7 +259,7 @@ solve_fix_point(const Mesh& msh, const hho_degree_info& hdi,
         {
             //for (size_t i = 0; i < Mesh::dimension; i++)
             //    ofs << bar[i] << " ";
-            //ofs << fullsol(0) << std::endl;
+            //ofs << full_sol(0) << std::endl;
 
             return 0;
         }
@@ -241,11 +267,9 @@ solve_fix_point(const Mesh& msh, const hho_degree_info& hdi,
 }
 
 //template<typename Mesh>
-//auto
-//run_signorini(const Mesh& msh)
-int main(void)
+auto
+run_signorini()//const Mesh& msh)
 {
-
     using T = double;
     const size_t degree = 0 ;
     hho_degree_info hdi(degree);
@@ -266,7 +290,6 @@ int main(void)
     m_bnd.addNeumannBC(disk::mechanics::NEUMANN,4,g_N);
     m_bnd.addContactBC(disk::mechanics::SIGNORINI,2);
 
-
     //cells with contact faces
     auto num_cells = msh.cells_size();
     std::vector<size_t> is_contact_vector = std::vector<size_t>(num_cells);
@@ -282,14 +305,19 @@ int main(void)
 
 		    if (m_bnd.is_contact_face(face_id))
 		    {
-			    is_contact_vector.at(i)=1;
+			    is_contact_vector.at(i) = 1;
 			    continue;
 		    }
 	    }
 	    i++;
     }
 
-    solve_fix_point( msh, hdi, m_bnd, is_contact_vector);
+    fix_point_solver( msh, hdi, m_bnd, is_contact_vector);
 
     return;
+}
+
+int main(void)
+{
+    run_signorini();
 }
