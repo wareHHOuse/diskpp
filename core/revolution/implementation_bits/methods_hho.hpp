@@ -133,7 +133,7 @@ make_contact_unnamed(const Mesh& msh, const typename Mesh::cell_type& cl,
 {
     using T = typename Mesh::coordinate_type;
     const size_t DIM = Mesh::dimension;
-    auto gamma_N = gamma_0 * measure(msh,cl);
+    auto gamma_N = gamma_0 / measure(msh,cl);
 
     auto fcs = faces(msh, cl);
     auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
