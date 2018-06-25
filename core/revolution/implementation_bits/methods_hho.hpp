@@ -2258,7 +2258,7 @@ public:
             throw std::invalid_argument("There are no Neumann faces");
     }
 
-    void robin_boundary_function (const Mesh& msh, const boundary_type& bnd)
+    void impose_robin_boundary_conditions(const Mesh& msh, const boundary_type& bnd)
     {
 
         if (bnd.nb_faces_robin() > 0)
@@ -2324,8 +2324,6 @@ public:
                             {
                                 if ( asm_map[j].assemble() )
                                     triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], mass(i,j)) );
-                                //else
-                                //    RHS(asm_map[i]) -= lhs(i,j) * data(j); //dirichlet
                             }
                         }
                     }
