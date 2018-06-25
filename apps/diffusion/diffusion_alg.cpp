@@ -256,7 +256,7 @@ public:
     {
         sol_old = sol;
 
-        auto assembler = make_diffusion_assembler(msh, di);
+        auto assembler = revolution::make_diffusion_assembler(msh, di);
         for (auto& cl : msh)
         {
             auto cb = revolution::make_scalar_monomial_basis(msh, cl, di.cell_degree());
