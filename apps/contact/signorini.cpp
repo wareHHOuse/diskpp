@@ -29,7 +29,7 @@ struct rhs_functor< Mesh<T, 2, Storage> >
 
     scalar_type operator()(const point_type& pt) const
     {
-        return 0.;
+        return  -2.0 * M_PI * std::sin(2. * M_PI * pt.x());
     }
 };
 
@@ -140,7 +140,7 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
 {
     using T = typename Mesh::coordinate_type;
 
-    auto gamma_N = 0.1;
+    auto gamma_0 = 0.1;
     auto max_iter = 1000;
     auto tol = 1.e-6;
     auto rhs_fun = make_rhs_function(msh);
@@ -148,10 +148,12 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
     auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
     auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
 
-    auto num_total_dofs = cbs*msh.cells_size() + 2 * fbs*msh.boundary_faces_size()
+    auto num_total_dofs = cbs*msh.cells_size() + 2 * fbs*msh.faces_size()
                                         - fbs*msh.boundary_faces_size() ;
     dynamic_vector<T> full_sol_old = dynamic_vector<T>::Zero(num_total_dofs);
     dynamic_vector<T> full_sol = dynamic_vector<T>::Zero(num_total_dofs);
+
+
     auto offset_vector = full_offset(msh, hdi);
 
     for(size_t iter = 0; iter < max_iter; iter++)
@@ -173,12 +175,26 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
 
             if (is_contact_vector.at(cl_count))
             {
-                auto ofs = offset_vector.at(cl_count);
-                Matrix<T, Dynamic,1> u_full = full_sol_old.block(ofs, 0, num_dofs, 1);
+                auto cell_ofs = offset_vector.at(cl_count);
+                Matrix<T, Dynamic,1> u_full = full_sol_old.block(cell_ofs, 0, num_dofs, 1);
 
-            	auto A_cont = make_contact_unnamed(msh, cl, hdi, gr.first, gamma_N, bnd);
-                auto rhs_cont = make_contact_negative(msh, cl, hdi, gr.first, gamma_N, bnd, u_full);
+            	Matrix<T, Dynamic, Dynamic> A_cont = make_contact_unnamed(msh, cl, hdi, gr.first, gamma_0, bnd);
+                Matrix<T, Dynamic,1> rhs_cont = make_contact_negative(msh, cl, hdi, gr.first, gamma_0, bnd, u_full);
 
+                #if 0
+                std::cout << "A : " << std::endl;
+                for(size_t row = 0; row < A_cont.rows(); row++)
+                {
+                    for(size_t col = 0; col < A_cont.cols(); col++)
+                        std::cout << A_cont(row, col)<< " ";
+                    std::cout << std::endl;
+                }
+
+                std::cout << "rhs : " << std::endl;
+                for(size_t row = 0; row < A_cont.rows(); row++)
+                    std::cout << rhs_cont(row, 0)<< " ";
+                std::cout << std::endl;
+                #endif
                 A -= A_cont;
                 rhs -=  rhs_cont;
             }
@@ -214,56 +230,54 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
         for (auto& cl : msh)
         {
             auto fcs = faces(msh, cl);
-            auto num_dofs = cbs + fcs.size() *fbs;
+            auto num_dofs = cbs + fcs.size() * fbs;
             auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
             auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
             auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
-            auto rhs  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
+            Matrix<T, Dynamic, 1> rhs  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
             Matrix<T, Dynamic, Dynamic> A = gr.second + stab;
 
             if (is_contact_vector.at(cl_count))
             {
-                auto ofs = offset_vector.at(cl_count);
-                Matrix<T, Dynamic,1> u_full = full_sol_old.block(ofs, 0, num_dofs, 1);
+                auto cell_ofs = offset_vector.at(cl_count);
+                Matrix<T, Dynamic,1> u_full = full_sol_old.block(cell_ofs, 0, num_dofs, 1);
 
-            	auto A_cont = make_contact_unnamed(msh, cl, hdi, gr.first, gamma_N, bnd );
-                auto rhs_cont = make_contact_negative(msh, cl, hdi, gr.first, gamma_N, bnd, u_full);
+            	Matrix<T, Dynamic, Dynamic> A_cont = make_contact_unnamed(msh, cl, hdi, gr.first, gamma_0, bnd );
+                Matrix<T, Dynamic, 1> rhs_cont = make_contact_negative(msh, cl, hdi, gr.first, gamma_0, bnd, u_full);
 
                 A -= A_cont;
                 rhs -=  rhs_cont.block(0, 0, cbs, 1);
             }
 
-            Eigen::Matrix<T, Eigen::Dynamic, 1> locsol =
+            Matrix<T, Dynamic, 1> locsol =
                                         assembler.take_local_data(msh, cl, sol);
-            Eigen::Matrix<T, Eigen::Dynamic, 1> locsol_old =
-                                        assembler.take_local_data(msh, cl, sol);
-
-            Eigen::Matrix<T, Eigen::Dynamic, 1> full_sol =
+            Matrix<T, Dynamic, 1> u_full =
                 diffusion_static_condensation_recover(msh, cl, hdi, A, rhs, locsol);
-            Eigen::Matrix<T, Eigen::Dynamic, 1> full_sol_old =
-                diffusion_static_condensation_recover(msh, cl, hdi, A, rhs, locsol_old);
 
-            auto diff = full_sol - full_sol_old;
+            auto cell_ofs = offset_vector.at(cl_count);
+            Matrix<T, Dynamic, 1> u_full_old = full_sol_old.block(cell_ofs, 0, num_dofs ,1);
+            full_sol.block(cell_ofs, 0, num_dofs ,1) = u_full;
+
+            Matrix<T, Dynamic, 1>  diff = u_full - u_full_old;
             error += diff.dot(A*diff);
 
             auto bar = barycenter(msh, cl);
+            ofs << bar.x() << " " << bar.y() <<" "<< u_full(0) << std::endl;
             cl_count++;
         }
-        std::cout<<"L'erreur: "<<std::endl;
-        std::cout << std::sqrt(error) << std::endl;
-
         ofs.close();
 
-        std::cout << "iter : "<< iter << "   ; error = "<< error << std::endl;
-        if( error < tol)
+        std::cout << "iter : "<< iter << "   ; error = "<< std::sqrt(error)<< std::endl;
+        if( std::sqrt(error)  < tol)
         {
             //for (size_t i = 0; i < Mesh::dimension; i++)
             //    ofs << bar[i] << " ";
             //ofs << full_sol(0) << std::endl;
-
             return 0;
+
         }
     }
+
 }
 
 //template<typename Mesh>
@@ -276,7 +290,7 @@ run_signorini()//const Mesh& msh)
     typedef disk::generic_mesh<T, 2>  Mesh;
 
     std::cout << "Mesh format: Medit format" << std::endl;
-    auto filename = "../../../diskpp/meshes/2D_quads/medit/square_h01.medit2d";
+    auto filename = "../../../diskpp/meshes/2D_quads/medit/square_h0025.medit2d";
     auto msh = disk::load_medit_2d_mesh<T>(filename);
 
     auto g_N = make_neumann_function(msh);

@@ -126,19 +126,23 @@ template <typename Mesh>
 Matrix< typename Mesh::coordinate_type, Dynamic, Dynamic>
 make_contact_unnamed(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
-            const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> rec,
-            const size_t& gamma_N,
+            const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& rec,
+            const typename Mesh::coordinate_type& gamma_0,
             const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
 {
     using T = typename Mesh::coordinate_type;
     const size_t DIM = Mesh::dimension;
-    auto facdeg = hdi.face_degree();
-    auto recdeg = hdi.reconstruction_degree();
-    auto cb  = make_scalar_monomial_basis(msh, cl, recdeg);
+    auto gamma_N = gamma_0 * measure(msh,cl);
+
     auto fcs = faces(msh, cl);
-    auto rbs = scalar_basis_size(recdeg, DIM);
-    auto fbs = scalar_basis_size(facdeg, DIM-1);
-    Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(rbs-1, rbs-1);
+    auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
+    auto cbs = scalar_basis_size(hdi.cell_degree(), DIM);
+    auto fbs = scalar_basis_size( hdi.face_degree(), DIM-1);
+    auto num_total_dofs = cbs + fbs * fcs.size();
+    auto cb  = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+
+    Matrix<T, Dynamic, Dynamic> ret =
+            Matrix<T, Dynamic, Dynamic>::Zero( num_total_dofs, num_total_dofs );
 
     for (auto& fc: fcs)
     {
@@ -148,7 +152,7 @@ make_contact_unnamed(const Mesh& msh, const typename Mesh::cell_type& cl,
 
         if (bnd.is_contact_face(face_id))
         {
-            auto qps = integrate(msh, fc, 2*facdeg);
+            auto qps = integrate(msh, fc, 2* hdi.face_degree());
             auto n = normal(msh, cl, fc);
 
             Matrix<T, Dynamic, Dynamic> stiff_n = Matrix<T, Dynamic, Dynamic>::Zero(rbs, rbs);
@@ -159,10 +163,11 @@ make_contact_unnamed(const Mesh& msh, const typename Mesh::cell_type& cl,
                 Matrix<T, Dynamic, 1> dphi_n = dphi * n;
                 stiff_n += qp.weight() * dphi_n  * dphi_n.transpose();
             }
-            ret += (1./gamma_N) * rec.transpose() * stiff_n.block(1, 1, rbs -1, rbs -1) * rec ;
+            ret +=  rec.transpose() * stiff_n.block(1, 1, rbs-1, rbs -1) * rec ;
         }
     }
-    return ret;
+
+    return ret * (1./gamma_N);
 }
 #if 0
 template <typename Mesh>
@@ -230,12 +235,15 @@ Matrix<typename Mesh::coordinate_type, Dynamic, 1>
 make_contact_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> rec,
-            const size_t& gamma_N,
+            const typename Mesh::coordinate_type& gamma_0,
             const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
             const Matrix<typename Mesh::coordinate_type, Dynamic, 1>& uloc)
 {
     using T = typename Mesh::coordinate_type;
     const size_t DIM = Mesh::dimension;
+
+    auto gamma_N = gamma_0 * measure(msh,cl);
+
     auto recdeg =  hdi.reconstruction_degree();
     auto facdeg =  hdi.face_degree();
     auto cb = make_scalar_monomial_basis(msh, cl, recdeg);
