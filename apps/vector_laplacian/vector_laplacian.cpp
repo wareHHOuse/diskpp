@@ -117,7 +117,7 @@ run_vector_laplacian_solver(const Mesh<T, 2, Storage>& msh,
       std::cout << "***********************************************************" << std::endl;
    }
 
-   std::cout << "Discetisation h: " << disk::mesh_h(msh) << std::endl;
+   std::cout << "Discetisation h: " << disk::average_diameter(msh) << std::endl;
    std::cout << "L2 error: " << le.compute_l2_displacement_error(solution) << std::endl;
    std::cout << "L2 grad error: " << le.compute_l2_gradient_error(gradient) << std::endl;
 
@@ -200,7 +200,7 @@ run_vector_laplacian_solver(const Mesh<T, 3, Storage>& msh,
       std::cout << "***********************************************************" << std::endl;
    }
 
-   std::cout << "Discetisation h: " << disk::mesh_h(msh) << std::endl;
+   std::cout << "Discetisation h: " << disk::average_diameter(msh) << std::endl;
    std::cout << "L2 error: " << le.compute_l2_displacement_error(solution) << std::endl;
    std::cout << "L2 grad error: " << le.compute_l2_gradient_error(gradient) << std::endl;
 

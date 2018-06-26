@@ -211,7 +211,7 @@ void convergence_test_typ1(void)
             loader.populate_mesh(msh);
 
             auto error = run_stokes(msh, k);
-            mesh_hs.push_back( disk::mesh_h(msh) );
+            mesh_hs.push_back( disk::average_diameter(msh) );
             l2_velocity_errors.push_back(error);
         }
 

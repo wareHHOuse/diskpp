@@ -314,7 +314,7 @@ do_testing(std::vector<Mesh>& meshes, const Function& run_test)
         for(auto& msh : meshes)
         {
             auto error = run_test(msh, k);
-            mesh_hs.push_back( disk::mesh_h(msh) );
+            mesh_hs.push_back( disk::average_diameter(msh) );
             l2_errors.push_back(error);
         }
 

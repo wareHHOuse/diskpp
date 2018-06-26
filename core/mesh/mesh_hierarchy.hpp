@@ -391,7 +391,7 @@ public:
         {
             std::cout << "Building level " << i+1 << " mesh. H = ";
             auto next_mesh = build_next( meshes[i] );
-            std::cout << mesh_h(next_mesh) << std::endl;
+            std::cout << average_diameter(next_mesh) << std::endl;
             //next_mesh.statistics();
             meshes.push_back( next_mesh );
             auto c2f = make_coarse_to_fine_map(meshes[i], meshes[i+1]);

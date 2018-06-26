@@ -651,6 +651,20 @@ integrate_polyhedron_face(const disk::generic_mesh<T, 3>&                msh,
     return ret;
 }
 
+template<typename MeshType, typename Element>
+std::vector<disk::quadrature_point<typename MeshType::coordinate_type, MeshType::dimension>>
+integrate_degree0(const MeshType& msh, const Element& elem)
+{
+    std::vector<disk::quadrature_point<typename MeshType::coordinate_type, MeshType::dimension>> ret;
+
+    const auto bar  = barycenter(msh, elem);
+    const auto meas = measure(msh, elem);
+
+    ret.push_back(disk::make_qp(bar, meas));
+
+    return ret;
+}
+
 } //priv
 
 
@@ -660,6 +674,11 @@ integrate(const disk::simplicial_mesh<T,2>& msh,
 		  const typename disk::simplicial_mesh<T,2>::cell& cl,
 		  size_t degree)
 {
+    if(degree == 0)
+    {
+        return priv::integrate_degree0(msh, cl);
+    }
+
     auto pts = points(msh, cl);
     return priv::integrate_triangle<T>(degree, pts);
 }
@@ -671,7 +690,12 @@ integrate(const disk::simplicial_mesh<T,2>& msh,
 		  const typename disk::simplicial_mesh<T,2>::face& fc,
 		  size_t degree)
 {
-	return priv::integrate_2D_face(msh, fc, degree);
+    if (degree == 0)
+    {
+        return priv::integrate_degree0(msh, fc);
+    }
+
+    return priv::integrate_2D_face(msh, fc, degree);
 }
 
 template<typename T>
@@ -680,6 +704,11 @@ integrate(const disk::cartesian_mesh<T,2>& msh,
 		  const typename disk::cartesian_mesh<T,2>::cell& cl,
 		  size_t degree)
 {
+    if (degree == 0)
+    {
+        return priv::integrate_degree0(msh, cl);
+    }
+
     auto pts = points(msh, cl);
     // transform arry to vector
     std::vector< point<T,2> > ptsv{pts[0], pts[1], pts[3], pts[2]};
@@ -694,7 +723,12 @@ integrate(const disk::cartesian_mesh<T,2>& msh,
 		  const typename disk::cartesian_mesh<T,2>::face& fc,
 		  size_t degree)
 {
-	return priv::integrate_2D_face(msh, fc, degree);
+    if (degree == 0)
+    {
+        return priv::integrate_degree0(msh, fc);
+    }
+
+    return priv::integrate_2D_face(msh, fc, degree);
 }
 
 template<typename T>
@@ -703,23 +737,25 @@ integrate(const disk::generic_mesh<T,2>& msh,
 		  const typename disk::generic_mesh<T,2>::cell& cl,
 		  size_t degree)
 {
-	auto pts = points(msh, cl);
-	switch (pts.size())
-	{
-		case 0:
-		case 1:
-		case 2:
-			throw std::invalid_argument("A 2D cell cannot have less than three points. "
+    if (degree == 0)
+    {
+        return priv::integrate_degree0(msh, cl);
+    }
+
+    auto pts = points(msh, cl);
+    switch (pts.size())
+    {
+        case 0:
+        case 1:
+        case 2:
+            throw std::invalid_argument("A 2D cell cannot have less than three points. "
                                         "This looks like a nice bug.");
 
-		case 3:
-			return priv::integrate_triangle<T>(degree, pts);
+        case 3: return priv::integrate_triangle<T>(degree, pts);
 
-		case 4:
-			return priv::integrate_quadrangle_tens(degree, pts);
+        case 4: return priv::integrate_quadrangle_tens(degree, pts);
 
-		default:
-			return priv::integrate_polygon(degree, pts);
+        default: return priv::integrate_polygon(degree, pts);
 	}
 }
 
@@ -729,7 +765,12 @@ integrate(const disk::generic_mesh<T,2>& msh,
 		  const typename disk::generic_mesh<T,2>::face& fc,
 		  size_t degree)
 {
-	return priv::integrate_2D_face(msh, fc, degree);
+    if (degree == 0)
+    {
+        return priv::integrate_degree0(msh, fc);
+    }
+
+    return priv::integrate_2D_face(msh, fc, degree);
 }
 
 
@@ -771,6 +812,11 @@ integrate(const disk::simplicial_mesh<T,3>& msh,
           const typename disk::simplicial_mesh<T,3>::cell& cl,
           size_t degree)
 {
+    if (degree == 0)
+    {
+        return priv::integrate_degree0(msh, cl);
+    }
+
     auto m_quadrature_data = disk::tetrahedron_quadrature(degree);
 
     auto pts  = points(msh, cl);
@@ -800,6 +846,11 @@ integrate(const disk::simplicial_mesh<T,3>& msh,
           const typename disk::simplicial_mesh<T,3>::face& fc,
           size_t degree)
 {
+    if (degree == 0)
+    {
+        return priv::integrate_degree0(msh, fc);
+    }
+
     auto m_quadrature_data = disk::triangle_quadrature(degree);
 
     auto pts = points(msh, fc);
@@ -826,6 +877,11 @@ template<typename T>
 std::vector<disk::quadrature_point<T, 3>>
 integrate(const disk::generic_mesh<T, 3>& msh, const typename disk::generic_mesh<T, 3>::cell& cl, size_t degree)
 {
+    if (degree == 0)
+    {
+        return priv::integrate_degree0(msh, cl);
+    }
+
     auto pts = points(msh, cl);
     switch (pts.size())
     {
@@ -844,6 +900,11 @@ template<typename T>
 std::vector<disk::quadrature_point<T, 3>>
 integrate(const disk::generic_mesh<T, 3>& msh, const typename disk::generic_mesh<T, 3>::face& fc, size_t degree)
 {
+    if (degree == 0)
+    {
+        return priv::integrate_degree0(msh, fc);
+    }
+
     auto pts = points(msh, fc);
     switch (pts.size())
     {
@@ -863,6 +924,11 @@ integrate(const disk::cartesian_mesh<T,3>& msh,
 		  const typename disk::cartesian_mesh<T,3>::cell& cl,
 		  size_t degree)
 {
+    if (degree == 0)
+    {
+        return priv::integrate_degree0(msh, cl);
+    }
+
     auto pts = points(msh, cl);
     // transform arry to vector
     std::array< point<T,3>, 8 > ptsv{pts[0], pts[1], pts[3], pts[2], pts[4], pts[5], pts[7], pts[6]};
@@ -875,6 +941,11 @@ integrate(const disk::cartesian_mesh<T,3>& msh,
           const typename disk::cartesian_mesh<T,3>::face& fc,
           size_t degree)
 {
+    if (degree == 0)
+    {
+        return priv::integrate_degree0(msh, fc);
+    }
+
     auto pts = points(msh, fc);
     auto meas              = measure(msh, fc);
     auto m_quadrature_data = proton::quadrangle_quadrature<T>(degree);
