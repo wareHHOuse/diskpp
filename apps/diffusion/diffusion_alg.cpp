@@ -460,7 +460,7 @@ void convergence_test_typ1(void)
             }
             loader.populate_mesh(msh);
             auto error = run_alg_diffusion(msh, k, ofs, qfs);
-            mesh_hs.push_back( disk::mesh_h(msh) );
+            mesh_hs.push_back( disk::average_diameter(msh) );
             errors.push_back(error);
 
             ofs << " " << std::endl;

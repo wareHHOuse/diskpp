@@ -423,7 +423,7 @@ public:
         using namespace revolution;
 
         std::cout << green << "Computed solution, HHO" << reset << std::endl;
-        std::cout << "Mesh size: " << mesh_h(sol_msh) << std::endl;
+        std::cout << "Mesh size: " << average_diameter(sol_msh) << std::endl;
         hho_eigenvalue_solver(sol_msh, degree);
 
 
@@ -562,7 +562,7 @@ public:
         std::string visit_output_filename = "hier_eigs.silo";
         silo_db.create(visit_output_filename);
         std::cout << green << "Reference solution, FEM" << reset << std::endl;
-        std::cout << "Mesh size: " << mesh_h(ref_msh) << std::endl;
+        std::cout << "Mesh size: " << average_diameter(ref_msh) << std::endl;
         cfem_eigenvalue_solver(ref_msh);
 
         for (size_t level = sol_level_min; level <= sol_level_max; level++)
