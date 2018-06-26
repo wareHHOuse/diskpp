@@ -112,7 +112,7 @@ template<typename Mesh>
 using namespace revolution;
 
 template<typename Mesh>
-auto
+std::vector<size_t>
 full_offset(const Mesh& msh, const hho_degree_info& hdi)
 {
     size_t  i = 1, dofs = 0;
@@ -129,7 +129,7 @@ full_offset(const Mesh& msh, const hho_degree_info& hdi)
 }
 
 template<typename Mesh>
-auto
+bool
 fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
                 const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
                 const typename Mesh::coordinate_type & gamma_0,
@@ -148,8 +148,8 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
 
     auto num_full_dofs = cbs*msh.cells_size() + 2 * fbs*msh.faces_size()
                                         - fbs*msh.boundary_faces_size() ;
-    dynamic_vector<T> full_sol_old = dynamic_vector<T>::Zero(num_full_dofs);
-    dynamic_vector<T> full_sol = dynamic_vector<T>::Zero(num_full_dofs);
+    vector_type       full_sol_old = dynamic_vector<T>::Zero(num_full_dofs);
+    vector_type       full_sol     = dynamic_vector<T>::Zero(num_full_dofs);
 
     auto offset_vector = full_offset(msh, hdi);
 
@@ -203,7 +203,10 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
         std::ofstream ofs("sol.dat");
 
         if(!ofs.is_open())
+        {
             std::cout<< "Error opening file"<<std::endl;
+            return false;
+        }
 
         cl_count = 0;
         for (auto& cl : msh)
@@ -227,10 +230,8 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
                 rhs -=  rhs_contact.block(0, 0, cbs, 1);
             }
 
-            Matrix<T, Dynamic, 1> u_faces =
-                                        assembler.take_local_data(msh, cl, sol);
-            Matrix<T, Dynamic, 1> u_full =
-                diffusion_static_condensation_recover(msh, cl, hdi, A, rhs, u_faces);
+            vector_type  u_faces = assembler.take_local_data(msh, cl, sol);
+            vector_type  u_full  = diffusion_static_condensation_recover(msh, cl, hdi, A, rhs, u_faces);
 
             auto cell_ofs = offset_vector.at(cl_count);
             vector_type  u_full_old = full_sol_old.block(cell_ofs, 0, num_total_dofs ,1);
@@ -247,9 +248,11 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
 
         std::cout << "iter : "<< iter << "   ; error = "<< std::sqrt(error)<< std::endl;
         if( std::sqrt(error)  < tol)
-            return 0;
+            return true;
     }
 
+    std::cout << "No convergence of the fix point solver" << std::endl;
+    return false;
 }
 
 template<typename Mesh>
@@ -294,8 +297,6 @@ run_signorini(const Mesh& msh, const typename Mesh::coordinate_type& gamma_0)
     }
 
     fix_point_solver( msh, hdi, m_bnd, gamma_0, is_contact_vector);
-
-    return;
 }
 
 int main(int argc, char **argv)
