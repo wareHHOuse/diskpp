@@ -73,10 +73,10 @@ compute_errors(const Mesh& msh,
     	//ofs << bar.x() << " " << bar.y() << " " << s(0) << " " << s(1) << std::endl;
 
         //pressure error
-        Matrix<scalar_type, Dynamic, 1> ppres = project_function(msh, cl, hdi, pressure);
+        Matrix<scalar_type, Dynamic, 1> ppres = revolution::project_function(msh, cl, hdi.face_degree(), pressure);
         auto fbs = revolution::vector_basis_size(hdi.face_degree(), dim - 1, dim);
-        auto pbs = revolution::scalar_basis_size(hdi.cell_degree(), dim);
-        auto pb  = revolution::make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        auto pbs = revolution::scalar_basis_size(hdi.face_degree(), dim);
+        auto pb  = revolution::make_scalar_monomial_basis(msh, cl, hdi.face_degree());
         auto num_other_faces = assembler.num_assembled_faces();
         auto pres_ofs = cbs * msh.cells_size() + fbs * num_other_faces + pbs * cell_ofs;
 
@@ -154,7 +154,6 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 
         return ret;
     };
-
     auto velocity = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
         Matrix<scalar_type, 2, 1> ret;
 
@@ -212,23 +211,23 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 void convergence_test_typ1(void)
 {
     using T = double;
-    bool use_sym_grad = false;
+    bool use_sym_grad = true;
     std::vector<std::string> meshfiles;
-    /*
+
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_1.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_2.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_3.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_4.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_5.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_6.typ1");
-    */
+    //meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_6.typ1");
 
+    /*
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_1.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_2.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_3.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
-
+    */
     /*
     meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_1.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_2.typ1");

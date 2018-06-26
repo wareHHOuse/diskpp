@@ -114,7 +114,6 @@ run_stokes(const Mesh& msh, size_t degree)
         auto rhs = make_rhs(msh, cl, face_basis, rhs_fun);
 
         assembler.assemble(msh, cl, (gr.second + stab), -dr, rhs);
-
     }
 
     assembler.finalize();

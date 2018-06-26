@@ -207,6 +207,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell>
 {
 
+
   public:
     typedef Mesh<T, 2, Storage>              mesh_type;
     typedef typename mesh_type::scalar_type  scalar_type;
