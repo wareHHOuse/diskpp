@@ -77,7 +77,10 @@ run_viscoplasticity(size_t degree,
             exit(1);
     }
 
-    mesh_type msh = disk::load_medit_2d_mesh<T>(filename);
+    mesh_type                     msh;
+    disk::medit_mesh_loader<T, 2> loader;
+    loader.read_mesh(filename);
+    loader.populate_mesh(msh);
 
     std::string info = name + "_k" + tostr(degree) + "_a" + tostr(alpha) + other_info;
     std::ofstream ofs("errors_" + info + ".data");
@@ -86,7 +89,7 @@ run_viscoplasticity(size_t degree,
         std::cout << "Error opening errors "<<std::endl;
 
     typename revolution::hho_degree_info hdi(degree, degree);
-    augmented_lagrangian_viscoplasticity<Mesh> als(msh, hdi, alpha);
+    augmented_lagrangian_viscoplasticity<mesh_type> als(msh, hdi, alpha);
 
     auto assembler = als.define_problem(msh, problem);
     als.initialize(msh, assembler);

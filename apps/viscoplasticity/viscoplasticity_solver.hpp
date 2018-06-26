@@ -63,8 +63,6 @@ class augmented_lagrangian_viscoplasticity
 
     using point_type = typename mesh_type::point_type;
 
-    typedef dynamic_vector<T>       dynamic_vector<T>;
-
     typedef Matrix<T, Mesh::dimension, Mesh::dimension>         tensor_type;
     typedef Matrix<T, Mesh::dimension, 1>                       vector2d_type;
     typedef Matrix<T, Dynamic, 1>                               vector_type ;
@@ -88,7 +86,7 @@ public:
     std::tuple<T, T, T>     convergence;
     bool                    use_sym_grad;
 
-    augmented_lagrangian_viscoplasticity(const Mesh& msh,
+    augmented_lagrangian_viscoplasticity(const mesh_type& msh,
                             const typename revolution::hho_degree_info & hdi,
                             const T& alpha_ext):
                             di(hdi), alpha(alpha_ext)
@@ -96,11 +94,15 @@ public:
         use_sym_grad = true;
         factor = (use_sym_grad)? 2. : 1.;
         viscosity = 1.;
-        auto omegaExt = 2;
+        T omegaExt = 2.;
         T f = 1;
         T Lref = 1.;
-        T Bn  =  std::sqrt(2) * 1.;
-        yield =  Bn * f * Lref;// * omegaExt; ////Bn * viscosity;// * omegaExt; //
+        T Bn  =  std::sqrt(2) * 2.;
+        //Driven
+        yield =  Bn * f * Lref;//Bn * viscosity;
+        //Couette
+        //yield =  Bn * omegaExt;
+
 
         dim =  Mesh::dimension;
 
@@ -216,8 +218,8 @@ public:
                     T r = std::sqrt(p.x()*p.x() + p.y()*p.y());
 
                     //1.All Solid
-                    ret(0) =  -std::sin(theta) *  2* r;
-                    ret(1) =  std::cos(theta) *  2*r;
+                    ret(0) =  -std::sin(theta) *  2. * r;
+                    ret(1) =  std::cos(theta) *  2. * r;
                     return ret;
                 };
 
@@ -324,12 +326,21 @@ public:
         T theta_eigen = theta_eval.norm();
         assert(theta_norm == theta_eigen);
 
-        //Gamma
+        //#if 0
+        //Gamma Driven
         // A. Solid
         if(theta_norm <=  std::sqrt(2) * yield ||  std::abs(theta_norm - std::sqrt(2) * yield) < 1.e-8)
             return  Matrix<T, Dynamic, 1>::Zero(sbs);
         else  // B. liquid
             return  value * theta * (1. - std::sqrt(2) *(yield/theta_norm));
+        //#endif
+        #if 0
+        // A. Solid
+        if(theta_norm <=   yield ||  std::abs(theta_norm -  yield) < 1.e-8)
+            return  Matrix<T, Dynamic, 1>::Zero(sbs);
+        else  // B. liquid
+            return  value * theta * (1. - (yield/theta_norm));
+        #endif
     }
 
     template<typename Assembler>
