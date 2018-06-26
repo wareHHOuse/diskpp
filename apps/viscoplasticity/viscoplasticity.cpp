@@ -54,7 +54,6 @@ run_viscoplasticity(size_t degree,
     std::cout << "Guessed mesh format: Medit format" << std::endl;
     typedef disk::generic_mesh<T, 2>  mesh_type;
 
-
     T tolerance = 1.e-10, Ninf = 10.e+5;
     size_t max_iters = 50000;
 

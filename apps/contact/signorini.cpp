@@ -52,7 +52,7 @@ struct rhs_functor< Mesh<T, 2, Storage> >
 
     scalar_type operator()(const point_type& pt) const
     {
-        return  -2.0 * M_PI * std::sin(2. * M_PI * pt.x());
+        return   - 2.* M_PI *  std::sin(2. * M_PI * pt.x());
     }
 };
 
@@ -122,8 +122,7 @@ full_offset(const Mesh& msh, const hho_degree_info& hdi)
     for (auto itor = msh.cells_begin(); itor != msh.cells_end() -1; itor++)
     {
         auto cl = *itor;
-        auto fcs = faces(msh, cl);
-        dofs += fcs.size() * fbs + cbs;
+        dofs += howmany_faces(msh, cl) * fbs + cbs;
         vec.at(i++) = dofs;
     }
     return vec;
@@ -161,8 +160,7 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
         auto assembler = make_diffusion_assembler2(msh, hdi, bnd);
         for (auto& cl : msh)
         {
-            auto fcs = faces(msh, cl);
-            auto num_dofs = cbs + fcs.size() *fbs;
+            auto num_dofs = cbs + howmany_faces(msh,cl) * fbs;
             auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
             auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
             auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
@@ -210,8 +208,7 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
         cl_count = 0;
         for (auto& cl : msh)
         {
-            auto fcs = faces(msh, cl);
-            auto num_total_dofs = cbs + fcs.size() * fbs;
+            auto num_total_dofs = cbs + howmany_faces(msh,cl) * fbs;
             auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
             auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
             auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
@@ -320,6 +317,8 @@ int main(int argc, char **argv)
                     std::cout << "gamma_0 must be >0. Falling back to 0.1" << std::endl;
                     gamma_0 = 0.1;
                 }
+                break;
+
             case '?':
             default:
                 std::cout << "wrong arguments" << std::endl;
@@ -331,12 +330,6 @@ int main(int argc, char **argv)
     argv += optind;
 
     filename = argv[0];
-
-    if (filename == nullptr)
-    {
-        std::cout << "Please specified a 2D mesh" << std::endl;
-        return 1;
-    }
 
     /* Medit 2d*/
     if (std::regex_match(filename, std::regex(".*\\.medit2d$")))

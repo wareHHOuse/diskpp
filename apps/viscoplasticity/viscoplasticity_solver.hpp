@@ -63,16 +63,18 @@ class augmented_lagrangian_viscoplasticity
 
     using point_type = typename mesh_type::point_type;
 
-    typedef dynamic_vector<T>       vector_type;
-    typedef dynamic_matrix<T>       matrix_type;
+    typedef dynamic_vector<T>       dynamic_vector<T>;
 
     typedef Matrix<T, Mesh::dimension, Mesh::dimension>         tensor_type;
     typedef Matrix<T, Mesh::dimension, 1>                       vector2d_type;
+    typedef Matrix<T, Dynamic, 1>                               vector_type ;
+    typedef Matrix<T, Dynamic, Dynamic>                         matrix_type;
+
     typedef std::function<vector2d_type (const point_type &)>   vector_funtion_type;
     typedef std::function<T   (const point_type &)>             scalar_funtion_type;
 
     vector_funtion_type     rhs_fun, velocity;
-    vector_type             multiplier, auxiliar, auxiliar_old;
+    dynamic_vector<T>             multiplier, auxiliar, auxiliar_old;
 
     typename revolution::hho_degree_info di;
     T             factor;
@@ -82,7 +84,7 @@ class augmented_lagrangian_viscoplasticity
     size_t        cbs, fbs, pbs, sbs, dim;
 
 public:
-    vector_type             sol, sol_old;
+    dynamic_vector<T>       sol, sol_old;
     std::tuple<T, T, T>     convergence;
     bool                    use_sym_grad;
 
@@ -97,8 +99,8 @@ public:
         auto omegaExt = 2;
         T f = 1;
         T Lref = 1.;
-        T Bn  =  std::sqrt(2) * 10.;
-        yield =  Bn * omegaExt; ////Bn * viscosity;// * omegaExt; //* f * Lref;
+        T Bn  =  std::sqrt(2) * 1.;
+        yield =  Bn * f * Lref;// * omegaExt; ////Bn * viscosity;// * omegaExt; //
 
         dim =  Mesh::dimension;
 
@@ -188,6 +190,7 @@ public:
                     auto term_3 = Bn * r * std::log(Rext/r) * sgn(sigma_i);
                     u_theta = term_1 + term_2 + term_3;
                     //3. with plug
+
                     #endif
 
                     ret(0) =  -std::sin(theta) * 2.* r;
@@ -237,12 +240,12 @@ public:
     initialize(const mesh_type& msh, const Assembler& assembler)
     {
         auto systsz = assembler.global_system_size();
-        sol = vector_type::Zero(systsz);
-        sol_old = vector_type::Zero(systsz);
+        sol = dynamic_vector<T>::Zero(systsz);
+        sol_old = dynamic_vector<T>::Zero(systsz);
 
-        multiplier = vector_type::Zero(msh.cells_size() * sbs);
-        auxiliar   = vector_type::Zero(msh.cells_size() * sbs);
-        auxiliar_old = vector_type::Zero(msh.cells_size() * sbs);
+        multiplier = dynamic_vector<T>::Zero(msh.cells_size() * sbs);
+        auxiliar   = dynamic_vector<T>::Zero(msh.cells_size() * sbs);
+        auxiliar_old = dynamic_vector<T>::Zero(msh.cells_size() * sbs);
 
         return;
     }
@@ -270,16 +273,16 @@ public:
         	auto bar = barycenter(msh, cl);
 
             //energy error
-            Matrix<T, Dynamic, 1> svel =  assembler.take_velocity(msh, cl, sol);
-            Matrix<T, Dynamic, 1> pvel = revolution::project_function(msh, cl, di, velocity);
-            //Matrix<T, Dynamic, 1> svel_old =  assembler.take_velocity(msh, cl, sol_old);
-            Matrix<T, Dynamic, 1> diff_vel = svel - pvel;
+            vector_type svel =  assembler.take_velocity(msh, cl, sol);
+            vector_type pvel = revolution::project_function(msh, cl, di, velocity);
+            //vector_type  svel_old =  assembler.take_velocity(msh, cl, sol_old);
+            vector_type diff_vel = svel - pvel;
             auto gr = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
-            Matrix<T, Dynamic, Dynamic> stab;
+            matrix_type stab;
             stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
             auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
 
-            Matrix<T, Dynamic, Dynamic> B = factor * (viscosity*G.second + viscosity*stab);
+            matrix_type B = factor * (viscosity*G.second + viscosity*stab);
 
             error_vel += diff_vel.dot(B * diff_vel);
             auto Gu_norm = svel.dot(B * svel);
@@ -298,15 +301,15 @@ public:
     compute_auxiliar(   const mesh_type& msh,
                         const cell_type& cl,
                         const Assembler& assembler,
-                        const vector_type& velocity_dofs)
+                        const dynamic_vector<T>& velocity_dofs)
     {
-        Matrix<T, Dynamic, 1> u_TF  = assembler.take_velocity(msh, cl, velocity_dofs);
+        vector_type u_TF  = assembler.take_velocity(msh, cl, velocity_dofs);
         auto value = 1./(factor * (viscosity + alpha));
         auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
 
         auto cell_ofs    = revolution::priv::offset(msh, cl);
-        Matrix<T, Dynamic, 1> Gu = G.first * u_TF;
-        Matrix<T, Dynamic, 1> stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
+        vector_type Gu = G.first * u_TF;
+        vector_type stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
 
         //Theta
         auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
@@ -314,7 +317,7 @@ public:
         auto bar = barycenter(msh, cl);
         auto s_phi  = sb.eval_functions(bar);
 
-        Matrix<T, Dynamic, 1>  theta  = stress  +  factor * alpha * Gu;
+        vector_type  theta  = stress  +  factor * alpha * Gu;
         Matrix<T, Mesh::dimension, Mesh::dimension> theta_eval = revolution::eval(theta, s_phi);
         T theta_norm  = std::sqrt((theta_eval.cwiseProduct(theta_eval)).sum());
 
@@ -340,21 +343,21 @@ public:
 
         for(auto cl: msh)
         {
-            Matrix<T, Dynamic, 1> u_TF = assembler.take_velocity(msh, cl, sol);
+            vector_type u_TF = assembler.take_velocity(msh, cl, sol);
             auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
             auto cell_ofs = revolution::priv::offset(msh, cl);
 
-            Matrix<T, Dynamic, 1> Gu = G.first * u_TF;
-            Matrix<T, Dynamic, 1> gamma_old = auxiliar_old.block(cell_ofs *sbs, 0, sbs, 1);
-            Matrix<T, Dynamic, 1> gamma = auxiliar.block(cell_ofs *sbs, 0, sbs, 1);
+            vector_type Gu = G.first * u_TF;
+            vector_type gamma_old = auxiliar_old.block(cell_ofs *sbs, 0, sbs, 1);
+            vector_type gamma = auxiliar.block(cell_ofs *sbs, 0, sbs, 1);
 
-            Matrix<T, Dynamic, 1> diff_stress = factor * alpha * (Gu - gamma);
-            Matrix<T, Dynamic, 1> diff_gamma  = alpha * (gamma - gamma_old);
+            vector_type diff_stress = factor * alpha * (Gu - gamma);
+            vector_type diff_gamma  = alpha * (gamma - gamma_old);
 
             multiplier.block(cell_ofs * sbs, 0, sbs, 1) += diff_stress;
 
             auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
-            Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, cl, sb);
+            matrix_type mass = make_mass_matrix(msh, cl, sb);
 
             conv_stress += diff_stress.dot(mass * diff_stress);
             conv_gamma  += diff_gamma.dot(mass * diff_gamma);
@@ -379,21 +382,18 @@ public:
         auto cell_ofs =  revolution::priv::offset(msh, cl);
         auto num_faces = howmany_faces(msh, cl);
 
-        Matrix<T, Dynamic, 1> stress = multiplier.block( sbs * cell_ofs,  0, sbs, 1);
-        Matrix<T, Dynamic, 1> gamma  = compute_auxiliar( msh,  cl, assembler, sol_old); //or sol at this point it's the same
-        auxiliar.block(cell_ofs * sbs, 0, sbs, 1) = gamma;
-
-        vector_type str_agam = stress - factor * alpha * gamma;
-
-        Matrix<T, Dynamic, Dynamic> mm = revolution::make_mass_matrix(msh, cl, sb);
-
-        Matrix<T, Dynamic, 1> rhs =
-                            Matrix<T, Dynamic, 1>::Zero(cbs + fbs * num_faces);
+        vector_type rhs = vector_type::Zero(cbs + fbs * num_faces);
 
         //(f, v_T)
         rhs.block( 0, 0, cbs, 1) = make_rhs(msh, cl, cb, rhs_fun);
 
         //(stress - alpha * gamma, Gv)
+        vector_type stress = multiplier.block( sbs * cell_ofs,  0, sbs, 1);
+        vector_type gamma  = compute_auxiliar( msh,  cl, assembler, sol_old); //or sol at this point it's the same
+        auxiliar.block(cell_ofs * sbs, 0, sbs, 1) = gamma;
+        vector_type str_agam = stress - factor * alpha * gamma;
+        matrix_type mm = revolution::make_mass_matrix(msh, cl, sb);
+
         rhs -=  G.first.transpose() * mm * str_agam;
 
         return rhs;
@@ -407,8 +407,7 @@ public:
 
         for (auto cl : msh)
         {
-            Matrix<T, Dynamic, 1> local_rhs = make_rhs_alg(msh, cl, assembler);
-
+            vector_type local_rhs = make_rhs_alg(msh, cl, assembler);
             assembler.assemble_rhs(msh, cl, local_rhs);
         }
         assembler.finalize_rhs();
@@ -426,11 +425,10 @@ public:
         {
             auto G  = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
             auto gr = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
-            Matrix<T, Dynamic, Dynamic> stab;
-            stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
+            matrix_type stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
             auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
 
-            Matrix<T, Dynamic, Dynamic> A = factor *(alpha * G.second + viscosity * stab);
+            matrix_type A = factor *(alpha * G.second + viscosity * stab);
 
             assembler.assemble_lhs(msh, cl, A, -dr);
         }
@@ -455,7 +453,7 @@ public:
         size_t systsz = assembler.LHS.rows();
         size_t nnz = assembler.LHS.nonZeros();
 
-        sol = vector_type::Zero(systsz);
+        sol = dynamic_vector<T>::Zero(systsz);
         disk::solvers::pardiso_params<T> pparams;
         mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);
 
@@ -471,9 +469,9 @@ public:
         auto dim = Mesh::dimension;
         auto rbs = revolution::vector_basis_size(di.reconstruction_degree(), dim, dim);
 
-        Matrix< T, Dynamic, 1> cell_sol(cbs * msh.cells_size());
-        Matrix< T, Dynamic, 1> cell_rec_sol(rbs * msh.cells_size());
-        Matrix< T, Dynamic, 1> press_vec(pbs * msh.cells_size());
+        dynamic_vector<T> cell_sol(cbs * msh.cells_size());
+        dynamic_vector<T> cell_rec_sol(rbs * msh.cells_size());
+        dynamic_vector<T> press_vec(pbs * msh.cells_size());
 
         std::ofstream ofs("data_" + info + ".data");
         if (!ofs.is_open())
@@ -483,7 +481,7 @@ public:
         {
             auto gr  = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
             auto cell_ofs = revolution::priv::offset(msh, cl);
-            Matrix<T, Dynamic, 1> svel =  assembler.take_velocity(msh, cl, sol);
+            vector_type svel =  assembler.take_velocity(msh, cl, sol);
             assert((gr.first * svel).rows() == rbs - dim);
             cell_rec_sol.block(cell_ofs * rbs + dim, 0, rbs - dim, 1) = gr.first * svel;
             cell_rec_sol.block(cell_ofs * rbs, 0, dim, 1) = svel.block(0,0, dim, 1);
@@ -493,13 +491,13 @@ public:
             auto bar = barycenter(msh, cl);
 
             //Velocity
-            Matrix<T, Dynamic, 1> cell_vel = svel.block(0,0, cbs, 1);
+            vector_type cell_vel = svel.block(0,0, cbs, 1);
             auto cb  = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
             auto phi = cb.eval_functions(bar);
             Matrix<T, Mesh::dimension, 1> ueval = revolution::eval(cell_vel, phi);
 
             //Pressure
-            Matrix<T, Dynamic, 1> spress =  assembler.take_pressure(msh, cl, sol);
+            vector_type spress =  assembler.take_pressure(msh, cl, sol);
             auto pb  = revolution::make_scalar_monomial_basis(msh, cl, di.face_degree());
             auto p_phi = pb.eval_functions(bar);
             T peval =  p_phi.dot(spress);
@@ -508,11 +506,11 @@ public:
             auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
             auto s_phi  = sb.eval_functions(bar);
             auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
-            Matrix<T, Dynamic, 1> Gu = G.first * svel;
-            Matrix<T, Dynamic, 1> stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
-            Matrix<T, Dynamic, 1> theta  = stress  +  factor * alpha * Gu;
-            Matrix<T, Mesh::dimension, Mesh::dimension> theta_eval = revolution::eval(theta, s_phi);
-            Matrix<T, Mesh::dimension, Mesh::dimension> sigma_eval = revolution::eval(stress, s_phi);
+            vector_type Gu = G.first * svel;
+            vector_type stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
+            vector_type theta  = stress  +  factor * alpha * Gu;
+            tensor_type theta_eval = revolution::eval(theta, s_phi);
+            tensor_type sigma_eval = revolution::eval(stress, s_phi);
             T divu = Gu(0,0) + Gu(1,1);
             T tr_stress = sigma_eval(0,0) + sigma_eval(1,1);
             ofs << ueval(0)   << " " << ueval(1) << " " << peval<< " ";
