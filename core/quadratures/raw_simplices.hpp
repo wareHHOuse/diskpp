@@ -99,7 +99,7 @@ barycenter(const raw_simplex<T,N>& rs)
 {
     auto pts = rs.points();
     auto bar = std::accumulate(std::next(pts.begin()), pts.end(), pts.front());
-    return bar / pts.size();
+    return bar / T(pts.size());
 }
 
 template<typename T>

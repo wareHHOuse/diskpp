@@ -124,9 +124,91 @@ diameter(const Mesh& msh, const Element& elem)
 }
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+std::array<T, 3>
+diameter_boundingbox(const Mesh<T, 3, Storage>& msh, const typename Mesh<T, 3, Storage>::cell& cl)
+{
+    const auto pts = points(msh, cl);
+
+    T xmin = 0;
+    T xmax = 0;
+    T ymin = 0;
+    T ymax = 0;
+    T zmin = 0;
+    T zmax = 0;
+
+    for (auto& pt : pts)
+    {
+        if (pt.x() < xmin)
+        {
+            xmin = pt.x();
+        }
+        else if (pt.x() > xmax)
+        {
+            xmax = pt.x();
+        }
+
+        if (pt.y() < ymin)
+        {
+            ymin = pt.y();
+        }
+        else if (pt.y() > ymax)
+        {
+            ymax = pt.y();
+        }
+
+        if (pt.z() < zmin)
+        {
+            zmin = pt.z();
+        }
+        else if (pt.z() > zmax)
+        {
+            zmax = pt.z();
+        }
+    }
+
+    return {std::abs(xmax - xmin), std::abs(ymax - ymin), std::abs(zmax - zmin)};
+}
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+std::array<T,2>
+diameter_boundingbox(const Mesh<T, 2, Storage>&                      msh,
+                     const typename Mesh<T, 2, Storage>::cell&       cl)
+{
+    const auto pts = points(msh, cl);
+
+    T xmin = 0;
+    T xmax = 0;
+    T ymin = 0;
+    T ymax = 0;
+
+    for (auto& pt : pts)
+    {
+        if(pt.x() < xmin)
+        {
+            xmin = pt.x();
+        }
+        else if (pt.x() > xmax)
+        {
+            xmax = pt.x();
+        }
+
+        if (pt.y() < ymin)
+        {
+            ymin = pt.y();
+        }
+        else if (pt.y() > ymax)
+        {
+            ymax = pt.y();
+        }
+    }
+
+    return {std::abs(xmax - xmin), std::abs(ymax - ymin)};
+}
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 bool
-is_inside(const Mesh<T, 2, Storage>& msh,
-          const typename Mesh<T, 2, Storage>::cell& cl,
+is_inside(const Mesh<T, 2, Storage>&                      msh,
+          const typename Mesh<T, 2, Storage>::cell&       cl,
           const typename Mesh<T, 2, Storage>::point_type& pt)
 {
     /* Nodes MUST be ordered COUNTERCLOCKWISE and the polygon must be CONVEX */
@@ -135,13 +217,16 @@ is_inside(const Mesh<T, 2, Storage>& msh,
     for (size_t i = 0; i < pts.size(); i++)
     {
         auto p0 = pts[i];
-        auto p1 = pts[i%pts.size()];
+        auto p1 = pts[i % pts.size()];
 
-        auto x = pt.x();  auto y = pt.y();
-        auto x0 = p0.x(); auto y0 = p0.y();
-        auto x1 = p1.x(); auto y1 = p1.y();
+        auto x  = pt.x();
+        auto y  = pt.y();
+        auto x0 = p0.x();
+        auto y0 = p0.y();
+        auto x1 = p1.x();
+        auto y1 = p1.y();
 
-        if ( (y - y0)*(x1 - x0) - (x - x0)*(y1 - y0) < 0.0 )
+        if ((y - y0) * (x1 - x0) - (x - x0) * (y1 - y0) < 0.0)
             return false;
     }
 
