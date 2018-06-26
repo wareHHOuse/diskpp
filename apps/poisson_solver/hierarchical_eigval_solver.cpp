@@ -186,6 +186,7 @@ class hierarchical_eigval_solver
         }
         ofs.close();
 
+        return true;
     }
 
     template<typename Mesh>
@@ -339,12 +340,14 @@ class hierarchical_eigval_solver
             ofs << gx.dot(gM*gx) << std::endl;
         }
         ofs.close();
+
+        return true;
     }
 
-
-	bool init(const std::string& config_fn)
-	{
-		sol::state lua;
+    bool
+    init(const std::string& config_fn)
+    {
+        sol::state lua;
     	lua.open_libraries(sol::lib::math, sol::lib::base);
     	lua["config"] = lua.create_table();
         lua["hs"] = lua.create_table();
