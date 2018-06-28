@@ -8,7 +8,6 @@
  *
  * This file is copyright of the following authors:
  * Karol Cascavita (C) 2018                     karol.cascavita@enpc.fr
- * Intissar Addali (C) 2018                     intissar.addali@inria.fr
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -129,7 +128,7 @@ full_offset(const Mesh& msh, const hho_degree_info& hdi)
 
 template<typename Mesh>
 auto
-fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
+newton_solver(const Mesh& msh, const hho_degree_info& hdi,
                 const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
                 const typename Mesh::coordinate_type & gamma_0,
                 const typename Mesh::coordinate_type & theta,
@@ -167,16 +166,25 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
             auto rhs_f  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
             matrix_type A = gr.second + stab;
             vector_type rhs = vector_type::Zero(num_dofs);
-            rhs.block(0, 0, cbs, 1) = rhs_f;
+            rhs.block(0, 0, cbs, 1) -= rhs_f;
+
+            auto cell_ofs = offset_vector.at(cl_count);
+            vector_type u_full = full_sol_old.block(cell_ofs, 0, num_dofs, 1);
 
             if (is_contact_vector.at(cl_count))
             {
-                auto cell_ofs = offset_vector.at(cl_count);
-                vector_type u_full = full_sol_old.block(cell_ofs, 0, num_dofs, 1);
-
+                //matrix An(du, v)
             	A -= theta * make_contact_unnamed(msh, cl, hdi, gr.first, gamma_0, bnd);
-                rhs -= make_contact_negative_trace(msh, cl, hdi, gr.first, gamma_0, theta, bnd, u_full);
+
+                //rhs: int [Pn(u_old,v)]_Pn[v]
+                rhs += = make_contact_negative_trace(msh, cl, hdi, gr.first, gamma_0, theta, bnd, u_full);
             }
+            //rhs: An(u_old,v)
+            rhs += A * u_full;
+
+            //matrix Heaviside term
+            if(in_set_A)
+               A -=  make_contact_heaveside(msh, cl, hdi, gr.first, gamma_0, theta, bnd);
 
             auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, rhs);
             assembler.assemble(msh, cl, sc.first, sc.second);
@@ -212,25 +220,36 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
             auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
             auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
             auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
-            vector_type rhs = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
+            auto rhs_force = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
             matrix_type A   = gr.second + stab;
+
+            vector_type rhs = vector_type::Zero(num_dofs);
+            rhs.block(0, 0, cbs, 1) -= rhs_force;
+
+            auto cell_ofs = offset_vector.at(cl_count);
+            vector_type u_full = full_sol_old.block(cell_ofs, 0, num_total_dofs, 1);
 
             if (is_contact_vector.at(cl_count))
             {
-                auto cell_ofs = offset_vector.at(cl_count);
-                vector_type u_full = full_sol_old.block(cell_ofs, 0, num_total_dofs, 1);
+                //matrix An(du, v)
+            	A -= theta * make_contact_unnamed(msh, cl, hdi, gr.first, gamma_0, bnd);
 
-            	A -= theta * make_contact_unnamed(msh, cl, hdi, gr.first, gamma_0, bnd );
-                vector_type rhs_contact =
-                    make_contact_negative_trace(msh, cl, hdi, gr.first, gamma_0, theta, bnd, u_full);
-
-                rhs -=  rhs_contact.block(0, 0, cbs, 1);
+                //rhs: int [Pn(u_old,v)]_Pn[v]
+                rhs += = make_contact_negative_trace(msh, cl, hdi, gr.first, gamma_0, theta, bnd, u_full);
             }
+            //rhs: An(u_old,v)
+            rhs += A * u_full;
+
+            //matrix Heaviside term ::: Dont use this before rhs += A * u_full;
+            if(in_set_A)
+               A -=  make_contact_heaveside(msh, cl, hdi, gr.first, gamma_0, theta, bnd);
+
+            vector_type cell_rhs = rhs.block(0, 0, cbs, 1);
 
             Matrix<T, Dynamic, 1> u_faces =
                                         assembler.take_local_data(msh, cl, sol);
             Matrix<T, Dynamic, 1> u_full =
-                diffusion_static_condensation_recover(msh, cl, hdi, A, rhs, u_faces);
+                diffusion_static_condensation_recover(msh, cl, hdi, A, cell_rhs, u_faces);
 
             auto cell_ofs = offset_vector.at(cl_count);
             vector_type  u_full_old = full_sol_old.block(cell_ofs, 0, num_total_dofs ,1);
@@ -294,7 +313,7 @@ run_signorini(const Mesh& msh,
 	    i++;
     }
 
-    fix_point_solver( msh, hdi, m_bnd, gamma_0, theta, is_contact_vector);
+    newton_solver( msh, hdi, m_bnd, gamma_0, theta, is_contact_vector);
 
     return;
 }
@@ -305,19 +324,20 @@ int main(int argc, char **argv)
     using T = double;
 
     int ch;
+    size_t degree = 1;
     T gamma_0 = 0.1;
     T theta = 1.;
 
-    while ( (ch = getopt(argc, argv, "g:npz")) != -1 )
+    while ( (ch = getopt(argc, argv, "k:g:npz")) != -1 )
     {
         switch(ch)
         {
-            case 'g':
-                gamma_0 = atof(optarg);
-                if (gamma_0 <= 0)
+            case 'k':
+                degree = atoi(optarg);
+                if (degree != 0 && degree != 1)
                 {
-                    std::cout << "gamma_0 must be >0. Falling back to 0.1" << std::endl;
-                    gamma_0 = 0.1;
+                    std::cout << "Degree can be 0 or 1. Falling back to 1" << std::endl;
+                    degree = 1;
                 }
                 break;
                 case 'n':
