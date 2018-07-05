@@ -39,6 +39,8 @@
 #include <Eigen/SparseLU>
 #include <unsupported/Eigen/SparseExtra>
 
+#include <Eigen/StdVector>
+
 #pragma clang diagnostic pop
 
 template<typename T>
@@ -47,11 +49,15 @@ using dynamic_matrix = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 template<typename T>
 using dynamic_vector = Eigen::Matrix<T, Eigen::Dynamic, 1>;
 
-template<typename T, size_t M, size_t N>
+template<typename T, int M, int N>
 using static_matrix = Eigen::Matrix<T, M, N>;
 
-template<typename T, size_t N>
+template<typename T, int N>
 using static_vector = Eigen::Matrix<T, N, 1>;
+
+// to mimic fourth order tensor
+template<typename T, int N>
+using static_tensor = Eigen::Matrix<T, N * N, N * N>;
 
 template<typename T, size_t M, size_t N>
 using material_tensor = static_matrix<T, M, N>;
@@ -61,6 +67,9 @@ using sparse_matrix = Eigen::SparseMatrix<T>;
 
 template<typename T>
 using triplet = Eigen::Triplet<T>;
+
+template<typename T>
+using eigen_compatible_stdvector = std::vector<T, Eigen::aligned_allocator<T>>;
 
 template<typename T>
 static_vector<T, 3>

@@ -24,7 +24,10 @@
 #include <regex>
 
 #include "loaders/loader.hpp"
-#include "hho/hho.hpp"
+//#include "hho/hho.hpp"
+
+#include "core/bases/bases.hpp"
+#include "core/quadratures/quadratures.hpp"
 
 
 template<typename MeshType>

@@ -99,7 +99,7 @@ barycenter(const raw_simplex<T,N>& rs)
 {
     auto pts = rs.points();
     auto bar = std::accumulate(std::next(pts.begin()), pts.end(), pts.front());
-    return bar / pts.size();
+    return bar / T(pts.size());
 }
 
 template<typename T>
@@ -167,19 +167,29 @@ split_in_raw_tetrahedra(const Mesh& msh, const typename Mesh::cell& cl)
 {
     typedef raw_simplex<typename Mesh::point_type, 3>   raw_simplex_type;
 
-    auto bar    = barycenter(msh, cl);
-    auto fcs    = faces(msh, cl);
+    auto pts    = points(msh, cl);
+    assert(pts.size() >= 4);
 
-    std::vector<raw_simplex_type>   raw_simplices;
-    for (auto& fc : fcs)
+    std::vector<raw_simplex_type> raw_simplices;
+    if(pts.size() == 4)
     {
-        auto tris = split_in_raw_triangles(msh, fc);
+        raw_simplices.push_back(raw_simplex_type({pts[0], pts[1], pts[2], pts[3]}));
+    }
+    else
+    {
+        auto bar = barycenter(msh, cl);
+        auto fcs = faces(msh, cl);
 
-        for (auto& tri : tris)
+        for (auto& fc : fcs)
         {
-            auto tpts = points(tri);
-            auto rs = raw_simplex_type( {bar, tpts[0], tpts[1], tpts[2]} );
-            raw_simplices.push_back( rs );
+            auto tris = split_in_raw_triangles(msh, fc);
+
+            for (auto& tri : tris)
+            {
+                auto tpts = points(tri);
+                auto rs   = raw_simplex_type({bar, tpts[0], tpts[1], tpts[2]});
+                raw_simplices.push_back(rs);
+            }
         }
     }
 
