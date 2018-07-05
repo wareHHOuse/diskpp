@@ -49,14 +49,14 @@ struct test_functor
 
         scalar_type error = 0.0;
 
-        for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++)
+        for (auto itor = msh.cells_begin(); itor != msh.cells_end(); itor++)
         {
-            auto fc = *itor;
-            auto basis = revolution::make_scalar_monomial_basis(msh, fc, degree);
+            auto cl = *itor;
+            auto basis = revolution::make_scalar_monomial_basis(msh, cl, degree);
 
-            Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, fc, degree, f);
+            Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, degree, f);
 
-            auto qps = revolution::integrate(msh, fc, 2*degree+4);
+            auto qps = revolution::integrate(msh, cl, 2*degree+4);
             for (auto& qp : qps)
             {
                 auto tv = f(qp.point());
@@ -124,8 +124,8 @@ int main(void)
 {
     _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
 
-    //test_triangles_generic();
-    //test_triangles_netgen();
+    test_triangles_generic();
+    test_triangles_netgen();
     test_quads();
     test_tetrahedra_netgen();
 

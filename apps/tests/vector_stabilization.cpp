@@ -123,10 +123,10 @@ void test_tetrahedra_netgen(void)
 
 int main(void)
 {
-    //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+    _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
 
-    //test_triangles_generic();
-    //test_triangles_netgen();
+    test_triangles_generic();
+    test_triangles_netgen();
     test_quads();
     test_tetrahedra_netgen();
 
