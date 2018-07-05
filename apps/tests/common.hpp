@@ -287,6 +287,37 @@ get_cartesian_diskpp_meshes(void)
 }
 
 template<typename T>
+std::vector< disk::generic_mesh<T, 3> >
+get_generic_fvca6_meshes(void)
+{
+    std::vector<std::string> meshfiles;
+    meshfiles.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_10.msh");
+    meshfiles.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_20.msh");
+    meshfiles.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_30.msh");
+    meshfiles.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_40.msh");
+
+    typedef disk::generic_mesh<T, 3>  mesh_type;
+
+    std::vector< mesh_type > ret;
+    for (size_t i = 0; i < meshfiles.size(); i++)
+    {
+        mesh_type msh;
+        disk::fvca6_mesh_loader<T, 3> loader;
+
+        if (!loader.read_mesh(meshfiles.at(i)))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            continue;
+        }
+        loader.populate_mesh(msh);
+
+        ret.push_back(msh);
+    }
+
+    return ret;
+}
+
+template<typename T>
 std::vector< disk::generic_mesh<T, 2> >
 get_quad_generic_meshes(void)
 {
