@@ -255,6 +255,38 @@ get_tetrahedra_netgen_meshes(void)
 }
 
 template<typename T>
+std::vector< disk::cartesian_mesh<T, 3> >
+get_cartesian_diskpp_meshes(void)
+{
+    std::vector<std::string> meshfiles;
+    meshfiles.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-2-2-2.hex");
+    meshfiles.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-4-4-4.hex");
+    meshfiles.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-8-8-8.hex");
+    meshfiles.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-16-16-16.hex");
+    meshfiles.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-32-32-32.hex");
+
+    typedef disk::cartesian_mesh<T, 3>  mesh_type;
+
+    std::vector< mesh_type > ret;
+    for (size_t i = 0; i < meshfiles.size(); i++)
+    {
+        mesh_type msh;
+        disk::cartesian_mesh_loader<T, 3> loader;
+
+        if (!loader.read_mesh(meshfiles.at(i)))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            continue;
+        }
+        loader.populate_mesh(msh);
+
+        ret.push_back(msh);
+    }
+
+    return ret;
+}
+
+template<typename T>
 std::vector< disk::generic_mesh<T, 2> >
 get_quad_generic_meshes(void)
 {
