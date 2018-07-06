@@ -41,13 +41,13 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-#include "plasticity_solver.hpp"
+#include "finite_strains_solver.hpp"
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 void
-run_plasticity_solver(const Mesh<T, 2, Storage>&        msh,
-                      const ParamRun<T>&                rp,
-                      const NLE::MaterialParameters<T>& material_data)
+run_finite_strains_solver(const Mesh<T, 2, Storage>&        msh,
+                          const ParamRun<T>&                rp,
+                          const NLE::MaterialParameters<T>& material_data)
 {
     typedef Mesh<T, 2, Storage>                            mesh_type;
     typedef static_vector<T, 2>                            result_type;
@@ -82,7 +82,7 @@ run_plasticity_solver(const Mesh<T, 2, Storage>&        msh,
     //bnd.addNeumannBC(disk::mechanics::NEUMANN, 8, trac);
     bnd.addDirichletBC(disk::mechanics::DY, 8, depltest);
 
-    plasticity_solver<mesh_type> nl(msh, bnd, rp, material_data);
+    finite_strains_solver<mesh_type> nl(msh, bnd, rp, material_data);
 
     if (nl.verbose())
     {
@@ -140,9 +140,9 @@ run_plasticity_solver(const Mesh<T, 2, Storage>&        msh,
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 void
-run_plasticity_solver(const Mesh<T, 3, Storage>&        msh,
-                      const ParamRun<T>&                rp,
-                      const NLE::MaterialParameters<T>& material_data)
+run_finite_strains_solver(const Mesh<T, 3, Storage>&        msh,
+                          const ParamRun<T>&                rp,
+                          const NLE::MaterialParameters<T>& material_data)
 {
     typedef Mesh<T, 3, Storage>                            mesh_type;
     typedef static_vector<T, 3>                            result_type;
@@ -222,7 +222,7 @@ run_plasticity_solver(const Mesh<T, 3, Storage>&        msh,
 
     // Solver
 
-    plasticity_solver<mesh_type> nl(msh, bnd, rp, material_data);
+    finite_strains_solver<mesh_type> nl(msh, bnd, rp, material_data);
 
     if (nl.verbose())
     {
@@ -276,8 +276,6 @@ run_plasticity_solver(const Mesh<T, 3, Storage>&        msh,
     nl.compute_is_plastic_continuous("state3D_cont.msh");
     nl.compute_continuous_deformed("deformed3D_cont.msh");
     nl.compute_discontinuous_deformed("deformed3D_disc.msh");
-
-    nl.compute_sphere("resu_sphere.dat");
 }
 
 int
@@ -381,7 +379,7 @@ main(int argc, char** argv)
 
     // material_data.sigma_y0 = 10E12;
 
-    //Test Thin Plate (elastic)
+    // Test Thin Plate (elastic)
     // RealType E  = 250;
     // RealType nu = 0.3;
 
@@ -423,7 +421,7 @@ main(int argc, char** argv)
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
         auto msh = disk::load_fvca5_2d_mesh<RealType>(mesh_filename);
-        run_plasticity_solver(msh, rp, material_data);
+        run_finite_strains_solver(msh, rp, material_data);
         return 0;
     }
 
@@ -432,7 +430,7 @@ main(int argc, char** argv)
     {
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
         auto msh = disk::load_netgen_2d_mesh<RealType>(mesh_filename);
-        run_plasticity_solver(msh, rp, material_data);
+        run_finite_strains_solver(msh, rp, material_data);
         return 0;
     }
 
@@ -440,7 +438,7 @@ main(int argc, char** argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.quad$"))) {
        std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
        auto msh = disk::load_cartesian_2d_mesh<RealType>(mesh_filename);
-       run_plasticity_solver(msh, rp, material_data);
+       run_finite_strains_solver(msh, rp, material_data);
        return 0;
     }
 
@@ -449,7 +447,7 @@ main(int argc, char** argv)
     {
         std::cout << "Guessed mesh format: Medit format" << std::endl;
         auto msh = disk::load_medit_2d_mesh<RealType>(mesh_filename);
-        run_plasticity_solver(msh, rp, material_data);
+        run_finite_strains_solver(msh, rp, material_data);
         return 0;
     }
 
@@ -457,7 +455,7 @@ main(int argc, char** argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$"))) {
        std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
        auto msh = disk::load_netgen_3d_mesh<RealType>(mesh_filename);
-       run_plasticity_solver(msh, rp, material_data);
+       run_finite_strains_solver(msh, rp, material_data);
        return 0;
     }
 
@@ -465,7 +463,7 @@ main(int argc, char** argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.medit3d$"))) {
        std::cout << "Guessed mesh format: Medit format" << std::endl;
        auto msh = disk::load_medit_3d_mesh<RealType>(mesh_filename);
-       run_plasticity_solver(msh, rp, material_data);
+       run_finite_strains_solver(msh, rp, material_data);
        return 0;
     }
 
@@ -473,7 +471,7 @@ main(int argc, char** argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.hex$"))) {
        std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
        auto msh = disk::load_cartesian_3d_mesh<RealType>(mesh_filename);
-       run_plasticity_solver(msh, rp, material_data);
+       run_finite_strains_solver(msh, rp, material_data);
        return 0;
     }
 
@@ -481,7 +479,7 @@ main(int argc, char** argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.msh$"))) {
        std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
        auto msh = disk::load_fvca6_3d_mesh<RealType>(mesh_filename);
-       run_plasticity_solver(msh, rp, material_data);
+       run_finite_strains_solver(msh, rp, material_data);
        return 0;
     }
 }

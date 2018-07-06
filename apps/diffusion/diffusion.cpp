@@ -79,7 +79,7 @@ run_diffusion_solver(const Mesh<T, 2, Storage>& msh, run_params& rp)
 {
     typedef Mesh<T, 2, Storage> mesh_type;
 
-    std::cout << mesh_h(msh) << std::endl;
+    std::cout << average_diameter(msh) << std::endl;
 
     auto load = [](const point<T, 2>& p) -> auto {
 

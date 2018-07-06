@@ -25,4 +25,4 @@ add_subdirectory(tests)
 add_subdirectory(netgen_bnd_test)
 add_subdirectory(vector_laplacian)
 add_subdirectory(plasticity)
-
+add_subdirectory(finite_strains)

@@ -11,14 +11,14 @@ set(diskpp_VERSION_MINOR 0)
 set(diskpp_VERSION_PATCH 0)
 
 # Additional modules path for cmake
-set (CMAKE_MODULE_PATH 
+set (CMAKE_MODULE_PATH
      ${CMAKE_MODULE_PATH}
      ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 include(safeguards)
 include(agmg)
 
-set(CMAKE_CXX_FLAGS_DEBUG "-std=c++14 -g -fpermissive -fsanitize=address")
+set(CMAKE_CXX_FLAGS_DEBUG "-std=c++14 -g -fpermissive")
 set(CMAKE_CXX_FLAGS_RELEASE "-std=c++14 -O3 -mavx -g -fpermissive -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASEASSERT "-std=c++14 -O3 -mavx -g -fpermissive")
 
@@ -70,6 +70,7 @@ endif()
 
 add_subdirectory(contrib)
 add_subdirectory(core)
+add_subdirectory(utils)
 
 add_library(diskpp SHARED ${diskpp_source})
 set(LINK_LIBS "${LINK_LIBS}" diskpp)

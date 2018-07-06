@@ -100,7 +100,9 @@ public:
 
     generic_element_base(std::initializer_list<sub_id_type> l)
         : m_sids_ptrs(l)
-    {}
+    {
+        set_point_ids();
+    }
 
     explicit generic_element_base(const std::vector<sub_id_type>& sids_ptrs)
         : m_sids_ptrs(sids_ptrs)
@@ -141,7 +143,7 @@ public:
     std::vector<point_id_type>
     point_ids(void) const
     {
-        assert( m_pts_ptrs.size() != 0 );
+        assert( m_pts_ptrs.size() > 0 );
         return m_pts_ptrs;
     }
 

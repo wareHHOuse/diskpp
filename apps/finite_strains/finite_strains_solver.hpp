@@ -55,7 +55,7 @@ struct time_step
 };
 
 template<typename Mesh>
-class plasticity_solver
+class finite_strains_solver
 {
     typedef Mesh                                 mesh_type;
     typedef typename mesh_type::scalar_type      scalar_type;
@@ -66,7 +66,7 @@ class plasticity_solver
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
     typedef disk::mechanics::BoundaryConditions<mesh_type>        bnd_type;
-    typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_type;
+    typedef disk::LinearLaw<mesh_type> law_type;
 
     typename revolution::hho_degree_info m_hdi;
     bnd_type                             m_bnd;
@@ -145,8 +145,8 @@ class plasticity_solver
         for (auto& cl : m_msh)
         {
             /////// Gradient Reconstruction /////////
-            const auto sgr = make_hho_sym_gradrec_matrix(m_msh, cl, m_hdi);
-            m_gradient_precomputed.push_back(sgr.first);
+            const auto gr = make_hho_gradrec_matrix(m_msh, cl, m_hdi);
+            m_gradient_precomputed.push_back(gr.first);
 
             if (m_rp.m_stab)
             {
@@ -154,8 +154,8 @@ class plasticity_solver
                 {
                     case HHO:
                     {
-                        const auto recons   = make_hho_vector_symmetric_laplacian(m_msh, cl, m_hdi);
-                        const auto stab_HHO = make_hho_vector_stabilization(m_msh, cl, recons.first, m_hdi);
+                        const auto recons_scalar = make_hho_scalar_laplacian(m_msh, cl, m_hdi);
+                        const auto stab_HHO = make_hho_vector_stabilization_optim(m_msh, cl, recons_scalar.first, m_hdi);
                         m_stab_precomputed.push_back(stab_HHO);
                         break;
                     }
@@ -174,8 +174,12 @@ class plasticity_solver
     }
 
   public:
-    plasticity_solver(const mesh_type& msh, const bnd_type& bnd, const param_type& rp, const data_type& material_data) :
-      m_msh(msh), m_verbose(rp.m_verbose), m_convergence(false), m_rp(rp), m_bnd(bnd)
+    finite_strains_solver(const mesh_type&  msh,
+                          const bnd_type&   bnd,
+                          const param_type& rp,
+                          const data_type&  material_data) :
+      m_msh(msh),
+      m_verbose(rp.m_verbose), m_convergence(false), m_rp(rp), m_bnd(bnd)
     {
         int face_degree = rp.m_face_degree;
         if (rp.m_face_degree < 0)
@@ -210,7 +214,7 @@ class plasticity_solver
 
         m_law = law_type(m_msh, 2 * m_hdi.grad_degree());
         m_law.addMaterialData(
-          material_data.lambda, material_data.mu, material_data.H, material_data.K, material_data.sigma_y0);
+          material_data.lambda, material_data.mu);
 
         if (m_verbose)
         {
@@ -285,7 +289,7 @@ class plasticity_solver
         }
 
         // Newton solver
-        NLE::NewtonRaphson_solver_plasticity<mesh_type> newton_solver(m_msh, m_hdi, m_bnd, m_rp);
+        NLE::NewtonRaphson_solver_finite_strains<mesh_type> newton_solver(m_msh, m_hdi, m_bnd, m_rp);
 
         newton_solver.initialize(m_solution_cells, m_solution_faces, m_solution_data);
 
@@ -1145,70 +1149,5 @@ class plasticity_solver
         }
         // Save mesh
         gmsh.writeGmesh(filename, 2);
-    }
-
-    // cas particuliers
-    // post traitement pour la sphere
-    void
-    compute_sphere(const std::string& filename) const
-    {
-        const size_t cell_degree   = m_hdi.cell_degree();
-        const auto   material_data = m_law.getMaterialData();
-
-        std::ofstream output;
-        output.open(filename, std::ofstream::out | std::ofstream::trunc);
-
-        if (!output.is_open())
-        {
-            std::cerr << "Unable to open file " << filename << std::endl;
-        }
-
-        output << "#R"
-               << "\t"
-               << "ur"
-               << "\t"
-               << "sigma_rr"
-               << "\t"
-               << "sigma_oo"
-               << "\t"
-               << "sigma_trace" << std::endl;
-
-        size_t cell_i(0);
-        for (auto& cl : m_msh)
-        {
-            const vector_dynamic x              = m_solution_cells.at(cell_i);
-            const auto           law_quadpoints = m_law.getCellIVs(cell_i).getIVs();
-
-            // Loop on nodes
-            auto cb = revolution::make_vector_monomial_basis(m_msh, cl, cell_degree);
-            for (auto& qp : law_quadpoints)
-            {
-                const auto        stress = qp.compute_stress(material_data);
-                const scalar_type trace  = stress.trace();
-
-                const auto qp_pt = qp.point();
-                const auto cphi  = cb.eval_functions(qp_pt);
-                const auto depl  = revolution::eval(x, cphi);
-
-                static_vector<scalar_type, dimension> er = static_vector<scalar_type, dimension>::Zero();
-
-                er(0) = qp_pt.x();
-                er(1) = qp_pt.y();
-                er(2) = qp_pt.z();
-
-                const scalar_type r = er.norm();
-                er /= r;
-
-                const scalar_type sigma_rr = er.dot(stress * er);
-                const scalar_type sigma_oo = (stress.trace() - sigma_rr) / 2.0;
-                const scalar_type ur       = depl.dot(er);
-
-                output << r << "\t" << ur << "\t" << sigma_rr << "\t" << sigma_oo << "\t" << stress.trace()
-                       << std ::endl;
-            }
-            cell_i++;
-        }
-
-        output.close();
     }
 };

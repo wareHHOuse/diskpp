@@ -30,7 +30,7 @@
 #include "CavitationLaw.hpp"
 #include "HenckyMises/HenckyMises.hpp"
 #include "LinearIsotropicAndKinematicHardening/LinearIsotropicAndKinematicHardening.hpp"
-#include "LinearLaw.hpp"
+#include "LinearLaw/LinearLaw.hpp"
 #include "NeohookeanLaw.hpp"
 #include "pLaplaceLaw.hpp"
 

@@ -135,12 +135,36 @@ void test_tetrahedra_netgen(void)
     do_testing(meshes, tf);
 }
 
+void test_cartesian_diskpp(void)
+{
+    std::cout << "*** TESTING CARTESIAN MESH ***" << std::endl;
+    using T = double;
+
+    auto meshes = get_cartesian_diskpp_meshes<T>();
+    auto tf = get_test_functor(meshes);
+    do_testing(meshes, tf);
+}
+
+void test_generic_fvca6(void)
+{
+    std::cout << "*** TESTING GENERIC FVCA6 MESH ***" << std::endl;
+    using T = double;
+
+    auto meshes = get_generic_fvca6_meshes<T>();
+    auto tf = get_test_functor(meshes);
+    do_testing(meshes, tf);
+}
+
 int main(void)
 {
-    _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+    //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
 
-    //test_triangles_generic();
-    //test_triangles_netgen();
-    //test_quads();
+    test_triangles_generic();
+    test_triangles_netgen();
+    test_quads();
     test_tetrahedra_netgen();
+    test_cartesian_diskpp();
+    test_generic_fvca6();
+
+    return 0;
 }

@@ -49,7 +49,7 @@ bool test_mesh(Mesh<T, DIM, Storage>& msh)
 
     std::cout << "Num. of boundary faces: " << msh.boundary_faces_size() << std::endl;
     std::cout << "Num. of internal faces: " << msh.internal_faces_size() << std::endl;
-    //std::cout << "Mesh h: " << mesh_h(msh) << std::endl;
+    //std::cout << "Mesh h: " << average_diameter(msh) << std::endl;
 
     size_t bcount = 0;
     for(auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++)

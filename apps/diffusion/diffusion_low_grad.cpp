@@ -242,7 +242,7 @@ void convergence_test_typ1(void)
 
             auto error = run_diffusion_solver(msh, k);
 
-            mesh_hs.push_back( disk::mesh_h(msh) );
+            mesh_hs.push_back( disk::average_diameter(msh) );
             errors.push_back(error);
         }
 
