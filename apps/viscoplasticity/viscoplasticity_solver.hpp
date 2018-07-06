@@ -97,11 +97,11 @@ public:
         T omegaExt = 2.;
         T f = 1;
         T Lref = 1.;
-        T Bn  =  std::sqrt(2) * 2.;
+        T Bn  =  0.; //std::sqrt(2) * 10.;
         //Driven
-        yield =  Bn * f * Lref;//Bn * viscosity;
+        //yield =  Bn * f * Lref;//Bn * viscosity;
         //Couette
-        //yield =  Bn * omegaExt;
+        yield =  Bn * omegaExt;
 
 
         dim =  Mesh::dimension;
@@ -150,20 +150,6 @@ public:
 
                break;
 
-            case POISEUILLE:
-                velocity  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
-                        return Matrix<T, Mesh::dimension, 1>::Zero();
-                    };
-                rhs_fun  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
-                        return Matrix<T, Mesh::dimension, 1>{1,0};
-                    };
-
-                    bnd.addDirichletBC(0, 1, wall);
-                    bnd.addDirichletBC(0, 2, wall);
-
-                    bnd.addNeumannBC(10, 3, symmetryPlane);
-                    bnd.addNeumannBC(10, 4, symmetryPlane);
-                break;
 
 
             case COUETTE:
@@ -192,41 +178,44 @@ public:
                     auto term_3 = Bn * r * std::log(Rext/r) * sgn(sigma_i);
                     u_theta = term_1 + term_2 + term_3;
                     //3. with plug
-
                     #endif
 
-                    ret(0) =  -std::sin(theta) * 2.* r;
-                    ret(1) =  std::cos(theta) * 2.* r;
+                    //ret(0) =  -std::sin(theta) * 2.* r;
+                    //ret(1) =  std::cos(theta) * 2.* r;
                     return ret;
                 };
 
-                auto v1  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
+                auto v4  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
                     Matrix<T, Mesh::dimension, 1> ret = Matrix<T, Mesh::dimension, 1>::Zero();
 
                     auto theta  = std::atan2(p.y() , p.x());
-                    T r = std::sqrt(p.x()*p.x() + p.y()*p.y());
+                    //T r = std::sqrt(p.x()*p.x() + p.y()*p.y());
+                    //w1 = 1; r = 0.5
+                    ret(0) =  -std::sin(theta) * 0.5 ;
+                    ret(1) =  std::cos(theta) * 0.5;
 
-                    ret(0) =  -std::sin(theta) *  r;
-                    ret(1) =  std::cos(theta) *  r;
                     return ret;
                 };
-
-                auto v2 = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
+                auto v3  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
                     Matrix<T, Mesh::dimension, 1> ret = Matrix<T, Mesh::dimension, 1>::Zero();
 
                     auto theta  = std::atan2(p.y() , p.x());
-                    T r = std::sqrt(p.x()*p.x() + p.y()*p.y());
+                    //T r = std::sqrt(p.x()*p.x() + p.y()*p.y());
+                    //w1 = 2; r = 1
+                    ret(0) =  -std::sin(theta);// * 2. ;
+                    ret(1) =  std::cos(theta);// * 2.;
 
-                    //1.All Solid
-                    ret(0) =  -std::sin(theta) *  2. * r;
-                    ret(1) =  std::cos(theta) *  2. * r;
+                    //std::cout << "(x,y) = ("<< p.x() << ";"<< p.y() <<");  theta = "  << theta;
+                    //std::cout << "  vel = ("<< ret(0) << "; "<< ret(1) << ")"  << std::endl;
+
                     return ret;
                 };
 
                 bnd.addNeumannBC(10, 1, symmetryPlane);
                 bnd.addNeumannBC(10, 2, symmetryPlane);
-                bnd.addDirichletBC(0, 3, v2); //velocity);
-                bnd.addDirichletBC(0, 4, v1);//velocity);
+
+                bnd.addDirichletBC(0, 3, v3); //velocity);
+                bnd.addDirichletBC(0, 4, v4);//velocity);
 
                 break;
 
@@ -275,7 +264,7 @@ public:
         	auto bar = barycenter(msh, cl);
 
             //energy error
-            vector_type svel =  assembler.take_velocity(msh, cl, sol);
+            vector_type svel = assembler.take_velocity(msh, cl, sol);
             vector_type pvel = revolution::project_function(msh, cl, di, velocity);
             //vector_type  svel_old =  assembler.take_velocity(msh, cl, sol_old);
             vector_type diff_vel = svel - pvel;
@@ -326,21 +315,21 @@ public:
         T theta_eigen = theta_eval.norm();
         assert(theta_norm == theta_eigen);
 
-        //#if 0
+        #if 0
         //Gamma Driven
         // A. Solid
         if(theta_norm <=  std::sqrt(2) * yield ||  std::abs(theta_norm - std::sqrt(2) * yield) < 1.e-8)
             return  Matrix<T, Dynamic, 1>::Zero(sbs);
         else  // B. liquid
             return  value * theta * (1. - std::sqrt(2) *(yield/theta_norm));
-        //#endif
-        #if 0
+        #endif
+        //#if 0
         // A. Solid
         if(theta_norm <=   yield ||  std::abs(theta_norm -  yield) < 1.e-8)
             return  Matrix<T, Dynamic, 1>::Zero(sbs);
         else  // B. liquid
             return  value * theta * (1. - (yield/theta_norm));
-        #endif
+        //#endif
     }
 
     template<typename Assembler>
@@ -405,7 +394,7 @@ public:
         vector_type str_agam = stress - factor * alpha * gamma;
         matrix_type mm = revolution::make_mass_matrix(msh, cl, sb);
 
-        rhs -=  G.first.transpose() * mm * str_agam;
+        //rhs -=  G.first.transpose() * mm * str_agam;
 
         return rhs;
     }
@@ -522,7 +511,9 @@ public:
             vector_type theta  = stress  +  factor * alpha * Gu;
             tensor_type theta_eval = revolution::eval(theta, s_phi);
             tensor_type sigma_eval = revolution::eval(stress, s_phi);
-            T divu = Gu(0,0) + Gu(1,1);
+            tensor_type grad_eval = revolution::eval(Gu, s_phi);
+
+            T divu = grad_eval(0,0) + grad_eval(1,1);
             T tr_stress = sigma_eval(0,0) + sigma_eval(1,1);
             ofs << ueval(0)   << " " << ueval(1) << " " << peval<< " ";
             ofs << theta_eval.norm() << " " << sigma_eval.norm()   << " ";

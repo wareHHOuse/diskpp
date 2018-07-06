@@ -55,7 +55,7 @@ run_viscoplasticity(size_t degree,
     typedef disk::generic_mesh<T, 2>  mesh_type;
 
     T tolerance = 1.e-10, Ninf = 10.e+5;
-    size_t max_iters = 50000;
+    size_t max_iters = 1; //50000;
 
     std::string name, filename;
     switch (problem)
@@ -66,11 +66,7 @@ run_viscoplasticity(size_t degree,
             break;
         case COUETTE:
             name = "couette";
-            filename = "../../../diskpp/meshes/2D_triangles/medit/couronne_h0025.medit2d";
-            break;
-        case POISEUILLE:
-            name = "poiseuille";
-            filename =  "../../../diskpp/meshes/2D_quads/medit/square_h0025.medit2d";
+            filename = "../../../diskpp/meshes/2D_triangles/medit/couronne_01.medit2d";
             break;
         default:
             std::cout << "wrong arguments" << std::endl;
@@ -98,16 +94,18 @@ run_viscoplasticity(size_t degree,
     for(i = 0; i < max_iters; i++)
     {
         als.run_stokes_like(msh, assembler, i);
-        als.update_multiplier(msh, assembler);
-        auto error = als.compute_errors(msh, assembler, false);
+
+        //als.update_multiplier(msh, assembler);
+        //auto error = als.compute_errors(msh, assembler, false);
 
         T cvg_total (0.), cvg_stress(0.), cvg_gamma(0.);
         std::tie(cvg_total, cvg_stress, cvg_gamma) = als.convergence;
 
-        if(i % 500 == 0)
+        if(i % 1000 == 0)
         {
             std::cout << "  i : "<< i<<"  - " << std::sqrt(cvg_total)<<std::endl;
             als.post_processing( msh, assembler, info +"_i" + tostr(i), problem);
+            std::cout << "done" << std::endl;
         }
 
         assert(std::sqrt(cvg_total) < Ninf);
@@ -116,6 +114,7 @@ run_viscoplasticity(size_t degree,
     }
     ofs.close();
 
+    std::cout << "Finish" << std::endl;
     auto final_error = als.compute_errors(msh, assembler, true);
     als.post_processing( msh, assembler, info +"_i" + tostr(i), problem);
 
@@ -155,11 +154,9 @@ int main(int argc, char **argv)
 
             case 'c':
                 problem = COUETTE;
+                std::cout << "couette chosen" << std::endl;
                 break;
 
-            case 'p':
-                problem = POISEUILLE;
-                break;
             case '?':
             default:
                 std::cout << "wrong arguments" << std::endl;
