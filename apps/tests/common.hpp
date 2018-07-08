@@ -28,8 +28,8 @@
 #include <iomanip>
 
 #include "core/loaders/loader.hpp"
-
 #include "contrib/sol2/sol.hpp"
+#include "contrib/colormanip.h"
 
 const size_t MIN_TEST_DEGREE = 0;
 const size_t MAX_TEST_DEGREE = 3;
@@ -366,6 +366,7 @@ get_quad_generic_meshes(void)
 template<typename Mesh, typename Function>
 void
 do_testing(std::vector<Mesh>& meshes, const Function& run_test,
+           const std::function<size_t(size_t)>& expected_rate,
            size_t min_test_degree = MIN_TEST_DEGREE,
            size_t max_test_degree = MAX_TEST_DEGREE)
 {
@@ -401,7 +402,14 @@ do_testing(std::vector<Mesh>& meshes, const Function& run_test,
                 std::cout << "    ";
                 std::cout << std::scientific << std::setprecision(5) << mesh_hs.at(i) << "    ";
                 std::cout << std::scientific << std::setprecision(5) << l2_errors.at(i) << "    ";
-                std::cout << std::defaultfloat << std::setprecision(3) << rate << std::endl;
+                std::cout << std::defaultfloat << std::setprecision(3) << rate << "    ";
+
+                if ( rate < expected_rate(k)-0.5 || rate > expected_rate(k)+0.5 )
+                    std::cout << "[" << red << "FAIL" << nocolor << "]";
+                else
+                    std::cout << "[" << green << " OK " << nocolor << "]";
+
+                std::cout << std::endl;
             }
         }
     }
@@ -424,7 +432,8 @@ class tester
 
         auto meshes = get_triangle_generic_meshes<T>();
         auto tf = get_test_functor(meshes);
-        do_testing(meshes, tf);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
     }
 
     void test_triangles_netgen(void)
@@ -434,7 +443,8 @@ class tester
 
         auto meshes = get_triangle_netgen_meshes<T>();
         auto tf = get_test_functor(meshes);
-        do_testing(meshes, tf);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
     }
 
     void test_quads(void)
@@ -444,7 +454,8 @@ class tester
 
         auto meshes = get_quad_generic_meshes<T>();
         auto tf = get_test_functor(meshes);
-        do_testing(meshes, tf);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
     }
 
     void test_tetrahedra_netgen(void)
@@ -454,7 +465,8 @@ class tester
 
         auto meshes = get_tetrahedra_netgen_meshes<T>();
         auto tf = get_test_functor(meshes);
-        do_testing(meshes, tf);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
     }
 
     void test_cartesian_diskpp(void)
@@ -464,7 +476,8 @@ class tester
 
         auto meshes = get_cartesian_diskpp_meshes<T>();
         auto tf = get_test_functor(meshes);
-        do_testing(meshes, tf);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
     }
 
     void test_generic_fvca6(void)
@@ -474,7 +487,8 @@ class tester
 
         auto meshes = get_generic_fvca6_meshes<T>();
         auto tf = get_test_functor(meshes);
-        do_testing(meshes, tf);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
     }
 
 public:

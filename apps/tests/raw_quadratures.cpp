@@ -23,23 +23,24 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
- #include <xmmintrin.h>
+#include <xmmintrin.h>
 
- #include "revolution/bases"
- #include "revolution/quadratures"
- #include "revolution/methods/hho"
+#include "revolution/bases"
+#include "revolution/quadratures"
+#include "revolution/methods/hho"
 
- #include "common.hpp"
-
- #include "contrib/sol2/sol.hpp"
+#include "common.hpp"
 
 template<typename Mesh>
-struct test_functor
+struct test_functor_base
 {
+    virtual typename Mesh::coordinate_type
+    integrand(const typename Mesh::point_type&) = 0;
+
+
     /* Expect k+1 convergence on the cells and k+0.5 on the faces. */
-    template<typename Function>
     typename Mesh::scalar_type
-    operator()(const Mesh& msh, size_t degree, const Function& integrand) const
+    operator()(const Mesh& msh, size_t degree) const
     {
         typedef Mesh mesh_type;
         typedef typename mesh_type::cell        cell_type;
@@ -61,7 +62,7 @@ struct test_functor
 
         return integral_value;
     }
- };
+};
 
 int main(void)
 {

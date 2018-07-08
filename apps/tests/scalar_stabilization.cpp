@@ -72,6 +72,12 @@ struct test_functor
 
         return std::sqrt( error );
     }
+
+    size_t
+    expected_rate(size_t k)
+    {
+        return k+1;
+    }
 };
 
 int main(void)
