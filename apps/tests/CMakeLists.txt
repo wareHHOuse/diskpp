@@ -25,3 +25,6 @@ target_link_libraries(stokes_t ${LINK_LIBS})
 
 add_executable(basis_quadratures basis_quadratures.cpp)
 target_link_libraries(basis_quadratures ${LINK_LIBS})
+
+add_executable(raw_quadratures raw_quadratures.cpp)
+target_link_libraries(raw_quadratures ${LINK_LIBS})

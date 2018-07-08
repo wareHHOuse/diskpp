@@ -31,6 +31,8 @@
 
 #include "common.hpp"
 
+#include "contrib/sol2/sol.hpp"
+
 template<typename Mesh>
 struct test_functor
 {
@@ -56,7 +58,7 @@ struct test_functor
 
             Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, degree, f);
 
-            auto qps = revolution::integrate(msh, cl, 2*degree+4);
+            auto qps = revolution::integrate(msh, cl, 2*degree+2);
             for (auto& qp : qps)
             {
                 auto tv = f(qp.point());
@@ -71,7 +73,6 @@ struct test_functor
         return std::sqrt( error );
     }
 };
-
 
 template<typename Mesh>
 test_functor<Mesh>
@@ -142,14 +143,48 @@ void test_generic_fvca6(void)
 
 int main(void)
 {
-    //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+    sol::state lua;
 
-    test_triangles_generic();
-    test_triangles_netgen();
-    test_quads();
-    test_tetrahedra_netgen();
-    test_cartesian_diskpp();
-    test_generic_fvca6();
+    bool crash_on_nan           = false;
+    bool do_triangles_generic   = true;
+    bool do_triangles_netgen    = true;
+    bool do_quads               = true;
+    bool do_tetrahedra_netgen   = true;
+    bool do_cartesian_diskpp    = true;
+    bool do_generic_fvca6       = true;
+
+    auto r = lua.do_file("test_config.lua");
+    if ( r.valid() )
+    {
+        crash_on_nan            = lua["crash_on_nan"].get_or(false);
+        do_triangles_generic    = lua["do_triangles_generic"].get_or(false);
+        do_triangles_netgen     = lua["do_triangles_netgen"].get_or(false);
+        do_quads                = lua["do_quads"].get_or(false);
+        do_tetrahedra_netgen    = lua["do_tetrahedra_netgen"].get_or(false);
+        do_cartesian_diskpp     = lua["do_cartesian_diskpp"].get_or(false);
+        do_generic_fvca6        = lua["do_generic_fvca6"].get_or(false);
+    }
+
+    if ( crash_on_nan )
+        _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+
+    if ( do_triangles_generic )
+        test_triangles_generic();
+
+    if ( do_triangles_netgen )
+        test_triangles_netgen();
+
+    if ( do_quads )
+        test_quads();
+
+    if ( do_tetrahedra_netgen )
+        test_tetrahedra_netgen();
+
+    if ( do_cartesian_diskpp )
+        test_cartesian_diskpp();
+
+    if ( do_generic_fvca6 )
+        test_generic_fvca6();
 
     return 0;
 }
