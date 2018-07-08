@@ -374,7 +374,8 @@ do_testing(std::vector<Mesh>& meshes, const Function& run_test,
 
 	for (size_t k = min_test_degree; k <= max_test_degree; k++)
     {
-        std::cout << "DEGREE " << k << std::endl;
+        std::cout << "  Testing degree " << k << " (expected rate is ";
+        std::cout << expected_rate(k) << ")" << std::endl;
 
         std::vector<T> mesh_hs;
         std::vector<T> l2_errors;
@@ -427,7 +428,8 @@ class tester
 
     void test_triangles_generic(void)
     {
-        std::cout << "*** TESTING TRIANGLES ON GENERIC MESH ***" << std::endl;
+        std::cout << yellow << "Mesh under test: triangles on generic mesh";
+        std::cout << nocolor << std::endl;
         using T = double;
 
         auto meshes = get_triangle_generic_meshes<T>();
@@ -438,7 +440,8 @@ class tester
 
     void test_triangles_netgen(void)
     {
-        std::cout << "*** TESTING TRIANGLES ON NETGEN MESH ***" << std::endl;
+        std::cout << yellow << "Mesh under test: triangles on netgen mesh";
+        std::cout << nocolor << std::endl;
         using T = double;
 
         auto meshes = get_triangle_netgen_meshes<T>();
@@ -449,7 +452,8 @@ class tester
 
     void test_quads(void)
     {
-        std::cout << "*** TESTING QUADS ON GENERIC MESH ***" << std::endl;
+        std::cout << yellow << "Mesh under test: quads on generic mesh";
+        std::cout << nocolor << std::endl;
         using T = double;
 
         auto meshes = get_quad_generic_meshes<T>();
@@ -460,7 +464,8 @@ class tester
 
     void test_tetrahedra_netgen(void)
     {
-        std::cout << "*** TESTING TETRAHEDRONS ON NETGEN MESH ***" << std::endl;
+        std::cout << yellow << "Mesh under test: tetrahedra on netgen mesh";
+        std::cout << nocolor << std::endl;
         using T = double;
 
         auto meshes = get_tetrahedra_netgen_meshes<T>();
@@ -471,7 +476,8 @@ class tester
 
     void test_cartesian_diskpp(void)
     {
-        std::cout << "*** TESTING CARTESIAN MESH ***" << std::endl;
+        std::cout << yellow << "Mesh under test: cartesian mesh (DiSk++)";
+        std::cout << nocolor << std::endl;
         using T = double;
 
         auto meshes = get_cartesian_diskpp_meshes<T>();
@@ -482,7 +488,8 @@ class tester
 
     void test_generic_fvca6(void)
     {
-        std::cout << "*** TESTING GENERIC FVCA6 MESH ***" << std::endl;
+        std::cout << yellow << "Mesh under test: polyhedra on generic mesh";
+        std::cout << nocolor << std::endl;
         using T = double;
 
         auto meshes = get_generic_fvca6_meshes<T>();
