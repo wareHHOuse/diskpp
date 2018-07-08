@@ -48,7 +48,7 @@ tetrahedron_quadrature(size_t degree)
     if (rule == 0)
         rule = 1;
 #else
-    int rule = degree/2 + 1;
+    int rule = degree/2;
 #endif
     int point_num;
 
