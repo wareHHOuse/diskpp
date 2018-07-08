@@ -191,6 +191,38 @@ get_triangle_generic_meshes(void)
 }
 
 template<typename T>
+std::vector< disk::generic_mesh<T, 2> >
+get_polygonal_generic_meshes(void)
+{
+	std::vector<std::string> meshfiles;
+    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_1.typ1");
+    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_2.typ1");
+    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_3.typ1");
+    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_4.typ1");
+    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_5.typ1");
+
+    typedef disk::generic_mesh<T, 2>  mesh_type;
+
+    std::vector< mesh_type > ret;
+    for (size_t i = 0; i < meshfiles.size(); i++)
+    {
+        mesh_type msh;
+        disk::fvca5_mesh_loader<T, 2> loader;
+
+        if (!loader.read_mesh(meshfiles.at(i)))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            continue;
+        }
+        loader.populate_mesh(msh);
+
+        ret.push_back(msh);
+    }
+
+    return ret;
+}
+
+template<typename T>
 std::vector< disk::simplicial_mesh<T, 2> >
 get_triangle_netgen_meshes(void)
 {
@@ -438,6 +470,18 @@ class tester
         do_testing(meshes, tf, er);
     }
 
+    void test_polygonal_generic(void)
+    {
+        std::cout << yellow << "Mesh under test: polygons on generic mesh";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_polygonal_generic_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
+    }
+
     void test_triangles_netgen(void)
     {
         std::cout << yellow << "Mesh under test: triangles on netgen mesh";
@@ -505,6 +549,7 @@ public:
 
         bool crash_on_nan           = false;
         bool do_triangles_generic   = true;
+        bool do_polygonal_generic   = true;
         bool do_triangles_netgen    = true;
         bool do_quads               = true;
         bool do_tetrahedra_netgen   = true;
@@ -516,6 +561,7 @@ public:
         {
             crash_on_nan            = lua["crash_on_nan"].get_or(false);
             do_triangles_generic    = lua["do_triangles_generic"].get_or(false);
+            do_polygonal_generic    = lua["do_polygonal_generic"].get_or(false);
             do_triangles_netgen     = lua["do_triangles_netgen"].get_or(false);
             do_quads                = lua["do_quads"].get_or(false);
             do_tetrahedra_netgen    = lua["do_tetrahedra_netgen"].get_or(false);
@@ -528,6 +574,9 @@ public:
 
         if ( do_triangles_generic )
             test_triangles_generic();
+
+        if ( do_polygonal_generic )
+            test_polygonal_generic();
 
         if ( do_triangles_netgen )
             test_triangles_netgen();
