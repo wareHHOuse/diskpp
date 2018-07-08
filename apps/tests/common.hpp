@@ -29,6 +29,8 @@
 
 #include "core/loaders/loader.hpp"
 
+#include "contrib/sol2/sol.hpp"
+
 const size_t MIN_TEST_DEGREE = 0;
 const size_t MAX_TEST_DEGREE = 3;
 
@@ -363,11 +365,13 @@ get_quad_generic_meshes(void)
 
 template<typename Mesh, typename Function>
 void
-do_testing(std::vector<Mesh>& meshes, const Function& run_test)
+do_testing(std::vector<Mesh>& meshes, const Function& run_test,
+           size_t min_test_degree = MIN_TEST_DEGREE,
+           size_t max_test_degree = MAX_TEST_DEGREE)
 {
 	using T = typename Mesh::scalar_type;
 
-	for (size_t k = MIN_TEST_DEGREE; k <= MAX_TEST_DEGREE; k++)
+	for (size_t k = min_test_degree; k <= max_test_degree; k++)
     {
         std::cout << "DEGREE " << k << std::endl;
 
@@ -402,3 +406,123 @@ do_testing(std::vector<Mesh>& meshes, const Function& run_test)
         }
     }
 }
+
+template< template<typename> class TestFunctor >
+class tester
+{
+    template<typename Mesh>
+    TestFunctor<Mesh>
+    get_test_functor(const std::vector<Mesh>& meshes)
+    {
+        return TestFunctor<Mesh>();
+    }
+
+    void test_triangles_generic(void)
+    {
+        std::cout << "*** TESTING TRIANGLES ON GENERIC MESH ***" << std::endl;
+        using T = double;
+
+        auto meshes = get_triangle_generic_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        do_testing(meshes, tf);
+    }
+
+    void test_triangles_netgen(void)
+    {
+        std::cout << "*** TESTING TRIANGLES ON NETGEN MESH ***" << std::endl;
+        using T = double;
+
+        auto meshes = get_triangle_netgen_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        do_testing(meshes, tf);
+    }
+
+    void test_quads(void)
+    {
+        std::cout << "*** TESTING QUADS ON GENERIC MESH ***" << std::endl;
+        using T = double;
+
+        auto meshes = get_quad_generic_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        do_testing(meshes, tf);
+    }
+
+    void test_tetrahedra_netgen(void)
+    {
+        std::cout << "*** TESTING TETRAHEDRONS ON NETGEN MESH ***" << std::endl;
+        using T = double;
+
+        auto meshes = get_tetrahedra_netgen_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        do_testing(meshes, tf);
+    }
+
+    void test_cartesian_diskpp(void)
+    {
+        std::cout << "*** TESTING CARTESIAN MESH ***" << std::endl;
+        using T = double;
+
+        auto meshes = get_cartesian_diskpp_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        do_testing(meshes, tf);
+    }
+
+    void test_generic_fvca6(void)
+    {
+        std::cout << "*** TESTING GENERIC FVCA6 MESH ***" << std::endl;
+        using T = double;
+
+        auto meshes = get_generic_fvca6_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        do_testing(meshes, tf);
+    }
+
+public:
+    int run(void)
+    {
+        sol::state lua;
+
+        bool crash_on_nan           = false;
+        bool do_triangles_generic   = true;
+        bool do_triangles_netgen    = true;
+        bool do_quads               = true;
+        bool do_tetrahedra_netgen   = true;
+        bool do_cartesian_diskpp    = true;
+        bool do_generic_fvca6       = true;
+
+        auto r = lua.do_file("test_config.lua");
+        if ( r.valid() )
+        {
+            crash_on_nan            = lua["crash_on_nan"].get_or(false);
+            do_triangles_generic    = lua["do_triangles_generic"].get_or(false);
+            do_triangles_netgen     = lua["do_triangles_netgen"].get_or(false);
+            do_quads                = lua["do_quads"].get_or(false);
+            do_tetrahedra_netgen    = lua["do_tetrahedra_netgen"].get_or(false);
+            do_cartesian_diskpp     = lua["do_cartesian_diskpp"].get_or(false);
+            do_generic_fvca6        = lua["do_generic_fvca6"].get_or(false);
+        }
+
+        if ( crash_on_nan )
+            _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+
+        if ( do_triangles_generic )
+            test_triangles_generic();
+
+        if ( do_triangles_netgen )
+            test_triangles_netgen();
+
+        if ( do_quads )
+            test_quads();
+
+        if ( do_tetrahedra_netgen )
+            test_tetrahedra_netgen();
+
+        if ( do_cartesian_diskpp )
+            test_cartesian_diskpp();
+
+        if ( do_generic_fvca6 )
+            test_generic_fvca6();
+
+        return 0;
+    }
+};

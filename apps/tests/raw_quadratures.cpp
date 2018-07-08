@@ -37,8 +37,9 @@ template<typename Mesh>
 struct test_functor
 {
     /* Expect k+1 convergence on the cells and k+0.5 on the faces. */
+    template<typename Function>
     typename Mesh::scalar_type
-    operator()(const Mesh& msh, size_t degree) const
+    operator()(const Mesh& msh, size_t degree, const Function& integrand) const
     {
         typedef Mesh mesh_type;
         typedef typename mesh_type::cell        cell_type;
@@ -48,28 +49,17 @@ struct test_functor
 
         auto f = make_scalar_testing_data(msh);
 
-        scalar_type error = 0.0;
+        scalar_type integral_value = 0.0;
 
         for (auto itor = msh.cells_begin(); itor != msh.cells_end(); itor++)
         {
             auto cl = *itor;
-            auto basis = revolution::make_scalar_monomial_basis(msh, cl, degree);
-
-            Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, degree, f);
-
-            auto qps = revolution::integrate(msh, cl, 2*degree+2);
+            auto qps = revolution::integrate(msh, cl, degree);
             for (auto& qp : qps)
-            {
-                auto tv = f(qp.point());
-
-                auto phi = basis.eval_functions(qp.point());
-                auto pv = proj.dot(phi);
-
-                error += qp.weight() * (tv - pv) * (tv - pv);
-            }
+                integral_value += qp.weight() * integrand(qp.point());
         }
 
-        return std::sqrt( error );
+        return integral_value;
     }
  };
 
