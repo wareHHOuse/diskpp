@@ -135,15 +135,16 @@ make_contact_unnamed(const Mesh& msh, const typename Mesh::cell_type& cl,
     const size_t DIM = Mesh::dimension;
     auto gamma_N = gamma_0 / measure(msh,cl);
 
-    auto fcs = faces(msh, cl);
-    auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
-    auto cbs = scalar_basis_size(hdi.cell_degree(), DIM);
-    auto fbs = scalar_basis_size( hdi.face_degree(), DIM-1);
-    auto num_total_dofs = cbs + fbs * fcs.size();
-    auto cb  = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+    const auto recdeg         = hdi.reconstruction_degree();
+    auto       fcs            = faces(msh, cl);
+    auto       rbs            = scalar_basis_size(recdeg, DIM);
+    auto       cbs            = scalar_basis_size(hdi.cell_degree(), DIM);
+    auto       fbs            = scalar_basis_size(hdi.face_degree(), DIM - 1);
+    auto       num_total_dofs = cbs + fbs * fcs.size();
+    auto       cb             = make_scalar_monomial_basis(msh, cl, recdeg);
 
     Matrix<T, Dynamic, Dynamic> ret =
-            Matrix<T, Dynamic, Dynamic>::Zero( num_total_dofs, num_total_dofs );
+            Matrix<T, Dynamic, Dynamic>::Zero(num_total_dofs, num_total_dofs);
 
     for (auto& fc: fcs)
     {
@@ -156,7 +157,7 @@ make_contact_unnamed(const Mesh& msh, const typename Mesh::cell_type& cl,
             auto n = normal(msh, cl, fc);
 
             Matrix<T, Dynamic, Dynamic> stiff_n = Matrix<T, Dynamic, Dynamic>::Zero(rbs, rbs);
-            auto qps = integrate(msh, fc, 2* hdi.face_degree());
+            auto                        qps     = integrate(msh, fc, 2 * (recdeg - 1));
 
             for (auto& qp : qps)
             {
@@ -205,7 +206,7 @@ make_contact_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
         if (bnd.is_contact_face(face_id))
         {
             auto fb  = make_scalar_monomial_basis(msh, fc, facdeg);
-            auto qps = integrate (msh, fc, 2*facdeg);
+            auto qps = integrate(msh, fc, std::max(int(facdeg + recdeg) - 1, 0));
             auto n = normal(msh, cl, fc);
             auto face_ofs  = cbs  +  fc_count * fbs;
 
@@ -339,7 +340,7 @@ make_hlow_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     gr_lhs = mass;
 
-    auto qps = integrate(msh, cl, 2*celdeg);
+    auto qps = integrate(msh, cl, std::max(0, int(celdeg) - 1 + int(facdeg)));
     for(auto& qp : qps)
     {
         auto c_dphi = cb.eval_gradients(qp.point());
@@ -356,17 +357,16 @@ make_hlow_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
         auto n = normal(msh, cl, fc);
         auto fb = make_scalar_monomial_basis(msh, fc, facdeg);
 
-        auto qps_f = integrate(msh, fc, 2* std::max(facdeg, celdeg));
+        auto qps_f = integrate(msh, fc, facdeg + std::max(facdeg, celdeg));
         for (auto& qp : qps_f)
         {
             Matrix<T, Dynamic, 1>   c_phi  = cb.eval_functions(qp.point());
             Matrix<T, Dynamic, 1>   f_phi  = fb.eval_functions(qp.point());
             Matrix<T, Dynamic, N>   s_phi  = sb.eval_functions(qp.point());
+            Matrix<T, Dynamic, 1>   s_phi_n = s_phi * n;
 
-            gr_rhs.block(0, cbs+i*fbs, sbs, fbs) +=
-                        qp.weight() * (s_phi * n) * f_phi.transpose();
-            gr_rhs.block(0, 0, sbs, cbs) -=
-                        qp.weight() * (s_phi * n) * c_phi.transpose();
+            gr_rhs.block(0, cbs + i * fbs, sbs, fbs) += qp.weight() * s_phi_n * f_phi.transpose();
+            gr_rhs.block(0, 0, sbs, cbs) -= qp.weight() * s_phi_n * c_phi.transpose();
         }
     }
 
@@ -480,7 +480,7 @@ make_hlow_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     gr_lhs = mass;
 
-    auto qps = integrate(msh, cl, 2*celdeg);
+    auto qps = integrate(msh, cl, std::max(0, int(facdeg + celdeg) - 1));
     for(auto& qp : qps)
     {
         auto c_dphi = cb.eval_gradients(qp.point());
@@ -501,18 +501,16 @@ make_hlow_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
         auto fb = make_vector_monomial_basis(msh, fc, facdeg);
 
         size_t N = Mesh::dimension;
-        auto qps_f = integrate(msh, fc, 2* std::max(facdeg, celdeg));
+        auto qps_f = integrate(msh, fc, facdeg + std::max(facdeg, celdeg));
         for (auto& qp : qps_f)
         {
             Matrix<T, Dynamic, 2>   c_phi  = cb.eval_functions(qp.point());
             Matrix<T, Dynamic, 2>   f_phi  = fb.eval_functions(qp.point());
             eigen_compatible_stdvector<Matrix<T, 2, 2>> s_phi  = sb.eval_functions(qp.point());
 
-            Matrix<T, Dynamic, 2> s_phi_n  =  priv::outer_product( s_phi, n);
-            gr_rhs.block(0, cbs+i*fbs, sbs, fbs) +=
-                        qp.weight() * s_phi_n * f_phi.transpose();
-            gr_rhs.block(0, 0, sbs, cbs) -=
-                        qp.weight() * s_phi_n * c_phi.transpose();
+            Matrix<T, Dynamic, 2> s_phi_n = priv::outer_product(s_phi, n);
+            gr_rhs.block(0, cbs + i * fbs, sbs, fbs) += qp.weight() * s_phi_n * f_phi.transpose();
+            gr_rhs.block(0, 0, sbs, cbs) -= qp.weight() * s_phi_n * c_phi.transpose();
         }
     }
 
@@ -976,7 +974,7 @@ make_hho_divergence_reconstruction_stokes_rhs(const Mesh& msh, const typename Me
 
     Matrix<T, Dynamic, Dynamic> dr_rhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs, cbs + num_faces*fbs);
 
-    const auto qps = integrate(msh, cl, std::max(int(celdeg) + int(recdeg) - 1, 0));
+    const auto qps = integrate(msh, cl, std::max(int(celdeg + recdeg) - 1, 0));
     for (auto& qp : qps)
     {
         const auto s_dphi = cbas_s.eval_gradients(qp.point());
