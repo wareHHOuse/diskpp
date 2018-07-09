@@ -59,8 +59,8 @@ fix_point_solver_faces(const Mesh& msh, const hho_degree_info& hdi,
     auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
     auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
 
-    auto num_full_dofs = cbs*msh.cells_size() + 2 * fbs*msh.faces_size()
-                                        - fbs*msh.boundary_faces_size() ;
+    auto num_full_dofs = cbs * msh.cells_size() + 2 * fbs * msh.faces_size()
+                                        - fbs * msh.boundary_faces_size() ;
     dynamic_vector<T> full_sol_old = dynamic_vector<T>::Zero(num_full_dofs);
 
     auto offset_vector = full_offset(msh, hdi);
@@ -348,7 +348,7 @@ run_signorini(  const Mesh& msh,
 
     dynamic_vector<T> full_sol = dynamic_vector<T>::Zero(num_full_dofs);
 
-    full_sol = fix_point_solver( msh, hdi, m_bnd, ap, rhs_fun);
+    full_sol = fix_point_solver_faces( msh, hdi, m_bnd, ap, rhs_fun);
 
     return;
 }

@@ -151,7 +151,7 @@ make_nitsche(const Mesh& msh, const typename Mesh::cell_type& cl,
         if (bnd.is_contact_face(face_id))
         {
             auto n = normal(msh, cl, fc);
-            auto qps = integrate(msh, fc, 2* hdi.face_degree());
+            auto qps = integrate(msh, fc, 2 * hdi.reconstruction_degree() - 2);
 
             for (auto& qp : qps)
             {
@@ -206,7 +206,6 @@ make_heaviside_other(const Mesh& msh, const typename Mesh::cell_type& cl,
 
             auto face_ofs  = cbs  +  fc_count * fbs;
             auto n = normal(msh, cl, fc);
-
             auto qps = integrate(msh, fc, 2* hdi.face_degree());
             for (auto& qp : qps)
             {
@@ -257,10 +256,14 @@ make_heaviside(const Mesh& msh, const typename Mesh::cell_type& cl,
     const size_t DIM = Mesh::dimension;
     T gamma_N = gamma_0 / diameter(msh, cl);
 
+    auto recdeg =  hdi.reconstruction_degree();
+    auto celdeg =  hdi.cell_degree();
+    auto facdeg =  hdi.face_degree();
+
     auto fcs = faces(msh, cl);
-    auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
-    auto cbs = scalar_basis_size(hdi.cell_degree(), DIM);
-    auto fbs = scalar_basis_size(hdi.face_degree(), DIM-1);
+    auto rbs = scalar_basis_size(recdeg, DIM);
+    auto cbs = scalar_basis_size(celdeg, DIM);
+    auto fbs = scalar_basis_size(facdeg, DIM-1);
     auto num_total_dofs = cbs + fbs * fcs.size();
 
     matrix_type ret = matrix_type::Zero( num_total_dofs, num_total_dofs );
@@ -281,7 +284,8 @@ make_heaviside(const Mesh& msh, const typename Mesh::cell_type& cl,
             auto face_ofs  = cbs  +  fc_count * fbs;
             auto n = normal(msh, cl, fc);
 
-            auto qps = integrate(msh, fc, 2* hdi.face_degree());
+            auto quad_degree = std::max(recdeg-1, celdeg);
+            auto qps = integrate(msh, fc, 2 * quad_degree );
             for (auto& qp : qps)
             {
                 Matrix<T, Dynamic, DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
@@ -404,8 +408,9 @@ make_heaviside_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
     const size_t DIM = Mesh::dimension;
     T gamma_N = gamma_0 / diameter(msh, cl);
 
+    auto recdeg =  hdi.reconstruction_degree();
     auto fcs = faces(msh, cl);
-    auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
+    auto rbs = scalar_basis_size(recdeg, DIM);
     auto cbs = scalar_basis_size(hdi.cell_degree(), DIM);
     auto fbs = scalar_basis_size(hdi.face_degree(), DIM-1);
     auto num_total_dofs = cbs + fbs * fcs.size();
@@ -429,7 +434,7 @@ make_heaviside_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
             matrix_type stiff_n = matrix_type::Zero(rbs -1, rbs -1);
             matrix_type mm  = revolution::make_mass_matrix(msh, fc, cb);
 
-            auto qps = integrate(msh, fc, 2* hdi.face_degree());
+            auto qps = integrate(msh, fc, 2 * recdeg);
             for (auto& qp : qps)
             {
                 auto c_phi = cb.eval_functions(qp.point());
@@ -480,6 +485,8 @@ make_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     auto recdeg =  hdi.reconstruction_degree();
     auto facdeg =  hdi.face_degree();
+    auto celdeg =  hdi.cell_degree();
+
     auto fcs = faces(msh, cl);
     auto cbs = scalar_basis_size(hdi.cell_degree(), DIM);
     auto rbs = scalar_basis_size(recdeg, DIM);
@@ -498,7 +505,8 @@ make_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
         {
             auto cb  = make_scalar_monomial_basis(msh, cl, recdeg);
             auto fb  = make_scalar_monomial_basis(msh, fc, facdeg);
-            auto qps = integrate (msh, fc, 2*facdeg);
+            auto quad_degree = std::max( recdeg - 1, celdeg);
+            auto qps = integrate (msh, fc, 2 * quad_degree);
             auto n = normal(msh, cl, fc);
 
             for (auto& qp : qps)
@@ -637,7 +645,7 @@ make_negative_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
         {
             auto fb  = make_scalar_monomial_basis(msh, fc, facdeg);
             auto cb = make_scalar_monomial_basis(msh, cl, recdeg);
-            auto qps = integrate (msh, fc, 2*facdeg);
+            auto qps = integrate (msh, fc, 2 * recdeg);
             auto n = normal(msh, cl, fc);
             auto face_ofs  = cbs  +  fc_count * fbs;
 
