@@ -33,7 +33,6 @@
 #include "revolution/bases"
 #include "revolution/quadratures"
 #include "revolution/methods/hho"
-#include "contact_hho.hpp"
 
 #include "core/loaders/loader.hpp"
 
@@ -43,6 +42,8 @@
 
 #include "output/silo.hpp"
 #include "solvers/solver.hpp"
+
+#include "cfem/cfem.hpp"
 
 using namespace revolution;
 
@@ -80,8 +81,10 @@ full_offset(const Mesh& msh, const hho_degree_info& hdi)
     size_t  i = 1, dofs = 0;
     auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
     auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+
     std::vector<size_t> vec(msh.cells_size());
-    for (auto itor = msh.cells_begin(); itor != msh.cells_end() -1; itor++)
+
+    for (auto itor = msh.cells_begin(); itor != msh.cells_end() - 1; itor++)
     {
         auto cl = *itor;
         dofs += howmany_faces(msh, cl) * fbs + cbs;
@@ -119,9 +122,41 @@ make_is_contact_vector(const Mesh& msh,
     return ret;
 }
 
+
+template<typename T>
+static_matrix<T, 3, 3>
+make_fem_nitsche(const disk::simplicial_mesh<T, 2>& msh,
+        const typename disk::simplicial_mesh<T, 2>::cell& cl,
+        const disk::mechanics::BoundaryConditionsScalar<disk::simplicial_mesh<T, 2>>& bnd,
+        const T & gamma_0,
+        const T & theta)
+{
+    static_matrix<T, 3, 3> stiff = static_matrix<T, 3, 3>::Zero();
+
+    auto gamma_N = gamma_0 / measure(msh, cl);
+    auto fcs = faces(msh, cl);
+
+    for (auto& fc: fcs)
+    {
+        auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+        if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+        const auto face_id = eid.second;
+
+        if (bnd.is_contact_face(face_id))
+        {
+            auto meas = measure(msh, fc);
+            auto n    = normal(msh, cl, fc);
+            auto dphi = disk::cfem::eval_basis_grad(msh, cl);
+            static_vector<T, 3> dphi_n = dphi * n;
+            stiff += meas * dphi_n * dphi_n.transpose();
+        }
+    }
+    return stiff * (theta /gamma_N);
+}
+
 template <typename Mesh>
 Matrix< typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_nitsche(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_hho_nitsche(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& rec,
             const typename Mesh::coordinate_type& gamma_0,
@@ -130,7 +165,7 @@ make_nitsche(const Mesh& msh, const typename Mesh::cell_type& cl,
 {
     using T = typename Mesh::coordinate_type;
     const size_t DIM = Mesh::dimension;
-    auto gamma_N = gamma_0 / diameter(msh, cl);
+    auto gamma_N = gamma_0 / measure(msh, cl);
 
     auto fcs = faces(msh, cl);
     auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
@@ -159,7 +194,7 @@ make_nitsche(const Mesh& msh, const typename Mesh::cell_type& cl,
                 Matrix<T, Dynamic, DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
                 Matrix<T, Dynamic, 1>  sigma_n = rec.transpose() * (c_dphi * n);
 
-                ret +=  sigma_n * sigma_n.transpose();
+                ret +=  qp.weight() * sigma_n * sigma_n.transpose();
             }
         }
     }
@@ -167,9 +202,56 @@ make_nitsche(const Mesh& msh, const typename Mesh::cell_type& cl,
     return ret * (theta /gamma_N);
 }
 
+template<typename T>
+static_matrix<T, 3, 3>
+make_fem_heaviside(const disk::simplicial_mesh<T, 2>& msh,
+        const typename disk::simplicial_mesh<T, 2>::cell& cl,
+        const disk::mechanics::BoundaryConditionsScalar<disk::simplicial_mesh<T, 2>>& bnd,
+        const T & gamma_0,
+        const T & theta,
+        const static_vector<T,3>& uloc)
+{
+    static_matrix<T, 3, 3> ret = static_matrix<T, 3, 3>::Zero();
+
+    auto gamma_N = gamma_0 / measure(msh, cl);
+    auto fcs = faces(msh, cl);
+
+    for (auto& fc: fcs)
+    {
+        auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+        if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+        const auto face_id = eid.second;
+
+        if (bnd.is_contact_face(face_id))
+        {
+            auto n   = normal(msh, cl, fc);
+            static_matrix<T, 3, 2> dphi = disk::cfem::eval_basis_grad(msh, cl);
+            static_vector<T, 3> sigma_n = dphi * n;
+
+            //(theta * grad * v * n - gamma_N * v)
+            static_vector<T, 3> t_sigmav_n_gamma_v =  theta * sigma_n;
+            static_vector<T, 3>   sigmau_n_gamma_u =  sigma_n;
+
+            auto qps = integrate (msh, fc, 2);
+            for (auto& qp : qps)
+            {
+                auto phi = disk::cfem::eval_basis(msh, cl, qp.point());
+
+                t_sigmav_n_gamma_v -= gamma_N * phi;
+                sigmau_n_gamma_u   -= gamma_N * phi;
+
+                // Heaviside(-Pn(u) = grad * u * n - gamma_N* u)
+                if(sigmau_n_gamma_u.dot(uloc) <= 0.)
+                    ret += qp.weight() * t_sigmav_n_gamma_v * sigmau_n_gamma_u.transpose();
+            }
+        }
+    }
+    return ret * (1/gamma_N);
+}
+
 template <typename Mesh, typename T>
 Matrix< T, Dynamic, Dynamic>
-make_heaviside_other(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_hho_heaviside_other(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<T, Dynamic, Dynamic>& rec,
             const T & gamma_0,
@@ -181,7 +263,7 @@ make_heaviside_other(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    T gamma_N = gamma_0 / diameter(msh, cl);
+    T gamma_N = gamma_0 / measure(msh, cl);
 
     auto fcs = faces(msh, cl);
     auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
@@ -242,7 +324,7 @@ make_heaviside_other(const Mesh& msh, const typename Mesh::cell_type& cl,
 
 template <typename Mesh, typename T>
 Matrix< T, Dynamic, Dynamic>
-make_heaviside(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_hho_heaviside(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<T, Dynamic, Dynamic>& rec,
             const T & gamma_0,
@@ -254,7 +336,7 @@ make_heaviside(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    T gamma_N = gamma_0 / diameter(msh, cl);
+    T gamma_N = gamma_0 / measure(msh, cl);
 
     auto recdeg =  hdi.reconstruction_degree();
     auto celdeg =  hdi.cell_degree();
@@ -321,7 +403,7 @@ make_heaviside(const Mesh& msh, const typename Mesh::cell_type& cl,
 
 template <typename Mesh, typename T>
 Matrix< T, Dynamic, Dynamic>
-make_heaviside_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_hho_heaviside_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<T, Dynamic, Dynamic>& rec,
             const T & gamma_0,
@@ -333,7 +415,7 @@ make_heaviside_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    T gamma_N = gamma_0 / diameter(msh, cl);
+    T gamma_N = gamma_0 / measure(msh, cl);
 
     auto fcs = faces(msh, cl);
     auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
@@ -394,7 +476,7 @@ make_heaviside_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
 
 template <typename Mesh, typename T>
 Matrix< T, Dynamic, Dynamic>
-make_heaviside_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_hho_heaviside_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<T, Dynamic, Dynamic>& rec,
             const T & gamma_0,
@@ -406,7 +488,7 @@ make_heaviside_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    T gamma_N = gamma_0 / diameter(msh, cl);
+    T gamma_N = gamma_0 / measure(msh, cl);
 
     auto recdeg =  hdi.reconstruction_degree();
     auto fcs = faces(msh, cl);
@@ -466,9 +548,57 @@ make_heaviside_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
     return ret * (1./gamma_N);
 }
 
+template <typename T>
+static_vector<T, 3>
+make_fem_negative(const disk::simplicial_mesh<T, 2>& msh,
+    const typename disk::simplicial_mesh<T, 2>::cell& cl,
+    const disk::mechanics::BoundaryConditionsScalar<disk::simplicial_mesh<T, 2>>& bnd,
+    const T & gamma_0,
+    const T & theta,
+    const static_vector<T, 3>& uloc)
+{
+    auto gamma_N = gamma_0 / measure(msh, cl);
+
+    auto fcs = faces(msh, cl);
+    static_vector<T, 3> rhs = static_vector<T, 3>::Zero();
+
+    for (auto& fc : fcs)
+    {
+        auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+        if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+        const auto face_id=eid.second;
+
+        if (bnd.is_contact_face(face_id))
+        {
+            auto n   = normal(msh, cl, fc);
+            static_matrix<T, 3, 2> dphi = disk::cfem::eval_basis_grad(msh, cl);
+            static_vector<T, 3> sigma_n = dphi * n;
+
+            //(theta * grad * v * n - gamma_N * v)
+            static_vector<T, 3> t_sigmav_n_gamma_v =  theta * sigma_n;
+            static_vector<T, 3>   sigmau_n_gamma_u =  sigma_n;
+
+            auto qps = integrate (msh, fc, 2);
+            for (auto& qp : qps)
+            {
+                auto phi = disk::cfem::eval_basis(msh, cl, qp.point());
+
+                t_sigmav_n_gamma_v -= gamma_N * phi;
+                sigmau_n_gamma_u   -= gamma_N * phi;
+
+                // [Pn(u)]_ = [grad * u * n - gamma_N* u]_
+                T negative = std::min(sigmau_n_gamma_u.dot(uloc), 0.);
+
+                rhs += qp.weight() * negative * t_sigmav_n_gamma_v;
+            }
+        }
+    }
+    return rhs * (1./gamma_N);
+}
+
 template <typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
-make_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_hho_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> rec,
             const typename Mesh::coordinate_type& gamma_0,
@@ -481,25 +611,25 @@ make_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    auto gamma_N = gamma_0 / diameter(msh, cl);
+    auto gamma_N = gamma_0 / measure(msh, cl);
 
     auto recdeg =  hdi.reconstruction_degree();
     auto facdeg =  hdi.face_degree();
     auto celdeg =  hdi.cell_degree();
 
     auto fcs = faces(msh, cl);
-    auto cbs = scalar_basis_size(hdi.cell_degree(), DIM);
+    auto cbs = scalar_basis_size(celdeg, DIM);
     auto rbs = scalar_basis_size(recdeg, DIM);
     auto fbs = scalar_basis_size(facdeg, DIM-1);
     auto num_total_dofs = cbs + fcs.size() * fbs;
     vector_type rhs = vector_type::Zero(num_total_dofs, 1);
 
     auto fc_count = 0;
-    for (auto& fc:fcs)
+    for (auto& fc : fcs)
     {
         auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
         if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
-        const auto face_id=eid.second;
+        const auto face_id = eid.second;
 
         if (bnd.is_contact_face(face_id))
         {
@@ -520,16 +650,16 @@ make_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
                 vector_type  sigma_n = rec.transpose() * (c_dphi * n);
 
                 // (grad * rec * v * n - gamma_N * v_T)
-                vector_type t_sigman_gamma_v =  theta * sigma_n;
-                t_sigman_gamma_v.block(0, 0, cbs, 1) -= gamma_N * c_phi;
+                vector_type t_sigmav_n_gamma_v =  theta * sigma_n;
+                t_sigmav_n_gamma_v.block(0, 0, cbs, 1) -= gamma_N * c_phi;
 
                 // [Pn(u)]_ = [grad * rec * u * n - gamma_N* u_T]_
-                vector_type  u_cell  = uloc.block(0, 0, cbs, 1);
-                T gamma_u  = gamma_N * c_phi.dot(u_cell);
-                T sigmau_n = sigma_n.dot(uloc);
-                T negative = std::min(sigmau_n - gamma_u, 0.);
+                vector_type sigmau_n_gamma_u  = sigma_n;
+                sigmau_n_gamma_u.block(0, 0, cbs, 1) -= gamma_N * c_phi;
 
-                rhs += qp.weight() * negative * t_sigman_gamma_v;
+                T negative = std::min(sigmau_n_gamma_u.dot(uloc), 0.);
+
+                rhs += qp.weight() * negative * t_sigmav_n_gamma_v;
             }
         }
         fc_count++;
@@ -539,7 +669,7 @@ make_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
 
 template <typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
-make_negative_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_hho_negative_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> rec,
             const typename Mesh::coordinate_type& gamma_0,
@@ -552,7 +682,7 @@ make_negative_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    auto gamma_N = gamma_0 / diameter(msh, cl);
+    auto gamma_N = gamma_0 / measure(msh, cl);
 
     auto recdeg =  hdi.reconstruction_degree();
     auto facdeg =  hdi.face_degree();
@@ -583,19 +713,19 @@ make_negative_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
                 Matrix<T, Dynamic,  DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
                 Matrix<T, Dynamic,  DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
                 vector_type  f_phi   = fb.eval_functions(qp.point());
-                vector_type  u_face  = uloc.block(face_ofs, 0, fbs, 1);
                 vector_type  sigma_n = rec.transpose() * (c_dphi * n);
 
                 // (grad * rec * v * n - gamma_N * v_F)
-                vector_type t_sigman_gamma_v =  theta * sigma_n;
-                t_sigman_gamma_v.block(face_ofs, 0, fbs, 1) -= gamma_N * f_phi;
+                vector_type t_sigmav_n_gamma_v =  theta * sigma_n;
+                t_sigmav_n_gamma_v.block(face_ofs, 0, fbs, 1) -= gamma_N * f_phi;
 
                 // [Pn(u)]_ = [grad * rec * u * n - gamma_N* u_F]_
-                T gamma_u  = gamma_N * f_phi.dot(u_face);
-                T sigmau_n = sigma_n.dot(uloc);
-                T negative = std::min(sigmau_n - gamma_u, 0.);
+                vector_type sigmau_n_gamma_u  = sigma_n;
+                sigmau_n_gamma_u.block(face_ofs, 0, fbs, 1) -= gamma_N * f_phi;
 
-                rhs += qp.weight() * negative * t_sigman_gamma_v;
+                T negative = std::min(sigmau_n_gamma_u.dot(uloc), 0.);
+
+                rhs += qp.weight() * negative * t_sigmav_n_gamma_v;
             }
         }
         fc_count++;
@@ -605,7 +735,7 @@ make_negative_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
 
 template <typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
-make_negative_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_hho_negative_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> rec,
             const typename Mesh::coordinate_type& gamma_0,
@@ -619,7 +749,7 @@ make_negative_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     const size_t DIM = Mesh::dimension;
 
-    auto gamma_N = gamma_0 / diameter(msh, cl);
+    auto gamma_N = gamma_0 / measure(msh, cl);
 
     auto recdeg =  hdi.reconstruction_degree();
     auto facdeg =  hdi.face_degree();
@@ -679,43 +809,47 @@ make_negative_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
 template<typename Mesh>
 std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
              Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
-make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_hho_contact_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
                           const hho_degree_info& di,
                           const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
 {
     using T = typename Mesh::coordinate_type;
     const size_t DIM = Mesh::dimension;
 
-    auto recdeg = di.reconstruction_degree();
-    auto celdeg = di.cell_degree();
-    auto facdeg = di.face_degree();
+    using vector_type   = Matrix<T, Dynamic, 1>;
+    using matrix_type   = Matrix<T, Dynamic, Dynamic>;
+    using gradient_type = Matrix<T, Dynamic, DIM>;
+
+    const auto recdeg = di.reconstruction_degree();
+    const auto celdeg = di.cell_degree();
+    const auto facdeg = di.face_degree();
 
     auto cb = make_scalar_monomial_basis(msh, cl, recdeg);
 
-    auto rbs = scalar_basis_size(recdeg, Mesh::dimension);
-    auto cbs = scalar_basis_size(celdeg, Mesh::dimension);
-    auto fbs = scalar_basis_size(facdeg, Mesh::dimension-1);
+    const auto rbs = scalar_basis_size(recdeg, Mesh::dimension);
+    const auto cbs = scalar_basis_size(celdeg, Mesh::dimension);
+    const auto fbs = scalar_basis_size(facdeg, Mesh::dimension-1);
 
-    auto num_faces = howmany_faces(msh, cl);
+    const auto num_faces = howmany_faces(msh, cl);
 
-    Matrix<T, Dynamic, Dynamic> stiff = Matrix<T, Dynamic, Dynamic>::Zero(rbs, rbs);
-    Matrix<T, Dynamic, Dynamic> gr_lhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs-1, rbs-1);
-    Matrix<T, Dynamic, Dynamic> gr_rhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs-1, cbs + num_faces*fbs);
+    matrix_type stiff = matrix_type::Zero(rbs, rbs);
+    matrix_type gr_lhs = matrix_type::Zero(rbs-1, rbs-1);
+    matrix_type gr_rhs = matrix_type::Zero(rbs-1, cbs + num_faces*fbs);
 
-    auto qps = integrate(msh, cl, 2*recdeg);
+    auto qps = integrate(msh, cl, 2 * (recdeg-1));
     for (auto& qp : qps)
     {
-        auto dphi = cb.eval_gradients(qp.point());
+        const auto dphi = cb.eval_gradients(qp.point());
         stiff += qp.weight() * dphi * dphi.transpose();
     }
 
     gr_lhs = stiff.block(1, 1, rbs-1, rbs-1);
     gr_rhs.block(0, 0, rbs-1, cbs) = stiff.block(1, 0, rbs-1, cbs);
 
-    auto fcs = faces(msh, cl);
+    const auto fcs = faces(msh, cl);
     for (size_t i = 0; i < fcs.size(); i++)
     {
-        auto fc = fcs[i];
+        const auto fc = fcs[i];
 
         auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
         if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
@@ -724,24 +858,26 @@ make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
         if (bnd.is_contact_face(face_id))
             continue;
 
-        auto n = normal(msh, cl, fc);
+        const auto n  = normal(msh, cl, fc);
         auto fb = make_scalar_monomial_basis(msh, fc, facdeg);
 
-        auto qps_f = integrate(msh, fc, 2*facdeg);
+        size_t quad_degree = std::max(recdeg - 1 + std::max(facdeg,celdeg), size_t(0));
+        auto qps_f = integrate(msh, fc, quad_degree);
         for (auto& qp : qps_f)
         {
-            Matrix<T, Dynamic, 1> c_phi_tmp = cb.eval_functions(qp.point());
-            Matrix<T, Dynamic, 1> c_phi = c_phi_tmp.head(cbs);
-            Matrix<T, Dynamic, DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
-            Matrix<T, Dynamic, DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
-            Matrix<T, Dynamic, 1> f_phi = fb.eval_functions(qp.point());
+            vector_type     c_phi_tmp = cb.eval_functions(qp.point());
+            vector_type     c_phi     = c_phi_tmp.head(cbs);
+            gradient_type   c_dphi_tmp= cb.eval_gradients(qp.point());
+            gradient_type   c_dphi    = c_dphi_tmp.block(1, 0, rbs-1, DIM);
+            vector_type     f_phi     = fb.eval_functions(qp.point());
+
             gr_rhs.block(0, cbs+i*fbs, rbs-1, fbs) += qp.weight() * (c_dphi * n) * f_phi.transpose();
             gr_rhs.block(0, 0, rbs-1, cbs) -= qp.weight() * (c_dphi * n) * c_phi.transpose();
         }
     }
 
-    Matrix<T, Dynamic, Dynamic> oper = gr_lhs.llt().solve(gr_rhs);
-    Matrix<T, Dynamic, Dynamic> data = gr_rhs.transpose() * oper;
+    matrix_type oper = gr_lhs.llt().solve(gr_rhs);
+    matrix_type data = gr_rhs.transpose() * oper;
 
     return std::make_pair(oper, data);
 }
