@@ -1610,7 +1610,7 @@ make_hho_vector_stabilization(const Mesh&                                       
         {
             const auto        f_phi   = fb.eval_functions(qp.point());
             const auto        c_phi   = cb.eval_functions(qp.point());
-            const matrix_type q_f_phi = qp.weight() * f_phi;
+            const Matrix<T, Dynamic, Mesh::dimension> q_f_phi = qp.weight() * f_phi;
             face_mass_matrix += priv::outer_product(f_phi, q_f_phi);
             face_trace_matrix += priv::outer_product(c_phi, q_f_phi);
         }
