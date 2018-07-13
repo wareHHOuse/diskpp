@@ -132,6 +132,9 @@ make_contact_unnamed(const Mesh& msh, const typename Mesh::cell_type& cl,
             const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
 {
     using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
+
     const size_t DIM = Mesh::dimension;
     auto gamma_N = gamma_0 / measure(msh,cl);
 
@@ -143,8 +146,7 @@ make_contact_unnamed(const Mesh& msh, const typename Mesh::cell_type& cl,
     auto       num_total_dofs = cbs + fbs * fcs.size();
     auto       cb             = make_scalar_monomial_basis(msh, cl, recdeg);
 
-    Matrix<T, Dynamic, Dynamic> ret =
-            Matrix<T, Dynamic, Dynamic>::Zero(num_total_dofs, num_total_dofs);
+    matrix_type ret = matrix_type::Zero(num_total_dofs, num_total_dofs);
 
     for (auto& fc: fcs)
     {
@@ -156,13 +158,14 @@ make_contact_unnamed(const Mesh& msh, const typename Mesh::cell_type& cl,
         {
             auto n = normal(msh, cl, fc);
 
-            Matrix<T, Dynamic, Dynamic> stiff_n = Matrix<T, Dynamic, Dynamic>::Zero(rbs, rbs);
-            auto                        qps     = integrate(msh, fc, 2 * (recdeg - 1));
+            matrix_type stiff_n = matrix_type::Zero(rbs, rbs);
+            const auto    qps   = integrate(msh, fc, 2 * (recdeg - 1));
 
             for (auto& qp : qps)
             {
-                auto dphi = cb.eval_gradients(qp.point());
-                Matrix<T, Dynamic, 1> dphi_n = dphi * n;
+                const auto dphi          = cb.eval_gradients(qp.point());
+                const vector_type dphi_n = dphi * n;
+
                 stiff_n += qp.weight() * dphi_n  * dphi_n.transpose();
             }
             ret +=  rec.transpose() * stiff_n.block(1, 1, rbs-1, rbs -1) * rec ;
@@ -182,8 +185,10 @@ make_contact_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
             const Matrix<typename Mesh::coordinate_type, Dynamic, 1>& uloc)
 {
     using T = typename Mesh::coordinate_type;
-    const size_t DIM = Mesh::dimension;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1> vector_type;
 
+    const size_t DIM = Mesh::dimension;
     auto gamma_N = gamma_0 * measure(msh,cl);
 
     auto recdeg =  hdi.reconstruction_degree();
@@ -194,7 +199,7 @@ make_contact_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
     auto rbs = scalar_basis_size(recdeg, DIM);
     auto fbs = scalar_basis_size(facdeg, DIM-1);
 
-    Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(cbs + fcs.size()* fbs, 1);
+    vector_type rhs = vector_type::Zero(cbs + fcs.size()* fbs, 1);
 
     auto fc_count = 0;
     for (auto& fc:fcs)
@@ -214,11 +219,11 @@ make_contact_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
             {
                 Matrix<T, Dynamic,  DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
                 Matrix<T, Dynamic,  DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
-                Matrix<T, Dynamic, 1>     f_phi = fb.eval_functions(qp.point());
-                Matrix<T, Dynamic, 1>     u_face= uloc.block(face_ofs, 0, fbs, 1);
+                vector_type     f_phi = fb.eval_functions(qp.point());
+                vector_type     u_face= uloc.block(face_ofs, 0, fbs, 1);
                 T gamma_u =  gamma_N * f_phi.dot(u_face);
                 T sigma_n = (c_dphi * n ).dot( rec * uloc);
-                Matrix<T, Dynamic, 1> sigman_gamma_v =  (c_dphi * n).transpose() * rec;
+                vector_type sigman_gamma_v =  (c_dphi * n).transpose() * rec;
                 sigman_gamma_v.block(face_ofs, 0, fbs, 1) = - gamma_N * f_phi;
 
                 rhs += qp.weight() * std::min( sigma_n - gamma_u, 0.) * sigman_gamma_v;
@@ -237,6 +242,9 @@ make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
                           const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
+
     const size_t DIM = Mesh::dimension;
 
     const auto recdeg = di.reconstruction_degree();
@@ -251,9 +259,9 @@ make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     const auto num_faces = howmany_faces(msh, cl);
 
-    Matrix<T, Dynamic, Dynamic> stiff = Matrix<T, Dynamic, Dynamic>::Zero(rbs, rbs);
-    Matrix<T, Dynamic, Dynamic> gr_lhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs-1, rbs-1);
-    Matrix<T, Dynamic, Dynamic> gr_rhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs-1, cbs + num_faces*fbs);
+    matrix_type stiff = matrix_type::Zero(rbs, rbs);
+    matrix_type gr_lhs = matrix_type::Zero(rbs-1, rbs-1);
+    matrix_type gr_rhs = matrix_type::Zero(rbs-1, cbs + num_faces*fbs);
 
     auto qps = integrate(msh, cl, 2 * (recdeg-1));
     for (auto& qp : qps)
@@ -275,18 +283,18 @@ make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
         auto qps_f = integrate(msh, fc, recdeg - 1 + std::max(facdeg,celdeg));
         for (auto& qp : qps_f)
         {
-            Matrix<T, Dynamic, 1> c_phi_tmp = cb.eval_functions(qp.point());
-            Matrix<T, Dynamic, 1> c_phi = c_phi_tmp.head(cbs);
+            vector_type c_phi_tmp = cb.eval_functions(qp.point());
+            vector_type c_phi = c_phi_tmp.head(cbs);
             Matrix<T, Dynamic, DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
             Matrix<T, Dynamic, DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
-            Matrix<T, Dynamic, 1> f_phi = fb.eval_functions(qp.point());
+            vector_type f_phi = fb.eval_functions(qp.point());
             gr_rhs.block(0, cbs+i*fbs, rbs-1, fbs) += qp.weight() * (c_dphi * n) * f_phi.transpose();
             gr_rhs.block(0, 0, rbs-1, cbs) -= qp.weight() * (c_dphi * n) * c_phi.transpose();
         }
     }
 
-    Matrix<T, Dynamic, Dynamic> oper = gr_lhs.llt().solve(gr_rhs);
-    Matrix<T, Dynamic, Dynamic> data = gr_rhs.transpose() * oper;
+    matrix_type oper = gr_lhs.llt().solve(gr_rhs);
+    matrix_type data = gr_rhs.transpose() * oper;
 
     return std::make_pair(oper, data);
 }
@@ -296,17 +304,18 @@ Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
 make_hho_eigval_mass_matrix(const Mesh& msh, const typename Mesh::cell_type& cl,
                             size_t degree)
 {
-    using scalar_type = typename Mesh::coordinate_type;
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+
     auto cb = make_scalar_monomial_basis(msh, cl, degree);
     auto cbs = scalar_basis_size(degree, Mesh::dimension);
 
-    Matrix<scalar_type, Dynamic, Dynamic> data =
-        Matrix<scalar_type, Dynamic, Dynamic>::Zero(cbs, cbs);
+    matrix_type data = matrix_type::Zero(cbs, cbs);
 
-    auto qps = integrate(msh, cl, 2*degree);
+    const auto qps = integrate(msh, cl, 2*degree);
     for (auto& qp : qps)
     {
-        auto phi = cb.eval_functions(qp.point());
+        const auto phi = cb.eval_functions(qp.point());
         data += qp.weight() * phi * phi.transpose();
     }
 
@@ -395,6 +404,7 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
     const auto num_faces = howmany_faces(msh, cl);
 
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
     typedef Matrix<T, N, N>             gradient_type;
     typedef Matrix<T, Dynamic, N>       function_type;
 
@@ -443,8 +453,8 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
         }
     }
 
-    Matrix<T, Dynamic, Dynamic> oper = gr_lhs.llt().solve(gr_rhs);
-    Matrix<T, Dynamic, Dynamic> data = gr_rhs.transpose() * oper;
+    matrix_type oper = gr_lhs.llt().solve(gr_rhs);
+    matrix_type data = gr_rhs.transpose() * oper;
 
     return std::make_pair(oper, data);
 }
@@ -480,8 +490,8 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
 
     const auto num_faces = howmany_faces(msh, cl);
 
-    typedef Matrix<T, Dynamic, 1> vector_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
     typedef Matrix<T, N, N>             gradient_type;
     typedef Matrix<T, Dynamic, N>       function_type;
 
@@ -560,6 +570,9 @@ make_hho_gradrec_matrix(const Mesh&                     msh,
                           const hho_degree_info&          di)
 {
    using T        = typename Mesh::coordinate_type;
+   typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+   typedef Matrix<T, Dynamic, 1>       vector_type;
+
    const size_t N = Mesh::dimension;
 
    const auto graddeg = di.grad_degree();
@@ -574,8 +587,6 @@ make_hho_gradrec_matrix(const Mesh&                     msh,
    const auto fbs = vector_basis_size(facdeg, Mesh::dimension - 1, Mesh::dimension);
 
    const auto num_faces = howmany_faces(msh, cl);
-
-   typedef Matrix<T, Dynamic, Dynamic> matrix_type;
 
    matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);
    matrix_type gr_rhs = matrix_type::Zero(gbs, cbs + num_faces * fbs);
@@ -635,14 +646,13 @@ make_hho_gradrec_matrix(const Mesh&                     msh,
          const auto fphi = fb.eval_functions(qp.point());
 
          const auto gphi_n = priv::outer_product(gphi, n);
-         gr_rhs.block(0, cbs + i * fbs, gbs , fbs) +=
-           qp.weight() * priv::outer_product(fphi, gphi_n);
+         gr_rhs.block(0, cbs + i * fbs, gbs , fbs) += qp.weight() * priv::outer_product(fphi, gphi_n);
          gr_rhs.block(0, 0, gbs, cbs) -= qp.weight() * priv::outer_product(cphi, gphi_n);
       }
    }
 
-   Matrix<T, Dynamic, Dynamic> oper = gr_lhs.llt().solve(gr_rhs);
-   Matrix<T, Dynamic, Dynamic> data = gr_rhs.transpose() * oper;
+   matrix_type oper = gr_lhs.llt().solve(gr_rhs);
+   matrix_type data = gr_rhs.transpose() * oper;
 
    return std::make_pair(oper, data);
 }
@@ -655,6 +665,9 @@ make_hho_sym_gradrec_matrix(const Mesh&                     msh,
                         const hho_degree_info&          di)
 {
    using T        = typename Mesh::coordinate_type;
+   typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+   typedef Matrix<T, Dynamic, 1>       vector_type;
+
    const size_t N = Mesh::dimension;
 
    const auto graddeg = di.grad_degree();
@@ -669,8 +682,6 @@ make_hho_sym_gradrec_matrix(const Mesh&                     msh,
    const auto fbs = vector_basis_size(facdeg, Mesh::dimension - 1, Mesh::dimension);
 
    const auto num_faces = howmany_faces(msh, cl);
-
-   typedef Matrix<T, Dynamic, Dynamic> matrix_type;
 
    matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);
    matrix_type gr_rhs = matrix_type::Zero(gbs, cbs + num_faces * fbs);
@@ -741,8 +752,8 @@ make_hho_sym_gradrec_matrix(const Mesh&                     msh,
         }
     }
 
-    Matrix<T, Dynamic, Dynamic> oper = gr_lhs.llt().solve(gr_rhs);
-    Matrix<T, Dynamic, Dynamic> data = gr_rhs.transpose() * oper;
+    matrix_type oper = gr_lhs.llt().solve(gr_rhs);
+    matrix_type data = gr_rhs.transpose() * oper;
 
     return std::make_pair(oper, data);
 }
@@ -754,6 +765,7 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
                                    const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
 
     const auto celdeg = di.cell_degree();
     const auto facdeg = di.face_degree();
@@ -773,8 +785,8 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
     assert(dr_lhs.rows() == rbs && dr_lhs.cols() == rbs);
     assert(dr_rhs.rows() == rbs && dr_rhs.cols() == cbs + num_faces * fbs);
 
-    Matrix<T, Dynamic, Dynamic> oper = dr_lhs.llt().solve(dr_rhs);
-    Matrix<T, Dynamic, Dynamic> data = dr_rhs.transpose() * oper;
+    matrix_type oper = dr_lhs.llt().solve(dr_rhs);
+    matrix_type data = dr_rhs.transpose() * oper;
 
     return std::make_pair(oper, data);
 }
@@ -785,6 +797,7 @@ make_hho_divergence_reconstruction_stokes_rhs(const Mesh& msh, const typename Me
                                    const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
 
     const auto celdeg = di.cell_degree();
     const auto facdeg = di.face_degree();
@@ -799,7 +812,7 @@ make_hho_divergence_reconstruction_stokes_rhs(const Mesh& msh, const typename Me
 
     const auto num_faces = howmany_faces(msh, cl);
 
-    Matrix<T, Dynamic, Dynamic> dr_rhs = Matrix<T, Dynamic, Dynamic>::Zero(rbs, cbs + num_faces*fbs);
+    matrix_type dr_rhs = matrix_type::Zero(rbs, cbs + num_faces*fbs);
 
     const auto qps = integrate(msh, cl, std::max(int(celdeg + recdeg) - 1, 0));
     for (auto& qp : qps)
@@ -837,6 +850,7 @@ make_hdg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
 
     const auto celdeg = di.cell_degree();
     const auto facdeg = di.face_degree();
@@ -859,10 +873,10 @@ make_hdg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
         const auto h  = measure(msh, fc);
         auto fb = make_scalar_monomial_basis(msh, fc, facdeg);
 
-        matrix_type                 oper  = Matrix<T, Dynamic, Dynamic>::Zero(fbs, total_dofs);
-        matrix_type                 tr    = Matrix<T, Dynamic, Dynamic>::Zero(fbs, total_dofs);
-        matrix_type                 mass  = Matrix<T, Dynamic, Dynamic>::Zero(fbs, fbs);
-        matrix_type                 trace = Matrix<T, Dynamic, Dynamic>::Zero(fbs, cbs);
+        matrix_type oper  = matrix_type::Zero(fbs, total_dofs);
+        matrix_type tr    = matrix_type::Zero(fbs, total_dofs);
+        matrix_type mass  = matrix_type::Zero(fbs, fbs);
+        matrix_type trace = matrix_type::Zero(fbs, cbs);
 
         oper.block(0, cbs + i  * fbs, fbs, fbs) = -If;
 
@@ -1301,6 +1315,8 @@ make_hho_scalar_stabilization_2(const Mesh& msh, const typename Mesh::cell_type&
                                 const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
 
     auto recdeg = di.reconstruction_degree();
     auto celdeg = di.cell_degree();
@@ -1312,7 +1328,7 @@ make_hho_scalar_stabilization_2(const Mesh& msh, const typename Mesh::cell_type&
 
     auto cb = make_scalar_monomial_basis(msh, cl, recdeg);
 
-    Matrix<T, Dynamic, Dynamic> mass_mat = Matrix<T, Dynamic, Dynamic>::Zero(rbs, rbs);
+    matrix_type mass_mat = matrix_type::Zero(rbs, rbs);
     auto cell_quadpoints = integrate(msh, cl, 2*recdeg);
     for (auto& qp : cell_quadpoints)
     {
@@ -1323,18 +1339,18 @@ make_hho_scalar_stabilization_2(const Mesh& msh, const typename Mesh::cell_type&
     // Build \pi_F^k (v_F - P_T^K v) equations (21) and (22)
 
     //Step 1: compute \pi_T^k p_T^k v (third term).
-    Matrix<T, Dynamic, Dynamic> M1 = mass_mat.block(0, 0, cbs, cbs);
-    Matrix<T, Dynamic, Dynamic> M2 = mass_mat.block(0, 1, cbs, rbs-1);
-    Matrix<T, Dynamic, Dynamic> proj1 = -M1.llt().solve(M2*reconstruction);
+    matrix_type M1 = mass_mat.block(0, 0, cbs, cbs);
+    matrix_type M2 = mass_mat.block(0, 1, cbs, rbs-1);
+    matrix_type proj1 = -M1.llt().solve(M2*reconstruction);
 
     //Step 2: v_T - \pi_T^k p_T^k v (first term minus third term)
-    Matrix<T, Dynamic, Dynamic> I_T = Matrix<T, Dynamic, Dynamic>::Identity(cbs, cbs);
+    matrix_type I_T = matrix_type::Identity(cbs, cbs);
     proj1.block(0, 0, cbs, cbs) += I_T;
 
     auto fcs = faces(msh, cl);
     auto num_faces = fcs.size();
 
-    Matrix<T, Dynamic, Dynamic> data = Matrix<T, Dynamic, Dynamic>::Zero(cbs+num_faces*fbs, cbs+num_faces*fbs);
+    matrix_type data = matrix_type::Zero(cbs+num_faces*fbs, cbs+num_faces*fbs);
 
     auto h = diameter(msh, cl);
 
@@ -1344,36 +1360,36 @@ make_hho_scalar_stabilization_2(const Mesh& msh, const typename Mesh::cell_type&
         auto fc = fcs[face_i];
         auto fb = make_scalar_monomial_basis(msh, fc, facdeg);
 
-        Matrix<T, Dynamic, Dynamic> face_mass_matrix    = Matrix<T, Dynamic, Dynamic>::Zero(fbs, fbs);
-        Matrix<T, Dynamic, Dynamic> face_trace_matrix   = Matrix<T, Dynamic, Dynamic>::Zero(fbs, rbs);
+        matrix_type face_mass_matrix    = matrix_type::Zero(fbs, fbs);
+        matrix_type face_trace_matrix   = matrix_type::Zero(fbs, rbs);
 
         auto face_quadpoints = integrate(msh, fc, 2*recdeg);
         for (auto& qp : face_quadpoints)
         {
             auto f_phi = fb.eval_functions(qp.point());
             auto c_phi = cb.eval_functions(qp.point());
-            Matrix<T, Dynamic, 1> q_f_phi = qp.weight() * f_phi;
+            vector_type q_f_phi = qp.weight() * f_phi;
             face_mass_matrix += q_f_phi * f_phi.transpose();
             face_trace_matrix += q_f_phi * c_phi.transpose();
         }
 
-        LLT<Matrix<T, Dynamic, Dynamic>> piKF;
+        LLT<matrix_type> piKF;
         piKF.compute(face_mass_matrix);
 
         // Step 3a: \pi_F^k( v_F - p_T^k v )
-        Matrix<T, Dynamic, Dynamic> MR1 = face_trace_matrix.block(0, 1, fbs, rbs-1);
-        Matrix<T, Dynamic, Dynamic> A = MR1 * reconstruction;
+        matrix_type MR1 = face_trace_matrix.block(0, 1, fbs, rbs-1);
+        matrix_type A = MR1 * reconstruction;
 
-        Matrix<T, Dynamic, Dynamic> proj2 = piKF.solve(A);
-        Matrix<T, Dynamic, Dynamic> I_F = Matrix<T, Dynamic, Dynamic>::Identity(fbs, fbs);
+        matrix_type proj2 = piKF.solve(A);
+        matrix_type I_F = matrix_type::Identity(fbs, fbs);
         proj2.block(0, cbs+face_i*fbs, fbs, fbs) -= I_F;
         A.block(0, cbs+face_i*fbs, fbs, fbs) -= face_mass_matrix;
 
         // Step 3b: \pi_F^k( v_T - \pi_T^k p_T^k v )
-        Matrix<T, Dynamic, Dynamic> MR2 = face_trace_matrix.block(0, 0, fbs, cbs);
-        Matrix<T, Dynamic, Dynamic> B = MR2 * proj1;
-        Matrix<T, Dynamic, Dynamic> proj3 = piKF.solve(B);
-        Matrix<T, Dynamic, Dynamic> BRF = proj2 + proj3;
+        matrix_type MR2 = face_trace_matrix.block(0, 0, fbs, cbs);
+        matrix_type B = MR2 * proj1;
+        matrix_type proj3 = piKF.solve(B);
+        matrix_type BRF = proj2 + proj3;
 
         data += BRF.transpose() * (A+B) / h;
     }
@@ -1390,6 +1406,7 @@ make_hho_vector_stabilization(const Mesh&                                       
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
 
     const auto recdeg = di.reconstruction_degree();
     const auto celdeg = di.cell_degree();
@@ -1469,16 +1486,18 @@ project_function(const Mesh& msh, const typename Mesh::cell_type& cl,
                  const scalar_rhs_function<Mesh>& f, size_t di = 0)
 {
     using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
 
     auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
     auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
     auto num_faces = howmany_faces(msh, cl);
 
-    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs+num_faces*fbs);
+    vector_type ret = vector_type::Zero(cbs+num_faces*fbs);
 
     auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-    Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, cb, di);
-    Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, cb, f, di);
+    matrix_type cell_mm = make_mass_matrix(msh, cl, cb, di);
+    vector_type cell_rhs = make_rhs(msh, cl, cb, f, di);
     ret.block(0, 0, cbs, 1) = cell_mm.llt().solve(cell_rhs);
 
     auto fcs = faces(msh, cl);
@@ -1486,8 +1505,8 @@ project_function(const Mesh& msh, const typename Mesh::cell_type& cl,
     {
         auto fc = fcs[i];
         auto fb = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
-        Matrix<T, Dynamic, Dynamic> face_mm = make_mass_matrix(msh, fc, fb, di);
-        Matrix<T, Dynamic, 1> face_rhs = make_rhs(msh, fc, fb, f, di);
+        matrix_type face_mm = make_mass_matrix(msh, fc, fb, di);
+        vector_type face_rhs = make_rhs(msh, fc, fb, f, di);
         ret.block(cbs+i*fbs, 0, fbs, 1) = face_mm.llt().solve(face_rhs);
     }
 
@@ -1501,16 +1520,18 @@ project_function(const Mesh& msh, const typename Mesh::cell_type& cl,
                  const vector_rhs_function<Mesh>& f, size_t di = 0)
 {
     using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
 
     auto cbs = vector_basis_size(hdi.cell_degree(), Mesh::dimension, Mesh::dimension);
     auto fbs = vector_basis_size(hdi.face_degree(), Mesh::dimension-1, Mesh::dimension);
     auto num_faces = howmany_faces(msh, cl);
 
-    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs+num_faces*fbs);
+    vector_type ret = vector_type::Zero(cbs+num_faces*fbs);
 
     auto cb = make_vector_monomial_basis(msh, cl, hdi.cell_degree());
-    Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, cb, di);
-    Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, cb, f, di);
+    matrix_type cell_mm = make_mass_matrix(msh, cl, cb, di);
+    vector_type cell_rhs = make_rhs(msh, cl, cb, f, di);
     ret.block(0, 0, cbs, 1) = cell_mm.llt().solve(cell_rhs);
 
     auto fcs = faces(msh, cl);
@@ -1531,14 +1552,16 @@ project_function(const Mesh&                      msh,
                  size_t                           di = 0)
 {
     using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1> vector_type;
 
     auto fbs       = vector_basis_size(hdi.face_degree(), Mesh::dimension - 1, Mesh::dimension);
 
-    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(fbs);
+    vector_type ret = vector_type::Zero(fbs);
 
-    auto                        fb       = make_vector_monomial_basis(msh, fc, hdi.face_degree());
-    Matrix<T, Dynamic, Dynamic> face_mm  = make_mass_matrix(msh, fc, fb, di);
-    Matrix<T, Dynamic, 1>       face_rhs = make_rhs(msh, fc, fb, f, di);
+    auto  fb             = make_vector_monomial_basis(msh, fc, hdi.face_degree());
+    matrix_type face_mm  = make_mass_matrix(msh, fc, fb, di);
+    vector_type face_rhs = make_rhs(msh, fc, fb, f, di);
     ret.block(0, 0, fbs, 1)  = face_mm.llt().solve(face_rhs);
 
    return ret;
@@ -1556,9 +1579,9 @@ project_tensor( const Mesh& msh, const typename Mesh::cell_type& cl,
     auto cb  =  make_vector_monomial_basis(msh, cl, hdi.cell_degree());
     auto cbs =  vector_basis_size(hdi.cell_degree(), Mesh::dimension, Mesh::dimension);
 
-    Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, cb, di);
-    Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(cbs);
-    //Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, cb, f, di);
+    matrix_type cell_mm = make_mass_matrix(msh, cl, cb, di);
+    vector_type rhs = vector_type::Zero(cbs);
+    //vector_type cell_rhs = make_rhs(msh, cl, cb, f, di);
 
     auto qps = integrate(msh, cl, 2*(hdi.cell_degree()+di));
 
@@ -1583,9 +1606,9 @@ project_tensor( const Mesh& msh, const typename Mesh::cell_type& cl,
     auto cb  =  make_matrix_monomial_basis(msh, cl, hdi.cell_degree());
     auto cbs =  matrix_basis_size(hdi.cell_degree(), Mesh::dimension, Mesh::dimension);
 
-    Matrix<T, Dynamic, Dynamic> cell_mm = make_mass_matrix(msh, cl, cb, di);
-    Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(cbs);
-    //Matrix<T, Dynamic, 1> cell_rhs = make_rhs(msh, cl, cb, f, di);
+    matrix_type cell_mm = make_mass_matrix(msh, cl, cb, di);
+    vector_type rhs = vector_type::Zero(cbs);
+    //vector_type cell_rhs = make_rhs(msh, cl, cb, f, di);
 
     auto qps = integrate(msh, cl, 2*(hdi.cell_degree()+di));
 
@@ -1672,9 +1695,11 @@ class diffusion_condensed_assembler
     };
 
 public:
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
 
     SparseMatrix<T>         LHS;
-    Matrix<T, Dynamic, 1>   RHS;
+    vector_type   RHS;
 
     diffusion_condensed_assembler(const Mesh& msh, hho_degree_info hdi)
         : di(hdi)
@@ -1707,7 +1732,7 @@ public:
         auto system_size = fbs * num_other_faces;
 
         LHS = SparseMatrix<T>( system_size, system_size );
-        RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
+        RHS = vector_type::Zero( system_size );
     }
 
 #if 0
@@ -1722,8 +1747,8 @@ public:
     template<typename Function>
     void
     assemble(const Mesh& msh, const typename Mesh::cell_type& cl,
-             const Matrix<T, Dynamic, Dynamic>& lhs,
-             const Matrix<T, Dynamic, 1>& rhs,
+             const matrix_type& lhs,
+             const vector_type& rhs,
              const Function& dirichlet_bf)
     {
         auto is_dirichlet = [&](const typename Mesh::face_type& fc) -> bool {
@@ -1737,7 +1762,7 @@ public:
         std::vector<assembly_index> asm_map;
         asm_map.reserve(fcs.size()*fbs);
 
-        Matrix<T, Dynamic, 1> dirichlet_data = Matrix<T, Dynamic, 1>::Zero(fcs.size()*fbs);
+        vector_type dirichlet_data = vector_type::Zero(fcs.size()*fbs);
 
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
@@ -1754,8 +1779,8 @@ public:
             {
                 auto fb = make_scalar_monomial_basis(msh, fc, di.face_degree());
 
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
-                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
+                matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                vector_type rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
                 dirichlet_data.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
             }
         }
@@ -1778,9 +1803,9 @@ public:
     } // assemble()
 
     template<typename Function>
-    Matrix<T, Dynamic, 1>
+    vector_type
     take_local_data(const Mesh& msh, const typename Mesh::cell_type& cl,
-    const Matrix<T, Dynamic, 1>& solution, const Function& dirichlet_bf)
+    const vector_type& solution, const Function& dirichlet_bf)
     {
         auto facdeg = di.face_degree();
         auto fbs = scalar_basis_size(di.face_degree(), Mesh::dimension-1);
@@ -1788,7 +1813,7 @@ public:
 
         auto num_faces = fcs.size();
 
-        Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(num_faces*fbs);
+        vector_type ret = vector_type::Zero(num_faces*fbs);
 
         for (size_t face_i = 0; face_i < num_faces; face_i++)
         {
@@ -1804,8 +1829,8 @@ public:
             {
                 auto fb = make_scalar_monomial_basis(msh, fc, di.face_degree());
 
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
-                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
+                matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                vector_type rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
                 ret.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
             }
             else
@@ -1884,42 +1909,42 @@ class diffusion_condensed_assembler2
     };
 
 public:
+  typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+  typedef Matrix<T, Dynamic, 1>       vector_type;
 
-    SparseMatrix<T>         LHS;
-    Matrix<T, Dynamic, 1>   RHS;
+  SparseMatrix<T> LHS;
+  vector_type     RHS;
 
-    diffusion_condensed_assembler2(const Mesh& msh, hho_degree_info hdi, const boundary_type& bnd)
-        : di(hdi), m_bnd(bnd)
-    {
-        auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
+  diffusion_condensed_assembler2(const Mesh& msh, hho_degree_info hdi, const boundary_type& bnd) : di(hdi), m_bnd(bnd)
+  {
+      auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
+          auto fc_id = msh.lookup(fc);
+          return bnd.is_dirichlet_face(fc_id);
+      };
 
-            auto fc_id = msh.lookup(fc);
-            return bnd.is_dirichlet_face(fc_id);
-        };
+      num_all_faces       = msh.faces_size();
+      num_dirichlet_faces = std::count_if(msh.faces_begin(), msh.faces_end(), is_dirichlet);
+      num_other_faces     = num_all_faces - num_dirichlet_faces;
 
-        num_all_faces = msh.faces_size();
-        num_dirichlet_faces = std::count_if(msh.faces_begin(), msh.faces_end(), is_dirichlet);
-        num_other_faces = num_all_faces - num_dirichlet_faces;
+      compress_table.resize(num_all_faces);
+      expand_table.resize(num_other_faces);
 
-        compress_table.resize( num_all_faces );
-        expand_table.resize( num_other_faces );
+      size_t compressed_offset = 0;
+      for (size_t i = 0; i < num_all_faces; i++)
+      {
+          auto fc = *std::next(msh.faces_begin(), i);
+          if (!is_dirichlet(fc))
+          {
+              compress_table.at(i)               = compressed_offset;
+              expand_table.at(compressed_offset) = i;
+              compressed_offset++;
+          }
+      }
+      auto fbs         = scalar_basis_size(hdi.face_degree(), Mesh::dimension - 1);
+      auto system_size = fbs * num_other_faces;
 
-        size_t compressed_offset = 0;
-        for (size_t i = 0; i < num_all_faces; i++)
-        {
-            auto fc = *std::next(msh.faces_begin(), i);
-            if ( !is_dirichlet(fc) )
-            {
-                compress_table.at(i) = compressed_offset;
-                expand_table.at(compressed_offset) = i;
-                compressed_offset++;
-            }
-        }
-        auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
-        auto system_size = fbs * num_other_faces;
-
-        LHS = SparseMatrix<T>( system_size, system_size );
-        RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
+      LHS = SparseMatrix<T>(system_size, system_size);
+      RHS = vector_type::Zero(system_size);
     }
 
 #if 0
@@ -1933,8 +1958,8 @@ public:
 
     void
     assemble(const Mesh& msh, const typename Mesh::cell_type& cl,
-             const Matrix<T, Dynamic, Dynamic>& lhs,
-             const Matrix<T, Dynamic, 1>& rhs)
+             const matrix_type& lhs,
+             const vector_type& rhs)
     {
 
         auto fbs = scalar_basis_size(di.face_degree(), Mesh::dimension-1);
@@ -1943,7 +1968,7 @@ public:
         std::vector<assembly_index> asm_map;
         asm_map.reserve(fcs.size()*fbs);
 
-        Matrix<T, Dynamic, 1> dirichlet_data = Matrix<T, Dynamic, 1>::Zero(fcs.size()*fbs);
+        vector_type dirichlet_data = vector_type::Zero(fcs.size()*fbs);
 
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
@@ -1961,8 +1986,8 @@ public:
             {
                 auto fb = make_scalar_monomial_basis(msh, fc, di.face_degree());
                 auto dirichlet_fun = m_bnd.dirichlet_boundary_func(face_id);
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
-                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_fun, di.face_degree());
+                matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                vector_type rhs = make_rhs(msh, fc, fb, dirichlet_fun, di.face_degree());
                 dirichlet_data.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
             }
         }
@@ -2023,7 +2048,7 @@ public:
                         }
 
                         auto fb = make_scalar_monomial_basis(msh, bfc, face_degree);
-                        Matrix<T, Dynamic, 1> neumann = make_rhs(msh, bfc, fb, bnd.neumann_boundary_func(face_id), face_degree);
+                        vector_type neumann = make_rhs(msh, bfc, fb, bnd.neumann_boundary_func(face_id), face_degree);
 
                         assert(neumann.size() == num_face_dofs);
                         for (size_t i = 0; i < neumann.size() ; i++)
@@ -2091,10 +2116,10 @@ public:
                             asm_map.push_back( assembly_index(face_LHS_offset+i,true) );
 
                         auto fb = make_scalar_monomial_basis(msh, bfc, face_degree);
-                        Matrix<T, Dynamic, 1> robin = make_rhs(msh,bfc,fb,bnd.robin_boundary_func(face_id), face_degree);
+                        vector_type robin = make_rhs(msh,bfc,fb,bnd.robin_boundary_func(face_id), face_degree);
                         assert (robin.size() == num_face_dofs);
 
-                        Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, bfc, fb, face_degree);
+                        matrix_type mass = make_mass_matrix(msh, bfc, fb, face_degree);
 
                         for (size_t i = 0; i < num_face_dofs; i++)
                         {
@@ -2114,9 +2139,9 @@ public:
 
 
 
-    Matrix<T, Dynamic,1>
+    vector_type
     take_local_data(const Mesh& msh, const typename Mesh::cell_type& cl,
-    const Matrix<T, Dynamic, 1>& solution)
+    const vector_type& solution)
     {
         auto facdeg = di.face_degree();
         auto fbs = scalar_basis_size(di.face_degree(), Mesh::dimension-1);
@@ -2124,7 +2149,7 @@ public:
 
         auto num_faces = fcs.size();
 
-        Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(num_faces*fbs);
+        vector_type ret = vector_type::Zero(num_faces*fbs);
 
         for (size_t face_i = 0; face_i < num_faces; face_i++)
         {
@@ -2140,8 +2165,8 @@ public:
             {
                 auto fb = make_scalar_monomial_basis(msh, fc, di.face_degree());
                 auto dirichlet_bf = m_bnd.dirichlet_boundary_func(face_id);
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
-                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
+                matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                vector_type rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
                 ret.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
             }
             else
@@ -2189,7 +2214,7 @@ class diffusion_condensed_assembler_vector
 
     std::vector< Triplet<T> >           triplets;
 
-    size_t      num_all_faces, num_dirichlet_faces, num_other_faces;
+    size_t   num_all_faces, num_dirichlet_faces, num_other_faces;
 
     class assembly_index
     {
@@ -2222,42 +2247,41 @@ class diffusion_condensed_assembler_vector
     };
 
 public:
+  typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+  typedef Matrix<T, Dynamic, 1>       vector_type;
 
-    SparseMatrix<T>         LHS;
-    Matrix<T, Dynamic, 1>   RHS;
+  SparseMatrix<T> LHS;
+  vector_type     RHS;
 
-    diffusion_condensed_assembler_vector(const Mesh& msh, hho_degree_info hdi)
-        : di(hdi)
-    {
-        auto is_dirichlet = [&](const typename Mesh::face_type& fc) -> bool {
-            return msh.is_boundary(fc);
-        };
+  diffusion_condensed_assembler_vector(const Mesh& msh, hho_degree_info hdi) : di(hdi)
+  {
+      auto is_dirichlet = [&](const typename Mesh::face_type& fc) -> bool { return msh.is_boundary(fc); };
 
-        num_all_faces = msh.faces_size();
-        num_dirichlet_faces = std::count_if(msh.faces_begin(), msh.faces_end(), is_dirichlet);
-        num_other_faces = num_all_faces - num_dirichlet_faces;
+      num_all_faces       = msh.faces_size();
+      num_dirichlet_faces = std::count_if(msh.faces_begin(), msh.faces_end(), is_dirichlet);
+      num_other_faces     = num_all_faces - num_dirichlet_faces;
 
-        compress_table.resize( num_all_faces );
-        expand_table.resize( num_other_faces );
+      compress_table.resize(num_all_faces);
+      expand_table.resize(num_other_faces);
 
-        size_t compressed_offset = 0;
-        for (size_t i = 0; i < num_all_faces; i++)
-        {
-            auto fc = *std::next(msh.faces_begin(), i);
-            if ( !is_dirichlet(fc) )
-            {
-                compress_table.at(i) = compressed_offset;
-                expand_table.at(compressed_offset) = i;
-                compressed_offset++;
-            }
-        }
+      size_t compressed_offset = 0;
+      for (size_t i = 0; i < num_all_faces; i++)
+      {
+          auto fc = *std::next(msh.faces_begin(), i);
+          if (!is_dirichlet(fc))
+          {
+              compress_table.at(i)               = compressed_offset;
+              expand_table.at(compressed_offset) = i;
+              compressed_offset++;
+          }
+      }
 
-        auto fbs = vector_basis_size(hdi.face_degree(), Mesh::dimension-1, Mesh::dimension);
+      auto fbs = vector_basis_size(hdi.face_degree(), Mesh::dimension - 1, Mesh::dimension);
 
-        auto system_size = fbs * num_other_faces;
+      auto system_size = fbs * num_other_faces;
 
-        LHS = SparseMatrix<T>( system_size, system_size );
-        RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
+      LHS = SparseMatrix<T>(system_size, system_size);
+      RHS = vector_type::Zero(system_size);
     }
 
 #if 0
@@ -2272,8 +2296,8 @@ public:
     template<typename Function>
     void
     assemble(const Mesh& msh, const typename Mesh::cell_type& cl,
-             const Matrix<T, Dynamic, Dynamic>& lhs,
-             const Matrix<T, Dynamic, 1>& rhs,
+             const matrix_type& lhs,
+             const vector_type& rhs,
              const Function& dirichlet_bf)
     {
         auto is_dirichlet = [&](const typename Mesh::face_type& fc) -> bool {
@@ -2287,7 +2311,7 @@ public:
         std::vector<assembly_index> asm_map;
         asm_map.reserve(fcs.size()*fbs);
 
-        Matrix<T, Dynamic, 1> dirichlet_data = Matrix<T, Dynamic, 1>::Zero(fcs.size()*fbs);
+        vector_type dirichlet_data = vector_type::Zero(fcs.size()*fbs);
 
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
@@ -2304,8 +2328,8 @@ public:
             {
                 auto fb = make_vector_monomial_basis(msh, fc, di.face_degree());
 
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
-                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
+                matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                vector_type rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
                 dirichlet_data.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
             }
         }
@@ -2328,9 +2352,9 @@ public:
     } // assemble()
 
     template<typename Function>
-    Matrix<T, Dynamic, 1>
+    vector_type
     take_local_data(const Mesh& msh, const typename Mesh::cell_type& cl,
-    const Matrix<T, Dynamic, 1>& solution, const Function& dirichlet_bf)
+    const vector_type& solution, const Function& dirichlet_bf)
     {
         auto facdeg = di.face_degree();
         auto fbs = vector_basis_size(di.face_degree(), Mesh::dimension-1,Mesh::dimension);
@@ -2338,7 +2362,7 @@ public:
 
         auto num_faces = fcs.size();
 
-        Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(num_faces*fbs);
+        vector_type ret = vector_type::Zero(num_faces*fbs);
 
         for (size_t face_i = 0; face_i < num_faces; face_i++)
         {
@@ -2354,8 +2378,8 @@ public:
             {
                 auto fb = make_vector_monomial_basis(msh, fc, di.face_degree());
 
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
-                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
+                matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                vector_type rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
                 ret.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
             }
             else
@@ -2463,55 +2487,54 @@ class stokes_assembler
     };
 
 public:
+  typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+  typedef Matrix<T, Dynamic, 1>       vector_type;
 
-    SparseMatrix<T>         LHS;
-    Matrix<T, Dynamic, 1>   RHS;
+  SparseMatrix<T> LHS;
+  vector_type     RHS;
 
-    stokes_assembler(const Mesh& msh, const hho_degree_info& hdi, const boundary_type& bnd)
-        : di(hdi), m_bnd(bnd)
-    {
-        auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
+  stokes_assembler(const Mesh& msh, const hho_degree_info& hdi, const boundary_type& bnd) : di(hdi), m_bnd(bnd)
+  {
+      auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
+          auto fc_id = msh.lookup(fc);
+          return bnd.is_dirichlet_face(fc_id);
+      };
 
-            auto fc_id = msh.lookup(fc);
-            return bnd.is_dirichlet_face(fc_id);
-        };
+      num_all_faces       = msh.faces_size();
+      num_dirichlet_faces = std::count_if(msh.faces_begin(), msh.faces_end(), is_dirichlet);
+      num_other_faces     = num_all_faces - num_dirichlet_faces;
 
-        num_all_faces = msh.faces_size();
-        num_dirichlet_faces = std::count_if(msh.faces_begin(), msh.faces_end(), is_dirichlet);
-        num_other_faces = num_all_faces - num_dirichlet_faces;
+      compress_table.resize(num_all_faces);
+      expand_table.resize(num_other_faces);
 
-        compress_table.resize( num_all_faces );
-        expand_table.resize( num_other_faces );
+      size_t compressed_offset = 0;
+      for (size_t i = 0; i < num_all_faces; i++)
+      {
+          auto fc = *std::next(msh.faces_begin(), i);
+          if (!is_dirichlet(fc))
+          {
+              compress_table.at(i)               = compressed_offset;
+              expand_table.at(compressed_offset) = i;
+              compressed_offset++;
+          }
+      }
 
-        size_t compressed_offset = 0;
-        for (size_t i = 0; i < num_all_faces; i++)
-        {
-            auto fc = *std::next(msh.faces_begin(), i);
-            if ( !is_dirichlet(fc) )
-            {
-                compress_table.at(i) = compressed_offset;
-                expand_table.at(compressed_offset) = i;
-                compressed_offset++;
-            }
-        }
+      cbs_A = vector_basis_size(di.cell_degree(), Mesh::dimension, Mesh::dimension);
+      fbs_A = vector_basis_size(di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+      cbs_B = scalar_basis_size(di.face_degree(), Mesh::dimension);
 
-        cbs_A = vector_basis_size(di.cell_degree(), Mesh::dimension, Mesh::dimension);
-        fbs_A = vector_basis_size(di.face_degree(), Mesh::dimension-1, Mesh::dimension);
-        cbs_B = scalar_basis_size(di.face_degree(), Mesh::dimension);
+      system_size = cbs_A * msh.cells_size() + fbs_A * num_other_faces + cbs_B * msh.cells_size() + 1;
 
+      LHS = SparseMatrix<T>(system_size, system_size);
+      RHS = vector_type::Zero(system_size);
 
-        system_size = cbs_A * msh.cells_size() + fbs_A * num_other_faces + cbs_B * msh.cells_size() + 1;
+      // testing Boundary module of Nicolas
+      auto   num_face_dofs = vector_basis_size(di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+      size_t face_dofs     = 0;
+      for (size_t face_id = 0; face_id < msh.faces_size(); face_id++)
+          face_dofs += num_face_dofs - m_bnd.dirichlet_imposed_dofs(face_id, di.face_degree());
 
-        LHS = SparseMatrix<T>( system_size, system_size );
-        RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
-
-        // testing Boundary module of Nicolas
-        auto num_face_dofs = vector_basis_size(di.face_degree(), Mesh::dimension-1, Mesh::dimension);
-        size_t face_dofs = 0;
-        for (size_t face_id = 0; face_id < msh.faces_size(); face_id++)
-           face_dofs += num_face_dofs - m_bnd.dirichlet_imposed_dofs(face_id, di.face_degree());
-
-        assert(face_dofs == fbs_A * num_other_faces);
+      assert(face_dofs == fbs_A * num_other_faces);
     }
 
 #if 0
@@ -2526,15 +2549,15 @@ public:
     initialize()
     {
         LHS = SparseMatrix<T>( system_size, system_size );
-        RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
+        RHS = vector_type::Zero( system_size );
         return;
     }
 
     void
     assemble(const Mesh& msh, const typename Mesh::cell_type& cl,
-             const Matrix<T, Dynamic, Dynamic>& lhs_A,
-             const Matrix<T, Dynamic, Dynamic>& lhs_B,
-             const Matrix<T, Dynamic, 1>& rhs)
+             const matrix_type& lhs_A,
+             const matrix_type& lhs_B,
+             const vector_type& rhs)
     {
         auto fcs = faces(msh, cl);
 
@@ -2549,7 +2572,7 @@ public:
         for (size_t i = 0; i < cbs_A; i++)
             asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
 
-        Matrix<T, Dynamic, 1> dirichlet_data = Matrix<T, Dynamic, 1>::Zero(cbs_A + fcs.size()*fbs_A);
+        vector_type dirichlet_data = vector_type::Zero(cbs_A + fcs.size()*fbs_A);
 
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
@@ -2573,8 +2596,8 @@ public:
 
                 auto dirichlet_fun  = m_bnd.dirichlet_boundary_func(face_id);
 
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
-                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_fun, di.face_degree());
+                matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                vector_type rhs = make_rhs(msh, fc, fb, dirichlet_fun, di.face_degree());
                 dirichlet_data.block(cbs_A + face_i*fbs_A, 0, fbs_A, 1) = mass.llt().solve(rhs);
             }
         }
@@ -2613,7 +2636,7 @@ public:
 
         auto scalar_cell_basis = make_scalar_monomial_basis(msh, cl, di.face_degree());
         auto qps = integrate(msh, cl, di.face_degree());
-        Matrix<T, Dynamic, 1> mult = Matrix<T, Dynamic, 1>::Zero( scalar_cell_basis.size() );
+        vector_type mult = vector_type::Zero( scalar_cell_basis.size() );
         for (auto& qp : qps)
         {
             auto phi = scalar_cell_basis.eval_functions(qp.point());
@@ -2633,9 +2656,9 @@ public:
 
     void
     assemble_alg(const Mesh& msh, const typename Mesh::cell_type& cl,
-             const Matrix<T, Dynamic, Dynamic>& lhs_A,
-             const Matrix<T, Dynamic, Dynamic>& lhs_B,
-             const Matrix<T, Dynamic, 1>& rhs)
+             const matrix_type& lhs_A,
+             const matrix_type& lhs_B,
+             const vector_type& rhs)
     {
         auto fcs = faces(msh, cl);
 
@@ -2650,7 +2673,7 @@ public:
         for (size_t i = 0; i < cbs_A; i++)
             asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
 
-        Matrix<T, Dynamic, 1> dirichlet_data = Matrix<T, Dynamic, 1>::Zero(cbs_A + fcs.size()*fbs_A);
+        vector_type dirichlet_data = vector_type::Zero(cbs_A + fcs.size()*fbs_A);
 
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
@@ -2674,8 +2697,8 @@ public:
 
                 auto dirichlet_fun  = m_bnd.dirichlet_boundary_func(face_id);
 
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
-                Matrix<T, Dynamic, 1> rhs_bnd = make_rhs(msh, fc, fb, dirichlet_fun, di.face_degree());
+                matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                vector_type rhs_bnd = make_rhs(msh, fc, fb, dirichlet_fun, di.face_degree());
                 dirichlet_data.block(cbs_A + face_i*fbs_A, 0, fbs_A, 1) = mass.llt().solve(rhs_bnd);
             }
         }
@@ -2717,7 +2740,7 @@ public:
 
         auto scalar_cell_basis = make_scalar_monomial_basis(msh, cl, di.face_degree());
         auto qps = integrate(msh, cl, di.face_degree());
-        Matrix<T, Dynamic, 1> mult = Matrix<T, Dynamic, 1>::Zero( scalar_cell_basis.size() );
+        vector_type mult = vector_type::Zero( scalar_cell_basis.size() );
         for (auto& qp : qps)
         {
             auto phi = scalar_cell_basis.eval_functions(qp.point());
@@ -2799,15 +2822,15 @@ public:
         return system_size;
     }
 
-    Matrix<T, Dynamic, 1>
+    vector_type
     take_velocity(  const Mesh& msh, const typename Mesh::cell_type& cl,
-                    const Matrix<T, Dynamic, 1>& sol) const
+                    const vector_type& sol) const
     {
         auto num_faces = howmany_faces(msh, cl);
         auto dim = Mesh::dimension;
         auto cell_ofs = revolution::priv::offset(msh, cl);
 
-        Matrix<T, Dynamic, 1> svel(cbs_A + num_faces * fbs_A );
+        vector_type svel(cbs_A + num_faces * fbs_A );
         svel.block(0, 0, cbs_A, 1) = sol.block(cell_ofs * cbs_A, 0, cbs_A, 1);
         auto fcs = faces(msh, cl);
         for (size_t i = 0; i < fcs.size(); i++)
@@ -2820,9 +2843,9 @@ public:
             if (m_bnd.is_dirichlet_face( face_id))
             {
                 auto fb = revolution::make_vector_monomial_basis(msh, fc, di.face_degree());
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 auto velocity = m_bnd.dirichlet_boundary_func(face_id);
-                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, velocity, di.face_degree());
+                vector_type rhs = make_rhs(msh, fc, fb, velocity, di.face_degree());
                 svel.block(cbs_A + i * fbs_A, 0, fbs_A, 1) = mass.llt().solve(rhs);
             }
             else
@@ -2835,15 +2858,15 @@ public:
         return svel;
     }
 
-    Matrix<T, Dynamic, 1>
+    vector_type
     take_pressure( const Mesh& msh, const typename Mesh::cell_type& cl,
-                  const Matrix<T, Dynamic, 1>& sol) const
+                  const vector_type& sol) const
     {
         auto cell_ofs = revolution::priv::offset(msh, cl);
         auto pres_ofs = cbs_A * msh.cells_size() + fbs_A * num_other_faces
                                                             + cbs_B * cell_ofs;
 
-        Matrix<T, Dynamic, 1> spres = sol.block(pres_ofs, 0, cbs_B, 1);
+        vector_type spres = sol.block(pres_ofs, 0, cbs_B, 1);
         return spres;
     }
 
@@ -2927,77 +2950,76 @@ class stokes_assembler_alg
 
 
 public:
+  typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+  typedef Matrix<T, Dynamic, 1>       vector_type;
 
-    SparseMatrix<T>         LHS;
-    Matrix<T, Dynamic, 1>   RHS;
+  SparseMatrix<T>                     LHS;
+  vector_type                         RHS;
 
-    stokes_assembler_alg(const Mesh& msh, const hho_degree_info& hdi, const boundary_type& bnd)
-        : di(hdi), m_bnd(bnd)
-    {
-        auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
+  stokes_assembler_alg(const Mesh& msh, const hho_degree_info& hdi, const boundary_type& bnd) : di(hdi), m_bnd(bnd)
+  {
+      auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
+          auto fc_id = msh.lookup(fc);
+          return bnd.is_dirichlet_face(fc_id);
+      };
 
-            auto fc_id = msh.lookup(fc);
-            return bnd.is_dirichlet_face(fc_id);
-        };
+      num_all_faces       = msh.faces_size();
+      num_dirichlet_faces = std::count_if(msh.faces_begin(), msh.faces_end(), is_dirichlet);
+      num_other_faces     = num_all_faces - num_dirichlet_faces;
 
-        num_all_faces = msh.faces_size();
-        num_dirichlet_faces = std::count_if(msh.faces_begin(), msh.faces_end(), is_dirichlet);
-        num_other_faces = num_all_faces - num_dirichlet_faces;
+      compress_table.resize(num_all_faces);
+      expand_table.resize(num_other_faces);
 
-        compress_table.resize( num_all_faces );
-        expand_table.resize( num_other_faces );
+      size_t compressed_offset = 0;
+      for (size_t i = 0; i < num_all_faces; i++)
+      {
+          auto fc = *std::next(msh.faces_begin(), i);
+          if (!is_dirichlet(fc))
+          {
+              compress_table.at(i)               = compressed_offset;
+              expand_table.at(compressed_offset) = i;
+              compressed_offset++;
+          }
+      }
 
-        size_t compressed_offset = 0;
-        for (size_t i = 0; i < num_all_faces; i++)
-        {
-            auto fc = *std::next(msh.faces_begin(), i);
-            if ( !is_dirichlet(fc) )
-            {
-                compress_table.at(i) = compressed_offset;
-                expand_table.at(compressed_offset) = i;
-                compressed_offset++;
-            }
-        }
+      cbs_A = vector_basis_size(di.cell_degree(), Mesh::dimension, Mesh::dimension);
+      fbs_A = vector_basis_size(di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+      cbs_B = scalar_basis_size(di.face_degree(), Mesh::dimension);
 
-        cbs_A = vector_basis_size(di.cell_degree(), Mesh::dimension, Mesh::dimension);
-        fbs_A = vector_basis_size(di.face_degree(), Mesh::dimension-1, Mesh::dimension);
-        cbs_B = scalar_basis_size(di.face_degree(), Mesh::dimension);
+      system_size = cbs_A * msh.cells_size() + fbs_A * num_other_faces + cbs_B * msh.cells_size() + 1;
 
+      LHS           = SparseMatrix<T>(system_size, system_size);
+      RHS           = vector_type::Zero(system_size);
+      RHS_DIRICHLET = vector_type::Zero(system_size);
 
-        system_size = cbs_A * msh.cells_size() + fbs_A * num_other_faces + cbs_B * msh.cells_size() + 1;
+      // testing Boundary module of Nicolas
+      auto   num_face_dofs = vector_basis_size(di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+      size_t face_dofs     = 0;
+      for (size_t face_id = 0; face_id < msh.faces_size(); face_id++)
+          face_dofs += num_face_dofs - m_bnd.dirichlet_imposed_dofs(face_id, di.face_degree());
 
-        LHS = SparseMatrix<T>( system_size, system_size );
-        RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
-        RHS_DIRICHLET = Matrix<T, Dynamic, 1>::Zero( system_size );
-
-        // testing Boundary module of Nicolas
-        auto num_face_dofs = vector_basis_size(di.face_degree(), Mesh::dimension-1, Mesh::dimension);
-        size_t face_dofs = 0;
-        for (size_t face_id = 0; face_id < msh.faces_size(); face_id++)
-           face_dofs += num_face_dofs - m_bnd.dirichlet_imposed_dofs(face_id, di.face_degree());
-
-        assert(face_dofs == fbs_A * num_other_faces);
+      assert(face_dofs == fbs_A * num_other_faces);
     }
 
     void
     initialize_lhs()
     {
         LHS = SparseMatrix<T>( system_size, system_size );
-        RHS_DIRICHLET = Matrix<T, Dynamic, 1>::Zero( system_size );
+        RHS_DIRICHLET = vector_type::Zero( system_size );
         return;
     }
 
     void
     initialize_rhs()
     {
-        RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
+        RHS = vector_type::Zero( system_size );
         return;
     }
 
     void
     assemble_lhs(const Mesh& msh, const typename Mesh::cell_type& cl,
-                const Matrix<T, Dynamic, Dynamic>& lhs_A,
-                const Matrix<T, Dynamic, Dynamic>& lhs_B)
+                const matrix_type& lhs_A,
+                const matrix_type& lhs_B)
     {
         auto fcs = faces(msh, cl);
         std::vector<assembly_index>         asm_map;
@@ -3011,7 +3033,7 @@ public:
         for (size_t i = 0; i < cbs_A; i++)
             asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
 
-        Matrix<T, Dynamic, 1> dirichlet_data = Matrix<T, Dynamic, 1>::Zero(cbs_A + fcs.size()*fbs_A);
+        vector_type dirichlet_data = vector_type::Zero(cbs_A + fcs.size()*fbs_A);
 
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
@@ -3035,8 +3057,8 @@ public:
 
                 auto dirichlet_fun  = m_bnd.dirichlet_boundary_func(face_id);
 
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
-                Matrix<T, Dynamic, 1> rhs_bnd = make_rhs(msh, fc, fb, dirichlet_fun, di.face_degree());
+                matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                vector_type rhs_bnd = make_rhs(msh, fc, fb, dirichlet_fun, di.face_degree());
                 dirichlet_data.block(cbs_A + face_i*fbs_A, 0, fbs_A, 1) = mass.llt().solve(rhs_bnd);
             }
         }
@@ -3076,7 +3098,7 @@ public:
 
         auto scalar_cell_basis = make_scalar_monomial_basis(msh, cl, di.face_degree());
         auto qps = integrate(msh, cl, di.face_degree());
-        Matrix<T, Dynamic, 1> mult = Matrix<T, Dynamic, 1>::Zero( scalar_cell_basis.size() );
+        vector_type mult = vector_type::Zero( scalar_cell_basis.size() );
         for (auto& qp : qps)
         {
             auto phi = scalar_cell_basis.eval_functions(qp.point());
@@ -3095,7 +3117,7 @@ public:
     } // assemble_alg()
     void
     assemble_rhs(const Mesh& msh, const typename Mesh::cell_type& cl,
-             const Matrix<T, Dynamic, 1>& rhs)
+             const vector_type& rhs)
     {
         auto fcs = faces(msh, cl);
         std::vector<assembly_index>         asm_map;
@@ -3149,15 +3171,15 @@ public:
         return system_size;
     }
 
-    Matrix<T, Dynamic, 1>
+    vector_type
     take_velocity(  const Mesh& msh, const typename Mesh::cell_type& cl,
-                    const Matrix<T, Dynamic, 1>& sol) const
+                    const vector_type& sol) const
     {
         auto num_faces = howmany_faces(msh, cl);
         auto dim = Mesh::dimension;
         auto cell_ofs = revolution::priv::offset(msh, cl);
 
-        Matrix<T, Dynamic, 1> svel(cbs_A + num_faces * fbs_A );
+        vector_type svel(cbs_A + num_faces * fbs_A );
         svel.block(0, 0, cbs_A, 1) = sol.block(cell_ofs * cbs_A, 0, cbs_A, 1);
         auto fcs = faces(msh, cl);
         for (size_t i = 0; i < fcs.size(); i++)
@@ -3171,9 +3193,9 @@ public:
             if (m_bnd.is_dirichlet_face(face_id) )
             {
                 auto fb = revolution::make_vector_monomial_basis(msh, fc, di.face_degree());
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 auto velocity = m_bnd.dirichlet_boundary_func(face_id);
-                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, velocity, di.face_degree());
+                vector_type rhs = make_rhs(msh, fc, fb, velocity, di.face_degree());
                 svel.block(cbs_A + i * fbs_A, 0, fbs_A, 1) = mass.llt().solve(rhs);
             }
             else
@@ -3186,15 +3208,15 @@ public:
         return svel;
     }
 
-    Matrix<T, Dynamic, 1>
+    vector_type
     take_pressure( const Mesh& msh, const typename Mesh::cell_type& cl,
-                  const Matrix<T, Dynamic, 1>& sol) const
+                  const vector_type& sol) const
     {
         auto cell_ofs = revolution::priv::offset(msh, cl);
         auto pres_ofs = cbs_A * msh.cells_size() + fbs_A * num_other_faces
                                                             + cbs_B * cell_ofs;
 
-        Matrix<T, Dynamic, 1> spres = sol.block(pres_ofs, 0, cbs_B, 1);
+        vector_type spres = sol.block(pres_ofs, 0, cbs_B, 1);
         return spres;
     }
 };
