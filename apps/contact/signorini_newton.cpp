@@ -157,12 +157,6 @@ public:
 
                 vector_type cell_rhs = b.block(0, 0, cbs, 1);
                 vector_type du_faces = assembler.take_local_data(msh, cl, dsol);
-
-                std::cout << "du_faces" << std::endl;
-                for(size_t i = 0; i <= du_faces.size(); i++)
-                    std::cout << du_faces(i) <<" ";
-                std::cout << std::endl;
-
                 vector_type du_full  =
                     diffusion_static_condensation_recover(msh, cl, hdi, A, cell_rhs, du_faces);
 
@@ -253,7 +247,7 @@ run_signorini(  const Mesh& msh,
 
 int main(int argc, char **argv)
 {
-    //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+    _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
 
     char    *filename       = nullptr;
     using T = double;
