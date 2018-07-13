@@ -246,6 +246,16 @@ class LinearIsotropicAndKinematicHardening_qp
         return stress.block(0, 0, DIM, DIM);
     }
 
+    static_matrix_type
+    compute_stressPrev(const data_type& data) const
+    {
+        const static_matrix_type3D Id = static_matrix_type3D::Identity();
+
+        const auto stress = 2 * data.getMu() * m_estrain_prev + data.getLambda() * m_estrain_prev.trace() * Id;
+
+        return stress.block(0, 0, DIM, DIM);
+    }
+
     std::pair<static_matrix_type, static_tensor<scalar_type, DIM>>
     compute_whole(const static_matrix_type& incr_strain, const data_type& data, bool tangentmodulus = true)
     {

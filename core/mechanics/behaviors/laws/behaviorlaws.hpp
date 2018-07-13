@@ -27,11 +27,11 @@
 
 #define _BEHAVIOR_HPP_WAS_INCLUDED_
 
-#include "CavitationLaw.hpp"
+#include "Cavitation/Cavitation.hpp"
 #include "HenckyMises/HenckyMises.hpp"
 #include "LinearIsotropicAndKinematicHardening/LinearIsotropicAndKinematicHardening.hpp"
 #include "LinearLaw/LinearLaw.hpp"
-#include "NeohookeanLaw.hpp"
+#include "Neohookean/Neohookean.hpp"
 #include "pLaplaceLaw.hpp"
 
 #undef _BEHAVIOR_HPP_WAS_INCLUDED_

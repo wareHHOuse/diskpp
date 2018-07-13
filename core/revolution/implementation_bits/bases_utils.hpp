@@ -30,9 +30,9 @@ using namespace Eigen;
 namespace revolution {
 
 namespace priv {
-template<typename T, int M, int N>
+template<typename T, int N>
 Matrix<T, Dynamic, Dynamic>
-outer_product(const Matrix<T, Dynamic, M>& a, const Matrix<T, Dynamic, N>& b)
+outer_product(const Matrix<T, Dynamic, N>& a, const Matrix<T, Dynamic, N>& b)
 {
 	return b * a.transpose();
 }
