@@ -314,64 +314,61 @@ make_hho_eigval_mass_matrix(const Mesh& msh, const typename Mesh::cell_type& cl,
 }
 
 template<typename Mesh>
-std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-             Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
-make_hlow_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
-                          const hho_degree_info& di)
+std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
+          Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+make_hho_gradrec_vector(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
-    const size_t N = Mesh::dimension;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
 
-    auto celdeg = di.cell_degree();
-    auto facdeg = di.face_degree();
+    const auto celdeg  = di.cell_degree();
+    const auto facdeg  = di.face_degree();
+    const auto graddeg = di.grad_degree();
 
     auto cb = make_scalar_monomial_basis(msh, cl, celdeg);
-    auto sb = make_vector_monomial_basis(msh, cl, facdeg);
+    auto gb = make_vector_monomial_basis(msh, cl, graddeg);
 
-    auto cbs = scalar_basis_size(celdeg, Mesh::dimension);
-    auto fbs = scalar_basis_size(facdeg, Mesh::dimension-1);
-    auto sbs = vector_basis_size(facdeg, Mesh::dimension, Mesh::dimension);
+    const auto cbs = scalar_basis_size(celdeg, Mesh::dimension);
+    const auto fbs = scalar_basis_size(facdeg, Mesh::dimension - 1);
+    const auto gbs = vector_basis_size(graddeg, Mesh::dimension, Mesh::dimension);
 
-    auto num_faces = howmany_faces(msh, cl);
+    const auto num_faces = howmany_faces(msh, cl);
 
-    Matrix<T, Dynamic, Dynamic> mass = revolution::make_mass_matrix(msh, cl, sb);
-    Matrix<T, Dynamic, Dynamic> gr_lhs = Matrix<T, Dynamic, Dynamic>::Zero(sbs, sbs);
-    Matrix<T, Dynamic, Dynamic> gr_rhs = Matrix<T, Dynamic, Dynamic>::Zero(sbs, cbs + num_faces*fbs);
+    const matrix_type           gr_lhs = revolution::make_mass_matrix(msh, cl, gb);
+    matrix_type                 gr_rhs = matrix_type::Zero(gbs, cbs + num_faces * fbs);
 
-    gr_lhs = mass;
-
-    auto qps = integrate(msh, cl, std::max(0, int(celdeg) - 1 + int(facdeg)));
+    const auto qps = integrate(msh, cl, std::max(0, int(celdeg) - 1 + int(facdeg)));
     for(auto& qp : qps)
     {
-        auto c_dphi = cb.eval_gradients(qp.point());
-        auto s_phi  = sb.eval_functions(qp.point());
+        const auto c_dphi = cb.eval_gradients(qp.point());
+        const auto g_phi  = gb.eval_functions(qp.point());
 
-        gr_rhs.block(0, 0, sbs, cbs) +=
-                                qp.weight() * priv::outer_product(c_dphi, s_phi);
+        gr_rhs.block(0, 0, gbs, cbs) += qp.weight() * priv::outer_product(c_dphi, g_phi);
     }
 
-    auto fcs = faces(msh, cl);
+    const auto fcs = faces(msh, cl);
     for (size_t i = 0; i < fcs.size(); i++)
     {
-        auto fc = fcs[i];
-        auto n = normal(msh, cl, fc);
+        const auto fc = fcs[i];
+        const auto n  = normal(msh, cl, fc);
         auto fb = make_scalar_monomial_basis(msh, fc, facdeg);
 
-        auto qps_f = integrate(msh, fc, facdeg + std::max(facdeg, celdeg));
+        const auto qps_f = integrate(msh, fc, facdeg + std::max(facdeg, celdeg));
         for (auto& qp : qps_f)
         {
-            Matrix<T, Dynamic, 1>   c_phi  = cb.eval_functions(qp.point());
-            Matrix<T, Dynamic, 1>   f_phi  = fb.eval_functions(qp.point());
-            Matrix<T, Dynamic, N>   s_phi  = sb.eval_functions(qp.point());
-            Matrix<T, Dynamic, 1>   s_phi_n = s_phi * n;
+            const vector_type c_phi      = cb.eval_functions(qp.point());
+            const vector_type f_phi      = fb.eval_functions(qp.point());
+            const auto        g_phi      = gb.eval_functions(qp.point());
+            const vector_type qp_g_phi_n = qp.weight() * g_phi * n;
 
-            gr_rhs.block(0, cbs + i * fbs, sbs, fbs) += qp.weight() * s_phi_n * f_phi.transpose();
-            gr_rhs.block(0, 0, sbs, cbs) -= qp.weight() * s_phi_n * c_phi.transpose();
+            gr_rhs.block(0, cbs + i * fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose();
+            gr_rhs.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
         }
     }
 
-    Matrix<T, Dynamic, Dynamic> oper = gr_lhs.llt().solve(gr_rhs);
-    Matrix<T, Dynamic, Dynamic> data = gr_rhs.transpose() * oper;
+    matrix_type oper = gr_lhs.llt().solve(gr_rhs);
+    matrix_type data = gr_rhs.transpose() * oper;
 
     return std::make_pair(oper, data);
 }
