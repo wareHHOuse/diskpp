@@ -146,10 +146,11 @@ public:
                 sol.block(cell_ofs * num_total_dofs, 0, num_total_dofs, 1);
 
             Matrix<scalar_type, Dynamic, 1> diff_vel = svel - p;
-            Matrix<scalar_type, Dynamic, Dynamic> stab;
-            auto gr    = make_hho_scalar_laplacian(msh, cl, di);
-            stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
-            auto G    = make_hlow_scalar_laplacian(msh, cl, di);
+
+            auto gr   = make_hho_scalar_laplacian(msh, cl, di);
+            auto stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
+            auto G    = make_hho_gradrec_vector(msh, cl, di);
+
             error_vel += diff_vel.dot( viscosity * (G.second + stab)*diff_vel);
         }
 
@@ -180,7 +181,7 @@ public:
             sol_old.block( cell_ofs * num_total_dofs, 0, num_total_dofs, 1);
 
         auto value = 1./ (viscosity + alpha);
-        auto G = make_hlow_scalar_laplacian(msh, cl, di);
+        auto G     = make_hho_gradrec_vector(msh, cl, di);
 
         Matrix<scalar_type, Dynamic, 1> Gu = G.first * u_TF;
         Matrix<scalar_type, Dynamic, 1> stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
@@ -203,10 +204,10 @@ public:
             Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> u_TF =
                 sol.block(cell_ofs * num_total_dofs, 0, num_total_dofs, 1);
 
-            auto G  = make_hlow_scalar_laplacian(msh, cl, di);
-            Matrix<scalar_type, Dynamic, 1> Gu = G.first * u_TF;
-            Matrix<scalar_type, Dynamic, 1> gamma = compute_auxiliar( msh,  cl);
-            Matrix<scalar_type, Dynamic, 1> gamma_old = auxiliar.block(cell_ofs *sbs, 0, sbs, 1);
+            auto                            G         = make_hho_gradrec_vector(msh, cl, di);
+            Matrix<scalar_type, Dynamic, 1> Gu        = G.first * u_TF;
+            Matrix<scalar_type, Dynamic, 1> gamma     = compute_auxiliar(msh, cl);
+            Matrix<scalar_type, Dynamic, 1> gamma_old = auxiliar.block(cell_ofs * sbs, 0, sbs, 1);
 
             Matrix<scalar_type, Dynamic, 1> diff_stress  = alpha * (Gu - gamma);
             Matrix<scalar_type, Dynamic, 1> diff_gamma   = alpha * (gamma - gamma_old);
@@ -226,7 +227,7 @@ public:
     make_rhs_alg(   const mesh_type& msh,
                     const cell_type& cl)
     {
-        auto G = make_hlow_scalar_laplacian(msh, cl, di);
+        auto G         = make_hho_gradrec_vector(msh, cl, di);
         auto cb = revolution::make_scalar_monomial_basis(msh, cl, di.cell_degree());
         auto sb = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
         auto cell_ofs  = revolution::priv::offset(msh, cl);
@@ -260,7 +261,7 @@ public:
         for (auto& cl : msh)
         {
             auto cb = revolution::make_scalar_monomial_basis(msh, cl, di.cell_degree());
-            auto G    = make_hlow_scalar_laplacian(msh, cl, di);
+            auto G    = make_hho_gradrec_vector(msh, cl, di);
             auto gr   = make_hho_scalar_laplacian(msh, cl, di);
             auto stab = make_hho_scalar_stabilization(msh, cl, gr.first, di);
 
@@ -297,7 +298,7 @@ public:
         for (auto& cl : msh)
         {
             auto cb = revolution::make_scalar_monomial_basis(msh, cl, di.cell_degree());
-            auto G    = make_hlow_scalar_laplacian(msh, cl, di);
+            auto G    = make_hho_gradrec_vector(msh, cl, di);
             auto gr   = make_hho_scalar_laplacian(msh, cl, di);
             auto stab = make_hho_scalar_stabilization(msh, cl, gr.first, di);
 
