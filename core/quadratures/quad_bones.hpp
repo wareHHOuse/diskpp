@@ -44,7 +44,7 @@ tetrahedron_quadrature(size_t degree)
     int dimension = 3;
 
 #ifdef USE_ARBQ
-    int rule = degree+1;
+    int rule = degree;
     if (rule == 0)
         rule = 1;
 #else
@@ -125,7 +125,7 @@ triangle_quadrature(size_t order)
     for(rule = 1; rule <= rule_num; rule++)
     {
         degree = dunavant_degree(rule);
-        if(degree > order)
+        if(degree >= order)
             break;
     }
     assert(rule != rule_num or degree >= order);
