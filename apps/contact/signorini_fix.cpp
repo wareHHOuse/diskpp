@@ -209,8 +209,6 @@ fix_point_solver_cells(const Mesh& msh,
     using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
 
     auto is_contact_vector = make_is_contact_vector(msh, bnd);
-    auto max_iter = 10000;
-    auto tol = 1.e-8;
 
     auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension - 1);
     auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
@@ -220,6 +218,8 @@ fix_point_solver_cells(const Mesh& msh,
     dynamic_vector<T> full_sol_old = dynamic_vector<T>::Zero(num_full_dofs);
 
     auto offset_vector = full_offset(msh, hdi);
+    auto max_iter = 10000;
+    auto tol = 1.e-8;
 
     for(size_t iter = 0; iter < max_iter; iter++)
     {
@@ -232,8 +232,8 @@ fix_point_solver_cells(const Mesh& msh,
 
             if (is_contact_vector.at(cl_count) == 1)
             {
-                auto num_total_dofs = cbs + howmany_faces(msh,cl) * fbs;
                 auto cell_ofs = offset_vector.at(cl_count);
+                auto num_total_dofs = cbs + howmany_faces(msh,cl) * fbs;
                 vector_type u_full = full_sol_old.block(cell_ofs, 0, num_total_dofs, 1);
 
                 auto gr   = make_hho_contact_scalar_laplacian(msh, cl, hdi, bnd);
@@ -286,17 +286,15 @@ fix_point_solver_cells(const Mesh& msh,
         mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
 
         T error = 0.0 ;
-        std::ofstream ofs;
-
         cl_count = 0;
         dynamic_vector<T> full_sol = dynamic_vector<T>::Zero(num_full_dofs);
 
         for (auto& cl : msh)
         {
-            auto num_total_dofs = cbs + howmany_faces(msh,cl) * fbs;
             auto cb  = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-
             auto cell_ofs = offset_vector.at(cl_count);
+            auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
+
             vector_type u_full_old = full_sol_old.block(cell_ofs, 0, num_total_dofs, 1);
 
             if (is_contact_vector.at(cl_count))
@@ -322,7 +320,6 @@ fix_point_solver_cells(const Mesh& msh,
                 vector_type diff = u_full - u_full_old;
                 error += diff.dot(A * diff);
                 full_sol.block(cell_ofs, 0, num_total_dofs, 1) = u_full;
-                auto bar = barycenter(msh, cl);
             }
             else
             {
@@ -340,11 +337,9 @@ fix_point_solver_cells(const Mesh& msh,
                 error += diff.dot(Ah * diff);
 
                 full_sol.block(cell_ofs, 0, num_total_dofs, 1) = u_full;
-                auto bar = barycenter(msh, cl);
             }
             cl_count++;
         }
-        ofs.close();
 
         if(iter % 100 == 0)
             std::cout << "  "<< iter << "  "<< std::sqrt(error)<< std::endl;

@@ -48,6 +48,8 @@
 
  #include "common.hpp"
 
+ #include "solvers/solver.hpp"
+
 template<typename T>
 class hierarchical_contact_solver
 {
