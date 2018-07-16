@@ -23,27 +23,22 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-
-#include <iostream>
-#include <iomanip>
-#include <regex>
-
-#include <unistd.h>
-
 #include <xmmintrin.h>
 
 #include "revolution/bases"
 #include "revolution/quadratures"
 #include "revolution/methods/hho"
 
-#include "core/loaders/loader.hpp"
-
 #include "common.hpp"
 
 template<typename Mesh>
-struct test_functor
+struct test_functor_base
 {
-    /* Expect k+1 convergence (hho stabilization) */
+    virtual typename Mesh::coordinate_type
+    integrand(const typename Mesh::point_type&) = 0;
+
+
+    /* Expect k+1 convergence on the cells and k+0.5 on the faces. */
     typename Mesh::scalar_type
     operator()(const Mesh& msh, size_t degree) const
     {
@@ -53,36 +48,23 @@ struct test_functor
         typedef typename mesh_type::scalar_type scalar_type;
         typedef typename mesh_type::point_type  point_type;
 
-
         auto f = make_scalar_testing_data(msh);
 
-        typename revolution::hho_degree_info hdi(degree);
+        scalar_type integral_value = 0.0;
 
-        scalar_type error = 0.0;
-        for (auto& cl : msh)
+        for (auto itor = msh.cells_begin(); itor != msh.cells_end(); itor++)
         {
-            auto gr = revolution::make_hho_scalar_laplacian(msh, cl, hdi);
-            auto stab = revolution::make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
-            //auto stab = revolution::make_hdg_scalar_stabilization(msh, cl, hdi);
-
-            Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, hdi, f);
-
-            error += proj.dot(stab*proj);
+            auto cl = *itor;
+            auto qps = revolution::integrate(msh, cl, degree);
+            for (auto& qp : qps)
+                integral_value += qp.weight() * integrand(qp.point());
         }
 
-        return std::sqrt( error );
-    }
-
-    size_t
-    expected_rate(size_t k)
-    {
-        return k+1;
+        return integral_value;
     }
 };
 
 int main(void)
 {
-    tester<test_functor> tstr;
-    tstr.run();
-    return 0;
+
 }

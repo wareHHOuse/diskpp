@@ -28,3 +28,6 @@ target_link_libraries(basis_quadratures ${LINK_LIBS})
 
 #add_executable(scalar_reconstruction_contact scalar_reconstruction_contact.cpp)
 #target_link_libraries(scalar_reconstruction_contact ${LINK_LIBS})
+
+add_executable(raw_quadratures raw_quadratures.cpp)
+target_link_libraries(raw_quadratures ${LINK_LIBS})

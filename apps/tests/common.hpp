@@ -28,6 +28,8 @@
 #include <iomanip>
 
 #include "core/loaders/loader.hpp"
+#include "contrib/sol2/sol.hpp"
+#include "contrib/colormanip.h"
 
 const size_t MIN_TEST_DEGREE = 0;
 const size_t MAX_TEST_DEGREE = 3;
@@ -166,6 +168,38 @@ get_triangle_generic_meshes(void)
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_3.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_4.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_5.typ1");
+
+    typedef disk::generic_mesh<T, 2>  mesh_type;
+
+    std::vector< mesh_type > ret;
+    for (size_t i = 0; i < meshfiles.size(); i++)
+    {
+        mesh_type msh;
+        disk::fvca5_mesh_loader<T, 2> loader;
+
+        if (!loader.read_mesh(meshfiles.at(i)))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            continue;
+        }
+        loader.populate_mesh(msh);
+
+        ret.push_back(msh);
+    }
+
+    return ret;
+}
+
+template<typename T>
+std::vector< disk::generic_mesh<T, 2> >
+get_polygonal_generic_meshes(void)
+{
+	std::vector<std::string> meshfiles;
+    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_1.typ1");
+    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_2.typ1");
+    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_3.typ1");
+    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_4.typ1");
+    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_5.typ1");
 
     typedef disk::generic_mesh<T, 2>  mesh_type;
 
@@ -363,13 +397,17 @@ get_quad_generic_meshes(void)
 
 template<typename Mesh, typename Function>
 void
-do_testing(std::vector<Mesh>& meshes, const Function& run_test)
+do_testing(std::vector<Mesh>& meshes, const Function& run_test,
+           const std::function<size_t(size_t)>& expected_rate,
+           size_t min_test_degree = MIN_TEST_DEGREE,
+           size_t max_test_degree = MAX_TEST_DEGREE)
 {
 	using T = typename Mesh::scalar_type;
 
-	for (size_t k = MIN_TEST_DEGREE; k <= MAX_TEST_DEGREE; k++)
+	for (size_t k = min_test_degree; k <= max_test_degree; k++)
     {
-        std::cout << "DEGREE " << k << std::endl;
+        std::cout << "  Testing degree " << k << " (expected rate is ";
+        std::cout << expected_rate(k) << ")" << std::endl;
 
         std::vector<T> mesh_hs;
         std::vector<T> l2_errors;
@@ -397,8 +435,164 @@ do_testing(std::vector<Mesh>& meshes, const Function& run_test)
                 std::cout << "    ";
                 std::cout << std::scientific << std::setprecision(5) << mesh_hs.at(i) << "    ";
                 std::cout << std::scientific << std::setprecision(5) << l2_errors.at(i) << "    ";
-                std::cout << std::defaultfloat << std::setprecision(3) << rate << std::endl;
+                std::cout << std::defaultfloat << std::setprecision(3) << rate << "    ";
+
+                if ( rate < expected_rate(k)-0.5 || rate > expected_rate(k)+0.5 )
+                    std::cout << "[" << red << "FAIL" << nocolor << "]";
+                else
+                    std::cout << "[" << green << " OK " << nocolor << "]";
+
+                std::cout << std::endl;
             }
         }
     }
 }
+
+template< template<typename> class TestFunctor >
+class tester
+{
+    template<typename Mesh>
+    TestFunctor<Mesh>
+    get_test_functor(const std::vector<Mesh>& meshes)
+    {
+        return TestFunctor<Mesh>();
+    }
+
+    void test_triangles_generic(void)
+    {
+        std::cout << yellow << "Mesh under test: triangles on generic mesh";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_triangle_generic_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
+    }
+
+    void test_polygonal_generic(void)
+    {
+        std::cout << yellow << "Mesh under test: polygons on generic mesh";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_polygonal_generic_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
+    }
+
+    void test_triangles_netgen(void)
+    {
+        std::cout << yellow << "Mesh under test: triangles on netgen mesh";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_triangle_netgen_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
+    }
+
+    void test_quads(void)
+    {
+        std::cout << yellow << "Mesh under test: quads on generic mesh";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_quad_generic_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
+    }
+
+    void test_tetrahedra_netgen(void)
+    {
+        std::cout << yellow << "Mesh under test: tetrahedra on netgen mesh";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_tetrahedra_netgen_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
+    }
+
+    void test_cartesian_diskpp(void)
+    {
+        std::cout << yellow << "Mesh under test: cartesian mesh (DiSk++)";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_cartesian_diskpp_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
+    }
+
+    void test_generic_fvca6(void)
+    {
+        std::cout << yellow << "Mesh under test: polyhedra on generic mesh";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_generic_fvca6_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
+    }
+
+public:
+    int run(void)
+    {
+        sol::state lua;
+
+        bool crash_on_nan           = false;
+        bool do_triangles_generic   = true;
+        bool do_polygonal_generic   = true;
+        bool do_triangles_netgen    = true;
+        bool do_quads               = true;
+        bool do_tetrahedra_netgen   = true;
+        bool do_cartesian_diskpp    = true;
+        bool do_generic_fvca6       = true;
+
+        auto r = lua.do_file("test_config.lua");
+        if ( r.valid() )
+        {
+            crash_on_nan            = lua["crash_on_nan"].get_or(false);
+            do_triangles_generic    = lua["do_triangles_generic"].get_or(false);
+            do_polygonal_generic    = lua["do_polygonal_generic"].get_or(false);
+            do_triangles_netgen     = lua["do_triangles_netgen"].get_or(false);
+            do_quads                = lua["do_quads"].get_or(false);
+            do_tetrahedra_netgen    = lua["do_tetrahedra_netgen"].get_or(false);
+            do_cartesian_diskpp     = lua["do_cartesian_diskpp"].get_or(false);
+            do_generic_fvca6        = lua["do_generic_fvca6"].get_or(false);
+        }
+
+        if ( crash_on_nan )
+            _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+
+        if ( do_triangles_generic )
+            test_triangles_generic();
+
+        if ( do_polygonal_generic )
+            test_polygonal_generic();
+
+        if ( do_triangles_netgen )
+            test_triangles_netgen();
+
+        if ( do_quads )
+            test_quads();
+
+        if ( do_tetrahedra_netgen )
+            test_tetrahedra_netgen();
+
+        if ( do_cartesian_diskpp )
+            test_cartesian_diskpp();
+
+        if ( do_generic_fvca6 )
+            test_generic_fvca6();
+
+        return 0;
+    }
+};
