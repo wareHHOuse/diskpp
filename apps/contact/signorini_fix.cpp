@@ -37,17 +37,19 @@
  #include "output/silo.hpp"
  #include "common.hpp"
 
+ #include "solvers/solver.hpp"
 
 template<typename Mesh, typename T, typename Function>
 auto
-fix_point_solver_faces(const Mesh& msh, const hho_degree_info& hdi,
+fix_point_solver_faces(const Mesh& msh,
                 const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
                 const algorithm_parameters<T>& ap,
                 const Function& rhs_fun)
 {
-    std::cout << "Solver : Fix point" << std::endl;
-    std::cout << "Theta  : "<< ap.theta << std::endl;
-    std::cout << "Gamma0 : "<< ap.gamma_0 << std::endl;
+    hho_degree_info hdi(ap.degree); // allow also (degree + 1, degree)
+
+    std::cout << " * cell degree :"<< hdi.cell_degree() << std::endl;
+    std::cout << " * face degree :"<< hdi.face_degree() << std::endl;
 
     using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
     using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
@@ -118,11 +120,6 @@ fix_point_solver_faces(const Mesh& msh, const hho_degree_info& hdi,
         mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
 
         T error = 0.0 ;
-        std::ofstream ofs("sol_"+ tostr(iter) +".dat");
-
-        if(!ofs.is_open())
-            std::cout<< "Error opening file"<<std::endl;
-
         dynamic_vector<T> full_sol = dynamic_vector<T>::Zero(num_full_dofs);
 
         cl_count = 0;
@@ -162,14 +159,35 @@ fix_point_solver_faces(const Mesh& msh, const hho_degree_info& hdi,
             error += diff.dot(A * diff);
 
             auto bar = barycenter(msh, cl);
-            ofs << bar.x() << " " << bar.y() <<" "<< u_full(0) << std::endl;
             cl_count++;
         }
-        ofs.close();
 
-        std::cout << "  "<< iter << "  "<< std::sqrt(error)<< std::endl;
+        if(iter % 100 == 0)
+            std::cout << "  "<< iter << "  "<< std::sqrt(error)<< std::endl;
+
         if( std::sqrt(error)  < tol)
+        {
+            std::ofstream efs("solution_fhho_faces.dat");
+
+            if(!efs.is_open())
+                std::cout<< "Error opening file"<<std::endl;
+
+            auto cl_count = 0;
+            for(auto& cl : msh)
+            {
+                auto num_total_dofs = cbs + howmany_faces(msh,cl) * fbs;
+                auto cell_ofs = offset_vector.at(cl_count++);
+                vector_type u_bar = full_sol.block(cell_ofs, 0, 1, 1);
+                auto bar = barycenter(msh, cl);
+                efs << bar.x() << " " << bar.y() <<" "<< u_bar(0) << std::endl;
+            }
+
+            efs.close();
+
+            std::cout << "  "<< iter << "  "<< std::sqrt(error)<< std::endl;
             return 0;
+        }
+
         full_sol_old = full_sol;
     }
     return 1;
@@ -177,23 +195,21 @@ fix_point_solver_faces(const Mesh& msh, const hho_degree_info& hdi,
 
 template<typename Mesh, typename T, typename Function>
 auto
-fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
+fix_point_solver_cells(const Mesh& msh,
                 const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
                 const algorithm_parameters<T>& ap,
                 const Function& rhs_fun)
 {
-    if(hdi.cell_degree() != hdi.face_degree() + 1)
-        throw std::invalid_argument("Change solver.");
+    hho_degree_info hdi(ap.degree + 1, ap.degree); // Not allow (degree + 1, degree)
 
-    std::cout << "Solver : Fix point" << std::endl;
-    std::cout << "Theta  : "<< ap.theta << std::endl;
-    std::cout << "Gamma0 : "<< ap.gamma_0 << std::endl;
+    std::cout << " * cell degree :"<< hdi.cell_degree() << std::endl;
+    std::cout << " * face degree :"<< hdi.face_degree() << std::endl;
 
     using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
     using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
 
     auto is_contact_vector = make_is_contact_vector(msh, bnd);
-    auto max_iter = 1000;
+    auto max_iter = 10000;
     auto tol = 1.e-8;
 
     auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension - 1);
@@ -220,7 +236,7 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
                 auto cell_ofs = offset_vector.at(cl_count);
                 vector_type u_full = full_sol_old.block(cell_ofs, 0, num_total_dofs, 1);
 
-                auto gr  = make_hho_contact_scalar_laplacian(msh, cl, hdi, bnd);
+                auto gr   = make_hho_contact_scalar_laplacian(msh, cl, hdi, bnd);
                 auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
                 //auto gr    = make_hho_scalar_laplacian(msh, cl, hdi);
                 //auto stab  = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
@@ -270,10 +286,7 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
         mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
 
         T error = 0.0 ;
-        std::ofstream ofs("sol_"+ tostr(iter) +".dat");
-
-        if(!ofs.is_open())
-            std::cout<< "Error opening file"<<std::endl;
+        std::ofstream ofs;
 
         cl_count = 0;
         dynamic_vector<T> full_sol = dynamic_vector<T>::Zero(num_full_dofs);
@@ -288,11 +301,11 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
 
             if (is_contact_vector.at(cl_count))
             {
-                auto gr  = make_hho_contact_scalar_laplacian(msh, cl, hdi, bnd);
+                auto gr   = make_hho_contact_scalar_laplacian(msh, cl, hdi, bnd);
                 auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
 
                 //auto gr   = make_hho_scalar_laplacian(msh, cl, hdi);
-                //auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+                //auto stab = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
 
                 matrix_type Ah = gr.second + stab;
                 vector_type Lh = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
@@ -305,11 +318,11 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
 
                 vector_type u_faces  = assembler.take_local_data(msh, cl, sol);
                 vector_type u_full   = diffusion_static_condensation_recover(msh, cl, hdi, A, cell_rhs, u_faces);
+
                 vector_type diff = u_full - u_full_old;
                 error += diff.dot(A * diff);
                 full_sol.block(cell_ofs, 0, num_total_dofs, 1) = u_full;
                 auto bar = barycenter(msh, cl);
-                ofs << bar.x() << " " << bar.y() <<" "<< u_full(0) << std::endl;
             }
             else
             {
@@ -325,29 +338,51 @@ fix_point_solver(const Mesh& msh, const hho_degree_info& hdi,
 
                 vector_type diff = u_full - u_full_old;
                 error += diff.dot(Ah * diff);
+
                 full_sol.block(cell_ofs, 0, num_total_dofs, 1) = u_full;
                 auto bar = barycenter(msh, cl);
-                ofs << bar.x() << " " << bar.y() <<" "<< u_full(0) << std::endl;
             }
             cl_count++;
         }
         ofs.close();
 
-        std::cout << "  "<< iter << "  "<< std::sqrt(error)<< std::endl;
+        if(iter % 100 == 0)
+            std::cout << "  "<< iter << "  "<< std::sqrt(error)<< std::endl;
+
         if( std::sqrt(error)  < tol)
-            return full_sol;
+        {
+            std::ofstream efs("solution_fhho_cells.dat");
+
+            if(!efs.is_open())
+                std::cout<< "Error opening file"<<std::endl;
+
+            auto cl_count = 0;
+            for(auto& cl : msh)
+            {
+                auto num_total_dofs = cbs + howmany_faces(msh,cl) * fbs;
+                auto cell_ofs = offset_vector.at(cl_count++);
+                vector_type u_bar = full_sol.block(cell_ofs, 0, 1, 1);
+                auto bar = barycenter(msh, cl);
+                efs << bar.x() << " " << bar.y() <<" "<< u_bar(0) << std::endl;
+            }
+
+            efs.close();
+
+            std::cout << "  "<< iter << "  "<< std::sqrt(error)<< std::endl;
+
+            return 0;
+        }
+
         full_sol_old = full_sol;
     }
+    return 1;
 }
 
 
 template<typename Mesh, typename T>
 void
-run_signorini(  const Mesh& msh,
-                algorithm_parameters<T>& ap)
+run_signorini(  const Mesh& msh, const algorithm_parameters<T>& ap)
 {
-    const size_t degree = 0 ;
-    hho_degree_info hdi(degree + 1, degree);
     typedef typename Mesh::point_type  point_type;
 
     auto zero_fun = [](const point_type& p) -> T {
@@ -365,7 +400,17 @@ run_signorini(  const Mesh& msh,
     bnd.addNeumannBC(disk::mechanics::NEUMANN,  4,  zero_fun); //
     bnd.addContactBC(disk::mechanics::SIGNORINI,3); //BOTTOM
 
-    fix_point_solver( msh, hdi, bnd, ap, rhs_fun);
+    switch(ap.solver)
+    {
+        case EVAL_ON_FACES:
+            fix_point_solver_faces( msh, bnd, ap, rhs_fun);
+            break;
+        case EVAL_IN_CELLS:
+            fix_point_solver_cells( msh, bnd, ap, rhs_fun);
+            break;
+        default:
+            throw std::invalid_argument("Invalid solver");
+    }
 
     return;
 }
@@ -379,31 +424,43 @@ int main(int argc, char **argv)
 
     int ch;
     algorithm_parameters<T> ap;
+    size_t degree = 1;
 
-    while ( (ch = getopt(argc, argv, "g:npz")) != -1 )
+    while ( (ch = getopt(argc, argv, "k:g:npzfc")) != -1 )
     {
         switch(ch)
         {
+            case 'k':
+                degree = atoi(optarg);
+                if (degree < 0)
+                {
+                    std::cout << "Degree must be positive. Falling back to 1." << std::endl;
+                    degree = 1;
+                }
+                ap.degree = degree;
+                break;
             case 'g':
-                std::cout << "choosing gamma" << std::endl;
                 ap.gamma_0 = atof(optarg);
                 if (ap.gamma_0 <= 0)
                 {
-                    std::cout << "gamma_0 must be >0. Falling back to 0.1" << std::endl;
+                    std::cout << "gamma_0 must be > 0. Falling back to 0.1" << std::endl;
                     ap.gamma_0 = 0.1;
                 }
                 break;
             case 'n':
                 ap.theta = -1.;
-                std::cout << "theta negative chosen" << std::endl;
                 break;
             case 'p':
                 ap.theta = 1.;
-                std::cout << "theta positive chosen" << std::endl;
                 break;
             case 'z':
                 ap.theta = 0.;
-                std::cout << "theta zero chosen" << std::endl;
+                break;
+            case 'f':
+                ap.solver = EVAL_ON_FACES;
+                break;
+            case 'c':
+                ap.solver = EVAL_IN_CELLS;
                 break;
             case '?':
             default:
@@ -411,6 +468,7 @@ int main(int argc, char **argv)
                 exit(1);
         }
     }
+    std::cout << ap << std::endl;
 
     argc -= optind;
     argv += optind;
@@ -433,7 +491,6 @@ int main(int argc, char **argv)
 
         run_signorini(msh, ap);
     }
-
     #if 0
     /* Medit 2d*/
     if (std::regex_match(filename, std::regex(".*\\.medit2d$")))

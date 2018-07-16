@@ -289,7 +289,7 @@ class hierarchical_contact_solver
                     Aheaviside = make_fem_heaviside(msh, cl, bnd, fem_gamma_0, fem_theta, uloc);
                 }
 
-                fem_matrix A = Ah - Anitsche - Aheaviside;
+                fem_matrix A = Ah - Anitsche + Aheaviside;
                 fem_vector b = Lh - (Ah - Anitsche) * uloc - Bnegative;
 
                 for (size_t i = 0; i < A.rows(); i++)
@@ -357,7 +357,7 @@ class hierarchical_contact_solver
 
             e_gx = e_gx + diff_gx;
 
-            //std::cout << "error ( "<< iter<<") :    "<< errord << std::endl;
+            std::cout << "error ( "<< iter<<") :    "<< errord << std::endl;
             //if(errord/erroru < tolerance)
             if(errord < fem_tolerance)
                 break;
@@ -441,7 +441,7 @@ class hierarchical_contact_solver
                     Aheaviside = make_hho_heaviside_faces(msh, cl, hdi, gr.first, hho_gamma_0, hho_theta, bnd, u_full);
                 }
 
-                hho_matrix A =   Ah - Anitsche - Aheaviside;
+                hho_matrix A =   Ah - Anitsche + Aheaviside;
                 hho_vector b = -(Ah - Anitsche) * u_full - Bnegative;
                 b.block(0, 0, cbs, 1) += Lh;
 
@@ -469,7 +469,7 @@ class hierarchical_contact_solver
             T error = 0.0 ;
 
             std::ofstream ofs;
-            if(iter % 500 == 0)
+            //if(iter % 500 == 0)
             {
                 ofs = std::ofstream("hho_level"+ tostr(level) + "_i"+ tostr(iter) +".dat");
                 if(!ofs.is_open())
@@ -506,7 +506,7 @@ class hierarchical_contact_solver
                     Aheaviside = make_hho_heaviside_faces(msh, cl, hdi, gr.first, hho_gamma_0, hho_theta, bnd, u_full);
                 }
 
-                hho_matrix A =   Ah - Anitsche - Aheaviside;
+                hho_matrix A =   Ah - Anitsche + Aheaviside;
                 hho_vector b = -(Ah - Anitsche) * u_full - Bnegative;
                 b.block(0, 0, cbs, 1) += Lh;
 
@@ -523,7 +523,6 @@ class hierarchical_contact_solver
                 auto bar = barycenter(msh, cl);
                 hho_vector u_full_new  = u_full + du_full;
 
-                if(iter % 500 == 0)
                     ofs << bar.x() << " " << bar.y() <<" "<< u_full_new(0) << std::endl;
                 cl_count++;
             }
@@ -531,10 +530,11 @@ class hierarchical_contact_solver
 
             full_sol += diff_sol;
 
-            if(iter % 500 == 0)
-                std::cout << "  "<< iter << "  "<< std::sqrt(error)<< std::endl;
             if( std::sqrt(error)  < tol)
+            {
+                std::cout << "  "<< iter << "  "<< std::sqrt(error)<< std::endl;
                 return 0;
+            }
         }
         return 1;
     }
@@ -659,7 +659,7 @@ public:
         std::cout << "Mesh size: " << average_diameter(ref_msh) << std::endl;
         cfem_newton_solver(ref_msh);
 
-        for (size_t level = sol_level_min; level <= sol_level_min; level++)// sol_level_max; level++)
+        for (size_t level = sol_level_min; level <= sol_level_max; level++)
         {
             auto sol_msh = *std::next(mesh_hier.meshes_begin(), level);
             run_hho(level, ref_msh, sol_msh);

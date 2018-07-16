@@ -5,15 +5,15 @@ config.input_mesh = "../../../diskpp/meshes/2D_triangles/netgen/square_tri1.mesh
 config.visit_output = "eigs_hho.silo"
 config.eigval_output = "eigs_hho.txt"
 
-hs.levels = 4
+hs.levels = 7
 hs.sol_level_min = 0
-hs.sol_level_max = 3
+hs.sol_level_max = 6
 
-hs.fem_theta = "p" -- Theta: p means 1; n means -1: z means 0
-hs.fem_gamma = 6 -- Gamma: 5 means 10^-5
+hs.fem_theta = "n" -- Theta: p means 1; n means -1: z means 0
+hs.fem_gamma = 1 -- Gamma: 5 means 10^-5
 
 hs.hho_theta = "n" -- Theta: p means 1; n means -1: z means 0
-hs.hho_gamma = 4 -- Gamma: 5 means 10^-5
+hs.hho_gamma = 100 -- Gamma: 5 means 10^-5
 
 
 -- Solver config for eigenvalue problems

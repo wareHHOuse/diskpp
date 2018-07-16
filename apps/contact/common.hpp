@@ -41,7 +41,7 @@
 #include "output/postMesh.hpp"
 
 #include "output/silo.hpp"
-#include "solvers/solver.hpp"
+//#include "solvers/solver.hpp"
 
 #include "cfem/cfem.hpp"
 
@@ -54,15 +54,45 @@ enum method_type
     ZERO
 };
 
+enum eval_solver_type
+{
+    EVAL_IN_CELLS,
+    EVAL_ON_FACES
+};
+
 template<typename T>
 struct algorithm_parameters
 {
-    algorithm_parameters():gamma_0(0.1), theta(1.), solver("fix_point")
+    algorithm_parameters():gamma_0(0.1), theta(-1.), solver(EVAL_ON_FACES), degree(1)
     {}
 
     T gamma_0;
     T theta;
-    std::string solver;
+    T degree;
+    eval_solver_type solver;
+
+    friend std::ostream& operator<<(std::ostream& os, const algorithm_parameters<T>& p)
+    {
+        os << "Algorithm parameters: "<<std::endl;
+        os << "* gamma_0 : "<< p.gamma_0<< std::endl;
+        os << "* theta   : "<< p.theta << std::endl;
+        os << "* degree  : "<< p.degree<< std::endl;
+
+        switch (p.solver)
+        {
+            case EVAL_IN_CELLS:
+                os << "* Values : IN CELLS"<< std::endl;
+                break;
+            case EVAL_ON_FACES:
+                os << "* Values : ON FACES"<< std::endl;
+                break;
+            default:
+                os << "* Values : NOT SPECIFIED"<< std::endl;
+                exit(1);
+        }
+
+        return os;
+    }
 };
 
 template< typename T>
@@ -350,8 +380,6 @@ make_hho_heaviside(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     matrix_type ret = matrix_type::Zero( num_total_dofs, num_total_dofs );
 
-    auto fc_count = 0;
-
     for (auto& fc: fcs)
     {
         auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
@@ -362,9 +390,7 @@ make_hho_heaviside(const Mesh& msh, const typename Mesh::cell_type& cl,
         {
             auto cb  = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
             auto fb  = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
-
-            auto face_ofs  = cbs  +  fc_count * fbs;
-            auto n = normal(msh, cl, fc);
+            auto n   = normal(msh, cl, fc);
 
             auto quad_degree = std::max(recdeg-1, celdeg);
             auto qps = integrate(msh, fc, 2 * quad_degree );
@@ -375,28 +401,23 @@ make_hho_heaviside(const Mesh& msh, const typename Mesh::cell_type& cl,
                 vector_type  sigma_n   = rec.transpose() * (c_dphi * n);
 
                 vector_type  c_phi_temp   = cb.eval_functions(qp.point());
-                vector_type  c_phi = c_dphi_tmp.block(0, 0, cbs, 1);
-                vector_type  u_cell  = uloc.block(0, 0, cbs, 1);
+                vector_type  c_phi = c_phi_temp.block(0, 0, cbs, 1);
+
+                // (grad * rec * u * n - gamma_N* u_T)
+                vector_type sigmau_n_gamma_u  = sigma_n;
+                sigmau_n_gamma_u.block(0, 0, cbs, 1) -= gamma_N * c_phi;
 
                 // Heaviside(-Pn(u) = -D*recu*n + gN*u_T)
-                T gamma_u  = gamma_N * c_phi.dot(u_cell);
-                T sigmau_n = sigma_n.dot(uloc);
-
-                if (sigmau_n - gamma_u  <= 0.)
+                if(sigmau_n_gamma_u.dot(uloc)  <= 0.)
                 {
                     // (theta * grad * rec * v * n - gamma_N* v_T)
-                    vector_type t_sigman_g_v = theta * sigma_n;
-                    t_sigman_g_v.block(0, 0,cbs, 1) -=  gamma_N * c_phi;
+                    vector_type t_sigmav_n_gamma_v = theta * sigma_n;
+                    t_sigmav_n_gamma_v.block(0, 0,cbs, 1) -=  gamma_N * c_phi;
 
-                    // (grad * rec * u * n - gamma_N* u_T)
-                    vector_type sigman_g_u = sigma_n;
-                    sigman_g_u.block(0, 0,cbs, 1) -=  gamma_N * c_phi;
-
-                    ret += qp.weight() * (t_sigman_g_v) * (sigman_g_u).transpose();
+                    ret += qp.weight() * (t_sigmav_n_gamma_v) * (sigmau_n_gamma_u).transpose();
                 }
             }
         }
-        fc_count++;
     }
     return ret * (1./gamma_N);
 }
@@ -600,7 +621,7 @@ template <typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
 make_hho_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
-            const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> rec,
+            const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& rec,
             const typename Mesh::coordinate_type& gamma_0,
             const typename Mesh::coordinate_type& theta,
             const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
@@ -624,7 +645,6 @@ make_hho_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
     auto num_total_dofs = cbs + fcs.size() * fbs;
     vector_type rhs = vector_type::Zero(num_total_dofs, 1);
 
-    auto fc_count = 0;
     for (auto& fc : fcs)
     {
         auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
@@ -645,7 +665,7 @@ make_hho_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
                 Matrix<T, Dynamic,  DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
                 Matrix<T, Dynamic,  DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
                 vector_type  c_phi_temp   = cb.eval_functions(qp.point());
-                vector_type  c_phi = c_dphi_tmp.block(0, 0, cbs, 1);
+                vector_type  c_phi = c_phi_temp.block(0, 0, cbs, 1);
 
                 vector_type  sigma_n = rec.transpose() * (c_dphi * n);
 
@@ -662,7 +682,6 @@ make_hho_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
                 rhs += qp.weight() * negative * t_sigmav_n_gamma_v;
             }
         }
-        fc_count++;
     }
     return rhs * (1./gamma_N);
 }
@@ -671,7 +690,7 @@ template <typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
 make_hho_negative_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
-            const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> rec,
+            const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& rec,
             const typename Mesh::coordinate_type& gamma_0,
             const typename Mesh::coordinate_type& theta,
             const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
@@ -737,7 +756,7 @@ template <typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
 make_hho_negative_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
-            const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> rec,
+            const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& rec,
             const typename Mesh::coordinate_type& gamma_0,
             const typename Mesh::coordinate_type& theta,
             const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,

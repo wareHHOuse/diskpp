@@ -36,6 +36,7 @@
 
  #include "output/silo.hpp"
  #include "common.hpp"
+ #include "solvers/solver.hpp"
 
 template<typename Mesh>
 class hho_newton_solver
@@ -45,11 +46,8 @@ class hho_newton_solver
     typedef Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>    matrix_type;
     typedef Eigen::Matrix<T, Eigen::Dynamic, 1>                 vector_type;
 
-    T       gamma_0, theta;
-    size_t  cbs, fbs, num_full_dofs;
-
-    hho_degree_info      hdi;
-    std::vector<size_t>  offset_vector, is_contact_vector;
+    std::vector<size_t> is_contact_vector;
+    algorithm_parameters<T> ap;
 
 public:
 
@@ -58,6 +56,18 @@ public:
     solve_faces(const Mesh&  msh, const Function& rhs_fun,
             const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
     {
+
+        hho_degree_info      hdi(ap.degree); //Also allow (degree + 1, degree)
+        std::cout << " * cell degree :"<< hdi.cell_degree() << std::endl;
+        std::cout << " * face degree :"<< hdi.face_degree() << std::endl;
+
+        auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
+        auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+
+        auto num_full_dofs = cbs*msh.cells_size() + 2 * fbs*msh.faces_size()
+                                        - fbs*msh.boundary_faces_size() ;
+
+        auto offset_vector = full_offset(msh, hdi);
 
         dynamic_vector<T>  full_sol = dynamic_vector<T>::Zero(num_full_dofs);
         auto max_iter = 1000;
@@ -87,12 +97,12 @@ public:
 
                 if (is_contact_vector.at(cl_count) == 1)
                 {
-                	Anitsche   = make_hho_nitsche(msh, cl, hdi, gr.first, gamma_0, theta, bnd );
-                    Bnegative  = make_hho_negative_faces(msh, cl, hdi, gr.first, gamma_0, theta, bnd, u_full);
-                    Aheaviside = make_hho_heaviside_faces(msh, cl, hdi, gr.first, gamma_0, theta, bnd, u_full);
+                	Anitsche   = make_hho_nitsche(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd );
+                    Bnegative  = make_hho_negative_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd, u_full);
+                    Aheaviside = make_hho_heaviside_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd, u_full);
                 }
 
-                matrix_type A =   Ah - Anitsche - Aheaviside;
+                matrix_type A =   Ah - Anitsche + Aheaviside;
                 vector_type b = -(Ah - Anitsche) * u_full - Bnegative;
                 b.block(0, 0, cbs, 1) += Lh;
 
@@ -118,10 +128,6 @@ public:
             mkl_pardiso(pparams, assembler.LHS, assembler.RHS, dsol);
 
             T error = 0.0 ;
-            std::ofstream ofs("sol_"+ tostr(iter) +".dat");
-            if(!ofs.is_open())
-                std::cout<< "Error opening file"<<std::endl;
-
 
             dynamic_vector<T> diff_sol = dynamic_vector<T>::Zero(num_full_dofs);
 
@@ -146,12 +152,12 @@ public:
 
                 if (is_contact_vector.at(cl_count))
                 {
-                	Anitsche   = make_hho_nitsche(msh, cl, hdi, gr.first, gamma_0, theta, bnd );
-                    Bnegative  = make_hho_negative_faces(msh, cl, hdi, gr.first, gamma_0, theta, bnd, u_full);
-                    Aheaviside = make_hho_heaviside_faces(msh, cl, hdi, gr.first, gamma_0, theta, bnd, u_full);
+                	Anitsche   = make_hho_nitsche(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd );
+                    Bnegative  = make_hho_negative_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd, u_full);
+                    Aheaviside = make_hho_heaviside_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd, u_full);
                 }
 
-                matrix_type A =   Ah - Anitsche - Aheaviside;
+                matrix_type A =   Ah - Anitsche + Aheaviside;
                 vector_type b = -(Ah - Anitsche) * u_full - Bnegative;
                 b.block(0, 0, cbs, 1) += Lh;
 
@@ -163,56 +169,234 @@ public:
                 diff_sol.block(cell_ofs, 0, num_total_dofs ,1) = du_full;
 
                 error += du_full.dot(A * du_full);
-
-                auto bar = barycenter(msh, cl);
-                vector_type u_full_new  = u_full + du_full;
-
-                ofs << bar.x() << " " << bar.y() <<" "<< u_full_new(0) << std::endl;
                 cl_count++;
             }
-            ofs.close();
 
             full_sol += diff_sol;
 
             std::cout << "  "<< iter << "  "<< std::sqrt(error)<< std::endl;
             if( std::sqrt(error)  < tol)
+            {
+                std::ofstream efs("solution_whho_faces.dat");
+
+                if(!efs.is_open())
+                    std::cout<< "Error opening file"<<std::endl;
+
+                auto cl_count = 0;
+                for(auto& cl : msh)
+                {
+                    auto num_total_dofs = cbs + howmany_faces(msh,cl) * fbs;
+                    auto cell_ofs = offset_vector.at(cl_count++);
+                    vector_type u_bar = full_sol.block(cell_ofs, 0, 1, 1);
+                    auto bar = barycenter(msh, cl);
+                    efs << bar.x() << " " << bar.y() <<" "<< u_bar(0) << std::endl;
+                }
+
+                efs.close();
                 return 0;
+            }
+
         }
         return 1;
     }
 
 
-    hho_newton_solver(const Mesh& msh, const hho_degree_info& hdi,
-                    const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
-                    const algorithm_parameters<T>& ap):
-                    theta(ap.theta), gamma_0(ap.gamma_0) //dynamic_vector<T>& full_sol)
+    template<typename Function>
+    auto
+    solve_cells(const Mesh&  msh, const Function& rhs_fun,
+            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
     {
-        std::cout << "Solver : Generalized Newton" << std::endl;
-        std::cout << "Theta  : "<< theta << std::endl;
-        std::cout << "Gamma0 : "<< gamma_0 << std::endl;
 
-        is_contact_vector = make_is_contact_vector(msh, bnd);
+        hho_degree_info      hdi(ap.degree +1, ap.degree); //Not allow (degree, degree)
 
-        fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
-        cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+        std::cout << " * cell degree :"<< hdi.cell_degree() << std::endl;
+        std::cout << " * face degree :"<< hdi.face_degree() << std::endl;
 
-        num_full_dofs = cbs*msh.cells_size() + 2 * fbs*msh.faces_size()
+        auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
+        auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+
+        auto num_full_dofs = cbs*msh.cells_size() + 2 * fbs*msh.faces_size()
                                         - fbs*msh.boundary_faces_size() ;
 
-        offset_vector = full_offset(msh, hdi);
+        auto offset_vector = full_offset(msh, hdi);
+
+        dynamic_vector<T>  full_sol = dynamic_vector<T>::Zero(num_full_dofs);
+        auto max_iter = 15000;
+        auto tol = 1.e-8;
+
+        for(size_t iter = 0; iter < max_iter; iter++)
+        {
+            auto cl_count = 0;
+            auto assembler = make_diffusion_assembler2(msh, hdi, bnd);
+
+            for (auto& cl : msh)
+            {
+                auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+
+                if (is_contact_vector.at(cl_count))
+                {
+                    auto cell_ofs = offset_vector.at(cl_count);
+                    auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
+                    vector_type  u_full = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
+
+                    //auto gr  = make_hho_contact_scalar_laplacian(msh, cl, hdi, bnd);
+                    //auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
+                    auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
+                    auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+
+                    vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
+                    matrix_type Ah  = gr.second + stab;
+
+
+                	matrix_type  Anitsche   = make_hho_nitsche(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd );
+                    vector_type  Bnegative  = make_hho_negative(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd, u_full);
+                    matrix_type  Aheaviside = make_hho_heaviside(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd, u_full);
+
+                    matrix_type A =   Ah - Anitsche + Aheaviside;
+                    vector_type b = -(Ah - Anitsche) * u_full - Bnegative;
+                    b.block(0, 0, cbs, 1) += Lh;
+
+                    auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, b);
+                    assembler.assemble(msh, cl, sc.first, sc.second);
+
+                }
+                else
+                {
+                    auto gr   = make_hho_scalar_laplacian(msh, cl, hdi);
+                    //auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
+                    auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+
+                    vector_type Lh = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
+                    matrix_type Ah = gr.second + stab;
+
+                    auto sc = diffusion_static_condensation_compute(msh, cl, hdi, Ah, Lh);
+                    assembler.assemble(msh, cl, sc.first, sc.second);
+                }
+
+
+                cl_count++;
+            }
+
+            assembler.impose_neumann_boundary_conditions(msh, bnd);
+            assembler.finalize();
+
+            size_t systsz = assembler.LHS.rows();
+            size_t nnz = assembler.LHS.nonZeros();
+
+            //std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
+            //std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
+            //std::cout << "Dofs: " << systsz << std::endl;
+
+            dynamic_vector<T> dsol = dynamic_vector<T>::Zero(systsz);
+
+            disk::solvers::pardiso_params<T> pparams;
+            pparams.report_factorization_Mflops = true;
+            mkl_pardiso(pparams, assembler.LHS, assembler.RHS, dsol);
+
+            T error = 0.0 ;
+
+            dynamic_vector<T> diff_sol = dynamic_vector<T>::Zero(num_full_dofs);
+
+            cl_count = 0;
+
+            for (auto& cl : msh)
+            {
+
+                auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+                auto cell_ofs = offset_vector.at(cl_count);
+                auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
+                vector_type  u_full = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
+
+                if (is_contact_vector.at(cl_count))
+                {
+                    //auto gr  = make_hho_contact_scalar_laplacian(msh, cl, hdi, bnd);
+                    //auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
+
+                    auto gr  = make_hho_scalar_laplacian(msh, cl, hdi);
+                    auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+
+                    vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
+                    matrix_type Ah  = gr.second + stab;
+
+
+                	matrix_type  Anitsche   = make_hho_nitsche(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd );
+                    vector_type  Bnegative  = make_hho_negative(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd, u_full);
+                    matrix_type  Aheaviside = make_hho_heaviside(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd, u_full);
+
+                    matrix_type A =   Ah - Anitsche + Aheaviside;
+                    vector_type b = -(Ah - Anitsche) * u_full - Bnegative;
+
+                    vector_type cell_rhs = Lh + b.block(0, 0, cbs, 1);
+                    vector_type du_faces = assembler.take_local_data(msh, cl, dsol);
+                    vector_type du_full  =
+                        diffusion_static_condensation_recover(msh, cl, hdi, A, cell_rhs, du_faces);
+
+                    diff_sol.block(cell_ofs, 0, num_total_dofs ,1) = du_full;
+                    error += du_full.dot(A * du_full);
+                }
+                else
+                {
+                    auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
+                    auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+                    //auto stab   = make_hdg_scalar_stabilization(msh, cl, gr.first, hdi);
+
+                    vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
+                    matrix_type Ah  = gr.second + stab;
+
+                    vector_type du_faces = assembler.take_local_data(msh, cl, dsol);
+                    vector_type du_full  =
+                        diffusion_static_condensation_recover(msh, cl, hdi, Ah, Lh, du_faces);
+
+                    diff_sol.block(cell_ofs, 0, num_total_dofs ,1) = du_full;
+                    error += du_full.dot(Ah * du_full);
+                }
+                cl_count++;
+            }
+
+            full_sol += diff_sol;
+
+            std::cout << "  "<< iter << "  "<< std::sqrt(error)<< std::endl;
+            if( std::sqrt(error)  < tol)
+            {
+                std::ofstream efs("solution_whho_cells.dat");
+
+                if(!efs.is_open())
+                    std::cout<< "Error opening file"<<std::endl;
+
+                auto cl_count = 0;
+                for(auto& cl : msh)
+                {
+                    auto num_total_dofs = cbs + howmany_faces(msh,cl) * fbs;
+                    auto cell_ofs = offset_vector.at(cl_count++);
+                    vector_type u_bar = full_sol.block(cell_ofs, 0, 1, 1);
+                    auto bar = barycenter(msh, cl);
+                    efs << bar.x() << " " << bar.y() <<" "<< u_bar(0) << std::endl;
+                }
+
+                efs.close();
+                return 0;
+            }
+        }
+        return 1;
+    }
+
+
+    hho_newton_solver(const Mesh& msh,
+                    const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+                    const algorithm_parameters<T>& alg_par):
+                    ap(alg_par)
+    {
+        is_contact_vector = make_is_contact_vector(msh, bnd);
     }
 };
 
 
 template<typename Mesh, typename T>
 void
-run_signorini(  const Mesh& msh,
-                const algorithm_parameters<T>& ap)
+run_signorini(  const Mesh& msh, const algorithm_parameters<T>& ap)
 {
     typedef typename Mesh::point_type  point_type;
 
-    const size_t degree = 0 ;
-    hho_degree_info hdi(degree, degree);
 
     auto force = [](const point_type& p) -> T {
         return - 2.* M_PI *  std::sin(2. * M_PI * p.x());
@@ -239,8 +423,18 @@ run_signorini(  const Mesh& msh,
     //bnd.addNeumannBC(disk::mechanics::NEUMANN, 3, zero_fun); //TOP
     bnd.addContactBC(disk::mechanics::SIGNORINI,3); //BOTTOM
 
-    hho_newton_solver<Mesh> ns(msh, hdi, bnd, ap);
-    ns.solve_faces(msh, force, bnd);
+    hho_newton_solver<Mesh> ns(msh, bnd, ap);
+    switch (ap.solver)
+    {
+        case EVAL_IN_CELLS:
+            ns.solve_cells(msh, force, bnd);
+            break;
+        case EVAL_ON_FACES:
+            ns.solve_faces(msh, force, bnd);
+            break;
+        default:
+            throw std::invalid_argument("Invalid solver");
+    }
 
     return;
 }
@@ -255,10 +449,21 @@ int main(int argc, char **argv)
     int ch;
     algorithm_parameters<T> ap;
 
-    while ( (ch = getopt(argc, argv, "g:npzfwm")) != -1 )
+    size_t degree = 1;
+
+    while ( (ch = getopt(argc, argv, "k:g:npzfc")) != -1 )
     {
         switch(ch)
         {
+            case 'k':
+                degree = atoi(optarg);
+                if (degree < 0)
+                {
+                    std::cout << "Degree must be positive. Falling back to 1." << std::endl;
+                    degree = 1;
+                }
+                ap.degree = degree;
+                break;
             case 'g':
                 std::cout << "choosing gamma" << std::endl;
                 ap.gamma_0 = atof(optarg);
@@ -270,15 +475,18 @@ int main(int argc, char **argv)
                 break;
             case 'n':
                 ap.theta = -1.;
-                std::cout << "theta negative chosen" << std::endl;
                 break;
             case 'p':
                 ap.theta = 1.;
-                std::cout << "theta positive chosen" << std::endl;
                 break;
             case 'z':
                 ap.theta = 0.;
-                std::cout << "theta zero chosen" << std::endl;
+                break;
+            case 'f':
+                ap.solver = EVAL_ON_FACES;
+                break;
+            case 'c':
+                ap.solver = EVAL_IN_CELLS;
                 break;
             case '?':
             default:
@@ -286,6 +494,8 @@ int main(int argc, char **argv)
                 exit(1);
         }
     }
+
+    std::cout << ap << std::endl;
 
     argc -= optind;
     argv += optind;

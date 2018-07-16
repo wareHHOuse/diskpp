@@ -119,7 +119,7 @@ public:
                     Aheaviside = make_fem_heaviside(msh, cl, bnd, ap.gamma_0, ap.theta, uloc);
                 }
 
-                matrix_type A = Ah - Anitsche - Aheaviside;
+                matrix_type A = Ah - Anitsche + Aheaviside;
                 vector_type b = Lh - (Ah - Anitsche) * uloc - Bnegative;
 
                 for (size_t i = 0; i < A.rows(); i++)
@@ -202,7 +202,7 @@ public:
         //dump_to_matlab(msh, "mesh.m");
 
         std::cout << "mesh size : "<< disk::average_diameter(msh) << std::endl;
-        std::ofstream ofs("solution_diskpp.dat");
+        std::ofstream ofs("solution_wfem.dat");
 
         std::vector<double> solution_vals, solution_vals_nodes;
         solution_vals.reserve(msh.cells_size());

@@ -5,10 +5,10 @@
 
 // 1. *********** Numerical parameters and input data **********
 
-real    gamma0    = 0.0001; // Nitsche's parameter - Ref. value from Burman et.al = 100
-real    theta     = 1.;
+real    gamma0    = 1000; // Nitsche's parameter - Ref. value from Burman et.al = 100
+real    theta     = -1.;
 real    tolerance = 1e-7;
-int     maxiter   = 5000; 
+int     maxiter   = 5000;
 int     Ne        = 10;
 real    hTAll     = 1./Ne;
 func    force     = -2. * pi * sin( 2. * pi * x);
@@ -35,8 +35,8 @@ func real heaviside(real t){if (t>=0) return 1; else return 0;}
 
 // 6.1 Initialisation of Newton -> membrane without obstacle (linear problem)
 
-solve Membrane(uh,vh) = 
-        int2d(Th)( ah(uh, vh) ) 
+solve Membrane(uh,vh) =
+        int2d(Th)( ah(uh, vh) )
       //- int2d(Th)( force * vh)
 	  //- int1d(Th,1) ( (theta/gnp) * sigman(uh) * sigman(vh))
       + on(1,2,3,4,uh=0);
@@ -58,7 +58,7 @@ for(iter = 1 ; iter < maxiter ; ++iter)
 	    //LHS
 		  int2d(Th)  ( ah(duh,vh))
 		- int1d(Th,1)( (theta/gnp) * sigman(duh) * sigman(vh))
-		- int1d(Th,1)( (1./gnp) * heaviside(-signoriniu(uh)) * signoriniu(duh) * signoriniv(vh) )
+		+ int1d(Th,1)( (1./gnp) * heaviside(-signoriniu(uh)) * signoriniu(duh) * signoriniv(vh) )
         //RHS
 		- int2d(Th)  ( force * vh )
 		+ int2d(Th)  ( ah(uh,vh) )
