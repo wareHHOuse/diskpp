@@ -55,6 +55,9 @@ class mesh_hierarchy
             p1          = ptids[1];
             assert(p0 < p1);
             is_boundary = msh.is_boundary(e);
+            if(is_boundary)
+                boundary_id = msh.boundary_id(e);
+
             is_broken   = false;
         }
 
@@ -257,7 +260,7 @@ class mesh_hierarchy
             auto p1 = point_id_type(m_edges[i].p1);
 
             bs_refined->edges[i] = mesh_edge_type({p0, p1});
-            bs_refined->boundary_info[i] = disk::bnd_info{1, m_edges[i].is_boundary};
+            bs_refined->boundary_info[i] = disk::bnd_info{m_edges[i].boundary_id, m_edges[i].is_boundary};
         }
 
         bs_refined->surfaces.resize( m_triangles.size() );

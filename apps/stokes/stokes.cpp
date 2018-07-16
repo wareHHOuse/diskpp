@@ -69,7 +69,7 @@ compute_errors(const Mesh& msh,
     	Matrix<scalar_type, Dynamic, 1> diff = s - p.head(cbs);
     	auto cb = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
     	Matrix<scalar_type, Dynamic, Dynamic> mm = revolution::make_mass_matrix(msh, cl, cb);
-    	error += diff.dot(mm*diff);
+    	error += diff.dot(mm * diff);
     	//ofs << bar.x() << " " << bar.y() << " " << s(0) << " " << s(1) << std::endl;
 
         //pressure error
