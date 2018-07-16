@@ -1,0 +1,86 @@
+// SIGNORINI PROBLEM WITH NITSCHE
+// SEMI-SMOOTH NEWTON SOLVER
+// 2018
+// Test case from F. Ben Belgacem and Y. Renard., 2003.
+
+// 1. *********** Numerical parameters and input data **********
+
+real    gamma0    = 1000; // Nitsche's parameter - Ref. value from Burman et.al = 100
+real    theta     = -1.;
+real    tolerance = 1e-7;
+int     maxiter   = 5000;
+int     Ne        = 10;
+real    hTAll     = 1./Ne;
+func    force     = -2. * pi * sin( 2. * pi * x);
+
+mesh    Th    = square(Ne,Ne,[x,y]);
+fespace Vh(Th,P2);
+Vh      uh, zh, duh, dzh, vh, wh;
+
+// 5. ************** Macros for the obstacle problem **********
+
+macro ah(u,v)  ( dx(u) *dx(v) + dy(u) * dy(v) )//EOM
+macro gnp()    ( gamma0 / hTriangle )       //EOM // Nitsche's parameter
+macro sigman(u)( dx(u)*N.x + dy(u)*N.y )    //EOM
+macro signoriniv(u) ( - gnp * u + sigman(u)) //EOM
+macro signoriniu(u) ( - gnp * u + sigman(u)* theta) //EOM
+
+
+// 3. ******* Functions for Newton iterations ****************
+
+func real negative (real t){if (t<=0) return t; else return 0;}
+func real heaviside(real t){if (t>=0) return 1; else return 0;}
+
+// 6. ************************* SOLVING *************************
+
+// 6.1 Initialisation of Newton -> membrane without obstacle (linear problem)
+
+solve Membrane(uh,vh) =
+        int2d(Th)( ah(uh, vh) )
+      //- int2d(Th)( force * vh)
+	  //- int1d(Th,1) ( (theta/gnp) * sigman(uh) * sigman(vh))
+      + on(1,2,3,4,uh=0);
+
+//plot(uh,wait=true,fill=true,value=true,cmm="Initial solution",ps="Init.eps");
+
+// 6.2  Newton loop
+
+real erroru = 0;
+int iter    = 1;
+
+for(iter = 1 ; iter < maxiter ; ++iter)
+{
+
+	cout << "*** Newton iteration: " << iter << ":" << endl;
+
+	// Solve the tangent problem
+	solve Dsignorini(duh,vh) =
+	    //LHS
+		  int2d(Th)  ( ah(duh,vh))
+		- int1d(Th,1)( (theta/gnp) * sigman(duh) * sigman(vh))
+		+ int1d(Th,1)( (1./gnp) * heaviside(-signoriniu(uh)) * signoriniu(duh) * signoriniv(vh) )
+        //RHS
+		- int2d(Th)  ( force * vh )
+		+ int2d(Th)  ( ah(uh,vh) )
+		- int1d(Th,1)( (theta/gnp) * sigman(uh) * sigman(vh))
+		+ int1d(Th,1)( (1./gnp) * negative(signoriniu(uh)) * signoriniv(vh) )
+		+ on(3, duh = 0) ;
+
+	// Compute the residual : relative L^2 norm of the increment on uh
+	erroru = sqrt ( int2d(Th) ( duh^2 ) ); // / sqrt ( int2d(Th) ( uh^2) );
+	cout << " * Residual : u -> " << erroru << endl;
+
+	if (erroru < tolerance)
+	    break;
+
+	// Update the displacement
+	uh = uh + duh;
+}
+
+// 7.**************  Post-processing **************
+
+plot(uh,wait=true,fill=true,value=true,cmm="Final solution",ps="Final.eps");
+
+cout << " **** N elements : **** " << Ne << endl;
+cout << " **** h          : **** " << hTAll << endl;
+cout << " **** Newton iterations : **** " << iter  << endl;
