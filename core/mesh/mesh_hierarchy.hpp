@@ -55,6 +55,9 @@ class mesh_hierarchy
             p1          = ptids[1];
             assert(p0 < p1);
             is_boundary = msh.is_boundary(e);
+            if(is_boundary)
+                boundary_id = msh.boundary_id(e);
+
             is_broken   = false;
         }
 
@@ -257,7 +260,7 @@ class mesh_hierarchy
             auto p1 = point_id_type(m_edges[i].p1);
 
             bs_refined->edges[i] = mesh_edge_type({p0, p1});
-            bs_refined->boundary_info[i] = disk::bnd_info{1, m_edges[i].is_boundary};
+            bs_refined->boundary_info[i] = disk::bnd_info{m_edges[i].boundary_id, m_edges[i].is_boundary};
         }
 
         bs_refined->surfaces.resize( m_triangles.size() );
@@ -323,30 +326,6 @@ class mesh_hierarchy
         return next_mesh;
     }
 
-    void
-    build_hierarchy(const mesh_type& initial_mesh, size_t levels)
-    {
-        meshes.clear();
-        coarse_to_fine.clear();
-
-        meshes.push_back(initial_mesh);
-
-        for (size_t i = 0; i < levels; i++)
-        {
-            std::cout << "Building level " << i+1 << " mesh. H = ";
-            auto next_mesh = build_next( meshes[i] );
-            std::cout << average_diameter(next_mesh) << std::endl;
-            //next_mesh.statistics();
-            meshes.push_back( next_mesh );
-            auto c2f = make_coarse_to_fine_map(meshes[i], meshes[i+1]);
-            coarse_to_fine.push_back( std::move(c2f) );
-        }
-
-        m_edges.clear();
-        m_triangles.clear();
-        assert (meshes.size() == coarse_to_fine.size()+1);
-    }
-
     bool
     is_inside(const mesh_type& msh, const mesh_triangle_type& t, const point_type& pt) const
     {
@@ -394,15 +373,45 @@ class mesh_hierarchy
     }
 
 public:
+    mesh_hierarchy()
+    {}
+
     mesh_hierarchy(const mesh_type& initial_mesh, size_t num_levels)
     {
         build_hierarchy(initial_mesh, num_levels);
         //dump_to_matlab(meshes[2], "mesh2.m");
     }
 
+    void
+    build_hierarchy(const mesh_type& initial_mesh, size_t levels)
+    {
+        meshes.clear();
+        coarse_to_fine.clear();
+
+        meshes.push_back(initial_mesh);
+
+        for (size_t i = 0; i < levels; i++)
+        {
+            std::cout << "Building level " << i+1 << " mesh. H = ";
+            auto next_mesh = build_next( meshes[i] );
+            std::cout << average_diameter(next_mesh) << std::endl;
+            //next_mesh.statistics();
+            meshes.push_back( next_mesh );
+            auto c2f = make_coarse_to_fine_map(meshes[i], meshes[i+1]);
+            coarse_to_fine.push_back( std::move(c2f) );
+        }
+
+        m_edges.clear();
+        m_triangles.clear();
+        assert (meshes.size() == coarse_to_fine.size()+1);
+    }
+
     size_t
     locate_point(const point_type& pt, size_t level)
     {
+        if (meshes.size() == 0)
+            throw std::logic_error("mesh hierarchy not built");
+
         size_t tri_num;
         for (tri_num = 0; tri_num < meshes[0].cells_size(); tri_num++)
         {
@@ -420,9 +429,11 @@ public:
         throw std::invalid_argument("point not found");
     }
 
-    auto meshes_begin() const { return meshes.begin(); }
-    auto meshes_end()   const { return meshes.end(); }
-    auto meshes_size()  const { return meshes.size(); }
+    auto meshes_begin()     const { return meshes.begin(); }
+    auto meshes_end()       const { return meshes.end(); }
+    auto coarsest_mesh()    const { return meshes.front(); }
+    auto finest_mesh()      const { return meshes.back(); }
+    auto meshes_size()      const { return meshes.size(); }
 };
 
 

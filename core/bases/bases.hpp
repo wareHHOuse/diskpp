@@ -42,6 +42,13 @@ struct scaled_monomial_vector_sg_basis
     static_assert(sizeof(Element) == -1, "scaled_monomial_vector_sg_basis: not suitable for the requested kind of element");
 };
 
+/* Basis 'factory'. */
+template<typename MeshType, typename ElementType>
+auto make_scal_mon_basis(const MeshType& msh, const ElementType& elem, size_t degree)
+{
+    return scaled_monomial_scalar_basis<MeshType, ElementType>(degree);
+}
+
 } //namespace disk
 
 //#define POWER_CACHE

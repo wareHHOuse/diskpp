@@ -11,7 +11,7 @@ set(diskpp_VERSION_MINOR 0)
 set(diskpp_VERSION_PATCH 0)
 
 # Additional modules path for cmake
-set (CMAKE_MODULE_PATH 
+set (CMAKE_MODULE_PATH
      ${CMAKE_MODULE_PATH}
      ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -46,8 +46,14 @@ find_package(Lua REQUIRED)
 include_directories("${LUA_INCLUDE_DIR}")
 set(LINK_LIBS ${LINK_LIBS} ${LUA_LIBRARIES})
 
-find_package(Eigen3 REQUIRED)
-include_directories(${EIGEN3_INCLUDE_DIR})
+set(UP_EIGEN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/contrib/eigen")
+if ( EXISTS ${UP_EIGEN_DIR} AND IS_DIRECTORY ${UP_EIGEN_DIR} )
+    include_directories(${UP_EIGEN_DIR})
+else ( EXISTS ${UP_EIGEN_DIR} AND IS_DIRECTORY ${UP_EIGEN_DIR} )
+    find_package(Eigen3 REQUIRED)
+    include_directories(${EIGEN3_INCLUDE_DIR})
+endif ( EXISTS ${UP_EIGEN_DIR} AND IS_DIRECTORY ${UP_EIGEN_DIR} )
+
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 
@@ -70,6 +76,7 @@ endif()
 
 add_subdirectory(contrib)
 add_subdirectory(core)
+add_subdirectory(utils)
 
 add_library(diskpp SHARED ${diskpp_source})
 set(LINK_LIBS "${LINK_LIBS}" diskpp)

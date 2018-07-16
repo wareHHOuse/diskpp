@@ -1014,7 +1014,7 @@ int main(int argc, char **argv)
 
         loader.populate_mesh(msh);
 
-        std::cout << "Mesh avg. diameter: " << mesh_h(msh) << std::endl;
+        std::cout << "Mesh avg. diameter: " << average_diameter(msh) << std::endl;
 
         if (method == "fem")
             cfem_solver(lua, msh);
@@ -1045,7 +1045,7 @@ int main(int argc, char **argv)
 
         loader.populate_mesh(msh);
 
-        std::cout << "Mesh avg. diameter: " << mesh_h(msh) << std::endl;
+        std::cout << "Mesh avg. diameter: " << average_diameter(msh) << std::endl;
 
         if (method == "hho")
             hho_solver(lua, msh);
@@ -1070,7 +1070,7 @@ int main(int argc, char **argv)
 
         loader.populate_mesh(msh);
 
-        std::cout << "Mesh avg. diameter: " << mesh_h(msh) << std::endl;
+        std::cout << "Mesh avg. diameter: " << average_diameter(msh) << std::endl;
 
         if (method == "hho")
             hho_solver(lua, msh);

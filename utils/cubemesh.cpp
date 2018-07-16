@@ -74,7 +74,7 @@
  * this code has to be integrated somewhere. If the goal is to generate only
  * the meshfile, constructing in memory is useless, so data is written directly.
  */
-//#define BUILD_IN_MEMORY
+#define BUILD_IN_MEMORY
 
 template<typename T>
 T strto(const char * nptr, char ** endptr = nullptr);
@@ -371,7 +371,7 @@ generate(const mesh_params<T,2>& mp)
 
             if (j == 0)
             {
-                typename mesh_data<T,3>::bnd_type   bf;
+                typename mesh_data<T,2>::bnd_type   bf;
                 bf[0] =  j   * y_offset +   i;
                 bf[1] =  j   * y_offset + (i+1);
 #ifdef BUILD_IN_MEMORY
@@ -383,7 +383,7 @@ generate(const mesh_params<T,2>& mp)
 
             if (j == mp.ny-1)
             {
-                typename mesh_data<T,3>::bnd_type   bf;
+                typename mesh_data<T,2>::bnd_type   bf;
                 bf[0] = (j+1) * y_offset +   i;
                 bf[1] = (j+1) * y_offset + (i+1);
 #ifdef BUILD_IN_MEMORY
@@ -402,6 +402,182 @@ generate(const mesh_params<T,2>& mp)
     return true;
 #endif
 }
+
+template<typename T>
+#ifdef BUILD_IN_MEMORY
+mesh_data<T,2>
+#else
+bool
+#endif
+generate_diffusive(const mesh_params<T,2>& mp)
+{
+#ifdef BUILD_IN_MEMORY
+    mesh_data<T,2> md;
+#else
+    FILE *fp = stdout;
+    if (mp.filename) fp = fopen(mp.filename, "w");
+    if (!fp)
+    {
+        std::cout << "Unable to open " << mp.filename << std::endl;
+        return false;
+    }
+#endif
+
+
+    auto hx = (mp.max_x - mp.min_x)/mp.nx;
+
+    auto num_points = (mp.nx+1)*(mp.ny+1);
+    auto num_vols = mp.nx * mp.ny;
+    auto num_bf = 2*mp.nx + 2*mp.ny;
+
+#ifdef BUILD_IN_MEMORY
+    md.points.reserve(num_points);
+    md.cells.reserve(num_vols);
+    md.boundaries.reserve(num_bf);
+#else
+    fprintf(fp, "%lu\n", num_points);
+#endif
+
+
+    std::default_random_engine e;
+    std::uniform_real_distribution<T> dist_x(-hx/5., hx/5.);
+    auto rx = std::bind(dist_x, e);
+
+
+    /* Generate points */
+    for (size_t j = 0; j < mp.ny+1; j++)
+    {
+        auto h    = 9./mp.ny;
+        auto y_j  = std::log(1 + j*h);
+        auto y_jj = std::log(1 + (1 + j)*h);
+
+        auto hy = y_jj - y_j;
+        std::uniform_real_distribution<T> dist_y(-hy/5., hy/5.);
+        auto ry = std::bind(dist_y, e);
+
+        for (size_t i = 0; i < mp.nx+1; i++)
+        {
+            typename mesh_data<T,2>::point_type p;
+            bool is_boundary = (i == 0) || (j == 0) || (i == mp.nx) || (j == mp.ny);
+
+            if (mp.randomize && !is_boundary)
+            {
+                p[0] = mp.min_x + i*hx + rx();
+                p[1] = ((mp.max_y - mp.min_y)/std::log(10)) * y_j + mp.min_y + ry();
+            }
+            else
+            {
+                p[0] = mp.min_x + i*hx;
+                p[1] = ((mp.max_y - mp.min_y)/std::log(10)) * y_j + mp.min_y;
+            }
+#ifdef BUILD_IN_MEMORY
+            md.points.push_back(p);
+#else
+            fprintf(fp, "%.15f %.15f\n", p[0], p[1]);
+#endif
+        }
+    }
+
+    /* Generate volumes */
+    size_t y_offset = mp.ny+1;
+
+#ifndef BUILD_IN_MEMORY
+    fprintf(fp, "%lu\n", num_vols);
+#endif
+    for (size_t j = 0; j < mp.ny; j++)
+    {
+        for (size_t i = 0; i < mp.nx; i++)
+        {
+            typename mesh_data<T,2>::cell_type   vol;
+            vol[0] =    j   * y_offset +   i;
+            vol[1] =    j   * y_offset + (i+1);
+            vol[2] =  (j+1) * y_offset +   i;
+            vol[3] =  (j+1) * y_offset + (i+1);
+
+#ifdef BUILD_IN_MEMORY
+            md.cells.push_back(vol);
+#else
+            fprintf(fp, "%lu %lu %lu %lu\n", vol[0], vol[1], vol[2], vol[3]);
+#endif
+        }
+    }
+
+#ifndef BUILD_IN_MEMORY
+    fprintf(fp, "%lu\n", num_bf);
+#endif
+    /* Generate boundary faces */
+    for (size_t j = 0; j < mp.ny; j++)
+    {
+        for (size_t i = 0; i < mp.nx; i++)
+        {
+            if (i == 0)
+            {
+                typename mesh_data<T,3>::bnd_type   bf;
+                //bf[0] = 4;
+                bf[0] =  j   * y_offset +   i;
+                bf[1] = (j+1) * y_offset +   i;
+#ifdef BUILD_IN_MEMORY
+                md.boundaries.push_back(bf);
+#else
+                //fprintf(fp, "%lu %lu %lu\n", bf[0], bf[1], bf[2]);
+                fprintf(fp, "%lu %lu\n", bf[0], bf[1]);
+#endif
+            }
+
+            if (i == mp.nx-1)
+            {
+                typename mesh_data<T,2>::bnd_type   bf;
+                //bf[0] = 3;
+                bf[0] =   j   * y_offset + (i+1);
+                bf[1] = (j+1) * y_offset + (i+1);
+#ifdef BUILD_IN_MEMORY
+                md.boundaries.push_back(bf);
+#else
+                //fprintf(fp, "%lu %lu %lu\n", bf[0], bf[1], bf[2]);
+                fprintf(fp, "%lu %lu\n", bf[0], bf[1]);
+#endif
+            }
+
+            if (j == 0)
+            {
+
+                typename mesh_data<T,3>::bnd_type   bf;
+                //bf[0] = 1;
+                bf[0] =  j   * y_offset +   i;
+                bf[1] =  j   * y_offset + (i+1);
+#ifdef BUILD_IN_MEMORY
+                md.boundaries.push_back(bf);
+#else
+                //fprintf(fp, "%lu %lu %lu\n", bf[0], bf[1], bf[2]);
+                fprintf(fp, "%lu %lu\n", bf[0], bf[1]);
+#endif
+            }
+
+            if (j == mp.ny-1)
+            {
+                typename mesh_data<T,3>::bnd_type   bf;
+                //bf[0] = 2;
+                bf[0] = (j+1) * y_offset +   i;
+                bf[1] = (j+1) * y_offset + (i+1);
+#ifdef BUILD_IN_MEMORY
+                md.boundaries.push_back(bf);
+#else
+                //fprintf(fp, "%lu %lu %lu\n", bf[0], bf[1], bf[2]);
+                fprintf(fp, "%lu %lu\n", bf[0], bf[1]);
+#endif
+            }
+        }
+    }
+
+#ifdef BUILD_IN_MEMORY
+    return md;
+#else
+    if (mp.filename) fclose(fp);
+    return true;
+#endif
+}
+
+
 
 template<typename T>
 #ifdef BUILD_IN_MEMORY
@@ -681,7 +857,9 @@ int main(int argc, char **argv)
 #ifdef BUILD_IN_MEMORY
         mesh_data<T,2> md = generate(mp);
         write_mesh(mp, md);
+
 #else
+        std::cout << "not output file" << std::endl;
         generate(mp);
 #endif
     }

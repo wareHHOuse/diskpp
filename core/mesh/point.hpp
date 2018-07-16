@@ -76,6 +76,11 @@ public:
     T   operator[](size_t pos) const { return m_coords(pos); }
     T&  operator[](size_t pos)       { return m_coords(pos); }
 
+    point   operator-() const {
+        auto ret = -1.0 * (*this);
+        return ret;
+    }
+
     template<typename U = T>
     typename std::enable_if<DIM == 1 || DIM == 2 || DIM == 3, U>::type
     x() const { return m_coords(0); }
@@ -138,6 +143,13 @@ public:
         return ret;
     }
 };
+
+template<typename T>
+T
+det(const point<T,2>& p1, const point<T,2>& p2)
+{
+    return p1.x() * p2.y() - p1.y() * p2.x();
+}
 
 template<typename T, size_t DIM>
 std::ostream&

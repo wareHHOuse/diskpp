@@ -45,6 +45,7 @@ namespace disk {
 
 /* Compute an estimate of the mesh discretization step 'h' */
 template<typename Mesh>
+[[deprecated("Use average_diameter(). This is not the correct way to compute h.")]]
 typename Mesh::scalar_type
 mesh_h(const Mesh& msh)
 {
@@ -111,7 +112,7 @@ template<typename Mesh, typename Element>
 typename Mesh::scalar_type
 diameter(const Mesh& msh, const Element& elem)
 {
-    auto pts = points(msh, elem);
+    const auto pts = points(msh, elem);
 
     typename Mesh::scalar_type diam = 0.;
 
@@ -123,9 +124,91 @@ diameter(const Mesh& msh, const Element& elem)
 }
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+std::array<T, 3>
+diameter_boundingbox(const Mesh<T, 3, Storage>& msh, const typename Mesh<T, 3, Storage>::cell& cl)
+{
+    const auto pts = points(msh, cl);
+
+    T xmin = 0;
+    T xmax = 0;
+    T ymin = 0;
+    T ymax = 0;
+    T zmin = 0;
+    T zmax = 0;
+
+    for (auto& pt : pts)
+    {
+        if (pt.x() < xmin)
+        {
+            xmin = pt.x();
+        }
+        else if (pt.x() > xmax)
+        {
+            xmax = pt.x();
+        }
+
+        if (pt.y() < ymin)
+        {
+            ymin = pt.y();
+        }
+        else if (pt.y() > ymax)
+        {
+            ymax = pt.y();
+        }
+
+        if (pt.z() < zmin)
+        {
+            zmin = pt.z();
+        }
+        else if (pt.z() > zmax)
+        {
+            zmax = pt.z();
+        }
+    }
+
+    return {std::abs(xmax - xmin), std::abs(ymax - ymin), std::abs(zmax - zmin)};
+}
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+std::array<T,2>
+diameter_boundingbox(const Mesh<T, 2, Storage>&                      msh,
+                     const typename Mesh<T, 2, Storage>::cell&       cl)
+{
+    const auto pts = points(msh, cl);
+
+    T xmin = 0;
+    T xmax = 0;
+    T ymin = 0;
+    T ymax = 0;
+
+    for (auto& pt : pts)
+    {
+        if(pt.x() < xmin)
+        {
+            xmin = pt.x();
+        }
+        else if (pt.x() > xmax)
+        {
+            xmax = pt.x();
+        }
+
+        if (pt.y() < ymin)
+        {
+            ymin = pt.y();
+        }
+        else if (pt.y() > ymax)
+        {
+            ymax = pt.y();
+        }
+    }
+
+    return {std::abs(xmax - xmin), std::abs(ymax - ymin)};
+}
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 bool
-is_inside(const Mesh<T, 2, Storage>& msh,
-          const typename Mesh<T, 2, Storage>::cell& cl,
+is_inside(const Mesh<T, 2, Storage>&                      msh,
+          const typename Mesh<T, 2, Storage>::cell&       cl,
           const typename Mesh<T, 2, Storage>::point_type& pt)
 {
     /* Nodes MUST be ordered COUNTERCLOCKWISE and the polygon must be CONVEX */
@@ -134,13 +217,16 @@ is_inside(const Mesh<T, 2, Storage>& msh,
     for (size_t i = 0; i < pts.size(); i++)
     {
         auto p0 = pts[i];
-        auto p1 = pts[i%pts.size()];
+        auto p1 = pts[i % pts.size()];
 
-        auto x = pt.x();  auto y = pt.y();
-        auto x0 = p0.x(); auto y0 = p0.y();
-        auto x1 = p1.x(); auto y1 = p1.y();
+        auto x  = pt.x();
+        auto y  = pt.y();
+        auto x0 = p0.x();
+        auto y0 = p0.y();
+        auto x1 = p1.x();
+        auto y1 = p1.y();
 
-        if ( (y - y0)*(x1 - x0) - (x - x0)*(y1 - y0) < 0.0 )
+        if ((y - y0) * (x1 - x0) - (x - x0) * (y1 - y0) < 0.0)
             return false;
     }
 
@@ -155,7 +241,7 @@ has_faces_on_boundary(const Mesh& msh, const typename Mesh::cell& cl)
     bool has_bnd = false;
     for (auto& fc : fcs)
         if ( msh.is_boundary(fc) )
-            has_bnd = true;
+            return true;
 
     return has_bnd;
 }
@@ -192,7 +278,7 @@ normal(const Mesh<T, 3, Storage>& msh,
        const typename Mesh<T, 3, Storage>::face& fc)
 {
     auto pts = points(msh, fc);
-    assert(pts.size() == 4);
+    assert(pts.size() >= 3);
 
     auto v0 = (pts[1] - pts[0]).to_vector();
     auto v1 = (pts[2] - pts[1]).to_vector();
@@ -207,7 +293,6 @@ normal(const Mesh<T, 3, Storage>& msh,
 
     return n/n.norm();
 }
-
 
 } // namespace disk
 

@@ -396,7 +396,7 @@ public:
         auto cell_LHS_offset    = A_ct.at(cell_offset) * cbs;
         bool cell_needs_asm_A   = !is_in_set_A.at(cell_offset);
         bool cell_needs_asm_B   = is_in_set_A.at(cell_offset);
-        
+
         for (size_t i = 0; i < cbs; i++)
         {
             asm_map_row.push_back( assembly_index(cell_offset+i, true) );
@@ -450,8 +450,8 @@ public:
                 }
             }
         }
-        
-        
+
+
         /* Needed both in case A and I */
         RHS.block(cell_offset, 0, cbs, 1) += rhs.block(0, 0, cbs, 1);
 
@@ -464,7 +464,7 @@ public:
 
     } // assemble_A()
 
-    
+
     template<typename Function>
     void
     expand_solution(const Mesh& msh,
@@ -513,7 +513,7 @@ public:
             }
         }
     }
-    
+
     void finalize(void)
     {
         LHS.setFromTriplets( triplets.begin(), triplets.end() );
@@ -602,7 +602,7 @@ hho_solver(const Mesh& msh, size_t degree)
     auto stab       = stab_type(bqd);
     auto statcond   = statcond_type(bqd);
 
-    std::cout << "Mesh average h: " << mesh_h(msh) << std::endl;
+    std::cout << "Mesh average h: " << average_diameter(msh) << std::endl;
 
     auto r0 = 0.7;
 
@@ -622,7 +622,7 @@ hho_solver(const Mesh& msh, size_t degree)
         auto t = std::max(s, 0.0);
         return t*t;
     };
-    
+
     auto bcs_fun = [&](const typename Mesh::point_type& pt) -> scalar_type {
         return sol_fun(pt);
     };
@@ -646,7 +646,7 @@ hho_solver(const Mesh& msh, size_t degree)
         auto t = std::max(s, 0.0);
         return t*t;
     };
-    
+
     auto bcs_fun = [&](const typename Mesh::point_type& pt) -> scalar_type {
         return sol_fun(pt);
     };
@@ -742,7 +742,7 @@ hho_solver(const Mesh& msh, size_t degree)
 
         Matrix<scalar_type, Dynamic, 1> local = take_local_data(msh, cl, bqd, alpha);
         Matrix<scalar_type, Dynamic, 1> proj  = project_function(msh, cl, bqd, sol_fun, quadrature_degree_increase);
-        
+
         Matrix<scalar_type, Dynamic, 1> diff = local - proj;
 
         error += diff.dot(lc*diff);
@@ -760,9 +760,9 @@ hho_solver(const Mesh& msh, size_t degree)
 
     silo.close();
 #endif
-    
+
     std::cout << "Error: " << std::sqrt(error) << std::endl;
-    
+
     return true;
 }
 
