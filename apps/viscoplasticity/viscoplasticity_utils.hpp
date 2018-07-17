@@ -37,7 +37,7 @@
  template<typename Mesh>
  class tensors_at_quad_pts_utils
  {
-     std::vector<std::pair<size_t, size_t>> offsets_vector;
+     std::vector<std::pair<size_t, size_t>> offsets_vec;
      size_t m_total_quads, m_quad_degree;
 
      tensors_at_quad_pts_utils(const Mesh msh, const size_t quad_degree):
@@ -60,7 +60,7 @@
          {
              auto cell_quadpoints = integrate(msh, cl, quad_degree);
              end_quads += cell_quadpoints.size();
-             offsets.at(cl_id++) = std::make_pair(init_quads, end_quads);
+             offsets_vec.at(cl_id++) = std::make_pair(init_quads, end_quads);
              init_quads += cell_quadpoints.size();
          }
      }
@@ -72,9 +72,9 @@
      }
 
      auto
-     offsets_at_quads()
+     offsets_vector()
      {
-         return offsets_vector;
+         return offsets_vec;
      }
  }
 

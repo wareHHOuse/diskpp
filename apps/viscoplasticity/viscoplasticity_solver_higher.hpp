@@ -75,12 +75,13 @@ class augmented_lagrangian_viscoplasticity
     T             alpha;
     T             yield;
     size_t        cbs, fbs, pbs, sbs;
+    tensors_at_quad_pts_utils   tsr_utils;
+    std::vector<std::pair<size_t, size_t>> tsr_offsets_vector;
 
 public:
     vector_type             sol_old;
     std::tuple<T, T, T>     convergence;
     boundary_type           bnd;
-    tensors_at_quad_pts_utils   tsr_utils;
 
     augmented_lagrangian_viscoplasticity(const Mesh& msh,
                             const typename hho_degree_info & hdi,
@@ -102,6 +103,7 @@ public:
 
         size_t quad_degree = 2. * di.face_degree();
         tsr_utils = tensors_at_quad_pts_utils<mesh_type>(msh, quad_degree);
+        tsr_offsets_vector = tsr_utils.offsets_vector();
     };
 
     auto
@@ -135,6 +137,55 @@ public:
 
     }
 
+
+    template<typename Assembler>
+    Matrix<T, Dynamic, 1>
+    make_rhs_alg(   const mesh_type& msh,
+                    const cell_type& cl,
+                    const Assembler& assembler)
+    {
+        auto G = revolution::make_hlow_stokes(msh, cl, di, true);
+        auto cb = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
+        auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
+
+        auto cell_ofs =  revolution::priv::offset(msh, cl);
+        auto num_faces = howmany_faces(msh, cl);
+
+        //(stress - alpha * gamma, Gv)
+        auto cl_id = msh.lookup(cl);
+        auto cl_offsets = offsets_vector(cl_id);
+
+        vector_type stress = multiplier.block( sbs * cell_ofs,  0, sbs, 1);
+        vector_type gamma  = compute_auxiliar( msh,  cl, assembler, sol_old);
+        auxiliar.block(cell_ofs * sbs, 0, sbs, 1) = gamma;
+        vector_type str_agam = stress - 2. * alpha * gamma;
+        matrix_type mm = revolution::make_mass_matrix(msh, cl, sb);
+
+            rhs_pst =  G.first.transpose() * mm * str_agam;
+
+        //(f, v_T)
+        vector_type Lh = make_rhs(msh, cl, cb, rhs_fun);
+        rhs.block( 0, 0, cbs, 1) += Lh;
+
+        return rhs;
+    }
+
+
+    template<typename Assembler>
+    auto
+    make_global_rhs(const mesh_type& msh, Assembler& assembler)
+    {
+        assembler.initialize_rhs();
+
+        for (auto cl : msh)
+        {
+            vector_type local_rhs = make_rhs_alg(msh, cl, assembler);
+            assembler.assemble_rhs(msh, cl, local_rhs);
+        }
+        assembler.finalize_rhs();
+
+        return;
+    }
 
     template<typename Assembler>
     auto
