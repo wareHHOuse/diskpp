@@ -33,6 +33,7 @@
  #include "revolution/quadratures"
  #include "revolution/methods/hho"
 
+ using namespace revolution;
 
  template<typename Mesh>
  class tensors_at_quad_pts_utils
@@ -40,43 +41,44 @@
      std::vector<std::pair<size_t, size_t>> offsets_vec;
      size_t m_total_quads, m_quad_degree;
 
+ public:
+     tensors_at_quad_pts_utils(){};
+
      tensors_at_quad_pts_utils(const Mesh msh, const size_t quad_degree):
          m_quad_degree(quad_degree)
-     {
-         m_total_quads = 0;
-         for(auto cl : msh)
-         {
-             auto cell_quadpoints = integrate(msh, cl, quad_degree);
-             num_total += cell_quadpoints.size();
-         }
+    {
+         offsets_vec = std::vector<std::pair<size_t, size_t>>(msh.cells_size());
 
-         offsets_vector(msh.cells_size());
-
-         size_t init_quad = 0;
-         size_t end_quads = 0;
+         size_t init_quads = 0;
          size_t cl_id = 0;
 
-         for(auto cl : msh)
-         {
-             auto cell_quadpoints = integrate(msh, cl, quad_degree);
-             end_quads += cell_quadpoints.size();
-             offsets_vec.at(cl_id++) = std::make_pair(init_quads, end_quads);
-             init_quads += cell_quadpoints.size();
-         }
-     }
+        for(auto cl : msh)
+        {
+            auto cell_quadpoints = integrate(msh, cl, quad_degree);
+            auto number_quads = cell_quadpoints.size();
+            offsets_vec.at(cl_id++) = std::make_pair(init_quads, number_quads);
+            init_quads += cell_quadpoints.size();
+        }
+        m_total_quads = init_quads;
+    }
 
+     auto
+     quad_degree()
+     {
+         return m_quad_degree;
+     }
      auto
      num_total_quad_points()
      {
          return m_total_quads;
      }
 
-     auto
+     std::vector<std::pair<size_t, size_t>>
      offsets_vector()
      {
          return offsets_vec;
      }
- }
+ };
 
 
  template< typename T>
