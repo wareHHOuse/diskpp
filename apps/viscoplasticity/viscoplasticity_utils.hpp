@@ -35,12 +35,12 @@
 
 
  template<typename Mesh>
- class augmented_lagrangian_values_at_quads
+ class tensors_at_quad_pts_utils
  {
      std::vector<std::pair<size_t, size_t>> offsets_vector;
      size_t m_total_quads, m_quad_degree;
 
-     augmented_lagrangian_values_at_quads(const Mesh msh, const size_t quad_degree):
+     tensors_at_quad_pts_utils(const Mesh msh, const size_t quad_degree):
          m_quad_degree(quad_degree)
      {
          m_total_quads = 0;
@@ -66,7 +66,7 @@
      }
 
      auto
-     num_total_quads()
+     num_total_quad_points()
      {
          return m_total_quads;
      }
