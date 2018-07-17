@@ -33,6 +33,52 @@
  #include "revolution/quadratures"
  #include "revolution/methods/hho"
 
+
+ template<typename Mesh>
+ class augmented_lagrangian_values_at_quads
+ {
+     std::vector<std::pair<size_t, size_t>> offsets_vector;
+     size_t m_total_quads, m_quad_degree;
+
+     augmented_lagrangian_values_at_quads(const Mesh msh, const size_t quad_degree):
+         m_quad_degree(quad_degree)
+     {
+         m_total_quads = 0;
+         for(auto cl : msh)
+         {
+             auto cell_quadpoints = integrate(msh, cl, quad_degree);
+             num_total += cell_quadpoints.size();
+         }
+
+         offsets_vector(msh.cells_size());
+
+         size_t init_quad = 0;
+         size_t end_quads = 0;
+         size_t cl_id = 0;
+
+         for(auto cl : msh)
+         {
+             auto cell_quadpoints = integrate(msh, cl, quad_degree);
+             end_quads += cell_quadpoints.size();
+             offsets.at(cl_id++) = std::make_pair(init_quads, end_quads);
+             init_quads += cell_quadpoints.size();
+         }
+     }
+
+     auto
+     num_total_quads()
+     {
+         return m_total_quads;
+     }
+
+     auto
+     offsets_at_quads()
+     {
+         return offsets_vector;
+     }
+ }
+
+
  template< typename T>
  std::string
  tostr(const T & var)
