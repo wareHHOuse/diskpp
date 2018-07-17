@@ -53,9 +53,6 @@ run_viscoplasticity(size_t degree,
     std::cout << "Guessed mesh format: Medit format" << std::endl;
     typedef disk::generic_mesh<T, 2>  mesh_type;
 
-    T tolerance = 1.e-10, Ninf = 10.e+5;
-    size_t max_iters = 50000;
-
     std::string name, filename;
     switch (problem)
     {
@@ -75,15 +72,13 @@ run_viscoplasticity(size_t degree,
 
     std::string info = name + "_k" + tostr(degree) + "_a" + tostr(alpha);
 
-    hho_degree_info hdi(degree, degree);
+    hho_degree_info hdi(degree +1, degree);
     augmented_lagrangian_viscoplasticity<mesh_type> als(msh, hdi, alpha);
 
-    if(!als.run_alg(msh, problem))
+    if(!als.run_alg(msh, info, problem))
         std::cout << "No convergence" << std::endl;
 
     //auto final_error = als.compute_errors(msh, assembler, true);
-    //als.post_processing( msh, assembler, info +"_i" + tostr(i), problem);
-
     return;
 }
 

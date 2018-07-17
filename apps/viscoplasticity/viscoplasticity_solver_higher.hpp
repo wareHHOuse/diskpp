@@ -127,8 +127,6 @@ public:
         vector_type u_TF  = assembler.take_velocity(msh, cl, velocity_dofs);
         auto value = 1./(2. * (viscosity + alpha));
         auto G = revolution::make_hlow_stokes(msh, cl, di, true);
-
-        auto cell_ofs    = revolution::priv::offset(msh, cl);
         vector_type   Gu = G.first * u_TF;
 
         auto qps = integrate(msh, cl, tsr_utils.quad_degree());
@@ -309,8 +307,93 @@ public:
         return;
     }
 
+    template<typename Assembler>
+    void
+    post_processing(const mesh_type& msh, const Assembler& assembler,
+                    const std::string & info,
+                    const problem_type& problem)
+    {
+        auto dim = Mesh::dimension;
+        auto rbs = revolution::vector_basis_size(di.reconstruction_degree(), dim, dim);
+
+        dynamic_vector<T> cell_sol(cbs * msh.cells_size());
+        dynamic_vector<T> cell_rec_sol(rbs * msh.cells_size());
+        dynamic_vector<T> press_vec(pbs * msh.cells_size());
+
+        std::ofstream ofs("data_" + info + ".data");
+        if (!ofs.is_open())
+            std::cout << "Error opening file"<<std::endl;
+
+        for(auto cl : msh)
+        {
+            auto gr  = revolution::make_hho_stokes(msh, cl, di, true);
+            auto cell_ofs = revolution::priv::offset(msh, cl);
+            vector_type svel =  assembler.take_velocity(msh, cl, sol_old);
+            assert((gr.first * svel).rows() == rbs - dim);
+            cell_rec_sol.block(cell_ofs * rbs + dim, 0, rbs - dim, 1) = gr.first * svel;
+            cell_rec_sol.block(cell_ofs * rbs, 0, dim, 1) = svel.block(0,0, dim, 1);
+            cell_sol.block(cell_ofs * cbs, 0, cbs, 1)     = svel.block(0,0, cbs, 1);
+
+            //this is only for k = 0, since there is only one velocity;
+            auto bar = barycenter(msh, cl);
+
+            //Velocity
+            vector_type cell_vel = svel.block(0,0, cbs, 1);
+            auto cb  = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
+            auto phi = cb.eval_functions(bar);
+            vector_type ueval = revolution::eval(cell_vel, phi);
+
+            //Pressure
+            vector_type spress =  assembler.take_pressure(msh, cl, sol_old);
+            auto pb  = revolution::make_scalar_monomial_basis(msh, cl, di.face_degree());
+            auto p_phi = pb.eval_functions(bar);
+            T peval =  p_phi.dot(spress);
+
+            /***********************************************************************/
+            #if 0
+            //Stress
+            auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
+            auto s_phi  = sb.eval_functions(bar);
+            auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
+            vector_type Gu = G.first * svel;
+
+            //*************************************************************
+            vector_type stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
+            vector_type theta  = stress  +  factor * alpha * Gu;
+            tensor_type theta_eval = revolution::eval(theta, s_phi);
+            tensor_type sigma_eval = revolution::eval(stress, s_phi);
+            //*************************************************************
+
+            //div
+            tensor_type grad_eval = revolution::eval(Gu, s_phi);
+            T divu = grad_eval(0,0) + grad_eval(1,1);
+
+            // tr_stress
+            T tr_stress = sigma_eval(0,0) + sigma_eval(1,1);
+            #endif
+
+            ofs << ueval(0)   << " " << ueval(1) << " " << peval<< " ";
+            //ofs << theta_eval.norm() << " " << sigma_eval.norm()   << " ";
+            //ofs << divu << " "<< tr_stress<<std::endl;
+            ofs <<std::endl;
+        }
+        ofs.close();
+
+        std::pair<point_type, point_type> p_x, p_y;
+        auto eps = 1.e-4;
+        p_y = std::make_pair(point_type({0.5 + eps, 0.0 + eps}), point_type({0.5 + eps, 1.0 + eps}));
+
+        //plot_over_line(msh, p_x, cell_rec_sol, di.reconstruction_degree(), "plot_over_x_" + info + ".data");
+        //plot_over_line(msh, p_y, cell_rec_sol, di.reconstruction_degree(), "plot_over_y_" + info + ".data");
+        plot_over_line(msh, p_y, cell_sol, di.cell_degree(), "plot_over_y_" + info + ".data");
+        compute_discontinuous_velocity( msh, cell_sol, di, "velocity_" + info +".msh");
+        save_coords(msh, "Coords_"+ info + ".data");
+        quiver( msh, sol_old, assembler, di, "quiver_"+ info + ".data");
+        return;
+    }
+
     bool
-    run_alg(const mesh_type& msh,  const problem_type& problem )
+    run_alg(const mesh_type& msh, const std::string& info, const problem_type& problem )
     {
         boundary_type bnd(msh);
 
@@ -372,13 +455,14 @@ public:
             //---------------------------------------------------------------------
             T cvg_total = std::sqrt(convergence.first + convergence.second);
 
-            //if(iter % 1000 == 0)
+            if(iter % 500 == 0)
                 std::cout << "  i : "<< iter <<"  - " << std::sqrt(cvg_total)<<std::endl;
 
             assert(cvg_total < Ninf);
             if( cvg_total < tolerance)
             {
                 std::cout << "  i : "<< iter <<"  - " << cvg_total <<std::endl;
+                post_processing( msh, assembler, info, problem);
                 return true;
             }
             sol_old = sol;
@@ -386,4 +470,5 @@ public:
         }
         return false;
     }
+
 };

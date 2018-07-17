@@ -304,7 +304,7 @@ public:
 
         //Theta
         auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
-        //barycenter only for k = 0; fix this for higher orders
+        //barycenter only for k = 0;
         auto bar = barycenter(msh, cl);
         auto s_phi  = sb.eval_functions(bar);
 
@@ -339,7 +339,7 @@ public:
         T conv_stress = 0.;
         T conv_gamma = 0.;
 
-        auto dim = Mesh::dimension;
+        const auto dim = Mesh::dimension;
 
         for(auto cl: msh)
         {
@@ -394,7 +394,7 @@ public:
         vector_type str_agam = stress - factor * alpha * gamma;
         matrix_type mm = revolution::make_mass_matrix(msh, cl, sb);
 
-        //rhs -=  G.first.transpose() * mm * str_agam;
+        rhs -=  G.first.transpose() * mm * str_agam;
 
         return rhs;
     }
