@@ -10,7 +10,7 @@
 
 #include "output/silo.hpp"
 
-#include "viscoplasticity_solver.hpp"
+#include "viscoplasticity_vector_solver_k0.hpp"
 template<typename T>
 auto
 run_viscoplasticity(size_t degree,

@@ -35,6 +35,73 @@
 
  using namespace revolution;
 
+ enum scalar_problem_type
+ {
+     CIRCULAR,
+     ANNULUS
+ };
+
+
+template<typename T>
+struct viscoplasticity_data
+{
+     viscoplasticity_data(): Lref(1.), Vref(1.), Bn(0.), mu(1.), alpha(1.),
+                         f(1.),  problem(CIRCULAR)
+     {}
+     T f;                    //WK: Cuidado porque f deberia ser el valor externo de la fuente.
+     T Lref;                 /* Charactetistic length */
+     T Vref;                 /* Reference velocity */
+     T Bn;                   /* Bingham number */
+     T mu;                   /* viscosity */
+     T alpha;                /* ALG parameter*/
+     scalar_problem_type problem;
+
+    friend std::ostream& operator<<(std::ostream& os, const viscoplasticity_data<T>& p)
+    {
+        os << "Viscoplastic data: "<<std::endl;
+        os << "* f      : "<< p.f<< std::endl;
+        os << "* Lref   : "<< p.Lref<< std::endl;
+        os << "* Vref   : "<< p.Vref<< std::endl;
+        os << "* mu     : "<< p.mu<< std::endl;
+        os << "* Bingham: "<< p.Bn<< std::endl;
+        os << "* alpha  : "<< p.alpha<< std::endl;
+        switch (p.problem)
+        {
+            case CIRCULAR:
+                 os << "* problem : CIRCULAR"<< std::endl;
+                 break;
+            case ANNULUS:
+                 os << "* problem : ANNULUS"<< std::endl;
+                 break;
+            default:
+                 os << "* problem : NOT SPECIFIED"<< std::endl;
+                 exit(1);
+        }
+        return os;
+    }
+};
+
+template<typename Mesh>
+auto
+make_scalar_solution_offset(const Mesh& msh, const hho_degree_info& hdi)
+{
+    auto cbs = scalar_basis_size( hdi.cell_degree(), Mesh::dimension);
+    auto fbs = scalar_basis_size( hdi.face_degree(), Mesh::dimension-1);
+    auto ret = std::vector<size_t>(msh.cells_size());
+
+    size_t sum = 0;
+    size_t cl_id = 0;
+
+    for(auto cl : msh)
+    {
+        ret.at(cl_id++) = sum;
+        auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
+        sum += num_total_dofs;
+    }
+    return ret;
+}
+
+
  template<typename Mesh>
  class tensors_at_quad_pts_utils
  {

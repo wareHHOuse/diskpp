@@ -42,7 +42,7 @@
 
 #include "output/silo.hpp"
 
-#include "viscoplasticity_solver_higher_scalar.hpp"
+#include "viscoplasticity_vector_solver.hpp"
 template<typename T>
 auto
 run_viscoplasticity(size_t degree,
@@ -56,13 +56,9 @@ run_viscoplasticity(size_t degree,
     std::string name, filename;
     switch (problem)
     {
-        case CIRCULAR:
-            name = "circular";
-            filename = "../../../*******DEFINE***";
-            break;
-        case ANNULUS:
-            name = "ANNULUS";
-            filename = "../../../*******DEFINE***";
+        case DRIVEN:
+            name = "driven";
+            filename = "../../../diskpp/meshes/2D_quads/medit/square_h005.medit2d";
             break;
         default:
             std::cout << "wrong arguments" << std::endl;
@@ -76,7 +72,7 @@ run_viscoplasticity(size_t degree,
 
     std::string info = name + "_k" + tostr(degree) + "_a" + tostr(alpha);
 
-    hho_degree_info hdi(degree, degree);
+    hho_degree_info hdi(degree , degree);
     augmented_lagrangian_viscoplasticity<mesh_type> als(msh, hdi, alpha);
 
     if(!als.run_alg(msh, info, problem))
