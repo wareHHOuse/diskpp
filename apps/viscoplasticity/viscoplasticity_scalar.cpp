@@ -41,10 +41,14 @@
 #include "output/postMesh.hpp"
 
 #include "output/silo.hpp"
+#include "contrib/sol2/sol.hpp"
+#include "contrib/timecounter.h"
+#include "contrib/colormanip.h"
 
 #include "viscoplasticity_scalar_solver.hpp"
 
 
+#include "core/output/hdf5_io.hpp"
 auto
 run_viscoplasticity(const std::string& config_fn)
 {
@@ -55,7 +59,7 @@ run_viscoplasticity(const std::string& config_fn)
     sol::state lua;
     lua.open_libraries(sol::lib::math, sol::lib::base);
     lua["config"] = lua.create_table();
-    lua["vpst"]    = lua.create_table();
+    lua["vpst"]   = lua.create_table();
 
     auto r = lua.do_file(config_fn);
 	if ( !r.valid() )
@@ -78,21 +82,27 @@ run_viscoplasticity(const std::string& config_fn)
     typedef disk::generic_mesh<T, 2>  mesh_type;
 
 
-    vp.alpha = lua["vpst"]["alpha"].get_or(vp_init.alpha);
+    std::string alpha = lua["vpst"]["alpha"];
+    std::string Bn = lua["vpst"]["Bn"];
+
+    vp.alpha = atof(alpha.c_str());
     vp.Lref  = lua["vpst"]["Lref"].get_or(vp_init.Lref);
     vp.Vref  = lua["vpst"]["Vref"].get_or(vp_init.Vref);
     vp.mu    = lua["vpst"]["mu"].get_or(vp_init.mu);
-    vp.Bn    = lua["vpst"]["Bn"].get_or(vp_init.Bn);
+    vp.Bn    = atof(Bn.c_str()); //lua["vpst"]["Bn"].get_or(vp_init.Bn);
     vp.f     = lua["vpst"]["f"].get_or(vp_init.f);
 
     std::string name = lua["vpst"]["problem"];
     if( name == "circular")    { vp.problem  =  CIRCULAR;}
     else if(name == "annulus") { vp.problem  =  ANNULUS; }
+    else if(name == "square") { vp.problem  =  SQUARE; }
     else
     {
-        std::cout << "Problem must be {circular, annulus}. Falling back to circular" << std::endl;
+        std::cout << "Problem must be {circular, annulus, circular}. Falling back to circular" << std::endl;
         vp.problem = CIRCULAR;
     }
+
+    std::cout << vp << std::endl;
 
     /* Medit 2d*/
     if (std::regex_match(input_mesh, std::regex(".*\\.medit2d$")))
@@ -107,6 +117,29 @@ run_viscoplasticity(const std::string& config_fn)
         loader.read_mesh(input_mesh);
         loader.populate_mesh(msh);
         //#endif
+
+        augmented_lagrangian_viscoplasticity<mesh_type> als(msh, hdi, vp);
+        if(!als.run_alg(msh))
+            std::cout << "No convergence" << std::endl;
+
+        return true;
+    }
+
+
+    if (std::regex_match(input_mesh, std::regex(".*\\.mesh2d$") ))
+    {
+        std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
+
+        typedef disk::simplicial_mesh<T, 2>  mesh_type;
+
+        mesh_type msh;
+        disk::netgen_mesh_loader<T, 2> loader;
+        if (!loader.read_mesh(input_mesh))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            return false;
+        }
+        loader.populate_mesh(msh);
 
         augmented_lagrangian_viscoplasticity<mesh_type> als(msh, hdi, vp);
         if(!als.run_alg(msh))

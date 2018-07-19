@@ -63,15 +63,18 @@ make_bnd(const Mesh& msh, const scalar_problem_type& problem)
     switch(problem)
     {
         case ANNULUS:
-            bnd.addDirichletBC(disk::mechanics::DIRICHLET,2, zero_fun); //TOP
-            bnd.addDirichletBC(disk::mechanics::DIRICHLET,4, zero_fun); //TOP
-            bnd.addNeumannBC(disk::mechanics::NEUMANN, 1, zero_fun); //
-            bnd.addNeumannBC(disk::mechanics::NEUMANN, 3, zero_fun); //
+            //bnd.addDirichletEverywhere(zero_fun); //TOP
+            //#if 0
+            bnd.addDirichletBC(disk::mechanics::DIRICHLET,1, zero_fun); //TOP
+            bnd.addNeumannBC(disk::mechanics::NEUMANN, 2, zero_fun); //
+            //#endif
             break;
         case CIRCULAR:
             bnd.addDirichletBC(disk::mechanics::DIRICHLET,2, zero_fun); //TOP
             bnd.addNeumannBC(disk::mechanics::NEUMANN, 1, zero_fun); //
-            bnd.addNeumannBC(disk::mechanics::NEUMANN, 3, zero_fun); //
+            break;
+        case SQUARE:
+            bnd.addDirichletEverywhere(zero_fun); //TOP
             break;
         default:
             throw std::invalid_argument("No  defined problem");
@@ -107,12 +110,9 @@ class augmented_lagrangian_viscoplasticity
     typedef std::function<T   (const point_type &)>             scalar_funtion_type;
 
     hho_degree_info di;
-    T             viscosity;
-    T             alpha;
     T             yield;
     size_t        cbs, fbs, sbs;
 
-    scalar_funtion_type                     rhs_fun;
     tensors_at_quad_pts_utils<mesh_type>    tsr_utils;
     std::vector<std::pair<size_t, size_t>>  tsr_offsets_vector;
     std::vector<size_t>                     sol_offset_map;
@@ -130,7 +130,7 @@ public:
                             const viscoplasticity_data<T>& vpst_parameters):
                             di(hdi), vp(vpst_parameters)
     {
-        yield   =  vp.Bn * vp.f * vp.Lref; // * vp.mu;// * omegaExt; //* f * Lref;
+        yield   =  vp.Bn * vp.f * vp.Lref / 2.; // * vp.mu;// * omegaExt; //* f * Lref;
 
         const auto dim =  Mesh::dimension;
 
@@ -141,20 +141,25 @@ public:
         size_t quad_degree = 2. * di.face_degree();
         tsr_utils = tensors_at_quad_pts_utils<mesh_type>(msh, quad_degree);
         tsr_offsets_vector = tsr_utils.offsets_vector();
-        sol_offset_map = make_scalar_solution_offset(msh, di);
+        auto pair_offset_map = make_scalar_solution_offset(msh, di);
+        auto total_dofs = pair_offset_map.first;
+        sol_offset_map = pair_offset_map.second;
+
+        full_sol = dynamic_vector<T>::Zero(total_dofs);
+        full_sol_old = dynamic_vector<T>::Zero(total_dofs);
     };
 
     matrix_type
     compute_auxiliar(   const mesh_type& msh,
                         const cell_type& cl,
-                        const vector_type& full_solution)
+                        const dynamic_vector<T>& full_solution)
     {
         auto cl_id = msh.lookup( cl);
         auto num_total_dofs = cbs + fbs * howmany_faces(msh, cl);
         auto sol_offset     = sol_offset_map.at(cl_id);
         vector_type u_TF    = full_solution.block(sol_offset, 0, num_total_dofs, 1);
 
-        auto value = 1./(viscosity + alpha);
+        auto value = 1./(vp.mu + vp.alpha);
         auto G = make_hlow_scalar_laplacian(msh, cl, di);
         vector_type   Gu = G.first * u_TF;
 
@@ -173,7 +178,7 @@ public:
         {
             auto s_phi  = sb.eval_functions(qp.point());
             vector_type stress_qp = stress.block( 0, qp_count, sbs, 1);
-            vector_type theta     = stress_qp  +  alpha * Gu;
+            vector_type theta     = stress_qp  +  vp.alpha * Gu;
 
             tensor_type theta_eval = revolution::eval(theta, s_phi);
 
@@ -220,12 +225,12 @@ public:
             //gamma updating for next iteration
             auxiliar.block(0, offset, sbs, qps.size()) = gamma_now;
 
-            matrix_type     diff_gamma  =   alpha * (gamma_now - gamma_old);
-            matrix_type     diff_stress = - alpha *  gamma_now;
+            matrix_type     diff_gamma  =   vp.alpha * (gamma_now - gamma_old);
+            matrix_type     diff_stress = - vp.alpha *  gamma_now;
 
             //Update multiplier
             for(size_t i = 0; i < qps.size(); i++)
-                diff_stress.block(0, i++, sbs, 1) += alpha *  Gu;
+                diff_stress.block(0, i++, sbs, 1) += vp.alpha *  Gu;
             multiplier.block(0, offset, sbs, qps.size()) += diff_stress;
 
             //Error computations
@@ -273,11 +278,12 @@ public:
         matrix_type stress = multiplier.block(0, offset, sbs, qps.size());
         matrix_type gamma  = compute_auxiliar(msh, cl, full_sol_old);
 
-        matrix_type str_agam = stress -  alpha * gamma;
+        matrix_type str_agam = stress -  vp.alpha * gamma;
         vector_type rhs = vector_type::Zero(cbs + num_faces * fbs);
 
         size_t qp_count = 0;
 
+        //#if 0
         for(auto& qp: qps)
         {
             auto s_phi  = sb.eval_functions(qp.point());
@@ -288,9 +294,10 @@ public:
             rhs -= qp.weight() * G.first.transpose() * mm * str_agam_qp;
             qp_count++;
         }
-
+        //#endif
 
         //(f, v_T)
+        auto rhs_fun = make_rhs_functor(msh, vp.problem);
         rhs.block( 0, 0, cbs, 1) += make_rhs(msh, cl, cb, rhs_fun);
 
         return rhs;
@@ -300,6 +307,8 @@ public:
     void
     make_global_rhs(const mesh_type& msh, Assembler& assembler)
     {
+        //std::cout << "START GLOBAL RHS" << std::endl;
+
         assembler.initialize_rhs();
 
         for (auto cl : msh)
@@ -307,13 +316,15 @@ public:
             auto G  = make_hlow_scalar_laplacian(msh, cl, di);
             auto gr = make_hho_scalar_laplacian(msh, cl, di);
             matrix_type stab = make_hho_scalar_stabilization(msh, cl, gr.first, di);
-            matrix_type A   = alpha * G.second + viscosity * stab;
+            matrix_type A   = vp.alpha * G.second + vp.mu * stab;
             vector_type rhs = make_rhs_alg(msh, cl, assembler);
 
             auto sc  = diffusion_static_condensation_compute_full(msh, cl, di, A, rhs);
             assembler.assemble_rhs(msh, cl, sc.second);
         }
         assembler.finalize_rhs();
+
+        //std::cout << "END GLOBAL RHS" << std::endl;
 
         return;
     }
@@ -322,6 +333,8 @@ public:
     void
     make_global_matrix(const mesh_type& msh, Assembler& assembler)
     {
+        //std::cout << "START GLOBAL MATTRIX" << std::endl;
+
         assembler.initialize_lhs();
 
         for (auto cl : msh)
@@ -329,7 +342,7 @@ public:
             auto G  = make_hlow_scalar_laplacian(msh, cl, di);
             auto gr = make_hho_scalar_laplacian(msh, cl, di);
             matrix_type stab   = make_hho_scalar_stabilization(msh, cl, gr.first, di);
-            matrix_type A = alpha * G.second + viscosity * stab;
+            matrix_type A = vp.alpha * G.second + vp.mu * stab;
 
             vector_type rhs_zero = vector_type::Zero(A.rows());
             auto sc  = diffusion_static_condensation_compute(msh, cl, di, A, rhs_zero);
@@ -338,6 +351,8 @@ public:
 
         assembler.finalize_lhs();
 
+        //std::cout << "END GLOBAL MATTRIX" << std::endl;
+
         return;
     }
 
@@ -345,13 +360,15 @@ public:
     auto
     recover_solution(const mesh_type& msh, const Assembler& assembler, const dynamic_vector<T>& sol)
     {
+        //std::cout << "START RECOVER SOLUTION" << std::endl;
+
         size_t cl_id  = 0;
         for (auto& cl : msh)
         {
             auto G  = make_hlow_scalar_laplacian(msh, cl, di);
             auto gr = make_hho_scalar_laplacian(msh, cl, di);
             matrix_type stab = make_hho_scalar_stabilization(msh, cl, gr.first, di);
-            matrix_type A   = alpha * G.second + viscosity * stab;
+            matrix_type A   = vp.alpha * G.second + vp.mu * stab;
             vector_type rhs = make_rhs_alg(msh, cl, assembler);
 
             vector_type cell_rhs = rhs.block( 0, 0, cbs, 1);
@@ -363,6 +380,7 @@ public:
             auto num_total_dofs = cbs + fbs * howmany_faces(msh, cl);
             full_sol.block(sol_offset, 0, num_total_dofs, 1) = ufull;
         }
+        //std::cout << "END RECOVER SOLUTION" << std::endl;
 
         return;
     }
@@ -372,6 +390,7 @@ public:
     post_processing(const mesh_type& msh, const Assembler& assembler,
                     const std::string & info)
     {
+        //std::cout << "START POST-PROCESSING" << std::endl;
         auto dim = Mesh::dimension;
         auto rbs = scalar_basis_size(di.reconstruction_degree(), dim);
 
@@ -410,6 +429,7 @@ public:
         }
         ofs.close();
 
+        //std::cout << "END POST-PROCESSING" << std::endl;
         return;
     }
 
@@ -418,7 +438,6 @@ public:
     {
         std::string info = "_k" + tostr(di.face_degree()) + "_a" + tostr(vp.alpha);
 
-        rhs_fun = make_rhs_functor(msh, vp.problem);
         boundary_type bnd = make_bnd(msh, vp.problem);
 
         auto assembler = revolution::make_diffusion_assembler_alg(msh, di, bnd);
@@ -457,7 +476,7 @@ public:
             //---------------------------------------------------------------------
             T cvg_total = std::sqrt(convergence.first + convergence.second);
 
-            if(iter % 500 == 0)
+            if(iter % 100 == 0)
                 std::cout << "  i : "<< iter <<"  - " << std::sqrt(cvg_total)<<std::endl;
 
             assert(cvg_total < Ninf);

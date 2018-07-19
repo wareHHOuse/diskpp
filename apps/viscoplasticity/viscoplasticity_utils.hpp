@@ -7,7 +7,6 @@
  *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
  *
  * This file is copyright of the following authors:
- * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
  * Karol Cascavita (C) 2018                     karol.cascavita@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
@@ -23,23 +22,24 @@
  * Journal of Computational and Applied Mathematics.
  * DOI: 10.1016/j.cam.2017.09.017
  */
- #include <iostream>
- #include <iomanip>
- #include <regex>
+#include <iostream>
+#include <iomanip>
+#include <regex>
 
- #include <unistd.h>
+#include <unistd.h>
 
- #include "revolution/bases"
- #include "revolution/quadratures"
- #include "revolution/methods/hho"
+#include "revolution/bases"
+#include "revolution/quadratures"
+#include "revolution/methods/hho"
 
- using namespace revolution;
+using namespace revolution;
 
- enum scalar_problem_type
- {
-     CIRCULAR,
-     ANNULUS
- };
+enum scalar_problem_type
+{
+    CIRCULAR,
+    ANNULUS,
+    SQUARE
+};
 
 
 template<typename T>
@@ -68,11 +68,15 @@ struct viscoplasticity_data
         switch (p.problem)
         {
             case CIRCULAR:
-                 os << "* problem : CIRCULAR"<< std::endl;
-                 break;
+                os << "* problem : CIRCULAR"<< std::endl;
+                break;
             case ANNULUS:
-                 os << "* problem : ANNULUS"<< std::endl;
-                 break;
+                os << "* problem : ANNULUS"<< std::endl;
+                break;
+            case SQUARE:
+                os << "* problem : SQUARE"<< std::endl;
+                break;
+
             default:
                  os << "* problem : NOT SPECIFIED"<< std::endl;
                  exit(1);
@@ -87,18 +91,18 @@ make_scalar_solution_offset(const Mesh& msh, const hho_degree_info& hdi)
 {
     auto cbs = scalar_basis_size( hdi.cell_degree(), Mesh::dimension);
     auto fbs = scalar_basis_size( hdi.face_degree(), Mesh::dimension-1);
-    auto ret = std::vector<size_t>(msh.cells_size());
+    auto map = std::vector<size_t>(msh.cells_size());
 
     size_t sum = 0;
     size_t cl_id = 0;
 
     for(auto cl : msh)
     {
-        ret.at(cl_id++) = sum;
-        auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
-        sum += num_total_dofs;
+        map.at(cl_id++) = sum;
+        auto cell_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
+        sum += cell_total_dofs;
     }
-    return ret;
+    return std::make_pair(sum, map);
 }
 
 
