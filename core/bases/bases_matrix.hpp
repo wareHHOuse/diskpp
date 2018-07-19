@@ -30,7 +30,6 @@
 #include <vector>
 
 #include "common/eigen.hpp"
-#include "bases/bases_scalar.hpp"
 
 
 namespace disk

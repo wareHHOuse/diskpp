@@ -26,8 +26,8 @@
 
 #pragma once
 
-#include "bases_matrix.hpp"
 #include "bases_scalar.hpp"
-#include "bases_utils.hpp"
+#include "bases_matrix.hpp"
 #include "bases_vector.hpp"
-#include "methods/implementation_bits/bases_utils.hpp"
+#include "bases_utils.hpp"
+
