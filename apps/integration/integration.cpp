@@ -29,7 +29,7 @@
 #include "loaders/loader.hpp"
 
 #include "core/bases/bases.hpp"
-#include "revolution/quadratures"
+#include "quadratures/quadratures.hpp"
 
 
 template<typename MeshType>

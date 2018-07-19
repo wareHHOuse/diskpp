@@ -27,7 +27,7 @@
 #include <regex>
 
 #include "bases/bases.hpp"
-#include "revolution/quadratures"
+#include "quadratures/quadratures.hpp"
 #include "methods/hho"
 
 #include "loaders/loader.hpp"

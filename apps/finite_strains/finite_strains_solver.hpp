@@ -31,7 +31,7 @@
 
 #include "bases/bases.hpp"
 #include "methods/hho"
-#include "revolution/quadratures"
+#include "quadratures/quadratures.hpp"
 
 #include "Informations.hpp"
 #include "NewtonSolver/newton_solver.hpp"

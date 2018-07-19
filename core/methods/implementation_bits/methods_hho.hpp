@@ -32,7 +32,7 @@
 
 #include "common/eigen.hpp"
 #include "bases/bases.hpp"
-#include "revolution/quadratures"
+#include "quadratures/quadratures.hpp"
 #include "mechanics/BoundaryConditions.hpp"
 
 using namespace Eigen;

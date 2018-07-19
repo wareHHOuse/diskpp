@@ -32,7 +32,7 @@
 #include "mechanics/behaviors/maths_tensor.hpp"
 #include "mechanics/behaviors/maths_utils.hpp"
 #include "bases/bases.hpp"
-#include "revolution/quadratures"
+#include "quadratures/quadratures.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>

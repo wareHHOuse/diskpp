@@ -32,7 +32,7 @@
 
 #include "loaders/loader.hpp"
 #include "bases/bases.hpp"
-#include "revolution/quadratures"
+#include "quadratures/quadratures.hpp"
 
 #include "timecounter.h"
 

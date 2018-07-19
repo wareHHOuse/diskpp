@@ -26,7 +26,7 @@
 #pragma once
 
 #include "common/eigen.hpp"
-#include "revolution/quadratures"
+#include "quadratures/quadratures.hpp"
 
 using namespace Eigen;
 

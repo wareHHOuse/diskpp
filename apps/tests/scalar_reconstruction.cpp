@@ -33,7 +33,7 @@
 #include <xmmintrin.h>
 //#define EIGEN_USE_MKL_ALL
 #include "bases/bases.hpp"
-#include "revolution/quadratures"
+#include "quadratures/quadratures.hpp"
 #include "methods/hho"
 
 #include "core/loaders/loader.hpp"
