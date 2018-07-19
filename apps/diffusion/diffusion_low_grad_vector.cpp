@@ -10,7 +10,7 @@
 
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
-#include "revolution/methods/hho"
+#include "methods/hho"
 #include "solvers/solver.hpp"
 
 /***************************************************************************/
@@ -106,7 +106,7 @@ auto make_solution_function(const Mesh& msh)
     return solution_functor<Mesh>();
 }
 
-using namespace revolution;
+using namespace disk;
 
 #if 0
 template<typename Mesh, typename T>

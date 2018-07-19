@@ -32,9 +32,9 @@
 
 #include <xmmintrin.h>
 
-#include "revolution/bases"
+#include "bases/bases.hpp"
 #include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -56,16 +56,16 @@ struct test_functor
 
         auto f = make_scalar_testing_data(msh);
 
-        typename revolution::hho_degree_info hdi(degree);
+        typename disk::hho_degree_info hdi(degree);
 
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            auto gr = revolution::make_hho_scalar_laplacian(msh, cl, hdi);
-            auto stab = revolution::make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
-            //auto stab = revolution::make_hdg_scalar_stabilization(msh, cl, hdi);
+            auto gr = disk::make_hho_scalar_laplacian(msh, cl, hdi);
+            auto stab = disk::make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+            //auto stab = disk::make_hdg_scalar_stabilization(msh, cl, hdi);
 
-            Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, hdi, f);
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f);
 
             error += proj.dot(stab*proj);
         }

@@ -160,7 +160,7 @@ class LinearIsotropicAndKinematicHardening_qp
     scalar_type
     sigmaeq(const static_matrix_type3D& dev) const
     {
-        return sqrt(scalar_type(1.5) * mm_prod(dev, dev));
+        return sqrt(scalar_type(1.5) * dev.squaredNorm());
     }
 
     static_matrix_type3D

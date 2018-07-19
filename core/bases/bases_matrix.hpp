@@ -30,10 +30,10 @@
 #include <vector>
 
 #include "common/eigen.hpp"
+#include "bases/bases_scalar.hpp"
 
-using namespace Eigen;
 
-namespace revolution
+namespace disk
 {
 
 /* Compute the size of a matrix basis of degree k in dimension d. */
@@ -206,7 +206,6 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell>
 {
-
 
   public:
     typedef Mesh<T, 2, Storage>              mesh_type;
@@ -415,7 +414,7 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
         eigen_compatible_stdvector<function_type> ret;
         ret.reserve(basis_size);
 
-        auto phi = scalar_basis.eval_functions(pt);
+        auto              phi     = scalar_basis.eval_functions(pt);
         const scalar_type invrac2 = 1.0 / std::sqrt(2.0);
 
         for (int k = 0; k < scalar_basis.size(); k++)
@@ -487,7 +486,7 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
         eigen_compatible_stdvector<function_type> ret;
         ret.reserve(basis_size);
 
-        auto phi = scalar_basis.eval_functions(pt);
+        auto              phi     = scalar_basis.eval_functions(pt);
         const scalar_type invrac2 = 1.0 / std::sqrt(2.0);
 
         for (int k = 0; k < scalar_basis.size(); k++)
@@ -557,7 +556,7 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
         eigen_compatible_stdvector<function_type> ret;
         ret.reserve(basis_size);
 
-        auto phi = scalar_basis.eval_functions(pt);
+        auto              phi     = scalar_basis.eval_functions(pt);
         const scalar_type invrac2 = 1.0 / std::sqrt(2.0);
 
         for (int k = 0; k < scalar_basis.size(); k++)
@@ -628,7 +627,7 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
         eigen_compatible_stdvector<function_type> ret;
         ret.reserve(basis_size);
 
-        auto phi = scalar_basis.eval_functions(pt);
+        auto              phi     = scalar_basis.eval_functions(pt);
         const scalar_type invrac2 = 1.0 / std::sqrt(2.0);
 
         for (int k = 0; k < scalar_basis.size(); k++)
@@ -667,4 +666,4 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
     }
 };
 
-} // namespace revolution
+} // namespace disk

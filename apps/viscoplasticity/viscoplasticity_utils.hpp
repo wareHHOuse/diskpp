@@ -29,9 +29,9 @@
 
  #include <unistd.h>
 
- #include "revolution/bases"
+ #include "bases/bases.hpp"
  #include "revolution/quadratures"
- #include "revolution/methods/hho"
+ #include "methods/hho"
 
  template< typename T>
  std::string
@@ -229,11 +229,11 @@ plot_over_line(const Mesh    & msh,
         {
             if(wn_PnPoly( msh, cl, p))
             {
-                auto cbs   = revolution::vector_basis_size(cell_degree, dim, dim);
-                auto cell_ofs = revolution::priv::offset(msh, cl);
+                auto cbs   = disk::vector_basis_size(cell_degree, dim, dim);
+                auto cell_ofs = disk::priv::offset(msh, cl);
 
                 vector_type s = vec.block(cell_ofs * cbs, 0, cbs, 1);
-                auto cb  = revolution::make_vector_monomial_basis(msh, cl, cell_degree);
+                auto cb  = disk::make_vector_monomial_basis(msh, cl, cell_degree);
                 auto phi = cb.eval_functions(p);
                 vector_type vel = phi.transpose() * s;
                 pfs<< p.x() << " "<< p.y() << " "<< vel(0) << " "<< vel(1)<< std::endl;
@@ -249,7 +249,7 @@ template<typename Mesh>
 void
 compute_discontinuous_velocity(const Mesh& msh,
                         const dynamic_vector< typename Mesh::scalar_type>& sol,
-                        const typename revolution::hho_degree_info& hdi,
+                        const typename disk::hho_degree_info& hdi,
                         const std::string& filename)
 {
     typedef Mesh mesh_type;
@@ -257,7 +257,7 @@ compute_discontinuous_velocity(const Mesh& msh,
     auto dim = Mesh::dimension;
 
     const size_t cell_degree   = hdi.cell_degree();
-    const size_t cbs = revolution::vector_basis_size(cell_degree,
+    const size_t cbs = disk::vector_basis_size(cell_degree,
                                     dim, dim);
     // compute mesh for post-processing
     disk::PostMesh<mesh_type> post_mesh = disk::PostMesh<mesh_type>(msh);
@@ -277,11 +277,11 @@ compute_discontinuous_velocity(const Mesh& msh,
 
     for (auto& cl : msh)
     {
-        auto cell_ofs = revolution::priv::offset(msh, cl);
+        auto cell_ofs = disk::priv::offset(msh, cl);
         Matrix<T, Dynamic, 1> x = sol.block(cell_ofs * cbs, 0, cbs, 1);
 
         const auto cell_nodes = post_mesh.nodes_cell(cell_i);
-        auto  cbas = revolution::make_vector_monomial_basis(msh, cl, cell_degree);
+        auto  cbas = disk::make_vector_monomial_basis(msh, cl, cell_degree);
 
        // Loop on the nodes of the cell
         for (auto& point_id : cell_nodes)
@@ -290,7 +290,7 @@ compute_discontinuous_velocity(const Mesh& msh,
 
             const auto phi = cbas.eval_functions(pt);
             assert(phi.rows() == cbs);
-            const auto depl = revolution::eval(x, phi);
+            const auto depl = disk::eval(x, phi);
 
             // Add displacement at node
             value[point_id].first++;
@@ -329,22 +329,22 @@ int sgn(T val) {
 template<typename Mesh, typename T, typename Assembler>
 void
 quiver( const Mesh& msh, const dynamic_vector<T>& sol, const Assembler& assembler,
-        const typename revolution::hho_degree_info & di, const std::string& filename)
+        const typename disk::hho_degree_info & di, const std::string& filename)
 {
     std::ofstream ofs(filename);
 
     if (!ofs.is_open())
         std::cout << "Error opening errors "<<std::endl;
 
-    auto cbs = revolution::vector_basis_size(di.cell_degree(),
+    auto cbs = disk::vector_basis_size(di.cell_degree(),
                                         Mesh::dimension, Mesh::dimension);
     for (auto& cl: msh)
     {
-        auto cell_ofs = revolution::priv::offset(msh, cl);
+        auto cell_ofs = disk::priv::offset(msh, cl);
         Matrix<T, Dynamic, 1>  s = assembler.take_velocity(msh, cl, sol);
 
-        auto cb  = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
-        auto qps =  revolution::integrate(msh, cl, 2 * di.face_degree());
+        auto cb  = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
+        auto qps =  disk::integrate(msh, cl, 2 * di.face_degree());
         for (auto& qp : qps)
         {
             Matrix<T, Dynamic, 2>  phi = cb.eval_functions(qp.point());

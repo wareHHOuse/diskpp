@@ -1,10 +1,14 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
- *      /__\       matteo.cicuttin@enpc.fr
- *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
- *    /\    /\
- *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
- *  /_\/_\/_\/_\   methods.
+ *       /\         DISK++, a template library for DIscontinuous SKeletal
+ *      /__\        methods.
+ *     /_\/_\
+ *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
+ *   /__\  /__\     matteo.cicuttin@enpc.fr
+ *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
+ *
+ * This file is copyright of the following authors:
+ * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
+ * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -28,8 +32,7 @@
 #include <Eigen/Eigenvalues>
 
 #include "loaders/loader.hpp"
-#include "cfem/cfem.hpp"
-#include "hho/hho.hpp"
+#include "methods/hho"
 #include "output/silo.hpp"
 #include "solvers/solver.hpp"
 
@@ -45,28 +48,9 @@ estimate_element_cond(sol::state& lua, const Mesh& msh)
     typedef typename mesh_type::cell                   cell_type;
     typedef typename mesh_type::face                   face_type;
 
-    typedef disk::quadrature<mesh_type, cell_type>      cell_quadrature_type;
-    typedef disk::quadrature<mesh_type, face_type>      face_quadrature_type;
+    size_t  degree  = lua["config"]["degree"].get_or(1);
 
-    typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
-    typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
-
-    typedef
-    disk::basis_quadrature_data<mesh_type,
-                                disk::scaled_monomial_scalar_basis,
-                                disk::quadrature> bqdata_type;
-
-    typedef disk::gradient_reconstruction_bq<bqdata_type>               gradrec_type;
-    typedef disk::diffusion_like_stabilization_bq<bqdata_type>          stab_type;
-    typedef disk::diffusion_like_static_condensation_bq<bqdata_type>    statcond_type;
-
-    size_t          degree      = lua["config"]["degree"].get_or(1);
-
-    auto bqd = bqdata_type(degree, degree);
-
-    auto gradrec    = gradrec_type(bqd);
-    auto stab       = stab_type(bqd);
-    auto statcond   = statcond_type(bqd);
+    disk::hho_degree_info hdi(degree);
 
     auto lua_rhs_fun = lua["right_hand_side"];
     if ( !lua_rhs_fun.valid() )
@@ -75,21 +59,19 @@ estimate_element_cond(sol::state& lua, const Mesh& msh)
         return false;
     }
 
-    auto f = [&](const typename mesh_type::point_type& pt) -> scalar_type {
-        return lua_rhs_fun(pt.x(), pt.y());
-    };
+    auto rhs_fun = [&](const typename mesh_type::point_type& pt) -> scalar_type { return lua_rhs_fun(pt.x(), pt.y()); };
 
     for (auto& cl : msh)
     {
-        gradrec.compute(msh, cl);
-        stab.compute(msh, cl, gradrec.oper);
-        auto cell_rhs = disk::compute_rhs<cell_basis_type, cell_quadrature_type>(msh, cl, f, degree);
-        dynamic_matrix<scalar_type> loc = gradrec.data + stab.data;
-        auto scnp = statcond.compute(msh, cl, loc, cell_rhs);
+        const auto cb   = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        const auto gr   = make_hho_scalar_laplacian(msh, cl, hdi);
+        const auto stab = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+        const auto rhs  = make_rhs(msh, cl, cb, rhs_fun);
+        const auto A    = gr.second + stab;
 
-        auto cbs = bqd.cell_basis.size();
+        auto cbs = cb.size();
+        auto cloc = A.block(0,0,cbs,cbs);
 
-        auto cloc = loc.block(0,0,cbs,cbs);
         Eigen::JacobiSVD<dynamic_matrix<scalar_type>> svd(cloc);
         auto sigma_max = svd.singularValues()(0);
         auto sigma_min = svd.singularValues()(svd.singularValues().size()-1);

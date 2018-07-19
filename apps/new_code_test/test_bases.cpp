@@ -27,9 +27,9 @@
 #include <iostream>
 #include <regex>
 
-#include "revolution/bases"
+#include "bases/bases.hpp"
 #include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -80,7 +80,7 @@ test_bases(const Mesh& msh)
         return ret;
     };
 
-    typename revolution::hho_degree_info hdi(degree);
+    typename disk::hho_degree_info hdi(degree);
 
     for(auto cl : msh)
     {
@@ -201,7 +201,7 @@ int main(int argc, char **argv)
         test_bases(msh);
     }
 
-/*
+
     if (std::regex_match(filename, std::regex(".*\\.quad$") ))
     {
         std::cout << "Guessed mesh format: Cartesian 2D" << std::endl;
@@ -219,7 +219,7 @@ int main(int argc, char **argv)
 
         test_bases(msh);
     }
-    */
+
 
     return 0;
 }

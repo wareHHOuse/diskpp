@@ -22,15 +22,16 @@
  * Journal of Computational and Applied Mathematics.
  * DOI: 10.1016/j.cam.2017.09.017
  */
+
  #include <iostream>
  #include <iomanip>
  #include <regex>
 
  #include <unistd.h>
 
- #include "revolution/bases"
+ #include "bases/bases.hpp"
  #include "revolution/quadratures"
- #include "revolution/methods/hho"
+ #include "methods/hho"
 
  #include "core/loaders/loader.hpp"
 
@@ -419,7 +420,7 @@ int main(int argc, char **argv)
 
     int ch;
     algorithm_parameters<T> ap;
-    size_t degree = 1;
+    int degree = 1;
 
     while ( (ch = getopt(argc, argv, "k:g:npzfc")) != -1 )
     {

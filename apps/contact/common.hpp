@@ -30,9 +30,9 @@
 
 #include <unistd.h>
 
-#include "revolution/bases"
+#include "bases/bases.hpp"
 #include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -45,7 +45,7 @@
 
 #include "cfem/cfem.hpp"
 
-using namespace revolution;
+using namespace disk;
 
 enum method_type
 {
@@ -535,7 +535,7 @@ make_hho_heaviside_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
             auto cb  = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
             auto n = normal(msh, cl, fc);
             matrix_type stiff_n = matrix_type::Zero(rbs -1, rbs -1);
-            matrix_type mm  = revolution::make_mass_matrix(msh, fc, cb);
+            matrix_type mm  = disk::make_mass_matrix(msh, fc, cb);
 
             auto qps = integrate(msh, fc, 2 * recdeg);
             for (auto& qp : qps)

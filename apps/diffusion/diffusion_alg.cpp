@@ -30,9 +30,9 @@
 
 #include <unistd.h>
 
-#include "revolution/bases"
+#include "bases/bases.hpp"
 #include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -65,7 +65,7 @@ class augmented_lagrangian_diffusion
     vector_type             multiplier;
     vector_type             auxiliar;
     Matrix<scalar_type, Dynamic, 1> rhs_all;
-    typename revolution::hho_degree_info di;
+    typename disk::hho_degree_info di;
     scalar_type             viscosity;
     scalar_type             alpha;
     size_t                  cbs, fbs, sbs;
@@ -74,7 +74,7 @@ public:
     scalar_type             convergence;
 
     augmented_lagrangian_diffusion(const Mesh& msh,
-                            const typename revolution::hho_degree_info & hdi):
+                            const typename disk::hho_degree_info & hdi):
                             di(hdi)
     {
         rhs_fun = [](const point_type& pt) -> scalar_type
@@ -96,9 +96,9 @@ public:
         convergence = 0.;
         auto dim =  Mesh::dimension;
 
-        cbs = revolution::scalar_basis_size(di.cell_degree(), dim);
-        fbs = revolution::scalar_basis_size(di.face_degree(), dim - 1);
-        sbs = revolution::vector_basis_size(di.cell_degree(), dim, dim);
+        cbs = disk::scalar_basis_size(di.cell_degree(), dim);
+        fbs = disk::scalar_basis_size(di.face_degree(), dim - 1);
+        sbs = disk::vector_basis_size(di.cell_degree(), dim, dim);
     };
 
     auto
@@ -131,11 +131,11 @@ public:
         {
         	auto bar = barycenter(msh, cl);
         	Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, di, sol_fun);
-        	auto cell_ofs = revolution::priv::offset(msh, cl);
+        	auto cell_ofs = disk::priv::offset(msh, cl);
         	Matrix<scalar_type, Dynamic, 1> s = sol.block(cell_ofs * cbs, 0, cbs, 1);
         	Matrix<scalar_type, Dynamic, 1> diff = s - p.head(cbs);
-        	auto cb = revolution::make_scalar_monomial_basis(msh, cl, di.cell_degree());
-        	Matrix<scalar_type, Dynamic, Dynamic> mm = revolution::make_mass_matrix(msh, cl, cb);
+        	auto cb = disk::make_scalar_monomial_basis(msh, cl, di.cell_degree());
+        	Matrix<scalar_type, Dynamic, Dynamic> mm = disk::make_mass_matrix(msh, cl, cb);
         	error += diff.dot(mm*diff);
         	//ofs << bar.x() << " " << bar.y() << " " << s(0) << " " << s(1) << std::endl;
 
@@ -163,7 +163,7 @@ public:
                         const cell_type& cl)
     {
         auto gamma = compute_auxiliar(msh, cl);
-        auto cell_ofs  = revolution::priv::offset(msh, cl);
+        auto cell_ofs  = disk::priv::offset(msh, cl);
         auxiliar.block(cell_ofs * sbs, 0, sbs, 1) = gamma;
         return;
     }
@@ -172,9 +172,9 @@ public:
     compute_auxiliar(   const mesh_type& msh,
                         const cell_type& cl)
     {
-        auto sb = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
+        auto sb = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
 
-        auto cell_ofs  = revolution::priv::offset(msh, cl);
+        auto cell_ofs  = disk::priv::offset(msh, cl);
         auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
 
         Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> u_TF =
@@ -198,7 +198,7 @@ public:
 
         for(auto cl: msh)
         {
-            auto cell_ofs  = revolution::priv::offset(msh, cl);
+            auto cell_ofs  = disk::priv::offset(msh, cl);
             auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
 
             Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> u_TF =
@@ -212,8 +212,8 @@ public:
             Matrix<scalar_type, Dynamic, 1> diff_stress  = alpha * (Gu - gamma);
             Matrix<scalar_type, Dynamic, 1> diff_gamma   = alpha * (gamma - gamma_old);
 
-            auto sb =  revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
-            Matrix<scalar_type, Dynamic, Dynamic> mass = revolution::make_mass_matrix(msh, cl, sb);
+            auto sb =  disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
+            Matrix<scalar_type, Dynamic, Dynamic> mass = disk::make_mass_matrix(msh, cl, sb);
 
             convergence += diff_stress.dot(mass * diff_stress) + diff_gamma.dot(mass * diff_gamma);
 
@@ -228,16 +228,16 @@ public:
                     const cell_type& cl)
     {
         auto G         = make_hho_gradrec_vector(msh, cl, di);
-        auto cb = revolution::make_scalar_monomial_basis(msh, cl, di.cell_degree());
-        auto sb = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
-        auto cell_ofs  = revolution::priv::offset(msh, cl);
+        auto cb = disk::make_scalar_monomial_basis(msh, cl, di.cell_degree());
+        auto sb = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
+        auto cell_ofs  = disk::priv::offset(msh, cl);
         auto num_faces = howmany_faces(msh, cl);
 
         auto stress = multiplier.block( sbs * cell_ofs,  0, sbs, 1);
         auto gamma  = compute_auxiliar( msh,  cl);
         vector_type str_agam = stress - alpha * gamma;
 
-        Matrix<scalar_type, Dynamic, Dynamic> mm = revolution::make_mass_matrix(msh, cl, sb);
+        Matrix<scalar_type, Dynamic, Dynamic> mm = disk::make_mass_matrix(msh, cl, sb);
 
         Matrix<scalar_type, Dynamic, 1> rhs =
                     Matrix<scalar_type, Dynamic, 1>::Zero(cbs + fbs * num_faces);
@@ -257,10 +257,10 @@ public:
     {
         sol_old = sol;
 
-        auto assembler = revolution::make_diffusion_assembler(msh, di);
+        auto assembler = disk::make_diffusion_assembler(msh, di);
         for (auto& cl : msh)
         {
-            auto cb = revolution::make_scalar_monomial_basis(msh, cl, di.cell_degree());
+            auto cb = disk::make_scalar_monomial_basis(msh, cl, di.cell_degree());
             auto G    = make_hho_gradrec_vector(msh, cl, di);
             auto gr   = make_hho_scalar_laplacian(msh, cl, di);
             auto stab = make_hho_scalar_stabilization(msh, cl, gr.first, di);
@@ -297,12 +297,12 @@ public:
 
         for (auto& cl : msh)
         {
-            auto cb = revolution::make_scalar_monomial_basis(msh, cl, di.cell_degree());
+            auto cb = disk::make_scalar_monomial_basis(msh, cl, di.cell_degree());
             auto G    = make_hho_gradrec_vector(msh, cl, di);
             auto gr   = make_hho_scalar_laplacian(msh, cl, di);
             auto stab = make_hho_scalar_stabilization(msh, cl, gr.first, di);
 
-            auto cell_ofs  = revolution::priv::offset(msh, cl);
+            auto cell_ofs  = disk::priv::offset(msh, cl);
             auto num_total_dofs = cbs + fbs * howmany_faces(msh, cl);
 
             Matrix<scalar_type, Dynamic, 1> cell_rhs = rhs_all.block( cbs*cell_ofs, 0, cbs, 1);
@@ -334,12 +334,12 @@ public:
 
         for (auto& cl: msh)
         {
-            auto cell_ofs = revolution::priv::offset(msh, cl);
+            auto cell_ofs = disk::priv::offset(msh, cl);
             vector_type stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
             auto gamma  = compute_auxiliar( msh,  cl);
 
-            auto sb = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
-            auto qps = revolution::integrate(msh, cl, 2 * di.face_degree());
+            auto sb = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
+            auto qps = disk::integrate(msh, cl, 2 * di.face_degree());
             for (auto& qp : qps)
             {
                 auto phi = sb.eval_functions(qp.point());
@@ -372,7 +372,7 @@ run_alg_diffusion(const Mesh& msh, size_t degree,
     T tolerance = 10.e-9, Ninf = 10.e+10;
     size_t max_iters = 10000;
 
-    typename revolution::hho_degree_info hdi(degree+1, degree);
+    typename disk::hho_degree_info hdi(degree+1, degree);
     augmented_lagrangian_diffusion<Mesh> ald(msh, hdi);
 
     ald.initialize(msh);

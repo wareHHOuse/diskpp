@@ -31,7 +31,7 @@
 #include "mechanics/behaviors/laws/Cavitation/Cavitation_qp.hpp"
 #include "mechanics/behaviors/maths_tensor.hpp"
 #include "mechanics/behaviors/maths_utils.hpp"
-#include "revolution/bases"
+#include "bases/bases.hpp"
 #include "revolution/quadratures"
 
 #define _USE_MATH_DEFINES
@@ -62,7 +62,7 @@ class Cavitation_cell
   public:
     Cavitation_cell(const mesh_type& msh, const cell_type& cl, const int degree)
     {
-        const auto qps = revolution::integrate(msh, cl, degree);
+        const auto qps = disk::integrate(msh, cl, degree);
 
         m_list_qp.clear();
         m_list_qp.reserve(qps.size());
@@ -105,12 +105,12 @@ class Cavitation_cell
     vector_type
     projectStressOnCell(const mesh_type&                   msh,
                         const cell_type&                   cl,
-                        const revolution::hho_degree_info& hdi,
+                        const disk::hho_degree_info& hdi,
                         const material_type&               material_data) const
     {
         const auto grad_degree     = hdi.grad_degree();
-        const int  grad_basis_size = revolution::sym_matrix_basis_size(grad_degree, dimension, dimension);
-        auto       gb              = revolution::make_sym_matrix_monomial_basis(msh, cl, grad_degree);
+        const int  grad_basis_size = disk::sym_matrix_basis_size(grad_degree, dimension, dimension);
+        auto       gb              = disk::make_sym_matrix_monomial_basis(msh, cl, grad_degree);
 
         matrix_type mass = matrix_type::Zero(grad_basis_size, grad_basis_size);
         vector_type rhs  = vector_type::Zero(grad_basis_size);
@@ -122,13 +122,13 @@ class Cavitation_cell
 
             for (int j = 0; j < grad_basis_size; j++)
             {
-                const auto qp_gphi_j = revolution::priv::inner_product(qp.weight(), gphi[j]);
+                const auto qp_gphi_j = disk::priv::inner_product(qp.weight(), gphi[j]);
                 for (int i = j; i < grad_basis_size; i++)
                 {
-                    mass(i, j) += revolution::priv::inner_product(gphi[i], qp_gphi_j);
+                    mass(i, j) += disk::priv::inner_product(gphi[i], qp_gphi_j);
                 }
 
-                rhs(j) += revolution::priv::inner_product(qp.compute_stress(material_data), qp_gphi_j);
+                rhs(j) += disk::priv::inner_product(qp.compute_stress(material_data), qp_gphi_j);
             }
         }
 
@@ -145,18 +145,18 @@ class Cavitation_cell
     }
 
     vector_type
-    projectPOnCell(const mesh_type& msh, const cell_type& cl, const revolution::hho_degree_info& hdi) const
+    projectPOnCell(const mesh_type& msh, const cell_type& cl, const disk::hho_degree_info& hdi) const
     {
         const auto grad_degree = hdi.grad_degree();
-        const auto pbs         = revolution::scalar_basis_size(grad_degree, dimension);
+        const auto pbs         = disk::scalar_basis_size(grad_degree, dimension);
         return vector_type::Zero(pbs);
     }
 
     vector_type
-    projectStateOnCell(const mesh_type& msh, const cell_type& cl, const revolution::hho_degree_info& hdi) const
+    projectStateOnCell(const mesh_type& msh, const cell_type& cl, const disk::hho_degree_info& hdi) const
     {
         const auto grad_degree = hdi.grad_degree();
-        const auto pbs         = revolution::scalar_basis_size(grad_degree, dimension);
+        const auto pbs         = disk::scalar_basis_size(grad_degree, dimension);
         return vector_type::Zero(pbs);
     }
 };

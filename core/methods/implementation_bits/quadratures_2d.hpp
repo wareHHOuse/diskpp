@@ -26,7 +26,7 @@
 #include "geometry/geometry.hpp"
 #include "quadratures/quad_bones.hpp"
 
-namespace revolution {
+namespace disk {
 namespace proton {
 
 template<typename T>

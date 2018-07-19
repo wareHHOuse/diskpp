@@ -1,7 +1,7 @@
 /*
- *       /\         DISK++, a template library for DIscontinuous SKeletal      
+ *       /\         DISK++, a template library for DIscontinuous SKeletal
  *      /__\        methods.
- *     /_\/_\      
+ *     /_\/_\
  *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
  *   /__\  /__\     matteo.cicuttin@enpc.fr
  *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
@@ -25,4 +25,4 @@
 
 #pragma once
 
-#include "implementation_bits/quadratures_2d.hpp"
+#include "../methods/implementation_bits/quadratures_2d.hpp"

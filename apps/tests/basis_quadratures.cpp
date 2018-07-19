@@ -25,9 +25,9 @@
 
 #include <xmmintrin.h>
 
-#include "revolution/bases"
+#include "bases/bases.hpp"
 #include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "methods/hho"
 
 #include "common.hpp"
 
@@ -52,11 +52,11 @@ struct test_functor
         for (auto itor = msh.cells_begin(); itor != msh.cells_end(); itor++)
         {
             auto cl = *itor;
-            auto basis = revolution::make_scalar_monomial_basis(msh, cl, degree);
+            auto basis = disk::make_scalar_monomial_basis(msh, cl, degree);
 
-            Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, degree, f);
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, degree, f);
 
-            auto qps = revolution::integrate(msh, cl, 2*degree+2);
+            auto qps = disk::integrate(msh, cl, 2*degree+2);
             for (auto& qp : qps)
             {
                 auto tv = f(qp.point());

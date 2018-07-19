@@ -31,13 +31,13 @@
 #include <iterator>
 
 #include "common/eigen.hpp"
-#include "revolution/bases"
+#include "bases/bases.hpp"
 #include "revolution/quadratures"
 #include "mechanics/BoundaryConditions.hpp"
 
 using namespace Eigen;
 
-namespace revolution
+namespace disk
 {
 
 class hho_degree_info
@@ -232,7 +232,7 @@ make_hho_gradrec_vector(const Mesh& msh, const typename Mesh::cell_type& cl, con
 
     const auto num_faces = howmany_faces(msh, cl);
 
-    const matrix_type           gr_lhs = revolution::make_mass_matrix(msh, cl, gb);
+    const matrix_type           gr_lhs = make_mass_matrix(msh, cl, gb);
     matrix_type                 gr_rhs = matrix_type::Zero(gbs, cbs + num_faces * fbs);
 
     const auto qps = integrate(msh, cl, std::max(0, int(celdeg) - 1 + int(facdeg)));
@@ -2716,7 +2716,7 @@ public:
     {
         auto num_faces = howmany_faces(msh, cl);
         auto dim = Mesh::dimension;
-        auto cell_ofs = revolution::priv::offset(msh, cl);
+        auto cell_ofs = priv::offset(msh, cl);
 
         vector_type svel(cbs_A + num_faces * fbs_A );
         svel.block(0, 0, cbs_A, 1) = sol.block(cell_ofs * cbs_A, 0, cbs_A, 1);
@@ -2730,7 +2730,7 @@ public:
 
             if (m_bnd.is_dirichlet_face( face_id))
             {
-                auto fb = revolution::make_vector_monomial_basis(msh, fc, di.face_degree());
+                auto fb = make_vector_monomial_basis(msh, fc, di.face_degree());
                 matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 auto velocity = m_bnd.dirichlet_boundary_func(face_id);
                 vector_type rhs = make_rhs(msh, fc, fb, velocity, di.face_degree());
@@ -2750,7 +2750,7 @@ public:
     take_pressure( const Mesh& msh, const typename Mesh::cell_type& cl,
                   const vector_type& sol) const
     {
-        auto cell_ofs = revolution::priv::offset(msh, cl);
+        auto cell_ofs = priv::offset(msh, cl);
         auto pres_ofs = cbs_A * msh.cells_size() + fbs_A * num_other_faces
                                                             + cbs_B * cell_ofs;
 
@@ -3065,7 +3065,7 @@ public:
     {
         auto num_faces = howmany_faces(msh, cl);
         auto dim = Mesh::dimension;
-        auto cell_ofs = revolution::priv::offset(msh, cl);
+        auto cell_ofs = priv::offset(msh, cl);
 
         vector_type svel(cbs_A + num_faces * fbs_A );
         svel.block(0, 0, cbs_A, 1) = sol.block(cell_ofs * cbs_A, 0, cbs_A, 1);
@@ -3080,7 +3080,7 @@ public:
 
             if (m_bnd.is_dirichlet_face(face_id) )
             {
-                auto fb = revolution::make_vector_monomial_basis(msh, fc, di.face_degree());
+                auto fb = make_vector_monomial_basis(msh, fc, di.face_degree());
                 matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 auto velocity = m_bnd.dirichlet_boundary_func(face_id);
                 vector_type rhs = make_rhs(msh, fc, fb, velocity, di.face_degree());
@@ -3100,7 +3100,7 @@ public:
     take_pressure( const Mesh& msh, const typename Mesh::cell_type& cl,
                   const vector_type& sol) const
     {
-        auto cell_ofs = revolution::priv::offset(msh, cl);
+        auto cell_ofs = priv::offset(msh, cl);
         auto pres_ofs = cbs_A * msh.cells_size() + fbs_A * num_other_faces
                                                             + cbs_B * cell_ofs;
 
@@ -4213,4 +4213,4 @@ make_hho_vector_stabilization_optim(const Mesh& msh, const typename Mesh::cell_t
 }
 
 
-} // revolution
+} // end revolution

@@ -1,10 +1,13 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017, 2018
- *      /__\       matteo.cicuttin@enpc.fr
- *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
- *    /\    /\
- *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
- *  /_\/_\/_\/_\   methods.
+ *       /\         DISK++, a template library for DIscontinuous SKeletal
+ *      /__\        methods.
+ *     /_\/_\
+ *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
+ *   /__\  /__\     matteo.cicuttin@enpc.fr
+ *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
+ *
+ * This file is copyright of the following authors:
+ * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -31,8 +34,7 @@
 
 #include "loaders/loader.hpp"
 #include "cfem/cfem.hpp"
-#include "hho/hho.hpp"
-#include "revolution/methods/hho"
+#include "methods/hho"
 #include "mesh/mesh_hierarchy.hpp"
 
 #include "output/silo.hpp"
@@ -193,7 +195,7 @@ class hierarchical_eigval_solver
     bool
     hho_eigenvalue_solver(const Mesh& msh, size_t degree)
     {
-        using namespace revolution;
+        using namespace disk;
 
         typedef Eigen::Triplet<T> triplet_type;
 
@@ -423,7 +425,7 @@ public:
                  const disk::simplicial_mesh<T,2>& ref_msh,
                  const disk::simplicial_mesh<T,2>& sol_msh)
     {
-        using namespace revolution;
+        using namespace disk;
 
         std::cout << green << "Computed solution, HHO" << reset << std::endl;
         std::cout << "Mesh size: " << average_diameter(sol_msh) << std::endl;

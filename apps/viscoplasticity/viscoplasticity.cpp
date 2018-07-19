@@ -30,9 +30,9 @@
 
 #include <unistd.h>
 
-#include "revolution/bases"
+#include "bases/bases.hpp"
 #include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -84,7 +84,7 @@ run_viscoplasticity(size_t degree,
     if (!ofs.is_open())
         std::cout << "Error opening errors "<<std::endl;
 
-    typename revolution::hho_degree_info hdi(degree, degree);
+    typename disk::hho_degree_info hdi(degree, degree);
     augmented_lagrangian_viscoplasticity<mesh_type> als(msh, hdi, alpha);
 
     auto assembler = als.define_problem(msh, problem);

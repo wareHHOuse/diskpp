@@ -8,7 +8,6 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -24,9 +23,12 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-#pragma once
+#include "contrib/triangle/triangle_mesher.h"
 
-#include "implementation_bits/bases_scalar.hpp"
-#include "implementation_bits/bases_vector.hpp"
-#include "implementation_bits/bases_matrix.hpp"
-#include "implementation_bits/bases_utils.hpp"
+template<typename T, typename Storage>
+void
+integrate_possibly_nonconvex(const generic_mesh<T, 2, Storage>& msh,
+							 const typename generic_mesh<T, 2, Storage>::cell_type& cl)
+{
+
+}

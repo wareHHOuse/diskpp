@@ -1,10 +1,13 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
- *      /__\       matteo.cicuttin@enpc.fr
- *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
- *    /\    /\
- *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
- *  /_\/_\/_\/_\   methods.
+ *       /\         DISK++, a template library for DIscontinuous SKeletal
+ *      /__\        methods.
+ *     /_\/_\
+ *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
+ *   /__\  /__\     matteo.cicuttin@enpc.fr
+ *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
+ *
+ * This file is copyright of the following authors:
+ * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -23,9 +26,9 @@
 #include <iostream>
 #include <regex>
 
-#include "revolution/bases"
+#include "bases/bases.hpp"
 #include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "methods/hho"
 
 #include "loaders/loader.hpp"
 
@@ -58,7 +61,7 @@ process_mesh(const MeshType& msh)
 
     for (auto& cl : msh)
     {
-        auto qps = revolution::integrate(msh, cl, degree);
+        auto qps = disk::integrate(msh, cl, degree);
 
         for (auto& qp : qps)
         {
@@ -67,13 +70,13 @@ process_mesh(const MeshType& msh)
             intval_f3 += qp.weight() * f3(qp.point());
         }
 
-        
+
         auto fcs = faces(msh, cl);
         for (auto& fc : fcs)
         {
-            revolution::integrate(msh, fc, degree);
+            disk::integrate(msh, fc, degree);
         }
-        
+
     }
 
     std::cout << "f(x,y) = x   : " << intval_f1 << std::endl;
@@ -152,7 +155,7 @@ int main(int argc, char **argv)
 
         process_mesh(msh);
     }
-/*
+
     if (std::regex_match(filename, std::regex(".*\\.msh$") ))
     {
         std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
@@ -227,6 +230,6 @@ int main(int argc, char **argv)
 
         process_mesh(msh);
     }
-    */
+
     return 0;
 }

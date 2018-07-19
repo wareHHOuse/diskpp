@@ -51,7 +51,7 @@ class NewtonRaphson_solver_finite_strains
     typedef MeshType                             mesh_type;
     typedef typename mesh_type::scalar_type      scalar_type;
     typedef ParamRun<scalar_type>                param_type;
-    typedef typename revolution::hho_degree_info hdi_type;
+    typedef typename disk::hho_degree_info hdi_type;
 
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;

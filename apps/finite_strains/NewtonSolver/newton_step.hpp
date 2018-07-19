@@ -35,8 +35,8 @@
 #include "../Parameters.hpp"
 #include "finite_strains_elementary_computation.hpp"
 #include "mechanics/BoundaryConditions.hpp"
-#include "revolution/bases"
-#include "revolution/methods/hho"
+#include "bases/bases.hpp"
+#include "methods/hho"
 #include "revolution/quadratures"
 
 #include "solvers/solver.hpp"
@@ -55,7 +55,7 @@ class NewtonRaphson_step_finite_strains
     typedef MeshType                                       mesh_type;
     typedef typename mesh_type::scalar_type                scalar_type;
     typedef ParamRun<scalar_type>                          param_type;
-    typedef typename revolution::hho_degree_info           hdi_type;
+    typedef typename disk::hho_degree_info           hdi_type;
     typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
 
     const static int dimension = mesh_type::dimension;
@@ -63,7 +63,7 @@ class NewtonRaphson_step_finite_strains
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
-    typedef revolution::assembler_mechanics<mesh_type> assembler_type;
+    typedef disk::assembler_mechanics<mesh_type> assembler_type;
 
     typedef finite_strains<mesh_type> elem_type;
 
@@ -99,7 +99,7 @@ class NewtonRaphson_step_finite_strains
         m_bL.clear();
         m_bL.resize(m_msh.cells_size());
 
-        m_assembler = revolution::make_mechanics_assembler(m_msh, m_hdi, m_bnd);
+        m_assembler = disk::make_mechanics_assembler(m_msh, m_hdi, m_bnd);
     }
 
     bool
@@ -139,7 +139,7 @@ class NewtonRaphson_step_finite_strains
              Law&                               law,
              bool                               elastic_modulus = false)
     {
-        typename revolution::static_condensation_vector<mesh_type> statcond;
+        typename disk::static_condensation_vector<mesh_type> statcond;
 
         elem_type    elem(m_msh, m_hdi);
         AssemblyInfo ai;
@@ -290,8 +290,8 @@ class NewtonRaphson_step_finite_strains
         timecounter tc;
         tc.tic();
 
-        const int fbs = revolution::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
-        const int cbs = revolution::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
+        const int fbs = disk::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
+        const int cbs = disk::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
 
         const auto solF = m_assembler.expand_solution_nl(m_msh, m_bnd, m_system_solution, m_solution_faces);
 
