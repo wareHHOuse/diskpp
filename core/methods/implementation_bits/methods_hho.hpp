@@ -749,8 +749,8 @@ make_hdg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
     const auto num_faces = howmany_faces(msh, cl);
     const auto total_dofs = cbs + num_faces * fbs;
 
-    matrix_type                       data = matrix_type::Zero(total_dofs, total_dofs);
-    const matrix_type                 If   = matrix_type::Identity(fbs, fbs);
+    matrix_type       data = matrix_type::Zero(total_dofs, total_dofs);
+    const matrix_type If   = matrix_type::Identity(fbs, fbs);
 
     auto cb = make_scalar_monomial_basis(msh, cl, celdeg);
     const auto fcs = faces(msh, cl);
@@ -758,7 +758,7 @@ make_hdg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
     for (size_t i = 0; i < num_faces; i++)
     {
         const auto fc = fcs[i];
-        const auto h  = measure(msh, fc);
+        const auto h  = diameter(msh, fc);
         auto fb = make_scalar_monomial_basis(msh, fc, facdeg);
 
         matrix_type oper  = matrix_type::Zero(fbs, total_dofs);
