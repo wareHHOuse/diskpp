@@ -129,12 +129,12 @@ diameter_boundingbox(const Mesh<T, 3, Storage>& msh, const typename Mesh<T, 3, S
 {
     const auto pts = points(msh, cl);
 
-    T xmin = 0;
-    T xmax = 0;
-    T ymin = 0;
-    T ymax = 0;
-    T zmin = 0;
-    T zmax = 0;
+    T xmin = pts[0].x();
+    T xmax = pts[0].x();
+    T ymin = pts[0].y();
+    T ymax = pts[0].y();
+    T zmin = pts[0].z();
+    T zmax = pts[0].z();
 
     for (auto& pt : pts)
     {
@@ -176,10 +176,10 @@ diameter_boundingbox(const Mesh<T, 2, Storage>&                      msh,
 {
     const auto pts = points(msh, cl);
 
-    T xmin = 0;
-    T xmax = 0;
-    T ymin = 0;
-    T ymax = 0;
+    T xmin = pts[0].x();
+    T xmax = pts[0].x();
+    T ymin = pts[0].y();
+    T ymax = pts[0].y();
 
     for (auto& pt : pts)
     {
