@@ -576,7 +576,7 @@ bool
 hho_solver(const Mesh& msh, size_t degree)
 {
     typedef Mesh                                       mesh_type;
-    typedef typename mesh_type::scalar_type            scalar_type;
+    typedef typename mesh_type::coordinate_type            scalar_type;
     typedef typename mesh_type::cell                   cell_type;
     typedef typename mesh_type::face                   face_type;
 

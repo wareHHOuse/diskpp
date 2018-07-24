@@ -58,7 +58,7 @@ template<typename Mesh>
 class finite_strains_solver
 {
     typedef Mesh                                 mesh_type;
-    typedef typename mesh_type::scalar_type      scalar_type;
+    typedef typename mesh_type::coordinate_type      scalar_type;
     typedef ParamRun<scalar_type>                param_type;
     typedef NLE::MaterialParameters<scalar_type> data_type;
 

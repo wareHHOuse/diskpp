@@ -47,7 +47,7 @@ class Neohookean_cell
 {
   private:
     typedef MeshType                        mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::cell        cell_type;
 
     typedef Neohookean_Data<scalar_type> material_type;

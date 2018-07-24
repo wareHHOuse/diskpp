@@ -42,6 +42,7 @@
 #include "solvers/solver.hpp"
 
 #include "timecounter.h"
+#include <unsupported/Eigen/ArpackSupport>
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -53,7 +54,7 @@ template<typename MeshType>
 class NewtonRaphson_step_plasticity
 {
     typedef MeshType                                       mesh_type;
-    typedef typename mesh_type::scalar_type                scalar_type;
+    typedef typename mesh_type::coordinate_type                scalar_type;
     typedef ParamRun<scalar_type>                          param_type;
     typedef typename disk::hho_degree_info           hdi_type;
     typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
@@ -157,6 +158,7 @@ class NewtonRaphson_step_plasticity
 
         for (auto& cl : m_msh)
         {
+            std::cout << "cell " << cl << std::endl;
             // Gradient Reconstruction
             matrix_dynamic GT;
             tc.tic();
@@ -246,6 +248,11 @@ class NewtonRaphson_step_plasticity
             tc.tic();
             auto scnp = statcond.compute_rhsfull(m_msh, cl, lhs, rhs, m_hdi);
 
+            // for (size_t k = 0; k < scnp.first.rows(); k++)
+            // {
+            //     std::cout << k << " " << scnp.first.row(k).sum() << " " << scnp.first.col(k).sum() << std::endl;
+            // }
+
             m_AL[cell_i] = statcond.AL;
             m_bL[cell_i] = statcond.bL;
 
@@ -279,6 +286,16 @@ class NewtonRaphson_step_plasticity
         disk::solvers::pardiso_params<scalar_type> pparams;
         mkl_pardiso(pparams, m_assembler.LHS, m_assembler.RHS, m_system_solution);
         tc.toc();
+
+        // Eigen::SelfAdjointEigenSolver<sparse_matrix<scalar_type>> svd;
+
+        // svd.compute(m_assembler.LHS);
+        // auto                                         sigma_min = svd.eigenvalues()(0);
+        // auto                                         sigma_max = svd.eigenvalues()(svd.eigenvalues().size() - 1);
+        // auto                                         cond      = sigma_max / sigma_min;
+        // std::cout << "Condition number: " << cond << std::endl;
+        // std::cout << "Sigma max: " << sigma_max << std::endl;
+        // std::cout << "Sigma min: " << sigma_min << std::endl;
 
         return SolveInfo(m_assembler.LHS.rows(), m_assembler.LHS.nonZeros(), tc.to_double());
     }

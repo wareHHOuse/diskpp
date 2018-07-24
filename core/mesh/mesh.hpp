@@ -375,8 +375,6 @@ class mesh : public priv::mesh_base<T,DIM,Storage>
 public:
     static const size_t dimension = DIM;
 
-    [[deprecated("Use 'coordinate_type'")]] typedef T scalar_type;
-
     typedef T           coordinate_type;
     typedef Storage     storage_type;
 
@@ -587,20 +585,6 @@ public:
             throw std::invalid_argument(ss.str());
         }
         return fi.second;
-    }
-
-    /* Th->maximumNumberOfFaces() */
-    [[deprecated("subelement_size works only on generic_element")]]
-    size_t  max_faces_per_element(void) const
-    {
-        size_t mfpe = 0;
-        for (auto itor = this->cells_begin(); itor != this->cells_end(); itor++)
-        {
-            auto cell = *itor;
-            mfpe = std::max(mfpe, cell.subelement_size());
-        }
-
-        return mfpe;
     }
 
     void statistics(void) const

@@ -71,7 +71,7 @@ template<typename MeshType>
 class finite_strains
 {
     typedef MeshType                             mesh_type;
-    typedef typename mesh_type::scalar_type      scalar_type;
+    typedef typename mesh_type::coordinate_type      scalar_type;
     typedef typename mesh_type::cell             cell_type;
     typedef typename disk::hho_degree_info hdi_type;
 

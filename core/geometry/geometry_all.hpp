@@ -45,34 +45,10 @@ namespace disk {
 
 /* Compute an estimate of the mesh discretization step 'h' */
 template<typename Mesh>
-[[deprecated("Use average_diameter(). This is not the correct way to compute h.")]]
-typename Mesh::scalar_type
-mesh_h(const Mesh& msh)
-{
-    typename Mesh::scalar_type h{};
-    for (auto itor = msh.cells_begin(); itor != msh.cells_end(); itor++)
-    {
-        auto cell = *itor;
-        auto cell_measure = measure(msh, cell);
-
-        auto fcs = faces(msh, cell);
-        typename Mesh::scalar_type face_sum{};
-        for (auto& f : fcs)
-        {
-            auto m = measure(msh, f);
-            face_sum += m;
-        }
-        h = std::max(h, cell_measure/face_sum);
-    }
-
-    return h;
-}
-
-template<typename Mesh>
-typename Mesh::scalar_type
+typename Mesh::coordinate_type
 average_diameter(const Mesh& msh)
 {
-    typename Mesh::scalar_type h{};
+    typename Mesh::coordinate_type h{};
     for (auto& cl : msh)
     {
         h += diameter(msh, cl);
@@ -109,12 +85,12 @@ barycenter(const Mesh& msh, const Element& elm)
 }
 
 template<typename Mesh, typename Element>
-typename Mesh::scalar_type
+typename Mesh::coordinate_type
 diameter(const Mesh& msh, const Element& elem)
 {
     const auto pts = points(msh, elem);
 
-    typename Mesh::scalar_type diam = 0.;
+    typename Mesh::coordinate_type diam = 0.;
 
     for (size_t i = 0; i < pts.size(); i++)
         for (size_t j = i+1; j < pts.size(); j++)

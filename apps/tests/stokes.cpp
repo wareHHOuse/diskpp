@@ -47,7 +47,7 @@ run_stokes(const Mesh& msh, size_t degree)
     typedef Mesh mesh_type;
     typedef typename mesh_type::cell        cell_type;
     typedef typename mesh_type::face        face_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
 
     typedef dynamic_matrix<scalar_type>     matrix_type;
     typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;

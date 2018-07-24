@@ -57,7 +57,7 @@ class augmented_lagrangian_viscoplasticity
     typedef Mesh mesh_type;
     typedef typename mesh_type::cell        cell_type;
     typedef typename mesh_type::face        face_type;
-    typedef typename mesh_type::scalar_type T;
+    typedef typename mesh_type::coordinate_type T;
 
     typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
 

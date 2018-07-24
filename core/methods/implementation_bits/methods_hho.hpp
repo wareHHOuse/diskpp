@@ -3121,7 +3121,7 @@ class assembler_mechanics
 {
    typedef disk::mechanics::BoundaryConditions<Mesh>    bnd_type;
    typedef Mesh                                         mesh_type;
-   typedef typename mesh_type::scalar_type              scalar_type;
+   typedef typename mesh_type::coordinate_type              scalar_type;
    typedef typename mesh_type::cell                     cell_type;
    typedef typename mesh_type::face                     face_type;
 
@@ -3951,7 +3951,7 @@ template<typename Mesh>
 class static_condensation_vector
 {
    typedef Mesh                            mesh_type;
-   typedef typename mesh_type::scalar_type scalar_type;
+   typedef typename mesh_type::coordinate_type scalar_type;
    typedef typename mesh_type::cell        cell_type;
 
    typedef dynamic_matrix<scalar_type> matrix_type;
@@ -4056,13 +4056,13 @@ class static_condensation_vector
 namespace priv {
 
 template<typename Mesh>
-dynamic_matrix<typename Mesh::scalar_type>
+dynamic_matrix<typename Mesh::coordinate_type>
 compute_lhs_vector(const Mesh&                msh,
                    const typename Mesh::cell& cl,
                    const hho_degree_info& hdi,
-                   const dynamic_matrix<typename Mesh::scalar_type>& lhs_scalar)
+                   const dynamic_matrix<typename Mesh::coordinate_type>& lhs_scalar)
 {
-    typedef typename Mesh::scalar_type scalar_type;
+    typedef typename Mesh::coordinate_type scalar_type;
 
     const int dimension     = Mesh::dimension;
     const auto num_cell_dofs = vector_basis_size(hdi.cell_degree(), dimension, dimension);
@@ -4115,13 +4115,13 @@ compute_lhs_vector(const Mesh&                msh,
 }
 
 template<typename Mesh>
-dynamic_matrix<typename Mesh::scalar_type>
+dynamic_matrix<typename Mesh::coordinate_type>
 compute_grad_vector(const Mesh&                                       msh,
                     const typename Mesh::cell&                        cl,
                     const hho_degree_info&                            hdi,
-                    const dynamic_matrix<typename Mesh::scalar_type>& grad_scalar)
+                    const dynamic_matrix<typename Mesh::coordinate_type>& grad_scalar)
 {
-    typedef typename Mesh::scalar_type scalar_type;
+    typedef typename Mesh::coordinate_type scalar_type;
 
     const int  dimension     = Mesh::dimension;
     const auto rbs           = vector_basis_size(hdi.reconstruction_degree(), dimension, dimension);

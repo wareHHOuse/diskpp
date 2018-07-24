@@ -42,7 +42,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct scalar_testing_function< Mesh<T,2,Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -55,7 +55,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct scalar_testing_function< Mesh<T,3,Storage> >
 {
     typedef Mesh<T,3,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -78,7 +78,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct vector_testing_function< Mesh<T,2,Storage> >
 {
 	typedef Mesh<T,2,Storage> 				mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
     typedef Matrix<scalar_type, 2, 1> 		ret_type;
 
@@ -95,7 +95,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct vector_testing_function< Mesh<T,3,Storage> >
 {
 	typedef Mesh<T,3,Storage> 				mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
     typedef Matrix<scalar_type, 3, 1> 		ret_type;
 
@@ -123,7 +123,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct vector_testing_function_div< Mesh<T,2,Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
     typedef Matrix<scalar_type, 2, 1>       ret_type;
 
@@ -138,7 +138,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct vector_testing_function_div< Mesh<T,3,Storage> >
 {
     typedef Mesh<T,3,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
     typedef Matrix<scalar_type, 3, 1>       ret_type;
 

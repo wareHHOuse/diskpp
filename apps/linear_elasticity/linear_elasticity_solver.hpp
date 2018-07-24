@@ -75,7 +75,7 @@ template<typename Mesh>
 class linear_elasticity_solver
 {
     typedef Mesh                                           mesh_type;
-    typedef typename mesh_type::scalar_type                scalar_type;
+    typedef typename mesh_type::coordinate_type                scalar_type;
     typedef typename mesh_type::cell                       cell_type;
     typedef typename mesh_type::face                       face_type;
     typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;

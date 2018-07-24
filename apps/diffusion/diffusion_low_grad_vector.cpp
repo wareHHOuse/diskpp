@@ -22,7 +22,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct rhs_functor< Mesh<T, 2, Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     Matrix<scalar_type, 2, 1> operator()(const point_type& p) const
@@ -73,7 +73,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct solution_functor< Mesh<T, 2, Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     Matrix<scalar_type, 2, 1> operator()(const point_type& p) const

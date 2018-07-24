@@ -93,7 +93,7 @@ class BoundaryConditions
 {
  public:
     typedef MeshType                                         mesh_type;
-    typedef typename mesh_type::scalar_type                  scalar_type;
+    typedef typename mesh_type::coordinate_type                  scalar_type;
     typedef static_vector<scalar_type, mesh_type::dimension> function_type;
     typedef point<scalar_type, mesh_type::dimension>         point_type;
 
@@ -354,7 +354,7 @@ class BoundaryConditionsScalar
 {
  public:
     typedef MeshType                                         mesh_type;
-    typedef typename mesh_type::scalar_type                  scalar_type;
+    typedef typename mesh_type::coordinate_type                  scalar_type;
     typedef scalar_type                                      function_type;
     typedef point<scalar_type, mesh_type::dimension>         point_type;
 

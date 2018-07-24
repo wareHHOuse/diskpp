@@ -75,7 +75,7 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 
   public:
     typedef Mesh<T, 3, Storage>              mesh_type;
-    typedef typename mesh_type::scalar_type  scalar_type;
+    typedef typename mesh_type::coordinate_type  scalar_type;
     typedef typename mesh_type::cell         cell_type;
     typedef typename mesh_type::point_type   point_type;
     typedef static_matrix<scalar_type, 3, 3> function_type;
@@ -142,7 +142,7 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 
   public:
     typedef Mesh<T, 3, Storage>              mesh_type;
-    typedef typename mesh_type::scalar_type  scalar_type;
+    typedef typename mesh_type::coordinate_type  scalar_type;
     typedef typename mesh_type::point_type   point_type;
     typedef typename mesh_type::face         face_type;
     typedef static_matrix<scalar_type, 3, 3> function_type;
@@ -208,7 +208,7 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 
   public:
     typedef Mesh<T, 2, Storage>              mesh_type;
-    typedef typename mesh_type::scalar_type  scalar_type;
+    typedef typename mesh_type::coordinate_type  scalar_type;
     typedef typename mesh_type::cell         cell_type;
     typedef typename mesh_type::point_type   point_type;
     typedef static_matrix<scalar_type, 2, 2> function_type;
@@ -275,7 +275,7 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 
   public:
     typedef Mesh<T, 2, Storage>              mesh_type;
-    typedef typename mesh_type::scalar_type  scalar_type;
+    typedef typename mesh_type::coordinate_type  scalar_type;
     typedef typename mesh_type::point_type   point_type;
     typedef typename mesh_type::face         face_type;
     typedef static_matrix<scalar_type, 2, 2> function_type;
@@ -388,7 +388,7 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
 
   public:
     typedef Mesh<T, 3, Storage>              mesh_type;
-    typedef typename mesh_type::scalar_type  scalar_type;
+    typedef typename mesh_type::coordinate_type  scalar_type;
     typedef typename mesh_type::cell         cell_type;
     typedef typename mesh_type::point_type   point_type;
     typedef static_matrix<scalar_type, 3, 3> function_type;
@@ -460,7 +460,7 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
 
   public:
     typedef Mesh<T, 3, Storage>              mesh_type;
-    typedef typename mesh_type::scalar_type  scalar_type;
+    typedef typename mesh_type::coordinate_type  scalar_type;
     typedef typename mesh_type::point_type   point_type;
     typedef typename mesh_type::face         face_type;
     typedef static_matrix<scalar_type, 3, 3> function_type;
@@ -530,7 +530,7 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
 {
   public:
     typedef Mesh<T, 2, Storage>              mesh_type;
-    typedef typename mesh_type::scalar_type  scalar_type;
+    typedef typename mesh_type::coordinate_type  scalar_type;
     typedef typename mesh_type::cell         cell_type;
     typedef typename mesh_type::point_type   point_type;
     typedef static_matrix<scalar_type, 2, 2> function_type;
@@ -601,7 +601,7 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
 {
   public:
     typedef Mesh<T, 2, Storage>              mesh_type;
-    typedef typename mesh_type::scalar_type  scalar_type;
+    typedef typename mesh_type::coordinate_type  scalar_type;
     typedef typename mesh_type::point_type   point_type;
     typedef typename mesh_type::face         face_type;
     typedef static_matrix<scalar_type, 2, 2> function_type;

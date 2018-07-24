@@ -45,7 +45,7 @@ class LinearLaw
 {
   private:
     typedef MeshType                        mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::cell        cell_type;
 
     int                                         m_nb_qp;

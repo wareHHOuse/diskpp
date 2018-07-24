@@ -50,7 +50,7 @@ struct test_functor
         typedef Mesh mesh_type;
         typedef typename mesh_type::cell        cell_type;
         typedef typename mesh_type::face        face_type;
-        typedef typename mesh_type::scalar_type scalar_type;
+        typedef typename mesh_type::coordinate_type scalar_type;
         typedef typename mesh_type::point_type  point_type;
 
 

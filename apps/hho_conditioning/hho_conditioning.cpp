@@ -44,7 +44,7 @@ bool
 estimate_element_cond(sol::state& lua, const Mesh& msh)
 {
     typedef Mesh                                       mesh_type;
-    typedef typename mesh_type::scalar_type            scalar_type;
+    typedef typename mesh_type::coordinate_type            scalar_type;
     typedef typename mesh_type::cell                   cell_type;
     typedef typename mesh_type::face                   face_type;
 

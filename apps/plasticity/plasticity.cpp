@@ -79,8 +79,8 @@ run_plasticity_solver(const Mesh<T, 2, Storage>&        msh,
     auto depltest = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 10}; };
 
     bnd.addDirichletBC(disk::mechanics::CLAMPED, 3, zero);
-    //bnd.addNeumannBC(disk::mechanics::NEUMANN, 8, trac);
-    bnd.addDirichletBC(disk::mechanics::DY, 8, depltest);
+    bnd.addNeumannBC(disk::mechanics::NEUMANN, 8, trac);
+    //bnd.addDirichletBC(disk::mechanics::DY, 8, depltest);
 
     plasticity_solver<mesh_type> nl(msh, bnd, rp, material_data);
 
@@ -161,23 +161,27 @@ run_plasticity_solver(const Mesh<T, 3, Storage>&        msh,
     // // Sphere
 
     auto zero = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 0.0}; };
+    auto un = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 1.0}; };
 
-    auto pres = [material_data](const point<T, 3>& p) -> result_type {
-        result_type er = result_type::Zero();
+    // auto pres = [material_data](const point<T, 3>& p) -> result_type {
+    //     result_type er = result_type::Zero();
 
-        er(0) = p.x();
-        er(1) = p.y();
-        er(2) = p.z();
+    //     er(0) = p.x();
+    //     er(1) = p.y();
+    //     er(2) = p.z();
 
-        er /= er.norm();
+    //     er /= er.norm();
 
-        return er;
-    };
+    //     return er;
+    // };
 
-    bnd.addDirichletBC(disk::mechanics::DX, 3, zero);
-    bnd.addDirichletBC(disk::mechanics::DY, 13, zero);
-    bnd.addDirichletBC(disk::mechanics::DZ, 24, zero);
-    bnd.addNeumannBC(disk::mechanics::NEUMANN, 27, pres);
+    // bnd.addDirichletBC(disk::mechanics::DX, 3, zero);
+    // bnd.addDirichletBC(disk::mechanics::DY, 13, zero);
+    // bnd.addDirichletBC(disk::mechanics::DZ, 24, zero);
+    // bnd.addNeumannBC(disk::mechanics::NEUMANN, 27, pres);
+
+    bnd.addDirichletBC(disk::mechanics::CLAMPED, 31, zero);
+    bnd.addDirichletBC(disk::mechanics::DZ, 33, un);
 
     // Cube + pres
     //    auto zero = [material_data](const point<T, 3>& p) -> result_type {
@@ -307,29 +311,29 @@ main(int argc, char** argv)
     //    material_data.sigma_y0 = 400;
 
     // // Cook Parameters (mm, GPa, kN)
-    // RealType E  = 70;
-    // RealType nu = 0.4999;
-
-    // material_data.mu     = material_data.converttomu(E, nu);
-    // material_data.lambda = material_data.converttolambda(E, nu);
-
-    // material_data.K = 0.0;
-    // material_data.H = 0.135;
-
-    // material_data.sigma_y0 = 0.243;
-
-    // Sphere Parameters (mm, GPa, kN)
-    RealType E  = 210000;
-    RealType nu = 0.3;
-    RealType ET = 0;
+    RealType E  = 70;
+    RealType nu = 0.4999;
 
     material_data.mu     = material_data.converttomu(E, nu);
     material_data.lambda = material_data.converttolambda(E, nu);
 
-    material_data.K = 0;
-    material_data.H = 0;
+    material_data.K = 0.0;
+    material_data.H = 0.135;
 
-    material_data.sigma_y0 = 240;
+    material_data.sigma_y0 = 0.243;
+
+    // Sphere Parameters (mm, GPa, kN)
+    // RealType E  = 210000;
+    // RealType nu = 0.3;
+    // RealType ET = 0;
+
+    // material_data.mu     = material_data.converttomu(E, nu);
+    // material_data.lambda = material_data.converttolambda(E, nu);
+
+    // material_data.K = 0;
+    // material_data.H = 0;
+
+    // material_data.sigma_y0 = 240E8;
 
     // Plaque Parameters(mm, GPa, kN)
     // RealType E  = 70;

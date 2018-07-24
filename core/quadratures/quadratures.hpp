@@ -34,7 +34,7 @@
 namespace disk {
 
 template<typename MeshType, typename Element>
-std::vector<disk::quadrature_point<typename MeshType::scalar_type, MeshType::dimension>>
+std::vector<disk::quadrature_point<typename MeshType::coordinate_type, MeshType::dimension>>
 integrate(const MeshType& msh, const Element& elem, const size_t degree)
 {
     static_assert(sizeof(MeshType) == -1, "quadrature: not suitable for the requested kind of mesh");
