@@ -96,13 +96,18 @@ class HenckyMises_Data
 //                          Tangent Moduli : C = 2 * mu * I4 + lambda * prod_Kronecker(Id, Id) /
 //                                                               it is the elastic moduli
 
-template<typename scalar_type, int DIM>
+template<typename T, int DIM>
 class HenckyMises_qp
 {
+  public:
+    typedef T                                    scalar_type;
     typedef static_matrix<scalar_type, DIM, DIM> static_matrix_type;
     typedef static_matrix<scalar_type, 3, 3>     static_matrix_type3D;
     typedef HenckyMises_Data<scalar_type>        data_type;
 
+    const static size_t dimension = DIM;
+
+  private:
     static_matrix_type3D zero_matrix = static_matrix_type3D::Zero();
 
     // coordinat and weight of considered gauss point.
@@ -159,6 +164,11 @@ class HenckyMises_qp
     }
 
   public:
+    HenckyMises_qp() :
+      m_weight(0), m_estrain_prev(zero_matrix), m_estrain_curr(zero_matrix)
+    {
+    }
+
     HenckyMises_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) :
       m_point(point), m_weight(weight), m_estrain_prev(zero_matrix), m_estrain_curr(zero_matrix)
     {

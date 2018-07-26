@@ -43,19 +43,22 @@ namespace disk
 template<typename MeshType>
 class LinearLaw
 {
-  private:
-    typedef MeshType                        mesh_type;
+  public:
+    typedef MeshType                            mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::cell        cell_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef LinearLaw_Data<scalar_type>         data_type;
+    typedef LinearLaw_cell<mesh_type>           law_cell_type;
 
-    int                                         m_nb_qp;
-    std::vector<LinearLaw_cell<mesh_type>>      m_list_cell_qp;
-    LinearLaw_Data<scalar_type>                 m_data;
+  private:
+    size_t                     m_nb_qp;
+    std::vector<law_cell_type> m_list_cell_qp;
+    data_type                  m_data;
 
   public:
     LinearLaw() : m_nb_qp(0){};
 
-    LinearLaw(const mesh_type& msh, const int degree)
+    LinearLaw(const mesh_type& msh, const size_t degree)
     {
         m_nb_qp = 0;
         m_list_cell_qp.clear();
@@ -63,7 +66,7 @@ class LinearLaw
 
         for (auto& cl : msh)
         {
-            LinearLaw_cell<mesh_type> cell_qp(msh, cl, degree);
+            law_cell_type cell_qp(msh, cl, degree);
 
             m_list_cell_qp.push_back(cell_qp);
             m_nb_qp += cell_qp.getNumberOfQP();
@@ -74,10 +77,10 @@ class LinearLaw
     addMaterialData(const scalar_type& lambda,
                     const scalar_type& mu)
     {
-        m_data = LinearLaw_Data<scalar_type>(lambda, mu);
+        m_data = data_type(lambda, mu);
     }
 
-    LinearLaw_Data<scalar_type>
+    data_type
     getMaterialData() const
     {
         return m_data;
@@ -98,13 +101,13 @@ class LinearLaw
         }
     }
 
-    LinearLaw_cell<mesh_type>&
+    law_cell_type&
     getCellQPs(const int cell_id)
     {
         return m_list_cell_qp.at(cell_id);
     }
 
-    LinearLaw_cell<mesh_type>
+    law_cell_type
     getCellIVs(const int cell_id) const
     {
         return m_list_cell_qp.at(cell_id);

@@ -121,13 +121,18 @@ class Cavitation_Data
  * 6- U(J) = sqrt( ( J^2 -1 - 2 *ln(J)) /2)
  * */
 
-template<typename scalar_type, int DIM>
+template<typename T, int DIM>
 class Cavitation_qp
 {
+  public:
+    typedef T                                    scalar_type;
     typedef static_matrix<scalar_type, DIM, DIM> static_matrix_type;
     typedef static_matrix<scalar_type, 3, 3>     static_matrix_type3D;
     typedef Cavitation_Data<scalar_type>         data_type;
 
+    const static size_t dimension = DIM;
+
+  private:
     static_matrix_type3D zero_matrix3D = static_matrix_type3D::Zero();
     static_matrix_type   zero_matrix   = static_matrix_type::Zero();
 
@@ -237,6 +242,11 @@ class Cavitation_qp
     }
 
   public:
+    Cavitation_qp() :
+      m_weight(0), m_F_prev(zero_matrix), m_F_curr(zero_matrix)
+    {
+    }
+
     Cavitation_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) :
       m_point(point), m_weight(weight), m_F_prev(zero_matrix), m_F_curr(zero_matrix)
     {

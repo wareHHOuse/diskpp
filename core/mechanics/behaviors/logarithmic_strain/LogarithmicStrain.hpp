@@ -28,37 +28,48 @@
 #include <vector>
 
 #include "common/eigen.hpp"
-#include "mechanics/behaviors/laws/Neohookean/Neohookean_cell.hpp"
-#include "mechanics/behaviors/maths_tensor.hpp"
-#include "mechanics/behaviors/maths_utils.hpp"
+#include "mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "core/mechanics/behaviors/logarithmic_strain/LogarithmicStrain_cell.hpp"
 
-#define _USE_MATH_DEFINES
-#include <cmath>
 
 namespace disk
 {
 
-// Law for Neohookean model in finite deformations
+namespace mechanics
+{
 
-template<typename MeshType>
-class Neohookean
+// Routine for Logarithmic Stain
+
+/* For details see the paper:
+ *   Anisotropic additive plasticity in the logaritmic strain: modular
+ *   kinematic formulation and implementation based on incremental minimization
+ *   principles for standard materials
+ *   C. Miehe, N. Apel, M. Lambrecht
+ *   Comput. Methods Appl. Mech. Engrg. (2002)
+ */
+
+template<typename LawType>
+class LogarithmicStrain
 {
   public:
-    typedef MeshType                            mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::cell            cell_type;
-    typedef Neohookean_Data<scalar_type>        data_type;
-    typedef Neohookean_cell<mesh_type>          law_cell_type;
+    typedef LawType                               law_hpp_type;
+    typedef typename law_hpp_type::law_cell_type  law_hpp_cell_type;
+    typedef typename law_hpp_type::mesh_type      mesh_type;
+    typedef typename mesh_type::coordinate_type   scalar_type;
+    typedef typename mesh_type::cell              cell_type;
+    typedef typename law_hpp_cell_type::data_type data_type;
+
+    typedef typename disk::mechanics::LogarithmicStrain_cell<law_hpp_cell_type> law_cell_type;
 
   private:
-    size_t                                  m_nb_qp;
-    std::vector<law_cell_type>              m_list_cell_qp;
-    data_type                               m_data;
+    size_t                     m_nb_qp;
+    std::vector<law_cell_type> m_list_cell_qp;
+    data_type                  m_data;
 
   public:
-    Neohookean() : m_nb_qp(0){};
+    LogarithmicStrain() : m_nb_qp(0){};
 
-    Neohookean(const mesh_type& msh, const size_t degree)
+    LogarithmicStrain(const mesh_type& msh, const size_t degree)
     {
         m_nb_qp = 0;
         m_list_cell_qp.clear();
@@ -74,11 +85,9 @@ class Neohookean
     }
 
     void
-    addMaterialData(const scalar_type& lambda,
-                    const scalar_type& mu,
-                    const size_t& type)
+    addMaterialData(const scalar_type& lambda, const scalar_type& mu)
     {
-        m_data = data_type(lambda, mu, type);
+        m_data = data_type(lambda, mu);
     }
 
     data_type
@@ -114,4 +123,5 @@ class Neohookean
         return m_list_cell_qp.at(cell_id);
     }
 };
+}
 }

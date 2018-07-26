@@ -38,6 +38,7 @@
 #include "Parameters.hpp"
 #include "mechanics/BoundaryConditions.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "core/mechanics/behaviors/logarithmic_strain/LogarithmicStrain.hpp"
 
 #include "output/gmshConvertMesh.hpp"
 #include "output/gmshDisk.hpp"
@@ -58,19 +59,20 @@ template<typename Mesh>
 class finite_strains_solver
 {
     typedef Mesh                                 mesh_type;
-    typedef typename mesh_type::coordinate_type      scalar_type;
+    typedef typename mesh_type::coordinate_type  scalar_type;
     typedef ParamRun<scalar_type>                param_type;
     typedef NLE::MaterialParameters<scalar_type> data_type;
 
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
-    typedef disk::mechanics::BoundaryConditions<mesh_type>        bnd_type;
-    typedef disk::LinearLaw<mesh_type> law_type;
+    typedef disk::mechanics::BoundaryConditions<mesh_type>   bnd_type;
+    typedef disk::LinearLaw<mesh_type>                       law_hpp_type;
+    typedef disk::mechanics::LogarithmicStrain<law_hpp_type> law_type;
 
     typename disk::hho_degree_info m_hdi;
-    bnd_type                             m_bnd;
-    const mesh_type&                     m_msh;
+    bnd_type                       m_bnd;
+    const mesh_type&               m_msh;
 
     disk::PostMesh<mesh_type> post_mesh;
 
@@ -213,8 +215,7 @@ class finite_strains_solver
         m_hdi = disk::hho_degree_info(cell_degree, face_degree, grad_degree);
 
         m_law = law_type(m_msh, 2 * m_hdi.grad_degree());
-        m_law.addMaterialData(
-          material_data.lambda, material_data.mu);
+        m_law.addMaterialData(material_data.lambda, material_data.mu);
 
         if (m_verbose)
         {

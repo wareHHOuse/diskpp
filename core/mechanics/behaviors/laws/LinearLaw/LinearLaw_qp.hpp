@@ -96,13 +96,18 @@ class LinearLaw_Data
 //                          Tangent Moduli : C = 2 * mu * I4 + lambda * prod_Kronecker(Id, Id) /
 //                                                               it is the elastic moduli
 
-template<typename scalar_type, int DIM>
+template<typename T, int DIM>
 class LinearLaw_qp
 {
+  public:
+    typedef T                                    scalar_type;
     typedef static_matrix<scalar_type, DIM, DIM> static_matrix_type;
     typedef static_matrix<scalar_type, 3, 3>     static_matrix_type3D;
-    typedef LinearLaw_Data<scalar_type>               data_type;
+    typedef LinearLaw_Data<scalar_type>          data_type;
 
+    const static size_t dimension = DIM;
+
+  private:
     static_matrix_type zero_matrix = static_matrix_type::Zero();
     static_matrix_type3D zero_matrix3D = static_matrix_type3D::Zero();
 
@@ -134,6 +139,10 @@ class LinearLaw_qp
     }
 
   public:
+    LinearLaw_qp() : m_weight(0), m_estrain_prev(zero_matrix), m_estrain_curr(zero_matrix)
+    {
+    }
+
     LinearLaw_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) :
       m_point(point), m_weight(weight), m_estrain_prev(zero_matrix), m_estrain_curr(zero_matrix)
     {

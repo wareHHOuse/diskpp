@@ -43,31 +43,34 @@ namespace disk
 template<typename MeshType>
 class LinearIsotropicAndKinematicHardening
 {
-  private:
-    typedef MeshType                        mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::cell        cell_type;
+    public:
+      typedef MeshType                                               mesh_type;
+      typedef typename mesh_type::coordinate_type                    scalar_type;
+      typedef typename mesh_type::cell                               cell_type;
+      typedef LinearIsotropicAndKinematicHardening_Data<scalar_type> data_type;
+      typedef LinearIsotropicAndKinematicHardening_cell<mesh_type>   law_cell_type;
 
-    size_t                                                            m_nb_qp;
-    std::vector<LinearIsotropicAndKinematicHardening_cell<mesh_type>> m_list_cell_qp;
-    LinearIsotropicAndKinematicHardening_Data<scalar_type>            m_data;
+    private:
+      size_t                     m_nb_qp;
+      std::vector<law_cell_type> m_list_cell_qp;
+      data_type                  m_data;
 
-  public:
-    LinearIsotropicAndKinematicHardening() : m_nb_qp(0){};
+    public:
+      LinearIsotropicAndKinematicHardening() : m_nb_qp(0){};
 
-    LinearIsotropicAndKinematicHardening(const mesh_type& msh, const int degree)
-    {
-        m_nb_qp = 0;
-        m_list_cell_qp.clear();
-        m_list_cell_qp.reserve(msh.cells_size());
+      LinearIsotropicAndKinematicHardening(const mesh_type& msh, const size_t degree)
+      {
+          m_nb_qp = 0;
+          m_list_cell_qp.clear();
+          m_list_cell_qp.reserve(msh.cells_size());
 
-        for (auto& cl : msh)
-        {
-            LinearIsotropicAndKinematicHardening_cell<mesh_type> cell_qp(msh, cl, degree);
+          for (auto& cl : msh)
+          {
+              law_cell_type cell_qp(msh, cl, degree);
 
-            m_list_cell_qp.push_back(cell_qp);
-            m_nb_qp += cell_qp.getNumberOfQP();
-        }
+              m_list_cell_qp.push_back(cell_qp);
+              m_nb_qp += cell_qp.getNumberOfQP();
+          }
     }
 
     void
@@ -77,10 +80,10 @@ class LinearIsotropicAndKinematicHardening
                     const scalar_type& K,
                     const scalar_type& sigma_y0)
     {
-        m_data = LinearIsotropicAndKinematicHardening_Data<scalar_type>(lambda, mu, H, K, sigma_y0);
+        m_data = data_type(lambda, mu, H, K, sigma_y0);
     }
 
-    LinearIsotropicAndKinematicHardening_Data<scalar_type>
+    data_type
     getMaterialData() const
     {
         return m_data;
@@ -101,13 +104,13 @@ class LinearIsotropicAndKinematicHardening
         }
     }
 
-    LinearIsotropicAndKinematicHardening_cell<mesh_type>&
+    law_cell_type&
     getCellQPs(const int cell_id)
     {
         return m_list_cell_qp.at(cell_id);
     }
 
-    LinearIsotropicAndKinematicHardening_cell<mesh_type>
+    law_cell_type
     getCellIVs(const int cell_id) const
     {
         return m_list_cell_qp.at(cell_id);

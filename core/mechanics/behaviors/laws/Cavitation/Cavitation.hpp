@@ -43,19 +43,22 @@ namespace disk
 template<typename MeshType>
 class Cavitation
 {
-  private:
-    typedef MeshType                        mesh_type;
+  public:
+    typedef MeshType                            mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::cell        cell_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef Cavitation_Data<scalar_type>        data_type;
+    typedef Cavitation_cell<mesh_type>          law_cell_type;
 
-    size_t                                  m_nb_qp;
-    std::vector<Cavitation_cell<mesh_type>> m_list_cell_qp;
-    Cavitation_Data<scalar_type>            m_data;
+  private:
+    size_t                     m_nb_qp;
+    std::vector<law_cell_type> m_list_cell_qp;
+    data_type                  m_data;
 
   public:
     Cavitation() : m_nb_qp(0){};
 
-    Cavitation(const mesh_type& msh, const int degree)
+    Cavitation(const mesh_type& msh, const size_t degree)
     {
         m_nb_qp = 0;
         m_list_cell_qp.clear();
@@ -63,7 +66,7 @@ class Cavitation
 
         for (auto& cl : msh)
         {
-            Cavitation_cell<mesh_type> cell_qp(msh, cl, degree);
+            law_cell_type cell_qp(msh, cl, degree);
 
             m_list_cell_qp.push_back(cell_qp);
             m_nb_qp += cell_qp.getNumberOfQP();
@@ -73,10 +76,10 @@ class Cavitation
     void
     addMaterialData(const scalar_type& lambda, const scalar_type& mu, const size_t& type)
     {
-        m_data = Cavitation_Data<scalar_type>(lambda, mu, type);
+        m_data = data_type(lambda, mu, type);
     }
 
-    Cavitation_Data<scalar_type>
+    data_type
     getMaterialData() const
     {
         return m_data;
@@ -97,13 +100,13 @@ class Cavitation
         }
     }
 
-    Cavitation_cell<mesh_type>&
+    law_cell_type&
     getCellQPs(const int cell_id)
     {
         return m_list_cell_qp.at(cell_id);
     }
 
-    Cavitation_cell<mesh_type>
+    law_cell_type
     getCellIVs(const int cell_id) const
     {
         return m_list_cell_qp.at(cell_id);

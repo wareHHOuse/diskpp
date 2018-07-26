@@ -125,13 +125,18 @@ class LinearIsotropicAndKinematicHardening_Data
     }
 };
 
-template<typename scalar_type, int DIM>
+template<typename T, int DIM>
 class LinearIsotropicAndKinematicHardening_qp
 {
+  public:
+    typedef T                                                      scalar_type;
     typedef static_matrix<scalar_type, DIM, DIM>                   static_matrix_type;
     typedef static_matrix<scalar_type, 3, 3>                       static_matrix_type3D;
     typedef LinearIsotropicAndKinematicHardening_Data<scalar_type> data_type;
 
+    const static size_t dimension = DIM;
+
+  private:
     static_matrix_type3D zero_matrix = static_matrix_type3D::Zero();
 
     // coordinat and weight of considered gauss point.
@@ -173,6 +178,12 @@ class LinearIsotropicAndKinematicHardening_qp
     }
 
   public:
+    LinearIsotropicAndKinematicHardening_qp() :
+      m_weight(0), m_estrain_prev(zero_matrix), m_pstrain_prev(zero_matrix), m_p_prev(scalar_type(0)),
+      m_estrain_curr(zero_matrix), m_pstrain_curr(zero_matrix), m_p_curr(scalar_type(0)), m_is_plastic_curr(false)
+    {
+    }
+
     LinearIsotropicAndKinematicHardening_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) :
       m_point(point), m_weight(weight), m_estrain_prev(zero_matrix), m_pstrain_prev(zero_matrix),
       m_p_prev(scalar_type(0)), m_estrain_curr(zero_matrix), m_pstrain_curr(zero_matrix), m_p_curr(scalar_type(0)),

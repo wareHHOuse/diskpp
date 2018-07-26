@@ -45,19 +45,21 @@ namespace disk
 template<typename MeshType>
 class LinearIsotropicAndKinematicHardening_cell
 {
-  private:
+  public:
     typedef MeshType                        mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::cell        cell_type;
 
-    typedef LinearIsotropicAndKinematicHardening_Data<scalar_type> material_type;
+    typedef LinearIsotropicAndKinematicHardening_qp<scalar_type, mesh_type::dimension> law_qp_type;
+    typedef LinearIsotropicAndKinematicHardening_Data<scalar_type> data_type;
 
     typedef dynamic_matrix<scalar_type> matrix_type;
     typedef dynamic_vector<scalar_type> vector_type;
 
     const static size_t dimension = mesh_type::dimension;
 
-    std::vector<LinearIsotropicAndKinematicHardening_qp<scalar_type, dimension>> m_list_qp;
+  private:
+    std::vector<law_qp_type> m_list_qp;
 
   public:
     LinearIsotropicAndKinematicHardening_cell(const mesh_type& msh, const cell_type& cl, const int degree)
@@ -69,9 +71,7 @@ class LinearIsotropicAndKinematicHardening_cell
 
         for (auto& qp : qps)
         {
-            const LinearIsotropicAndKinematicHardening_qp<scalar_type, dimension> gp(qp.point(), qp.weight());
-
-            m_list_qp.push_back(gp);
+            m_list_qp.push_back(law_qp_type(qp.point(), qp.weight()));
         }
     }
 
@@ -90,13 +90,13 @@ class LinearIsotropicAndKinematicHardening_cell
         }
     }
 
-    std::vector<LinearIsotropicAndKinematicHardening_qp<scalar_type, dimension>>&
+    std::vector<law_qp_type>&
     getQPs()
     {
         return m_list_qp;
     }
 
-    std::vector<LinearIsotropicAndKinematicHardening_qp<scalar_type, dimension>>
+    std::vector<law_qp_type>
     getIVs() const
     {
         return m_list_qp;
@@ -106,7 +106,7 @@ class LinearIsotropicAndKinematicHardening_cell
     projectStressOnCell(const mesh_type&                   msh,
                         const cell_type&                   cl,
                         const disk::hho_degree_info& hdi,
-                        const material_type&               material_data) const
+                        const data_type&               material_data) const
     {
         const auto grad_degree     = hdi.grad_degree();
         const int  grad_basis_size = disk::sym_matrix_basis_size(grad_degree, dimension, dimension);
