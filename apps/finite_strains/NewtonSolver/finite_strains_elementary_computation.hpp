@@ -179,6 +179,7 @@ class finite_strains
         // std::cout << uTF.transpose() << std::endl;
 
         const vector_type GT_uTF = GT * uTF;
+        const auto        Id     = static_matrix<scalar_type, dimension, dimension>::Identity();
 
         // std::cout << "ET: " << GsT.norm() << std::endl;
         // std::cout << GsT << std::endl;
@@ -198,7 +199,7 @@ class finite_strains
             // Compute local gradient and norm
             //std::cout << "GT_utf: " << GsT_uTF << std::endl;
             const auto GT_iqn = disk::eval(GT_uTF, gphi);
-            const gvt  incr_F = GT_iqn - qp.getTotalStrainPrev();
+            const gvt  F_curr = GT_iqn + Id;
             // std::cout << "Em" << std::endl;
             // std::cout << qp.getTotalStrainPrev() << std::endl;
             // std::cout << "dE" << std::endl;
@@ -206,7 +207,7 @@ class finite_strains
 
             // Compute bahavior
             tc.tic();
-            const auto tensor_behavior = qp.compute_whole(incr_F, material_data, !elatic_modulus);
+            const auto tensor_behavior = qp.compute_whole(F_curr, material_data, !elatic_modulus);
             tc.toc();
             time_law += tc.to_double();
 

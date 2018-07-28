@@ -26,8 +26,9 @@
 #pragma once
 
 #include "common/eigen.hpp"
-#include "mechanics/behaviors/maths_tensor.hpp"
-#include "mechanics/behaviors/maths_utils.hpp"
+#include "core/mechanics/behaviors/maths_tensor.hpp"
+#include "core/mechanics/behaviors/maths_utils.hpp"
+#include "core/mechanics/behaviors/tensor_conversion.hpp"
 #include "mesh/point.hpp"
 
 #define _USE_MATH_DEFINES
@@ -137,8 +138,6 @@ class LinearIsotropicAndKinematicHardening_qp
     const static size_t dimension = DIM;
 
   private:
-    static_matrix_type3D zero_matrix = static_matrix_type3D::Zero();
-
     // coordinat and weight of considered gauss point.
     point<scalar_type, DIM> m_point;
     scalar_type             m_weight;
@@ -154,12 +153,12 @@ class LinearIsotropicAndKinematicHardening_qp
     scalar_type          m_p_curr;          // cumulate plastic strain
     bool                 m_is_plastic_curr; // the gauss point is plastic ?
 
-    static_tensor<scalar_type, DIM>
+    static_tensor<scalar_type, 3>
     elastic_modulus(const data_type& data) const
     {
 
-        return 2 * data.getMu() * compute_IdentitySymTensor<scalar_type, DIM>() +
-               data.getLambda() * compute_IxI<scalar_type, DIM>();
+        return 2 * data.getMu() * compute_IdentitySymTensor<scalar_type, 3>() +
+               data.getLambda() * compute_IxI<scalar_type, 3>();
     }
 
     scalar_type
@@ -168,26 +167,19 @@ class LinearIsotropicAndKinematicHardening_qp
         return sqrt(scalar_type(1.5) * dev.squaredNorm());
     }
 
-    static_matrix_type3D
-    convert3D(const static_matrix_type& mat) const
-    {
-        static_matrix_type3D ret  = zero_matrix;
-        ret.block(0, 0, DIM, DIM) = mat;
-
-        return ret;
-    }
-
   public:
     LinearIsotropicAndKinematicHardening_qp() :
-      m_weight(0), m_estrain_prev(zero_matrix), m_pstrain_prev(zero_matrix), m_p_prev(scalar_type(0)),
-      m_estrain_curr(zero_matrix), m_pstrain_curr(zero_matrix), m_p_curr(scalar_type(0)), m_is_plastic_curr(false)
+      m_weight(0), m_estrain_prev(static_matrix_type3D::Zero()), m_pstrain_prev(static_matrix_type3D::Zero()),
+      m_p_prev(scalar_type(0)), m_estrain_curr(static_matrix_type3D::Zero()),
+      m_pstrain_curr(static_matrix_type3D::Zero()), m_p_curr(scalar_type(0)), m_is_plastic_curr(false)
     {
     }
 
     LinearIsotropicAndKinematicHardening_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) :
-      m_point(point), m_weight(weight), m_estrain_prev(zero_matrix), m_pstrain_prev(zero_matrix),
-      m_p_prev(scalar_type(0)), m_estrain_curr(zero_matrix), m_pstrain_curr(zero_matrix), m_p_curr(scalar_type(0)),
-      m_is_plastic_curr(false)
+      m_point(point), m_weight(weight), m_estrain_prev(static_matrix_type3D::Zero()),
+      m_pstrain_prev(static_matrix_type3D::Zero()), m_p_prev(scalar_type(0)),
+      m_estrain_curr(static_matrix_type3D::Zero()), m_pstrain_curr(static_matrix_type3D::Zero()),
+      m_p_curr(scalar_type(0)), m_is_plastic_curr(false)
     {
     }
 
@@ -224,13 +216,13 @@ class LinearIsotropicAndKinematicHardening_qp
     static_matrix_type
     getTotalStrain() const
     {
-        return (m_estrain_curr + m_pstrain_curr).block(0, 0, DIM, DIM);
+        return convertMatrix<scalar_type, DIM>(m_estrain_curr + m_pstrain_curr);
     }
 
     static_matrix_type
     getTotalStrainPrev() const
     {
-        return (m_estrain_prev + m_pstrain_prev).block(0, 0, DIM, DIM);
+        return convertMatrix<scalar_type, DIM>(m_estrain_prev + m_pstrain_prev);
     }
 
     scalar_type
@@ -247,14 +239,20 @@ class LinearIsotropicAndKinematicHardening_qp
         m_p_prev       = m_p_curr;
     }
 
-    static_matrix_type
-    compute_stress(const data_type& data) const
+    static_matrix_type3D
+    compute_stress3D(const data_type& data) const
     {
         const static_matrix_type3D Id = static_matrix_type3D::Identity();
 
         const auto stress = 2 * data.getMu() * m_estrain_curr + data.getLambda() * m_estrain_curr.trace() * Id;
 
-        return stress.block(0, 0, DIM, DIM);
+        return stress;
+    }
+
+    static_matrix_type
+    compute_stress(const data_type& data) const
+    {
+        return convertMatrix<scalar_type, DIM>(compute_stress3D(data));
     }
 
     static_matrix_type
@@ -264,22 +262,24 @@ class LinearIsotropicAndKinematicHardening_qp
 
         const auto stress = 2 * data.getMu() * m_estrain_prev + data.getLambda() * m_estrain_prev.trace() * Id;
 
-        return stress.block(0, 0, DIM, DIM);
+        return convertMatrix<scalar_type, DIM>(stress);
     }
 
-    std::pair<static_matrix_type, static_tensor<scalar_type, DIM>>
-    compute_whole(const static_matrix_type& incr_strain, const data_type& data, bool tangentmodulus = true)
+    std::pair<static_matrix_type3D, static_tensor<scalar_type, 3>>
+    compute_whole3D(const static_matrix_type3D& strain_curr, const data_type& data, bool tangentmodulus = true)
     {
-        static_tensor<scalar_type, DIM> Cep = elastic_modulus(data);
+        static_tensor<scalar_type, 3> Cep = elastic_modulus(data);
 
         // prediction
-        const static_matrix_type3D estrain_trial = m_estrain_prev + convert3D(incr_strain); // elastic strain trial
-        const static_matrix_type3D X_prev        = data.getK() * m_pstrain_prev;            // back-stress previous
+        const static_matrix_type3D incr_strain   = strain_curr - convertMatrix3D(this->getTotalStrainPrev());
+        const static_matrix_type3D estrain_trial = m_estrain_prev + incr_strain; // elastic strain trial
+        const static_matrix_type3D X_prev        = data.getK() * m_pstrain_prev; // back-stress previous
+        const static_matrix_type3D se            = 2 * data.getMu() * deviator(estrain_trial) - X_prev;
+        const scalar_type          se_eq         = sigmaeq(se);
+        const scalar_type          Phi_trial     = se_eq - data.getSigma_y0() - data.getH() * m_p_prev;
+
         assert(std::abs(X_prev.trace()) <= 1E-8);
-        const static_matrix_type3D se = 2 * data.getMu() * deviator(estrain_trial) - X_prev;
         assert(std::abs(se.trace()) <= 1E-8);
-        const scalar_type se_eq     = sigmaeq(se);
-        const scalar_type Phi_trial = se_eq - data.getSigma_y0() - data.getH() * m_p_prev;
 
         // check
         if (Phi_trial < scalar_type(0))
@@ -313,12 +313,11 @@ class LinearIsotropicAndKinematicHardening_qp
             if (tangentmodulus)
             {
                 // compute cep coherent
-                const static_matrix_type              n    = normal.block(0, 0, DIM, DIM);
-                const static_tensor<scalar_type, DIM> nxn  = computeKroneckerProduct(n, n);
-                const static_tensor<scalar_type, DIM> IxI  = compute_IxI<scalar_type, DIM>();
-                const static_tensor<scalar_type, DIM> Is   = compute_IdentityTensor<scalar_type, DIM>();
-                const static_tensor<scalar_type, DIM> Pdev = Is - IxI / scalar_type(DIM);
-                const scalar_type                     mu2  = data.getMu() * data.getMu();
+                const static_tensor<scalar_type, 3> nxn  = computeKroneckerProduct(normal, normal);
+                const static_tensor<scalar_type, 3> IxI  = compute_IxI<scalar_type, 3>();
+                const static_tensor<scalar_type, 3> Is   = compute_IdentityTensor<scalar_type, 3>();
+                const static_tensor<scalar_type, 3> Pdev = Is - IxI / scalar_type(3);
+                const scalar_type                   mu2  = data.getMu() * data.getMu();
 
                 Cep += 4 * mu2 * (delta_p / se_eq - 1.0 / dem) * nxn - 6.0 * mu2 * delta_p / se_eq * Pdev;
             }
@@ -339,7 +338,7 @@ class LinearIsotropicAndKinematicHardening_qp
         // std::cout << m_estrain_curr + m_pstrain_curr << std::endl;
 
         // compute Cauchy stress
-        const static_matrix_type stress = this->compute_stress(data);
+        const static_matrix_type3D stress = this->compute_stress3D(data);
 
         // std::cout << "stress:" << std::endl;
         // std::cout << stress << std::endl;
@@ -350,6 +349,18 @@ class LinearIsotropicAndKinematicHardening_qp
 
         // std::cout << "p:" << std::endl;
         // std::cout << m_p_curr << std::endl;
+
+        return std::make_pair(stress, Cep);
+    }
+
+    std::pair<static_matrix_type, static_tensor<scalar_type, DIM>>
+    compute_whole(const static_matrix_type& strain_curr, const data_type& data, bool tangentmodulus = true)
+    {
+        const static_matrix_type3D strain3D_curr = convertMatrix3D(strain_curr);
+        const auto                 behaviors3D   = this->compute_whole3D(strain3D_curr, data, tangentmodulus);
+
+        const static_matrix_type              stress = convertMatrix<scalar_type, DIM>(behaviors3D.first);
+        const static_tensor<scalar_type, DIM> Cep    = convertTensor<scalar_type, DIM>(behaviors3D.second);
 
         return std::make_pair(stress, Cep);
     }

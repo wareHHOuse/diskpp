@@ -170,7 +170,6 @@ class plasticity
             // Compute local gradient and norm
             //std::cout << "GT_utf: " << GsT_uTF << std::endl;
             const auto GsT_iqn     = disk::eval(GsT_uTF, gphi);
-            const gvt  incr_strain = GsT_iqn - qp.getTotalStrainPrev();
             // std::cout << "Em" << std::endl;
             // std::cout << qp.getTotalStrainPrev() << std::endl;
             // std::cout << "dE" << std::endl;
@@ -178,7 +177,7 @@ class plasticity
 
             // Compute bahavior
             tc.tic();
-            const auto tensor_behavior = qp.compute_whole(incr_strain, material_data, !elatic_modulus);
+            const auto tensor_behavior = qp.compute_whole(GsT_iqn, material_data, !elatic_modulus);
             tc.toc();
             time_law += tc.to_double();
 

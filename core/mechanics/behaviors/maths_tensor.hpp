@@ -34,76 +34,7 @@ namespace disk
 // | A1111  A1112  A1211  A1212 |
 // | A1121  A1122  A1221  A1222 |
 // | A2111  A2112  A2211  A2212 |
-// | A2112  A2122  A2221  A2222 |
-
-// Convert Matrix in Coulum vector
-
-template<typename T, int DIM>
-void
-converttovector(const static_matrix<T, DIM, DIM>& mat)
-{
-    static_assert((DIM == 2 || DIM == 3), "Can not compute conversion for this dimension");
-}
-
-template<typename T>
-static_vector<T, 4>
-converttovector(const static_matrix<T, 2, 2>& mat)
-{
-    return static_vector<T, 4>{mat(0, 0), mat(1, 0), mat(0, 1), mat(1, 1)};
-}
-
-template<typename T>
-static_vector<T, 9>
-converttovector(const static_matrix<T, 3, 3>& mat)
-{
-    return static_vector<T, 9>{
-      mat(0, 0), mat(1, 0), mat(2, 0), mat(0, 1), mat(1, 1), mat(2, 1), mat(0, 2), mat(1, 2), mat(2, 2)};
-}
-
-// Convert vector in matrix
-
-template<typename T, int DIM>
-void
-converttomatrix(const static_vector<T, DIM>& vec)
-{
-    static_assert((DIM == 4 || DIM == 9), "Can not compute conversion for this dimension");
-}
-
-template<typename T>
-static_matrix<T, 2, 2>
-converttomatrix(const static_vector<T, 4>& vec)
-{
-    static_matrix<T, 2, 2> mat;
-
-    mat(0, 0) = vec(0);
-    mat(1, 0) = vec(1);
-
-    mat(0, 1) = vec(2);
-    mat(1, 1) = vec(3);
-
-    return mat;
-}
-
-template<typename T>
-static_matrix<T, 3, 3>
-converttomatrix(const static_vector<T, 9>& vec)
-{
-    static_matrix<T, 3, 3> mat;
-
-    mat(1, 0) = vec(0);
-    mat(2, 0) = vec(1);
-    mat(3, 0) = vec(2);
-
-    mat(1, 1) = vec(3);
-    mat(2, 1) = vec(4);
-    mat(3, 1) = vec(5);
-
-    mat(1, 2) = vec(6);
-    mat(2, 2) = vec(7);
-    mat(3, 2) = vec(8);
-
-    return mat;
-}
+// | A2121  A2122  A2221  A2222 |
 
 // Put it in Line
 template<typename T, int DIM2> // DIM2 = DIM*DIM
@@ -221,6 +152,35 @@ computeKroneckerProduct(const static_matrix<T, DIM, DIM>& A, const static_matrix
         }
     }
     return ret;
+}
+
+template<typename T, int DIM>
+static_matrix<T, DIM, DIM>
+computeKroneckerProduct(const static_vector<T, DIM>& A, const static_vector<T, DIM>& B)
+{
+    return A * B.transpose();
+}
+
+// contracted product
+template<typename T, int DIM>
+T
+computeContractedProduct(const static_vector<T, DIM>& A, const static_vector<T, DIM>& B)
+{
+    return A.dot(B);
+}
+
+template<typename T, int DIM>
+T
+computeContractedProduct(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DIM, DIM>& B)
+{
+    return A.cwiseProduct(B).sum();
+}
+
+template<typename T, int DIM>
+static_matrix<T, DIM, DIM>
+computeContractedProduct(const static_tensor<T, DIM>& Tens, const static_matrix<T, DIM, DIM>& B)
+{
+    return tm_prod(Tens, B);
 }
 
 // T_ijkl = A_ik B_jl
@@ -354,5 +314,153 @@ static_tensor<T, DIM>
 compute_IxI()
 {
     return static_tensor<T, DIM>::Identity();
+}
+
+template<typename T>
+static_tensor<T, 3>
+transpose(const static_tensor<T, 3>& tens)
+{
+    static_tensor<T, 3> ret;
+
+    // block 11
+    ret(0, 0) = tens(0, 0);
+    ret(0, 1) = tens(0, 3);
+    ret(0, 2) = tens(0, 6);
+    ret(1, 0) = tens(3, 0);
+    ret(1, 1) = tens(3, 3);
+    ret(1, 2) = tens(3, 6);
+    ret(2, 0) = tens(6, 0);
+    ret(2, 1) = tens(6, 3);
+    ret(2, 2) = tens(6, 6);
+
+    // block 12
+    ret(0, 3) = tens(0, 1);
+    ret(0, 4) = tens(0, 4);
+    ret(0, 5) = tens(0, 7);
+    ret(1, 3) = tens(3, 1);
+    ret(1, 4) = tens(3, 4);
+    ret(1, 5) = tens(3, 7);
+    ret(2, 3) = tens(6, 1);
+    ret(2, 4) = tens(6, 4);
+    ret(2, 5) = tens(6, 7);
+
+    // block 13
+    ret(0, 6) = tens(0, 2);
+    ret(0, 7) = tens(0, 5);
+    ret(0, 8) = tens(0, 8);
+    ret(1, 6) = tens(3, 2);
+    ret(1, 7) = tens(3, 5);
+    ret(1, 8) = tens(3, 8);
+    ret(2, 6) = tens(6, 2);
+    ret(2, 7) = tens(6, 5);
+    ret(2, 8) = tens(6, 0);
+
+    // block 21
+    ret(3, 0) = tens(1, 0);
+    ret(3, 1) = tens(1, 3);
+    ret(3, 2) = tens(1, 6);
+    ret(4, 0) = tens(4, 0);
+    ret(4, 1) = tens(4, 3);
+    ret(4, 2) = tens(4, 6);
+    ret(5, 0) = tens(7, 0);
+    ret(5, 1) = tens(7, 3);
+    ret(5, 2) = tens(7, 6);
+
+    // block 22
+    ret(3, 3) = tens(1, 1);
+    ret(3, 4) = tens(1, 4);
+    ret(3, 5) = tens(1, 7);
+    ret(4, 3) = tens(4, 1);
+    ret(4, 4) = tens(4, 4);
+    ret(4, 5) = tens(4, 7);
+    ret(5, 3) = tens(7, 1);
+    ret(5, 4) = tens(7, 4);
+    ret(5, 5) = tens(7, 7);
+
+    // block 23
+    ret(3, 6) = tens(1, 2);
+    ret(3, 7) = tens(1, 5);
+    ret(3, 8) = tens(1, 8);
+    ret(4, 6) = tens(4, 2);
+    ret(4, 7) = tens(4, 5);
+    ret(4, 8) = tens(4, 8);
+    ret(5, 6) = tens(7, 2);
+    ret(5, 7) = tens(7, 5);
+    ret(5, 8) = tens(7, 8);
+
+    // block 31
+    ret(6, 0) = tens(2, 0);
+    ret(6, 1) = tens(2, 3);
+    ret(6, 2) = tens(2, 6);
+    ret(7, 0) = tens(5, 0);
+    ret(7, 1) = tens(5, 3);
+    ret(7, 2) = tens(5, 6);
+    ret(8, 0) = tens(8, 0);
+    ret(8, 1) = tens(8, 3);
+    ret(8, 2) = tens(8, 6);
+
+    // block 32
+    ret(6, 3) = tens(2, 1);
+    ret(6, 4) = tens(2, 4);
+    ret(6, 5) = tens(2, 7);
+    ret(7, 3) = tens(5, 1);
+    ret(7, 4) = tens(5, 4);
+    ret(7, 5) = tens(5, 7);
+    ret(8, 3) = tens(8, 1);
+    ret(8, 4) = tens(8, 4);
+    ret(8, 5) = tens(8, 7);
+
+    // block 33
+    ret(6, 6) = tens(2, 2);
+    ret(6, 7) = tens(2, 5);
+    ret(6, 8) = tens(2, 8);
+    ret(7, 6) = tens(5, 2);
+    ret(7, 7) = tens(5, 5);
+    ret(7, 8) = tens(5, 8);
+    ret(8, 6) = tens(8, 2);
+    ret(8, 7) = tens(8, 5);
+    ret(8, 8) = tens(8, 8);
+
+    return ret;
+}
+
+template<typename T>
+static_tensor<T, 2>
+transpose(const static_tensor<T, 2>& tens)
+{
+    static_tensor<T, 2> ret;
+
+    // block 11
+    ret(0, 0) = tens(0, 0);
+    ret(0, 1) = tens(0, 2);
+    ret(1, 0) = tens(2, 0);
+    ret(1, 1) = tens(2, 2);
+
+    // block 12
+    ret(0, 2) = tens(0, 1);
+    ret(0, 3) = tens(0, 3);
+    ret(1, 2) = tens(2, 1);
+    ret(1, 3) = tens(2, 3);
+
+    // block 21
+    ret(2, 0) = tens(1, 0);
+    ret(2, 1) = tens(1, 2);
+    ret(3, 0) = tens(3, 0);
+    ret(3, 1) = tens(3, 2);
+
+    // block 22
+    ret(2, 2) = tens(1, 1);
+    ret(2, 3) = tens(1, 3);
+    ret(3, 2) = tens(3, 1);
+    ret(3, 3) = tens(3, 3);
+
+    return ret;
+}
+
+template<typename T, int DIM>
+static_tensor<T, DIM>
+symetric_part(const static_tensor<T, DIM>& tens)
+{
+    return (tens + transpose(tens)) / T(2);
 }
 }

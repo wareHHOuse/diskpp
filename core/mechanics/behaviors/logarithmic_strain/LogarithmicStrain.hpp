@@ -28,9 +28,8 @@
 #include <vector>
 
 #include "common/eigen.hpp"
-#include "mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "core/mechanics/behaviors/logarithmic_strain/LogarithmicStrain_cell.hpp"
-
+#include "mechanics/behaviors/laws/behaviorlaws.hpp"
 
 namespace disk
 {

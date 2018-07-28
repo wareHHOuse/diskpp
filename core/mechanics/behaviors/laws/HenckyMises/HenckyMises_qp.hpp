@@ -26,8 +26,9 @@
 #pragma once
 
 #include "common/eigen.hpp"
-#include "mechanics/behaviors/maths_tensor.hpp"
-#include "mechanics/behaviors/maths_utils.hpp"
+#include "core/mechanics/behaviors/maths_tensor.hpp"
+#include "core/mechanics/behaviors/maths_utils.hpp"
+#include "core/mechanics/behaviors/tensor_conversion.hpp"
 #include "mesh/point.hpp"
 
 #define _USE_MATH_DEFINES
@@ -108,7 +109,6 @@ class HenckyMises_qp
     const static size_t dimension = DIM;
 
   private:
-    static_matrix_type3D zero_matrix = static_matrix_type3D::Zero();
 
     // coordinat and weight of considered gauss point.
     point<scalar_type, DIM> m_point;
@@ -154,23 +154,15 @@ class HenckyMises_qp
                data.getLambda() * compute_IxI<scalar_type, DIM>();
     }
 
-    static_matrix_type3D
-    convert3D(const static_matrix_type& mat) const
-    {
-        static_matrix_type3D ret  = zero_matrix;
-        ret.block(0, 0, DIM, DIM) = mat;
-
-        return ret;
-    }
 
   public:
     HenckyMises_qp() :
-      m_weight(0), m_estrain_prev(zero_matrix), m_estrain_curr(zero_matrix)
+      m_weight(0), m_estrain_prev(static_matrix_type3D::Zero()), m_estrain_curr(static_matrix_type3D::Zero())
     {
     }
 
     HenckyMises_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) :
-      m_point(point), m_weight(weight), m_estrain_prev(zero_matrix), m_estrain_curr(zero_matrix)
+      m_point(point), m_weight(weight), m_estrain_prev(static_matrix_type3D::Zero()), m_estrain_curr(static_matrix_type3D::Zero())
     {
     }
 
@@ -201,7 +193,7 @@ class HenckyMises_qp
     static_matrix_type3D
     getPlasticStrain() const
     {
-        return zero_matrix;
+        return static_matrix_type3D::Zero();
     }
 
     static_matrix_type
@@ -240,12 +232,12 @@ class HenckyMises_qp
     }
 
     std::pair<static_matrix_type, static_tensor<scalar_type, DIM>>
-    compute_whole(const static_matrix_type& incr_strain, const data_type& data, bool tangentmodulus = true)
+    compute_whole(const static_matrix_type& strain_curr, const data_type& data, bool tangentmodulus = true)
     {
         static_tensor<scalar_type, DIM> Cep = elastic_modulus(data);
 
         // is always elastic
-        m_estrain_curr = m_estrain_prev + convert3D(incr_strain);
+        m_estrain_curr = convertMatrix3D(strain_curr);
 
         // compute Cauchy stress
         const static_matrix_type stress = this->compute_stress(data);

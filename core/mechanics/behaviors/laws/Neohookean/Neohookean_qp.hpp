@@ -26,9 +26,10 @@
 #pragma once
 
 #include "common/eigen.hpp"
-#include "mechanics/behaviors/maths_tensor.hpp"
-#include "mechanics/behaviors/maths_utils.hpp"
-#include "mechanics/deformation_tensors.hpp"
+#include "core/mechanics/behaviors/maths_tensor.hpp"
+#include "core/mechanics/behaviors/maths_utils.hpp"
+#include "core/mechanics/behaviors/tensor_conversion.hpp"
+#include "core/mechanics/deformation_tensors.hpp"
 #include "mesh/point.hpp"
 
 #define _USE_MATH_DEFINES
@@ -152,14 +153,6 @@ class Neohookean_qp
                data.getLambda() * compute_IxI<scalar_type, DIM>();
     }
 
-    static_matrix_type3D
-    convert3D(const static_matrix_type& mat) const
-    {
-        static_matrix_type3D ret  = zero_matrix3D;
-        ret.block(0, 0, DIM, DIM) = mat;
-
-        return ret;
-    }
 
     scalar_type
     compute_U(const data_type& data, scalar_type J) const
@@ -263,7 +256,7 @@ class Neohookean_qp
     static_matrix_type3D
     getElasticStrain() const
     {
-        return convert3D(m_F_curr);
+        return convertMatrix3DwithOne(m_F_curr);
     }
 
     static_matrix_type3D
@@ -347,10 +340,10 @@ class Neohookean_qp
     }
 
     std::pair<static_matrix_type, static_tensor<scalar_type, DIM>>
-    compute_whole(const static_matrix_type& incr_F, const data_type& data, bool tangentmodulus = true)
+    compute_whole(const static_matrix_type& F_curr, const data_type& data, bool tangentmodulus = true)
     {
         // is always elastic
-        m_F_curr = m_F_prev + incr_F;
+        m_F_curr = F_curr;
 
         const auto PK1 = this->compute_stress(data);
         const auto A   = this->compute_tangent_moduli_A(data);

@@ -26,9 +26,10 @@
 #pragma once
 
 #include "common/eigen.hpp"
-#include "mechanics/behaviors/maths_tensor.hpp"
-#include "mechanics/behaviors/maths_utils.hpp"
-#include "mechanics/deformation_tensors.hpp"
+#include "core/mechanics/behaviors/tensor_conversion.hpp"
+#include "core/mechanics/behaviors/maths_tensor.hpp"
+#include "core/mechanics/behaviors/maths_utils.hpp"
+#include "core/mechanics/deformation_tensors.hpp"
 #include "mesh/point.hpp"
 
 #define _USE_MATH_DEFINES
@@ -133,8 +134,6 @@ class Cavitation_qp
     const static size_t dimension = DIM;
 
   private:
-    static_matrix_type3D zero_matrix3D = static_matrix_type3D::Zero();
-    static_matrix_type   zero_matrix   = static_matrix_type::Zero();
 
     // coordinat and weight of considered gauss point.
     point<scalar_type, DIM> m_point;
@@ -152,15 +151,6 @@ class Cavitation_qp
 
         return 2 * data.getMu() * compute_IdentitySymTensor<scalar_type, DIM>() +
                data.getLambda() * compute_IxI<scalar_type, DIM>();
-    }
-
-    static_matrix_type3D
-    convert3D(const static_matrix_type& mat) const
-    {
-        static_matrix_type3D ret  = zero_matrix3D;
-        ret.block(0, 0, DIM, DIM) = mat;
-
-        return ret;
     }
 
     scalar_type
@@ -243,12 +233,12 @@ class Cavitation_qp
 
   public:
     Cavitation_qp() :
-      m_weight(0), m_F_prev(zero_matrix), m_F_curr(zero_matrix)
+      m_weight(0), m_F_prev(static_matrix_type::Zero()), m_F_curr(static_matrix_type::Zero())
     {
     }
 
     Cavitation_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) :
-      m_point(point), m_weight(weight), m_F_prev(zero_matrix), m_F_curr(zero_matrix)
+      m_point(point), m_weight(weight), m_F_prev(static_matrix_type::Zero()), m_F_curr(static_matrix_type::Zero())
     {
     }
 
@@ -273,13 +263,13 @@ class Cavitation_qp
     static_matrix_type3D
     getElasticStrain() const
     {
-        return convert3D(m_F_curr);
+        return convertMatrix3DwithOne(m_F_curr);
     }
 
     static_matrix_type3D
     getPlasticStrain() const
     {
-        return zero_matrix3D;
+        return static_matrix_type3D::Zero();
     }
 
     static_matrix_type
@@ -365,10 +355,10 @@ class Cavitation_qp
     }
 
     std::pair<static_matrix_type, static_tensor<scalar_type, DIM>>
-    compute_whole(const static_matrix_type& incr_F, const data_type& data, bool tangentmodulus = true)
+    compute_whole(const static_matrix_type& F_curr, const data_type& data, bool tangentmodulus = true)
     {
         // is always elastic
-        m_F_curr = m_F_prev + incr_F;
+        m_F_curr = F_curr;
 
         const auto PK1 = this->compute_stress(data);
         const auto A   = this->compute_tangent_moduli_A(data);
