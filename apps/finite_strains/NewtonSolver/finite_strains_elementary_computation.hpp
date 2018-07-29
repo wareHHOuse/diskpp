@@ -207,7 +207,7 @@ class finite_strains
 
             // Compute bahavior
             tc.tic();
-            const auto tensor_behavior = qp.compute_whole(F_curr, material_data, !elatic_modulus);
+            const auto tensor_behavior = qp.compute_whole(F_curr, material_data, elatic_modulus);
             tc.toc();
             time_law += tc.to_double();
 

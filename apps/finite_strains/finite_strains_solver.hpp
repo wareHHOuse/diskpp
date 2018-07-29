@@ -67,7 +67,7 @@ class finite_strains_solver
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
     typedef disk::mechanics::BoundaryConditions<mesh_type>   bnd_type;
-    typedef disk::LinearLaw<mesh_type>                       law_hpp_type;
+    typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_hpp_type;
     typedef disk::mechanics::LogarithmicStrain<law_hpp_type> law_type;
 
     typename disk::hho_degree_info m_hdi;
@@ -215,7 +215,8 @@ class finite_strains_solver
         m_hdi = disk::hho_degree_info(cell_degree, face_degree, grad_degree);
 
         m_law = law_type(m_msh, 2 * m_hdi.grad_degree());
-        m_law.addMaterialData(material_data.lambda, material_data.mu);
+        m_law.addMaterialData(
+          material_data.lambda, material_data.mu, material_data.H, material_data.K, material_data.sigma_y0);
 
         if (m_verbose)
         {

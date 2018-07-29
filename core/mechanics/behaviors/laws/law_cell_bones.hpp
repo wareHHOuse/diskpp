@@ -27,12 +27,12 @@
 
 #include <vector>
 
-#include "common/eigen.hpp"
-#include "mechanics/behaviors/laws/Cavitation/Cavitation_qp.hpp"
-#include "mechanics/behaviors/maths_tensor.hpp"
-#include "mechanics/behaviors/maths_utils.hpp"
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
+#include "core/bases/bases.hpp"
+#include "core/common/eigen.hpp"
+#include "core/mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "core/mechanics/behaviors/maths_tensor.hpp"
+#include "core/mechanics/behaviors/maths_utils.hpp"
+#include "core/quadratures/quadratures.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -40,18 +40,18 @@
 namespace disk
 {
 
-/// Law for Cavitation model in small deformations
+/// Law for LinearIsotropicAndKinematicHardening model in small deformations
 
-template<typename MeshType>
-class Cavitation_cell
+template<typename MeshType, typename LawTypeQp, bool PlasticBehavior>
+class LawTypeCellBones
 {
   public:
-    typedef MeshType                        mesh_type;
+    typedef MeshType                            mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::cell        cell_type;
+    typedef typename mesh_type::cell            cell_type;
 
-    typedef Cavitation_Data<scalar_type> data_type;
-    typedef Cavitation_qp<scalar_type, mesh_type::dimension> law_qp_type;
+    typedef LawTypeQp                     law_qp_type;
+    typedef typename LawTypeQp::data_type data_type;
 
     typedef dynamic_matrix<scalar_type> matrix_type;
     typedef dynamic_vector<scalar_type> vector_type;
@@ -59,10 +59,10 @@ class Cavitation_cell
     const static size_t dimension = mesh_type::dimension;
 
   private:
-    std::vector<Cavitation_qp<scalar_type, dimension>> m_list_qp;
+    std::vector<law_qp_type> m_list_qp;
 
   public:
-    Cavitation_cell(const mesh_type& msh, const cell_type& cl, const int degree)
+    LawTypeCellBones(const mesh_type& msh, const cell_type& cl, const size_t degree)
     {
         const auto qps = disk::integrate(msh, cl, degree);
 
@@ -103,10 +103,10 @@ class Cavitation_cell
     }
 
     vector_type
-    projectStressOnCell(const mesh_type&                   msh,
-                        const cell_type&                   cl,
+    projectStressOnCell(const mesh_type&             msh,
+                        const cell_type&             cl,
                         const disk::hho_degree_info& hdi,
-                        const data_type&               material_data) const
+                        const data_type&             material_data) const
     {
         const auto grad_degree     = hdi.grad_degree();
         const int  grad_basis_size = disk::sym_matrix_basis_size(grad_degree, dimension, dimension);
@@ -148,7 +148,27 @@ class Cavitation_cell
     projectPOnCell(const mesh_type& msh, const cell_type& cl, const disk::hho_degree_info& hdi) const
     {
         const auto grad_degree = hdi.grad_degree();
-        const auto pbs         = disk::scalar_basis_size(grad_degree, dimension);
+        const int  pbs         = disk::scalar_basis_size(grad_degree, dimension);
+
+        if (PlasticBehavior)
+        {
+            matrix_type mass = matrix_type::Zero(pbs, pbs);
+            vector_type rhs  = vector_type::Zero(pbs);
+
+            auto pb = disk::make_scalar_monomial_basis(msh, cl, grad_degree);
+
+            for (auto& qp : m_list_qp)
+            {
+                const auto pphi = pb.eval_functions(qp.point());
+                assert(pphi.size() == pbs);
+
+                mass += qp.weight() * disk::priv::outer_product(pphi, pphi);
+                rhs += qp.weight() * qp.getAccumulatedPlasticStrain() * pphi;
+            }
+
+            return mass.llt().solve(rhs);
+        }
+
         return vector_type::Zero(pbs);
     }
 
@@ -156,7 +176,31 @@ class Cavitation_cell
     projectStateOnCell(const mesh_type& msh, const cell_type& cl, const disk::hho_degree_info& hdi) const
     {
         const auto grad_degree = hdi.grad_degree();
-        const auto pbs         = disk::scalar_basis_size(grad_degree, dimension);
+        const int  pbs         = disk::scalar_basis_size(grad_degree, dimension);
+
+        if (PlasticBehavior)
+        {
+
+            matrix_type mass = matrix_type::Zero(pbs, pbs);
+            vector_type rhs  = vector_type::Zero(pbs);
+
+            auto pb = disk::make_scalar_monomial_basis(msh, cl, grad_degree);
+
+            for (auto& qp : m_list_qp)
+            {
+                const auto pphi = pb.eval_functions(qp.point());
+                assert(pphi.size() == pbs);
+
+                mass += qp.weight() * disk::priv::outer_product(pphi, pphi);
+                if (qp.is_plastic())
+                {
+                    rhs += qp.weight() * pphi;
+                }
+            }
+
+            return mass.llt().solve(rhs);
+        }
+
         return vector_type::Zero(pbs);
     }
 };

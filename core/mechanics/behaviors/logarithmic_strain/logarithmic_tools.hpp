@@ -75,7 +75,8 @@ template<typename T>
 static_matrix<T, 3, 3>
 compute_Elog(const static_vector<T, 3>& lambda_i, const static_matrix<T, 3, 3>& P)
 {
-    const Eigen::DiagonalMatrix<T, 3> D = Eigen::DiagonalMatrix<T, 3>(lambda_i[0], lambda_i[1], lambda_i[2]);
+    const static_vector<T, 3>         ei = compute_ei(lambda_i);
+    const Eigen::DiagonalMatrix<T, 3> D = Eigen::DiagonalMatrix<T, 3>(ei[0], ei[1], ei[2]);
 
     return P * D * P.transpose();
 }
@@ -97,7 +98,7 @@ compute_Ni(const static_matrix<T, 3, 3>& evec)
     return Ni;
 }
 
-// compute Ni
+// compute ni = F * Ni
 template<typename T>
 std::array<static_vector<T, 3>, 3>
 compute_ni(const static_matrix<T, 3, 3>& F, const std::array<static_vector<T, 3>, 3>& Ni)
@@ -386,6 +387,7 @@ compute_coefficient(const static_vector<T, 3>& lambda_i,
                     const static_vector<T, 3>& fi)
 {
     const int evcase = priv::selectCase(lambda_i);
+    std::cout << "CASE: " << evcase << std::endl;
     switch (evcase)
     {
         case THREE_DIFF: return priv::compute_three_diff(lambda_i, ei, di); break;

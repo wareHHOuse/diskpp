@@ -50,7 +50,10 @@ class LinearIsotropicAndKinematicHardening_Data
     scalar_type m_sigma_y0;
 
   public:
-    LinearIsotropicAndKinematicHardening_Data() : m_lambda(1.0), m_mu(1.0), m_H(0), m_K(0), m_sigma_y0(10E60) {}
+    LinearIsotropicAndKinematicHardening_Data() :
+      m_lambda(1.0), m_mu(1.0), m_H(0), m_K(0), m_sigma_y0(std::numeric_limits<scalar_type>::max())
+    {
+    }
 
     LinearIsotropicAndKinematicHardening_Data(const scalar_type& lambda,
                                               const scalar_type& mu,
@@ -59,6 +62,11 @@ class LinearIsotropicAndKinematicHardening_Data
                                               const scalar_type& sigma_y0) :
       m_lambda(lambda),
       m_mu(mu), m_H(H), m_K(K), m_sigma_y0(sigma_y0)
+    {
+    }
+
+    LinearIsotropicAndKinematicHardening_Data(const scalar_type& lambda, const scalar_type& mu) :
+      m_lambda(lambda), m_mu(mu), m_H(0), m_K(0), m_sigma_y0(std::numeric_limits<scalar_type>::max())
     {
     }
 

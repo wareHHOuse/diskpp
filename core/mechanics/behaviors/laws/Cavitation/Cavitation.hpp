@@ -28,12 +28,10 @@
 #include <vector>
 
 #include "common/eigen.hpp"
-#include "mechanics/behaviors/laws/Cavitation/Cavitation_cell.hpp"
+#include "mechanics/behaviors/laws/Cavitation/Cavitation_qp.hpp"
+#include "mechanics/behaviors/laws/law_cell_bones.hpp"
 #include "mechanics/behaviors/maths_tensor.hpp"
 #include "mechanics/behaviors/maths_utils.hpp"
-
-#define _USE_MATH_DEFINES
-#include <cmath>
 
 namespace disk
 {
@@ -44,13 +42,15 @@ template<typename MeshType>
 class Cavitation
 {
   public:
-    typedef MeshType                            mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::cell            cell_type;
-    typedef Cavitation_Data<scalar_type>        data_type;
-    typedef Cavitation_cell<mesh_type>          law_cell_type;
+    typedef MeshType                                         mesh_type;
+    typedef typename mesh_type::coordinate_type              scalar_type;
+    typedef typename mesh_type::cell                         cell_type;
+    typedef Cavitation_qp<scalar_type, mesh_type::dimension> law_qp_type;
+    typedef typename law_qp_type::data_type                  data_type;
 
   private:
+    typedef LawTypeCellBones<mesh_type, law_qp_type, false> law_cell_type;
+
     size_t                     m_nb_qp;
     std::vector<law_cell_type> m_list_cell_qp;
     data_type                  m_data;

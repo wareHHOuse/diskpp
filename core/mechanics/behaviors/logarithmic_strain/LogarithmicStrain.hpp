@@ -28,8 +28,9 @@
 #include <vector>
 
 #include "common/eigen.hpp"
-#include "core/mechanics/behaviors/logarithmic_strain/LogarithmicStrain_cell.hpp"
+#include "core/mechanics/behaviors/logarithmic_strain/LogarithmicStrain_qp.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "mechanics/behaviors/laws/law_cell_bones.hpp"
 
 namespace disk
 {
@@ -51,14 +52,16 @@ template<typename LawType>
 class LogarithmicStrain
 {
   public:
-    typedef LawType                               law_hpp_type;
-    typedef typename law_hpp_type::law_cell_type  law_hpp_cell_type;
-    typedef typename law_hpp_type::mesh_type      mesh_type;
-    typedef typename mesh_type::coordinate_type   scalar_type;
-    typedef typename mesh_type::cell              cell_type;
-    typedef typename law_hpp_cell_type::data_type data_type;
+    typedef LawType                             law_hpp_type;
+    typedef typename law_hpp_type::law_qp_type  law_hpp_qp_type;
+    typedef typename law_hpp_type::mesh_type    mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename law_hpp_qp_type::data_type data_type;
 
-    typedef typename disk::mechanics::LogarithmicStrain_cell<law_hpp_cell_type> law_cell_type;
+    typedef LogarithmicStrain_qp<law_hpp_qp_type> law_qp_type;
+
+    typedef LawTypeCellBones<mesh_type, law_qp_type, true> law_cell_type;
 
   private:
     size_t                     m_nb_qp;
@@ -87,6 +90,16 @@ class LogarithmicStrain
     addMaterialData(const scalar_type& lambda, const scalar_type& mu)
     {
         m_data = data_type(lambda, mu);
+    }
+
+    void
+    addMaterialData(const scalar_type& lambda,
+                    const scalar_type& mu,
+                    const scalar_type& H,
+                    const scalar_type& K,
+                    const scalar_type& sigma_y0)
+    {
+        m_data = data_type(lambda, mu, H, K, sigma_y0);
     }
 
     data_type
