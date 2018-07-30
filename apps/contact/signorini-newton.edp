@@ -22,8 +22,8 @@ Vh      uh, zh, duh, dzh, vh, wh;
 macro ah(u,v)  ( dx(u) *dx(v) + dy(u) * dy(v) )//EOM
 macro gnp()    ( gamma0 / hTriangle )       //EOM // Nitsche's parameter
 macro sigman(u)( dx(u)*N.x + dy(u)*N.y )    //EOM
-macro signoriniv(u) ( - gnp * u + sigman(u)) //EOM
-macro signoriniu(u) ( - gnp * u + sigman(u)* theta) //EOM
+macro signoriniu(u) ( - gnp * u + sigman(u)) //EOM
+macro signoriniv(u) ( - gnp * u + sigman(u)* theta) //EOM
 
 
 // 3. ******* Functions for Newton iterations ****************
