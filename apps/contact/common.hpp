@@ -156,7 +156,6 @@ make_is_contact_vector(const Mesh& msh,
     return ret;
 }
 
-
 template<typename T>
 static_matrix<T, 3, 3>
 make_fem_nitzsche(const disk::simplicial_mesh<T, 2>& msh,
