@@ -41,7 +41,7 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-#include "diffusion_nitzche_solver.hpp"
+#include "diffusion_nitsche_solver.hpp"
 
 
 template<typename MeshType, typename LoaderType>

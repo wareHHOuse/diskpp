@@ -34,7 +34,7 @@
 
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
-#include "diffusion_nitzche_solver.hpp"
+#include "diffusion_nitsche_solver.hpp"
 
 
 int main(int argc, char **argv)

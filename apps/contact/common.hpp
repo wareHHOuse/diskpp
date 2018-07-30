@@ -158,7 +158,7 @@ make_is_contact_vector(const Mesh& msh,
 
 template<typename T>
 static_matrix<T, 3, 3>
-make_fem_nitzsche(const disk::simplicial_mesh<T, 2>& msh,
+make_fem_nitsche(const disk::simplicial_mesh<T, 2>& msh,
         const typename disk::simplicial_mesh<T, 2>::cell& cl,
         const disk::mechanics::BoundaryConditionsScalar<disk::simplicial_mesh<T, 2>>& bnd,
         const T & gamma_0,
@@ -189,7 +189,7 @@ make_fem_nitzsche(const disk::simplicial_mesh<T, 2>& msh,
 
 template <typename Mesh>
 Matrix< typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_hho_nitzsche(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_hho_nitsche(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& rec,
             const typename Mesh::coordinate_type& gamma_0,
@@ -269,8 +269,7 @@ make_hho_consist_diff(const Mesh& msh, const typename Mesh::cell_type& cl,
 
         if (msh.is_boundary(fc))
         {
-            auto cb  = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
-            auto fb  = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
+            auto cb  = make_scalar_monomial_basis(msh, cl, recdeg);
             auto n   = normal(msh, cl, fc);
 
             auto quad_degree = std::max(recdeg-1, celdeg);
@@ -282,13 +281,10 @@ make_hho_consist_diff(const Mesh& msh, const typename Mesh::cell_type& cl,
                 // grad * rec * u * n
                 vector_type  sigma_n   = rec.transpose() * (c_dphi * n);
 
-
                 vector_type  c_phi_temp   = cb.eval_functions(qp.point());
                 vector_type  c_phi = c_phi_temp.block(0, 0, cbs, 1);
-                // v_T
-                vector_type v = c_phi;
 
-                ret.block(0,0, cbs, num_total_dofs) += qp.weight() * v * sigma_n.transpose();
+                ret.block(0,0, cbs, num_total_dofs) += qp.weight() * c_phi * sigma_n.transpose();
             }
         }
     }
@@ -301,7 +297,7 @@ Matrix< T, Dynamic, Dynamic>
 make_hho_consist_diff_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<T, Dynamic, Dynamic>& rec,
-            const T & gamma_0,
+            const T& gamma_0,
             const T& theta)
 {
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
@@ -353,7 +349,7 @@ make_hho_consist_diff_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
 
 template <typename Mesh, typename T, typename Function>
 std::pair<Matrix<T, Dynamic, Dynamic>, Matrix<T, Dynamic, 1>>
-make_hho_nitzsche_diff(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_hho_nitsche_diff(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<T, Dynamic, Dynamic>& rec,
             const T & gamma_0,
@@ -417,7 +413,7 @@ make_hho_nitzsche_diff(const Mesh& msh, const typename Mesh::cell_type& cl,
 
 template <typename Mesh, typename T, typename Function>
 std::pair<Matrix<T, Dynamic, Dynamic>, Matrix<T, Dynamic, 1>>
-make_hho_nitzsche_diff_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_hho_nitsche_diff_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<T, Dynamic, Dynamic>& rec,
             const T & gamma_0,

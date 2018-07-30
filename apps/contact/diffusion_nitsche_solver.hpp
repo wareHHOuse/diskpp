@@ -43,7 +43,12 @@ struct rhs_functor< Mesh<T, 2, Storage> >
     {
         auto cos_px = std::cos(M_PI * pt.x());
         auto cos_py = std::cos(M_PI * pt.y());
+
+        auto sin_px = std::sin(M_PI * pt.x());
+        auto sin_py = std::sin(M_PI * pt.y());
+
         return 2.0 * M_PI * M_PI * cos_px * cos_py;
+        //return 2.0 * M_PI * M_PI * sin_px * sin_py;
     }
 };
 
@@ -85,7 +90,12 @@ struct solution_functor< Mesh<T, 2, Storage> >
     {
         auto cos_px = std::cos(M_PI * pt.x());
         auto cos_py = std::cos(M_PI * pt.y());
+
+        auto sin_px = std::sin(M_PI * pt.x());
+        auto sin_py = std::sin(M_PI * pt.y());
+
         return cos_px * cos_py;
+        //return sin_px * sin_py;
     }
 };
 
@@ -115,7 +125,7 @@ using namespace revolution;
 
 template<typename Mesh>
 auto
-run_hho_diffusion_nitzche_faces(const Mesh& msh,
+run_hho_diffusion_nitsche_faces(const Mesh& msh,
     const algorithm_parameters<typename Mesh::scalar_type>& ap)
 {
     using T =  typename Mesh::scalar_type;
@@ -127,7 +137,7 @@ run_hho_diffusion_nitzche_faces(const Mesh& msh,
     auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
     auto rhs_fun = make_rhs_function(msh);
     auto sol_fun = make_solution_function(msh);
-    auto assembler = make_diffusion_assembler_nitzsche(msh, hdi);
+    auto assembler = make_diffusion_assembler_nitsche(msh, hdi);
 
     for (auto& cl : msh)
     {
@@ -138,8 +148,8 @@ run_hho_diffusion_nitzche_faces(const Mesh& msh,
         matrix_type Ah = gr.second + stab;
 
         matrix_type Aconsist   = matrix_type::Zero(Ah.rows(), Ah.cols());
-        matrix_type Anitzsche  = matrix_type::Zero(Ah.rows(), Ah.cols());
-        vector_type Bnitzsche  = vector_type::Zero(Ah.cols());
+        matrix_type Anitsche  = matrix_type::Zero(Ah.rows(), Ah.cols());
+        vector_type Bnitsche  = vector_type::Zero(Ah.cols());
 
         bool has_a_boundary_face = false;
         auto fcs = faces(msh, cl);
@@ -155,13 +165,13 @@ run_hho_diffusion_nitzche_faces(const Mesh& msh,
         if (has_a_boundary_face)
         {
             Aconsist   = make_hho_consist_diff_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta);
-            auto ntz   = make_hho_nitzsche_diff_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun );
-            Anitzsche  = ntz.first;
-            Bnitzsche  = ntz.second;
+            auto ntz   = make_hho_nitsche_diff_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun );
+            Anitsche  = ntz.first;
+            Bnitsche  = ntz.second;
         }
 
-        matrix_type A = Ah - Anitzsche - Aconsist;
-        vector_type rhs = -Bnitzsche;
+        matrix_type A = Ah - Anitsche - Aconsist;
+        vector_type rhs = -Bnitsche;
         rhs.block(0, 0, cbs, 1) += Lh;
         auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, rhs);
         assembler.assemble(msh, cl, sc.first, sc.second);
@@ -197,8 +207,8 @@ run_hho_diffusion_nitzche_faces(const Mesh& msh,
         matrix_type Ah = gr.second + stab;
 
         matrix_type Aconsist   = matrix_type::Zero(Ah.rows(), Ah.cols());
-        matrix_type Anitzsche  = matrix_type::Zero(Ah.rows(), Ah.cols());
-        vector_type Bnitzsche  = vector_type::Zero(Ah.rows());
+        matrix_type Anitsche  = matrix_type::Zero(Ah.rows(), Ah.cols());
+        vector_type Bnitsche  = vector_type::Zero(Ah.rows());
 
         bool has_a_boundary_face = false;
         auto fcs = faces(msh, cl);
@@ -214,13 +224,13 @@ run_hho_diffusion_nitzche_faces(const Mesh& msh,
         if (has_a_boundary_face)
         {
             Aconsist   = make_hho_consist_diff_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta);
-            auto ntz   = make_hho_nitzsche_diff_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun );
-            Anitzsche  = ntz.first;
-            Bnitzsche  = ntz.second;
+            auto ntz   = make_hho_nitsche_diff_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun );
+            Anitsche  = ntz.first;
+            Bnitsche  = ntz.second;
         }
 
-        matrix_type A   = Ah - Anitzsche - Aconsist;
-        vector_type rhs = Lh - Bnitzsche.block(0, 0, cbs, 1);
+        matrix_type A   = Ah - Anitsche - Aconsist;
+        vector_type rhs = Lh - Bnitsche.block(0, 0, cbs, 1);
 
         vector_type locsol = assembler.take_local_data(msh, cl, sol);
 
@@ -250,7 +260,7 @@ run_hho_diffusion_nitzche_faces(const Mesh& msh,
 
 template<typename Mesh>
 auto
-run_hho_diffusion_nitzche(const Mesh& msh,
+run_hho_diffusion_nitsche(const Mesh& msh,
     const algorithm_parameters<typename Mesh::scalar_type>& ap)
 {
     using T =  typename Mesh::scalar_type;
@@ -262,7 +272,7 @@ run_hho_diffusion_nitzche(const Mesh& msh,
     auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
     auto rhs_fun = make_rhs_function(msh);
     auto sol_fun = make_solution_function(msh);
-    auto assembler = make_diffusion_assembler_nitzsche(msh, hdi);
+    auto assembler = make_diffusion_assembler_nitsche(msh, hdi);
 
     for (auto& cl : msh)
     {
@@ -273,8 +283,8 @@ run_hho_diffusion_nitzche(const Mesh& msh,
         matrix_type Ah = gr.second + stab;
 
         matrix_type Aconsist   = matrix_type::Zero(Ah.rows(), Ah.cols());
-        matrix_type Anitzsche  = matrix_type::Zero(Ah.rows(), Ah.cols());
-        vector_type Bnitzsche  = vector_type::Zero(Ah.cols());
+        matrix_type Anitsche  = matrix_type::Zero(Ah.rows(), Ah.cols());
+        vector_type Bnitsche  = vector_type::Zero(Ah.cols());
 
         bool has_a_boundary_face = false;
         auto fcs = faces(msh, cl);
@@ -290,13 +300,13 @@ run_hho_diffusion_nitzche(const Mesh& msh,
         if (has_a_boundary_face)
         {
             Aconsist   = make_hho_consist_diff(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta);
-            auto ntz   = make_hho_nitzsche_diff(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun );
-            Anitzsche  = ntz.first;
-            Bnitzsche  = ntz.second;
+            auto ntz   = make_hho_nitsche_diff(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun );
+            Anitsche  = ntz.first;
+            Bnitsche  = ntz.second;
         }
 
-        matrix_type A = Ah - Anitzsche - Aconsist;
-        vector_type rhs = -Bnitzsche;
+        matrix_type A = Ah - Anitsche - Aconsist;
+        vector_type rhs = -Bnitsche;
         rhs.block(0, 0, cbs, 1) += Lh;
         auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, rhs);
         assembler.assemble(msh, cl, sc.first, sc.second);
@@ -332,8 +342,8 @@ run_hho_diffusion_nitzche(const Mesh& msh,
         matrix_type Ah = gr.second + stab;
 
         matrix_type Aconsist   = matrix_type::Zero(Ah.rows(), Ah.cols());
-        matrix_type Anitzsche  = matrix_type::Zero(Ah.rows(), Ah.cols());
-        vector_type Bnitzsche  = vector_type::Zero(Ah.rows());
+        matrix_type Anitsche  = matrix_type::Zero(Ah.rows(), Ah.cols());
+        vector_type Bnitsche  = vector_type::Zero(Ah.rows());
 
         bool has_a_boundary_face = false;
         auto fcs = faces(msh, cl);
@@ -349,13 +359,13 @@ run_hho_diffusion_nitzche(const Mesh& msh,
         if (has_a_boundary_face)
         {
             Aconsist   = make_hho_consist_diff(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta);
-            auto ntz   = make_hho_nitzsche_diff(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun );
-            Anitzsche  = ntz.first;
-            Bnitzsche  = ntz.second;
+            auto ntz   = make_hho_nitsche_diff(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun );
+            Anitsche  = ntz.first;
+            Bnitsche  = ntz.second;
         }
 
-        matrix_type A   = Ah - Anitzsche - Aconsist;
-        vector_type rhs = Lh - Bnitzsche.block(0, 0, cbs, 1);
+        matrix_type A   = Ah - Anitsche - Aconsist;
+        vector_type rhs = Lh - Bnitsche.block(0, 0, cbs, 1);
 
         vector_type locsol = assembler.take_local_data(msh, cl, sol);
 
@@ -390,10 +400,10 @@ run_diffusion_solver(const Mesh& msh, const algorithm_parameters<T>& ap)
     switch (ap.solver)
     {
         case EVAL_IN_CELLS:
-            error = run_hho_diffusion_nitzche(msh, ap);
+            error = run_hho_diffusion_nitsche(msh, ap);
             break;
         case EVAL_ON_FACES:
-            error = run_hho_diffusion_nitzche_faces(msh, ap);
+            error = run_hho_diffusion_nitsche_faces(msh, ap);
             break;
         case EVAL_IN_CELLS_AS_FACES:
             std::cout << "Not valid in this case. Choose faces (f) or cells( c)" << std::endl;

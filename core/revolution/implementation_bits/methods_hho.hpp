@@ -2238,6 +2238,185 @@ public:
     }
 
 };
+template<typename Mesh>
+class diffusion_condensed_assembler_nitsche
+{
+using T = typename Mesh::coordinate_type;
+
+typedef disk::mechanics::BoundaryConditionsScalar<Mesh> boundary_type;
+
+std::vector<size_t>                 compress_table;
+std::vector<size_t>                 expand_table;
+
+hho_degree_info                     di;
+std::vector< Triplet<T> >           triplets;
+
+size_t       num_all_faces, num_dirichlet_faces, num_other_faces;
+size_t       system_size;
+
+
+class assembly_index
+{
+    size_t  idx;
+    bool    assem;
+
+public:
+    assembly_index(size_t i, bool as)
+        : idx(i), assem(as)
+    {}
+
+    operator size_t() const
+    {
+        if (!assem)
+            throw std::logic_error("Invalid assembly_index");
+
+        return idx;
+    }
+
+    bool assemble() const
+    {
+        return assem;
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const assembly_index& as)
+    {
+        os << "(" << as.idx << "," << as.assem << ")";
+        return os;
+    }
+};
+
+public:
+
+SparseMatrix<T>         LHS;
+Matrix<T, Dynamic, 1>   RHS;
+
+diffusion_condensed_assembler_nitsche(const Mesh& msh, hho_degree_info hdi)
+    : di(hdi)
+{
+
+    num_all_faces = msh.faces_size();
+    num_other_faces = num_all_faces;
+
+    compress_table.resize( num_all_faces );
+    expand_table.resize( num_other_faces );
+
+    size_t compressed_offset = 0;
+    for (size_t i = 0; i < num_all_faces; i++)
+    {
+        auto fc = *std::next(msh.faces_begin(), i);
+        compress_table.at(i) = compressed_offset;
+        expand_table.at(compressed_offset) = i;
+        compressed_offset++;
+    }
+    auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
+    auto system_size = fbs * num_other_faces;
+
+    LHS = SparseMatrix<T>( system_size, system_size );
+    RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
+}
+
+#if 0
+void dump_tables() const
+{
+    std::cout << "Compress table: " << std::endl;
+    for (size_t i = 0; i < compress_table.size(); i++)
+        std::cout << i << " -> " << compress_table.at(i) << std::endl;
+}
+#endif
+
+void
+assemble(const Mesh& msh, const typename Mesh::cell_type& cl,
+         const Matrix<T, Dynamic, Dynamic>& lhs,
+         const Matrix<T, Dynamic, 1>& rhs)
+{
+    auto fbs = scalar_basis_size(di.face_degree(), Mesh::dimension-1);
+    auto fcs = faces(msh, cl);
+
+    std::vector<assembly_index> asm_map;
+    asm_map.reserve(fcs.size()*fbs);
+
+    for (size_t face_i = 0; face_i < fcs.size(); face_i++)
+    {
+        auto fc = fcs[face_i];
+        auto face_offset = priv::offset(msh, fc);
+        auto face_LHS_offset = compress_table.at(face_offset)*fbs;
+
+        auto face_id = msh.lookup(fc);
+        bool dirichlet = false;
+
+        for (size_t i = 0; i < fbs; i++)
+            asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
+    }
+
+    for (size_t i = 0; i < lhs.rows(); i++)
+    {
+        if (!asm_map[i].assemble())
+            continue;
+
+        for (size_t j = 0; j < lhs.cols(); j++)
+        {
+            if ( asm_map[j].assemble() )
+                triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs(i,j)) );
+            else
+                throw std::invalid_argument("It shouldn't come here!!");
+        }
+
+        RHS(asm_map[i]) += rhs(i);
+    }
+}
+
+
+Matrix<T, Dynamic,1>
+take_local_data(const Mesh& msh, const typename Mesh::cell_type& cl,
+        const Matrix<T, Dynamic, 1>& solution)
+
+{
+    auto facdeg = di.face_degree();
+    auto fbs = scalar_basis_size(di.face_degree(), Mesh::dimension-1);
+    auto fcs = faces(msh, cl);
+
+    auto num_faces = fcs.size();
+
+    Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(num_faces*fbs);
+
+    for (size_t face_i = 0; face_i < num_faces; face_i++)
+    {
+        auto fc = fcs[face_i];
+
+        auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+        if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+        const auto face_id=eid.second;
+
+        auto face_offset = priv::offset(msh, fc);
+        auto face_SOL_offset = compress_table.at(face_offset)*fbs;
+        ret.block(face_i*fbs, 0, fbs, 1) = solution.block(face_SOL_offset, 0, fbs, 1);
+    }
+
+    return ret;
+}
+
+void finalize(void)
+{
+    LHS.setFromTriplets( triplets.begin(), triplets.end() );
+    triplets.clear();
+
+    dump_sparse_matrix(LHS, "diff.dat");
+}
+
+size_t num_assembled_faces() const
+{
+    return num_other_faces;
+}
+
+};
+
+template<typename Mesh>
+auto make_diffusion_assembler_nitsche(const Mesh& msh, hho_degree_info hdi)
+{
+return diffusion_condensed_assembler_nitsche<Mesh>(msh, hdi);
+}
+
+
 
 template<typename Mesh, typename BoundaryType>
 auto make_diffusion_assembler2(const Mesh& msh, hho_degree_info hdi,
