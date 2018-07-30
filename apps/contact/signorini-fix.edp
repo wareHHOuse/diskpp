@@ -8,7 +8,7 @@
 real    gamma0    = 0.0001; // Nitsche's parameter - Ref. value from Burman et.al = 100
 real    theta     = 1.;
 real    tolerance = 1e-7;
-int     maxiter   = 1000; 
+int     maxiter   = 1000;
 int     Ne        = 10;
 real    hTAll     = 1./Ne;
 func    force     = -2. * pi * sin( 2. * pi * x);
@@ -22,8 +22,8 @@ Vh      uh, ouh, vh;
 macro ah(u,v)  ( dx(u) *dx(v) + dy(u) * dy(v) )//EOM
 macro gnp()    ( gamma0 / hTriangle )       //EOM // Nitsche's parameter
 macro sigman(u)( dx(u)*N.x + dy(u)*N.y )    //EOM
-macro signoriniv(u) ( - gnp * u + sigman(u)) //EOM
-macro signoriniu(u) ( - gnp * u + sigman(u)* theta) //EOM
+macro signoriniu(u) ( - gnp * u + sigman(u)) //EOM
+macro signoriniv(u) ( - gnp * u + sigman(u)* theta) //EOM
 
 
 // 3. ******* Functions for Newton iterations ****************
@@ -35,8 +35,8 @@ func real heaviside(real t){if (t>=0) return 1; else return 0;}
 
 // 6.1 Initialisation of Newton -> membrane without obstacle (linear problem)
 
-solve Membrane(ouh,vh) = 
-        int2d(Th)( ah(ouh, vh) ) 
+solve Membrane(ouh,vh) =
+        int2d(Th)( ah(ouh, vh) )
       - int2d(Th)( force * vh)
 	  //- int1d(Th,1) ( (theta/gnp) * sigman(ouh) * sigman(vh))
       + on(1,2,3,4,ouh=0);
@@ -65,7 +65,7 @@ for(iter = 1 ; iter < maxiter ; ++iter)
 
 	// Compute the residual : relative L^2 norm of the increment on uh
 	erroru = sqrt ( int2d(Th)( (uh- ouh)^2 ) ); // / sqrt ( int2d(Th) ( uh^2) );
-        
+
     ouh = uh;
 	cout << " * Residual : u -> " << erroru << endl;
 	if (erroru < tolerance)
