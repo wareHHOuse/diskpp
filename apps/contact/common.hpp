@@ -57,7 +57,8 @@ enum method_type
 enum eval_solver_type
 {
     EVAL_IN_CELLS,
-    EVAL_ON_FACES
+    EVAL_ON_FACES,
+    EVAL_IN_CELLS_AS_FACES
 };
 
 template<typename T>
@@ -85,6 +86,9 @@ struct algorithm_parameters
                 break;
             case EVAL_ON_FACES:
                 os << "* Values : ON FACES"<< std::endl;
+                break;
+            case EVAL_IN_CELLS_AS_FACES:
+                os << "* Values : IN CELLS AS FACES"<< std::endl;
                 break;
             default:
                 os << "* Values : NOT SPECIFIED"<< std::endl;
@@ -155,7 +159,7 @@ make_is_contact_vector(const Mesh& msh,
 
 template<typename T>
 static_matrix<T, 3, 3>
-make_fem_nitsche(const disk::simplicial_mesh<T, 2>& msh,
+make_fem_nitzsche(const disk::simplicial_mesh<T, 2>& msh,
         const typename disk::simplicial_mesh<T, 2>::cell& cl,
         const disk::mechanics::BoundaryConditionsScalar<disk::simplicial_mesh<T, 2>>& bnd,
         const T & gamma_0,
@@ -186,7 +190,7 @@ make_fem_nitsche(const disk::simplicial_mesh<T, 2>& msh,
 
 template <typename Mesh>
 Matrix< typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_hho_nitsche(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_hho_nitzsche(const Mesh& msh, const typename Mesh::cell_type& cl,
             const hho_degree_info& hdi,
             const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& rec,
             const typename Mesh::coordinate_type& gamma_0,
@@ -231,6 +235,251 @@ make_hho_nitsche(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     return ret * (theta /gamma_N);
 }
+
+template <typename Mesh, typename T>
+Matrix< T, Dynamic, Dynamic>
+make_hho_consist_diff(const Mesh& msh, const typename Mesh::cell_type& cl,
+            const hho_degree_info& hdi,
+            const Matrix<T, Dynamic, Dynamic>& rec,
+            const T& gamma_0,
+            const T& theta)
+{
+    using matrix_type = Matrix<T, Dynamic, Dynamic>;
+    using vector_type = Matrix<T, Dynamic, 1>;
+
+    const size_t DIM = Mesh::dimension;
+    T gamma_N = gamma_0 / measure(msh, cl);
+
+    auto recdeg =  hdi.reconstruction_degree();
+    auto celdeg =  hdi.cell_degree();
+    auto facdeg =  hdi.face_degree();
+
+    auto fcs = faces(msh, cl);
+    auto rbs = scalar_basis_size(recdeg, DIM);
+    auto cbs = scalar_basis_size(celdeg, DIM);
+    auto fbs = scalar_basis_size(facdeg, DIM-1);
+    auto num_total_dofs = cbs + fbs * fcs.size();
+
+    matrix_type ret = matrix_type::Zero( num_total_dofs, num_total_dofs );
+
+    for (auto& fc: fcs)
+    {
+        auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+        if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+        const auto face_id=eid.second;
+
+        if (msh.is_boundary(fc))
+        {
+            auto cb  = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+            auto fb  = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
+            auto n   = normal(msh, cl, fc);
+
+            auto quad_degree = std::max(recdeg-1, celdeg);
+            auto qps = integrate(msh, fc, 2 * quad_degree );
+            for (auto& qp : qps)
+            {
+                Matrix<T, Dynamic, DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
+                Matrix<T, Dynamic, DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
+                // grad * rec * u * n
+                vector_type  sigma_n   = rec.transpose() * (c_dphi * n);
+
+
+                vector_type  c_phi_temp   = cb.eval_functions(qp.point());
+                vector_type  c_phi = c_phi_temp.block(0, 0, cbs, 1);
+                // v_T
+                vector_type v = c_phi;
+
+                ret.block(0,0, cbs, num_total_dofs) += qp.weight() * v * sigma_n.transpose();
+            }
+        }
+    }
+    return ret;
+}
+
+
+template <typename Mesh, typename T>
+Matrix< T, Dynamic, Dynamic>
+make_hho_consist_diff_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
+            const hho_degree_info& hdi,
+            const Matrix<T, Dynamic, Dynamic>& rec,
+            const T & gamma_0,
+            const T& theta)
+{
+    using matrix_type = Matrix<T, Dynamic, Dynamic>;
+    using vector_type = Matrix<T, Dynamic, 1>;
+
+    const size_t DIM = Mesh::dimension;
+    T gamma_N = gamma_0 / measure(msh, cl);
+
+    auto fcs = faces(msh, cl);
+    auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
+    auto cbs = scalar_basis_size(hdi.cell_degree(), DIM);
+    auto fbs = scalar_basis_size(hdi.face_degree(), DIM-1);
+    auto num_total_dofs = cbs + fbs * fcs.size();
+
+    matrix_type ret = matrix_type::Zero( num_total_dofs, num_total_dofs );
+
+    auto fc_count = 0;
+
+    for (auto& fc: fcs)
+    {
+        auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+        if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+        const auto face_id=eid.second;
+
+        if (msh.is_boundary(fc))
+        {
+            auto cb  = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+            auto fb  = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
+
+            auto face_ofs  = cbs  +  fc_count * fbs;
+            auto n = normal(msh, cl, fc);
+
+            auto qps = integrate(msh, fc, 2* hdi.face_degree());
+            for (auto& qp : qps)
+            {
+                Matrix<T, Dynamic, DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
+                Matrix<T, Dynamic, DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
+                vector_type sigma_n   = rec.transpose() * (c_dphi * n);
+
+                vector_type  f_phi   = fb.eval_functions(qp.point());
+
+                ret.block( face_ofs, 0, fbs, num_total_dofs) += qp.weight() * f_phi * sigma_n.transpose();
+            }
+        }
+        fc_count++;
+    }
+    return ret;
+}
+
+template <typename Mesh, typename T, typename Function>
+std::pair<Matrix<T, Dynamic, Dynamic>, Matrix<T, Dynamic, 1>>
+make_hho_nitzsche_diff(const Mesh& msh, const typename Mesh::cell_type& cl,
+            const hho_degree_info& hdi,
+            const Matrix<T, Dynamic, Dynamic>& rec,
+            const T & gamma_0,
+            const T& theta,
+            const Function& dirichlet_bf)
+{
+    using matrix_type = Matrix<T, Dynamic, Dynamic>;
+    using vector_type = Matrix<T, Dynamic, 1>;
+
+    const size_t DIM = Mesh::dimension;
+    T gamma_N = gamma_0 / measure(msh, cl);
+
+    auto recdeg =  hdi.reconstruction_degree();
+    auto celdeg =  hdi.cell_degree();
+    auto facdeg =  hdi.face_degree();
+
+    auto fcs = faces(msh, cl);
+    auto rbs = scalar_basis_size(recdeg, DIM);
+    auto cbs = scalar_basis_size(celdeg, DIM);
+    auto fbs = scalar_basis_size(facdeg, DIM-1);
+    auto num_total_dofs = cbs + fbs * fcs.size();
+
+    matrix_type Aret = matrix_type::Zero( num_total_dofs, num_total_dofs );
+    vector_type Bret = vector_type::Zero( num_total_dofs);
+
+    for (auto& fc: fcs)
+    {
+        auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+        if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+        const auto face_id=eid.second;
+
+        if (msh.is_boundary(fc))
+        {
+            auto cb  = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+            auto fb  = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
+            auto n   = normal(msh, cl, fc);
+
+            auto quad_degree = std::max(recdeg-1, celdeg);
+            auto qps = integrate(msh, fc, 2 * quad_degree );
+            for (auto& qp : qps)
+            {
+                Matrix<T, Dynamic, DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
+                Matrix<T, Dynamic, DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
+                vector_type  sigma_n   = rec.transpose() * (c_dphi * n);
+
+                vector_type  c_phi_temp   = cb.eval_functions(qp.point());
+                vector_type  c_phi = c_phi_temp.block(0, 0, cbs, 1);
+
+                // (theta * grad * rec * v * n - gamma_N* v_T)
+                vector_type t_sigmav_n_gamma_v = theta * sigma_n;
+                t_sigmav_n_gamma_v.block(0, 0,cbs, 1) -=  gamma_N * c_phi;
+
+                Aret.block(0, 0, num_total_dofs, cbs) += qp.weight() * (t_sigmav_n_gamma_v) * c_phi.transpose();
+                Bret += qp.weight() * (t_sigmav_n_gamma_v) * dirichlet_bf(qp.point());
+            }
+        }
+    }
+
+    return std::make_pair(Aret, Bret);
+}
+
+template <typename Mesh, typename T, typename Function>
+std::pair<Matrix<T, Dynamic, Dynamic>, Matrix<T, Dynamic, 1>>
+make_hho_nitzsche_diff_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
+            const hho_degree_info& hdi,
+            const Matrix<T, Dynamic, Dynamic>& rec,
+            const T & gamma_0,
+            const T& theta,
+            const Function& dirichlet_bf)
+{
+    using matrix_type = Matrix<T, Dynamic, Dynamic>;
+    using vector_type = Matrix<T, Dynamic, 1>;
+
+    const size_t DIM = Mesh::dimension;
+    T gamma_N = gamma_0 / measure(msh, cl);
+
+    auto fcs = faces(msh, cl);
+    auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
+    auto cbs = scalar_basis_size(hdi.cell_degree(), DIM);
+    auto fbs = scalar_basis_size(hdi.face_degree(), DIM-1);
+    auto num_total_dofs = cbs + fbs * fcs.size();
+
+    matrix_type Aret = matrix_type::Zero( num_total_dofs, num_total_dofs );
+    vector_type Bret = vector_type::Zero( num_total_dofs );
+
+    auto fc_count = 0;
+
+    for (auto& fc: fcs)
+    {
+        auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+        if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+        const auto face_id=eid.second;
+
+        if (msh.is_boundary(fc))
+        {
+            auto cb  = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+            auto fb  = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
+
+            auto face_ofs  = cbs  +  fc_count * fbs;
+            auto n = normal(msh, cl, fc);
+
+            auto qps = integrate(msh, fc, 2* hdi.face_degree());
+            for (auto& qp : qps)
+            {
+                Matrix<T, Dynamic, DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
+                Matrix<T, Dynamic, DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
+                vector_type sigma_n   = rec.transpose() * (c_dphi * n);
+
+                vector_type  f_phi   = fb.eval_functions(qp.point());
+
+                // (theta * grad * rec * v * n - gamma_N* v_F)
+                vector_type t_sigmav_n_gamma_v = theta * sigma_n;
+                t_sigmav_n_gamma_v.block(face_ofs, 0,fbs, 1) -=  gamma_N * f_phi;
+
+                Aret.block(0, face_ofs, num_total_dofs, fbs) +=
+                            qp.weight() * (t_sigmav_n_gamma_v) * f_phi.transpose();
+                Bret += qp.weight() * (t_sigmav_n_gamma_v) * dirichlet_bf(qp.point());
+            }
+        }
+        fc_count++;
+    }
+    return std::make_pair(Aret, Bret);
+}
+
+
 
 template<typename T>
 static_matrix<T, 3, 3>
