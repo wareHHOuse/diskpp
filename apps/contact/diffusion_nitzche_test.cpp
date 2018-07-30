@@ -1,25 +1,27 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
- *      /__\       matteo.cicuttin@enpc.fr
- *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
- *    /\    /\
- *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
- *  /_\/_\/_\/_\   methods.
- *
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
- *
- * If you use this code or parts of it for scientific publications, you
- * are required to cite it as following:
- *
- * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
- * polytopal meshes using generic programming.
- * M. Cicuttin, D. A. Di Pietro, A. Ern.
- * Journal of Computational and Applied Mathematics.
- * DOI: 10.1016/j.cam.2017.09.017
- */
-
+*       /\         DISK++, a template library for DIscontinuous SKeletal
+*      /__\        methods.
+*     /_\/_\
+*    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
+*   /__\  /__\     matteo.cicuttin@enpc.fr
+*  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
+*
+* This file is copyright of the following authors:
+* Karol Cascavita (C) 2018                     karol.cascavita@enpc.fr
+*
+* This Source Code Form is subject to the terms of the Mozilla Public
+* License, v. 2.0. If a copy of the MPL was not distributed with this
+* file, You can obtain one at http://mozilla.org/MPL/2.0/.
+*
+* If you use this code or parts of it for scientific publications, you
+* are required to cite it as following:
+*
+* Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+* polytopal meshes using generic programming.
+* M. Cicuttin, D. A. Di Pietro, A. Ern.
+* Journal of Computational and Applied Mathematics.
+* DOI: 10.1016/j.cam.2017.09.017
+*/
 #include <iostream>
 #include <regex>
 #include <unistd.h>
@@ -63,7 +65,7 @@ verify_convergence(const std::vector<std::string>& paths,
 
     for (size_t i = mindeg; i <= maxdeg; i++)
     {
-        scalar_type expected_rate = i+1;
+        scalar_type expected_rate = i+2;
 
         std::vector<std::pair<scalar_type, scalar_type>> errdiams;
 

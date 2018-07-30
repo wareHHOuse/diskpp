@@ -1,3 +1,27 @@
+/*
+*       /\         DISK++, a template library for DIscontinuous SKeletal
+*      /__\        methods.
+*     /_\/_\
+*    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
+*   /__\  /__\     matteo.cicuttin@enpc.fr
+*  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
+*
+* This file is copyright of the following authors:
+* Karol Cascavita (C) 2018                     karol.cascavita@enpc.fr
+*
+* This Source Code Form is subject to the terms of the Mozilla Public
+* License, v. 2.0. If a copy of the MPL was not distributed with this
+* file, You can obtain one at http://mozilla.org/MPL/2.0/.
+*
+* If you use this code or parts of it for scientific publications, you
+* are required to cite it as following:
+*
+* Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+* polytopal meshes using generic programming.
+* M. Cicuttin, D. A. Di Pietro, A. Ern.
+* Journal of Computational and Applied Mathematics.
+* DOI: 10.1016/j.cam.2017.09.017
+*/
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
 #include "revolution/methods/hho"
@@ -233,7 +257,7 @@ run_hho_diffusion_nitzche(const Mesh& msh,
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
     using vector_type = Matrix<T, Dynamic, 1>;
 
-    hho_degree_info hdi(ap.degree);
+    hho_degree_info hdi(ap.degree + 1, ap.degree);
 
     auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
     auto rhs_fun = make_rhs_function(msh);
