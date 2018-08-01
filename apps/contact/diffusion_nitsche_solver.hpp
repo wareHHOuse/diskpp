@@ -206,7 +206,7 @@ run_hho_diffusion_nitsche_faces(const Mesh& msh,
         auto Lh     = make_rhs(msh, cl, cb, rhs_fun);
         matrix_type Ah = gr.second + stab;
 
-        matrix_type Aconsist   = matrix_type::Zero(Ah.rows(), Ah.cols());
+        matrix_type Aconsist  = matrix_type::Zero(Ah.rows(), Ah.cols());
         matrix_type Anitsche  = matrix_type::Zero(Ah.rows(), Ah.cols());
         vector_type Bnitsche  = vector_type::Zero(Ah.rows());
 
@@ -282,7 +282,7 @@ run_hho_diffusion_nitsche(const Mesh& msh,
         auto Lh     = make_rhs(msh, cl, cb, rhs_fun);
         matrix_type Ah = gr.second + stab;
 
-        matrix_type Aconsist   = matrix_type::Zero(Ah.rows(), Ah.cols());
+        matrix_type Aconsist  = matrix_type::Zero(Ah.rows(), Ah.cols());
         matrix_type Anitsche  = matrix_type::Zero(Ah.rows(), Ah.cols());
         vector_type Bnitsche  = vector_type::Zero(Ah.cols());
 

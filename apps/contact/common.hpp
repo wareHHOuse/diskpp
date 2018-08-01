@@ -166,7 +166,7 @@ make_fem_nitsche(const disk::simplicial_mesh<T, 2>& msh,
 {
     static_matrix<T, 3, 3> stiff = static_matrix<T, 3, 3>::Zero();
 
-    auto gamma_N = gamma_0 / measure(msh, cl);
+    auto gamma_N = gamma_0 / diameter(msh, cl);
     auto fcs = faces(msh, cl);
 
     for (auto& fc: fcs)
@@ -198,7 +198,7 @@ make_hho_nitsche(const Mesh& msh, const typename Mesh::cell_type& cl,
 {
     using T = typename Mesh::coordinate_type;
     const size_t DIM = Mesh::dimension;
-    auto gamma_N = gamma_0 / measure(msh, cl);
+    auto gamma_N = gamma_0 / diameter(msh, cl);
 
     auto fcs = faces(msh, cl);
     auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
@@ -247,7 +247,7 @@ make_hho_consist_diff(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    T gamma_N = gamma_0 / measure(msh, cl);
+    T gamma_N = gamma_0 / diameter(msh, cl);
 
     auto recdeg =  hdi.reconstruction_degree();
     auto celdeg =  hdi.cell_degree();
@@ -304,7 +304,7 @@ make_hho_consist_diff_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    T gamma_N = gamma_0 / measure(msh, cl);
+    T gamma_N = gamma_0 / diameter(msh, cl);
 
     auto fcs = faces(msh, cl);
     auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
@@ -360,7 +360,7 @@ make_hho_nitsche_diff(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    T gamma_N = gamma_0 / measure(msh, cl);
+    T gamma_N = gamma_0 / diameter(msh, cl);
 
     auto recdeg =  hdi.reconstruction_degree();
     auto celdeg =  hdi.cell_degree();
@@ -424,7 +424,7 @@ make_hho_nitsche_diff_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    T gamma_N = gamma_0 / measure(msh, cl);
+    T gamma_N = gamma_0 / diameter(msh, cl);
 
     auto fcs = faces(msh, cl);
     auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
@@ -487,7 +487,7 @@ make_fem_heaviside(const disk::simplicial_mesh<T, 2>& msh,
 {
     static_matrix<T, 3, 3> ret = static_matrix<T, 3, 3>::Zero();
 
-    auto gamma_N = gamma_0 / measure(msh, cl);
+    auto gamma_N = gamma_0 / diameter(msh, cl);
     auto fcs = faces(msh, cl);
 
     for (auto& fc: fcs)
@@ -537,7 +537,7 @@ make_hho_heaviside_other(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    T gamma_N = gamma_0 / measure(msh, cl);
+    T gamma_N = gamma_0 /diameter(msh, cl);
 
     auto fcs = faces(msh, cl);
     auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
@@ -610,7 +610,7 @@ make_hho_heaviside(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    T gamma_N = gamma_0 / measure(msh, cl);
+    T gamma_N = gamma_0 / diameter(msh, cl);
 
     auto recdeg =  hdi.reconstruction_degree();
     auto celdeg =  hdi.cell_degree();
@@ -637,7 +637,8 @@ make_hho_heaviside(const Mesh& msh, const typename Mesh::cell_type& cl,
             auto n   = normal(msh, cl, fc);
 
             auto quad_degree = std::max(recdeg-1, celdeg);
-            auto qps = integrate(msh, fc, 2 * quad_degree );
+            auto qps = integrate(msh, fc, 3 * quad_degree );
+
             for (auto& qp : qps)
             {
                 Matrix<T, Dynamic, DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
@@ -655,7 +656,9 @@ make_hho_heaviside(const Mesh& msh, const typename Mesh::cell_type& cl,
                 if(sigmau_n_gamma_u.dot(uloc)  <= 0.)
                 {
                     // (theta * grad * rec * v * n - gamma_N* v_T)
-                    vector_type t_sigmav_n_gamma_v = theta * sigma_n;
+
+                    vector_type t_sigmav_n_gamma_v = vector_type::Zero(num_total_dofs);
+                    t_sigmav_n_gamma_v = theta * sigma_n;
                     t_sigmav_n_gamma_v.block(0, 0,cbs, 1) -=  gamma_N * c_phi;
 
                     ret += qp.weight() * (t_sigmav_n_gamma_v) * (sigmau_n_gamma_u).transpose();
@@ -680,7 +683,7 @@ make_hho_heaviside_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    T gamma_N = gamma_0 / measure(msh, cl);
+    T gamma_N = gamma_0 / diameter(msh, cl);
 
     auto fcs = faces(msh, cl);
     auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
@@ -753,7 +756,7 @@ make_hho_heaviside_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    T gamma_N = gamma_0 / measure(msh, cl);
+    T gamma_N = gamma_0 / diameter(msh, cl);
 
     auto recdeg =  hdi.reconstruction_degree();
     auto fcs = faces(msh, cl);
@@ -822,7 +825,7 @@ make_fem_negative(const disk::simplicial_mesh<T, 2>& msh,
     const T & theta,
     const static_vector<T, 3>& uloc)
 {
-    auto gamma_N = gamma_0 / measure(msh, cl);
+    auto gamma_N = gamma_0 / diameter(msh, cl);
 
     auto fcs = faces(msh, cl);
     static_vector<T, 3> rhs = static_vector<T, 3>::Zero();
@@ -876,7 +879,7 @@ make_hho_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    auto gamma_N = gamma_0 / measure(msh, cl);
+    auto gamma_N = gamma_0 / diameter(msh, cl);
 
     auto recdeg =  hdi.reconstruction_degree();
     auto facdeg =  hdi.face_degree();
@@ -900,7 +903,7 @@ make_hho_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
             auto cb  = make_scalar_monomial_basis(msh, cl, recdeg);
             auto fb  = make_scalar_monomial_basis(msh, fc, facdeg);
             auto quad_degree = std::max( recdeg - 1, celdeg);
-            auto qps = integrate (msh, fc, 2 * quad_degree);
+            auto qps = integrate (msh, fc, 3 * quad_degree);
             auto n = normal(msh, cl, fc);
 
             for (auto& qp : qps)
@@ -945,7 +948,7 @@ make_hho_negative_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
-    auto gamma_N = gamma_0 / measure(msh, cl);
+    auto gamma_N = gamma_0 / diameter(msh, cl);
 
     auto recdeg =  hdi.reconstruction_degree();
     auto facdeg =  hdi.face_degree();
@@ -1012,7 +1015,7 @@ make_hho_negative_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     const size_t DIM = Mesh::dimension;
 
-    auto gamma_N = gamma_0 / measure(msh, cl);
+    auto gamma_N = gamma_0 / diameter(msh, cl);
 
     auto recdeg =  hdi.reconstruction_degree();
     auto facdeg =  hdi.face_degree();
