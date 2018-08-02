@@ -38,7 +38,7 @@ class point
 public:
     typedef T                                   value_type;
     const static size_t                         dimension = DIM;
-    typedef identifier<point, ident_impl_t, 0>  id_type;
+    typedef identifier<point, ident_raw_t, 0>  id_type;
 
     point()
     {
@@ -169,4 +169,4 @@ operator<<(std::ostream& os, const point<T, DIM>& pt)
 
 struct dummy_point_type {};
 template<size_t DIM>
-using point_identifier = identifier<point<dummy_point_type, DIM>, ident_impl_t, 0>;
+using point_identifier = identifier<point<dummy_point_type, DIM>, ident_raw_t, 0>;

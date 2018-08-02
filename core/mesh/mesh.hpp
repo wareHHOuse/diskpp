@@ -162,22 +162,6 @@ namespace priv {
 
 } //namespace priv
 
-template<typename T>
-[[deprecated]]
-std::pair<bool, typename T::id_type>
-find_element_id(const std::vector<T>& elements, const T& element)
-{
-    auto itor = std::lower_bound(elements.begin(), elements.end(), element);
-
-    if (itor != elements.end() && !(element < *itor))
-    {
-        typename T::id_type id(std::distance(elements.begin(), itor));
-        return std::make_pair(true, id);
-    }
-
-    return std::make_pair(false, typename T::id_type());
-}
-
 template<typename T, typename Iterator>
 std::pair<bool, typename T::id_type>
 find_element_id(const Iterator& begin, const Iterator& end, const T& element)
@@ -192,8 +176,6 @@ find_element_id(const Iterator& begin, const Iterator& end, const T& element)
 
     return std::make_pair(false, typename T::id_type());
 }
-
-
 
 /****************************************************************************/
 namespace priv {
