@@ -107,20 +107,18 @@ sort_by_polar_angle(const Mesh & msh,
                     const typename Mesh::cell &  cl,
                     const Points& pts)
 {
-    typedef point<typename Mesh::scalar_type,2> point_type;
+    typedef point<typename Mesh::coordinate_type, 2> point_type;
     //Warningn this may work only on convex polygons
     auto h = barycenter(msh, cl);
     auto sorted_pts = pts;
 
-    std::sort( sorted_pts.begin(), sorted_pts.end(),
-                            [&](const point<typename Mesh::scalar_type,2>& va,
-                                 const point_type& vb )
-        {
-            auto theta_a = to_angle(va, h);
-            auto theta_b = to_angle(vb, h);
-            return (theta_a < theta_b);
-        }
-    );
+    std::sort(sorted_pts.begin(),
+              sorted_pts.end(),
+              [&](const point<typename Mesh::coordinate_type, 2>& va, const point_type& vb) {
+                  auto theta_a = to_angle(va, h);
+                  auto theta_b = to_angle(vb, h);
+                  return (theta_a < theta_b);
+              });
     return sorted_pts;
 }
 /*
@@ -156,13 +154,11 @@ isLeft( const point<T,2>& P0, const point<T,2>& P1, const point<T,2>& P2 )
 */
 template<typename Mesh>
 bool
-wn_PnPoly(const Mesh& msh,
-          const typename Mesh::cell& cl,
-          const point<typename Mesh::scalar_type,2>& P)
+wn_PnPoly(const Mesh& msh, const typename Mesh::cell& cl, const point<typename Mesh::coordinate_type, 2>& P)
 {
     auto vts = points(msh, cl);
 
-    typedef typename Mesh::scalar_type T;
+    typedef typename Mesh::coordinate_type T;
 
     std::vector< point<T,2>> svts(vts.size()+1);
     auto svts_temp = sort_by_polar_angle(msh, cl, vts);
@@ -201,16 +197,16 @@ wn_PnPoly(const Mesh& msh,
 }
 template<typename Mesh>
 void
-plot_over_line(const Mesh    & msh,
-                const std::pair<point<typename Mesh::scalar_type,2>,
-                                point<typename Mesh::scalar_type,2>> & e,
-                const Matrix<typename Mesh::scalar_type, Dynamic, 1> & vec,
-                const size_t cell_degree,
-                const std::string & filename)
+plot_over_line(const Mesh&                                                                                          msh,
+               const std::pair<point<typename Mesh::coordinate_type, 2>,
+               const point<typename Mesh::coordinate_type, 2>>& e,
+               const Matrix<typename Mesh::coordinate_type, Dynamic, 1>&                                            vec,
+               const size_t       cell_degree,
+               const std::string& filename)
 {
 
-    typedef Matrix<typename Mesh::scalar_type, Dynamic, 1>  vector_type;
-    typedef point<typename Mesh::scalar_type,2>             point_type;
+    typedef Matrix<typename Mesh::coordinate_type, Dynamic, 1>   vector_type;
+    typedef point<typename Mesh::coordinate_type, 2>             point_type;
 
     std::ofstream pfs(filename);
     if(!pfs.is_open())
@@ -247,13 +243,13 @@ plot_over_line(const Mesh    & msh,
 
 template<typename Mesh>
 void
-compute_discontinuous_velocity(const Mesh& msh,
-                        const dynamic_vector< typename Mesh::scalar_type>& sol,
-                        const typename disk::hho_degree_info& hdi,
-                        const std::string& filename)
+compute_discontinuous_velocity(const Mesh&                                           msh,
+                               const dynamic_vector<typename Mesh::coordinate_type>& sol,
+                               const typename disk::hho_degree_info&                 hdi,
+                               const std::string&                                    filename)
 {
     typedef Mesh mesh_type;
-    typedef typename Mesh::scalar_type T;
+    typedef typename Mesh::coordinate_type T;
     auto dim = Mesh::dimension;
 
     const size_t cell_degree   = hdi.cell_degree();

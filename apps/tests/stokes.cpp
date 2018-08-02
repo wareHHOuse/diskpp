@@ -40,7 +40,7 @@
 
 
 template<typename Mesh>
-typename Mesh::scalar_type
+typename Mesh::coordinate_type
 run_stokes(const Mesh& msh, size_t degree)
 {
 

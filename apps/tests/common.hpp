@@ -402,7 +402,7 @@ do_testing(std::vector<Mesh>& meshes, const Function& run_test,
            size_t min_test_degree = MIN_TEST_DEGREE,
            size_t max_test_degree = MAX_TEST_DEGREE)
 {
-	using T = typename Mesh::scalar_type;
+	using T = typename Mesh::coordinate_type;
 
 	for (size_t k = min_test_degree; k <= max_test_degree; k++)
     {

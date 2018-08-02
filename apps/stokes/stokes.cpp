@@ -43,7 +43,7 @@
 template<typename Mesh, typename Velocity, typename Pressure, typename Assembler>
 auto
 compute_errors(const Mesh& msh,
-                const dynamic_vector<typename Mesh::scalar_type>& sol,
+                const dynamic_vector<typename Mesh::coordinate_type>& sol,
                 const typename disk::hho_degree_info & hdi,
                 const Velocity& velocity,
                 const Pressure& pressure,

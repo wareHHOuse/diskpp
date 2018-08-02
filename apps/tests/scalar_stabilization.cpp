@@ -44,7 +44,7 @@ template<typename Mesh>
 struct test_functor
 {
     /* Expect k+1 convergence (hho stabilization) */
-    typename Mesh::scalar_type
+    typename Mesh::coordinate_type
     operator()(const Mesh& msh, size_t degree) const
     {
         typedef Mesh mesh_type;

@@ -103,7 +103,7 @@ template<typename Mesh>
 auto
 run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
 {
-    using T = typename Mesh::scalar_type;
+    using T = typename Mesh::coordinate_type;
 
     hho_degree_info hdi(degree+1, degree);
 
@@ -182,7 +182,7 @@ template<typename Mesh>
 auto
 run_diffusion_solver(const Mesh& msh, const size_t k)
 {
-    using T = typename Mesh::scalar_type;
+    using T = typename Mesh::coordinate_type;
 
     T error = run_hho_diffusion_solver(msh, k);
 

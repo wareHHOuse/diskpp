@@ -103,7 +103,7 @@ template<typename Mesh>
 void
 run_hho_diffusion_solver(const Mesh& msh)
 {
-    using T = typename Mesh::scalar_type;
+    using T = typename Mesh::coordinate_type;
 
     size_t degree = 0;
 
