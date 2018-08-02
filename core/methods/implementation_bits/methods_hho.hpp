@@ -3950,106 +3950,136 @@ make_mechanics_assembler( const Mesh&           msh,
 template<typename Mesh>
 class static_condensation_vector
 {
-   typedef Mesh                            mesh_type;
-   typedef typename mesh_type::coordinate_type scalar_type;
-   typedef typename mesh_type::cell        cell_type;
+    typedef Mesh                                mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::cell            cell_type;
 
-   typedef dynamic_matrix<scalar_type> matrix_type;
-   typedef dynamic_vector<scalar_type> vector_type;
+    typedef dynamic_matrix<scalar_type> matrix_type;
+    typedef dynamic_vector<scalar_type> vector_type;
 
-   const static size_t dimension = mesh_type::dimension;
+    const static size_t dimension = mesh_type::dimension;
 
- public:
-   matrix_type AL;
-   vector_type bL;
-   static_condensation_vector() {}
+  public:
+    matrix_type AL;
+    vector_type bL;
+    static_condensation_vector() {}
 
-   std::pair<matrix_type, vector_type>
-   compute(const mesh_type&   msh,
-           const cell_type&   cl,
-           const matrix_type& local_mat,
-           const vector_type& cell_rhs,
-           const hho_degree_info hdi)
-   {
-      const size_t num_cell_dofs = vector_basis_size(hdi.cell_degree(), dimension, dimension);
-      const size_t num_face_dofs = vector_basis_size(hdi.face_degree(), dimension - 1, dimension);
+    std::pair<matrix_type, vector_type>
+    compute(const mesh_type&      msh,
+            const cell_type&      cl,
+            const matrix_type&    local_mat,
+            const vector_type&    cell_rhs,
+            const hho_degree_info hdi)
+    {
+        const size_t num_cell_dofs = vector_basis_size(hdi.cell_degree(), dimension, dimension);
+        const size_t num_face_dofs = vector_basis_size(hdi.face_degree(), dimension - 1, dimension);
 
-      const auto   fcs       = faces(msh, cl);
-      const size_t num_faces = fcs.size();
+        const auto   fcs       = faces(msh, cl);
+        const size_t num_faces = fcs.size();
 
-      const size_t cell_size = num_cell_dofs;
-      const size_t face_size = num_faces * num_face_dofs;
+        const size_t cell_size = num_cell_dofs;
+        const size_t face_size = num_faces * num_face_dofs;
 
-      assert(cell_size == cell_rhs.rows() && "wrong rhs dimension");
-      assert((cell_size + face_size) == local_mat.rows() && "wrong lhs rows dimension");
-      assert((cell_size + face_size) == local_mat.cols() && "wrong lhs cols dimension");
+        assert(cell_size == cell_rhs.rows() && "wrong rhs dimension");
+        assert((cell_size + face_size) == local_mat.rows() && "wrong lhs rows dimension");
+        assert((cell_size + face_size) == local_mat.cols() && "wrong lhs cols dimension");
 
-      const matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
-      const matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
-      const matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
-      const matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
+        const matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
+        const matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
+        const matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
+        const matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
 
-      assert(K_TT.cols() == cell_size && "wrong K_TT dimension");
-      assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
-      assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
-      assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
-      assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
+        assert(K_TT.cols() == cell_size && "wrong K_TT dimension");
+        assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
+        assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
+        assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
+        assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
 
-      const auto K_TT_ldlt = K_TT.llt();
-      AL                   = K_TT_ldlt.solve(K_TF);
-      bL                   = K_TT_ldlt.solve(cell_rhs);
+        const auto K_TT_ldlt = K_TT.llt();
+        AL                   = K_TT_ldlt.solve(K_TF);
+        if (K_TT_ldlt.info() != Eigen::Success)
+        {
+            throw std::invalid_argument("static_condenstion: the matrix is not symmetrix positive definite");
+        }
+        bL = K_TT_ldlt.solve(cell_rhs);
+        if (K_TT_ldlt.info() != Eigen::Success)
+        {
+            throw std::invalid_argument("static_condenstion: the matrix is not symmetrix positive definite");
+        }
 
-      const matrix_type AC = K_FF - K_FT * AL;
-      const vector_type bC = /* no projection on faces, eqn. 26*/ -K_FT * bL;
+        const matrix_type AC = K_FF - K_FT * AL;
+        const vector_type bC = /* no projection on faces, eqn. 26*/ -K_FT * bL;
 
-      return std::make_pair(AC, bC);
-   }
+        return std::make_pair(AC, bC);
+    }
 
-   std::pair<matrix_type, vector_type>
-   compute_rhsfull( const mesh_type&      msh,
+    std::pair<matrix_type, vector_type>
+    compute_rhsfull(const mesh_type&      msh,
                     const cell_type&      cl,
                     const matrix_type&    local_mat,
                     const vector_type&    rhs,
                     const hho_degree_info hdi)
-   {
-      const size_t num_cell_dofs = vector_basis_size(hdi.cell_degree(), dimension, dimension);
-      const size_t num_face_dofs = vector_basis_size(hdi.face_degree(), dimension - 1, dimension);
+    {
+        const size_t num_cell_dofs = vector_basis_size(hdi.cell_degree(), dimension, dimension);
+        const size_t num_face_dofs = vector_basis_size(hdi.face_degree(), dimension - 1, dimension);
 
-      const auto   fcs       = faces(msh, cl);
-      const size_t num_faces = fcs.size();
+        const auto   fcs       = faces(msh, cl);
+        const size_t num_faces = fcs.size();
 
-      const size_t cell_size        = num_cell_dofs;
-      const size_t total_faces_size = num_faces * num_face_dofs;
+        const size_t cell_size        = num_cell_dofs;
+        const size_t total_faces_size = num_faces * num_face_dofs;
 
-      const vector_type cell_rhs = rhs.head(cell_size);
-      const vector_type faces_rhs = rhs.tail(total_faces_size);
+        const vector_type cell_rhs  = rhs.head(cell_size);
+        const vector_type faces_rhs = rhs.tail(total_faces_size);
 
-      assert(cell_size + total_faces_size == rhs.rows() && "wrong  rhs dimension");
-      assert(cell_size == cell_rhs.rows() && "wrong cell rhs dimension");
-      assert(total_faces_size == faces_rhs.rows() && "wrong face rhs dimension");
-      assert((cell_size + total_faces_size) == local_mat.rows() && "wrong lhs rows dimension");
-      assert((cell_size + total_faces_size) == local_mat.cols() && "wrong lhs cols dimension");
+        assert(cell_size + total_faces_size == rhs.rows() && "wrong  rhs dimension");
+        assert(cell_size == cell_rhs.rows() && "wrong cell rhs dimension");
+        assert(total_faces_size == faces_rhs.rows() && "wrong face rhs dimension");
+        assert((cell_size + total_faces_size) == local_mat.rows() && "wrong lhs rows dimension");
+        assert((cell_size + total_faces_size) == local_mat.cols() && "wrong lhs cols dimension");
 
-      const matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
-      const matrix_type K_TF = local_mat.topRightCorner(cell_size, total_faces_size);
-      const matrix_type K_FT = local_mat.bottomLeftCorner(total_faces_size, cell_size);
-      const matrix_type K_FF = local_mat.bottomRightCorner(total_faces_size, total_faces_size);
+        const matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
+        const matrix_type K_TF = local_mat.topRightCorner(cell_size, total_faces_size);
+        const matrix_type K_FT = local_mat.bottomLeftCorner(total_faces_size, cell_size);
+        const matrix_type K_FF = local_mat.bottomRightCorner(total_faces_size, total_faces_size);
 
-      assert(K_TT.cols() == cell_size && "wrong K_TT dimension");
-      assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
-      assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
-      assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
-      assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
+        assert(K_TT.cols() == cell_size && "wrong K_TT dimension");
+        assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
+        assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
+        assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
+        assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
 
-      const auto K_TT_ldlt = K_TT.llt();
-      AL                   = K_TT_ldlt.solve(K_TF);
-      bL                   = K_TT_ldlt.solve(cell_rhs);
+        const auto K_TT_ldlt = K_TT.llt();
+        AL                   = K_TT_ldlt.solve(K_TF);
 
-      const matrix_type AC = K_FF - K_FT * AL;
-      const vector_type bC = faces_rhs -K_FT * bL;
+        if (K_TT_ldlt.info() != Eigen::Success)
+        {
+            const auto K_TT_lu = K_TT.fullPivLu();
 
-      return std::make_pair(AC, bC);
-   }
+            if(K_TT_lu.isInvertible())
+            {
+                AL = K_TT_lu.solve(K_TF);
+                bL = K_TT_lu.solve(cell_rhs);
+            }
+            else
+            {
+                throw std::invalid_argument("static_condenstion: the matrix is not inversible");
+            }
+        }
+        else
+        {
+            bL = K_TT_ldlt.solve(cell_rhs);
+            if (K_TT_ldlt.info() != Eigen::Success)
+            {
+                throw std::invalid_argument("static_condenstion: the matrix is not symmetrix positive definite");
+            }
+        }
+
+        const matrix_type AC = K_FF - K_FT * AL;
+        const vector_type bC = faces_rhs - K_FT * bL;
+
+        return std::make_pair(AC, bC);
+    }
 };
 
 // define some optimization

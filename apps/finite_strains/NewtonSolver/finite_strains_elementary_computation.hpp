@@ -27,10 +27,10 @@
 
 #include <cassert>
 
+#include "bases/bases.hpp"
 #include "common/eigen.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "mechanics/deformation_tensors.hpp"
-#include "bases/bases.hpp"
 #include "methods/hho"
 #include "quadratures/quadratures.hpp"
 
@@ -70,10 +70,10 @@ struct MaterialParameters
 template<typename MeshType>
 class finite_strains
 {
-    typedef MeshType                             mesh_type;
-    typedef typename mesh_type::coordinate_type      scalar_type;
-    typedef typename mesh_type::cell             cell_type;
-    typedef typename disk::hho_degree_info hdi_type;
+    typedef MeshType                            mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename disk::hho_degree_info      hdi_type;
 
     const static int dimension = mesh_type::dimension;
 
@@ -175,29 +175,29 @@ class finite_strains
         assert(GT.cols() == uTF.rows());
         assert(GT.rows() == grad_basis_size);
 
-        // std::cout << "sol" << std::endl;
-        // std::cout << uTF.transpose() << std::endl;
+        //  std::cout << "sol" << std::endl;
+        //  std::cout << uTF.transpose() << std::endl;
 
         const vector_type GT_uTF = GT * uTF;
         const auto        Id     = static_matrix<scalar_type, dimension, dimension>::Identity();
 
-        // std::cout << "ET: " << GsT.norm() << std::endl;
+        // std::cout << "GT: " << GT.norm() << std::endl;
         // std::cout << GsT << std::endl;
 
         auto& law_quadpoints = law.getQPs();
 
         auto gb = disk::make_matrix_monomial_basis(m_msh, cl, grad_degree);
 
-        //std::cout << "nb: " << law_quadpoints.size() << std::endl;
+        // std::cout << "nb: " << law_quadpoints.size() << std::endl;
         for (auto& qp : law_quadpoints)
         {
-            //std::cout << "qp: " << qp.point() << std::endl;
+            // std::cout << "qp: " << qp.point() << std::endl;
             const auto gphi = gb.eval_functions(qp.point());
 
             assert(gphi.size() == grad_basis_size);
 
             // Compute local gradient and norm
-            //std::cout << "GT_utf: " << GsT_uTF << std::endl;
+            // std::cout << "GT_utf: " << GsT_uTF << std::endl;
             const auto GT_iqn = disk::eval(GT_uTF, gphi);
             const gvt  F_curr = GT_iqn + Id;
             // std::cout << "Em" << std::endl;
@@ -207,11 +207,11 @@ class finite_strains
 
             // Compute bahavior
             tc.tic();
-            const auto tensor_behavior = qp.compute_whole(F_curr, material_data, elatic_modulus);
+            const auto tensor_behavior = qp.compute_whole(F_curr, material_data, !elatic_modulus);
             tc.toc();
             time_law += tc.to_double();
 
-            //std::cout << "module " << tensor_behavior.second << std::endl;
+            // std::cout << "module " << tensor_behavior.second << std::endl;
             const auto qp_A_gphi = compute_A_gphi(qp.weight() * tensor_behavior.second, gphi);
 
             for (int j = 0; j < grad_basis_size; j += dim_dofs)

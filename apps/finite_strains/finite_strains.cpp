@@ -79,8 +79,8 @@ run_finite_strains_solver(const Mesh<T, 2, Storage>&        msh,
     auto depltest = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 1}; };
 
     bnd.addDirichletBC(disk::mechanics::CLAMPED, 3, zero);
-    //bnd.addNeumannBC(disk::mechanics::NEUMANN, 8, trac);
-    bnd.addDirichletBC(disk::mechanics::DY, 8, depltest);
+    bnd.addNeumannBC(disk::mechanics::NEUMANN, 8, trac);
+    //bnd.addDirichletBC(disk::mechanics::DY, 8, depltest);
 
     finite_strains_solver<mesh_type> nl(msh, bnd, rp, material_data);
 
@@ -305,29 +305,29 @@ main(int argc, char** argv)
     //    material_data.sigma_y0 = 400;
 
     // // Cook Parameters (mm, GPa, kN)
-    RealType E  = 70;
-    RealType nu = 0.4999;
-
-    material_data.mu     = material_data.converttomu(E, nu);
-    material_data.lambda = material_data.converttolambda(E, nu);
-
-    material_data.K = 0.0;
-    material_data.H = 0.135;
-
-    material_data.sigma_y0 = 0.243;
-
-    // Sphere Parameters (mm, GPa, kN)
-    // RealType E  = 210000;
-    // RealType nu = 0.3;
-    // RealType ET = 0;
+    // RealType E  = 70;
+    // RealType nu = 0.4999;
 
     // material_data.mu     = material_data.converttomu(E, nu);
     // material_data.lambda = material_data.converttolambda(E, nu);
 
-    // material_data.K = 0;
-    // material_data.H = 0;
+    // material_data.K = 0.0;
+    // material_data.H = 0.135;
 
-    // material_data.sigma_y0 = 240;
+    // material_data.sigma_y0 = 0.243;
+
+    // Sphere Parameters (mm, GPa, kN)
+    RealType E  = 210000;
+    RealType nu = 0.3;
+    RealType ET = 0;
+
+    material_data.mu     = material_data.converttomu(E, nu);
+    material_data.lambda = material_data.converttolambda(E, nu);
+
+    material_data.K = 0;
+    material_data.H = 0;
+
+    material_data.sigma_y0 = 240;
 
     // Plaque Parameters(mm, GPa, kN)
     // RealType E  = 70;
@@ -451,21 +451,21 @@ main(int argc, char** argv)
         return 0;
     }
 
-    // /* Netgen 3D */
-    // if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$"))) {
-    //    std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-    //    auto msh = disk::load_netgen_3d_mesh<RealType>(mesh_filename);
-    //    run_finite_strains_solver(msh, rp, material_data);
-    //    return 0;
-    // }
+    /* Netgen 3D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$"))) {
+       std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
+       auto msh = disk::load_netgen_3d_mesh<RealType>(mesh_filename);
+       run_finite_strains_solver(msh, rp, material_data);
+       return 0;
+    }
 
-    // /* Medit 3d*/
-    // if (std::regex_match(mesh_filename, std::regex(".*\\.medit3d$"))) {
-    //    std::cout << "Guessed mesh format: Medit format" << std::endl;
-    //    auto msh = disk::load_medit_3d_mesh<RealType>(mesh_filename);
-    //    run_finite_strains_solver(msh, rp, material_data);
-    //    return 0;
-    // }
+    /* Medit 3d*/
+    if (std::regex_match(mesh_filename, std::regex(".*\\.medit3d$"))) {
+       std::cout << "Guessed mesh format: Medit format" << std::endl;
+       auto msh = disk::load_medit_3d_mesh<RealType>(mesh_filename);
+       run_finite_strains_solver(msh, rp, material_data);
+       return 0;
+    }
 
     // /* DiSk++ cartesian 3D */
     // if (std::regex_match(mesh_filename, std::regex(".*\\.hex$"))) {

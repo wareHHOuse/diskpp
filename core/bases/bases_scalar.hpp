@@ -139,7 +139,6 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         box_h        = diameter_boundingbox(msh, cl);
         basis_degree = degree;
         basis_size   = scalar_basis_size(degree, 2);
-        std::cout << "box " << box_h[0] << " " << box_h[1] << std::endl;
     }
 
     function_type

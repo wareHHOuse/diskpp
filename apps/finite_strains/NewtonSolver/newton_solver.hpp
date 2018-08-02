@@ -48,10 +48,10 @@ namespace NLE
 template<typename MeshType>
 class NewtonRaphson_solver_finite_strains
 {
-    typedef MeshType                             mesh_type;
-    typedef typename mesh_type::coordinate_type      scalar_type;
-    typedef ParamRun<scalar_type>                param_type;
-    typedef typename disk::hho_degree_info hdi_type;
+    typedef MeshType                            mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef ParamRun<scalar_type>               param_type;
+    typedef typename disk::hho_degree_info      hdi_type;
 
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
@@ -126,7 +126,7 @@ class NewtonRaphson_solver_finite_strains
         newton_step.initialize(m_solution_cells, m_solution_faces, m_solution_data);
 
         m_convergence           = false;
-        bool elastic_prediction = true;
+        bool elastic_prediction = false;
 
         for (int iter = 0; iter < m_rp.m_iter_max; iter++)
         {

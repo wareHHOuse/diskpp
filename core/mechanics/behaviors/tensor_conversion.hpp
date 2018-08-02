@@ -26,6 +26,7 @@
 #pragma once
 
 #include "common/eigen.hpp"
+#include "mechanics/behaviors/maths_tensor.hpp"
 
 namespace disk
 {
@@ -166,7 +167,63 @@ convertTensor(const static_tensor<T, 3>& tens)
         return ret.block(0, 0, DIM * DIM, DIM * DIM);
     }
 
-    return tens.block(0,0, DIM*DIM, DIM*DIM);
+    return tens.block(0, 0, DIM * DIM, DIM * DIM);
 }
 
+template<typename T, int DIM>
+static_matrix<T, 6, 6>
+convertTensorNotationMangel(const static_tensor<T, DIM>& tens)
+{
+    static_assert((DIM == 2 || DIM == 3), "Can not compute conversion for this dimension");
+
+    static_matrix<T, 6, 6> ret = static_matrix<T, 6, 6>::Zero();
+
+    ret(0, 0) = coeff<T, DIM>(tens, 0, 0, 0, 0);
+    ret(0, 1) = coeff<T, DIM>(tens, 0, 0, 1, 1);
+    ret(1, 0) = coeff<T, DIM>(tens, 1, 1, 0, 0);
+    ret(1, 1) = coeff<T, DIM>(tens, 1, 1, 1, 1);
+
+    ret(0, 3) = coeff<T, DIM>(tens, 0, 0, 0, 1) * sqrt(T(2));
+    ret(1, 3) = coeff<T, DIM>(tens, 1, 1, 0, 1) * sqrt(T(2));
+    ret(3, 0) = coeff<T, DIM>(tens, 0, 1, 0, 0) * sqrt(T(2));
+    ret(3, 1) = coeff<T, DIM>(tens, 0, 1, 1, 1) * sqrt(T(2));
+    ret(3, 3) = coeff<T, DIM>(tens, 0, 1, 0, 1) * T(2);
+
+    if (DIM == 3)
+    {
+        ret(0, 2) = coeff<T, DIM>(tens, 0, 0, 2, 2);
+        ret(1, 2) = coeff<T, DIM>(tens, 1, 1, 2, 2);
+        ret(2, 2) = coeff<T, DIM>(tens, 2, 2, 2, 2);
+        ret(2, 0) = coeff<T, DIM>(tens, 2, 2, 0, 0);
+        ret(2, 1) = coeff<T, DIM>(tens, 2, 2, 1, 1);
+
+        ret(2, 3) = coeff<T, DIM>(tens, 2, 2, 0, 1) * sqrt(T(2));
+        ret(3, 2) = coeff<T, DIM>(tens, 0, 1, 2, 2) * sqrt(T(2));
+
+        ret(0, 5) = coeff<T, DIM>(tens, 0, 0, 1, 2) * sqrt(T(2));
+        ret(0, 4) = coeff<T, DIM>(tens, 0, 0, 0, 2) * sqrt(T(2));
+        ret(1, 5) = coeff<T, DIM>(tens, 1, 1, 1, 2) * sqrt(T(2));
+        ret(1, 4) = coeff<T, DIM>(tens, 1, 1, 0, 2) * sqrt(T(2));
+        ret(2, 5) = coeff<T, DIM>(tens, 2, 2, 1, 2) * sqrt(T(2));
+        ret(2, 4) = coeff<T, DIM>(tens, 2, 2, 0, 2) * sqrt(T(2));
+
+        ret(4, 0) = coeff<T, DIM>(tens, 0, 2, 0, 0) * sqrt(T(2));
+        ret(4, 1) = coeff<T, DIM>(tens, 0, 2, 1, 1) * sqrt(T(2));
+        ret(4, 2) = coeff<T, DIM>(tens, 0, 2, 2, 2) * sqrt(T(2));
+        ret(5, 0) = coeff<T, DIM>(tens, 1, 2, 0, 0) * sqrt(T(2));
+        ret(5, 1) = coeff<T, DIM>(tens, 1, 2, 1, 1) * sqrt(T(2));
+        ret(5, 2) = coeff<T, DIM>(tens, 1, 2, 2, 2) * sqrt(T(2));
+
+        ret(3, 5) = coeff<T, DIM>(tens, 0, 1, 1, 2) * T(2);
+        ret(3, 4) = coeff<T, DIM>(tens, 0, 1, 0, 2) * T(2);
+        ret(4, 3) = coeff<T, DIM>(tens, 0, 2, 0, 1) * T(2);
+        ret(4, 5) = coeff<T, DIM>(tens, 0, 2, 1, 2) * T(2);
+        ret(4, 4) = coeff<T, DIM>(tens, 0, 2, 0, 2) * T(2);
+        ret(5, 3) = coeff<T, DIM>(tens, 1, 2, 0, 1) * T(2);
+        ret(5, 5) = coeff<T, DIM>(tens, 1, 2, 1, 2) * T(2);
+        ret(5, 4) = coeff<T, DIM>(tens, 1, 2, 0, 2) * T(2);
+    }
+
+    return ret;
+}
 }

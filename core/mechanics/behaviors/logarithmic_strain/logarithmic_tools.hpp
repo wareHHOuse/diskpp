@@ -76,7 +76,7 @@ static_matrix<T, 3, 3>
 compute_Elog(const static_vector<T, 3>& lambda_i, const static_matrix<T, 3, 3>& P)
 {
     const static_vector<T, 3>         ei = compute_ei(lambda_i);
-    const Eigen::DiagonalMatrix<T, 3> D = Eigen::DiagonalMatrix<T, 3>(ei[0], ei[1], ei[2]);
+    const Eigen::DiagonalMatrix<T, 3> D  = Eigen::DiagonalMatrix<T, 3>(ei[0], ei[1], ei[2]);
 
     return P * D * P.transpose();
 }
@@ -152,7 +152,7 @@ compute_zeta(const static_matrix<T, 3, 3>& stress_T, const std::array<static_vec
     {
         for (int i = 0; i < 3; i++)
         {
-            zeta(i, j) = computeContractedProduct(stress_T, computeKroneckerProduct(Ni[i], Ni[j]));
+            zeta(i, j) = computeInnerProduct(stress_T, computeKroneckerProduct(Ni[i], Ni[j]));
         }
     }
     return zeta;
@@ -246,16 +246,22 @@ compute_three_diff(const static_vector<T, 3>& lambda_i, const static_vector<T, 3
 
     for (int i = 0; i < 3; i++)
     {
-        for (int j = 0; j < 3 && j != i; j++)
+        for (int j = 0; j < 3; j++)
         {
-            const T lilj = lambda_i(i) - lambda_i(j);
-            theta(i, j)  = (ei(i) - ei(j)) / lilj;
-            xi(i, j)     = (theta(i, j) - di(j) / T(2)) / lilj;
-
-            for (int k = 0; k < 3 && k != i && k != j; k++)
+            if (j != i)
             {
-                const T lilk = lambda_i(i) - lambda_i(k);
-                eta += ei(i) / (T(2) * lilj * lilk);
+                const T lilj = lambda_i(i) - lambda_i(j);
+                theta(i, j)  = (ei(i) - ei(j)) / lilj;
+                xi(i, j)     = (theta(i, j) - di(j) / T(2)) / lilj;
+
+                for (int k = 0; k < 3; k++)
+                {
+                    if (k != i && k != j)
+                    {
+                        const T lilk = lambda_i(i) - lambda_i(k);
+                        eta += ei(i) / (T(2) * lilj * lilk);
+                    }
+                }
             }
         }
     }
@@ -277,10 +283,13 @@ compute_three_equal(const static_vector<T, 3>& di, const static_vector<T, 3>& fi
 
     for (int i = 0; i < 3; i++)
     {
-        for (int j = 0; j < 3 && j != i; j++)
+        for (int j = 0; j < 3; j++)
         {
-            theta(i, j) = d;
-            xi(i, j)    = f;
+            if (j != i)
+            {
+                theta(i, j) = d;
+                xi(i, j)    = f;
+            }
         }
     }
 
@@ -387,7 +396,7 @@ compute_coefficient(const static_vector<T, 3>& lambda_i,
                     const static_vector<T, 3>& fi)
 {
     const int evcase = priv::selectCase(lambda_i);
-    std::cout << "CASE: " << evcase << std::endl;
+    // std::cout << "CASE: " << evcase << std::endl;
     switch (evcase)
     {
         case THREE_DIFF: return priv::compute_three_diff(lambda_i, ei, di); break;
@@ -402,13 +411,13 @@ compute_coefficient(const static_vector<T, 3>& lambda_i,
 }
 
 // compute projector tensor
-// compute Mij
 template<typename T>
 std::pair<static_tensor<T, 3>, static_tensor<T, 3>>
 compute_projector(const static_matrix<T, 3, 3>& F,
                   const static_matrix<T, 3, 3>& stress_T,
                   const static_vector<T, 3>&    lambda_i,
-                  const static_matrix<T, 3, 3>& evec)
+                  const static_matrix<T, 3, 3>& evec,
+                  bool                          compute_TL = true)
 {
     typedef static_tensor<T, 3>    tensor_type;
     typedef static_matrix<T, 3, 3> matrix_type;
@@ -440,48 +449,162 @@ compute_projector(const static_matrix<T, 3, 3>& F,
 
     // std::cout << "ei" << std::endl;
     // std::cout << ei.transpose() << std::endl;
+    // std::cout << "di" << std::endl;
+    // std::cout << di.transpose() << std::endl;
+    // std::cout << "fi" << std::endl;
+    // std::cout << fi.transpose() << std::endl;
+    // std::cout << "zeta" << std::endl;
+    // std::cout << zeta << std::endl;
+    // std::cout << "eta" << std::endl;
+    // std::cout << eta << std::endl;
+    // std::cout << "theta" << std::endl;
+    // std::cout << theta << std::endl;
+    // std::cout << "xi" << std::endl;
+    // std::cout << xi << std::endl;
+
+    for (int i = 0; i < 3; i++)
+    {
+        const matrix_type Mii      = compute_Mij(Ni, ni, i, i);
+        const matrix_type di2_NiNi = di(i) / T(2) * computeKroneckerProduct(Ni[i], Ni[i]);
+
+        P += computeKroneckerProduct(di2_NiNi, Mii);
+
+        if (compute_TL)
+        {
+            const T fiZeta = fi(i) / T(4) * zeta(i, i);
+            TL += fiZeta * computeKroneckerProduct(Mii, Mii);
+        }
+
+        for (int j = 0; j < 3; j++)
+        {
+            if (j != i)
+            {
+                const matrix_type Mij        = compute_Mij(Ni, ni, i, j);
+                const matrix_type theta_NiNj = theta(i, j) * computeKroneckerProduct(Ni[i], Ni[j]);
+
+                P += computeKroneckerProduct(theta_NiNj, Mij);
+
+                // for TL
+                const matrix_type zeta_Mjj    = zeta(i, j) * compute_Mij(Ni, ni, j, j);
+                const tensor_type zeta_MijMjj = computeKroneckerProduct(Mij, zeta_Mjj);
+                const tensor_type zeta_MjjMij = computeKroneckerProduct(zeta_Mjj, Mij);
+                const tensor_type MijMij      = computeKroneckerProduct(Mij, Mij);
+
+                if (compute_TL)
+                {
+                    const T twoxi = T(2) * xi(i, j);
+                    TL += twoxi * ((zeta_MijMjj + zeta_MjjMij) + zeta(j, j) * MijMij);
+
+                    for (int k = 0; k < 3; k++)
+                    {
+                        if (k != i && k != j)
+                        {
+                            const T           etaZeta     = T(2) * eta * zeta(i, j);
+                            const matrix_type etaZeta_Mik = etaZeta * compute_Mij(Ni, ni, i, k);
+                            const matrix_type Mjk         = compute_Mij(Ni, ni, j, k);
+
+                            TL += computeKroneckerProduct(etaZeta_Mik, Mjk);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (compute_TL)
+    {
+        // last term partie symmetric
+        const matrix_type inv_F   = F.inverse();
+        const matrix_type invF_TP = inv_F * computeContractedProduct<T, 3>(stress_T, P);
+        const matrix_type Id      = matrix_type::Identity();
+        TL += symetric_part<T, 3>(computeKroneckerProduct(invF_TP, Id));
+    }
+    // std::cout << "P" << std::endl;
+    // std::cout << P << std::endl;
+    // std::cout << "TL" << std::endl;
+    // std::cout << TL << std::endl;
+
+    return std::make_pair(P, TL);
+}
+
+// compute projector tensor
+template<typename T>
+std::pair<static_tensor<T, 3>, static_tensor<T, 3>>
+compute_projector_PK2(const static_matrix<T, 3, 3>& F,
+                      const static_matrix<T, 3, 3>& stress_T,
+                      const static_vector<T, 3>&    lambda_i,
+                      const static_matrix<T, 3, 3>& evec)
+{
+    typedef static_tensor<T, 3>    tensor_type;
+    typedef static_matrix<T, 3, 3> matrix_type;
+    typedef static_vector<T, 3>    vector_type;
+
+    // projector tensor
+    tensor_type P  = tensor_type::Zero();
+    tensor_type TL = tensor_type::Zero();
+
+    // compute Normal
+    const std::array<vector_type, 3> Ni = compute_Ni(evec);
+
+    // compute quantites
+    const vector_type ei   = compute_ei(lambda_i);
+    const vector_type di   = compute_di(lambda_i);
+    const vector_type fi   = compute_fi(lambda_i);
+    const matrix_type zeta = compute_zeta(stress_T, Ni);
+
+    const auto        coefficient = compute_coefficient(lambda_i, ei, di, fi);
+    const matrix_type theta       = std::get<0>(coefficient);
+    const matrix_type xi          = std::get<1>(coefficient);
+    const T           eta         = std::get<2>(coefficient);
+
+    // std::cout << "T" << std::endl;
+    // std::cout << stress_T << std::endl;
+    // std::cout << "F" << std::endl;
+    // std::cout << F << std::endl;
+
+    // std::cout << "ei" << std::endl;
+    // std::cout << ei.transpose() << std::endl;
     // std::cout << "zeta" << std::endl;
     // std::cout << zeta << std::endl;
 
     for (int i = 0; i < 3; i++)
     {
-        const matrix_type Mii  = compute_Mij(Ni, ni, i, i);
+        const matrix_type Mii  = compute_Mij(Ni, Ni, i, i);
         const matrix_type NiNi = computeKroneckerProduct(Ni[i], Ni[i]);
 
         P += di(i) / T(2) * computeKroneckerProduct(NiNi, Mii);
         TL += fi(i) / T(4) * zeta(i, i) * computeKroneckerProduct(Mii, Mii);
 
-        for (int j = 0; j < 3 && j != i; j++)
+        for (int j = 0; j < 3; j++)
         {
-            const matrix_type Mij  = compute_Mij(Ni, ni, i, j);
-            const matrix_type NiNj = computeKroneckerProduct(Ni[i], Ni[j]);
-
-            P += theta(i, j) * computeKroneckerProduct(NiNj, Mij);
-
-            // for TL
-            const matrix_type Mjj    = compute_Mij(Ni, ni, j, j);
-            const tensor_type MijMjj = computeKroneckerProduct(Mij, Mjj);
-            const tensor_type MjjMij = computeKroneckerProduct(Mjj, Mij);
-            const tensor_type MijMij = computeKroneckerProduct(Mij, Mij);
-
-            TL += T(2) * xi(i, j) * (zeta(i, j) * (MijMjj + MjjMij) + zeta(j, j) * MijMij);
-
-            for (int k = 0; k < 3 && k != i && k != j; k++)
+            if (j != i)
             {
-                const matrix_type Mik = compute_Mij(Ni, ni, i, k);
-                const matrix_type Mjk = compute_Mij(Ni, ni, j, k);
+                const matrix_type Mij  = compute_Mij(Ni, Ni, i, j);
+                const matrix_type NiNj = computeKroneckerProduct(Ni[i], Ni[j]);
 
-                TL += T(2) * eta * zeta(i, j) * computeKroneckerProduct(Mik, Mjk);
+                P += theta(i, j) * computeKroneckerProduct(NiNj, Mij);
+
+                // for TL
+                const matrix_type Mjj    = compute_Mij(Ni, Ni, j, j);
+                const tensor_type MijMjj = computeKroneckerProduct(Mij, Mjj);
+                const tensor_type MjjMij = computeKroneckerProduct(Mjj, Mij);
+                const tensor_type MijMij = computeKroneckerProduct(Mij, Mij);
+
+                TL += T(2) * xi(i, j) * (zeta(i, j) * (MijMjj + MjjMij) + zeta(j, j) * MijMij);
+
+                for (int k = 0; k < 3; k++)
+                {
+                    if (k != i && k != j)
+                    {
+                        const matrix_type Mik = compute_Mij(Ni, Ni, i, k);
+                        const matrix_type Mjk = compute_Mij(Ni, Ni, j, k);
+
+                        TL += T(2) * eta * zeta(i, j) * computeKroneckerProduct(Mik, Mjk);
+                    }
+                }
             }
         }
     }
-
-    // last term partie symmetric
-    const matrix_type inv_F   = F.inverse();
-    const matrix_type PT      = computeContractedProduct(P, stress_T);
-    const matrix_type invF_PT = inv_F * computeContractedProduct(P, stress_T);
-    const matrix_type Id      = matrix_type::Identity();
-    TL += symetric_part<T,3>(computeKroneckerProduct(invF_PT, Id));
 
     // std::cout << "P" << std::endl;
     // std::cout << P << std::endl;

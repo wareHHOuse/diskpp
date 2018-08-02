@@ -36,9 +36,9 @@
 #include "Informations.hpp"
 #include "NewtonSolver/newton_solver.hpp"
 #include "Parameters.hpp"
+#include "core/mechanics/behaviors/logarithmic_strain/LogarithmicStrain.hpp"
 #include "mechanics/BoundaryConditions.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
-#include "core/mechanics/behaviors/logarithmic_strain/LogarithmicStrain.hpp"
 
 #include "output/gmshConvertMesh.hpp"
 #include "output/gmshDisk.hpp"
@@ -66,9 +66,9 @@ class finite_strains_solver
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
-    typedef disk::mechanics::BoundaryConditions<mesh_type>   bnd_type;
+    typedef disk::mechanics::BoundaryConditions<mesh_type>        bnd_type;
     typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_hpp_type;
-    typedef disk::mechanics::LogarithmicStrain<law_hpp_type> law_type;
+    typedef disk::mechanics::LogarithmicStrain<law_hpp_type>      law_type;
 
     typename disk::hho_degree_info m_hdi;
     bnd_type                       m_bnd;
@@ -157,7 +157,8 @@ class finite_strains_solver
                     case HHO:
                     {
                         const auto recons_scalar = make_hho_scalar_laplacian(m_msh, cl, m_hdi);
-                        const auto stab_HHO = make_hho_vector_stabilization_optim(m_msh, cl, recons_scalar.first, m_hdi);
+                        const auto stab_HHO =
+                          make_hho_vector_stabilization_optim(m_msh, cl, recons_scalar.first, m_hdi);
                         m_stab_precomputed.push_back(stab_HHO);
                         break;
                     }
@@ -411,7 +412,8 @@ class finite_strains_solver
         return total_dof_depl_static;
     }
 
-    void printSolutionCell() const
+    void
+    printSolutionCell() const
     {
         int cell_i = 0;
         std::cout << "Solution at the cells:" << std::endl;
@@ -669,7 +671,7 @@ class finite_strains_solver
         size_t nb_nodes = 0;
         for (auto& cl : m_msh)
         {
-            auto                    gb = disk::make_sym_matrix_monomial_basis(m_msh, cl, m_hdi.grad_degree());
+            auto                    gb           = disk::make_sym_matrix_monomial_basis(m_msh, cl, m_hdi.grad_degree());
             const auto              law_cell     = m_law.getCellIVs(cell_i);
             const vector_dynamic    stress_coeff = law_cell.projectStressOnCell(m_msh, cl, m_hdi, material_data);
             const auto              cell_nodes   = disk::cell_nodes(m_msh, cl);
@@ -730,8 +732,8 @@ class finite_strains_solver
 
         for (auto& cl : m_msh)
         {
-            auto                 gb       = disk::make_sym_matrix_monomial_basis(m_msh, cl, m_hdi.grad_degree());
-            const auto           law_cell = m_law.getCellIVs(cell_i);
+            auto                 gb           = disk::make_sym_matrix_monomial_basis(m_msh, cl, m_hdi.grad_degree());
+            const auto           law_cell     = m_law.getCellIVs(cell_i);
             const vector_dynamic stress_coeff = law_cell.projectStressOnCell(m_msh, cl, m_hdi, material_data);
             const auto           cell_nodes   = post_mesh.nodes_cell(cell_i);
 

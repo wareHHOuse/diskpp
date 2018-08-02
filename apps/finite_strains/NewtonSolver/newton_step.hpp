@@ -33,9 +33,9 @@
 
 #include "../Informations.hpp"
 #include "../Parameters.hpp"
+#include "bases/bases.hpp"
 #include "finite_strains_elementary_computation.hpp"
 #include "mechanics/BoundaryConditions.hpp"
-#include "bases/bases.hpp"
 #include "methods/hho"
 #include "quadratures/quadratures.hpp"
 
@@ -53,9 +53,9 @@ template<typename MeshType>
 class NewtonRaphson_step_finite_strains
 {
     typedef MeshType                                       mesh_type;
-    typedef typename mesh_type::coordinate_type                scalar_type;
+    typedef typename mesh_type::coordinate_type            scalar_type;
     typedef ParamRun<scalar_type>                          param_type;
-    typedef typename disk::hho_degree_info           hdi_type;
+    typedef typename disk::hho_degree_info                 hdi_type;
     typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
 
     const static int dimension = mesh_type::dimension;
@@ -223,7 +223,8 @@ class NewtonRaphson_step_finite_strains
                             rhs -= m_rp.m_beta * stab_HHO * m_solution_data.at(cell_i);
                             break;
                         }
-                        case HDG: {
+                        case HDG:
+                        {
                             const auto stab_HDG = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
                             assert(elem.K_int.rows() == stab_HDG.rows());
                             assert(elem.K_int.cols() == stab_HDG.cols());
