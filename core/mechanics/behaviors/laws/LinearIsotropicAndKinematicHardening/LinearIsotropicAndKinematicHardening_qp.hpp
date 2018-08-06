@@ -160,7 +160,7 @@ class LinearIsotropicAndKinematicHardening_qp
     scalar_type
     sigmaeq(const static_matrix_type3D& dev) const
     {
-        return sqrt(scalar_type(1.5) * mm_prod(dev, dev));
+        return sqrt(scalar_type(1.5) * dev.squaredNorm());
     }
 
     static_matrix_type3D
@@ -242,6 +242,16 @@ class LinearIsotropicAndKinematicHardening_qp
         const static_matrix_type3D Id = static_matrix_type3D::Identity();
 
         const auto stress = 2 * data.getMu() * m_estrain_curr + data.getLambda() * m_estrain_curr.trace() * Id;
+
+        return stress.block(0, 0, DIM, DIM);
+    }
+
+    static_matrix_type
+    compute_stressPrev(const data_type& data) const
+    {
+        const static_matrix_type3D Id = static_matrix_type3D::Identity();
+
+        const auto stress = 2 * data.getMu() * m_estrain_prev + data.getLambda() * m_estrain_prev.trace() * Id;
 
         return stress.block(0, 0, DIM, DIM);
     }

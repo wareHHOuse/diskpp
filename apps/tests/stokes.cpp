@@ -30,9 +30,9 @@
 
 #include <unistd.h>
 
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "bases/bases.hpp"
+#include "quadratures/quadratures.hpp"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -94,11 +94,11 @@ run_stokes(const Mesh& msh, size_t degree)
     };
 
 
-    typename revolution::hho_degree_info hdi(degree);
+    typename disk::hho_degree_info hdi(degree);
     boundary_type                        bnd(msh);
     bnd.addDirichletEverywhere(sol_fun);
 
-    auto assembler = revolution::make_stokes_assembler(msh, hdi, bnd);
+    auto assembler = disk::make_stokes_assembler(msh, hdi, bnd);
 
     for (auto cl : msh)
     {
@@ -109,7 +109,7 @@ run_stokes(const Mesh& msh, size_t degree)
 
         auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, hdi);
 
-        auto face_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.face_degree());
+        auto face_basis = disk::make_vector_monomial_basis(msh, cl, hdi.face_degree());
 
         auto rhs = make_rhs(msh, cl, face_basis, rhs_fun);
 
@@ -138,16 +138,16 @@ run_stokes(const Mesh& msh, size_t degree)
 
     	Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, sol_fun);
 
-    	auto cbs = revolution::vector_basis_size(degree, Mesh::dimension, Mesh::dimension);
+    	auto cbs = disk::vector_basis_size(degree, Mesh::dimension, Mesh::dimension);
 
-    	auto cell_ofs = revolution::priv::offset(msh, cl);
+    	auto cell_ofs = disk::priv::offset(msh, cl);
     	Matrix<scalar_type, Dynamic, 1> s = sol.block(cell_ofs * cbs, 0, cbs, 1);
 
     	Matrix<scalar_type, Dynamic, 1> diff = s - p.head(cbs);
 
-    	auto cb = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
+    	auto cb = disk::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
 
-    	Matrix<scalar_type, Dynamic, Dynamic> mm = revolution::make_mass_matrix(msh, cl, cb);
+    	Matrix<scalar_type, Dynamic, Dynamic> mm = disk::make_mass_matrix(msh, cl, cb);
 
     	error += diff.dot(mm*diff);
 

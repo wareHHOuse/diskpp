@@ -520,7 +520,7 @@ class tester
 
     void test_cartesian_diskpp(void)
     {
-        std::cout << yellow << "Mesh under test: cartesian mesh (DiSk++)";
+        std::cout << yellow << "Mesh under test: 3D cartesian mesh (DiSk++)";
         std::cout << nocolor << std::endl;
         using T = double;
 

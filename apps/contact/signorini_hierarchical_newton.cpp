@@ -34,8 +34,7 @@
 
 #include "loaders/loader.hpp"
 #include "cfem/cfem.hpp"
-#include "hho/hho.hpp"
-#include "revolution/methods/hho"
+#include "methods/hho"
 #include "mesh/mesh_hierarchy.hpp"
 
 #include "output/silo.hpp"
@@ -553,7 +552,7 @@ public:
                  const disk::simplicial_mesh<T,2>& ref_msh,
                  const disk::simplicial_mesh<T,2>& sol_msh)
     {
-        using namespace revolution;
+        using namespace disk;
 
         std::cout << green << "Computed solution, HHO" << reset << std::endl;
         std::cout << "Mesh size: " << average_diameter(sol_msh) << std::endl;

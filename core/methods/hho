@@ -8,7 +8,6 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -26,7 +25,4 @@
 
 #pragma once
 
-#include "implementation_bits/bases_scalar.hpp"
-#include "implementation_bits/bases_vector.hpp"
-#include "implementation_bits/bases_matrix.hpp"
-#include "implementation_bits/bases_utils.hpp"
+#include "implementation_bits/methods_hho.hpp"

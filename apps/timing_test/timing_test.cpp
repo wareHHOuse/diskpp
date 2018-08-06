@@ -1,10 +1,14 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
- *      /__\       matteo.cicuttin@enpc.fr
- *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
- *    /\    /\
- *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
- *  /_\/_\/_\/_\   methods.
+ *       /\         DISK++, a template library for DIscontinuous SKeletal
+ *      /__\        methods.
+ *     /_\/_\
+ *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
+ *   /__\  /__\     matteo.cicuttin@enpc.fr
+ *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
+ *
+ * This file is copyright of the following authors:
+ * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
+ * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -27,7 +31,8 @@
 #include <map>
 
 #include "loaders/loader.hpp"
-#include "hho/hho.hpp"
+#include "bases/bases.hpp"
+#include "quadratures/quadratures.hpp"
 
 #include "timecounter.h"
 
@@ -43,42 +48,25 @@ test_quadrature_loop(MeshType& msh, size_t degree)
     typedef typename mesh_type::cell                   cell_type;
     typedef typename mesh_type::face                   face_type;
 
-    typedef disk::quadrature<mesh_type, cell_type>      cell_quadrature_type;
-    typedef disk::quadrature<mesh_type, face_type>      face_quadrature_type;
-
-    typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
-    typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
-
     typedef dynamic_matrix<scalar_type> matrix_type;
 
-    cell_basis_type     cell_basis;
-    face_basis_type     face_basis;
-    cell_quadrature_type      cell_quadrature;
-    face_quadrature_type      face_quadrature;
+    const auto cbs = disk::scalar_basis_size(degree, mesh_type::dimension);
 
-    cell_basis          = cell_basis_type(degree);
-    face_basis          = face_basis_type(degree);
-    cell_quadrature     = cell_quadrature_type(2*degree);
-    face_quadrature     = face_quadrature_type(2*degree);
-
-    auto cell_basis_size = cell_basis.size();
-    auto face_basis_size = face_basis.size();
-
-    std::cout << "Cell basis size: " << cell_basis_size << std::endl;
+    std::cout << "Cell basis size: " << cbs << std::endl;
 
     timecounter tc;
 
     tc.tic();
-    //Eigen::Matrix<scalar_type, 20, 20> stiff_mat;
+
     for (auto& cl : msh)
     {
-        matrix_type stiff_mat = matrix_type::Zero(cell_basis_size, cell_basis_size);
-        //stiff_mat.setZero();
+        matrix_type stiff_mat = matrix_type::Zero(cbs, cbs);
 
-        auto cell_quadpoints = cell_quadrature.integrate(msh, cl);
-        for (auto& qp : cell_quadpoints)
+        auto       cb  = disk::make_scalar_monomial_basis(msh, cl, degree);
+        const auto qps = disk::integrate(msh, cl, 2 * degree);
+        for (auto& qp : qps)
         {
-            matrix_type dphi = cell_basis.eval_gradients(msh, cl, qp.point());
+            const auto dphi = cb.eval_gradients(qp.point());
             stiff_mat += qp.weight() * dphi * dphi.transpose();
         }
     }
@@ -126,26 +114,6 @@ int main(int argc, char **argv)
 
     if (argc == 0)
     {
-        std::cout << "Running 1D test simulation" << std::endl;
-
-        typedef disk::generic_mesh<RealType, 1>  mesh_type;
-
-        mesh_type msh;
-        disk::uniform_mesh_loader<RealType, 1> loader(0,1,elems_1d);
-        loader.populate_mesh(msh);
-
-        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
-            //return 2.;
-            return M_PI * M_PI * sin(p.x() * M_PI);
-        };
-
-        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
-            //return - p.x() * p.x();
-            return sin(p.x() * M_PI);
-        };
-
-        test_quadrature_loop(msh, degree);
-
         return 0;
     }
 

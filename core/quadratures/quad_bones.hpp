@@ -1,10 +1,14 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
- *      /__\       matteo.cicuttin@enpc.fr
- *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
- *    /\    /\
- *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
- *  /_\/_\/_\/_\   methods.
+ *       /\         DISK++, a template library for DIscontinuous SKeletal
+ *      /__\        methods.
+ *     /_\/_\
+ *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
+ *   /__\  /__\     matteo.cicuttin@enpc.fr
+ *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
+ *
+ * This file is copyright of the following authors:
+ * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
+ * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -38,17 +42,154 @@
 
 namespace disk {
 
+template<typename T>
+std::vector<std::pair<point<T, 1>, T>>
+golub_welsch(const size_t degree)
+{
+    typedef Matrix<T, Dynamic, Dynamic>    matrix_type;
+    std::vector<std::pair<point<T, 1>, T>> ret;
+
+    size_t comp_degree = degree;
+    if (comp_degree % 2 == 0)
+        comp_degree++;
+
+    size_t reqd_nodes = (comp_degree + 1) / 2;
+
+    if (reqd_nodes == 1)
+    {
+        auto qp = std::make_pair(point<T, 1>({0.}), 2.0);
+        ret.push_back(qp);
+        return ret;
+    }
+
+    matrix_type M = matrix_type::Zero(reqd_nodes, reqd_nodes);
+    for (size_t i = 1; i < reqd_nodes; i++)
+    {
+        T p         = 4.0 - 1.0 / (i * i);
+        M(i, i - 1) = sqrt(1.0 / p);
+    }
+
+    SelfAdjointEigenSolver<matrix_type> solver;
+    solver.compute(M);
+
+    matrix_type weights  = solver.eigenvectors().row(0);
+    weights              = weights.array().square();
+    matrix_type nodes    = solver.eigenvalues();
+
+    assert(weights.size() == nodes.size());
+
+    for (size_t i = 0; i < nodes.size(); i++)
+    {
+        auto qp = std::make_pair(point<T, 1>({nodes(i)}), 2 * weights(i));
+        ret.push_back(qp);
+    }
+
+    return ret;
+}
+
+template<typename T>
+std::vector<std::pair<point<T, 1>, T>>
+gauss_legendre(const size_t degree)
+{
+    auto comp_degree = degree;
+
+    if (degree % 2 == 0)
+        comp_degree = degree + 1;
+
+    size_t reqd_nodes = (comp_degree + 1) / 2;
+
+    std::vector<std::pair<point<T, 1>, T>> ret;
+    ret.reserve(reqd_nodes);
+
+    point<T, 1> qp;
+    T           qw;
+    T           a1, a2;
+
+    switch (reqd_nodes)
+    {
+        case 1:
+            qp = point<T, 1>({0.0});
+            qw = 2.0;
+            ret.push_back(std::make_pair(qp, qw));
+            return ret;
+
+        case 2:
+            qp = point<T, 1>({1.0 / std::sqrt(3.0)});
+            qw = 1.0;
+            ret.push_back(std::make_pair(-qp, qw));
+            ret.push_back(std::make_pair(qp, qw));
+            return ret;
+
+        case 3:
+            qp = point<T, 1>({std::sqrt(3.0 / 5.0)});
+            qw = 5.0 / 9.0;
+            ret.push_back(std::make_pair(-qp, qw));
+            ret.push_back(std::make_pair(qp, qw));
+
+            qp = point<T, 1>({0.0});
+            qw = 8.0 / 9.0;
+            ret.push_back(std::make_pair(qp, qw));
+
+            return ret;
+
+        case 4:
+            a1 = 15;
+            a2 = 2.0 * std::sqrt(30.0);
+
+            qp = point<T, 1>({std::sqrt((a1 - a2) / 35.0)});
+            qw = (18.0 + std::sqrt(30.0)) / 36.0;
+            ret.push_back(std::make_pair(-qp, qw));
+            ret.push_back(std::make_pair(qp, qw));
+
+            qp = point<T, 1>({std::sqrt((a1 + a2) / 35.0)});
+            qw = (18.0 - std::sqrt(30.0)) / 36.0;
+            ret.push_back(std::make_pair(-qp, qw));
+            ret.push_back(std::make_pair(qp, qw));
+
+            return ret;
+
+        case 5:
+            qp = point<T, 1>({0.0});
+            qw = 128.0 / 225.0;
+            ret.push_back(std::make_pair(qp, qw));
+
+            a1 = 5.0;
+            a2 = 2.0 * std::sqrt(10.0 / 7.0);
+            qp = point<T, 1>({std::sqrt(a1 - a2) / 3.0});
+            qw = (322 + 13.0 * std::sqrt(70.0)) / 900.0;
+            ret.push_back(std::make_pair(-qp, qw));
+            ret.push_back(std::make_pair(qp, qw));
+
+            qp = point<T, 1>({std::sqrt(a1 + a2) / 3.0});
+            qw = (322 - 13.0 * std::sqrt(70.0)) / 900.0;
+            ret.push_back(std::make_pair(-qp, qw));
+            ret.push_back(std::make_pair(qp, qw));
+            return ret;
+
+        default: return golub_welsch<T>(degree);
+    }
+
+    return ret;
+}
+
+template<typename T>
+std::vector<std::pair<point<T, 1>, T>>
+edge_quadrature(const size_t doe)
+{
+    return gauss_legendre<T>(doe);
+}
+
 std::vector<std::pair<point<double,3>, double>>
 tetrahedron_quadrature(size_t degree)
 {
     int dimension = 3;
 
 #ifdef USE_ARBQ
-    int rule = degree+1;
+    int rule = degree;
     if (rule == 0)
         rule = 1;
 #else
-    int rule = degree/2 + 1;
+    int rule = degree/2;
 #endif
     int point_num;
 
@@ -125,7 +266,7 @@ triangle_quadrature(size_t order)
     for(rule = 1; rule <= rule_num; rule++)
     {
         degree = dunavant_degree(rule);
-        if(degree > order)
+        if(degree >= order)
             break;
     }
     assert(rule != rule_num or degree >= order);
@@ -148,51 +289,34 @@ triangle_quadrature(size_t order)
     return ret;
 }
 
+
 template<typename T>
-std::vector<std::pair<point<T,1>, T>>
-edge_quadrature(size_t doe)
+std::vector<std::pair<point<T, 2>, T>>
+quadrangle_quadrature(const size_t degree)
 {
-    std::vector<std::pair<point<T,1>, T>> ret;
+    const auto qps = disk::edge_quadrature<T>(degree);
 
-    using namespace Eigen;
+    std::vector<std::pair<point<T, 2>, T>> ret; //;
+    ret.reserve(qps.size() * qps.size());
 
-    if (doe%2 == 0)
-        doe++;
-
-    size_t num_nodes = (doe+1)/2;
-
-    if (num_nodes == 1)
+    for (auto jtor = qps.begin(); jtor != qps.end(); jtor++)
     {
-        auto qp = std::make_pair(point<T,1>({0.5}), 1.0);
-        ret.push_back(qp);
-        return ret;
-    }
+        const auto qp_y = *jtor;
+        const auto eta  = qp_y.first.x();
 
-    dynamic_matrix<T> M = dynamic_matrix<T>::Zero(num_nodes, num_nodes);
-    for (size_t i = 1; i < num_nodes; i++)
-    {
-        T p = 4.0 - 1.0/(i*i);
-        M(i, i-1) = sqrt(1.0/p);
-    }
+        for (auto itor = qps.begin(); itor != qps.end(); itor++)
+        {
+            const auto qp_x = *itor;
+            const auto xi   = qp_x.first.x();
 
-    SelfAdjointEigenSolver<dynamic_matrix<T>> solver;
-    solver.compute(M);
+            const auto w = qp_x.second * qp_y.second;
 
-    dynamic_vector<T> weights = solver.eigenvectors().row(0);
-                      weights = weights.array().square();
-    dynamic_vector<T> nodes = solver.eigenvalues();
-
-    assert( weights.size() == nodes.size() );
-
-    for (size_t i = 0; i < nodes.size(); i++)
-    {
-        auto qp = std::make_pair(point<T,1>({(nodes(i) + 1.)/2.}), weights(i));
-        ret.push_back(qp);
+            ret.push_back(std::make_pair(point<T, 2>({xi, eta}), w));
+        }
     }
 
     return ret;
 }
-
 
 template<typename T, size_t DIM>
 class quadrature_point : private std::pair<point<T,DIM>, T>
@@ -230,6 +354,176 @@ operator<<(std::ostream& os, const quadrature_point<T,DIM>& qp)
     os << qp.point() << " " << qp.weight();
     return os;
 }
+
+
+
+namespace priv {
+
+template<typename T, typename PtA>
+std::vector<disk::quadrature_point<T, 2>>
+integrate_triangle(size_t degree, const PtA& pts)
+{
+    assert(pts.size() == 3);
+
+    static_assert(std::is_same<typename PtA::value_type, point<T, 2>>::value, "This function is for 2D points");
+
+    using quadpoint_type = disk::quadrature_point<T, 2>;
+
+    const auto qps = disk::triangle_quadrature(degree);
+
+    std::vector<quadpoint_type> ret;
+
+    ret.resize(qps.size());
+
+    const auto col1 = pts[1] - pts[0];
+    const auto col2 = pts[2] - pts[0];
+
+    /* Compute the area of the sub-triangle */
+    const auto tm = (col1.x() * col2.y() - col2.x() * col1.y()) / 2.;
+
+    auto tr = [&](const std::pair<point<T, 2>, T>& qd) -> auto
+    {
+        const auto point  = col1 * qd.first.x() + col2 * qd.first.y() + pts[0];
+        const auto weight = qd.second * std::abs(tm);
+        return disk::make_qp(point, weight);
+    };
+
+    std::transform(qps.begin(), qps.end(), ret.begin(), tr);
+
+    return ret;
+}
+
+template<typename T>
+std::vector<disk::quadrature_point<T, 2>>
+integrate_quadrangle_tens(size_t degree, const std::vector<point<T, 2>>& pts)
+{
+    const auto qps = disk::quadrangle_quadrature<T>(degree);
+
+    std::vector<disk::quadrature_point<T, 2>> ret;
+    ret.reserve(qps.size());
+
+    auto P = [&](T xi, T eta) -> T {
+        return 0.25 * pts[0].x() * (1 - xi) * (1 - eta) + 0.25 * pts[1].x() * (1 + xi) * (1 - eta) +
+               0.25 * pts[2].x() * (1 + xi) * (1 + eta) + 0.25 * pts[3].x() * (1 - xi) * (1 + eta);
+    };
+
+    auto Q = [&](T xi, T eta) -> T {
+        return 0.25 * pts[0].y() * (1 - xi) * (1 - eta) + 0.25 * pts[1].y() * (1 + xi) * (1 - eta) +
+               0.25 * pts[2].y() * (1 + xi) * (1 + eta) + 0.25 * pts[3].y() * (1 - xi) * (1 + eta);
+    };
+
+    auto J = [&](T xi, T eta) -> T {
+        auto j11 = 0.25 * ((pts[1].x() - pts[0].x()) * (1 - eta) + (pts[2].x() - pts[3].x()) * (1 + eta));
+        auto j12 = 0.25 * ((pts[1].y() - pts[0].y()) * (1 - eta) + (pts[2].y() - pts[3].y()) * (1 + eta));
+        auto j21 = 0.25 * ((pts[3].x() - pts[0].x()) * (1 - xi) + (pts[2].x() - pts[1].x()) * (1 + xi));
+        auto j22 = 0.25 * ((pts[3].y() - pts[0].y()) * (1 - xi) + (pts[2].y() - pts[1].y()) * (1 + xi));
+
+        return std::abs(j11 * j22 - j12 * j21);
+    };
+
+    for (auto& qp : qps)
+    {
+        const T xi  = qp.first.x();
+        const T eta = qp.first.y();
+
+        const T px = P(xi, eta);
+        const T py = Q(xi, eta);
+
+        const T weight = qp.second * J(xi, eta);
+        ret.push_back(disk::make_qp(point<T, 2>({px, py}), weight));
+    }
+
+    return ret;
+}
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename PtA>
+std::vector<disk::quadrature_point<T, 2>>
+integrate_quadrangle(const Mesh<T, 2, Storage>&                msh,
+                     const typename Mesh<T, 2, Storage>::cell& cl,
+                     size_t                                    degree,
+                     const PtA&                                pts)
+{
+    assert(pts.size() == 4);
+
+    using mesh_type      = Mesh<T, 2, Storage>;
+    using quadpoint_type = disk::quadrature_point<T, 2>;
+
+    const auto qps = disk::triangle_quadrature(degree);
+
+    std::vector<quadpoint_type> ret;
+
+    ret.resize(qps.size() * 2);
+
+    for (size_t i = 1; i < 3; i++)
+    {
+        const auto pt1  = pts[i];
+        const auto pt2  = pts[i + 1];
+        const auto col1 = pt1 - pts[0];
+        const auto col2 = pt2 - pts[0];
+
+        /* Compute the area of the sub-triangle */
+        const auto tm = (col1.x() * col2.y() - col2.x() * col1.y()) / 2.;
+
+        auto tr = [&](const std::pair<point<T, 2>, T>& qd) -> auto
+        {
+            const auto point  = col1 * qd.first.x() + col2 * qd.first.y() + pts[0];
+            const auto weight = qd.second * std::abs(tm);
+            return disk::make_qp(point, weight);
+        };
+
+        auto retbegin = ret.begin();
+        std::advance(retbegin, qps.size() * (i - 1));
+
+        std::transform(qps.begin(), qps.end(), retbegin, tr);
+    }
+
+    return ret;
+}
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+std::vector<disk::quadrature_point<T, 2>>
+integrate_2D_face(const Mesh<T, 2, Storage>& msh, const typename Mesh<T, 2, Storage>::face& fc, size_t degree)
+{
+    using mesh_type  = disk::simplicial_mesh<T, 2>;
+    using point_type = typename mesh_type::point_type;
+
+    const auto qps = disk::edge_quadrature<T>(degree);
+    const auto pts = points(msh, fc);
+
+    const auto scale = (pts[1] - pts[0]);
+    const auto meas  = scale.to_vector().norm();
+
+    std::vector<disk::quadrature_point<T, 2>> ret;
+    ret.reserve(qps.size());
+
+    for (auto itor = qps.begin(); itor != qps.end(); itor++)
+    {
+        const auto qp = *itor;
+        const auto t  = qp.first.x();
+        const auto p  = 0.5 * (1 - t) * pts[0] + 0.5 * (1 + t) * pts[1];
+        const auto w  = qp.second * meas * 0.5;
+
+        ret.push_back(disk::make_qp(p, w));
+    }
+
+    return ret;
+}
+
+template<typename MeshType, typename Element>
+std::vector<disk::quadrature_point<typename MeshType::coordinate_type, MeshType::dimension>>
+integrate_degree0(const MeshType& msh, const Element& elem)
+{
+    std::vector<disk::quadrature_point<typename MeshType::coordinate_type, MeshType::dimension>> ret;
+
+    const auto bar  = barycenter(msh, elem);
+    const auto meas = measure(msh, elem);
+
+    ret.push_back(disk::make_qp(bar, meas));
+
+    return ret;
+}
+
+} // end priv
 
 
 } // namespace disk

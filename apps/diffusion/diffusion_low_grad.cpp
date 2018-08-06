@@ -10,7 +10,7 @@
 
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
-#include "revolution/methods/hho"
+#include "methods/hho"
 #include "solvers/solver.hpp"
 
 /***************************************************************************/
@@ -97,7 +97,7 @@ auto make_solution_function(const Mesh& msh)
     return solution_functor<Mesh>();
 }
 
-using namespace revolution;
+using namespace disk;
 
 template<typename Mesh>
 auto
@@ -114,11 +114,12 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
 
     for (auto& cl : msh)
     {
-        auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-        auto G      = make_hlow_scalar_laplacian(msh, cl, hdi);
-        auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-        auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
-        auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
+        auto cb   = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        auto G    = make_hho_gradrec_vector(msh, cl, hdi);
+        auto gr   = make_hho_scalar_laplacian(msh, cl, hdi);
+        auto stab = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+        auto rhs  = make_rhs(msh, cl, cb, rhs_fun);
+
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = G.second + stab;
         auto sc     = diffusion_static_condensation_compute(msh, cl, hdi, A, rhs);
         assembler.assemble(msh, cl, sc.first, sc.second, sol_fun);
@@ -147,10 +148,11 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
     for (auto& cl : msh)
     {
         auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-        auto G      = make_hlow_scalar_laplacian(msh, cl, hdi);
+        auto G      = make_hho_gradrec_vector(msh, cl, hdi);
         auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
         auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
         auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
+
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = G.second + stab;
 
         Eigen::Matrix<T, Eigen::Dynamic, 1> locsol =

@@ -30,9 +30,9 @@
 
 #include <unistd.h>
 
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "bases/bases.hpp"
+#include "quadratures/quadratures.hpp"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -56,19 +56,19 @@ struct test_functor
         auto f = make_vector_testing_data(msh);
         auto divf = make_vector_testing_data_div(msh);
 
-        typename revolution::hho_degree_info hdi(degree);
+        typename disk::hho_degree_info hdi(degree);
 
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, hdi, f);
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f);
             auto dr = make_hho_divergence_reconstruction(msh, cl, hdi);
 
             Matrix<scalar_type, Dynamic, 1> div = dr.first * proj;
 
-            auto cb = revolution::make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-            Matrix<scalar_type, Dynamic, Dynamic> mass = revolution::make_mass_matrix(msh, cl, cb);
-            Matrix<scalar_type, Dynamic, 1> rhs = revolution::make_rhs(msh, cl, cb, divf);
+            auto cb = disk::make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+            Matrix<scalar_type, Dynamic, Dynamic> mass = disk::make_mass_matrix(msh, cl, cb);
+            Matrix<scalar_type, Dynamic, 1> rhs = disk::make_rhs(msh, cl, cb, divf);
             Matrix<scalar_type, Dynamic, 1> exp_div = mass.llt().solve(rhs);
 
             Matrix<scalar_type, Dynamic, 1> diff = div - exp_div;

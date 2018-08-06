@@ -1,8 +1,8 @@
 
 #include "core/loaders/loader.hpp"
 
-#include "core/revolution/bases"
-#include "core/revolution/quadratures"
+#include "core/bases/bases.hpp"
+#include "core/quadratures/quadratures.hpp"
 
 #include "timecounter.h"
 
@@ -17,11 +17,11 @@ void testperf_pre(const Mesh& msh, size_t degree)
 	{
 		std::vector< std::pair<T, Matrix<T, Dynamic, Dynamic> > > p;
 
-		auto cb = revolution::make_scalar_monomial_basis(msh, cl, degree);
+		auto cb = disk::make_scalar_monomial_basis(msh, cl, degree);
 
 		Matrix<T, Dynamic, Dynamic> stiff = Matrix<T, Dynamic, Dynamic>::Zero(cb.size(), cb.size());
 
-		auto qps = revolution::integrate(msh, cl, 2*degree);
+		auto qps = disk::integrate(msh, cl, 2*degree);
 		for (auto& qp : qps)
 		{
 			auto dphi = cb.eval_functions(qp.point());
@@ -37,7 +37,7 @@ void testperf_pre(const Mesh& msh, size_t degree)
 	size_t i = 0;
 	for (auto& cl : msh)
 	{
-		auto cb = revolution::make_scalar_monomial_basis(msh, cl, degree);
+		auto cb = disk::make_scalar_monomial_basis(msh, cl, degree);
 		Matrix<T, Dynamic, Dynamic> stiff = Matrix<T, Dynamic, Dynamic>::Zero(cb.size(), cb.size());
 
 		auto pb = pre_bases[i++];
@@ -63,11 +63,11 @@ void testperf_otf(const Mesh& msh, size_t degree)
 
 	for (auto& cl : msh)
 	{
-		auto cb = revolution::make_scalar_monomial_basis(msh, cl, degree);
+		auto cb = disk::make_scalar_monomial_basis(msh, cl, degree);
 
 		Matrix<T, Dynamic, Dynamic> stiff = Matrix<T, Dynamic, Dynamic>::Zero(cb.size(), cb.size());
 
-		auto qps = revolution::integrate(msh, cl, 2*degree);
+		auto qps = disk::integrate(msh, cl, 2*degree);
 		for (auto& qp : qps)
 		{
 			auto dphi = cb.eval_functions(qp.point());
@@ -103,6 +103,6 @@ int main(void)
 
     for (size_t k = 0; k < 8; k++)
     	testperf_pre(msh, k);
-    
+
     return 0;
 }

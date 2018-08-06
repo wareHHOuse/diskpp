@@ -1,10 +1,13 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
- *      /__\       matteo.cicuttin@enpc.fr
- *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
- *    /\    /\
- *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
- *  /_\/_\/_\/_\   methods.
+ *       /\         DISK++, a template library for DIscontinuous SKeletal
+ *      /__\        methods.
+ *     /_\/_\
+ *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
+ *   /__\  /__\     matteo.cicuttin@enpc.fr
+ *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
+ *
+ * This file is copyright of the following authors:
+ * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -31,7 +34,7 @@
 
 #include "loaders/loader.hpp"
 #include "cfem/cfem.hpp"
-#include "hho/hho.hpp"
+#include "methods/hho"
 #include "output/silo.hpp"
 #include "solvers/solver.hpp"
 
@@ -614,10 +617,6 @@ cfem_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
 
     return true;
 }
-
-
-
-
 
 
 template<typename Mesh>

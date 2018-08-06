@@ -25,9 +25,9 @@
 
 #include <xmmintrin.h>
 
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "bases/bases.hpp"
+#include "quadratures/quadratures.hpp"
+#include "methods/hho"
 
 #include "common.hpp"
 
@@ -55,7 +55,7 @@ struct test_functor_base
         for (auto itor = msh.cells_begin(); itor != msh.cells_end(); itor++)
         {
             auto cl = *itor;
-            auto qps = revolution::integrate(msh, cl, degree);
+            auto qps = disk::integrate(msh, cl, degree);
             for (auto& qp : qps)
                 integral_value += qp.weight() * integrand(qp.point());
         }

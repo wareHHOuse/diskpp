@@ -1,10 +1,13 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
- *      /__\       matteo.cicuttin@enpc.fr
- *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
- *    /\    /\
- *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
- *  /_\/_\/_\/_\   methods.
+ *       /\         DISK++, a template library for DIscontinuous SKeletal
+ *      /__\        methods.
+ *     /_\/_\
+ *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
+ *   /__\  /__\     matteo.cicuttin@enpc.fr
+ *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
+ *
+ * This file is copyright of the following authors:
+ * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -23,95 +26,92 @@
 #include <iostream>
 
 #include "loaders/loader.hpp"
-#include "hho/hho.hpp"
 #include "common/eigen.hpp"
-
 
 
 int main(int argc, char **argv)
 {
-    using RealType = double;
+    std::cout << "Not used anymore (multiscale data are missing)" << std::endl;
+    // using RealType = double;
 
-    //const char *msh_fn = "/Users/matteo/Desktop/MsHHO meshes/mesh6.mesh2d";
-    const char *msh_fn = "../multiscale/newsol/L11-2.mesh2d";
-    const char *sol_fn = "../multiscale/newsol/solution-L11-2.bin";
-
-
-    typedef disk::simplicial_mesh<RealType, 2>      mesh_type;
-    typedef typename mesh_type::cell                cell_type;
-    //typedef typename mesh_type::face                face_type;
-    typedef typename mesh_type::scalar_type         scalar_type;
-
-    mesh_type msh;
-
-    disk::netgen_mesh_loader<RealType, 2> loader;
-    loader.verbose(true);
-    if (!loader.read_mesh(msh_fn))
-    {
-        std::cout << "Problem loading mesh." << std::endl;
-        return 1;
-    }
-    loader.populate_mesh(msh);
+    // //const char *msh_fn = "/Users/matteo/Desktop/MsHHO meshes/mesh6.mesh2d";
+    // // const char *msh_fn = "../multiscale/newsol/L11-2.mesh2d";
+    // // const char *sol_fn = "../multiscale/newsol/solution-L11-2.bin";
 
 
+    // typedef disk::simplicial_mesh<RealType, 2>      mesh_type;
+    // typedef typename mesh_type::cell                cell_type;
+    // //typedef typename mesh_type::face                face_type;
+    // typedef typename mesh_type::scalar_type         scalar_type;
 
-    std::ifstream ifs(sol_fn, std::ifstream::binary);
+    // mesh_type msh;
 
-    size_t sol_num_elements, cell_basis_deg, face_basis_deg;
+    // disk::netgen_mesh_loader<RealType, 2> loader;
+    // loader.verbose(true);
+    // if (!loader.read_mesh(msh_fn))
+    // {
+    //     std::cout << "Problem loading mesh." << std::endl;
+    //     return 1;
+    // }
+    // loader.populate_mesh(msh);
 
-    ifs.read(reinterpret_cast<char *>(&sol_num_elements), sizeof(size_t));
-    ifs.read(reinterpret_cast<char *>(&cell_basis_deg), sizeof(size_t));
-    ifs.read(reinterpret_cast<char *>(&face_basis_deg), sizeof(size_t));
+    // std::ifstream ifs(sol_fn, std::ifstream::binary);
 
-    if (sol_num_elements != msh.cells_size())
-    {
-        std::cout << "Solution has a different number of elements than the mesh (";
-        std::cout << sol_num_elements << " vs. " << msh.cells_size() << ")" << std::endl;
-        return 1;
-    }
+    // size_t sol_num_elements, cell_basis_deg, face_basis_deg;
 
-    //std::cout << "Solution has " << sol_num_elements << " elements" << std::endl;
-    //std::cout << "Cell basis degree: " << cell_basis_deg << std::endl;
-    //std::cout << "Face basis degree: " << face_basis_deg << std::endl;
+    // ifs.read(reinterpret_cast<char *>(&sol_num_elements), sizeof(size_t));
+    // ifs.read(reinterpret_cast<char *>(&cell_basis_deg), sizeof(size_t));
+    // ifs.read(reinterpret_cast<char *>(&face_basis_deg), sizeof(size_t));
 
+    // if (sol_num_elements != msh.cells_size())
+    // {
+    //     std::cout << "Solution has a different number of elements than the mesh (";
+    //     std::cout << sol_num_elements << " vs. " << msh.cells_size() << ")" << std::endl;
+    //     return 1;
+    // }
 
-    typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
-    typedef disk::quadrature<mesh_type, cell_type>    cell_quadrature_type;
-    //typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
-
-    cell_basis_type         cell_basis_k1(cell_basis_deg+1);
-    cell_quadrature_type    cell_quadrature(2*cell_basis_deg+2);
-
-    size_t local_dofs_size = cell_basis_k1.size();
-    size_t dofs_vec_size = msh.cells_size() * local_dofs_size;
-    dynamic_vector<scalar_type> cell_dofs = dynamic_vector<scalar_type>::Zero(dofs_vec_size);
-
-    for (size_t i = 0; i < dofs_vec_size; i++)
-        ifs.read(reinterpret_cast<char *>(&cell_dofs(i)), sizeof(scalar_type));
-
-    ifs.close();
+    // //std::cout << "Solution has " << sol_num_elements << " elements" << std::endl;
+    // //std::cout << "Cell basis degree: " << cell_basis_deg << std::endl;
+    // //std::cout << "Face basis degree: " << face_basis_deg << std::endl;
 
 
-    std::ofstream ofs("pippo.dat");
+    // typedef disk::scaled_monomial_scalar_basis<mesh_type, cell_type>    cell_basis_type;
+    // typedef disk::quadrature<mesh_type, cell_type>    cell_quadrature_type;
+    // //typedef disk::scaled_monomial_scalar_basis<mesh_type, face_type>    face_basis_type;
 
-    size_t elemnum = 0;
-    for (auto& cl : msh)
-    {
-        auto offset_start = elemnum * local_dofs_size;
-        dynamic_vector<scalar_type> local_dofs;
-        local_dofs = cell_dofs.block(offset_start, 0, local_dofs_size, 1);
+    // cell_basis_type         cell_basis_k1(cell_basis_deg+1);
+    // cell_quadrature_type    cell_quadrature(2*cell_basis_deg+2);
 
-        auto bar = barycenter(msh, cl);
+    // size_t local_dofs_size = cell_basis_k1.size();
+    // size_t dofs_vec_size = msh.cells_size() * local_dofs_size;
+    // dynamic_vector<scalar_type> cell_dofs = dynamic_vector<scalar_type>::Zero(dofs_vec_size);
 
-        auto phi = cell_basis_k1.eval_functions(msh, cl, bar);
-        auto val = local_dofs.dot(phi);
+    // for (size_t i = 0; i < dofs_vec_size; i++)
+    //     ifs.read(reinterpret_cast<char *>(&cell_dofs(i)), sizeof(scalar_type));
 
-        elemnum++;
+    // ifs.close();
 
-        ofs << bar.x() << " " << bar.y() << " " << val << std::endl;
-    }
 
-    ofs.close();
+    // std::ofstream ofs("pippo.dat");
+
+    // size_t elemnum = 0;
+    // for (auto& cl : msh)
+    // {
+    //     auto offset_start = elemnum * local_dofs_size;
+    //     dynamic_vector<scalar_type> local_dofs;
+    //     local_dofs = cell_dofs.block(offset_start, 0, local_dofs_size, 1);
+
+    //     auto bar = barycenter(msh, cl);
+
+    //     auto phi = cell_basis_k1.eval_functions(msh, cl, bar);
+    //     auto val = local_dofs.dot(phi);
+
+    //     elemnum++;
+
+    //     ofs << bar.x() << " " << bar.y() << " " << val << std::endl;
+    // }
+
+    // ofs.close();
 
 
     /*

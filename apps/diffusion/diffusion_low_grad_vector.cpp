@@ -10,7 +10,7 @@
 
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
-#include "revolution/methods/hho"
+#include "methods/hho"
 #include "solvers/solver.hpp"
 
 /***************************************************************************/
@@ -106,7 +106,7 @@ auto make_solution_function(const Mesh& msh)
     return solution_functor<Mesh>();
 }
 
-using namespace revolution;
+using namespace disk;
 
 #if 0
 template<typename Mesh, typename T>
@@ -154,11 +154,12 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
 
     for (auto& cl : msh)
     {
-        auto cb = make_vector_monomial_basis(msh, cl, hdi.cell_degree());
-        auto G      = make_hlow_vector_laplacian(msh, cl, hdi);
+        auto cb     = make_vector_monomial_basis(msh, cl, hdi.cell_degree());
+        auto G      = make_hho_gradrec_matrix(msh, cl, hdi);
         auto gr     = make_hho_vector_laplacian(msh, cl, hdi);
         auto stab   = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
         auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
+
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = G.second + stab;
         //Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
         auto sc     = diffusion_static_condensation_compute_vector(msh, cl, hdi, A, rhs);
@@ -188,10 +189,11 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
     for (auto& cl : msh)
     {
         auto cb     = make_vector_monomial_basis(msh, cl, hdi.cell_degree());
-        auto G      = make_hlow_vector_laplacian(msh, cl, hdi);
+        auto G      = make_hho_gradrec_matrix(msh, cl, hdi);
         auto gr     = make_hho_vector_laplacian(msh, cl, hdi);
         auto stab   = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
         auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
+
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = G.second + stab;
         //Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
 

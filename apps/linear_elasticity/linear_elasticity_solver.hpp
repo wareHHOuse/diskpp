@@ -34,9 +34,9 @@
 #include <iostream>
 #include <sstream>
 
-#include "revolution/bases"
-#include "revolution/methods/hho"
-#include "revolution/quadratures"
+#include "bases/bases.hpp"
+#include "methods/hho"
+#include "quadratures/quadratures.hpp"
 
 #include "solvers/solver.hpp"
 
@@ -83,7 +83,7 @@ class linear_elasticity_solver
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
-    typedef revolution::assembler_mechanics<mesh_type> assembler_type;
+    typedef disk::assembler_mechanics<mesh_type> assembler_type;
 
     size_t m_cell_degree, m_face_degree;
 
@@ -91,7 +91,7 @@ class linear_elasticity_solver
 
     const bnd_type&                      m_bnd;
     const mesh_type&                     m_msh;
-    typename revolution::hho_degree_info m_hdi;
+    typename disk::hho_degree_info m_hdi;
     assembler_type                       m_assembler;
 
     std::vector<vector_dynamic> m_solution_data;
@@ -131,8 +131,8 @@ class linear_elasticity_solver
         m_elas_parameters.mu     = data.mu;
         m_elas_parameters.lambda = data.lambda;
 
-        m_hdi       = revolution::hho_degree_info(m_cell_degree, m_face_degree);
-        m_assembler = revolution::make_mechanics_assembler(m_msh, m_hdi, m_bnd);
+        m_hdi       = disk::hho_degree_info(m_cell_degree, m_face_degree);
+        m_assembler = disk::make_mechanics_assembler(m_msh, m_hdi, m_bnd);
         m_AL.clear();
         m_AL.reserve(m_msh.cells_size());
 
@@ -164,7 +164,7 @@ class linear_elasticity_solver
     size_t
     getDofs()
     {
-        return m_msh.faces_size() * revolution::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
+        return m_msh.faces_size() * disk::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
     }
 
     template<typename LoadFunction>
@@ -174,7 +174,7 @@ class linear_elasticity_solver
         assembly_info ai;
         bzero(&ai, sizeof(ai));
 
-        typename revolution::static_condensation_vector<mesh_type> statcond;
+        typename disk::static_condensation_vector<mesh_type> statcond;
 
         timecounter tc;
 
@@ -206,7 +206,7 @@ class linear_elasticity_solver
             ai.time_stab += tc.to_double();
 
             tc.tic();
-            auto                 cb       = revolution::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
+            auto                 cb       = disk::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
             const auto           cell_rhs = make_rhs(m_msh, cl, cb, lf, 1);
             const matrix_dynamic loc =
               2.0 * m_elas_parameters.mu * (sg.second + stab) + m_elas_parameters.lambda * dr.second;
@@ -261,8 +261,8 @@ class linear_elasticity_solver
     postprocess_info
     postprocess(const LoadFunction& lf)
     {
-        const auto   fbs = revolution::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
-        const auto   cbs = revolution::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
+        const auto   fbs = disk::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
+        const auto   cbs = disk::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
 
         postprocess_info pi;
 
@@ -312,7 +312,7 @@ class linear_elasticity_solver
     {
         scalar_type err_dof = 0;
 
-        const size_t cbs      = revolution::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
+        const size_t cbs      = disk::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
         const int    diff_deg = m_hdi.face_degree() - m_hdi.cell_degree();
         const int    di       = std::max(diff_deg, 1);
 
@@ -322,10 +322,10 @@ class linear_elasticity_solver
         {
             const auto x = m_solution_data.at(cell_i++);
 
-            const vector_dynamic true_dof = revolution::project_function(m_msh, cl, m_hdi.cell_degree(), as, di);
+            const vector_dynamic true_dof = disk::project_function(m_msh, cl, m_hdi.cell_degree(), as, di);
 
-            auto                 cb   = revolution::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
-            const matrix_dynamic mass = revolution::make_mass_matrix(m_msh, cl, cb);
+            auto                 cb   = disk::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
+            const matrix_dynamic mass = disk::make_mass_matrix(m_msh, cl, cb);
 
             const vector_dynamic comp_dof = x.head(cbs);
             const vector_dynamic diff_dof = (true_dof - comp_dof);
@@ -356,17 +356,17 @@ class linear_elasticity_solver
             const auto           dr   = make_hho_divergence_reconstruction(m_msh, cl, m_hdi);
             const vector_dynamic divu = dr.first * x;
 
-            auto cbas_v = revolution::make_vector_monomial_basis(m_msh, cl, rec_degree);
-            auto cbas_s = revolution::make_scalar_monomial_basis(m_msh, cl, face_degree);
+            auto cbas_v = disk::make_vector_monomial_basis(m_msh, cl, rec_degree);
+            auto cbas_s = disk::make_scalar_monomial_basis(m_msh, cl, face_degree);
 
-            auto qps = revolution::integrate(m_msh, cl, 2 * rec_degree);
+            auto qps = disk::integrate(m_msh, cl, 2 * rec_degree);
             for (auto& qp : qps)
             {
                 const auto gphi   = cbas_v.eval_sgradients(qp.point());
-                const auto GT_iqn = revolution::eval(GTu, gphi, dimension);
+                const auto GT_iqn = disk::eval(GTu, gphi, dimension);
 
                 const auto divphi   = cbas_s.eval_functions(qp.point());
-                const auto divu_iqn = revolution::eval(divu, divphi);
+                const auto divu_iqn = disk::eval(divu, divphi);
 
                 const auto sigma =
                   2.0 * m_elas_parameters.mu * GT_iqn +
@@ -374,7 +374,7 @@ class linear_elasticity_solver
 
                 const auto stress_diff = (stress(qp.point()) - sigma).eval();
 
-                error_stress += qp.weight() * disk::mm_prod(stress_diff, stress_diff);
+                error_stress += qp.weight() * stress_diff.squaredNorm();
             }
         }
 
@@ -385,7 +385,7 @@ class linear_elasticity_solver
     compute_continuous_displacement(const std::string& filename) const
     {
         const size_t cell_degree = m_hdi.cell_degree();
-        const size_t cbs         = revolution::vector_basis_size(cell_degree, dimension, dimension);
+        const size_t cbs         = disk::vector_basis_size(cell_degree, dimension, dimension);
 
         // compute mesh for post-processing
         disk::PostMesh<mesh_type> post_mesh = disk::PostMesh<mesh_type>(m_msh);
@@ -404,7 +404,7 @@ class linear_elasticity_solver
         {
             vector_dynamic x          = m_solution_data.at(cell_i).head(cbs);
             const auto     cell_nodes = post_mesh.nodes_cell(cell_i);
-            auto           cbas       = revolution::make_vector_monomial_basis(m_msh, cl, cell_degree);
+            auto           cbas       = disk::make_vector_monomial_basis(m_msh, cl, cell_degree);
 
             // Loop on the nodes of the cell
             for (auto& point_id : cell_nodes)
@@ -413,7 +413,7 @@ class linear_elasticity_solver
 
                 const auto phi = cbas.eval_functions(pt);
                 assert(phi.rows() == cbs);
-                const auto depl = revolution::eval(x, phi);
+                const auto depl = disk::eval(x, phi);
 
                 // Add displacement at node
                 value[point_id].first++;

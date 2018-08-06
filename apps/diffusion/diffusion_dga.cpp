@@ -23,7 +23,7 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-#include "revolution/methods/dga"
+#include "methods/dga"
 #include "loaders/loader.hpp"
 #include "solvers/solver.hpp"
 

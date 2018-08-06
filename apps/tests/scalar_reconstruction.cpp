@@ -32,9 +32,9 @@
 
 #include <xmmintrin.h>
 //#define EIGEN_USE_MKL_ALL
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "bases/bases.hpp"
+#include "quadratures/quadratures.hpp"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -57,28 +57,28 @@ struct test_functor
 
         auto f = make_scalar_testing_data(msh);
 
-        typename revolution::hho_degree_info hdi(degree);
+        typename disk::hho_degree_info hdi(degree);
 
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, hdi, f);
-            auto gr = revolution::make_hho_scalar_laplacian(msh, cl, hdi);
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f);
+            auto gr = disk::make_hho_scalar_laplacian(msh, cl, hdi);
 
-            size_t rec_size = revolution::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
+            size_t rec_size = disk::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
 
             Matrix<scalar_type, Dynamic, 1> reconstr = Matrix<scalar_type, Dynamic, 1>::Zero(rec_size);
             reconstr.tail(rec_size-1) = gr.first * proj;
             reconstr(0) = proj(0);
 
-            auto cb = revolution::make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
-            Matrix<scalar_type, Dynamic, Dynamic> mass = revolution::make_mass_matrix(msh, cl, cb);
-            Matrix<scalar_type, Dynamic, 1> rhs = revolution::make_rhs(msh, cl, cb, f);
+            auto cb = disk::make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+            Matrix<scalar_type, Dynamic, Dynamic> mass = disk::make_mass_matrix(msh, cl, cb);
+            Matrix<scalar_type, Dynamic, 1> rhs = disk::make_rhs(msh, cl, cb, f);
             Matrix<scalar_type, Dynamic, 1> exp_reconstr = mass.llt().solve(rhs);
 
             Matrix<scalar_type, Dynamic, 1> diff = reconstr - exp_reconstr;
 
-            Matrix<scalar_type, Dynamic, Dynamic> stiffness = revolution::make_stiffness_matrix(msh, cl, cb);
+            Matrix<scalar_type, Dynamic, Dynamic> stiffness = disk::make_stiffness_matrix(msh, cl, cb);
 
             error += diff.dot(stiffness*diff);
         }

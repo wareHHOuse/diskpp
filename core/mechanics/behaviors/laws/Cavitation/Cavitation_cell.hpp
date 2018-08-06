@@ -28,7 +28,7 @@
 #include <vector>
 
 #include "common/eigen.hpp"
-#include "mechanics/behaviors/laws/LinearLaw/LinearLaw_qp.hpp"
+#include "mechanics/behaviors/laws/Cavitation/Cavitation_qp.hpp"
 #include "mechanics/behaviors/maths_tensor.hpp"
 #include "mechanics/behaviors/maths_utils.hpp"
 #include "bases/bases.hpp"
@@ -40,27 +40,27 @@
 namespace disk
 {
 
-/// Law for LinearLaw model in small deformations
+/// Law for Cavitation model in small deformations
 
 template<typename MeshType>
-class LinearLaw_cell
+class Cavitation_cell
 {
   private:
     typedef MeshType                        mesh_type;
     typedef typename mesh_type::scalar_type scalar_type;
     typedef typename mesh_type::cell        cell_type;
 
-    typedef LinearLaw_Data<scalar_type> material_type;
+    typedef Cavitation_Data<scalar_type> material_type;
 
     typedef dynamic_matrix<scalar_type> matrix_type;
     typedef dynamic_vector<scalar_type> vector_type;
 
     const static size_t dimension = mesh_type::dimension;
 
-    std::vector<LinearLaw_qp<scalar_type, dimension>> m_list_qp;
+    std::vector<Cavitation_qp<scalar_type, dimension>> m_list_qp;
 
   public:
-    LinearLaw_cell(const mesh_type& msh, const cell_type& cl, const int degree)
+    Cavitation_cell(const mesh_type& msh, const cell_type& cl, const int degree)
     {
         const auto qps = disk::integrate(msh, cl, degree);
 
@@ -69,7 +69,7 @@ class LinearLaw_cell
 
         for (auto& qp : qps)
         {
-            const LinearLaw_qp<scalar_type, dimension> gp(qp.point(), qp.weight());
+            const Cavitation_qp<scalar_type, dimension> gp(qp.point(), qp.weight());
 
             m_list_qp.push_back(gp);
         }
@@ -90,13 +90,13 @@ class LinearLaw_cell
         }
     }
 
-    std::vector<LinearLaw_qp<scalar_type, dimension>>&
+    std::vector<Cavitation_qp<scalar_type, dimension>>&
     getQPs()
     {
         return m_list_qp;
     }
 
-    std::vector<LinearLaw_qp<scalar_type, dimension>>
+    std::vector<Cavitation_qp<scalar_type, dimension>>
     getIVs() const
     {
         return m_list_qp;
@@ -109,8 +109,8 @@ class LinearLaw_cell
                         const material_type&               material_data) const
     {
         const auto grad_degree     = hdi.grad_degree();
-        const int  grad_basis_size = disk::matrix_basis_size(grad_degree, dimension, dimension);
-        auto       gb              = disk::make_matrix_monomial_basis(msh, cl, grad_degree);
+        const int  grad_basis_size = disk::sym_matrix_basis_size(grad_degree, dimension, dimension);
+        auto       gb              = disk::make_sym_matrix_monomial_basis(msh, cl, grad_degree);
 
         matrix_type mass = matrix_type::Zero(grad_basis_size, grad_basis_size);
         vector_type rhs  = vector_type::Zero(grad_basis_size);
@@ -148,8 +148,7 @@ class LinearLaw_cell
     projectPOnCell(const mesh_type& msh, const cell_type& cl, const disk::hho_degree_info& hdi) const
     {
         const auto grad_degree = hdi.grad_degree();
-        const int  pbs         = disk::scalar_basis_size(grad_degree, dimension);
-
+        const auto pbs         = disk::scalar_basis_size(grad_degree, dimension);
         return vector_type::Zero(pbs);
     }
 
@@ -157,8 +156,7 @@ class LinearLaw_cell
     projectStateOnCell(const mesh_type& msh, const cell_type& cl, const disk::hho_degree_info& hdi) const
     {
         const auto grad_degree = hdi.grad_degree();
-        const int  pbs         = disk::scalar_basis_size(grad_degree, dimension);
-
+        const auto pbs         = disk::scalar_basis_size(grad_degree, dimension);
         return vector_type::Zero(pbs);
     }
 };
