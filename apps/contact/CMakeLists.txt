@@ -18,3 +18,7 @@ target_link_libraries(diffusion_nitsche ${LINK_LIBS})
 
 add_executable(diffusion_nitsche_test diffusion_nitsche_test.cpp)
 target_link_libraries(diffusion_nitsche_test ${LINK_LIBS})
+
+add_executable(signorini_whho_par signorini_newton_parameter.cpp)
+target_link_libraries(signorini_whho_par ${LINK_LIBS})
+

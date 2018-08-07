@@ -58,7 +58,8 @@ enum eval_solver_type
 {
     EVAL_IN_CELLS,
     EVAL_ON_FACES,
-    EVAL_IN_CELLS_AS_FACES
+    EVAL_IN_CELLS_AS_FACES,
+    EVAL_WITH_PARAMETER
 };
 
 template<typename T>
@@ -89,6 +90,9 @@ struct algorithm_parameters
                 break;
             case EVAL_IN_CELLS_AS_FACES:
                 os << "* Values : IN CELLS AS FACES"<< std::endl;
+                break;
+            case EVAL_WITH_PARAMETER:
+                os << "* Values : IN CELLS AND FACES (PARAMETER)"<< std::endl;
                 break;
             default:
                 os << "* Values : NOT SPECIFIED"<< std::endl;
@@ -624,6 +628,8 @@ make_hho_heaviside(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     matrix_type ret = matrix_type::Zero( num_total_dofs, num_total_dofs );
 
+    auto fc_count = 0;
+
     for (auto& fc: fcs)
     {
         auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
@@ -1071,6 +1077,162 @@ make_hho_negative_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
     }
     return rhs * (1./gamma_N);
 }
+
+template <typename Mesh, typename T>
+Matrix< T, Dynamic, Dynamic>
+make_hho_heaviside_par(const Mesh& msh, const typename Mesh::cell_type& cl,
+            const hho_degree_info& hdi,
+            const Matrix<T, Dynamic, Dynamic>& rec,
+            const T & gamma_0,
+            const T& theta,
+            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+            const Matrix<T, Dynamic, 1>& uloc,
+            const typename Mesh::coordinate_type& eta)
+{
+    using matrix_type = Matrix<T, Dynamic, Dynamic>;
+    using vector_type = Matrix<T, Dynamic, 1>;
+
+    const size_t DIM = Mesh::dimension;
+    T gamma_N = gamma_0 / diameter(msh, cl);
+
+    auto fcs = faces(msh, cl);
+    auto rbs = scalar_basis_size(hdi.reconstruction_degree(), DIM);
+    auto cbs = scalar_basis_size(hdi.cell_degree(), DIM);
+    auto fbs = scalar_basis_size(hdi.face_degree(), DIM-1);
+    auto num_total_dofs = cbs + fbs * fcs.size();
+
+    matrix_type ret = matrix_type::Zero( num_total_dofs, num_total_dofs );
+
+    auto fc_count = 0;
+
+    for (auto& fc: fcs)
+    {
+        auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+        if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+        const auto face_id=eid.second;
+
+        if (bnd.is_contact_face(face_id))
+        {
+            auto cb  = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+            auto fb  = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
+
+            auto face_ofs  = cbs  +  fc_count * fbs;
+            auto n = normal(msh, cl, fc);
+
+            auto qps = integrate(msh, fc, 2* std::max(hdi.face_degree(), hdi.face_degree()));
+            for (auto& qp : qps)
+            {
+                Matrix<T, Dynamic, DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
+                Matrix<T, Dynamic, DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
+                vector_type sigma_n   = rec.transpose() * (c_dphi * n);
+
+                vector_type  c_phi_temp   = cb.eval_functions(qp.point());
+                vector_type  c_phi   = c_phi_temp.block(0, 0, cbs, 1);
+                vector_type  u_cell  = uloc.block(0, 0, cbs, 1);
+
+                vector_type  f_phi   = fb.eval_functions(qp.point());
+                vector_type  u_face  = uloc.block(face_ofs, 0, fbs, 1);
+
+                // Heaviside(-Pn(u) = -D*recu*n +  gamma_N* (eta* u_T + (1-eta)*uF)
+                T uF_1_eta  = (1. - eta) * f_phi.dot(u_face);
+                T uT_eta    = eta * c_phi.dot(u_cell);
+                T sigmau_n = sigma_n.dot(uloc);
+
+                if (sigmau_n - gamma_N * (uT_eta +  uF_1_eta)  <= 0.)
+                {
+                    // (theta * grad * rec * v * n - gamma_N*(eta* v_T + (1-eta)*vF))
+                    vector_type t_sigman_g_v = theta * sigma_n;
+                    t_sigman_g_v.block(face_ofs, 0,fbs, 1) -= (1. - eta) *  gamma_N * f_phi;
+                    t_sigman_g_v.block(0, 0,cbs, 1) -=  eta * gamma_N * c_phi;
+
+                    // (grad * rec * u * n - gamma_N* (eta* u_T + (1-eta)*uF)
+                    vector_type sigman_g_u = sigma_n;
+                    sigman_g_u.block(face_ofs, 0,fbs, 1) -= (1. - eta) * gamma_N * f_phi;
+                    sigman_g_u.block(0, 0,cbs, 1) -=  eta * gamma_N * c_phi;
+
+                    ret += qp.weight() * (t_sigman_g_v) * (sigman_g_u).transpose();
+                }
+            }
+        }
+        fc_count++;
+    }
+    return ret * (1./gamma_N);
+}
+
+template <typename Mesh>
+Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+make_hho_negative_par(const Mesh& msh, const typename Mesh::cell_type& cl,
+            const hho_degree_info& hdi,
+            const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& rec,
+            const typename Mesh::coordinate_type& gamma_0,
+            const typename Mesh::coordinate_type& theta,
+            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+            const Matrix<typename Mesh::coordinate_type, Dynamic, 1>& uloc,
+            const typename Mesh::coordinate_type& eta)
+{
+    using T = typename Mesh::coordinate_type;
+    using matrix_type = Matrix<T, Dynamic, Dynamic>;
+    using vector_type = Matrix<T, Dynamic, 1>;
+
+    const size_t DIM = Mesh::dimension;
+    auto gamma_N = gamma_0 / diameter(msh, cl);
+
+    auto recdeg =  hdi.reconstruction_degree();
+    auto facdeg =  hdi.face_degree();
+    auto celdeg =  hdi.cell_degree();
+
+    auto fcs = faces(msh, cl);
+    auto cbs = scalar_basis_size(celdeg, DIM);
+    auto rbs = scalar_basis_size(recdeg, DIM);
+    auto fbs = scalar_basis_size(facdeg, DIM-1);
+    auto num_total_dofs = cbs + fcs.size() * fbs;
+    vector_type rhs = vector_type::Zero(num_total_dofs, 1);
+
+    auto fc_count = 0;
+    for (auto& fc:fcs)
+    {
+        auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+        if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+        const auto face_id=eid.second;
+
+        if (bnd.is_contact_face(face_id))
+        {
+            auto cb  = make_scalar_monomial_basis(msh, cl, recdeg);
+            auto fb  = make_scalar_monomial_basis(msh, fc, facdeg);
+            auto qps = integrate (msh, fc, 2*std::max(facdeg, celdeg));
+            auto n = normal(msh, cl, fc);
+            auto face_ofs  = cbs  +  fc_count * fbs;
+
+            for (auto& qp : qps)
+            {
+                Matrix<T, Dynamic,  DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
+                Matrix<T, Dynamic,  DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
+
+                vector_type  c_phi_temp   = cb.eval_functions(qp.point());
+                vector_type  c_phi   = c_phi_temp.block(0, 0, cbs, 1);
+                vector_type  f_phi   = fb.eval_functions(qp.point());
+                vector_type  sigma_n = rec.transpose() * (c_dphi * n);
+
+                // ( theta * grad * rec * v * n - gamma_N* (eta* v_T + (1-eta)*vF))
+                vector_type t_sigmav_n_gamma_v =  theta * sigma_n;
+                t_sigmav_n_gamma_v.block(face_ofs, 0, fbs, 1) -= (1. - eta) * gamma_N * f_phi;
+                t_sigmav_n_gamma_v.block(0, 0, cbs, 1) -= eta * gamma_N * c_phi;
+
+                // [Pn(u)]_ = [grad * rec * u * n - gamma_N* (eta* u_T + (1-eta)*uF)]_
+                vector_type sigmau_n_gamma_u  = sigma_n;
+                sigmau_n_gamma_u.block(face_ofs, 0, fbs, 1) -= (1. - eta) * gamma_N * f_phi;
+                sigmau_n_gamma_u.block(0, 0, cbs, 1) -= eta * gamma_N * c_phi;
+
+                T negative = std::min(sigmau_n_gamma_u.dot(uloc), 0.);
+
+                rhs += qp.weight() * negative * t_sigmav_n_gamma_v;
+            }
+        }
+        fc_count++;
+    }
+    return rhs * (1./gamma_N);
+}
+
 
 template<typename Mesh>
 std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
