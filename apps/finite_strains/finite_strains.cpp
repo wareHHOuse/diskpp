@@ -174,9 +174,10 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&        msh,
         return er;
     };
 
-    bnd.addDirichletBC(disk::mechanics::DX, 3, zero);
-    bnd.addDirichletBC(disk::mechanics::DY, 13, zero);
-    bnd.addDirichletBC(disk::mechanics::DZ, 24, zero);
+    bnd.addDirichletBC(disk::mechanics::DX, 12, zero);
+    bnd.addDirichletBC(disk::mechanics::DY, 24, zero);
+    bnd.addDirichletBC(disk::mechanics::DZ, 19, zero);
+    //bnd.addNeumannBC(disk::mechanics::DIRICHLET, 27, pres);
     bnd.addNeumannBC(disk::mechanics::NEUMANN, 27, pres);
 
     // Cube + pres
@@ -197,28 +198,6 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&        msh,
     //    bnd.addDirichletBC(disk::mechanics::DX, 4, zero);
     //    bnd.addDirichletBC(disk::mechanics::DX, 38, zero);
     //    bnd.addNeumannBC(disk::mechanics::NEUMANN, 21, pres);
-
-    // Beam 3D
-
-    // auto zero = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 0.0}; };
-
-    // auto pres = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, -3000.0}; };
-
-    // bnd.addDirichletBC(disk::mechanics::CLAMPED, 3, zero);
-    // bnd.addNeumannBC(disk::mechanics::NEUMANN, 13, pres);
-
-
-    // Thin Plate 3D
-
-    // auto zero = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 0.0}; };
-
-    // auto pres = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, -2.0E-1}; };
-
-    // bnd.addDirichletBC(disk::mechanics::CLAMPED, 3, zero);
-    // bnd.addDirichletBC(disk::mechanics::CLAMPED, 13, zero);
-    // bnd.addDirichletBC(disk::mechanics::CLAMPED, 23, zero);
-    // bnd.addDirichletBC(disk::mechanics::CLAMPED, 27, zero);
-    // bnd.addNeumannBC(disk::mechanics::NEUMANN, 33, pres);
 
     // Solver
 
@@ -276,6 +255,7 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&        msh,
     nl.compute_is_plastic_continuous("state3D_cont.msh");
     nl.compute_continuous_deformed("deformed3D_cont.msh");
     nl.compute_discontinuous_deformed("deformed3D_disc.msh");
+    nl.compute_sphere("resu_sphere.dat");
 }
 
 int
@@ -317,7 +297,7 @@ main(int argc, char** argv)
     // material_data.sigma_y0 = 0.243;
 
     // Sphere Parameters (mm, GPa, kN)
-    RealType E  = 210000;
+    RealType E  = 2.E11;
     RealType nu = 0.3;
     RealType ET = 0;
 
@@ -327,7 +307,7 @@ main(int argc, char** argv)
     material_data.K = 0;
     material_data.H = 0;
 
-    material_data.sigma_y0 = 240;
+    material_data.sigma_y0 = 1.5E8;
 
     // Plaque Parameters(mm, GPa, kN)
     // RealType E  = 70;
@@ -366,30 +346,6 @@ main(int argc, char** argv)
 
     // material_data.sigma_y0 = 0.5;
 
-
-    // Test Beam (elastic)
-    // RealType E  = 30E6;
-    // RealType nu = 0.3;
-
-    // material_data.mu     = material_data.converttomu(E, nu);
-    // material_data.lambda = material_data.converttolambda(E, nu);
-
-    // material_data.K = 0.0;
-    // material_data.H = 30E6;
-
-    // material_data.sigma_y0 = 10E12;
-
-    // Test Thin Plate (elastic)
-    // RealType E  = 250;
-    // RealType nu = 0.3;
-
-    // material_data.mu     = material_data.converttomu(E, nu);
-    // material_data.lambda = material_data.converttolambda(E, nu);
-
-    // material_data.K = 0.0;
-    // material_data.H = 500;
-
-    // material_data.sigma_y0 = 10E20;
 
     int ch;
 

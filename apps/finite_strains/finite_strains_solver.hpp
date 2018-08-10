@@ -381,6 +381,25 @@ class finite_strains_solver
                 {
                     if (m_rp.m_time_save.front() < old_time + 1E-5)
                     {
+                        std::cout << "** Save results" << std::endl;
+                        std::string name = "result" + std::to_string(dimension) + "D_k" +
+                                           std::to_string(m_hdi.face_degree()) + "_l" +
+                                           std::to_string(m_hdi.cell_degree()) + "_g" +
+                                           std::to_string(m_hdi.grad_degree()) + "_t" + std::to_string(old_time) + "_";
+
+                        // this->compute_discontinuous_displacement(name + "depl_disc.msh");
+                        // this->compute_continuous_displacement(name + "depl_cont.msh");
+                        // this->compute_discontinuous_stress(name + "stress_disc.msh");
+                        // this->compute_continuous_stress(name + "stress_cont.msh");
+                        this->compute_stress_GP(name + "stress_GP.msh");
+                        // this->compute_discontinuous_equivalent_plastic_strain(name + "_disc.msh");
+                        // this->compute_continuous_equivalent_plastic_strain(name + "p_cont.msh");
+                        this->compute_equivalent_plastic_strain_GP(name + "p_GP.msh");
+                        this->compute_is_plastic_GP(name + "state_GP.msh");
+                        // this->compute_is_plastic_continuous(name + "state_cont.msh");
+                        // this->compute_continuous_deformed(name + "deformed_cont.msh");
+                        // this->compute_discontinuous_deformed(name + "deformed_disc.msh");
+
                         m_rp.m_time_save.pop_front();
                         if (m_rp.m_time_save.empty())
                             time_saving = false;
@@ -1153,5 +1172,70 @@ class finite_strains_solver
         }
         // Save mesh
         gmsh.writeGmesh(filename, 2);
+    }
+
+    // cas particuliers
+    // post traitement pour la sphere
+    void
+    compute_sphere(const std::string& filename) const
+    {
+        const size_t cell_degree   = m_hdi.cell_degree();
+        const auto   material_data = m_law.getMaterialData();
+
+        std::ofstream output;
+        output.open(filename, std::ofstream::out | std::ofstream::trunc);
+
+        if (!output.is_open())
+        {
+            std::cerr << "Unable to open file " << filename << std::endl;
+        }
+
+        output << "#R"
+               << "\t"
+               << "ur"
+               << "\t"
+               << "sigma_rr"
+               << "\t"
+               << "sigma_oo"
+               << "\t"
+               << "sigma_trace" << std::endl;
+
+        size_t cell_i(0);
+        for (auto& cl : m_msh)
+        {
+            const vector_dynamic x              = m_solution_cells.at(cell_i);
+            const auto           law_quadpoints = m_law.getCellIVs(cell_i).getIVs();
+
+            // Loop on nodes
+            auto cb = disk::make_vector_monomial_basis(m_msh, cl, cell_degree);
+            for (auto& qp : law_quadpoints)
+            {
+                const auto        stress = qp.compute_stress(material_data);
+                const scalar_type trace  = stress.trace();
+
+                const auto qp_pt = qp.point();
+                const auto cphi  = cb.eval_functions(qp_pt);
+                const auto depl  = disk::eval(x, cphi);
+
+                static_vector<scalar_type, dimension> er = static_vector<scalar_type, dimension>::Zero();
+
+                er(0) = qp_pt.x();
+                er(1) = qp_pt.y();
+                er(2) = qp_pt.z();
+
+                const scalar_type r = er.norm();
+                er /= r;
+
+                const scalar_type sigma_rr = er.dot(stress * er);
+                const scalar_type sigma_oo = (stress.trace() - sigma_rr) / 2.0;
+                const scalar_type ur       = depl.dot(er);
+
+                output << r << "\t" << ur << "\t" << sigma_rr << "\t" << sigma_oo << "\t" << stress.trace()
+                       << std ::endl;
+            }
+            cell_i++;
+        }
+
+        output.close();
     }
 };

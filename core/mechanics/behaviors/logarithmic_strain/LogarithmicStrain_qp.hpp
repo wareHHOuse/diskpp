@@ -83,6 +83,12 @@ class LogarithmicStrain_qp
         return m_law_hpp_qp.compute_stress3D(data);
     }
 
+    static_matrix_type3D
+    compute_stress3DPrev_T(const data_type& data) const
+    {
+        return m_law_hpp_qp.compute_stress3DPrev(data);
+    }
+
     std::pair<static_matrix_type3D, static_tensor<scalar_type, 3>>
     compute_whole3D(const static_matrix_type3D& F_curr, const data_type& data, bool tangentmodulus = true)
     {
@@ -133,9 +139,9 @@ class LogarithmicStrain_qp
         const auto CP = computeContractedProduct<scalar_type, 3>(behavior3D_hpp.second, Pn);
         const auto A  = computeContractedProduct<scalar_type, 3>(transpose<scalar_type, 3>(Pn), CP) + projector.second;
 
-        const auto projector2 = compute_projector_PK2(F_curr, behavior3D_hpp.first, ev_C.first, ev_C.second);
-        const auto Pn2        = projector2.first;
-        const auto CP2        = computeContractedProduct<scalar_type, 3>(behavior3D_hpp.second, Pn2);
+        // const auto projector2 = compute_projector_PK2(F_curr, behavior3D_hpp.first, ev_C.first, ev_C.second);
+        // const auto Pn2        = projector2.first;
+        // const auto CP2        = computeContractedProduct<scalar_type, 3>(behavior3D_hpp.second, Pn2);
         // const auto A2  = computeContractedProduct<scalar_type, 3>(transpose<scalar_type, 3>(Pn2), CP2) +
         // projector2.second;
 
@@ -212,6 +218,12 @@ class LogarithmicStrain_qp
     compute_stress(const data_type& data) const
     {
         return convertMatrix<scalar_type, DIM>(this->compute_stress3D(data));
+    }
+
+    static_matrix_type
+    compute_stressPrev_T(const data_type& data) const
+    {
+        return m_law_hpp_qp.compute_stressPrev(data);
     }
 
     static_matrix_type

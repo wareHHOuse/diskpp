@@ -175,35 +175,35 @@ class finite_strains
         assert(GT.cols() == uTF.rows());
         assert(GT.rows() == grad_basis_size);
 
-        //  std::cout << "sol" << std::endl;
-        //  std::cout << uTF.transpose() << std::endl;
+        //   std::cout << "sol" << std::endl;
+        //   std::cout << uTF.transpose() << std::endl;
 
         const vector_type GT_uTF = GT * uTF;
         const auto        Id     = static_matrix<scalar_type, dimension, dimension>::Identity();
 
-        // std::cout << "GT: " << GT.norm() << std::endl;
-        // std::cout << GsT << std::endl;
+        //  std::cout << "GT: " << GT.norm() << std::endl;
+        //  std::cout << "GT_Utf: " << GT_uTF.transpose() << std::endl;
 
-        auto& law_quadpoints = law.getQPs();
+         auto& law_quadpoints = law.getQPs();
 
-        auto gb = disk::make_matrix_monomial_basis(m_msh, cl, grad_degree);
+         auto gb = disk::make_matrix_monomial_basis(m_msh, cl, grad_degree);
 
-        // std::cout << "nb: " << law_quadpoints.size() << std::endl;
-        for (auto& qp : law_quadpoints)
-        {
-            // std::cout << "qp: " << qp.point() << std::endl;
+         // std::cout << "nb: " << law_quadpoints.size() << std::endl;
+         for (auto& qp : law_quadpoints)
+         {
+            //  std::cout << "qp: " << qp.point() << std::endl;
             const auto gphi = gb.eval_functions(qp.point());
 
             assert(gphi.size() == grad_basis_size);
 
             // Compute local gradient and norm
-            // std::cout << "GT_utf: " << GsT_uTF << std::endl;
+            //  std::cout << "GT_utf: " << GT_uTF.transpose() << std::endl;
             const auto GT_iqn = disk::eval(GT_uTF, gphi);
             const gvt  F_curr = GT_iqn + Id;
-            // std::cout << "Em" << std::endl;
-            // std::cout << qp.getTotalStrainPrev() << std::endl;
-            // std::cout << "dE" << std::endl;
-            // std::cout << incr_strain << std::endl;
+            // std::cout << "Gp" << std::endl;
+            // std::cout << GT_iqn << std::endl;
+            // std::cout << "Fp" << std::endl;
+            // std::cout << F_curr << std::endl;
 
             // Compute bahavior
             tc.tic();
@@ -230,10 +230,15 @@ class finite_strains
                 }
             }
 
+            // std::cout << "Tm" << std::endl;
+            // std::cout << qp.compute_stressPrev_T(material_data) << std::endl;
+            // std::cout << "Tp" << std::endl;
+            // std::cout << qp.compute_stress_T(material_data) << std::endl;
+
             // compute (PK1(u), G^k_T v)_T
             const auto stress_qp = disk::priv::inner_product(qp.weight(), tensor_behavior.first);
-            // std::cout << "stress" << std::endl;
-            // std::cout << tensor_behavior.first << std::endl;
+            //  std::cout << "stress" << std::endl;
+            //  std::cout << tensor_behavior.first << std::endl;
 
             for (int i = 0; i < grad_basis_size; i += dim_dofs)
             {
@@ -267,9 +272,9 @@ class finite_strains
         F_int = GT.transpose() * aT;
         RTF -= F_int;
 
-        // std::cout << "K: " << K_int.norm() << std::endl;
-        // std::cout << K_int << std::endl;
-        // std::cout << "F: " << F_int.norm() << std::endl;
+        //  std::cout << "K: " << K_int.norm() << std::endl;
+        // // std::cout << K_int << std::endl;
+        //  std::cout << "F: " << F_int.norm() << std::endl;
 
         assert(K_int.rows() == num_total_dofs);
         assert(K_int.cols() == num_total_dofs);

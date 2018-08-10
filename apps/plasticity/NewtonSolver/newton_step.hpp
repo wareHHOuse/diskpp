@@ -283,8 +283,11 @@ class NewtonRaphson_step_plasticity
         tc.tic();
         m_system_solution = vector_dynamic::Zero(m_assembler.LHS.rows());
 
-        disk::solvers::pardiso_params<scalar_type> pparams;
-        mkl_pardiso(pparams, m_assembler.LHS, m_assembler.RHS, m_system_solution);
+        if(m_system_solution.size() > 0)
+        {
+            disk::solvers::pardiso_params<scalar_type> pparams;
+            mkl_pardiso(pparams, m_assembler.LHS, m_assembler.RHS, m_system_solution);
+        }
         tc.toc();
 
         // Eigen::SelfAdjointEigenSolver<sparse_matrix<scalar_type>> svd;

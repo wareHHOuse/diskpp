@@ -263,6 +263,16 @@ class LinearIsotropicAndKinematicHardening_qp
         return convertMatrix<scalar_type, DIM>(compute_stress3D(data));
     }
 
+    static_matrix_type3D
+    compute_stress3DPrev(const data_type& data) const
+    {
+        const static_matrix_type3D Id = static_matrix_type3D::Identity();
+
+        const auto stress = 2 * data.getMu() * m_estrain_prev + data.getLambda() * m_estrain_prev.trace() * Id;
+
+        return stress;
+    }
+
     static_matrix_type
     compute_stressPrev(const data_type& data) const
     {
