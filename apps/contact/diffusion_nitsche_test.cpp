@@ -56,10 +56,11 @@ template<typename MeshType, typename LoaderType>
 bool
 verify_convergence(const std::vector<std::string>& paths,
                    size_t mindeg, size_t maxdeg,
-                    algorithm_parameters<typename MeshType::scalar_type>& ap)
+                    algorithm_parameters<typename MeshType::scalar_type>& ap,
+                    const typename MeshType::scalar_type& eta)
 {
     typedef typename MeshType::scalar_type scalar_type;
-
+    typedef std::tuple<scalar_type, scalar_type, scalar_type> tuple_type;
 
     bool success = true;
 
@@ -67,7 +68,8 @@ verify_convergence(const std::vector<std::string>& paths,
     {
         scalar_type expected_rate = i+2;
 
-        std::vector<std::pair<scalar_type, scalar_type>> errdiams;
+
+        std::vector<std::pair<scalar_type, tuple_type>> errdiams;
 
         std::cout << "Convergence rates for k = " << i << ":   " << std::endl;
 
@@ -85,8 +87,10 @@ verify_convergence(const std::vector<std::string>& paths,
             }
             loader.populate_mesh(msh);
             auto diam = average_diameter(msh);
-            auto error = run_diffusion_solver(msh, ap);
-            errdiams.push_back( std::make_pair(diam, error) );
+            auto error_full = run_diffusion_solver(msh, ap, eta);
+
+            errdiams.push_back( std::make_pair(diam, error_full) );
+
         }
 
         bool pass       = true;
@@ -94,18 +98,38 @@ verify_convergence(const std::vector<std::string>& paths,
         bool high, low, ok;
         for (size_t i = 1; i < errdiams.size(); i++)
         {
-            auto d = log2(errdiams[i-1].first/errdiams[i].first);
-            auto e = log2(errdiams[i-1].second/errdiams[i].second);
-            auto rate = e/d;
 
-            ok   = (std::abs(expected_rate - rate) < 0.4); /* Test passed */
-            low  = ((expected_rate - rate) > 0.2); /* a bit too low, warn */
-            high = ((rate - expected_rate) > 0.2); /* a bit too high, warn */
+            auto error_full_i = errdiams[i].second;
+            auto error_full_i_1 = errdiams[i-1].second;
+
+            auto H1_e = log2(std::get<0>(error_full_i_1)/std::get<0>(error_full_i));
+            auto L2_e = log2(std::get<1>(error_full_i_1)/std::get<1>(error_full_i));
+            auto Linf_e = log2(std::get<2>(error_full_i_1)/std::get<2>(error_full_i));
+            auto d = log2(errdiams[i-1].first/errdiams[i].first);
+
+            auto H1_rate    = H1_e/d;
+            auto L2_rate    = L2_e/d;
+            auto Linf_rate  = Linf_e/d;
+
+            ok   = (std::abs(expected_rate - H1_rate) < 0.4); /* Test passed */
+            low  = ((expected_rate - H1_rate) > 0.2); /* a bit too low, warn */
+            high = ((H1_rate - expected_rate) > 0.2); /* a bit too high, warn */
 
             if (low)    std::cout << magenta;
             if (high)   std::cout << cyan;
-            std::cout << std::fixed << std::setprecision(3) << errdiams[i].first;
-            std::cout << "  " << rate << "  "<<std::endl;
+
+
+            auto H1_error = std::get<0>(error_full_i);
+            auto L2_error = std::get<1>(error_full_i);
+            auto Linf_error = std::get<2>(error_full_i);
+
+            std::cout << std::fixed << std::setprecision(3) << errdiams[i].first <<" :    ";
+            std::cout << " " <<  std::scientific<< std::setprecision(3)<< H1_error;
+            std::cout << "  "<<  std::fixed << std::setprecision(3)<< H1_rate << "   -   ";
+            std::cout << " " <<  std::scientific<< std::setprecision(3)<< L2_error;
+            std::cout << "  "<<  std::fixed << std::setprecision(3)<< L2_rate << "   -   ";
+            std::cout << " " <<  std::scientific<< std::setprecision(3)<<Linf_error;
+            std::cout << "  " << std::fixed << std::setprecision(3)<< Linf_rate <<std::endl;
             if (low or high)
             {
                 std::cout << reset;
@@ -132,7 +156,7 @@ enum test_type
     TEST_MEASURE_TIMES
 };
 
-void test_triangles_specialized(test_type tt, algorithm_parameters<double>& ap)
+void test_triangles_specialized(test_type tt, algorithm_parameters<double>& ap, const double& eta)
 {
     size_t runs = 2;
 
@@ -152,7 +176,7 @@ void test_triangles_specialized(test_type tt, algorithm_parameters<double>& ap)
             break;
 
         case TEST_VERIFY_CONVERGENCE:
-            verify_convergence<MT, LT>(paths, 0, 3, ap);
+            verify_convergence<MT, LT>(paths, 0, 3, ap, eta);
             break;
 
         default:
@@ -161,7 +185,7 @@ void test_triangles_specialized(test_type tt, algorithm_parameters<double>& ap)
     }
 }
 
-void test_triangles_generic(test_type tt, algorithm_parameters<double>& ap)
+void test_triangles_generic(test_type tt, algorithm_parameters<double>& ap, const double& eta)
 {
     size_t runs = 2;
 
@@ -181,7 +205,7 @@ void test_triangles_generic(test_type tt, algorithm_parameters<double>& ap)
             break;
 
         case TEST_VERIFY_CONVERGENCE:
-            verify_convergence<MT, LT>(paths, 0, 3, ap);
+            verify_convergence<MT, LT>(paths, 0, 3, ap, eta);
             break;
 
         default:
@@ -190,7 +214,7 @@ void test_triangles_generic(test_type tt, algorithm_parameters<double>& ap)
     }
 }
 
-void test_hexagons_generic(test_type tt, algorithm_parameters<double>& ap)
+void test_hexagons_generic(test_type tt, algorithm_parameters<double>& ap, const double& eta)
 {
     size_t runs = 2;
 
@@ -210,7 +234,7 @@ void test_hexagons_generic(test_type tt, algorithm_parameters<double>& ap)
             break;
 
         case TEST_VERIFY_CONVERGENCE:
-            verify_convergence<MT, LT>(paths, 0, 3, ap);
+            verify_convergence<MT, LT>(paths, 0, 3, ap, eta);
             break;
 
         default:
@@ -219,7 +243,7 @@ void test_hexagons_generic(test_type tt, algorithm_parameters<double>& ap)
     }
 }
 
-void test_hextri_generic(test_type tt, algorithm_parameters<double>& ap)
+void test_hextri_generic(test_type tt, algorithm_parameters<double>& ap, const double& eta)
 {
     size_t runs = 2;
 
@@ -241,7 +265,7 @@ void test_hextri_generic(test_type tt, algorithm_parameters<double>& ap)
             break;
 
         case TEST_VERIFY_CONVERGENCE:
-            verify_convergence<MT, LT>(paths, 0, 3, ap);
+            verify_convergence<MT, LT>(paths, 0, 3, ap, eta);
             break;
 
         default:
@@ -250,7 +274,7 @@ void test_hextri_generic(test_type tt, algorithm_parameters<double>& ap)
     }
 }
 
-void test_kershaw_2d(test_type tt, algorithm_parameters<double>& ap)
+void test_kershaw_2d(test_type tt, algorithm_parameters<double>& ap, const double& eta)
 {
     size_t runs = 2;
 
@@ -271,7 +295,7 @@ void test_kershaw_2d(test_type tt, algorithm_parameters<double>& ap)
             break;
 
         case TEST_VERIFY_CONVERGENCE:
-            verify_convergence<MT, LT>(paths, 0, 3, ap);
+            verify_convergence<MT, LT>(paths, 0, 3, ap, eta);
             break;
 
         default:
@@ -286,8 +310,9 @@ int main(int argc, char **argv)
     test_type tt = TEST_VERIFY_CONVERGENCE;
     int ch;
     algorithm_parameters<double> ap;
+    double parameter = 0.5;
 
-    while ( (ch = getopt(argc, argv, "g:npzfcotv")) != -1 )
+    while ( (ch = getopt(argc, argv, "g:npzfcoe:tv")) != -1 )
     {
         switch(ch)
         {
@@ -318,6 +343,17 @@ int main(int argc, char **argv)
             case 'o':
                 ap.solver = EVAL_IN_CELLS_AS_FACES;
                 break;
+            case 'e':
+                ap.solver = EVAL_WITH_PARAMETER;
+                std::cout << "choosing parameter" << std::endl;
+                parameter = atof(optarg);
+                if (parameter < 0  || parameter > 1 )
+                {
+                    std::cout << "parameter must be in [0 1]. Falling back to 0.5" << std::endl;
+                    parameter = 0.5;
+                }
+                std::cout << "parameter :"<< parameter << std::endl;
+                break;
             case 't':
                 tt = TEST_MEASURE_TIMES;
                 break;
@@ -336,15 +372,16 @@ int main(int argc, char **argv)
 
 
     std::cout << bold << underline << "Triangles specialized" << reset << std::endl;
-    test_triangles_specialized(tt, ap);
-
-    std::cout << bold << underline << "Triangles generic" << reset << std::endl;
-    test_triangles_generic(tt, ap);
+    test_triangles_specialized(tt, ap, parameter);
 
     std::cout << bold << underline << "Hexagons" << reset << std::endl;
-    test_hexagons_generic(tt, ap);
+    test_hexagons_generic(tt, ap, parameter);
+
+    #if 0
+    std::cout << bold << underline << "Triangles generic" << reset << std::endl;
+    test_triangles_generic(tt, ap, parameter);
 
     std::cout << bold << underline << "Kershaw 2D" << reset << std::endl;
-    test_kershaw_2d(tt, ap);
-
+    test_kershaw_2d(tt, ap, parameter);
+    #endif
 }
