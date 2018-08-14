@@ -312,7 +312,7 @@ int main(int argc, char **argv)
     algorithm_parameters<double> ap;
     double parameter = 0.5;
 
-    while ( (ch = getopt(argc, argv, "g:npzfcoe:tv")) != -1 )
+    while ( (ch = getopt(argc, argv, "g:npzfc:oe:tv")) != -1 )
     {
         switch(ch)
         {
@@ -339,6 +339,15 @@ int main(int argc, char **argv)
                 break;
             case 'c':
                 ap.solver = EVAL_IN_CELLS;
+                std::cout << "choosing parameter" << std::endl;
+                parameter = atof(optarg);
+                if (parameter < 0  || parameter > 1 )
+                {
+                    std::cout << "parameter must be in [0 1]. Falling back to 0.5" << std::endl;
+                    parameter = 0.5;
+                }
+                std::cout << "parameter :"<< parameter << std::endl;
+
                 break;
             case 'o':
                 ap.solver = EVAL_IN_CELLS_AS_FACES;
