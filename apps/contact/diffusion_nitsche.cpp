@@ -46,7 +46,7 @@ int main(int argc, char **argv)
 
     int ch;
     algorithm_parameters<T> ap;
-
+    T parameter = 1;
     size_t degree = 1;
 
     while ( (ch = getopt(argc, argv, "k:g:npzfco")) != -1 )
@@ -75,7 +75,8 @@ int main(int argc, char **argv)
                 ap.theta = -1.;
                 break;
             case 'p':
-                ap.theta = 1.;
+                ap.theta = 0.99999;
+                //ap.theta = atof(optarg);
                 break;
             case 'z':
                 ap.theta = 0.;
@@ -107,7 +108,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
         auto msh = disk::load_fvca5_2d_mesh<T>(mesh_filename);
-        run_diffusion_solver(msh, ap);
+        auto error = run_diffusion_solver(msh, ap, parameter);
         return 0;
     }
 
@@ -119,7 +120,16 @@ int main(int argc, char **argv)
 
         std::cout << msh.faces_size() << std::endl;
 
-        run_diffusion_solver(msh, ap);
+        auto error = run_diffusion_solver(msh, ap, parameter);
+
+        auto H1_error = std::get<0>(error);
+        auto L2_error = std::get<1>(error);
+        auto Linf_error = std::get<2>(error);
+
+        std::cout << average_diameter(msh) <<":    ";
+        std::cout << " " <<  H1_error << " " << L2_error <<"  " << Linf_error << "  ";
+        std::cout << std::endl;
+
         return 0;
     }
 
@@ -128,11 +138,8 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
         auto msh = disk::load_cartesian_2d_mesh<T>(mesh_filename);
-        run_diffusion_solver(msh, ap);
+        auto error = run_diffusion_solver(msh, ap, parameter);
         return 0;
     }
-
-
-
 
 }

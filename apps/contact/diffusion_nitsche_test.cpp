@@ -172,7 +172,7 @@ void test_triangles_specialized(test_type tt, algorithm_parameters<double>& ap, 
     switch(tt)
     {
         case TEST_MEASURE_TIMES:
-            test_mesh_format<MT, LT>(paths, runs, 0, 3, "triangle_spec");
+            test_mesh_format<MT, LT>(paths, runs, 0, 0, "triangle_spec");
             break;
 
         case TEST_VERIFY_CONVERGENCE:
@@ -312,7 +312,7 @@ int main(int argc, char **argv)
     algorithm_parameters<double> ap;
     double parameter = 0.5;
 
-    while ( (ch = getopt(argc, argv, "g:npzfc:oe:tv")) != -1 )
+    while ( (ch = getopt(argc, argv, "g:np:zfc:oe:tv")) != -1 )
     {
         switch(ch)
         {
@@ -329,7 +329,8 @@ int main(int argc, char **argv)
                 ap.theta = -1.;
                 break;
             case 'p':
-                ap.theta = 1.;
+                ap.theta = atof(optarg);
+                //ap.theta = 1.; //0.99999;
                 break;
             case 'z':
                 ap.theta = 0.;
@@ -383,10 +384,11 @@ int main(int argc, char **argv)
     std::cout << bold << underline << "Triangles specialized" << reset << std::endl;
     test_triangles_specialized(tt, ap, parameter);
 
+
+    #if 0
     std::cout << bold << underline << "Hexagons" << reset << std::endl;
     test_hexagons_generic(tt, ap, parameter);
 
-    #if 0
     std::cout << bold << underline << "Triangles generic" << reset << std::endl;
     test_triangles_generic(tt, ap, parameter);
 
