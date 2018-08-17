@@ -476,3 +476,458 @@ quiver( const Mesh& msh, const dynamic_vector<T>& sol, const Assembler& assemble
     }
     ofs.close();
 }
+
+template<typename T, size_t DIM, typename Storage>
+class post_processing_base
+{
+    static_assert(DIM > 0 && DIM <= 3, "mesh: Allowed dimensions are 1, 2 and 3");
+};
+
+template<typename T, typename Storage>
+class post_processing_base<T,1, Storage>
+{
+    public:
+
+    typedef disk::mesh<T,1,Storage>             mesh_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef std::vector<point_type>             point_vector_type;
+
+    size_t m_degree;
+    size_t m_num_sub_nodes,   m_num_sub_elems;
+    size_t m_total_sub_nodes, m_total_sub_elems;
+
+    point_vector_type   m_sub_nodes;
+    point_vector_type   m_vertices;
+
+//    post_processing_base(const mesh<T,1,Storage>& msh)
+    post_processing_base()
+    {}
+
+    void
+    plot_nodes(size_t n, const std::vector<point_type> & vers, std::vector<point_type> & nodes)
+    {
+        auto p1 = vers[0];
+        auto p2 = vers[1];
+
+        if(n == 0)
+        {
+            nodes.push_back(p1);
+            nodes.push_back(p2);
+        }
+        else
+        {
+            T h = std::abs(p1.x()-p2.x())/n;
+            for(size_t i = 0; i < n + 1;  i++)
+            {
+                point_type p = point<T,1>({h*i});
+                nodes.push_back(p);
+            }
+        }
+    }
+
+
+    std::vector<point_type>
+    make_vtk_points(const mesh_type& msh,const size_t degree)
+    {
+        m_degree = degree;
+        //if(m_degree == 0)
+        //    m_degree = 1; /* Same treatment as linear functions*/
+
+        m_num_sub_nodes   = m_degree+1;
+        m_num_sub_elems   = 1;
+        m_total_sub_nodes = 2 * m_num_sub_nodes * msh.cells_size();
+        m_total_sub_elems = 2 * msh.cells_size();
+        m_sub_nodes.reserve(m_num_sub_nodes);
+        m_vertices.reserve(2); /*WK: do it without reserve*/
+        m_vertices[0]     = point<T,1>({0.});
+        m_vertices[1]     = point<T,1>({1.});
+
+        plot_nodes(m_degree, m_vertices, m_sub_nodes);
+        std::vector<point_type> test_points(m_total_sub_nodes);
+        size_t cont = 0;
+
+        for(auto& cl : msh)
+        {
+            auto cl_faces = faces(msh, cl);
+            auto bar = barycenter(msh, cl);
+            auto pts = points(msh, cl);
+            auto h   = std::abs(pts[1].x() - pts[0].x())/2.;
+            size_t ifc = 0;
+            for(auto& fc:cl_faces)
+            {
+                for(size_t  i = 0; i < m_num_sub_nodes; i++)
+                {
+                    auto p     = m_sub_nodes[i];
+                    auto c     = point<T,1> ({h*ifc});
+                    int  idx   = cont * m_num_sub_nodes + i;
+
+                    test_points[idx] = h * p + pts[0] + c;
+                }
+                ++cont;
+                ++ifc;
+            }
+        }
+        return test_points;
+    }
+};
+
+template<typename T, typename Storage>
+class post_processing_base<T,2,Storage>
+{
+public:
+    typedef disk::mesh<T,2,Storage>                       mesh_type;
+    typedef typename mesh_type::point_type          point_type;
+    typedef std::vector<point_type>                 point_vector_type;
+
+    size_t m_degree;
+    size_t m_num_sub_nodes,   m_num_sub_elems;
+    size_t m_total_sub_nodes, m_total_sub_elems;
+    point_vector_type   m_sub_nodes;
+    point_vector_type   m_vertices;
+
+
+    //post_processing_base(const mesh<T,2,Storage>& msh)
+    post_processing_base(const size_t degree): m_degree(degree)
+    { }
+
+    void
+    plot_nodes(const size_t n, const std::vector<point_type>& vers, std::vector<point_type> & nodes)
+    {
+        /*WK: check for degree 0*/
+        auto p1 = vers[0];
+        auto p2 = vers[1];
+        auto p3 = vers[2];
+
+        if(n == 0)
+        {
+            nodes.push_back(p1);
+            nodes.push_back(p2);
+            nodes.push_back(p3);
+        }
+        else
+        {
+            auto p4 = (p1 + p2)/2.;
+            auto p5 = (p2 + p3)/2.;
+            auto p6 = (p1 + p3)/2.;
+
+            point_vector_type vertices_T1 = point_vector_type({p1, p4, p6});
+            point_vector_type vertices_T2 = point_vector_type({p4, p5, p6});
+            point_vector_type vertices_T3 = point_vector_type({p4, p2, p5});
+            point_vector_type vertices_T4 = point_vector_type({p6, p5, p3});
+
+            plot_nodes(n-1, vertices_T1, nodes);
+            plot_nodes(n-1, vertices_T2, nodes);
+            plot_nodes(n-1, vertices_T3, nodes);
+            plot_nodes(n-1, vertices_T4, nodes);
+        }
+    }
+
+    std::vector<point_type>
+    make_vtk_points(const mesh_type& msh, const size_t degree)
+    {
+        m_degree = degree;
+        //if(m_degree == 0)
+        //    m_degree = 1; /* Same treatment as linear functions*/
+
+        m_num_sub_nodes   = 3 * std::pow(4,m_degree);
+        m_num_sub_elems   = std::pow(4,m_degree);
+        m_total_sub_nodes = m_num_sub_nodes*(msh.boundary_faces_size() +  2*msh.internal_faces_size() );
+        m_total_sub_elems = m_num_sub_elems*(msh.boundary_faces_size() +  2*msh.internal_faces_size() );
+        m_sub_nodes.reserve(m_num_sub_nodes);
+        m_vertices.reserve(3);
+        m_vertices[0]   =   point<T,2>({0.,0.});
+        m_vertices[1]   =   point<T,2>({1.,0.});
+        m_vertices[2]   =   point<T,2>({0.,1.});
+
+        plot_nodes(m_degree, m_vertices, m_sub_nodes);
+
+        std::vector<point_type> test_points(m_total_sub_nodes);
+        size_t cont = 0;
+
+        for(auto& cl : msh)
+        {
+            auto cl_faces = faces(msh, cl);
+            auto bar = barycenter(msh, cl);
+            for(auto& fc : cl_faces)
+            {
+                auto pts = points(msh, fc);
+                for(size_t  i = 0; i < m_num_sub_nodes; i++)
+                {
+                    auto p    = m_sub_nodes[i];
+                    int idx   = cont*m_num_sub_nodes;
+                    test_points[idx+i] = ((bar + (pts[1] - bar) * p.x() ) + (pts[0] - bar) * p.y());
+                }
+            ++cont;
+            }
+        }
+        return test_points;
+    }
+};
+
+
+template<typename Mesh>
+class paraview
+{};
+
+template<typename T, typename Storage>
+class paraview<disk::mesh<T,2, Storage>>: public post_processing_base<T, 2,Storage>
+{
+public:
+
+    typedef disk::mesh<T,2, Storage>                    mesh_type;
+    typedef typename mesh_type::point_type              point_type;
+
+    typedef post_processing_base<T,2,Storage>         pp_base;
+    typedef dynamic_vector<T>                           vector_type;
+    typedef dynamic_matrix<T>                           matrix_type;
+    typedef std::vector<point_type>                     point_vector_type;
+
+    point_vector_type sub_nodes;
+    point_vector_type vertices;
+
+    std::vector<point_type> test_points;
+    size_t num_sub_elems;
+    size_t num_sub_nodes;
+    size_t total_sub_nodes;
+    size_t total_sub_elems;
+    size_t m_degree;
+    size_t DIM;
+
+    paraview(const size_t degree):
+        pp_base(degree)
+    {
+        m_degree = degree;
+        DIM = 2;
+    }
+
+    struct sizes
+    {
+        sizes(){};
+        size_t num_nodes;
+        size_t num_elems;
+        size_t num_scalars;
+        size_t num_vectors;
+    };
+
+    void vtk_vector(std::ofstream &ofs,
+                    const mesh_type& msh,
+                    const std::string& name,
+                    const dynamic_vector<T> & vec)
+    {
+        ofs << "VECTORS  Vector  double"<< std::endl;
+
+        size_t cl_cont = 0;
+        size_t fc_cont = 0;
+
+        auto cbs = scalar_basis_size(m_degree, mesh_type::dimension);
+
+        for(auto& cl : msh)
+        {
+            auto cb = make_vector_monomial_basis(msh, cl, m_degree);
+
+            auto cl_id = msh.lookup( cl);
+            auto fcs   = faces(msh, cl);
+            vector_type v = vec.block(cbs * cl_id, 0, cbs, 1);
+
+            for(auto& fc : fcs)
+            {
+                for (size_t itp = 0; itp < num_sub_nodes; itp++)
+                {
+                    auto pot  = 0.;
+                    auto idx  = itp + num_sub_nodes * fc_cont;
+                    auto tp   = test_points.at(idx);
+                    auto c_phi = cb.eval_functions(tp);
+
+                    vector_type dpot    =  v.transpose() * c_phi;
+                    for (size_t d = 0; d < DIM; d++)
+                        ofs <<  dpot(d) << " ";
+
+                    for (size_t d = 0; d < 3 - DIM; d++) /* VTK only supports until 3D */
+                        ofs<< 0. << " ";
+                    ofs<< std::endl;
+                }
+                ++fc_cont;
+            }
+            ++cl_cont;
+        }
+        return;
+    }
+
+    void
+    vtk_scalar( std::ofstream &ofs,
+                const mesh_type& msh,
+                const std::string& name,
+                const dynamic_vector<T> & vec)
+    {}
+        #if 0
+
+        size_t cl_cont = 0;
+        size_t fc_cont = 0;
+
+        auto cbs = scalar_basis_size(m_degree, mesh_type::dimension);
+
+        ofs << "SCALARS  Scalar  double 1"<< std::endl;
+        ofs << "LOOKUP_TABLE default"<< std::endl;
+
+        for(auto& cel : msh)
+        {
+            auto cb = make_scalar_monomial_basis(msh, cel, m_degree);
+
+            vector_type dofs =  vec.at(cl_cont);
+
+            auto fcs = faces(msh, cel);
+
+            for(auto& fc : fcs)
+            {
+                for (size_t itp = 0; itp < num_sub_nodes; itp++)
+                {
+                    auto pot  = 0.;
+                    auto idx  = itp + num_sub_nodes * fc_cont;
+                    auto tp   = test_points.at(idx);
+                    auto phi  = cb.eval_functions(tp);
+
+                    assert(cbs == dofs.size());
+                    for (size_t i = 0; i < cbs; i++)
+                        pot  +=  phi[i] * dofs(i);
+                    ofs << pot <<' ';
+                }
+                ++fc_cont;
+            }
+            ++cl_cont;
+        }
+        return;
+    }
+    #endif
+
+    void
+    vtk_vector_magnitud( std::ofstream &ofs,
+                const mesh_type& msh,
+                const std::string& name,
+                const dynamic_vector<T> & vec)
+    {
+        size_t cl_cont = 0;
+        size_t fc_cont = 0;
+
+        auto cbs = scalar_basis_size(m_degree, mesh_type::dimension);
+
+        ofs << "SCALARS  Scalar  double 1"<< std::endl;
+        ofs << "LOOKUP_TABLE default"<< std::endl;
+
+        for(auto& cel : msh)
+        {
+            auto cb = make_scalar_monomial_basis(msh, cel, m_degree);
+
+            vector_type dofs =  vec.at(cl_cont);
+
+            auto fcs = faces(msh, cel);
+
+            for(auto& fc : fcs)
+            {
+                for (size_t itp = 0; itp < num_sub_nodes; itp++)
+                {
+                    auto pot  = 0.;
+                    auto idx  = itp + num_sub_nodes * fc_cont;
+                    auto tp   = test_points.at(idx);
+
+                    assert(cbs == dofs.size());
+                    pot  =  std::sqrt( dofs(0) * dofs(0) + dofs(1) * dofs(1) );
+                    ofs << pot <<' ';
+                }
+                ++fc_cont;
+            }
+            ++cl_cont;
+        }
+        return;
+    }
+
+    void make_file(const mesh_type   & msh,
+                const std::string & name,
+                const dynamic_vector<T> & vector_Th,
+                const std::string & type)
+    {
+        test_points  = pp_base::make_vtk_points(msh, m_degree);
+
+        total_sub_nodes = pp_base::m_total_sub_nodes;
+        total_sub_elems = pp_base::m_total_sub_elems;
+        num_sub_nodes   = pp_base::m_num_sub_nodes;
+        sub_nodes       = pp_base::m_sub_nodes;
+        vertices        = pp_base::m_vertices;
+
+        size_t cl_cont = 0;
+        size_t fc_cont = 0;
+        //std::string file_name = name + "_i" + numstr;
+        std::string file_name = name;
+
+        std::vector<size_t> vtk_cell_type = {4,5,10}; /*WK: check this for others VTK types*/
+        std::vector<size_t> vtk_nodes_inside_cell = {m_degree+1,3,4};/* WK: all cells are the same type */
+
+        //vtk_writer(vtk_points, vtk_elems, vtk_scalar_data, vtk_vector_data, sz);
+
+        /*VTK file*/
+        std::string ext = ".vtk";
+        std::ofstream  ofs(file_name + ext);
+        ofs << "# vtk DataFile Version 3.0"<< std::endl;
+        ofs << "#This file was generated by the DISK++ library"<< std::endl;
+        ofs << "ASCII"<< std::endl;
+
+        /* Data header */
+        ofs << "DATASET UNSTRUCTURED_GRID\n" << std::endl;
+
+        /* Points */
+        ofs << "POINTS " << total_sub_nodes<<" double"<<std::endl;
+
+        for(auto& cel : msh)
+        {
+            auto cl_faces = faces(msh, cel);
+
+            for(auto& fc : cl_faces)
+            {
+                for (size_t itp = 0; itp < num_sub_nodes; itp++)
+                {
+                    auto pot  = 0.;
+                    auto idx  = itp + num_sub_nodes*fc_cont;
+                    auto tp   = test_points.at(idx);
+
+                    for (size_t d = 0; d < DIM; d++)
+                        ofs << tp.at(d) << " ";
+                    for (size_t d = 0; d < 3 - DIM; d++) /* VTK only supports until 3D */
+                        ofs<< 0. << " ";
+                    ofs<< std::endl;
+                }
+                ++fc_cont;
+            }
+            ++cl_cont;
+        }
+        ofs<<std::endl;
+
+        /* Cells */
+        size_t el = 0;
+        ofs << "CELLS " << total_sub_elems <<' ';
+        ofs <<  total_sub_elems *(vtk_nodes_inside_cell[DIM-1] + 1)<< std::endl;
+        for (size_t i = 0; i < total_sub_elems; i++)
+        {
+            ofs << vtk_nodes_inside_cell[DIM-1] << " ";
+            for(size_t j=0; j < vtk_nodes_inside_cell[DIM-1]; j++, el++)
+                ofs << el<< " ";
+            ofs<< std::endl;
+        }
+
+        /* Types of cells*/
+        ofs << "CELL_TYPES " << total_sub_elems << std::endl;
+            for(size_t i = 0; i < total_sub_elems; i++)
+                ofs << ' ' << vtk_cell_type[DIM-1];
+        ofs << std::endl;
+
+        /* Data */
+        ofs << "POINT_DATA " << total_sub_nodes << std::endl;
+
+        if(type == "scalar")
+            vtk_scalar(ofs, msh, name, vector_Th);
+        if(type == "vector")
+            vtk_vector(ofs, msh, name, vector_Th);
+
+        ofs.close();
+
+        return;
+    }
+};

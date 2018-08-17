@@ -36,6 +36,10 @@ run_viscoplasticity(size_t degree,
             name = "couette";
             filename = "../../../diskpp/meshes/2D_triangles/medit/couronne_01.medit2d";
             break;
+        case VANE:
+            name = "vane";
+            filename = "../../../diskpp/meshes/2D_triangles/medit/vane05.medit2d";
+            break;
         default:
             std::cout << "wrong arguments" << std::endl;
             exit(1);
@@ -55,7 +59,9 @@ run_viscoplasticity(size_t degree,
     typename revolution::hho_degree_info hdi(degree, degree);
     augmented_lagrangian_viscoplasticity<mesh_type> als(msh, hdi, alpha);
 
+    std::cout << "before define problem" << std::endl;
     auto assembler = als.define_problem(msh, problem);
+    std::cout << "after define problem" << std::endl;
     als.initialize(msh, assembler);
 
     size_t i;
@@ -101,7 +107,7 @@ int main(int argc, char **argv)
 
     problem_type problem = DRIVEN;
 
-    while ( (ch = getopt(argc, argv, "k:a:dcp")) != -1 )
+    while ( (ch = getopt(argc, argv, "k:a:dcv")) != -1 )
     {
         switch(ch)
         {
@@ -124,7 +130,10 @@ int main(int argc, char **argv)
                 problem = COUETTE;
                 std::cout << "couette chosen" << std::endl;
                 break;
-
+            case 'v':
+                problem = VANE;
+                std::cout << "vane chosen" << std::endl;
+                break;
             case '?':
             default:
                 std::cout << "wrong arguments" << std::endl;

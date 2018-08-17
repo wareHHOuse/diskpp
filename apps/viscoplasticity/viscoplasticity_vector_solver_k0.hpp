@@ -48,6 +48,7 @@ enum problem_type
 {
     DRIVEN,
     COUETTE,
+    VANE,
     POISEUILLE
 };
 
@@ -94,15 +95,20 @@ public:
         use_sym_grad = true;
         factor = (use_sym_grad)? 2. : 1.;
         viscosity = 1.;
-        T omegaExt = 2.;
         T f = 1;
         T Lref = 1.;
-        T Bn  =  0.; //std::sqrt(2) * 10.;
+        //T Bn  =  0.; //std::sqrt(2) * 10.;
+
         //Driven
         //yield =  Bn * f * Lref;//Bn * viscosity;
-        //Couette
-        yield =  Bn * omegaExt;
 
+        //Couette
+        //T omegaExt = 2.;
+        //yield =  Bn * omegaExt;
+
+        //VANE
+        yield = 1.;
+        //T Bn = yield; // /eta/omega; eta = 1; omega = 1;
 
         dim =  Mesh::dimension;
 
@@ -115,6 +121,8 @@ public:
     auto
     define_problem(const mesh_type& msh, const problem_type& problem )
     {
+        std::cout << "inside define problem" << std::endl;
+
         boundary_type bnd(msh);
 
         auto wall = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
@@ -127,9 +135,12 @@ public:
             return Matrix<T, Mesh::dimension, 1>{0,0};
         };
 
+        #if 0
         switch (problem)
 		{
+            std::cout << "im starting" << std::endl;
             case DRIVEN:
+                std::cout << "im in driven" << std::endl;
                 velocity  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
                     if( std::abs(p.y() - 1.) < 1.e-8 )
                         return Matrix<T, Mesh::dimension, 1>{1,0};
@@ -150,10 +161,8 @@ public:
 
                break;
 
-
-
             case COUETTE:
-
+            std::cout << "im in couette" << std::endl;
                 rhs_fun  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
                     return Matrix<T, Mesh::dimension, 1>::Zero();
                 };
@@ -219,7 +228,41 @@ public:
 
                 break;
 
+            case VANE:
+            std::cout << "im in vane" << std::endl;
+                rhs_fun  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
+                    return Matrix<T, Mesh::dimension, 1>::Zero();
+                };
+
+                auto rot  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
+                    T omega = 1;
+                    return Matrix<T, Mesh::dimension, 1>{omega * p.y(), -omega * p.x()};
+                };
+
+                bnd.addDirichletBC( 0, 2, wall);
+                bnd.addDirichletBC( 0, 1, rot);
+                break;
+            default:
+                throw std::invalid_argument("No problem defined");
+
         }
+        #endif
+
+
+        //case VANE:
+        std::cout << "im in vane" << std::endl;
+            rhs_fun  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
+                return Matrix<T, Mesh::dimension, 1>::Zero();
+            };
+
+            auto rot  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
+                T omega = 1;
+                return Matrix<T, Mesh::dimension, 1>{omega * p.y(), -omega * p.x()};
+            };
+
+            bnd.addDirichletBC( 0, 2, wall);
+            bnd.addDirichletBC( 0, 1, rot);
+
 
         auto assembler = revolution::make_stokes_assembler_alg(msh, di, bnd);
 
