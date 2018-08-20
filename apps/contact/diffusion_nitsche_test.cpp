@@ -66,7 +66,7 @@ verify_convergence(const std::vector<std::string>& paths,
 
     for (size_t i = mindeg; i <= maxdeg; i++)
     {
-        scalar_type expected_rate = i+2;
+        scalar_type expected_rate = i+1;
 
 
         std::vector<std::pair<scalar_type, tuple_type>> errdiams;
@@ -310,9 +310,9 @@ int main(int argc, char **argv)
     test_type tt = TEST_VERIFY_CONVERGENCE;
     int ch;
     algorithm_parameters<double> ap;
-    double parameter = 0.5;
+    double parameter = 1.;
 
-    while ( (ch = getopt(argc, argv, "g:np:zfc:oe:tv")) != -1 )
+    while ( (ch = getopt(argc, argv, "g:npzfcle:tv")) != -1 )
     {
         switch(ch)
         {
@@ -329,8 +329,7 @@ int main(int argc, char **argv)
                 ap.theta = -1.;
                 break;
             case 'p':
-                ap.theta = atof(optarg);
-                //ap.theta = 1.; //0.99999;
+                ap.theta = 1.;
                 break;
             case 'z':
                 ap.theta = 0.;
@@ -340,18 +339,9 @@ int main(int argc, char **argv)
                 break;
             case 'c':
                 ap.solver = EVAL_IN_CELLS;
-                std::cout << "choosing parameter" << std::endl;
-                parameter = atof(optarg);
-                if (parameter < 0  || parameter > 1 )
-                {
-                    std::cout << "parameter must be in [0 1]. Falling back to 0.5" << std::endl;
-                    parameter = 0.5;
-                }
-                std::cout << "parameter :"<< parameter << std::endl;
-
                 break;
-            case 'o':
-                ap.solver = EVAL_IN_CELLS_AS_FACES;
+            case 'l':
+                ap.solver = EVAL_IN_CELLS_FULL;
                 break;
             case 'e':
                 ap.solver = EVAL_WITH_PARAMETER;

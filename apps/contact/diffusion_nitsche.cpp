@@ -75,7 +75,7 @@ int main(int argc, char **argv)
                 ap.theta = -1.;
                 break;
             case 'p':
-                ap.theta = 0.99999;
+                ap.theta = 1;
                 //ap.theta = atof(optarg);
                 break;
             case 'z':
