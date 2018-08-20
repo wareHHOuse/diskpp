@@ -114,6 +114,7 @@ int main(int argc, char **argv)
                     std::cout << "alpha must be >=0. Falling back to 1." << std::endl;
                     alpha = 1.;
                 }
+                break;
             case '?':
             default:
                 std::cout << "wrong arguments" << std::endl;

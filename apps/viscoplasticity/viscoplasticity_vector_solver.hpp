@@ -74,7 +74,7 @@ class augmented_lagrangian_viscoplasticity
     typedef std::function<T   (const point_type &)>             scalar_funtion_type;
 
     hho_degree_info di;
-    T             viscosity;
+    T             viscosity, Bn;
     T             alpha;
     T             yield;
     size_t        cbs, fbs, pbs, sbs;
@@ -99,17 +99,17 @@ public:
         viscosity = 1.;
         T f     = 1;
         T Lref  = 1.;
-        T Bn    =  2* std::sqrt(2);
+        T Bn    =  2 * std::sqrt(2);
         yield   =  Bn * f * Lref; // * viscosity;// * omegaExt; //* f * Lref;
         #endif
 
         //VANE
-        T Bn = 1;
-        T Lref = 1.; //R
+        Bn = 10.;
+        T Lref = 4.02; //R
         viscosity = 1.;
         T omega = 1;
         T Vref = omega * Lref;
-        yield = Bn * (viscosity * Vref) / Lref; // Bn/std::sqrt(2); // ;
+        yield = Bn * std::sqrt(2) * (viscosity * Vref) / Lref; // Bn/std::sqrt(2); // ;
 
         const auto dim =  Mesh::dimension;
 
@@ -332,7 +332,8 @@ public:
         dynamic_vector<T> cell_rec_sol(rbs * msh.cells_size());
         dynamic_vector<T> press_vec(pbs * msh.cells_size());
 
-        std::ofstream ofs("data_" + info + ".data");
+        auto infoall = info  + "_Bn"+ tostr(Bn);
+        std::ofstream ofs("data_" + infoall + ".data");
         if (!ofs.is_open())
             std::cout << "Error opening file"<<std::endl;
 
@@ -398,13 +399,15 @@ public:
         //plot_over_line(msh, p_x, cell_rec_sol, di.reconstruction_degree(), "plot_over_x_" + info + ".data");
         //plot_over_line(msh, p_y, cell_rec_sol, di.reconstruction_degree(), "plot_over_y_" + info + ".data");
         //plot_over_line(msh, p_y, cell_sol, di.cell_degree(), "plot_over_y_" + info + ".data");
-        compute_discontinuous_velocity( msh, cell_sol, di, "velocity_" + info +".msh");
-        save_coords(msh, "Coords_"+ info + ".data");
-        quiver( msh, sol_old, assembler, di, "quiver_"+ info + ".data");
+
+        compute_discontinuous_velocity( msh, cell_sol, di, "velocity_" + infoall +".msh");
+        save_coords(msh, "Coords_"+ infoall + ".data");
+        quiver( msh, sol_old, assembler, di, "quiver_"+ infoall + ".data");
 
         paraview<mesh_type> pw(di.cell_degree());
         //pp.paraview(msh, "Velocity_Magnitud", Vmagnitud, "scalar");
-        pw.make_file(msh, "Velocity_"+ info, cell_sol, "vector");
+        pw.make_file(msh, "Velocity_"+ infoall, cell_sol, "vector");
+        std::cout << "Velocity_"+ infoall << std::endl;
 
         return;
     }
@@ -447,8 +450,13 @@ public:
                 };
 
                 auto rotation = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
-                   T omega = 1;
-                   return Matrix<T, Mesh::dimension, 1>{omega * p.y(), -omega * p.x()};
+                    T omega = 1;
+                    auto theta  = std::atan2(p.y() , p.x());
+                    T r  =  std::sqrt(p.x()*p.x() + p.y()*p.y());
+                    T vx = -std::sin(theta) * omega * r;
+                    T vy =  std::cos(theta) * omega * r;
+                   return Matrix<T, Mesh::dimension, 1>{ vx, vy} ;
+                   //return Matrix<T, Mesh::dimension, 1>{omega * p.y(), -omega * p.x()};
                 };
 
                 bnd.addDirichletBC( 0, 2, wall);
@@ -496,13 +504,16 @@ public:
             T cvg_total = std::sqrt(convergence.first + convergence.second);
 
             if(iter % 100 == 0)
+            {
                 std::cout << "  i : "<< iter <<"  - " << std::sqrt(cvg_total)<<std::endl;
+                post_processing( msh, assembler, info +"_i" + tostr(iter), problem);
+            }
 
             assert(cvg_total < Ninf);
             if( cvg_total < tolerance)
             {
                 std::cout << "  i : "<< iter <<"  - " << cvg_total <<std::endl;
-                post_processing( msh, assembler, info, problem);
+                post_processing( msh, assembler, info +"_i" + tostr(iter), problem);
                 return true;
             }
             sol_old = sol;
