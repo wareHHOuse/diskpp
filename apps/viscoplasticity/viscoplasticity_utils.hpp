@@ -719,7 +719,8 @@ public:
         size_t cl_cont = 0;
         size_t fc_cont = 0;
 
-        auto cbs = scalar_basis_size(m_degree, mesh_type::dimension);
+        auto cbs_scalar = scalar_basis_size(m_degree, mesh_type::dimension);
+        auto cbs = vector_basis_size(m_degree, mesh_type::dimension, mesh_type::dimension);
 
         for(auto& cl : msh)
         {
@@ -733,14 +734,20 @@ public:
             {
                 for (size_t itp = 0; itp < num_sub_nodes; itp++)
                 {
-                    auto pot  = 0.;
                     auto idx  = itp + num_sub_nodes * fc_cont;
                     auto tp   = test_points.at(idx);
                     auto c_phi = cb.eval_functions(tp);
 
-                    vector_type dpot    =  v.transpose() * c_phi;
+                    vector_type pot = vector_type::Zero(2);
+
+                    for (size_t i = 0; i < cbs_scalar; i++)
+                    {
+                        pot(0)+=  v( 2 * i ) * c_phi(i);
+                        pot(1)+=  v( 2 * i + 1) * c_phi(i);
+                    }
+
                     for (size_t d = 0; d < DIM; d++)
-                        ofs <<  dpot(d) << " ";
+                        ofs <<  pot(d) << " ";
 
                     for (size_t d = 0; d < 3 - DIM; d++) /* VTK only supports until 3D */
                         ofs<< 0. << " ";

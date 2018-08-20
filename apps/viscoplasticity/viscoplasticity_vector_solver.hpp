@@ -48,7 +48,8 @@ using namespace revolution;
 
 enum problem_type
 {
-    DRIVEN
+    DRIVEN,
+    VANE
 };
 
 template<typename Mesh>
@@ -93,11 +94,22 @@ public:
                             const T& alpha_ext):
                             di(hdi), alpha(alpha_ext)
     {
+        //DRIVEN
+        #if 0
         viscosity = 1.;
         T f     = 1;
         T Lref  = 1.;
         T Bn    =  2* std::sqrt(2);
         yield   =  Bn * f * Lref; // * viscosity;// * omegaExt; //* f * Lref;
+        #endif
+
+        //VANE
+        T Bn = 1;
+        T Lref = 1.; //R
+        viscosity = 1.;
+        T omega = 1;
+        T Vref = omega * Lref;
+        yield = Bn * (viscosity * Vref) / Lref; // Bn/std::sqrt(2); // ;
 
         const auto dim =  Mesh::dimension;
 
@@ -350,16 +362,16 @@ public:
             T peval =  p_phi.dot(spress);
 
             /***********************************************************************/
-            #if 0
+            //#if 0
             //Stress
             auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
             auto s_phi  = sb.eval_functions(bar);
-            auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
+            auto G = revolution::make_hlow_stokes(msh, cl, di, true);
             vector_type Gu = G.first * svel;
 
             //*************************************************************
             vector_type stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
-            vector_type theta  = stress  +  factor * alpha * Gu;
+            vector_type theta  = stress  +  2. * alpha * Gu;
             tensor_type theta_eval = revolution::eval(theta, s_phi);
             tensor_type sigma_eval = revolution::eval(stress, s_phi);
             //*************************************************************
@@ -370,25 +382,30 @@ public:
 
             // tr_stress
             T tr_stress = sigma_eval(0,0) + sigma_eval(1,1);
-            #endif
+            //#endif
 
             ofs << ueval(0)   << " " << ueval(1) << " " << peval<< " ";
-            //ofs << theta_eval.norm() << " " << sigma_eval.norm()   << " ";
-            //ofs << divu << " "<< tr_stress<<std::endl;
+            ofs << theta_eval.norm() << " " << sigma_eval.norm()   << " ";
+            ofs << divu << " "<< tr_stress<<std::endl;
             ofs <<std::endl;
         }
         ofs.close();
 
-        std::pair<point_type, point_type> p_x, p_y;
-        auto eps = 1.e-4;
-        p_y = std::make_pair(point_type({0.5 + eps, 0.0 + eps}), point_type({0.5 + eps, 1.0 + eps}));
+        //std::pair<point_type, point_type> p_x, p_y;
+        //auto eps = 1.e-4;
+        //p_y = std::make_pair(point_type({0.5 + eps, 0.0 + eps}), point_type({0.5 + eps, 1.0 + eps}));
 
         //plot_over_line(msh, p_x, cell_rec_sol, di.reconstruction_degree(), "plot_over_x_" + info + ".data");
         //plot_over_line(msh, p_y, cell_rec_sol, di.reconstruction_degree(), "plot_over_y_" + info + ".data");
-        plot_over_line(msh, p_y, cell_sol, di.cell_degree(), "plot_over_y_" + info + ".data");
+        //plot_over_line(msh, p_y, cell_sol, di.cell_degree(), "plot_over_y_" + info + ".data");
         compute_discontinuous_velocity( msh, cell_sol, di, "velocity_" + info +".msh");
         save_coords(msh, "Coords_"+ info + ".data");
         quiver( msh, sol_old, assembler, di, "quiver_"+ info + ".data");
+
+        paraview<mesh_type> pw(di.cell_degree());
+        //pp.paraview(msh, "Velocity_Magnitud", Vmagnitud, "scalar");
+        pw.make_file(msh, "Velocity_"+ info, cell_sol, "vector");
+
         return;
     }
 
@@ -416,9 +433,32 @@ public:
                 bnd.addDirichletBC(0, 2, wall);
                 bnd.addDirichletBC(0, 3, wall);
                 bnd.addDirichletBC(0, 4, wall);
-               break;
+                break;
+
+            case VANE:
+                std::cout << " I'm in VANE" << std::endl;
+
+                rhs_fun  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
+                   return Matrix<T, Mesh::dimension, 1>::Zero();
+                };
+
+                auto symmetryPlane = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
+                    return Matrix<T, Mesh::dimension, 1>{0,0};
+                };
+
+                auto rotation = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
+                   T omega = 1;
+                   return Matrix<T, Mesh::dimension, 1>{omega * p.y(), -omega * p.x()};
+                };
+
+                bnd.addDirichletBC( 0, 2, wall);
+                bnd.addDirichletBC( 0, 1, rotation);
+                bnd.addNeumannBC(10, 3, symmetryPlane);
+                break;
+
             default:
                 throw std::invalid_argument("Invalid problem");
+                break;
         }
 
         auto assembler = revolution::make_stokes_assembler_alg(msh, di, bnd);
@@ -455,7 +495,7 @@ public:
             //---------------------------------------------------------------------
             T cvg_total = std::sqrt(convergence.first + convergence.second);
 
-            if(iter % 500 == 0)
+            if(iter % 100 == 0)
                 std::cout << "  i : "<< iter <<"  - " << std::sqrt(cvg_total)<<std::endl;
 
             assert(cvg_total < Ninf);
