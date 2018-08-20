@@ -69,10 +69,10 @@ class augmented_lagrangian_viscoplasticity
     typedef Matrix<T, Dynamic, 1>                               vector_type ;
     typedef Matrix<T, Dynamic, Dynamic>                         matrix_type;
 
-    typedef std::function<vector2d_type (const point_type &)>   vector_funtion_type;
+    typedef std::function<vector2d_type (const point_type &)>   vector_function_type;
     typedef std::function<T   (const point_type &)>             scalar_funtion_type;
 
-    vector_funtion_type     rhs_fun, velocity;
+    vector_function_type           rhs_fun, velocity;
     dynamic_vector<T>             multiplier, auxiliar, auxiliar_old;
 
     typename revolution::hho_degree_info di;
@@ -96,7 +96,7 @@ public:
         factor = (use_sym_grad)? 2. : 1.;
         viscosity = 1.;
         T f = 1;
-        T Lref = 1.;
+        T Lref = 6.;
         //T Bn  =  0.; //std::sqrt(2) * 10.;
 
         //Driven
@@ -107,7 +107,7 @@ public:
         //yield =  Bn * omegaExt;
 
         //VANE
-        yield = 1.;
+        yield = 1. ;
         //T Bn = yield; // /eta/omega; eta = 1; omega = 1;
 
         dim =  Mesh::dimension;
@@ -250,7 +250,6 @@ public:
 
 
         //case VANE:
-        std::cout << "im in vane" << std::endl;
             rhs_fun  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
                 return Matrix<T, Mesh::dimension, 1>::Zero();
             };
@@ -260,8 +259,15 @@ public:
                 return Matrix<T, Mesh::dimension, 1>{omega * p.y(), -omega * p.x()};
             };
 
+            #if 0
+            //full vane
             bnd.addDirichletBC( 0, 2, wall);
             bnd.addDirichletBC( 0, 1, rot);
+            #endif
+
+            bnd.addDirichletBC( 0, 2, wall);
+            bnd.addDirichletBC( 0, 1, rot);
+            bnd.addNeumannBC(10, 3, symmetryPlane);
 
 
         auto assembler = revolution::make_stokes_assembler_alg(msh, di, bnd);
@@ -428,7 +434,10 @@ public:
         vector_type rhs = vector_type::Zero(cbs + fbs * num_faces);
 
         //(f, v_T)
-        rhs.block( 0, 0, cbs, 1) = make_rhs(msh, cl, cb, rhs_fun);
+        auto rhs_fun_test  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
+            return Matrix<T, Mesh::dimension, 1>::Zero();
+        };
+        rhs.block( 0, 0, cbs, 1) = make_rhs(msh, cl, cb, rhs_fun_test);
 
         //(stress - alpha * gamma, Gv)
         vector_type stress = multiplier.block( sbs * cell_ofs,  0, sbs, 1);
@@ -498,7 +507,7 @@ public:
 
         sol = dynamic_vector<T>::Zero(systsz);
         disk::solvers::pardiso_params<T> pparams;
-        mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);
+        mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
 
         return;
     }
@@ -584,6 +593,10 @@ public:
         compute_discontinuous_velocity( msh, cell_sol, di, "velocity_" + info +".msh");
         save_coords(msh, "Coords_"+ info + ".data");
         quiver( msh, sol, assembler, di, "quiver_"+ info + ".data");
+
+        paraview<mesh_type> pw(di.cell_degree());
+        //pp.paraview(msh, "Velocity_Magnitud", Vmagnitud, "scalar");
+        pw.make_file(msh, "Velocity_"+ info, cell_sol, "vector");
         return;
     }
 

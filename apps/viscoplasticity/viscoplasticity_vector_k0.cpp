@@ -23,7 +23,7 @@ run_viscoplasticity(size_t degree,
     typedef disk::generic_mesh<T, 2>  mesh_type;
 
     T tolerance = 1.e-10, Ninf = 10.e+5;
-    size_t max_iters = 1; //50000;
+    size_t max_iters = 50000;
 
     std::string name, filename;
     switch (problem)
@@ -38,7 +38,8 @@ run_viscoplasticity(size_t degree,
             break;
         case VANE:
             name = "vane";
-            filename = "../../../diskpp/meshes/2D_triangles/medit/vane05.medit2d";
+            filename = "../../../diskpp/meshes/2D_triangles/medit/vane_01.medit2d";
+            //filename = "../../../diskpp/meshes/2D_triangles/medit/vane_sym_h0125.medit2d";
             break;
         default:
             std::cout << "wrong arguments" << std::endl;
@@ -68,14 +69,13 @@ run_viscoplasticity(size_t degree,
     for(i = 0; i < max_iters; i++)
     {
         als.run_stokes_like(msh, assembler, i);
-
-        //als.update_multiplier(msh, assembler);
+        als.update_multiplier(msh, assembler);
         //auto error = als.compute_errors(msh, assembler, false);
 
         T cvg_total (0.), cvg_stress(0.), cvg_gamma(0.);
         std::tie(cvg_total, cvg_stress, cvg_gamma) = als.convergence;
 
-        if(i % 1000 == 0)
+        if(i % 100 == 0)
         {
             std::cout << "  i : "<< i<<"  - " << std::sqrt(cvg_total)<<std::endl;
             als.post_processing( msh, assembler, info +"_i" + tostr(i), problem);
@@ -84,12 +84,17 @@ run_viscoplasticity(size_t degree,
 
         assert(std::sqrt(cvg_total) < Ninf);
         if( std::sqrt(cvg_total)  < tolerance)
+        {
+            als.post_processing( msh, assembler, info +"_i" + tostr(i), problem);
+            std::cout << "ALG final error : "<< std::sqrt(cvg_total) << std::endl;
             break;
+        }
     }
     ofs.close();
 
     std::cout << "Finish" << std::endl;
-    auto final_error = als.compute_errors(msh, assembler, true);
+    //auto final_error = als.compute_errors(msh, assembler, true);
+    T final_error = 0.;
     als.post_processing( msh, assembler, info +"_i" + tostr(i), problem);
 
     return final_error;
