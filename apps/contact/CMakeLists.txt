@@ -24,3 +24,6 @@ target_link_libraries(signorini_whho_par ${LINK_LIBS})
 
 add_executable(diffusion_borrar diffusion_nitsche_borrar.cpp)
 target_link_libraries(diffusion_borrar ${LINK_LIBS})
+
+add_executable(diffusion_mix diffusion_mix.cpp)
+target_link_libraries(diffusion_mix ${LINK_LIBS})

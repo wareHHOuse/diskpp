@@ -41,7 +41,8 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-#include "diffusion_nitsche_solver.hpp"
+//#include "diffusion_nitsche_solver.hpp"
+#include "diffusion_mix_solver.hpp"
 
 
 template<typename MeshType, typename LoaderType>
@@ -155,6 +156,34 @@ enum test_type
     TEST_VERIFY_CONVERGENCE,
     TEST_MEASURE_TIMES
 };
+
+void test_triangles(test_type tt, algorithm_parameters<double>& ap, const double& eta)
+{
+    size_t runs = 2;
+
+    std::vector<std::string> paths;
+    paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/square_tri1.mesh2d");
+    paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/square_tri2.mesh2d");
+    paths.push_back("../../../diskpp/meshes/2D_triangles/netgen/square_tri3.mesh2d");
+
+    typedef disk::simplicial_mesh<double, 2>      MT;
+    typedef disk::netgen_mesh_loader<double, 2>   LT;
+
+    switch(tt)
+    {
+        case TEST_MEASURE_TIMES:
+            test_mesh_format<MT, LT>(paths, runs, 0, 0, "triangle_spec");
+            break;
+
+        case TEST_VERIFY_CONVERGENCE:
+            verify_convergence<MT, LT>(paths, 0, 3, ap, eta);
+            break;
+
+        default:
+            std::cout << "[ Unavailable Test ]" << std::endl;
+            return;
+    }
+}
 
 void test_triangles_specialized(test_type tt, algorithm_parameters<double>& ap, const double& eta)
 {
@@ -370,12 +399,13 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
+    std::cout << bold << underline << "Triangles for contact" << reset << std::endl;
+    test_triangles(tt, ap, parameter);
 
+    #if 0
     std::cout << bold << underline << "Triangles specialized" << reset << std::endl;
     test_triangles_specialized(tt, ap, parameter);
 
-
-    #if 0
     std::cout << bold << underline << "Hexagons" << reset << std::endl;
     test_hexagons_generic(tt, ap, parameter);
 
