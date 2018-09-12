@@ -97,6 +97,23 @@ verify_convergence(const std::vector<std::string>& paths,
         bool pass       = true;
         bool warning    = false;
         bool high, low, ok;
+
+        {
+            auto error_full_i = errdiams[0].second;
+
+            auto H1_error = std::get<0>(error_full_i);
+            auto L2_error = std::get<1>(error_full_i);
+            auto Linf_error = std::get<2>(error_full_i);
+
+            std::cout << std::fixed << std::setprecision(3) << errdiams[i].first <<" :    ";
+            std::cout << " " <<  std::scientific<< std::setprecision(3)<< H1_error;
+            std::cout << "  "<<  std::fixed << std::setprecision(3)<<"        -   ";
+            std::cout << " " <<  std::scientific<< std::setprecision(3)<< L2_error;
+            std::cout << "  "<<  std::fixed << std::setprecision(3)<< "        -   ";
+            std::cout << " " <<  std::scientific<< std::setprecision(3)<<Linf_error;
+            std::cout << "  " << std::fixed << std::setprecision(3)<< "     " <<std::endl;            
+        }
+
         for (size_t i = 1; i < errdiams.size(); i++)
         {
 

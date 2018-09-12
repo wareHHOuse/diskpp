@@ -312,8 +312,6 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
 }
 
 
-
-
 template<typename Mesh, typename T>
 auto
 run_diffusion_solver(const Mesh& msh, const algorithm_parameters<T>& ap,
@@ -360,12 +358,24 @@ run_diffusion_solver(const Mesh& msh, const algorithm_parameters<T>& ap,
     *                    |_____|                  |_____|
     *                       3                        2
     *-------------------------------------------------------------------------*/
-
+    //test 1
+    //#if 0
     bnd.addDirichletBC(disk::mechanics::DIRICHLET,1,sol_fun); //TOP
     bnd.addContactBC(disk::mechanics::SIGNORINI, 3); //
     bnd.addNeumannBC(disk::mechanics::NEUMANN, 4, neu_left); //
     bnd.addNeumannBC(disk::mechanics::NEUMANN, 2, neu_right); //Bottom
     //bnd.addContactBC(disk::mechanics::SIGNORINI,3); //BOTTOM
+    //#endif
+
+    //test 2
+    #if 0
+    bnd.addContactBC(disk::mechanics::SIGNORINI, 1); //
+    bnd.addContactBC(disk::mechanics::SIGNORINI, 2); //
+    bnd.addContactBC(disk::mechanics::SIGNORINI, 3); //
+    bnd.addContactBC(disk::mechanics::SIGNORINI, 4); //
+    #endif
+
+
 
     std::tuple<T, T, T> error;
     switch (ap.solver)
