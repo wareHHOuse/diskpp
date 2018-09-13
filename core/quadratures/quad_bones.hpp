@@ -89,7 +89,7 @@ golub_welsch(const size_t degree)
 
 template<typename T>
 std::vector<std::pair<point<T, 1>, T>>
-gauss_legendre(const size_t degree)
+gauss_legendre(size_t degree)
 {
     auto comp_degree = degree;
 
