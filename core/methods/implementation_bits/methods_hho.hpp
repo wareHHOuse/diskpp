@@ -232,16 +232,19 @@ make_hho_gradrec_vector(const Mesh& msh, const typename Mesh::cell_type& cl, con
 
     const auto num_faces = howmany_faces(msh, cl);
 
-    const matrix_type           gr_lhs = make_mass_matrix(msh, cl, gb);
-    matrix_type                 gr_rhs = matrix_type::Zero(gbs, cbs + num_faces * fbs);
+    const matrix_type  gr_lhs = make_mass_matrix(msh, cl, gb);
+    matrix_type        gr_rhs = matrix_type::Zero(gbs, cbs + num_faces * fbs);
 
-    const auto qps = integrate(msh, cl, std::max(0, int(celdeg) - 1 + int(facdeg)));
-    for(auto& qp : qps)
+    if(celdeg > 0)
     {
-        const auto c_dphi = cb.eval_gradients(qp.point());
-        const auto g_phi  = gb.eval_functions(qp.point());
+        const auto qps = integrate(msh, cl, celdeg - 1 + facdeg);
+        for (auto& qp : qps)
+        {
+            const auto c_dphi = cb.eval_gradients(qp.point());
+            const auto g_phi  = gb.eval_functions(qp.point());
 
-        gr_rhs.block(0, 0, gbs, cbs) += qp.weight() * priv::outer_product(c_dphi, g_phi);
+            gr_rhs.block(0, 0, gbs, cbs) += qp.weight() * priv::outer_product(c_dphi, g_phi);
+        }
     }
 
     const auto fcs = faces(msh, cl);
@@ -507,19 +510,25 @@ make_hho_gradrec_matrix(const Mesh&                     msh,
       }
    }
 
-    // compute rhs
-   const auto qpc = integrate(msh, cl, std::max(int(graddeg + celdeg) -1,0));
-   for (auto& qp : qpc) {
-      const auto gphi = gb.eval_functions(qp.point());
-      const auto dphi = cb.eval_gradients(qp.point());
+   // compute rhs
+   if (celdeg > 0)
+   {
+       const auto qpc = integrate(msh, cl, graddeg + celdeg - 1);
+       for (auto& qp : qpc)
+       {
+           const auto gphi = gb.eval_functions(qp.point());
+           const auto dphi = cb.eval_gradients(qp.point());
 
-      for (size_t j = 0; j < cbs; j++) {
-         const auto qp_dphi_j = priv::inner_product(qp.weight(), dphi[j]);
-         for (size_t i = 0; i < gbs; i++) {
-            gr_rhs(i, j) += priv::inner_product(gphi[i], qp_dphi_j);
-         }
-      }
-   } // end qp
+           for (size_t j = 0; j < cbs; j++)
+           {
+               const auto qp_dphi_j = priv::inner_product(qp.weight(), dphi[j]);
+               for (size_t i = 0; i < gbs; i++)
+               {
+                   gr_rhs(i, j) += priv::inner_product(gphi[i], qp_dphi_j);
+               }
+           }
+       } // end qp
+   }
 
    const auto fcs = faces(msh, cl);
    for (size_t i = 0; i < fcs.size(); i++) {
@@ -605,19 +614,23 @@ make_hho_sym_gradrec_matrix(const Mesh&                     msh,
             gr_lhs(i, j) = gr_lhs(j, i);
 
     // compute rhs
-    const auto qpc = integrate(msh, cl, std::max(int(graddeg + celdeg) - 1, 0));
-    for (auto& qp : qpc)
+    if(celdeg)
     {
-        const auto gphi = gb.eval_functions(qp.point());
-        const auto dphi = cb.eval_sgradients(qp.point());
-
-        for (size_t j = 0; j < cbs; j++)
+        const auto qpc = integrate(msh, cl, graddeg + celdeg - 1);
+        for (auto& qp : qpc)
         {
-            const auto qp_dphi_j = priv::inner_product(qp.weight(), dphi[j]);
-            for (size_t i = 0; i < gbs; i++)
-                gr_rhs(i, j) += priv::inner_product(gphi[i], qp_dphi_j);
-        }
-    } // end qp
+            const auto gphi = gb.eval_functions(qp.point());
+            const auto dphi = cb.eval_sgradients(qp.point());
+
+            for (size_t j = 0; j < cbs; j++)
+            {
+                const auto qp_dphi_j = priv::inner_product(qp.weight(), dphi[j]);
+                for (size_t i = 0; i < gbs; i++)
+                    gr_rhs(i, j) += priv::inner_product(gphi[i], qp_dphi_j);
+            }
+        } // end qp
+    }
+
 
     const auto fcs = faces(msh, cl);
     for (size_t i = 0; i < fcs.size(); i++)
@@ -702,13 +715,16 @@ make_hho_divergence_reconstruction_stokes_rhs(const Mesh& msh, const typename Me
 
     matrix_type dr_rhs = matrix_type::Zero(rbs, cbs + num_faces*fbs);
 
-    const auto qps = integrate(msh, cl, std::max(int(celdeg + recdeg) - 1, 0));
-    for (auto& qp : qps)
+    if(recdeg > 0)
     {
-        const auto s_dphi = cbas_s.eval_gradients(qp.point());
-        const auto v_phi  = cbas_v.eval_functions(qp.point());
+        const auto qps = integrate(msh, cl, celdeg + recdeg - 1);
+        for (auto& qp : qps)
+        {
+            const auto s_dphi = cbas_s.eval_gradients(qp.point());
+            const auto v_phi  = cbas_v.eval_functions(qp.point());
 
-        dr_rhs.block(0, 0, rbs, cbs) -= qp.weight() * priv::outer_product(v_phi, s_dphi);
+            dr_rhs.block(0, 0, rbs, cbs) -= qp.weight() * priv::outer_product(v_phi, s_dphi);
+        }
     }
 
     const auto fcs = faces(msh, cl);
