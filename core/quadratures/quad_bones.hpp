@@ -89,7 +89,7 @@ golub_welsch(const size_t degree)
 
 template<typename T>
 std::vector<std::pair<point<T, 1>, T>>
-gauss_legendre(const size_t degree)
+gauss_legendre(size_t degree)
 {
     auto comp_degree = degree;
 
@@ -296,7 +296,7 @@ quadrangle_quadrature(const size_t degree)
 {
     const auto qps = disk::edge_quadrature<T>(degree);
 
-    std::vector<std::pair<point<T, 2>, T>> ret; //;
+    std::vector<std::pair<point<T, 2>, T>> ret;
     ret.reserve(qps.size() * qps.size());
 
     for (auto jtor = qps.begin(); jtor != qps.end(); jtor++)
