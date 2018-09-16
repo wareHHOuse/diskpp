@@ -194,15 +194,72 @@ test_2d_triangle_quadrature(void)
 /* Test 2D quadrature for triangles */
 template<typename T>
 bool
+test_2d_quad_quadrature(void)
+{
+    /* max degree to test: pay attention that setting degree k
+     * means testing up to degree 2*k, because we consider the
+     * monomial x^m y^n where m and n go from 0 to k. */
+    size_t max_test_degree = 10;
+    
+    /* max error in ULP */
+    T ULP_max = 10;
+    
+    /* triangle on which we integrate */
+    std::vector<point<T,2>> tp;
+    tp.resize(4);
+    tp[0] = point<T,2>({0,0});
+    tp[1] = point<T,2>({1,0});
+    tp[2] = point<T,2>({1,0.5});
+    tp[3] = point<T,2>({1,1});
+    
+    /* This is \int_0^1 \int_0^x x^m y^n dy dx */
+    auto analytic_integral = [](size_t degree_x, size_t degree_y) -> T {
+        return 1.0/((degree_y+1)*(degree_x+degree_y+2));
+    };
+    
+    auto monomial = [](const point<T,2>& pt, size_t m, size_t n) -> T {
+        return iexp_pow(pt.x(), m)*iexp_pow(pt.y(), n);
+    };
+    
+    bool success = true;
+    for (size_t m = 0; m <= max_test_degree; m++)
+    {
+        for (size_t n = 0; n <= max_test_degree; n++)
+        {
+            /* This is the function we are testing: see quad_bones.hpp */
+            auto qps = disk::priv::integrate_quadrangle_tens<T>(m+n+2, tp);
+            T int_num = 0.0;
+            for (auto& qp : qps)
+                int_num += qp.weight()*monomial(qp.point(),m,n);
+            
+            T int_ana = analytic_integral(m,n);
+            
+            if ( not almost_equal(int_ana, int_num, ULP_max) )
+            {
+                std::cout << "FAIL: m = " << m << ", n = " << n;
+                std::cout << " analytical value = " << std::setprecision(16) << int_ana;
+                std::cout << " numerical value = " << std::setprecision (16) << int_num;
+                std::cout << std::endl;
+                success = false;
+            }
+        }
+    }
+    
+    return success;
+}
+
+/* Test 2D quadrature for triangles */
+template<typename T>
+bool
 test_tetrahedron_quadrature(void)
 {
     /* max degree to test: pay attention that setting degree k
      * means testing up to degree 3*k, because we consider the
      * monomial x^m y^n z^k where m, n and k go from 0 to k. */
-    size_t max_test_degree = 3;
+    size_t max_test_degree = 5;
     
     /* max error in ULP */
-    T ULP_max = 6; /* ARBQ is fuckin' precise...use 6 here for it. */
+    T ULP_max = 12; /* ARBQ is fuckin' precise...use 12 here for it. */
     
     /* tetrahedron on which we integrate */
     std::array<point<T,3>,4> tp;
@@ -217,6 +274,7 @@ test_tetrahedron_quadrature(void)
     
     auto tv = std::abs( v0.dot(v1.cross(v2))/T(6) );
     
+    /* This is \int_0^1 \int_0^x \int_x^1 x^m y^n z^k dz dy dx */
     auto analytic_integral = [](size_t m, size_t n, size_t k) -> T {
         T a = 1./((k+1)*(n+1));
         T b = 1./(m+n+2);
@@ -282,6 +340,9 @@ int main(void)
     test_1d_driver("general driver", quadtype::DRIVER, ret);
 
     if (!test_2d_triangle_quadrature<double>())
+        ret = EXIT_FAILURE;
+    
+    if (!test_2d_quad_quadrature<double>())
         ret = EXIT_FAILURE;
     
     if (!test_tetrahedron_quadrature<double>())

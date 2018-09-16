@@ -42,6 +42,10 @@
 
 namespace disk {
 
+/* Golub-Welsch algorithm to get quadrature points on a line. Pay attention
+ * that this functions solves an eigenvalue problem each time you call it,
+ * so it is quite expensive. You should use the Gauss-Legendre quadrature
+ * defined below, which calls Golub-Welsch only when really needed. */
 template<typename T>
 std::vector<std::pair<point<T, 1>, T>>
 golub_welsch(const size_t degree)
@@ -87,6 +91,8 @@ golub_welsch(const size_t degree)
     return ret;
 }
 
+/* Gauss-Legendre 1D quadrature. Fall-back to Golub-Welsch if the required
+ * degree is too high. */
 template<typename T>
 std::vector<std::pair<point<T, 1>, T>>
 gauss_legendre(size_t degree)
@@ -166,12 +172,15 @@ gauss_legendre(size_t degree)
             ret.push_back(std::make_pair(qp, qw));
             return ret;
 
-        default: return golub_welsch<T>(degree);
+        default:
+            return golub_welsch<T>(degree);
     }
 
     return ret;
 }
 
+/* The client code should call this when a quadrature on the reference edge
+ * is required. In our case the reference edge is [-1,1]. */
 template<typename T>
 std::vector<std::pair<point<T, 1>, T>>
 edge_quadrature(const size_t doe)
@@ -179,6 +188,8 @@ edge_quadrature(const size_t doe)
     return gauss_legendre<T>(doe);
 }
 
+/* Tetrahedron quadrature. This is just a driver to call either ABRQ or GM
+ * quadrature rules in the jburkardt's code. */
 std::vector<std::pair<point<double,3>, double>>
 tetrahedron_quadrature(size_t degree)
 {
@@ -254,7 +265,8 @@ tetrahedron_quadrature(size_t degree)
     return ret;
 }
 
-
+/* Triangle quadrature. This is just a driver to call either Dunavant
+ * quadrature rule in the jburkardt's code. */
 std::vector<std::pair<point<double,2>, double>>
 triangle_quadrature(size_t order)
 {
@@ -289,7 +301,7 @@ triangle_quadrature(size_t order)
     return ret;
 }
 
-
+/* Quadrature for cartesian quadrangles, it is just tensorized Gauss points. */
 template<typename T>
 std::vector<std::pair<point<T, 2>, T>>
 quadrangle_quadrature(const size_t degree)
@@ -318,6 +330,8 @@ quadrangle_quadrature(const size_t degree)
     return ret;
 }
 
+/* This class represents a quadrature point, which is composed by the
+ * coordinates (method .point()) and the weight (method .weight()) */
 template<typename T, size_t DIM>
 class quadrature_point : private std::pair<point<T,DIM>, T>
 {
@@ -356,9 +370,11 @@ operator<<(std::ostream& os, const quadrature_point<T,DIM>& qp)
 }
 
 
-
+/* Private stuff to support quadratures. User should not rely on this stuff. */
 namespace priv {
 
+/* Get quadrature points for a triangle specified as a list of points. The
+ * list of points is contained in a STL random-access containter (PtA) */
 template<typename T, typename PtA>
 std::vector<disk::quadrature_point<T, 2>>
 integrate_triangle(size_t degree, const PtA& pts)
@@ -393,6 +409,8 @@ integrate_triangle(size_t degree, const PtA& pts)
     return ret;
 }
 
+/* Integrate using tensorized Gauss points on any quadrangle (not only
+ * cartesian quadrangles) */
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
 integrate_quadrangle_tens(size_t degree, const std::vector<point<T, 2>>& pts)
@@ -403,20 +421,31 @@ integrate_quadrangle_tens(size_t degree, const std::vector<point<T, 2>>& pts)
     ret.reserve(qps.size());
 
     auto P = [&](T xi, T eta) -> T {
-        return 0.25 * pts[0].x() * (1 - xi) * (1 - eta) + 0.25 * pts[1].x() * (1 + xi) * (1 - eta) +
-               0.25 * pts[2].x() * (1 + xi) * (1 + eta) + 0.25 * pts[3].x() * (1 - xi) * (1 + eta);
+        return 0.25 * pts[0].x() * (1 - xi) * (1 - eta) +
+               0.25 * pts[1].x() * (1 + xi) * (1 - eta) +
+               0.25 * pts[2].x() * (1 + xi) * (1 + eta) +
+               0.25 * pts[3].x() * (1 - xi) * (1 + eta);
     };
 
     auto Q = [&](T xi, T eta) -> T {
-        return 0.25 * pts[0].y() * (1 - xi) * (1 - eta) + 0.25 * pts[1].y() * (1 + xi) * (1 - eta) +
-               0.25 * pts[2].y() * (1 + xi) * (1 + eta) + 0.25 * pts[3].y() * (1 - xi) * (1 + eta);
+        return 0.25 * pts[0].y() * (1 - xi) * (1 - eta) +
+               0.25 * pts[1].y() * (1 + xi) * (1 - eta) +
+               0.25 * pts[2].y() * (1 + xi) * (1 + eta) +
+               0.25 * pts[3].y() * (1 - xi) * (1 + eta);
     };
 
     auto J = [&](T xi, T eta) -> T {
-        auto j11 = 0.25 * ((pts[1].x() - pts[0].x()) * (1 - eta) + (pts[2].x() - pts[3].x()) * (1 + eta));
-        auto j12 = 0.25 * ((pts[1].y() - pts[0].y()) * (1 - eta) + (pts[2].y() - pts[3].y()) * (1 + eta));
-        auto j21 = 0.25 * ((pts[3].x() - pts[0].x()) * (1 - xi) + (pts[2].x() - pts[1].x()) * (1 + xi));
-        auto j22 = 0.25 * ((pts[3].y() - pts[0].y()) * (1 - xi) + (pts[2].y() - pts[1].y()) * (1 + xi));
+        auto j11 = 0.25 * ( (pts[1].x() - pts[0].x()) * (1 - eta) +
+                            (pts[2].x() - pts[3].x()) * (1 + eta) );
+        
+        auto j12 = 0.25 * ( (pts[1].y() - pts[0].y()) * (1 - eta) +
+                            (pts[2].y() - pts[3].y()) * (1 + eta) );
+        
+        auto j21 = 0.25 * ( (pts[3].x() - pts[0].x()) * (1 - xi) +
+                            (pts[2].x() - pts[1].x()) * (1 + xi) );
+        
+        auto j22 = 0.25 * ( (pts[3].y() - pts[0].y()) * (1 - xi) +
+                            (pts[2].y() - pts[1].y()) * (1 + xi) );
 
         return std::abs(j11 * j22 - j12 * j21);
     };
