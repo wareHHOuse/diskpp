@@ -65,6 +65,7 @@ test_1d_quadrature(quadtype qt)
         return std::make_pair(p,w);
     };
     
+    /* This is \int_0^1 x^n dx */
     auto analytic_integral = [](size_t degree) -> T {
         return 1.0/(degree+1);
     };
@@ -74,7 +75,7 @@ test_1d_quadrature(quadtype qt)
     };
     
     auto get_quadrature = [](quadtype qt, size_t degree) -> auto {
-        /* Those are the functions we are testing: see quad_bones.hpp */
+        /* These are the functions we are testing: see quad_bones.hpp */
         if ( qt == quadtype::GOLUB_WELSCH )
             return disk::golub_welsch<T>(degree);
         
@@ -154,6 +155,7 @@ test_2d_triangle_quadrature(void)
     tp[1] = point<T,2>({1,0});
     tp[2] = point<T,2>({1,1});
     
+    /* This is \int_0^1 \int_0^x x^m y^n dy dx */
     auto analytic_integral = [](size_t degree_x, size_t degree_y) -> T {
         return 1.0/((degree_y+1)*(degree_x+degree_y+2));
     };
