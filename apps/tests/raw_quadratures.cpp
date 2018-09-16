@@ -189,6 +189,88 @@ test_2d_triangle_quadrature(void)
     return success;
 }
 
+/* Test 2D quadrature for triangles */
+template<typename T>
+bool
+test_tetrahedron_quadrature(void)
+{
+    /* max degree to test: pay attention that setting degree k
+     * means testing up to degree 3*k, because we consider the
+     * monomial x^m y^n z^k where m, n and k go from 0 to k. */
+    size_t max_test_degree = 3;
+    
+    /* max error in ULP */
+    T ULP_max = 6; /* ARBQ is fuckin' precise...use 6 here for it. */
+    
+    /* tetrahedron on which we integrate */
+    std::array<point<T,3>,4> tp;
+    tp[0] = point<T,3>({0,0,0});
+    tp[1] = point<T,3>({0,0,1});
+    tp[2] = point<T,3>({1,0,1});
+    tp[3] = point<T,3>({1,1,1});
+    
+    auto v0 = (tp[1] - tp[0]).to_vector();
+    auto v1 = (tp[2] - tp[0]).to_vector();
+    auto v2 = (tp[3] - tp[0]).to_vector();
+    
+    auto tv = std::abs( v0.dot(v1.cross(v2))/T(6) );
+    
+    auto analytic_integral = [](size_t m, size_t n, size_t k) -> T {
+        T a = 1./((k+1)*(n+1));
+        T b = 1./(m+n+2);
+        T c = 1./(m+n+k+3);
+        return a*(b-c);
+    };
+    
+    auto monomial = [](const point<T,3>& pt, size_t m, size_t n, size_t k) -> T {
+        return iexp_pow(pt.x(), m)*iexp_pow(pt.y(), n)*iexp_pow(pt.z(), k);
+    };
+    
+    auto transform = [&](const std::pair<point<T,3>, T>& rqp) -> auto {
+        auto p = rqp.first;
+        auto w = rqp.second;
+        auto rp = (tp[1] - tp[0]) * p.x() +
+                  (tp[2] - tp[0]) * p.y() +
+                  (tp[3] - tp[0]) * p.z() + tp[0];
+        
+        auto rw = w*tv;
+        
+        return std::make_pair(rp, rw);
+    };
+    
+    bool success = true;
+    for (size_t m = 0; m <= max_test_degree; m++)
+    {
+        for (size_t n = 0; n <= max_test_degree; n++)
+        {
+            for (size_t k = 0; k <= max_test_degree; k++)
+            {
+                /* This is the function we are testing: see quad_bones.hpp */
+                auto rqps = disk::tetrahedron_quadrature(m+n+k);
+                
+                T int_num = 0.0;
+                for (auto& rqp : rqps)
+                {
+                    auto qp = transform(rqp);
+                    int_num += qp.second*monomial(qp.first,m,n,k);
+                }
+                T int_ana = analytic_integral(m,n,k);
+            
+                if ( not almost_equal(int_ana, int_num, ULP_max) )
+                {
+                    std::cout << "FAIL: m = " << m << ", n = " << n << ", k = " << k;
+                    std::cout << " analytical value = " << std::setprecision(16) << int_ana;
+                    std::cout << " numerical value = " << std::setprecision (16) << int_num;
+                    std::cout << std::endl;
+                    success = false;
+                }
+            }
+        }
+    }
+    
+    return success;
+}
+
 int main(void)
 {
     int ret = EXIT_SUCCESS;
@@ -198,6 +280,9 @@ int main(void)
     test_1d_driver("general driver", quadtype::DRIVER, ret);
 
     if (!test_2d_triangle_quadrature<double>())
+        ret = EXIT_FAILURE;
+    
+    if (!test_tetrahedron_quadrature<double>())
         ret = EXIT_FAILURE;
     
     return ret;
