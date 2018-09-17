@@ -437,8 +437,10 @@ do_testing(std::vector<Mesh>& meshes, const Function& run_test,
                 std::cout << std::scientific << std::setprecision(5) << l2_errors.at(i) << "    ";
                 std::cout << std::defaultfloat << std::setprecision(3) << rate << "    ";
 
-                if ( rate < expected_rate(k)-0.5 || rate > expected_rate(k)+0.5 )
+                if ( rate < expected_rate(k)-0.5 )
                     std::cout << "[" << red << "FAIL" << nocolor << "]";
+                else if ( rate > expected_rate(k)+0.5 )
+                    std::cout << "[" << yellow << "FAIL" << nocolor << "]";
                 else
                     std::cout << "[" << green << " OK " << nocolor << "]";
 
