@@ -59,6 +59,9 @@ test_1d_quadrature(quadtype qt)
     size_t max_test_degree = 20; /* max degree to test */
     T ULP_max = 50; /* max error in ULP */
     
+    size_t failed_tests = 0;
+    size_t total_tests = 0;
+    
     auto transform = [](const std::pair<point<T, 1>, T>& qp) -> auto {
         point<T,1> p({0.5 + qp.first.x()/2.0});
         T w = 0.5*qp.second;
@@ -87,8 +90,6 @@ test_1d_quadrature(quadtype qt)
             
         throw std::invalid_argument("Unknown quadrature to test");
     };
-
-    bool success = true;
     
     for (size_t qd = 0; qd <= max_test_degree; qd++)
     {        
@@ -110,30 +111,43 @@ test_1d_quadrature(quadtype qt)
                 std::cout << " analytical value = " << std::setprecision(16) << int_ana;
                 std::cout << " numerical value = " << std::setprecision (16) << int_num;
                 std::cout << std::endl;
-                success = false;
+                
+                failed_tests++;
             }
+            
+            total_tests++;
         }
-    } 
-    
-    return success;
-}
-
-void
-test_1d_driver(const char *name, quadtype qt, int& status)
-{
-    std::string str_success = "[ \x1b[32mOK\x1b[0m ]";
-    std::string str_failure = "[\x1b[31mFAIL\x1b[0m]";
-    
-    std::cout << "Testing 1D " << name << ": ";
-    if ( not test_1d_quadrature<double>(qt) )
-    {
-        std::cout << str_failure << std::endl;
-        status = EXIT_FAILURE; 
     }
-    else
+    
+    std::string qt_string;
+    switch (qt)
     {
-        std::cout << str_success << std::endl;
+        case quadtype::GOLUB_WELSCH:
+            qt_string = "Golub-Welsch quadrature test:   ";
+            break;
+            
+        case quadtype::GAUSS_LEGENDRE:
+            qt_string = "Gauss-Legendre quadrature test: ";
+            break;
+            
+        case quadtype::DRIVER:
+            qt_string = "Driver function test:           ";
+            break;
     }
+    
+    std::cout << qt_string;
+    
+    if (failed_tests != 0)
+    {
+        std::cout << "[\x1b[31mFAIL\x1b[0m] (";
+        std::cout << failed_tests << "/" << total_tests << " tests failed)";
+        std::cout << std::endl;
+        return false;
+    }
+    
+    std::cout << "[ \x1b[32mOK\x1b[0m ] (" << total_tests << " tests passed)";
+    std::cout << std::endl;
+    return true;
 }
 
 /* Test 2D quadrature for triangles */
@@ -148,6 +162,9 @@ test_2d_triangle_quadrature(void)
     
     /* max error in ULP */
     T ULP_max = 100;
+    
+    size_t failed_tests = 0;
+    size_t total_tests = 0;
     
     /* triangle on which we integrate */
     std::array<point<T,2>,3> tp;
@@ -164,7 +181,6 @@ test_2d_triangle_quadrature(void)
         return iexp_pow(pt.x(), m)*iexp_pow(pt.y(), n);
     };
     
-    bool success = true;
     for (size_t m = 0; m <= max_test_degree; m++)
     {
         for (size_t n = 0; n <= max_test_degree; n++)
@@ -183,12 +199,25 @@ test_2d_triangle_quadrature(void)
                 std::cout << " analytical value = " << std::setprecision(16) << int_ana;
                 std::cout << " numerical value = " << std::setprecision (16) << int_num;
                 std::cout << std::endl;
-                success = false;
+                failed_tests++;
             }
+            
+            total_tests++;
         }
     }
     
-    return success;
+    std::cout << "Triangle quadrature test:       ";
+    if (failed_tests != 0)
+    {
+        std::cout << "[\x1b[31mFAIL\x1b[0m] (";
+        std::cout << failed_tests << "/" << total_tests << " tests failed)";
+        std::cout << std::endl;
+        return false;
+    }
+    
+    std::cout << "[ \x1b[32mOK\x1b[0m ] (" << total_tests << " tests passed)";
+    std::cout << std::endl;
+    return true;
 }
 
 /* Test 2D quadrature for triangles */
@@ -202,7 +231,10 @@ test_2d_quad_quadrature(void)
     size_t max_test_degree = 10;
     
     /* max error in ULP */
-    T ULP_max = 10;
+    T ULP_max = 50;
+    
+    size_t failed_tests = 0;
+    size_t total_tests = 0;
     
     /* triangle on which we integrate */
     std::vector<point<T,2>> tp;
@@ -221,7 +253,6 @@ test_2d_quad_quadrature(void)
         return iexp_pow(pt.x(), m)*iexp_pow(pt.y(), n);
     };
     
-    bool success = true;
     for (size_t m = 0; m <= max_test_degree; m++)
     {
         for (size_t n = 0; n <= max_test_degree; n++)
@@ -240,12 +271,24 @@ test_2d_quad_quadrature(void)
                 std::cout << " analytical value = " << std::setprecision(16) << int_ana;
                 std::cout << " numerical value = " << std::setprecision (16) << int_num;
                 std::cout << std::endl;
-                success = false;
+                failed_tests++;
             }
+            total_tests++;
         }
     }
+
+    std::cout << "Quad tensorized test:           ";
+    if (failed_tests != 0)
+    {
+        std::cout << "[\x1b[31mFAIL\x1b[0m] (";
+        std::cout << failed_tests << "/" << total_tests << " tests failed)";
+        std::cout << std::endl;
+        return false;
+    }
     
-    return success;
+    std::cout << "[ \x1b[32mOK\x1b[0m ] (" << total_tests << " tests passed)";
+    std::cout << std::endl;
+    return true;
 }
 
 /* Test 2D quadrature for triangles */
@@ -260,6 +303,9 @@ test_tetrahedron_quadrature(void)
     
     /* max error in ULP */
     T ULP_max = 12; /* ARBQ is fuckin' precise...use 12 here for it. */
+    
+    size_t failed_tests = 0;
+    size_t total_tests = 0;
     
     /* tetrahedron on which we integrate */
     std::array<point<T,3>,4> tp;
@@ -298,7 +344,6 @@ test_tetrahedron_quadrature(void)
         return std::make_pair(rp, rw);
     };
     
-    bool success = true;
     for (size_t m = 0; m <= max_test_degree; m++)
     {
         for (size_t n = 0; n <= max_test_degree; n++)
@@ -322,30 +367,49 @@ test_tetrahedron_quadrature(void)
                     std::cout << " analytical value = " << std::setprecision(16) << int_ana;
                     std::cout << " numerical value = " << std::setprecision (16) << int_num;
                     std::cout << std::endl;
-                    success = false;
+                    failed_tests++;
                 }
+                total_tests++;
             }
         }
     }
     
-    return success;
+    std::cout << "Tetrahedron quadrature test:    ";
+    if (failed_tests != 0)
+    {
+        std::cout << "[\x1b[31mFAIL\x1b[0m] (";
+        std::cout << failed_tests << "/" << total_tests << " tests failed)";
+        std::cout << std::endl;
+        return false;
+    }
+    
+    std::cout << "[ \x1b[32mOK\x1b[0m ] (" << total_tests << " tests passed)";
+    std::cout << std::endl;
+    return true;
 }
 
 int main(void)
 {
+    using T = double;
+    
     int ret = EXIT_SUCCESS;
 
-    test_1d_driver("Golub-Welsch", quadtype::GOLUB_WELSCH, ret);
-    test_1d_driver("Gauss-Legendre", quadtype::GAUSS_LEGENDRE, ret);
-    test_1d_driver("general driver", quadtype::DRIVER, ret);
+    if ( !test_1d_quadrature<T>(quadtype::GOLUB_WELSCH) )
+        ret = EXIT_FAILURE;
+    
+    if ( !test_1d_quadrature<T>(quadtype::GAUSS_LEGENDRE) )
+        ret = EXIT_FAILURE;
+        
+    if ( !test_1d_quadrature<T>(quadtype::DRIVER) )
+        ret = EXIT_FAILURE;
 
-    if (!test_2d_triangle_quadrature<double>())
+    if (!test_2d_triangle_quadrature<T>())
         ret = EXIT_FAILURE;
     
-    if (!test_2d_quad_quadrature<double>())
+    if (!test_2d_quad_quadrature<T>())
         ret = EXIT_FAILURE;
     
-    if (!test_tetrahedron_quadrature<double>())
+    if (!test_tetrahedron_quadrature<T>())
         ret = EXIT_FAILURE;
     
     return ret;
