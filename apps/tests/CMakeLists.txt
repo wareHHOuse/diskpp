@@ -31,3 +31,7 @@ target_link_libraries(basis_quadratures ${LINK_LIBS})
 
 add_executable(raw_quadratures raw_quadratures.cpp)
 target_link_libraries(raw_quadratures ${LINK_LIBS})
+
+add_executable(quadratures_on_mesh quadratures_on_mesh.cpp)
+target_link_libraries(quadratures_on_mesh ${LINK_LIBS})
+

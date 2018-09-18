@@ -50,6 +50,7 @@ template<typename T>
 std::vector<std::pair<point<T, 1>, T>>
 golub_welsch(const size_t degree)
 {
+    using namespace Eigen;
     typedef Matrix<T, Dynamic, Dynamic>    matrix_type;
     std::vector<std::pair<point<T, 1>, T>> ret;
 
@@ -265,31 +266,29 @@ tetrahedron_quadrature(size_t degree)
     return ret;
 }
 
-/* Triangle quadrature. This is just a driver to call either Dunavant
+
+/* Triangle quadrature. This is just a driver to call Dunavant
  * quadrature rule in the jburkardt's code. */
 std::vector<std::pair<point<double,2>, double>>
-triangle_quadrature(size_t order)
+triangle_quadrature(size_t degree)
 {
     std::vector<std::pair<point<double,2>, double>> ret;
 
-    int rule_num = dunavant_rule_num();
-    int rule, order_num, degree;
+    if ( degree == 0 )
+        degree++;
 
-    for(rule = 1; rule <= rule_num; rule++)
-    {
-        degree = dunavant_degree(rule);
-        if(degree >= order)
-            break;
-    }
-    assert(rule != rule_num or degree >= order);
+    int max_degree = dunavant_rule_num();
 
-    order_num = dunavant_order_num(rule);
-    std::vector<double> xytab(2*order_num), wtab(order_num);
+    if ( degree > max_degree )
+        throw std::invalid_argument("Degree too high");
 
-    dunavant_rule(rule, order_num, &xytab[0], &wtab[0]);
+    int num_points = dunavant_order_num(degree);
+    std::vector<double> xytab(2*num_points), wtab(num_points);
 
-    ret.reserve( order_num );
-    for(int iQN = 0; iQN < order_num; iQN++)
+    dunavant_rule(degree, num_points, &xytab[0], &wtab[0]);
+
+    ret.reserve( num_points );
+    for(int iQN = 0; iQN < num_points; iQN++)
     {
         point<double,2> xQN;
         xQN.at(0) = xytab[0+iQN*2];
@@ -373,14 +372,77 @@ operator<<(std::ostream& os, const quadrature_point<T,DIM>& qp)
 /* Private stuff to support quadratures. User should not rely on this stuff. */
 namespace priv {
 
+/* See Ern & Guermond - Theory and practice of FEM, pag 360. */
+/*
+template<typename T>
+std::vector<quadrature_point<T,2>>
+triangle_quadrature_low_order(const point<T,2>& p0,
+                              const point<T,2>& p1, 
+                              const point<T,2>& p2, size_t deg)
+{
+    std::vector<quadrature_point<T,2>>   ret;
+    auto v0 = p1 - p0;
+    auto v1 = p2 - p0;
+    auto area = std::abs( (v0.x() * v1.y() - v0.y() * v1.x())/2.0 );
+    point<T,2>      qp;
+    T               qw;
+    T               a1 = (6. - std::sqrt(15.)) / 21;
+    T               a2 = (6. + std::sqrt(15.)) / 21;
+    T               w1 = (155. - std::sqrt(15.)) / 1200;
+    T               w2 = (155. + std::sqrt(15.)) / 1200;
+    switch(deg)
+    {
+        case 0:
+        case 1:
+            qw = area;
+            qp = (p0 + p1 + p2)/3;      ret.push_back( make_qp(qp, qw) );
+            return ret;
+        case 2:
+            qw = area/3;
+            qp = p0/6 + p1/6 + 2*p2/3;  ret.push_back( make_qp(qp, qw) );
+            qp = p0/6 + 2*p1/3 + p2/6;  ret.push_back( make_qp(qp, qw) );
+            qp = 2*p0/3 + p1/6 + p2/6;  ret.push_back( make_qp(qp, qw) );
+            return ret;
+        case 3:
+            qw = 9*area/20;
+            qp = (p0 + p1 + p2)/3;      ret.push_back( make_qp(qp, qw) );
+            qw = 2*area/15;
+            qp = (p0 + p1)/2;           ret.push_back( make_qp(qp, qw) );
+            qp = (p0 + p2)/2;           ret.push_back( make_qp(qp, qw) );
+            qp = (p1 + p2)/2;           ret.push_back( make_qp(qp, qw) );
+            qw = area/20;
+            qp = p0;                    ret.push_back( make_qp(qp, qw) );
+            qp = p1;                    ret.push_back( make_qp(qp, qw) );
+            qp = p2;                    ret.push_back( make_qp(qp, qw) );
+            return ret;
+        case 4:
+        case 5:
+            qw = 9*area/40;
+            qp = (p0 + p1 + p2)/3;      ret.push_back( make_qp(qp, qw) );
+            qw = w1 * area;
+            qp = a1*p0 + a1*p1 + (1-2*a1)*p2;   ret.push_back( make_qp(qp, qw) );
+            qp = a1*p0 + (1-2*a1)*p1 + a1*p2;   ret.push_back( make_qp(qp, qw) );
+            qp = (1-2*a1)*p0 + a1*p1 + a1*p2;   ret.push_back( make_qp(qp, qw) );
+            qw = w2 * area;
+            qp = a2*p0 + a2*p1 + (1-2*a2)*p2;   ret.push_back( make_qp(qp, qw) );
+            qp = a2*p0 + (1-2*a2)*p1 + a2*p2;   ret.push_back( make_qp(qp, qw) );
+            qp = (1-2*a2)*p0 + a2*p1 + a2*p2;   ret.push_back( make_qp(qp, qw) );
+            return ret;
+            
+        default:
+            throw std::invalid_argument("Triangle quadrature: requested order too high");
+    }
+    return ret;
+}
+*/
 /* Get quadrature points for a triangle specified as a list of points. The
  * list of points is contained in a STL random-access containter (PtA) */
 template<typename T, typename PtA>
 std::vector<disk::quadrature_point<T, 2>>
 integrate_triangle(size_t degree, const PtA& pts)
 {
+    degree += 2;
     assert(pts.size() == 3);
-
     static_assert(std::is_same<typename PtA::value_type, point<T, 2>>::value, "This function is for 2D points");
 
     using quadpoint_type = disk::quadrature_point<T, 2>;

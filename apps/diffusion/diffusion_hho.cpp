@@ -13,6 +13,8 @@
 #include "methods/hho"
 #include "solvers/solver.hpp"
 
+#include "../tests/common.hpp"
+
 /***************************************************************************/
 /* RHS definition */
 template<typename Mesh>
@@ -100,12 +102,12 @@ auto make_solution_function(const Mesh& msh)
 using namespace disk;
 
 template<typename Mesh>
-void
-run_hho_diffusion_solver(const Mesh& msh)
+typename Mesh::scalar_type
+run_hho_diffusion_solver(const Mesh& msh, size_t degree)
 {
     using T = typename Mesh::scalar_type;
 
-    size_t degree = 0;
+    //size_t degree = 0;
 
     hho_degree_info hdi(degree);
 
@@ -130,19 +132,19 @@ run_hho_diffusion_solver(const Mesh& msh)
     size_t systsz = assembler.LHS.rows();
     size_t nnz = assembler.LHS.nonZeros();
 
-    std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
-    std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
-    std::cout << "Dofs: " << systsz << std::endl;
+    //std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
+    //std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
+    //std::cout << "Dofs: " << systsz << std::endl;
 
     dynamic_vector<T> sol = dynamic_vector<T>::Zero(systsz);
 
     disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = true;
+    pparams.report_factorization_Mflops = false;
     mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
 
     T error = 0.0;
 
-    std::ofstream ofs("sol.dat");
+    //std::ofstream ofs("sol.dat");
 
     for (auto& cl : msh)
     {
@@ -163,26 +165,48 @@ run_hho_diffusion_solver(const Mesh& msh)
         auto diff = realsol - fullsol;
         error += diff.dot(A*diff);
 
-        auto bar = barycenter(msh, cl);
+        //auto bar = barycenter(msh, cl);
 
-        for (size_t i = 0; i < Mesh::dimension; i++)
-            ofs << bar[i] << " ";
-        ofs << fullsol(0) << std::endl;
+        //for (size_t i = 0; i < Mesh::dimension; i++)
+        //    ofs << bar[i] << " ";
+        //ofs << fullsol(0) << std::endl;
 
     }
 
-    std::cout << std::sqrt(error) << std::endl;
+    //std::cout << std::sqrt(error) << std::endl;
 
-    ofs.close();
+    //ofs.close();
+
+    return std::sqrt(error);
 }
+
+
+template<typename Mesh>
+struct test_functor
+{
+    /* Expect k+1 convergence (hho stabilization, energy norm) */
+    typename Mesh::scalar_type
+    operator()(const Mesh& msh, size_t degree) const
+    {
+        return run_hho_diffusion_solver(msh, degree);
+    }
+
+    size_t
+    expected_rate(size_t k)
+    {
+        return k+1;
+    }
+};
+
 
 template<typename Mesh>
 void
 run_diffusion_solver(const Mesh& msh)
 {
-    run_hho_diffusion_solver(msh);
+    run_hho_diffusion_solver(msh, 0);
 }
 
+#if 0
 int main(int argc, char **argv)
 {
     using T = double;
@@ -245,5 +269,12 @@ int main(int argc, char **argv)
         return 0;
     }
     */
+}
+#endif
 
+int main(void)
+{
+    tester<test_functor> tstr;
+    tstr.run();
+    return 0;
 }

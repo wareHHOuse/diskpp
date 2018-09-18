@@ -34,6 +34,20 @@
 const size_t MIN_TEST_DEGREE = 0;
 const size_t MAX_TEST_DEGREE = 3;
 
+using namespace Eigen;
+
+template<class T>
+typename std::enable_if<!std::numeric_limits<T>::is_integer, bool>::type
+    almost_equal(T x, T y, T ulp)
+{
+    // the machine epsilon has to be scaled to the magnitude of the values used
+    // and multiplied by the desired precision in ULPs (units in the last place)
+    return std::abs(x-y) <= std::numeric_limits<T>::epsilon() * std::abs(x+y) * ulp
+    // unless the result is subnormal
+           || std::abs(x-y) < std::numeric_limits<T>::min();
+}
+
+
 /*****************************************************************************************/
 template<typename Mesh>
 struct scalar_testing_function;

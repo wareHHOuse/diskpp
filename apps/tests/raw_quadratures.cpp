@@ -33,17 +33,6 @@
 
 #include "common.hpp"
 
-template<class T>
-typename std::enable_if<!std::numeric_limits<T>::is_integer, bool>::type
-    almost_equal(T x, T y, T ulp)
-{
-    // the machine epsilon has to be scaled to the magnitude of the values used
-    // and multiplied by the desired precision in ULPs (units in the last place)
-    return std::abs(x-y) <= std::numeric_limits<T>::epsilon() * std::abs(x+y) * ulp
-    // unless the result is subnormal
-           || std::abs(x-y) < std::numeric_limits<T>::min();
-}
-
 enum class quadtype
 {
     GOLUB_WELSCH,
@@ -158,7 +147,7 @@ test_2d_triangle_quadrature(void)
     /* max degree to test: pay attention that setting degree k
      * means testing up to degree 2*k, because we consider the
      * monomial x^m y^n where m and n go from 0 to k. */
-    size_t max_test_degree = 10;
+    size_t max_test_degree = 8;
     
     /* max error in ULP */
     T ULP_max = 100;
