@@ -189,10 +189,10 @@ measure(const simplicial_mesh<T, 2>& msh,
     auto pts = points(msh, cl);
     assert(pts.size() == 3);
 
-    auto v0 = (pts[1] - pts[0]).to_vector();
-    auto v1 = (pts[2] - pts[0]).to_vector();
-
-    return cross(v0, v1).norm()/T(2);
+    auto d0 = (pts[1] - pts[0]);
+    auto d1 = (pts[2] - pts[0]);
+    
+    return std::abs(d0.x()*d1.y() - d1.x()*d0.y())/T(2);
 }
 
 template<typename T>

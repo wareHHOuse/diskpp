@@ -47,6 +47,17 @@ test_integration_on_mesh(const Mesh<T, 2, Storage>& msh)
         return iexp_pow(pt.x(), m)*iexp_pow(pt.y(), n);
     };
     
+    T area = 0.0;
+    for (auto& cl : msh)
+        area += measure(msh, cl);
+    
+    if ( !almost_equal(area, 1.0, 2.0/* Max 2ULP for area */) )
+    {
+        std::cout << bold << magenta << "  Area not computed accurately: ";
+        std::cout << std::setprecision(16) << area << reset << std::endl; 
+        //return false;
+    }
+    
     for (size_t m = 0; m < max_test_degree; m++)
     {
         for (size_t n = 0; n < max_test_degree; n++)
@@ -97,6 +108,17 @@ test_integration_on_mesh(const Mesh<T, 3, Storage>& msh)
         return iexp_pow(pt.x(), m)*iexp_pow(pt.y(), n)*iexp_pow(pt.z(), k);
     };
     
+    T volume = 0.0;
+    for (auto& cl : msh)
+        volume += measure(msh, cl);
+    
+    if ( !almost_equal(volume, 1.0, 2.0/* Max 2ULP for volume */) )
+    {
+        std::cout << bold << magenta << "  Volume not computed accurately: ";
+        std::cout << std::setprecision(16) << volume << reset << std::endl; 
+        //return false;
+    }
+    
     for (size_t m = 0; m < max_test_degree; m++)
     {
         for (size_t n = 0; n < max_test_degree; n++)
@@ -145,8 +167,10 @@ void test(const T& meshes)
 
 int main(void)
 {
-    std::cout << bold << yellow << "Testing triangular meshes" << reset << std::endl;
+    std::cout << bold << yellow << "Testing triangular meshes (generic)" << reset << std::endl;
     test( get_triangle_generic_meshes<double>() );
+    std::cout << bold << yellow << "Testing triangular meshes (netgen)" << reset << std::endl;
+    test( get_triangle_netgen_meshes<double>() );
     std::cout << bold << yellow << "Testing quad meshes" << reset << std::endl;
     test( get_quad_generic_meshes<double>() );
     std::cout << bold << yellow << "Testing polygonal meshes" << reset << std::endl;
