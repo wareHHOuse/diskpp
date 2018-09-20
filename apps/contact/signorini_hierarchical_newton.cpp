@@ -38,7 +38,7 @@
 #include "revolution/methods/hho"
 #include "mesh/mesh_hierarchy.hpp"
 
-#include "output/silo.hpp"
+//#include "output/silo.hpp"
 
 #include "contrib/sol2/sol.hpp"
 #include "contrib/timecounter.h"
@@ -46,9 +46,10 @@
 
 #include "core/output/hdf5_io.hpp"
 
- #include "common.hpp"
+// #include "common.hpp"
 
- #include "solvers/solver.hpp"
+// #include "solvers/solver.hpp"
+ #include "signorini_newton_solver_new.hpp"
 
 template<typename T>
 class hierarchical_contact_solver
@@ -104,12 +105,15 @@ class hierarchical_contact_solver
 
     	std::string     input_mesh  = lua["config"]["input_mesh"];
 
+        std::cout << "input_mesh: " << input_mesh << std::endl;
+
         size_t hho_degree_cell          = lua["config"]["degree_cell"].get_or(0);
         size_t hho_degree_face          = lua["config"]["degree_face"].get_or(0);
 
         hdi = hho_degree_info(hho_degree_cell, hho_degree_face);
 
         hierarchy_levels    = lua["hs"]["levels"].get_or(4);
+        std::cout << "hierarchy_levels : "<< hierarchy_levels << std::endl;
         sol_level_min       = lua["hs"]["sol_level_min"].get_or(0);
         sol_level_max       = lua["hs"]["sol_level_max"].get_or(0);
 
@@ -125,13 +129,16 @@ class hierarchical_contact_solver
             fem_theta     = 1;
         }
 
-        auto EXP_GAMMA    = lua["hs"]["fem_gamma"].get_or(0);
+        T EXP_GAMMA    = lua["hs"]["fem_gamma"].get_or(0);
         if (EXP_GAMMA >= 0 && EXP_GAMMA < 10)
-            fem_gamma_0 = std::pow(10, -EXP_GAMMA);
+        {
+            fem_gamma_0 = std::pow(10, EXP_GAMMA);
+        }
         else
         {
-            std::cout << "Invalid gamma exponent. Falling back to 1" << std::endl;
-            fem_gamma_0 = 0.1;
+            std::cout << "EXP_GAMMA : "<< EXP_GAMMA << std::endl;
+            std::cout << "Invalid gamma exponent. Falling back to 100" << std::endl;
+            fem_gamma_0 = 100;
         }
 
         std::cout << "fem gamma = "<< fem_gamma_0 << std::endl;
@@ -150,11 +157,12 @@ class hierarchical_contact_solver
 
         auto HEXP_GAMMA    = lua["hs"]["hho_gamma"].get_or(0);
         if (HEXP_GAMMA >= 0 && HEXP_GAMMA < 10)
-            hho_gamma_0 = std::pow(10, - HEXP_GAMMA);
+            hho_gamma_0 = std::pow(10, HEXP_GAMMA);
         else
         {
-            std::cout << "Invalid gamma exponent. Falling back to 1" << std::endl;
-            hho_gamma_0 = 0.1;
+            std::cout << "HEXP_GAMMA : "<< HEXP_GAMMA << std::endl;
+            std::cout << "Invalid gamma exponent. Falling back to 100" << std::endl;
+            hho_gamma_0 = 100;
         }
 
         std::cout << "hho gamma = "<< hho_gamma_0 << std::endl;
@@ -169,7 +177,7 @@ class hierarchical_contact_solver
         else
         {
             std::cout << "Invalid tolerance. Falling back to tol = 1.e-8" << std::endl;
-            fem_tolerance = 1.e-8;
+            fem_tolerance = 1.e-10;
         }
 
 
@@ -359,11 +367,15 @@ class hierarchical_contact_solver
 
             e_gx = e_gx + diff_gx;
 
-            std::cout << "error ( "<< iter<<") :    "<< errord << std::endl;
             //if(errord/erroru < tolerance)
             if(errord < fem_tolerance)
+            {
+                std::cout <<  iter << "  " << errord << std::endl;
                 break;
+            }
         }
+
+        save_data(e_gx, "hier_fem_ref_solution.dat");
 
         std::ofstream ofs("hier_fem_ref.dat");
 
@@ -388,11 +400,14 @@ class hierarchical_contact_solver
     }
 
     auto
-    hho_newton_solver(const mesh_type& msh, const size_t level)
+    hho_newton_solver_faces(const mesh_type& msh, const size_t level)
     {
-        std::cout << "Solver : Generalized Newton" << std::endl;
-        std::cout << "Theta  : "<< hho_theta << std::endl;
-        std::cout << "Gamma0 : "<< hho_gamma_0 << std::endl;
+        std::cout << "Solver : Generalized Newton on faces with ";
+        std::cout << "Theta  = "<< hho_theta << "  and  ";
+        std::cout << "Gamma0 = "<< 2 *( level + 1) * hho_gamma_0 << std::endl;
+        std::cout << "degree_face = "<< hdi.face_degree() << std::endl;
+        std::cout << "degree_cell = "<< hdi.cell_degree() << std::endl;
+
 
         auto pair = set_test1(msh);
         auto bnd = pair.second;
@@ -467,6 +482,8 @@ class hierarchical_contact_solver
             disk::solvers::pardiso_params<T> pparams;
             pparams.report_factorization_Mflops = true;
             mkl_pardiso(pparams, assembler.LHS, assembler.RHS, dsol);
+
+            dump_sparse_matrix(assembler.LHS , "Ahier_mat" + tostr(level) +".dat");
 
             T error = 0.0 ;
 
@@ -549,7 +566,292 @@ public:
 		init(config_fn);
 	}
 
-    void run_hho(size_t level,
+    void run_hho_cells(size_t level,
+                 const disk::simplicial_mesh<T,2>& ref_msh,
+                 const disk::simplicial_mesh<T,2>& sol_msh)
+    {
+        algorithm_parameters<T> ap;
+        ap.theta   = hho_theta;
+        ap.gamma_0 = hho_gamma_0;
+        ap.solver  = EVAL_IN_CELLS_FULL;
+
+        auto pair = set_test1(sol_msh);
+        auto bnd = pair.second;
+        auto f = pair.first;
+
+        //Solve newton
+        full_sol = solve_cells_full(sol_msh, f, ap, bnd);
+
+
+        std::vector<T> fem_grad_x, fem_grad_y, hho_grad_x, hho_grad_y;
+        fem_grad_x.reserve( ref_msh.cells_size() );
+        fem_grad_y.reserve( ref_msh.cells_size() );
+        hho_grad_x.reserve( ref_msh.cells_size() );
+        hho_grad_y.reserve( ref_msh.cells_size() );
+
+        size_t num_cell_dofs = scalar_basis_size(hdi.cell_degree(), 2);
+        size_t num_face_dofs = scalar_basis_size(hdi.face_degree(), 1);
+
+        std::vector<dynamic_vector<T>> rec_sols;
+
+        auto offset_vector = full_offset(sol_msh, hdi);
+
+        save_data(offset_vector, "ofs_ext.data");
+
+        auto is_contact_vector = make_is_contact_vector(sol_msh, bnd);
+        size_t sol_cl_count = 0;
+
+        for (auto& sol_cl : sol_msh)
+        {
+            auto cell_ofs = offset_vector.at(sol_cl_count);
+            auto num_total_dofs = num_cell_dofs + 3 * num_face_dofs;
+            hho_vector  sol_ufull = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
+
+            if (is_contact_vector.at(sol_cl_count) == 1)
+            {
+                auto gr = make_hho_contact_scalar_laplacian(sol_msh, sol_cl, hdi, bnd);
+                rec_sols.push_back( gr.first * sol_ufull );
+            }
+            else
+            {
+                auto gr = make_hho_scalar_laplacian(sol_msh, sol_cl, hdi);
+                rec_sols.push_back( gr.first * sol_ufull );
+            }
+
+            sol_cl_count++;
+        }
+
+        T H1_error = 0.0; T L2_error = 0.0; T Linf_error = 0.0;
+        size_t cell_i = 0;
+        for (auto& ref_cl : ref_msh)
+        {
+            auto cfem_dphi = disk::cfem::eval_basis_grad(ref_msh, ref_cl);
+            auto ptids = ref_cl.point_ids();
+
+            Eigen::Matrix<T,1,2> fem_grad = Eigen::Matrix<T,1,2>::Zero();
+            for (size_t i = 0; i < 3; i++)
+                fem_grad += e_gx(ptids[i]) * cfem_dphi.block(i,0,1,2);
+
+
+            fem_grad_x.push_back( fem_grad(0) );
+            fem_grad_y.push_back( fem_grad(1) );
+
+            /* find parent cell */
+            auto bar = barycenter(ref_msh, ref_cl);
+            size_t sol_cl_ofs = mesh_hier.locate_point(bar, level);
+            auto sol_cl = *std::next(sol_msh.cells_begin(), sol_cl_ofs);
+
+            /*hho*/
+
+            auto sol_cl_id = sol_msh.lookup(sol_cl);
+            auto cell_ofs = offset_vector.at(sol_cl_id);
+            auto num_total_dofs = num_cell_dofs + 3 * num_face_dofs;
+            hho_vector  sol_ufull = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
+
+            dynamic_vector<T> rec_sol = rec_sols.at(sol_cl_ofs);
+
+            auto sol_cb = make_scalar_monomial_basis(sol_msh, sol_cl, hdi.reconstruction_degree());
+            auto qps = integrate(ref_msh, ref_cl, 2 * (std::max(hdi.face_degree(), hdi.cell_degree())));
+            for (auto& qp : qps)
+            {
+                auto hho_dphi = sol_cb.eval_gradients(qp.point());
+
+                Eigen::Matrix<T,1,2> hho_grad = Eigen::Matrix<T,1,2>::Zero();
+                for (size_t i = 1; i < sol_cb.size(); i++)
+                    hho_grad += rec_sol(i-1) * hho_dphi.block(i,0,1,2);
+
+                auto hho_phi = sol_cb.eval_functions(qp.point());
+
+                T hho_ucell = sol_ufull(0);
+                for (size_t i = 1; i < sol_cb.size(); i++)
+                    hho_ucell += rec_sol(i-1) * hho_phi(i,0);
+
+                Eigen::Matrix<T,1,2> diff = hho_grad - fem_grad;
+
+
+                T fem_cell = 0.;
+                Eigen::Matrix<T,Eigen::Dynamic,1> cfem_phi = disk::cfem::eval_basis(ref_msh, ref_cl, qp.point());
+                for (size_t i = 0; i < 3; i++)
+                    fem_cell += e_gx(ptids[i]) * cfem_phi(i,0);
+
+                T ucell = hho_ucell - fem_cell;
+
+                H1_error += qp.weight() * diff.dot(diff);
+                L2_error += qp.weight() * ucell * ucell;
+            }
+
+            {
+                auto hho_dphi = sol_cb.eval_gradients(bar);
+
+                Eigen::Matrix<T,1,2> hho_grad = Eigen::Matrix<T,1,2>::Zero();
+                for (size_t i = 1; i < sol_cb.size(); i++)
+                    hho_grad += rec_sol(i-1) * hho_dphi.block(i,0,1,2);
+
+                hho_grad_x.push_back( hho_grad(0) );
+                hho_grad_y.push_back( hho_grad(1) );
+            }
+
+            cell_i++;
+        }
+
+        disk::silo_zonal_variable<T> rgx("ref_grad_x", fem_grad_x);
+        silo_db.add_variable("refmesh", rgx);
+        disk::silo_zonal_variable<T> rgy("ref_grad_y", fem_grad_y);
+        silo_db.add_variable("refmesh", rgy);
+
+        disk::silo_zonal_variable<T> sgx("sol_grad_x", hho_grad_x);
+        silo_db.add_variable("refmesh", sgx);
+        disk::silo_zonal_variable<T> sgy("sol_grad_y", hho_grad_y);
+        silo_db.add_variable("refmesh", sgy);
+
+        std::cout << "(H1, L2): " << std::sqrt(H1_error);
+        std::cout << "  -  " << std::sqrt(L2_error) << std::endl;
+
+        std::ofstream efs("hier_hho__solution_H"+ tostr(level) + ".dat");
+        if(!efs.is_open())
+            std::cout<< "Error opening file"<<std::endl;
+
+        auto cl_count = 0;
+        for(auto& cl : sol_msh)
+        {
+            auto num_total_dofs = num_cell_dofs + howmany_faces(sol_msh, cl) * num_face_dofs;
+            auto cell_ofs = offset_vector.at(cl_count++);
+            hho_vector u_bar = full_sol.block(cell_ofs, 0, 1, 1);
+            auto bar = barycenter(sol_msh, cl);
+
+            efs << bar.x() << " " << bar.y() <<" "<< u_bar(0) << std::endl;
+        }
+
+
+        efs.close();
+
+    }
+
+    void run_hho_faces(size_t level,
+                 const disk::simplicial_mesh<T,2>& ref_msh,
+                 const disk::simplicial_mesh<T,2>& sol_msh)
+    {
+        using namespace revolution;
+
+        std::cout << green << "Computed solution, HHO" << reset << std::endl;
+        std::cout << "Mesh size: " << average_diameter(sol_msh) << std::endl;
+        hho_newton_solver_faces(sol_msh, level);
+
+        std::vector<T> fem_grad_x, fem_grad_y, hho_grad_x, hho_grad_y;
+        fem_grad_x.reserve( ref_msh.cells_size() );
+        fem_grad_y.reserve( ref_msh.cells_size() );
+        hho_grad_x.reserve( ref_msh.cells_size() );
+        hho_grad_y.reserve( ref_msh.cells_size() );
+
+        size_t num_cell_dofs = scalar_basis_size(hdi.cell_degree(), 2);
+        size_t num_face_dofs = scalar_basis_size(hdi.face_degree(), 1);
+
+        std::vector<dynamic_vector<T>> rec_sols;
+
+        auto offset_vector = full_offset(sol_msh, hdi);
+
+        size_t sol_cl_count = 0;
+        for (auto& sol_cl : sol_msh)
+        {
+            auto gr = make_hho_scalar_laplacian(sol_msh, sol_cl, hdi);
+
+            auto cell_ofs = offset_vector.at(sol_cl_count);
+            auto num_total_dofs = num_cell_dofs + 3 * num_face_dofs;
+            hho_vector  sol_ufull = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
+
+            rec_sols.push_back( gr.first * sol_ufull );
+            sol_cl_count++;
+        }
+
+        T H1_error = 0.0; T L2_error = 0.0; T Linf_error = 0.0;
+        size_t cell_i = 0;
+        for (auto& ref_cl : ref_msh)
+        {
+            auto cfem_dphi = disk::cfem::eval_basis_grad(ref_msh, ref_cl);
+            auto ptids = ref_cl.point_ids();
+
+            Eigen::Matrix<T,1,2> fem_grad = Eigen::Matrix<T,1,2>::Zero();
+            for (size_t i = 0; i < 3; i++)
+                fem_grad += e_gx(ptids[i]) * cfem_dphi.block(i,0,1,2);
+
+
+            fem_grad_x.push_back( fem_grad(0) );
+            fem_grad_y.push_back( fem_grad(1) );
+
+            /* find parent cell */
+            auto bar = barycenter(ref_msh, ref_cl);
+            size_t sol_cl_ofs = mesh_hier.locate_point(bar, level);
+            auto sol_cl = *std::next(sol_msh.cells_begin(), sol_cl_ofs);
+
+
+            /*hho*/
+
+            auto sol_cl_id = sol_msh.lookup(sol_cl);
+            auto cell_ofs = offset_vector.at(sol_cl_id);
+            auto num_total_dofs = num_cell_dofs + 3 * num_face_dofs;
+            hho_vector  sol_ufull = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
+
+            dynamic_vector<T> rec_sol = rec_sols.at(sol_cl_ofs);
+
+            auto sol_cb = make_scalar_monomial_basis(sol_msh, sol_cl, hdi.reconstruction_degree());
+            auto qps = integrate(ref_msh, ref_cl, 2 * (std::max(hdi.face_degree(), hdi.cell_degree())));
+            for (auto& qp : qps)
+            {
+                auto hho_dphi = sol_cb.eval_gradients(qp.point());
+
+                Eigen::Matrix<T,1,2> hho_grad = Eigen::Matrix<T,1,2>::Zero();
+                for (size_t i = 1; i < sol_cb.size(); i++)
+                    hho_grad += rec_sol(i-1) * hho_dphi.block(i,0,1,2);
+
+                auto hho_phi = sol_cb.eval_functions(qp.point());
+
+                T hho_ucell = sol_ufull(0);
+                for (size_t i = 1; i < sol_cb.size(); i++)
+                    hho_ucell += rec_sol(i-1) * hho_phi(i,0);
+
+                Eigen::Matrix<T,1,2> diff = hho_grad - fem_grad;
+
+                T fem_cell = 0.;
+                Eigen::Matrix<T,Eigen::Dynamic,1> cfem_phi = disk::cfem::eval_basis(ref_msh, ref_cl, qp.point());
+                for (size_t i = 0; i < 3; i++)
+                    fem_cell += e_gx(ptids[i]) * cfem_phi(i,0);
+
+                T ucell = hho_ucell - fem_cell;
+
+                H1_error += qp.weight() * diff.dot(diff);
+                L2_error += qp.weight() * ucell * ucell;
+            }
+
+            {
+                auto hho_dphi = sol_cb.eval_gradients(bar);
+
+                Eigen::Matrix<T,1,2> hho_grad = Eigen::Matrix<T,1,2>::Zero();
+                for (size_t i = 1; i < sol_cb.size(); i++)
+                    hho_grad += rec_sol(i-1) * hho_dphi.block(i,0,1,2);
+
+                hho_grad_x.push_back( hho_grad(0) );
+                hho_grad_y.push_back( hho_grad(1) );
+            }
+
+            cell_i++;
+        }
+
+        disk::silo_zonal_variable<T> rgx("ref_grad_x", fem_grad_x);
+        silo_db.add_variable("refmesh", rgx);
+        disk::silo_zonal_variable<T> rgy("ref_grad_y", fem_grad_y);
+        silo_db.add_variable("refmesh", rgy);
+
+        disk::silo_zonal_variable<T> sgx("sol_grad_x", hho_grad_x);
+        silo_db.add_variable("refmesh", sgx);
+        disk::silo_zonal_variable<T> sgy("sol_grad_y", hho_grad_y);
+        silo_db.add_variable("refmesh", sgy);
+
+        std::cout << "(H1, L2): " << std::sqrt(H1_error);
+        std::cout << "  -  " << std::sqrt(L2_error) << std::endl;
+    }
+
+
+    void run_hho_hho(size_t level,
                  const disk::simplicial_mesh<T,2>& ref_msh,
                  const disk::simplicial_mesh<T,2>& sol_msh)
     {
@@ -558,7 +860,6 @@ public:
         std::cout << green << "Computed solution, HHO" << reset << std::endl;
         std::cout << "Mesh size: " << average_diameter(sol_msh) << std::endl;
         hho_newton_solver(sol_msh, level);
-
 
         std::vector<T> fem_grad_x, fem_grad_y, hho_grad_x, hho_grad_y;
         fem_grad_x.reserve( ref_msh.cells_size() );
@@ -587,7 +888,7 @@ public:
         }
 
 
-        T H1_error = 0.0;
+        T H1_error = 0.0; T L2_error = 0.0; T Linf_error = 0.0;
         size_t cell_i = 0;
         for (auto& ref_cl : ref_msh)
         {
@@ -597,6 +898,7 @@ public:
             Eigen::Matrix<T,1,2> fem_grad = Eigen::Matrix<T,1,2>::Zero();
             for (size_t i = 0; i < 3; i++)
                 fem_grad += e_gx(ptids[i]) * cfem_dphi.block(i,0,1,2);
+
 
             fem_grad_x.push_back( fem_grad(0) );
             fem_grad_y.push_back( fem_grad(1) );
@@ -618,9 +920,23 @@ public:
                 for (size_t i = 1; i < sol_cb.size(); i++)
                     hho_grad += rec_sol(i-1) * hho_dphi.block(i,0,1,2);
 
+                auto hho_phi = sol_cb.eval_functions(qp.point());
+                T hho_ucell = 0;
+                for (size_t i = 0; i < sol_cb.size(); i++)
+                    hho_ucell += rec_sol(i) * hho_phi(i,0);
+
                 Eigen::Matrix<T,1,2> diff = hho_grad - fem_grad;
 
+
+                T fem_cell = 0.;
+                Eigen::Matrix<T,Eigen::Dynamic,1> cfem_phi = disk::cfem::eval_basis(ref_msh, ref_cl, qp.point());
+                for (size_t i = 0; i < 3; i++)
+                    fem_cell += e_gx(ptids[i]) * cfem_phi(i,0);
+
+                T ucell = hho_ucell - fem_cell;
+
                 H1_error += qp.weight() * diff.dot(diff);
+                L2_error += qp.weight() * ucell * ucell;
             }
 
             {
@@ -648,6 +964,7 @@ public:
         silo_db.add_variable("refmesh", sgy);
 
         std::cout << "H1 error: " << std::sqrt(H1_error) << std::endl;
+        std::cout << "L2 error: " << std::sqrt(L2_error) << std::endl;
     }
 
     void
@@ -659,12 +976,17 @@ public:
         silo_db.create(visit_output_filename);
         std::cout << green << "Reference solution, FEM" << reset << std::endl;
         std::cout << "Mesh size: " << average_diameter(ref_msh) << std::endl;
+
         cfem_newton_solver(ref_msh);
+        //e_gx = read_data<T>("hier_fem_ref_solution.dat");
+
+        //run_hho(ref_msh);
 
         for (size_t level = sol_level_min; level <= sol_level_max; level++)
         {
             auto sol_msh = *std::next(mesh_hier.meshes_begin(), level);
-            run_hho(level, ref_msh, sol_msh);
+            run_hho_cells(level, ref_msh, sol_msh);
+            //run_hho_faces(level, ref_msh, sol_msh);
         }
         silo_db.close();
     }

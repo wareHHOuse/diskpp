@@ -877,15 +877,21 @@ run_hho_diffusion_nitsche_cells(const Mesh& msh,
         ofs << fullsol(0) << std::endl;
 
         auto fcs = faces(msh, cl);
-        auto fc_count = 0;
-        for(auto fc : fcs)
+        for(size_t fi = 0; fi < fcs.size(); fi++)
         {
+            auto fc = fcs[fi];
+            auto face_id = msh.lookup(fc);
+
+            if(bnd.is_dirichlet_face(face_id))
+                continue;
+
             auto fbar = barycenter(msh, fc);
             for (size_t i = 0; i < Mesh::dimension; i++)
                 ofs << fbar[i] << " ";
-            auto idx = cbs + fbs * fc_count++;
+            auto idx = cbs + fbs * fi;
             ofs << fullsol(idx) << std::endl;
         }
+
 
         solcells.block(cl_count * cbs, 0, cbs, 1) = fullsol.block(0,0, cbs,1);
         cl_count++;
@@ -912,6 +918,373 @@ run_hho_diffusion_nitsche_cells(const Mesh& msh,
 
 template<typename Mesh>
 auto
+run_hho_diffusion_nitsche_faces_borrar_test(const Mesh& msh,
+    const algorithm_parameters<typename Mesh::scalar_type>& ap)
+{
+    using T =  typename Mesh::scalar_type;
+    using matrix_type = Matrix<T, Dynamic, Dynamic>;
+    using vector_type = Matrix<T, Dynamic, 1>;
+
+    hho_degree_info hdi(ap.degree + 1, ap.degree );
+
+    auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+    auto rhs_fun = make_rhs_function(msh);
+    auto sol_fun = make_solution_function(msh);
+    auto assembler = make_diffusion_assembler_nitsche_faces(msh, hdi);
+
+
+    for (auto& cl : msh)
+    {
+        auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
+        auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+        auto Lh     = make_rhs(msh, cl, cb, rhs_fun);
+        matrix_type Ah = gr.second + stab;
+
+        matrix_type Aconsist   = matrix_type::Zero(Ah.rows(), Ah.cols());
+        matrix_type Anitsche  = matrix_type::Zero(Ah.rows(), Ah.cols());
+        vector_type Bnitsche  = vector_type::Zero(Ah.cols());
+
+        bool has_a_boundary_face = false;
+        auto fcs = faces(msh, cl);
+        for(auto fc : fcs)
+        {
+            if(msh.is_boundary(fc))
+            {
+                has_a_boundary_face = true;
+                break;
+            }
+        }
+
+        if (has_a_boundary_face)
+        {
+            Aconsist   = make_hho_consist_diff_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta);
+            auto ntz   = make_hho_nitsche_diff_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun );
+            Anitsche  = ntz.first;
+            Bnitsche  = ntz.second;
+        }
+
+        matrix_type A = Ah - Anitsche - Aconsist;
+        vector_type rhs = -Bnitsche;
+        rhs.block(0, 0, cbs, 1) += Lh;
+        auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, rhs);
+        assembler.assemble(msh, cl, sc.first, sc.second);
+    }
+
+    assembler.finalize();
+
+    size_t systsz = assembler.LHS.rows();
+    size_t nnz = assembler.LHS.nonZeros();
+
+    #if 0
+    std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
+    std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
+    std::cout << "Dofs: " << systsz << std::endl;
+    #endif
+
+    dynamic_vector<T> sol = dynamic_vector<T>::Zero(systsz);
+
+    //disk::solvers::pardiso_params<T> pparams;
+    //pparams.report_factorization_Mflops = true;
+    //mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+
+    //disk::solvers::qmr(assembler.LHS, assembler.RHS, sol);
+
+    disk::solvers::conjugated_gradient_params<T> cgp;
+    cgp.max_iter = assembler.LHS.cols();
+    cgp.verbose=true;
+    disk::solvers::conjugated_gradient(cgp, assembler.LHS, assembler.RHS, sol);
+
+    dump_sparse_matrix(assembler.LHS , "Afmat.dat");
+    dump_matrix(assembler.RHS , "Bfvec.dat");
+    dump_matrix(sol , "Xfvec.dat");
+
+    T H1_error = 0.0;
+    T L2_error = 0.0;
+
+    std::ofstream ofs("sol.dat");
+
+    std::vector<T> inf_errors;
+
+    dynamic_vector<T> sol_faces = run_hho_diffusion_nitsche_faces_borrar(msh, ap);//borrar
+    dynamic_vector<std::pair<T,T>> residue_vector = dynamic_vector<std::pair<T,T>>::Zero(msh.cells_size()); //borrar
+
+    auto dofs = 0;
+
+    for (auto& cl : msh)
+    {
+        auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
+        auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+        auto Lh     = make_rhs(msh, cl, cb, rhs_fun);
+        matrix_type Ah = gr.second + stab;
+
+        matrix_type Aconsist  = matrix_type::Zero(Ah.rows(), Ah.cols());
+        matrix_type Anitsche  = matrix_type::Zero(Ah.rows(), Ah.cols());
+        vector_type Bnitsche  = vector_type::Zero(Ah.rows());
+
+        bool has_a_boundary_face = false;
+        auto fcs = faces(msh, cl);
+        for(auto fc : fcs)
+        {
+            if(msh.is_boundary(fc))
+            {
+                has_a_boundary_face = true;
+                break;
+            }
+        }
+
+        if (has_a_boundary_face)
+        {
+            Aconsist   = make_hho_consist_diff_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta);
+            auto ntz   = make_hho_nitsche_diff_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun );
+            Anitsche  = ntz.first;
+            Bnitsche  = ntz.second;
+        }
+
+        matrix_type A   = Ah - Anitsche - Aconsist;
+        vector_type rhs = Lh - Bnitsche.block(0, 0, cbs, 1);
+
+        vector_type locsol = assembler.take_local_data(msh, cl, sol);
+
+        vector_type fullsol =
+            diffusion_static_condensation_recover(msh, cl, hdi, A, rhs, locsol);
+
+        vector_type realsol = project_function(msh, cl, hdi, sol_fun);
+
+        auto diff = realsol - fullsol;
+        H1_error += diff.dot(A*diff);
+
+        matrix_type mass  = make_mass_matrix(msh, cl, cb, hdi.cell_degree());
+        vector_type u_diff = diff.block(0, 0, cbs, 1);
+        L2_error += u_diff.dot(mass * u_diff);
+
+        vector_type ucell= fullsol.block(0,0, cbs,1);
+        auto qps = integrate(msh, cl, 2 * hdi.cell_degree());
+
+        for(auto qp : qps)
+        {
+            auto c_phi = cb.eval_functions(qp.point());
+            auto realeval = sol_fun(qp.point());
+            auto hho_eval = ucell.dot(c_phi);
+            inf_errors.push_back( std::abs(hho_eval -realeval));
+        }
+
+
+        auto bar = barycenter(msh, cl);
+
+        for (size_t i = 0; i < Mesh::dimension; i++)
+            ofs << bar[i] << " ";
+        ofs << fullsol(0) << std::endl;
+
+        const auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
+        vector_type u_full  = sol_faces.block(dofs, 0, num_total_dofs, 1 );//borrar
+        dofs += num_total_dofs; //borrar
+        vector_type res = - A * u_full; //borrar
+        res.block(0,0, cbs, 1) += Lh; //borrar
+        residue_vector.at(cl_count) = std::make_pair( (res.block(0,0, cbs, 1)).norm(), res.norm());//borrar
+
+        cl_count++;
+
+    }
+
+
+
+    auto itor = std::max_element(inf_errors.begin(), inf_errors.end());
+    size_t distance = std::distance(inf_errors.begin(), itor);
+    auto Linf_error = *std::next(inf_errors.begin(), distance);
+
+    //std::cout << std::sqrt(error) << std::endl;
+
+    ofs.close();
+
+    H1_error = std::sqrt(H1_error);
+    L2_error = std::sqrt(L2_error);
+
+    auto error = std::make_tuple(H1_error, L2_error, Linf_error);
+    return error;
+}
+
+template<typename Mesh>
+dynamic_vector<typename Mesh::scalar_type>
+run_hho_diffusion_nitsche_faces_borrar(const Mesh& msh,
+    const algorithm_parameters<typename Mesh::scalar_type>& ap)
+{
+    using T =  typename Mesh::scalar_type;
+    using matrix_type = Matrix<T, Dynamic, Dynamic>;
+    using vector_type = Matrix<T, Dynamic, 1>;
+
+    hho_degree_info hdi(ap.degree + 1, ap.degree );
+
+    auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+    auto rhs_fun = make_rhs_function(msh);
+    auto sol_fun = make_solution_function(msh);
+    auto assembler = make_diffusion_assembler_nitsche_faces(msh, hdi);
+
+    for (auto& cl : msh)
+    {
+        auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
+        auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+        auto Lh     = make_rhs(msh, cl, cb, rhs_fun);
+        matrix_type Ah = gr.second + stab;
+
+        matrix_type Aconsist   = matrix_type::Zero(Ah.rows(), Ah.cols());
+        matrix_type Anitsche  = matrix_type::Zero(Ah.rows(), Ah.cols());
+        vector_type Bnitsche  = vector_type::Zero(Ah.cols());
+
+        bool has_a_boundary_face = false;
+        auto fcs = faces(msh, cl);
+        for(auto fc : fcs)
+        {
+            if(msh.is_boundary(fc))
+            {
+                has_a_boundary_face = true;
+                break;
+            }
+        }
+
+        if (has_a_boundary_face)
+        {
+            Aconsist   = make_hho_consist_diff_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta);
+            auto ntz   = make_hho_nitsche_diff_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun );
+            Anitsche  = ntz.first;
+            Bnitsche  = ntz.second;
+        }
+
+        matrix_type A = Ah - Anitsche - Aconsist;
+        vector_type rhs = -Bnitsche;
+        rhs.block(0, 0, cbs, 1) += Lh;
+        auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, rhs);
+        assembler.assemble(msh, cl, sc.first, sc.second);
+    }
+
+    assembler.finalize();
+
+    size_t systsz = assembler.LHS.rows();
+    size_t nnz = assembler.LHS.nonZeros();
+
+    #if 0
+    std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
+    std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
+    std::cout << "Dofs: " << systsz << std::endl;
+    #endif
+
+    dynamic_vector<T> sol = dynamic_vector<T>::Zero(systsz);
+
+    //disk::solvers::pardiso_params<T> pparams;
+    //pparams.report_factorization_Mflops = true;
+    //mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+
+    //disk::solvers::qmr(assembler.LHS, assembler.RHS, sol);
+
+    disk::solvers::conjugated_gradient_params<T> cgp;
+    cgp.max_iter = assembler.LHS.cols();
+    cgp.verbose=true;
+    disk::solvers::conjugated_gradient(cgp, assembler.LHS, assembler.RHS, sol);
+
+    dump_sparse_matrix(assembler.LHS , "Afmat.dat");
+    dump_matrix(assembler.RHS , "Bfvec.dat");
+    dump_matrix(sol , "Xfvec.dat");
+
+    T H1_error = 0.0;
+    T L2_error = 0.0;
+
+    std::ofstream ofs("sol.dat");
+
+    std::vector<T> inf_errors;
+
+    auto dofs = 0;
+    dynamic_vector<std::pair<T,T>> residue_vector = dynamic_vector<std::pair<T,T>>::Zero(msh.cells_size()); //borrar
+
+    for (auto& cl : msh)
+    {
+        auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
+        auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+        auto Lh     = make_rhs(msh, cl, cb, rhs_fun);
+        matrix_type Ah = gr.second + stab;
+
+        matrix_type Aconsist  = matrix_type::Zero(Ah.rows(), Ah.cols());
+        matrix_type Anitsche  = matrix_type::Zero(Ah.rows(), Ah.cols());
+        vector_type Bnitsche  = vector_type::Zero(Ah.rows());
+
+        bool has_a_boundary_face = false;
+        auto fcs = faces(msh, cl);
+        for(auto fc : fcs)
+        {
+            if(msh.is_boundary(fc))
+            {
+                has_a_boundary_face = true;
+                break;
+            }
+        }
+
+        if (has_a_boundary_face)
+        {
+            Aconsist   = make_hho_consist_diff_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta);
+            auto ntz   = make_hho_nitsche_diff_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun );
+            Anitsche  = ntz.first;
+            Bnitsche  = ntz.second;
+        }
+
+        matrix_type A   = Ah - Anitsche - Aconsist;
+        vector_type rhs = Lh - Bnitsche.block(0, 0, cbs, 1);
+
+        vector_type locsol = assembler.take_local_data(msh, cl, sol);
+
+        vector_type fullsol =
+            diffusion_static_condensation_recover(msh, cl, hdi, A, rhs, locsol);
+
+        vector_type realsol = project_function(msh, cl, hdi, sol_fun);
+
+        auto diff = realsol - fullsol;
+        H1_error += diff.dot(A*diff);
+
+        matrix_type mass  = make_mass_matrix(msh, cl, cb, hdi.cell_degree());
+        vector_type u_diff = diff.block(0, 0, cbs, 1);
+        L2_error += u_diff.dot(mass * u_diff);
+
+        vector_type ucell= fullsol.block(0,0, cbs,1);
+        auto qps = integrate(msh, cl, 2 * hdi.cell_degree());
+
+        for(auto qp : qps)
+        {
+            auto c_phi = cb.eval_functions(qp.point());
+            auto realeval = sol_fun(qp.point());
+            auto hho_eval = ucell.dot(c_phi);
+            inf_errors.push_back( std::abs(hho_eval -realeval));
+        }
+
+
+        auto bar = barycenter(msh, cl);
+
+        for (size_t i = 0; i < Mesh::dimension; i++)
+            ofs << bar[i] << " ";
+        ofs << fullsol(0) << std::endl;
+
+        const auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
+        full_sol.block(dofs,0, num_total_dofs, 1) = full_sol;
+        dofs += num_total_dofs;
+    }
+
+    auto itor = std::max_element(inf_errors.begin(), inf_errors.end());
+    size_t distance = std::distance(inf_errors.begin(), itor);
+    auto Linf_error = *std::next(inf_errors.begin(), distance);
+
+    //std::cout << std::sqrt(error) << std::endl;
+
+    ofs.close();
+
+    H1_error = std::sqrt(H1_error);
+    L2_error = std::sqrt(L2_error);
+
+    return full_sol;
+}
+
+
+template<typename Mesh>
+auto
 run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
     const algorithm_parameters<typename Mesh::scalar_type>& ap,
     const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
@@ -933,6 +1306,10 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
     auto assembler = make_diffusion_full_assembler(msh, hdi, bnd);
 
     auto cl_count = 0;
+    auto dofs = 0; // borrar
+
+    dynamic_vector<T> sol_faces = run_hho_diffusion_nitsche_faces_borrar(msh, ap);//borrar
+    dynamic_vector<std::pair<T,T>> residue_vector = dynamic_vector<std::pair<T,T>>::Zero(msh.cells_size()); //borrar
 
     for (auto& cl : msh)
     {
@@ -940,7 +1317,9 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
         const auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
 
         matrix_type A  = matrix_type::Zero(num_total_dofs, num_total_dofs);
-        vector_type fullsol  = vector_type::Zero(num_total_dofs);
+
+        vector_type u_full  = sol_faces.block(dofs, 0, num_total_dofs, 1 );//borrar
+        dofs += num_total_dofs; //borrar
 
         if (is_contact_vector.at(cl_count) == 1)
         {
@@ -955,7 +1334,7 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
             matrix_type Anitsche  = ntz.first;
             vector_type Bnitsche  = ntz.second;
 
-            matrix_type A = Ah - Anitsche - Aconsist;
+            A = Ah - Anitsche - Aconsist;
             vector_type rhs = -Bnitsche;
             rhs.block(0, 0, cbs, 1) += Lh;
             assembler.assemble(msh, cl, A, rhs);
@@ -968,9 +1347,15 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
 
             vector_type Lh = make_rhs(msh, cl, cb, rhs_fun);//, hdi.cell_degree());
             matrix_type Ah = gr.second + stab;
-
             assembler.assemble(msh, cl, Ah, Lh);
+
+            A = Ah;
         }
+
+        vector_type res = - A * u_full; //borrar
+        res.block(0,0, cbs, 1) += Lh; //borrar
+        residue_vector.at(cl_count) = std::make_pair( (res.block(0,0, cbs, 1)).norm(), res.norm());//borrar
+
         cl_count++;
 
     }
@@ -1119,7 +1504,8 @@ run_diffusion_solver(const Mesh& msh, const algorithm_parameters<T>& ap,
             error = run_hho_diffusion_nitsche_cells_full(msh, ap, bnd, eta);
             break;
         case EVAL_ON_FACES:
-            error = run_hho_diffusion_nitsche_faces(msh, ap);
+            //error = run_hho_diffusion_nitsche_faces(msh, ap);
+            error = run_hho_diffusion_nitsche_faces_borrar_test(msh, ap); //borrar
             break;
         case EVAL_WITH_PARAMETER:
             error = run_hho_diffusion_nitsche_par(msh, ap, bnd, eta);
