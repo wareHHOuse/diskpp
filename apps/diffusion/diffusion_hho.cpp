@@ -160,6 +160,7 @@ run_hho_diffusion_solver(const Mesh& msh)
 
         Eigen::Matrix<T, Eigen::Dynamic, 1> realsol = project_function(msh, cl, hdi, sol_fun);
 
+
         auto diff = realsol - fullsol;
         error += diff.dot(A*diff);
 
