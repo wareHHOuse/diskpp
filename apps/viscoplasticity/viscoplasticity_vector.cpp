@@ -58,7 +58,7 @@ run_viscoplasticity(size_t degree,
     {
         case DRIVEN:
             name = "driven";
-            filename = "../../../diskpp/meshes/2D_quads/medit/square_h005.medit2d";
+            filename = "../../../diskpp/meshes/2D_quads/medit/square_h00125.medit2d";
             break;
         case VANE:
             name = "vane";
@@ -97,7 +97,7 @@ int main(int argc, char **argv)
     size_t degree = 0;
     RealType alpha = 1.;
 
-    problem_type problem = VANE;//DRIVEN;
+    problem_type problem = DRIVEN;
 
     while ( (ch = getopt(argc, argv, "k:a:")) != -1 )
     {

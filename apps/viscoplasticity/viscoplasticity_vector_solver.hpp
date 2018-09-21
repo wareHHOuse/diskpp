@@ -95,14 +95,15 @@ public:
                             di(hdi), alpha(alpha_ext)
     {
         //DRIVEN
-        #if 0
+        //#if 0
         viscosity = 1.;
         T f     = 1;
         T Lref  = 1.;
-        T Bn    =  2 * std::sqrt(2);
+        T Bn    =  2. * std::sqrt(2);
         yield   =  Bn * f * Lref; // * viscosity;// * omegaExt; //* f * Lref;
-        #endif
+        //#endif
 
+        #if 0
         //VANE
         Bn = 10.;
         T Lref = 4.02; //R
@@ -110,7 +111,7 @@ public:
         T omega = 1;
         T Vref = omega * Lref;
         yield = Bn * std::sqrt(2) * (viscosity * Vref) / Lref; // Bn/std::sqrt(2); // ;
-
+        #endif
         const auto dim =  Mesh::dimension;
 
         cbs = revolution::vector_basis_size(di.cell_degree(), dim, dim);
@@ -392,13 +393,13 @@ public:
         }
         ofs.close();
 
-        //std::pair<point_type, point_type> p_x, p_y;
-        //auto eps = 1.e-4;
-        //p_y = std::make_pair(point_type({0.5 + eps, 0.0 + eps}), point_type({0.5 + eps, 1.0 + eps}));
+        std::pair<point_type, point_type> p_x, p_y;
+        auto eps = 1.e-4;
+        p_y = std::make_pair(point_type({0.5 + eps, 0.0 + eps}), point_type({0.5 + eps, 1.0 + eps}));
 
         //plot_over_line(msh, p_x, cell_rec_sol, di.reconstruction_degree(), "plot_over_x_" + info + ".data");
         //plot_over_line(msh, p_y, cell_rec_sol, di.reconstruction_degree(), "plot_over_y_" + info + ".data");
-        //plot_over_line(msh, p_y, cell_sol, di.cell_degree(), "plot_over_y_" + info + ".data");
+        plot_over_line(msh, p_y, cell_sol, di.cell_degree(), "plot_over_y_" + info + ".data");
 
         compute_discontinuous_velocity( msh, cell_sol, di, "velocity_" + infoall +".msh");
         save_coords(msh, "Coords_"+ infoall + ".data");
@@ -427,6 +428,7 @@ public:
         switch (problem)
         {
             case DRIVEN:
+                std::cout << " I'm in DRIVEN" << std::endl;
 
                 rhs_fun  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
                     return Matrix<T, Mesh::dimension, 1>::Zero();

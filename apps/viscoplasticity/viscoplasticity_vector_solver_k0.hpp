@@ -76,7 +76,6 @@ class augmented_lagrangian_viscoplasticity
     dynamic_vector<T>             multiplier, auxiliar, auxiliar_old;
 
     typename revolution::hho_degree_info di;
-    T             factor;
     T             viscosity;
     T             alpha;
     T             yield;
@@ -85,29 +84,28 @@ class augmented_lagrangian_viscoplasticity
 public:
     dynamic_vector<T>       sol, sol_old;
     std::tuple<T, T, T>     convergence;
-    bool                    use_sym_grad;
 
     augmented_lagrangian_viscoplasticity(const mesh_type& msh,
                             const typename revolution::hho_degree_info & hdi,
                             const T& alpha_ext):
                             di(hdi), alpha(alpha_ext)
     {
-        use_sym_grad = true;
-        factor = (use_sym_grad)? 2. : 1.;
+        #if 0
         viscosity = 1.;
         T f = 1;
         T Lref = 6.;
-        //T Bn  =  0.; //std::sqrt(2) * 10.;
+        #endif
 
         //Driven
-        //yield =  Bn * f * Lref;//Bn * viscosity;
+        T Bn  = 10.;
+        yield = std::sqrt(2) * 10.;
 
         //Couette
         //T omegaExt = 2.;
         //yield =  Bn * omegaExt;
 
         //VANE
-        yield = 1. ;
+        //yield = 1. ;
         //T Bn = yield; // /eta/omega; eta = 1; omega = 1;
 
         dim =  Mesh::dimension;
@@ -230,26 +228,6 @@ public:
 
             case VANE:
             std::cout << "im in vane" << std::endl;
-                rhs_fun  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
-                    return Matrix<T, Mesh::dimension, 1>::Zero();
-                };
-
-                auto rot  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
-                    T omega = 1;
-                    return Matrix<T, Mesh::dimension, 1>{omega * p.y(), -omega * p.x()};
-                };
-
-                bnd.addDirichletBC( 0, 2, wall);
-                bnd.addDirichletBC( 0, 1, rot);
-                break;
-            default:
-                throw std::invalid_argument("No problem defined");
-
-        }
-        #endif
-
-
-        //case VANE:
             rhs_fun  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
                 return Matrix<T, Mesh::dimension, 1>::Zero();
             };
@@ -268,6 +246,31 @@ public:
             bnd.addDirichletBC( 0, 2, wall);
             bnd.addDirichletBC( 0, 1, rot);
             bnd.addNeumannBC(10, 3, symmetryPlane);
+                break;
+            default:
+                throw std::invalid_argument("No problem defined");
+
+        }
+        #endif
+
+        std::cout << "im in driven" << std::endl;
+        velocity  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
+            if( std::abs(p.y() - 1.) < 1.e-8 )
+                return Matrix<T, Mesh::dimension, 1>{1,0};
+            else
+                return Matrix<T, Mesh::dimension, 1>{0,0};
+        };
+        rhs_fun  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
+            return Matrix<T, Mesh::dimension, 1>::Zero();
+        };
+
+        #if 0
+        bnd.addDirichletBC(0, 1, movingWall);
+        bnd.addDirichletBC(0, 2, wall);
+        bnd.addDirichletBC(0, 3, wall);
+        bnd.addDirichletBC(0, 4, wall);
+        #endif
+        bnd.addDirichletEverywhere(velocity);
 
 
         auto assembler = revolution::make_stokes_assembler_alg(msh, di, bnd);
@@ -317,12 +320,12 @@ public:
             vector_type pvel = revolution::project_function(msh, cl, di, velocity);
             //vector_type  svel_old =  assembler.take_velocity(msh, cl, sol_old);
             vector_type diff_vel = svel - pvel;
-            auto gr = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
+            auto gr = revolution::make_hho_stokes(msh, cl, di, true);
             matrix_type stab;
             stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
-            auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
+            auto G = revolution::make_hlow_stokes(msh, cl, di, true);
 
-            matrix_type B = factor * (viscosity*G.second + viscosity*stab);
+            matrix_type B = 2. * (viscosity*G.second + viscosity*stab);
 
             error_vel += diff_vel.dot(B * diff_vel);
             auto Gu_norm = svel.dot(B * svel);
@@ -344,8 +347,8 @@ public:
                         const dynamic_vector<T>& velocity_dofs)
     {
         vector_type u_TF  = assembler.take_velocity(msh, cl, velocity_dofs);
-        auto value = 1./(factor * (viscosity + alpha));
-        auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
+        auto value = 1./(2. * (viscosity + alpha));
+        auto G = revolution::make_hlow_stokes(msh, cl, di, true);
 
         auto cell_ofs    = revolution::priv::offset(msh, cl);
         vector_type Gu = G.first * u_TF;
@@ -357,7 +360,7 @@ public:
         auto bar = barycenter(msh, cl);
         auto s_phi  = sb.eval_functions(bar);
 
-        vector_type  theta  = stress  +  factor * alpha * Gu;
+        vector_type  theta  = stress  +  2. * alpha * Gu;
         Matrix<T, Mesh::dimension, Mesh::dimension> theta_eval = revolution::eval(theta, s_phi);
         T theta_norm  = std::sqrt((theta_eval.cwiseProduct(theta_eval)).sum());
 
@@ -393,14 +396,14 @@ public:
         for(auto cl: msh)
         {
             vector_type u_TF = assembler.take_velocity(msh, cl, sol);
-            auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
+            auto G = revolution::make_hlow_stokes(msh, cl, di, true);
             auto cell_ofs = revolution::priv::offset(msh, cl);
 
             vector_type Gu = G.first * u_TF;
             vector_type gamma_old = auxiliar_old.block(cell_ofs *sbs, 0, sbs, 1);
             vector_type gamma = auxiliar.block(cell_ofs *sbs, 0, sbs, 1);
 
-            vector_type diff_stress = factor * alpha * (Gu - gamma);
+            vector_type diff_stress = 2. * alpha * (Gu - gamma);
             vector_type diff_gamma  = alpha * (gamma - gamma_old);
 
             multiplier.block(cell_ofs * sbs, 0, sbs, 1) += diff_stress;
@@ -424,7 +427,7 @@ public:
                     const cell_type& cl,
                     const Assembler& assembler)
     {
-        auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
+        auto G = revolution::make_hlow_stokes(msh, cl, di, true);
         auto cb = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
         auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
 
@@ -443,7 +446,7 @@ public:
         vector_type stress = multiplier.block( sbs * cell_ofs,  0, sbs, 1);
         vector_type gamma  = compute_auxiliar( msh,  cl, assembler, sol_old); //or sol at this point it's the same
         auxiliar.block(cell_ofs * sbs, 0, sbs, 1) = gamma;
-        vector_type str_agam = stress - factor * alpha * gamma;
+        vector_type str_agam = stress - 2. * alpha * gamma;
         matrix_type mm = revolution::make_mass_matrix(msh, cl, sb);
 
         rhs -=  G.first.transpose() * mm * str_agam;
@@ -475,12 +478,12 @@ public:
 
         for (auto cl : msh)
         {
-            auto G  = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
-            auto gr = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
+            auto G  = revolution::make_hlow_stokes(msh, cl, di, true);
+            auto gr = revolution::make_hho_stokes(msh, cl, di, true);
             matrix_type stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
             auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
 
-            matrix_type A = factor *(alpha * G.second + viscosity * stab);
+            matrix_type A = 2. *(alpha * G.second + viscosity * stab);
 
             assembler.assemble_lhs(msh, cl, A, -dr);
         }
@@ -531,7 +534,7 @@ public:
 
         for(auto cl : msh)
         {
-            auto gr  = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
+            auto gr  = revolution::make_hho_stokes(msh, cl, di, true);
             auto cell_ofs = revolution::priv::offset(msh, cl);
             vector_type svel =  assembler.take_velocity(msh, cl, sol);
             assert((gr.first * svel).rows() == rbs - dim);
@@ -557,10 +560,10 @@ public:
             //Stress
             auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
             auto s_phi  = sb.eval_functions(bar);
-            auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
+            auto G = revolution::make_hlow_stokes(msh, cl, di, true);
             vector_type Gu = G.first * svel;
             vector_type stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
-            vector_type theta  = stress  +  factor * alpha * Gu;
+            vector_type theta  = stress  +  2. * alpha * Gu;
             tensor_type theta_eval = revolution::eval(theta, s_phi);
             tensor_type sigma_eval = revolution::eval(stress, s_phi);
             tensor_type grad_eval = revolution::eval(Gu, s_phi);
