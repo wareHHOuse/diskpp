@@ -35,3 +35,9 @@ target_link_libraries(raw_quadratures ${LINK_LIBS})
 add_executable(quadratures_on_mesh quadratures_on_mesh.cpp)
 target_link_libraries(quadratures_on_mesh ${LINK_LIBS})
 
+add_executable(primitives primitives.cpp)
+target_link_libraries(primitives ${LINK_LIBS})
+
+add_executable(netgen_primitives netgen_primitives.cpp)
+target_link_libraries(netgen_primitives ${LINK_LIBS})
+

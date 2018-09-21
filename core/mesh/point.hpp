@@ -33,7 +33,7 @@
 template<typename T, size_t DIM>
 class point
 {
-    static_vector<T, DIM>     m_coords;
+    std::array<T, DIM>     m_coords;
 
 public:
     typedef T                                   value_type;
@@ -42,7 +42,8 @@ public:
 
     point()
     {
-        m_coords = static_vector<T, DIM>::Zero(DIM);
+        for (size_t i = 0; i < DIM; i++)
+            m_coords[i] = T(0);
     }
 
     point(const point& other) : m_coords(other.m_coords) {}
@@ -53,28 +54,42 @@ public:
             throw std::invalid_argument("Wrong initializer list size");
 
         for (size_t i = 0; i < DIM; i++)
-            m_coords(i) = *(l.begin()+i);
+            m_coords[i] = *(l.begin()+i);
 
     }
-
-    T   at(size_t pos) const
+    
+    point operator=(const point& other)
     {
-        if (pos >= DIM)
-            throw std::out_of_range("access out of range");
-
-        return m_coords(pos);
+        m_coords = other.m_coords;
+        return *this;
     }
-
-    T&  at(size_t pos)
+    
+    template<typename U = T>
+    point(const typename std::enable_if<DIM == 1, U>::type& x)
     {
-        if (pos >= DIM)
-            throw std::out_of_range("access out of range");
-
-        return m_coords(pos);
+        m_coords[0] = x;
+    }
+    
+    template<typename U = T>
+    point(const typename std::enable_if<DIM == 2, U>::type& x, const U& y)
+    {
+        m_coords[0] = x;
+        m_coords[1] = y;
+    }
+    
+    template<typename U = T>
+    point(const typename std::enable_if<DIM == 3, U>::type& x, const U& y, const U& z)
+    {
+        m_coords[0] = x;
+        m_coords[1] = y;
+        m_coords[2] = z;
     }
 
-    T   operator[](size_t pos) const { return m_coords(pos); }
-    T&  operator[](size_t pos)       { return m_coords(pos); }
+    T   at(size_t pos) const { return m_coords.at(pos); }
+    T&  at(size_t pos)       { return m_coords.at(pos); }
+
+    T   operator[](size_t pos) const { return m_coords[pos]; }
+    T&  operator[](size_t pos)       { return m_coords[pos]; }
 
     point   operator-() const {
         auto ret = -1.0 * (*this);
@@ -83,51 +98,60 @@ public:
 
     template<typename U = T>
     typename std::enable_if<DIM == 1 || DIM == 2 || DIM == 3, U>::type
-    x() const { return m_coords(0); }
+    x() const { return m_coords[0]; }
 
     template<typename U = T>
     typename std::enable_if<DIM == 1 || DIM == 2 || DIM == 3, U>::type&
-    x() { return m_coords(0); }
+    x() { return m_coords[0]; }
 
     template<typename U = T>
     typename std::enable_if<DIM == 2 || DIM == 3, U>::type
-    y() const { return m_coords(1); }
+    y() const { return m_coords[1]; }
 
     template<typename U = T>
     typename std::enable_if<DIM == 2 || DIM == 3, U>::type&
-    y() { return m_coords(1); }
+    y() { return m_coords[1]; }
 
     template<typename U = T>
     typename std::enable_if<DIM == 3, U>::type
-    z() const { return m_coords(2); }
+    z() const { return m_coords[2]; }
 
     template<typename U = T>
     typename std::enable_if<DIM == 3, U>::type&
-    z() { return m_coords(2); }
+    z() { return m_coords[2]; }
 
     auto to_vector() const
     {
-        return m_coords;
+        static_vector<T, DIM> ret;
+        for (size_t i = 0; i < DIM; i++)
+            ret(i) = m_coords[i];
+        return ret;
     }
 
     friend point operator+(const point& p1, const point& p2)
     {
         point ret;
-        ret.m_coords = p1.m_coords + p2.m_coords;
+        for (size_t i = 0; i < DIM; i++)
+            ret.m_coords[i] = p1.m_coords[i] + p2.m_coords[i];
+        
         return ret;
     }
 
     friend point operator-(const point& p1, const point& p2)
     {
         point ret;
-        ret.m_coords = p1.m_coords - p2.m_coords;
+        for (size_t i = 0; i < DIM; i++)
+            ret.m_coords[i] = p1.m_coords[i] - p2.m_coords[i];
+        
         return ret;
     }
 
     friend point operator*(const point& p, T scalefactor)
     {
         point ret;
-        ret.m_coords = p.m_coords * scalefactor;
+        for (size_t i = 0; i < DIM; i++)
+            ret.m_coords[i] = p.m_coords[i] * scalefactor;
+        
         return ret;
     }
 
@@ -139,7 +163,9 @@ public:
     friend point operator/(const point& p, T scalefactor)
     {
         point ret;
-        ret.m_coords = p.m_coords / scalefactor;
+        for (size_t i = 0; i < DIM; i++)
+            ret.m_coords[i] = p.m_coords[i] / scalefactor;
+        
         return ret;
     }
 };

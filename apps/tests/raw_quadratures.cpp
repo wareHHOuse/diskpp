@@ -45,8 +45,8 @@ template<typename T>
 bool
 test_1d_quadrature(quadtype qt)
 {
-    size_t max_test_degree = 20; /* max degree to test */
-    T ULP_max = 50; /* max error in ULP */
+    size_t max_test_degree = 15; /* max degree to test */
+    T ULP_max = 10; /* max error in ULP */
     
     size_t failed_tests = 0;
     size_t total_tests = 0;
@@ -80,32 +80,29 @@ test_1d_quadrature(quadtype qt)
         throw std::invalid_argument("Unknown quadrature to test");
     };
     
-    for (size_t qd = 0; qd <= max_test_degree; qd++)
-    {        
-        auto qps = get_quadrature(qt, qd);
-        
-        for (size_t md = 0; md <= qd; md++)
+    
+    for (size_t md = 0; md <= max_test_degree; md++)
+    {
+        auto qps = get_quadrature(qt, md);
+        T int_ana = analytic_integral(md);
+        T int_num = 0.0;
+        for (auto& qp : qps)
         {
-            T int_ana = analytic_integral(md);
-            T int_num = 0.0;
-            for (auto& qp : qps)
-            { 
-                auto real_qp = transform(qp);
-                int_num += real_qp.second * monomial(real_qp.first, md);
-            }
-            
-            if ( not almost_equal(int_ana, int_num, ULP_max) )
-            {
-                std::cout << "FAIL: md = " << md << ", qd = " << qd;
-                std::cout << " analytical value = " << std::setprecision(16) << int_ana;
-                std::cout << " numerical value = " << std::setprecision (16) << int_num;
-                std::cout << std::endl;
-                
-                failed_tests++;
-            }
-            
-            total_tests++;
+            auto real_qp = transform(qp);
+            int_num += real_qp.second * monomial(real_qp.first, md);
         }
+        
+        if ( not almost_equal(int_ana, int_num, ULP_max) )
+        {
+            std::cout << "FAIL: md = " << md;
+            std::cout << " analytical value = " << std::setprecision(16) << int_ana;
+            std::cout << " numerical value = " << std::setprecision (16) << int_num;
+            std::cout << std::endl;
+            
+            failed_tests++;
+        }
+        
+        total_tests++;
     }
     
     std::string qt_string;
