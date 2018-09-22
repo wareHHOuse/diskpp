@@ -87,19 +87,9 @@ class LogarithmicStrain
     }
 
     void
-    addMaterialData(const scalar_type& lambda, const scalar_type& mu)
+    addMaterialData(const data_type& material_data)
     {
-        m_data = data_type(lambda, mu);
-    }
-
-    void
-    addMaterialData(const scalar_type& lambda,
-                    const scalar_type& mu,
-                    const scalar_type& H,
-                    const scalar_type& K,
-                    const scalar_type& sigma_y0)
-    {
-        m_data = data_type(lambda, mu, H, K, sigma_y0);
+        m_data = material_data;
     }
 
     data_type

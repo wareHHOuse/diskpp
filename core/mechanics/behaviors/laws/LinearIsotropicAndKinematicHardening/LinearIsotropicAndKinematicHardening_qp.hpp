@@ -26,6 +26,7 @@
 #pragma once
 
 #include "common/eigen.hpp"
+#include "core/mechanics/behaviors/laws/materialData.hpp"
 #include "core/mechanics/behaviors/maths_tensor.hpp"
 #include "core/mechanics/behaviors/maths_utils.hpp"
 #include "core/mechanics/behaviors/tensor_conversion.hpp"
@@ -39,111 +40,15 @@ namespace disk
 
 // Law for Linear Isotropic and Kinematic Hardening model with von Mises Criteria  in small
 
-template<typename scalar_type>
-class LinearIsotropicAndKinematicHardening_Data
-{
-  private:
-    scalar_type m_lambda;
-    scalar_type m_mu;
-    scalar_type m_H;
-    scalar_type m_K;
-    scalar_type m_sigma_y0;
-
-  public:
-    LinearIsotropicAndKinematicHardening_Data() :
-      m_lambda(1.0), m_mu(1.0), m_H(0), m_K(0), m_sigma_y0(std::numeric_limits<scalar_type>::max())
-    {
-    }
-
-    LinearIsotropicAndKinematicHardening_Data(const scalar_type& lambda,
-                                              const scalar_type& mu,
-                                              const scalar_type& H,
-                                              const scalar_type& K,
-                                              const scalar_type& sigma_y0) :
-      m_lambda(lambda),
-      m_mu(mu), m_H(H), m_K(K), m_sigma_y0(sigma_y0)
-    {
-    }
-
-    LinearIsotropicAndKinematicHardening_Data(const scalar_type& lambda, const scalar_type& mu) :
-      m_lambda(lambda), m_mu(mu), m_H(0), m_K(0), m_sigma_y0(std::numeric_limits<scalar_type>::max())
-    {
-    }
-
-    scalar_type
-    getE() const
-    {
-        return m_mu * (3 * m_lambda + 2 * m_mu) / (m_lambda + m_mu);
-    }
-
-    scalar_type
-    getNu() const
-    {
-        return m_lambda / (2 * (m_lambda + m_mu));
-    }
-
-    scalar_type
-    getET() const
-    {
-        const scalar_type E = getE();
-        return E * (m_H + 1.5 * m_K) / (m_H + 1.5 * m_K + E);
-    }
-
-    scalar_type
-    getLambda() const
-    {
-        return m_lambda;
-    }
-
-    scalar_type
-    getMu() const
-    {
-        return m_mu;
-    }
-
-    scalar_type
-    getH() const
-    {
-        return m_H;
-    }
-
-    scalar_type
-    getK() const
-    {
-        return m_K;
-    }
-
-    scalar_type
-    getSigma_y0() const
-    {
-        return m_sigma_y0;
-    }
-
-    void
-    print() const
-    {
-        std::cout << "Material parameters: " << std::endl;
-        std::cout << "* E: " << getE() << std::endl;
-        std::cout << "* Nu: " << getNu() << std::endl;
-        std::cout << "* ET: " << getET() << std::endl;
-        std::cout << "* H: " << getH() << std::endl;
-        std::cout << "* K: " << getK() << std::endl;
-        std::cout << "* Sy0: " << getSigma_y0() << std::endl;
-        std::cout << "* Lambda: " << getLambda() << std::endl;
-        std::cout << "* Mu: " << getMu() << std::endl;
-    }
-};
-
 template<typename T, int DIM>
 class LinearIsotropicAndKinematicHardening_qp
 {
   public:
-    typedef T                                                      scalar_type;
-    typedef static_matrix<scalar_type, DIM, DIM>                   static_matrix_type;
-    typedef static_matrix<scalar_type, 3, 3>                       static_matrix_type3D;
-    typedef LinearIsotropicAndKinematicHardening_Data<scalar_type> data_type;
-
     const static size_t dimension = DIM;
+    typedef T                                    scalar_type;
+    typedef static_matrix<scalar_type, DIM, DIM> static_matrix_type;
+    typedef static_matrix<scalar_type, 3, 3>     static_matrix_type3D;
+    typedef MaterialData<scalar_type>            data_type;
 
   private:
     // coordinat and weight of considered gauss point.

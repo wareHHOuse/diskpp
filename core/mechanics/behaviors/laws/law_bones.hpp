@@ -28,7 +28,6 @@
 #include <vector>
 
 #include "common/eigen.hpp"
-#include "mechanics/behaviors/laws/LinearIsotropicAndKinematicHardening/LinearIsotropicAndKinematicHardening_qp.hpp"
 #include "mechanics/behaviors/laws/law_cell_bones.hpp"
 #include "mechanics/behaviors/maths_tensor.hpp"
 #include "mechanics/behaviors/maths_utils.hpp"
@@ -36,29 +35,29 @@
 namespace disk
 {
 
-// Law forLinearIsotropicAndKinematicHardening model in small deformations
+// Law bones
 
-template<typename MeshType>
-class LinearIsotropicAndKinematicHardening
+template<typename MeshType, typename LawTypeQp, bool PlasticBehavior>
+class LawTypeBones
 {
   public:
-    typedef MeshType                                                                   mesh_type;
-    typedef typename mesh_type::coordinate_type                                        scalar_type;
-    typedef typename mesh_type::cell                                                   cell_type;
-    typedef LinearIsotropicAndKinematicHardening_qp<scalar_type, mesh_type::dimension> law_qp_type;
-    typedef typename law_qp_type::data_type                                            data_type;
+    typedef MeshType                            mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef LawTypeQp                           law_qp_type;
+    typedef typename law_qp_type::data_type     data_type;
 
   private:
-    typedef LawTypeCellBones<mesh_type, law_qp_type, true> law_cell_type;
+    typedef LawTypeCellBones<mesh_type, law_qp_type, PlasticBehavior> law_cell_type;
 
     size_t                     m_nb_qp;
     std::vector<law_cell_type> m_list_cell_qp;
     data_type                  m_data;
 
   public:
-    LinearIsotropicAndKinematicHardening() : m_nb_qp(0){};
+    LawTypeBones() : m_nb_qp(0){};
 
-    LinearIsotropicAndKinematicHardening(const mesh_type& msh, const size_t degree)
+    LawTypeBones(const mesh_type& msh, const size_t degree)
     {
         m_nb_qp = 0;
         m_list_cell_qp.clear();
@@ -74,13 +73,9 @@ class LinearIsotropicAndKinematicHardening
     }
 
     void
-    addMaterialData(const scalar_type& lambda,
-                    const scalar_type& mu,
-                    const scalar_type& H,
-                    const scalar_type& K,
-                    const scalar_type& sigma_y0)
+    addMaterialData(const data_type materialData)
     {
-        m_data = data_type(lambda, mu, H, K, sigma_y0);
+        m_data = materialData;
     }
 
     data_type

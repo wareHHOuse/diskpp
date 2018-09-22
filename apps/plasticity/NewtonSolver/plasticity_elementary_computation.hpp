@@ -39,34 +39,6 @@
 namespace NLE
 {
 
-template<typename T>
-struct MaterialParameters
-{
-    T lambda;
-    T mu;
-    T H;
-    T K;
-    T sigma_y0;
-
-    T
-    converttomu(const T E, const T nu)
-    {
-        return E / (2 * (1 + nu));
-    }
-
-    T
-    converttolambda(const T E, const T nu)
-    {
-        return E * nu / ((1 + nu) * (1 - 2 * nu));
-    }
-
-    T
-    converttoH(const T E, const T ET, const T K)
-    {
-        return E * ET / (E - ET) - 1.5 * K;
-    }
-};
-
 template<typename MeshType>
 class plasticity
 {

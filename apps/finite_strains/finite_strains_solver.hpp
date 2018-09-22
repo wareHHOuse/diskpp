@@ -36,6 +36,7 @@
 #include "Informations.hpp"
 #include "NewtonSolver/newton_solver.hpp"
 #include "Parameters.hpp"
+#include "core/mechanics/behaviors/laws/materialData.hpp"
 #include "core/mechanics/behaviors/logarithmic_strain/LogarithmicStrain.hpp"
 #include "mechanics/BoundaryConditions.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
@@ -61,7 +62,7 @@ class finite_strains_solver
     typedef Mesh                                 mesh_type;
     typedef typename mesh_type::coordinate_type  scalar_type;
     typedef ParamRun<scalar_type>                param_type;
-    typedef NLE::MaterialParameters<scalar_type> data_type;
+    typedef disk::MaterialData<scalar_type>      data_type;
 
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
@@ -216,8 +217,7 @@ class finite_strains_solver
         m_hdi = disk::hho_degree_info(cell_degree, face_degree, grad_degree);
 
         m_law = law_type(m_msh, 2 * m_hdi.grad_degree());
-        m_law.addMaterialData(
-          material_data.lambda, material_data.mu, material_data.H, material_data.K, material_data.sigma_y0);
+        m_law.addMaterialData(material_data);
 
         if (m_verbose)
         {

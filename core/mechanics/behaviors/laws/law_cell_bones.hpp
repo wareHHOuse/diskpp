@@ -40,7 +40,7 @@
 namespace disk
 {
 
-/// Law for LinearIsotropicAndKinematicHardening model in small deformations
+/// Law cell bones
 
 template<typename MeshType, typename LawTypeQp, bool PlasticBehavior>
 class LawTypeCellBones

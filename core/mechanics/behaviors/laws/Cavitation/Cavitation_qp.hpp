@@ -26,9 +26,10 @@
 #pragma once
 
 #include "common/eigen.hpp"
-#include "core/mechanics/behaviors/tensor_conversion.hpp"
+#include "core/mechanics/behaviors/laws/materialData.hpp"
 #include "core/mechanics/behaviors/maths_tensor.hpp"
 #include "core/mechanics/behaviors/maths_utils.hpp"
+#include "core/mechanics/behaviors/tensor_conversion.hpp"
 #include "core/mechanics/deformation_tensors.hpp"
 #include "mesh/point.hpp"
 
@@ -39,64 +40,6 @@ namespace disk
 {
 
 // Law for Linear Isotropic and Kinematic Hardening model with von Mises Criteria  in small
-
-template<typename scalar_type>
-class Cavitation_Data
-{
-  private:
-    scalar_type m_lambda;
-    scalar_type m_mu;
-    size_t      m_type;
-
-  public:
-    Cavitation_Data() : m_lambda(1.0), m_mu(1.0), m_type(1) {}
-
-    Cavitation_Data(const scalar_type& lambda, const scalar_type& mu, const size_t& type) :
-      m_lambda(lambda), m_mu(mu), m_type(type)
-    {
-    }
-
-    scalar_type
-    getE() const
-    {
-        return m_mu * (3 * m_lambda + 2 * m_mu) / (m_lambda + m_mu);
-    }
-
-    scalar_type
-    getNu() const
-    {
-        return m_lambda / (2 * (m_lambda + m_mu));
-    }
-
-    scalar_type
-    getLambda() const
-    {
-        return m_lambda;
-    }
-
-    scalar_type
-    getMu() const
-    {
-        return m_mu;
-    }
-
-    size_t
-    getType() const
-    {
-        return m_type;
-    }
-
-    void
-    print() const
-    {
-        std::cout << "Material parameters: " << std::endl;
-        std::cout << "* E     : " << getE() << std::endl;
-        std::cout << "* Nu    : " << getNu() << std::endl;
-        std::cout << "* Lambda: " << getLambda() << std::endl;
-        std::cout << "* Mu    : " << getMu() << std::endl;
-        std::cout << "* Type  : " << getType() << std::endl;
-    }
-};
 
 /* Material: Neo-nookean for cavitation
  * Energy :  W(F) = Wiso(F) + Wvol(F)
@@ -129,12 +72,10 @@ class Cavitation_qp
     typedef T                                    scalar_type;
     typedef static_matrix<scalar_type, DIM, DIM> static_matrix_type;
     typedef static_matrix<scalar_type, 3, 3>     static_matrix_type3D;
-    typedef Cavitation_Data<scalar_type>         data_type;
-
     const static size_t dimension = DIM;
+    typedef MaterialData<scalar_type>            data_type;
 
   private:
-
     // coordinat and weight of considered gauss point.
     point<scalar_type, DIM> m_point;
     scalar_type             m_weight;
@@ -216,8 +157,8 @@ class Cavitation_qp
         const static_matrix_type C     = convertFtoCauchyGreenRight(m_F_curr);
 
         const scalar_type trace_C = C.trace();
-        const scalar_type T1 = compute_T1(J);
-        const scalar_type T2 = compute_T2(J);
+        const scalar_type T1      = compute_T1(J);
+        const scalar_type T2      = compute_T2(J);
 
         const static_tensor<scalar_type, DIM> I4          = compute_IdentityTensor<scalar_type, DIM>();
         const static_tensor<scalar_type, DIM> invFt_invF  = computeProductInf(invFt, invF);
@@ -232,10 +173,7 @@ class Cavitation_qp
     }
 
   public:
-    Cavitation_qp() :
-      m_weight(0), m_F_prev(static_matrix_type::Zero()), m_F_curr(static_matrix_type::Zero())
-    {
-    }
+    Cavitation_qp() : m_weight(0), m_F_prev(static_matrix_type::Zero()), m_F_curr(static_matrix_type::Zero()) {}
 
     Cavitation_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) :
       m_point(point), m_weight(weight), m_F_prev(static_matrix_type::Zero()), m_F_curr(static_matrix_type::Zero())

@@ -33,6 +33,7 @@
 
 #include "Informations.hpp"
 #include "Parameters.hpp"
+#include "core/mechanics/behaviors/laws/materialData.hpp"
 #include "loaders/loader.hpp"
 #include "mechanics/BoundaryConditions.hpp"
 
@@ -47,7 +48,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 void
 run_plasticity_solver(const Mesh<T, 2, Storage>&        msh,
                       const ParamRun<T>&                rp,
-                      const NLE::MaterialParameters<T>& material_data)
+                      const disk::MaterialData<T>& material_data)
 {
     typedef Mesh<T, 2, Storage>                            mesh_type;
     typedef static_vector<T, 2>                            result_type;
@@ -142,7 +143,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 void
 run_plasticity_solver(const Mesh<T, 3, Storage>&        msh,
                       const ParamRun<T>&                rp,
-                      const NLE::MaterialParameters<T>& material_data)
+                      const disk::MaterialData<T>& material_data)
 {
     typedef Mesh<T, 3, Storage>                            mesh_type;
     typedef static_vector<T, 3>                            result_type;
@@ -180,8 +181,13 @@ run_plasticity_solver(const Mesh<T, 3, Storage>&        msh,
     // bnd.addDirichletBC(disk::mechanics::DZ, 24, zero);
     // bnd.addNeumannBC(disk::mechanics::NEUMANN, 27, pres);
 
-    bnd.addDirichletBC(disk::mechanics::CLAMPED, 31, zero);
-    bnd.addDirichletBC(disk::mechanics::DZ, 33, un);
+    // bnd.addDirichletBC(disk::mechanics::CLAMPED, 31, zero);
+    // bnd.addDirichletBC(disk::mechanics::DZ, 33, un);
+
+    bnd.addDirichletBC(disk::mechanics::CLAMPED, 1, zero);
+    bnd.addDirichletBC(disk::mechanics::DIRICHLET, 2, un);
+    bnd.addDirichletBC(disk::mechanics::DIRICHLET, 3, un);
+    bnd.addDirichletBC(disk::mechanics::DIRICHLET, 4, un);
 
     // Cube + pres
     //    auto zero = [material_data](const point<T, 3>& p) -> result_type {
@@ -294,7 +300,7 @@ main(int argc, char** argv)
     ParamRun<RealType> rp;
 
     // Elasticity Parameters
-    NLE::MaterialParameters<RealType> material_data;
+    disk::MaterialData<RealType> material_data;
 
     //    material_data.mu       = 82E4;
     //    material_data.lambda   = 11E5;
@@ -314,13 +320,13 @@ main(int argc, char** argv)
     RealType E  = 70;
     RealType nu = 0.4999;
 
-    material_data.mu     = material_data.converttomu(E, nu);
-    material_data.lambda = material_data.converttolambda(E, nu);
+    material_data.setMu(E, nu);
+    material_data.setLambda(E, nu);
 
-    material_data.K = 0.0;
-    material_data.H = 0.135;
+    material_data.setK(0.0);
+    material_data.setH(0.135);
 
-    material_data.sigma_y0 = 0.243;
+    material_data.setSigma_y0(0.243);
 
     // Sphere Parameters (mm, GPa, kN)
     // RealType E  = 210000;

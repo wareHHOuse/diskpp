@@ -33,6 +33,7 @@
 
 #include "Informations.hpp"
 #include "Parameters.hpp"
+#include "core/mechanics/behaviors/laws/materialData.hpp"
 #include "loaders/loader.hpp"
 #include "mechanics/BoundaryConditions.hpp"
 
@@ -47,7 +48,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 void
 run_finite_strains_solver(const Mesh<T, 2, Storage>&        msh,
                           const ParamRun<T>&                rp,
-                          const NLE::MaterialParameters<T>& material_data)
+                          const disk::MaterialData<T>& material_data)
 {
     typedef Mesh<T, 2, Storage>                            mesh_type;
     typedef static_vector<T, 2>                            result_type;
@@ -140,9 +141,9 @@ run_finite_strains_solver(const Mesh<T, 2, Storage>&        msh,
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 void
-run_finite_strains_solver(const Mesh<T, 3, Storage>&        msh,
-                          const ParamRun<T>&                rp,
-                          const NLE::MaterialParameters<T>& material_data)
+run_finite_strains_solver(const Mesh<T, 3, Storage>&   msh,
+                          const ParamRun<T>&           rp,
+                          const disk::MaterialData<T>& material_data)
 {
     typedef Mesh<T, 3, Storage>                            mesh_type;
     typedef static_vector<T, 3>                            result_type;
@@ -268,7 +269,7 @@ main(int argc, char** argv)
     ParamRun<RealType> rp;
 
     // Elasticity Parameters
-    NLE::MaterialParameters<RealType> material_data;
+    disk::MaterialData<RealType> material_data;
 
     //    material_data.mu       = 82E4;
     //    material_data.lambda   = 11E5;
@@ -276,64 +277,39 @@ main(int argc, char** argv)
     //    RealType nu = 0.3;
     //    RealType ET = 40000;
 
-    //    material_data.mu     = material_data.converttomu(E, nu);
-    //    material_data.lambda = material_data.converttolambda(E, nu);
+    //    material_data.setMu(E, nu);
+    //    material_data.setLambda(E, nu);
 
-    //    material_data.K = 20000;
-    //    material_data.H = material_data.converttoH(E, ET, material_data.K);
+    //    material_data.setK(20000);
+    //    material_data.setH(E, ET, material_data.getK());
 
-    //    material_data.sigma_y0 = 400;
+    //    material_data.setSigma_y0(400);
 
     // // Cook Parameters (mm, GPa, kN)
     // RealType E  = 70;
     // RealType nu = 0.4999;
 
-    // material_data.mu     = material_data.converttomu(E, nu);
-    // material_data.lambda = material_data.converttolambda(E, nu);
+    // material_data.setMu(E, nu);
+    // material_data.setLambda(E, nu);
 
-    // material_data.K = 0.0;
-    // material_data.H = 0.135;
+    // material_data.setK(0.0);
+    // material_data.setH(0.135);
 
-    // material_data.sigma_y0 = 0.243;
+    // material_data.setSigma_y0(0.243);
 
     // Sphere Parameters (mm, GPa, kN)
     RealType E  = 2.E11;
     RealType nu = 0.3;
     RealType ET = 0;
 
-    material_data.mu     = material_data.converttomu(E, nu);
-    material_data.lambda = material_data.converttolambda(E, nu);
+    material_data.setMu(E, nu);
+    material_data.setLambda(E, nu);
 
-    material_data.K = 0;
-    material_data.H = 0;
+    material_data.setK(0);
+    material_data.setH(0);
 
-    material_data.sigma_y0 = 1.5E8;
-
-    // Plaque Parameters(mm, GPa, kN)
-    // RealType E  = 70;
-    // RealType nu = 0.3;
-
-    // material_data.mu     = material_data.converttomu(E, nu);
-    // material_data.lambda = material_data.converttolambda(E, nu);
-
-    // material_data.K = 0;
-    // material_data.H = 10;
-
-    // material_data.sigma_y0 = 0.8;
-
-    // Cube Parameters (mm, MPa, N)
-    //    RealType E  = 200000;
-    //    RealType ET = 0;
-    //    RealType nu = 0.499;
-
-    //    material_data.mu     = material_data.converttomu(E, nu);
-    //    material_data.lambda = material_data.converttolambda(E, nu);
-
-    //    material_data.K = 0;
-    //    material_data.H = material_data.converttoH(E, ET, material_data.K);
-
-    //    material_data.sigma_y0 = 150;
-
+    material_data.setSigma_y0(1.5E8);
+;
     // Test aster Parameters (mm, GPa, kN)
     // RealType E  = 70;
     // RealType nu = 0.4999;
