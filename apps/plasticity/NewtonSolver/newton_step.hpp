@@ -158,7 +158,7 @@ class NewtonRaphson_step_plasticity
 
         for (auto& cl : m_msh)
         {
-            std::cout << "cell " << cl << std::endl;
+            // std::cout << "cell " << cl << std::endl;
             // Gradient Reconstruction
             matrix_dynamic GT;
             tc.tic();

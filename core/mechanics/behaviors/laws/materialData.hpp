@@ -25,6 +25,9 @@
 
 #pragma once
 
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 namespace disk
 {
 
@@ -95,7 +98,7 @@ class MaterialData
     void
     setMu(const scalar_type E, const scalar_type nu)
     {
-        m_mu = E / (2 * (1 + nu));
+        m_mu = E / (2.0 * (1.0 + nu));
     }
 
     void
@@ -107,7 +110,7 @@ class MaterialData
     void
     setLambda(const scalar_type E, const scalar_type nu)
     {
-        m_mu = E * nu / ((1 + nu) * (1 - 2 * nu));
+        m_lambda = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu));
     }
 
     void
@@ -220,6 +223,26 @@ class MaterialData
     }
 
     void
+    checkRpCurve()
+    {
+        if (m_Rp_curve.size() > 0)
+        {
+            std::sort(m_Rp_curve.begin(), m_Rp_curve.end(), [](const auto& lhs, const auto& rhs) {
+                return lhs.getP() < rhs.getP();
+            });
+
+            for (size_t i = 0; i < m_Rp_curve.size() - 1; i++)
+            {
+                if (std::abs(m_Rp_curve[i].getP() - m_Rp_curve[i + 1].getP()) <
+                    std::numeric_limits<scalar_type>::epsilon())
+                {
+                    throw std::invalid_argument("RpCurve: You have two values with the same p");
+                }
+            }
+        }
+    }
+
+    void
     print() const
     {
         std::cout << "Material parameters: " << std::endl;
@@ -231,6 +254,10 @@ class MaterialData
         std::cout << "* Sy0: " << getSigma_y0() << std::endl;
         std::cout << "* Lambda: " << getLambda() << std::endl;
         std::cout << "* Mu: " << getMu() << std::endl;
+        std::cout << "* Traction Curve:" << std::endl;
+        std::cout << "(p, R(p))" << std::endl;
+        for (auto& pt : m_Rp_curve)
+            std::cout << "( " << pt.getP() << ", " << pt.getRp() << " )" << std::endl;
     }
 };
 }

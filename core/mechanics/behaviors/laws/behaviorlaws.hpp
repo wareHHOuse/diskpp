@@ -27,6 +27,7 @@
 
 #include "Cavitation/Cavitation_qp.hpp"
 #include "HenckyMises/HenckyMises_qp.hpp"
+#include "IsotropicHardeningVMis/IsotropicHardeningVMis_qp.hpp"
 #include "LinearIsotropicAndKinematicHardening/LinearIsotropicAndKinematicHardening_qp.hpp"
 #include "LinearLaw/LinearLaw_qp.hpp"
 #include "Neohookean/Neohookean_qp.hpp"
@@ -36,7 +37,8 @@ namespace disk
 {
 
 template<typename MeshType>
-using Cavitation = LawTypeBones<MeshType, Cavitation_qp<typename MeshType::coordinate_type, MeshType::dimension>, false>;
+using Cavitation =
+  LawTypeBones<MeshType, Cavitation_qp<typename MeshType::coordinate_type, MeshType::dimension>, false>;
 
 template<typename MeshType>
 using Neohookean =
@@ -54,4 +56,8 @@ using LinearIsotropicAndKinematicHardening =
   LawTypeBones<MeshType,
                LinearIsotropicAndKinematicHardening_qp<typename MeshType::coordinate_type, MeshType::dimension>,
                true>;
+
+template<typename MeshType>
+using IsotropicHardeningVMis =
+  LawTypeBones<MeshType, IsotropicHardeningVMis_qp<typename MeshType::coordinate_type, MeshType::dimension>, true>;
 }

@@ -23,6 +23,7 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <regex>
@@ -44,10 +45,39 @@
 
 #include "finite_strains_solver.hpp"
 
+template<typename T>
+void
+readCurve(const std::string filename, disk::MaterialData<T>& material_data)
+{
+    std::ifstream file(filename, std::ios::in);
+
+    if (file)
+    {
+        // L'ouverture s'est bien passée, on peut donc lire
+
+        T p, Rp;
+
+        while (!file.eof()) // Tant qu'on n'est pas à la fin, on lit
+        {
+            file >> p >> Rp;
+            if (!file.eof())
+            {
+                material_data.addCurvePoint(p, Rp);
+            }
+        }
+        material_data.checkRpCurve();
+        file.close();
+    }
+    else
+    {
+        std::cout << "ERREUR: Imposible to read the file" << std::endl;
+    }
+}
+
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 void
-run_finite_strains_solver(const Mesh<T, 2, Storage>&        msh,
-                          const ParamRun<T>&                rp,
+run_finite_strains_solver(const Mesh<T, 2, Storage>&   msh,
+                          const ParamRun<T>&           rp,
                           const disk::MaterialData<T>& material_data)
 {
     typedef Mesh<T, 2, Storage>                            mesh_type;
@@ -76,12 +106,12 @@ run_finite_strains_solver(const Mesh<T, 2, Storage>&        msh,
     // Cook with quadrilaterals
     auto zero = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
 
-    auto trac = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0.1125}; };
+    auto trac     = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0.1125}; };
     auto depltest = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 1}; };
 
     bnd.addDirichletBC(disk::mechanics::CLAMPED, 3, zero);
     bnd.addNeumannBC(disk::mechanics::NEUMANN, 8, trac);
-    //bnd.addDirichletBC(disk::mechanics::DY, 8, depltest);
+    // bnd.addDirichletBC(disk::mechanics::DY, 8, depltest);
 
     finite_strains_solver<mesh_type> nl(msh, bnd, rp, material_data);
 
@@ -178,7 +208,7 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&   msh,
     bnd.addDirichletBC(disk::mechanics::DX, 12, zero);
     bnd.addDirichletBC(disk::mechanics::DY, 24, zero);
     bnd.addDirichletBC(disk::mechanics::DZ, 19, zero);
-    //bnd.addNeumannBC(disk::mechanics::DIRICHLET, 27, pres);
+    // bnd.addNeumannBC(disk::mechanics::DIRICHLET, 27, pres);
     bnd.addNeumannBC(disk::mechanics::NEUMANN, 27, pres);
 
     // Cube + pres
@@ -309,7 +339,7 @@ main(int argc, char** argv)
     material_data.setH(0);
 
     material_data.setSigma_y0(1.5E8);
-;
+    ;
     // Test aster Parameters (mm, GPa, kN)
     // RealType E  = 70;
     // RealType nu = 0.4999;
@@ -321,7 +351,6 @@ main(int argc, char** argv)
     // material_data.H = 70;
 
     // material_data.sigma_y0 = 0.5;
-
 
     int ch;
 
@@ -384,19 +413,21 @@ main(int argc, char** argv)
     }
 
     /* Netgen 3D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$"))) {
-       std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-       auto msh = disk::load_netgen_3d_mesh<RealType>(mesh_filename);
-       run_finite_strains_solver(msh, rp, material_data);
-       return 0;
+    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$")))
+    {
+        std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
+        auto msh = disk::load_netgen_3d_mesh<RealType>(mesh_filename);
+        run_finite_strains_solver(msh, rp, material_data);
+        return 0;
     }
 
     /* Medit 3d*/
-    if (std::regex_match(mesh_filename, std::regex(".*\\.medit3d$"))) {
-       std::cout << "Guessed mesh format: Medit format" << std::endl;
-       auto msh = disk::load_medit_3d_mesh<RealType>(mesh_filename);
-       run_finite_strains_solver(msh, rp, material_data);
-       return 0;
+    if (std::regex_match(mesh_filename, std::regex(".*\\.medit3d$")))
+    {
+        std::cout << "Guessed mesh format: Medit format" << std::endl;
+        auto msh = disk::load_medit_3d_mesh<RealType>(mesh_filename);
+        run_finite_strains_solver(msh, rp, material_data);
+        return 0;
     }
 
     // /* DiSk++ cartesian 3D */
