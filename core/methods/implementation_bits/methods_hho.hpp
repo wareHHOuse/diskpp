@@ -167,7 +167,7 @@ make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
         const auto fc = fcs[i];
         const auto n  = normal(msh, cl, fc);
         auto fb = make_scalar_monomial_basis(msh, fc, facdeg);
-
+        
         auto qps_f = integrate(msh, fc, recdeg - 1 + std::max(facdeg,celdeg));
         for (auto& qp : qps_f)
         {
@@ -181,7 +181,7 @@ make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
         }
     }
 
-    matrix_type oper = gr_lhs.llt().solve(gr_rhs);
+    matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type data = gr_rhs.transpose() * oper;
 
     return std::make_pair(oper, data);

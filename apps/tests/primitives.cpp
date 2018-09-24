@@ -40,17 +40,17 @@ bool test_barycenter(const point<T,1>& pt)
 template<typename T>
 bool test_barycenter(const point<T,2>& pt)
 {
-    T ULP_max = 2;
+    T max_abs_error = 1e-14;
     bool success = true;
     
-    if ( !almost_equal(pt.x(), 0.5, ULP_max) )
+    if ( std::abs(pt.x()-0.5) > max_abs_error )
     {
         std::cout << "  pt.x() not accurate: ";
         std::cout << std::setprecision(16) << pt.x() << std::endl;
         success = false;
     }
     
-    if ( !almost_equal(pt.y(), 0.5, ULP_max) )
+    if ( std::abs(pt.y()-0.5) > max_abs_error )
     {
         std::cout << "  pt.y() not accurate: ";
         std::cout << std::setprecision(16) << pt.y() << std::endl;
@@ -63,24 +63,24 @@ bool test_barycenter(const point<T,2>& pt)
 template<typename T>
 bool test_barycenter(const point<T,3>& pt)
 {
-    T ULP_max = 2;
+    T max_abs_error = 1e-14;
     bool success = true;
     
-    if ( !almost_equal(pt.x(), 0.5, ULP_max) )
+    if ( std::abs(pt.x()-0.5) > max_abs_error )
     {
         std::cout << "  pt.x() not accurate: ";
         std::cout << std::setprecision(16) << pt.x() << std::endl;
         success = false;
     }
     
-    if ( !almost_equal(pt.y(), 0.5, ULP_max) )
+    if ( std::abs(pt.y()-0.5) > max_abs_error )
     {
         std::cout << "  pt.y() not accurate: ";
         std::cout << std::setprecision(16) << pt.y() << std::endl;
         success = false;
     }
     
-    if ( !almost_equal(pt.z(), 0.5, ULP_max) )
+    if ( std::abs(pt.z()-0.5) > max_abs_error )
     {
         std::cout << "  pt.z() not accurate: ";
         std::cout << std::setprecision(16) << pt.z() << std::endl;

@@ -177,7 +177,7 @@ public:
 		
 		m_num = a*c;
 		m_den = b*d;
-		assert(m_den > 0);
+		//assert(m_den > 0);
 		return *this;
 	}
     

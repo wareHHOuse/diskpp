@@ -160,7 +160,7 @@ run_hho_diffusion_solver(const Mesh& msh, size_t degree)
         Eigen::Matrix<T, Eigen::Dynamic, 1> fullsol =
             diffusion_static_condensation_recover(msh, cl, hdi, A, rhs, locsol);
 
-        Eigen::Matrix<T, Eigen::Dynamic, 1> realsol = project_function(msh, cl, hdi, sol_fun);
+        Eigen::Matrix<T, Eigen::Dynamic, 1> realsol = project_function(msh, cl, hdi, sol_fun, 2);
 
         auto diff = realsol - fullsol;
         error += diff.dot(A*diff);

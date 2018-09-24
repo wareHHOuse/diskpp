@@ -441,7 +441,6 @@ template<typename T, typename PtA>
 std::vector<disk::quadrature_point<T, 2>>
 integrate_triangle(size_t degree, const PtA& pts)
 {
-    degree += 2;
     assert(pts.size() == 3);
     static_assert(std::is_same<typename PtA::value_type, point<T, 2>>::value, "This function is for 2D points");
 
