@@ -65,7 +65,7 @@ struct test_functor
 
             size_t rec_size = disk::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
 
-            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f);
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
 
             error += proj.dot(stab*proj);
         }

@@ -34,6 +34,20 @@
 const size_t MIN_TEST_DEGREE = 0;
 const size_t MAX_TEST_DEGREE = 3;
 
+using namespace Eigen;
+
+template<class T>
+typename std::enable_if<!std::numeric_limits<T>::is_integer, bool>::type
+    almost_equal(T x, T y, T ulp)
+{
+    // the machine epsilon has to be scaled to the magnitude of the values used
+    // and multiplied by the desired precision in ULPs (units in the last place)
+    return std::abs(x-y) <= std::numeric_limits<T>::epsilon() * std::abs(x+y) * ulp
+    // unless the result is subnormal
+           || std::abs(x-y) < std::numeric_limits<T>::min();
+}
+
+
 /*****************************************************************************************/
 template<typename Mesh>
 struct scalar_testing_function;
@@ -437,8 +451,10 @@ do_testing(std::vector<Mesh>& meshes, const Function& run_test,
                 std::cout << std::scientific << std::setprecision(5) << l2_errors.at(i) << "    ";
                 std::cout << std::defaultfloat << std::setprecision(3) << rate << "    ";
 
-                if ( rate < expected_rate(k)-0.5 || rate > expected_rate(k)+0.5 )
+                if ( rate < expected_rate(k)-0.5 )
                     std::cout << "[" << red << "FAIL" << nocolor << "]";
+                else if ( rate > expected_rate(k)+0.5 )
+                    std::cout << "[" << yellow << "FAIL" << nocolor << "]";
                 else
                     std::cout << "[" << green << " OK " << nocolor << "]";
 

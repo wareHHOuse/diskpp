@@ -84,7 +84,9 @@ map_to_physical(const disk::simplicial_mesh<T, 3>&                msh,
 {
     const auto pts = points(msh, cell);
 
-    const auto pp = (pts[1] - pts[0]) * p.x() + (pts[2] - pts[0]) * p.y() + (pts[3] - pts[0]) * p.z() + pts[0];
+    const auto pp = (pts[1] - pts[0]) * p.x() +
+                    (pts[2] - pts[0]) * p.y() +
+                    (pts[3] - pts[0]) * p.z() + pts[0];
 
     return pp;
 }
@@ -94,7 +96,9 @@ map_to_physical(const disk::simplicial_mesh<T, 3>&                msh,
 
 template<typename T>
 std::vector<disk::quadrature_point<T, 3>>
-integrate(const disk::simplicial_mesh<T, 3>& msh, const typename disk::simplicial_mesh<T, 3>::face& fc, size_t degree)
+integrate(const disk::simplicial_mesh<T, 3>& msh,
+          const typename disk::simplicial_mesh<T, 3>::face& fc,
+          size_t degree)
 {
     if (degree == 0)
     {
@@ -125,7 +129,9 @@ integrate(const disk::simplicial_mesh<T, 3>& msh, const typename disk::simplicia
 
 template<typename T>
 std::vector<disk::quadrature_point<T, 3>>
-integrate(const disk::simplicial_mesh<T, 3>& msh, const typename disk::simplicial_mesh<T, 3>::cell& cl, size_t degree)
+integrate(const disk::simplicial_mesh<T, 3>& msh,
+          const typename disk::simplicial_mesh<T, 3>::cell& cl,
+          size_t degree)
 {
     if (degree == 0)
     {
@@ -144,7 +150,9 @@ integrate(const disk::simplicial_mesh<T, 3>& msh, const typename disk::simplicia
 
     auto tr = [&](const std::pair<point<T, 3>, T>& qd) -> auto
     {
-        const auto point  = col1 * qd.first.x() + col2 * qd.first.y() + col3 * qd.first.z() + pts[0];
+        const auto point  = col1 * qd.first.x() +
+                            col2 * qd.first.y() +
+                            col3 * qd.first.z() + pts[0];
         const auto weight = qd.second * meas;
         return disk::make_qp(point, weight);
     };

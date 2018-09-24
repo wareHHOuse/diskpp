@@ -62,7 +62,7 @@ struct test_functor
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f);
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
             auto gr = disk::make_hho_scalar_laplacian(msh, cl, hdi);
 
             size_t rec_size = disk::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);

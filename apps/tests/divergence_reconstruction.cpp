@@ -61,7 +61,7 @@ struct test_functor
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f);
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
             auto dr = make_hho_divergence_reconstruction(msh, cl, hdi);
 
             Matrix<scalar_type, Dynamic, 1> div = dr.first * proj;

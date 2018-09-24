@@ -65,7 +65,7 @@ struct test_functor
             auto stab = disk::make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
             //auto stab = disk::make_hdg_scalar_stabilization(msh, cl, hdi);
 
-            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f);
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
 
             error += proj.dot(stab*proj);
         }
