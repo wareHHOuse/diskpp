@@ -102,7 +102,7 @@ auto make_solution_function(const Mesh& msh)
 using namespace disk;
 
 template<typename Mesh>
-typename Mesh::scalar_type
+typename Mesh::coordinate_type
 run_hho_diffusion_solver(const Mesh& msh, size_t degree)
 {
     using T = typename Mesh::coordinate_type;
@@ -185,7 +185,7 @@ template<typename Mesh>
 struct test_functor
 {
     /* Expect k+1 convergence (hho stabilization, energy norm) */
-    typename Mesh::scalar_type
+    typename Mesh::coordinate_type
     operator()(const Mesh& msh, size_t degree) const
     {
         return run_hho_diffusion_solver(msh, degree);
