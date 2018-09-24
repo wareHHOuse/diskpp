@@ -1,3 +1,7 @@
+# WARNING
+
+Disk++ is undergoing major architectural revision. Keep an eye on branch ``revolution''
+
 ### DiSk++
 
 This is __DiSk++__, a C++ template library for Discontinuous Skeletal methods like discontinuous Galerkin (dG) and Hybrid-High Order (HHO).
