@@ -38,7 +38,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun,
     const algorithm_parameters<typename Mesh::scalar_type>& ap,
     const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
 {
-    std::cout << "Im in CELLS FULL" << std::endl;
+    std::cout << "Im in CELLS FULL in NEW" << std::endl;
     std::cout << ap << std::endl;
     using T = typename Mesh::scalar_type;
 
@@ -121,6 +121,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun,
             cl_count++;
         }
 
+        assembler.impose_neumann_boundary_conditions(msh, bnd);
         assembler.finalize();
 
         size_t systsz = assembler.LHS.rows();
@@ -178,7 +179,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun,
 
         std::cout << "  "<< iter << "  "<< std::sqrt(H1_error)<< "   "<< std::sqrt(L2_error)<< std::endl;
 
-        if( std::sqrt(H1_error)  < tol)
+        //if( std::sqrt(H1_error)  < tol)
         {
             std::ofstream efs("solution_whho_cnew_i" + tostr(iter) + ".dat");
 
@@ -200,7 +201,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun,
 
             efs.close();
 
-            return full_sol;
+            //return full_sol;
         }
 
     }
@@ -209,7 +210,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun,
 
 template<typename Mesh>
 void
-run_signorini(  const Mesh& msh, const algorithm_parameters<typename Mesh::scalar_type>& ap,
+run_signorini_unknown(  const Mesh& msh, const algorithm_parameters<typename Mesh::scalar_type>& ap,
                 const typename Mesh::scalar_type& parameter)
 {
     typedef typename Mesh::point_type  point_type;
@@ -253,4 +254,87 @@ run_signorini(  const Mesh& msh, const algorithm_parameters<typename Mesh::scala
     }
 
     return;
+}
+
+template<typename Mesh>
+void
+run_signorini_analytical(  const Mesh& msh, const algorithm_parameters<typename Mesh::scalar_type>& ap,
+                const typename Mesh::scalar_type& parameter)
+{
+    typedef typename Mesh::point_type  point_type;
+    using T =  typename Mesh::scalar_type;
+
+
+    dump_to_matlab(msh,"mesh.m");
+
+    auto force = [](const point_type& p) -> T {
+        return 0.;
+    };
+
+    auto zero_fun = [](const point_type& p) -> T {
+        return 0.;
+    };
+
+    auto left = [](const point_type& p) -> T {
+        T radio = std::sqrt(p.x()*p.x() + p.y()*p.y());
+        T theta = std::atan2(p.y(), p.x());
+        T sintcos = std::sin(theta) *std::cos(4.5 *theta);
+        T sincost = std::sin(4.5 *theta) * std::cos(theta);
+         return  4.5 * std::pow(radio, 3.5) *( sincost - sintcos);
+    };
+
+    auto right = [](const point_type& p) -> T {
+        T radio = std::sqrt(p.x()*p.x() + p.y()*p.y());
+        T theta = std::atan2(p.y(), p.x());
+        T sintcos = std::sin(theta) *std::cos(4.5 *theta);
+        T sincost = std::sin(4.5 *theta) * std::cos(theta);
+         return  -4.5 * std::pow(radio, 3.5) *( sincost - sintcos);
+    };
+
+
+    auto fun = [](const point_type& p) -> T {
+        T radio = std::sqrt(p.x()*p.x() + p.y()*p.y());
+        T theta = std::atan2(p.y(), p.x());
+
+        return  std::pow(radio, 4.5) * std::sin(4.5 *theta);
+    };
+
+    typedef disk::mechanics::BoundaryConditionsScalar<Mesh> boundary_type;
+    boundary_type  bnd(msh);
+
+    /*--------------------------------------------------------------------------
+    *  Check boundary labels for the unitary square domain
+    *          Netgen     _____          Medit     _____
+    *                4   |     | 2                |     |
+    *                    |_____|                  |_____|
+    *                       3                        2
+    *-------------------------------------------------------------------------*/
+
+    bnd.addDirichletBC(disk::mechanics::DIRICHLET,1, fun); //TOP
+    bnd.addDirichletBC(disk::mechanics::DIRICHLET,2, fun); //TOP
+    bnd.addDirichletBC(disk::mechanics::DIRICHLET,4, fun); //TOP
+
+    //bnd.addNeumannBC(disk::mechanics::NEUMANN, 2, left); //
+    //bnd.addNeumannBC(disk::mechanics::NEUMANN, 4, right); //
+    //bnd.addNeumannBC(disk::mechanics::NEUMANN, 3, zero_fun); //TOP
+    bnd.addContactBC(disk::mechanics::SIGNORINI,3); //BOTTOM
+
+    switch (ap.solver)
+    {
+        case EVAL_IN_CELLS_FULL:
+            solve_cells_full(msh, force, ap, bnd);
+            break;
+        default:
+            throw std::invalid_argument("Invalid solver");
+    }
+
+    return;
+}
+
+template<typename Mesh>
+void
+run_signorini(  const Mesh& msh, const algorithm_parameters<typename Mesh::scalar_type>& ap,
+                const typename Mesh::scalar_type& parameter)
+{
+    run_signorini_analytical(msh, ap, parameter);
 }
