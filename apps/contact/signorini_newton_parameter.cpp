@@ -82,8 +82,8 @@ public:
             {
                 auto cell_ofs = offset_vector.at(cl_count);
                 auto num_total_dofs  = cbs + howmany_faces(msh, cl) * fbs;
-                vector_type  u_full  = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
-
+                vector_type  u_full  = take_velocity(msh, cl, full_offset, full_sol);
+                
                 auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
                 auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
                 auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);

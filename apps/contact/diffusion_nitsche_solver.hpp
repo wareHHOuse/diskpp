@@ -687,34 +687,7 @@ run_hho_diffusion_nitsche_faces(const Mesh& msh,
 }
 
 
-template<typename Mesh>
-auto
-make_is_dirichlet_vector(const Mesh& msh,
-                const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
-{
-    //cells with contact faces
-    auto num_cells = msh.cells_size();
-    std::vector<size_t> ret = std::vector<size_t>(num_cells);
-    size_t i =0;
-    for (auto& cl : msh)
-    {
-        auto fcs = faces(msh, cl);
-        for (auto& fc:fcs)
-        {
-            auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
-            if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
-            const auto face_id=eid.second;
 
-            if (bnd.is_dirichlet_face(face_id))
-            {
-                ret.at(i) = 1;
-                continue;
-            }
-        }
-        i++;
-    }
-    return ret;
-}
 template<typename Mesh>
 auto
 run_hho_diffusion_nitsche_cells(const Mesh& msh,

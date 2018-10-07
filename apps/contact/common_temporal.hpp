@@ -263,8 +263,7 @@ std::vector<std::pair<size_t,size_t >>
 dirichlet_offset(const Mesh& msh, const hho_degree_info& hdi,
                 const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
 {
-    auto ofsets = full_offset( msh, hdi);
-    auto dcells = make_is_dirichlet_vector(msh, bnd);
+    auto ofsets = full_offset(msh, hdi);
 
     auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
     auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
@@ -275,24 +274,19 @@ dirichlet_offset(const Mesh& msh, const hho_degree_info& hdi,
 
     for (auto & cl : msh)
     {
-        if(dcells.at(cell_count))
+        auto fcs = faces(msh, cl);
+        for (size_t i = 0; i < fcs.size(); i++)
         {
-            auto fcs = faces(msh, cl);
-            for (size_t i = 0; i < fcs.size(); i++)
+            const auto fc = fcs[i];
+            auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+            if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+            const auto face_id=eid.second;
+
+            if (bnd.is_dirichlet_face(face_id))
             {
-                const auto fc = fcs[i];
+                auto face_ofs = ofsets.at(cell_count) + cbs + fbs * i;
 
-                auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
-                if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
-                const auto face_id=eid.second;
-
-                if (bnd.is_dirichlet_face(face_id))
-                {
-                    auto cell_id  = msh.lookup(cl);
-                    auto face_ofs = ofsets.at(cell_id) + fbs * i;
-
-                    vec.push_back(std::make_pair( face_id, face_ofs));
-                }
+                vec.push_back(std::make_pair( face_id, face_ofs));
             }
         }
         cell_count++;

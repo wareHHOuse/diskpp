@@ -29,18 +29,19 @@
 
 
 #include "output/silo.hpp"
-#include "common.hpp"
+#include "common_temporal.hpp"
 #include "solvers/solver.hpp"
 
-template<typename Mesh, typename Function>
-dynamic_vector<typename Mesh::scalar_type>
-solve_cells_full(const Mesh&  msh, const Function& rhs_fun,
-    const algorithm_parameters<typename Mesh::scalar_type>& ap,
+template<typename Mesh, typename Function, typename Analytical>
+//dynamic_vector<typename Mesh::coordinate_type> //This is for hierarchical (solve conflicts!!)
+std::pair<typename Mesh::coordinate_type, typename Mesh::coordinate_type>
+solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun,
+    const algorithm_parameters<typename Mesh::coordinate_type>& ap,
     const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
 {
     std::cout << "Im in CELLS FULL in NEW" << std::endl;
     std::cout << ap << std::endl;
-    using T = typename Mesh::scalar_type;
+    using T = typename Mesh::coordinate_type;
 
     typedef Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>    matrix_type;
     typedef Eigen::Matrix<T, Eigen::Dynamic, 1>                 vector_type;
@@ -62,12 +63,15 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun,
 
     dynamic_vector<T>  full_sol = dynamic_vector<T>::Zero(num_full_dofs);
 
-    auto max_iter = 20;
+
+    auto max_iter = 15;
     auto tol = 1.e-6;
 
     for(size_t iter = 0; iter < max_iter; iter++)
     {
         auto assembler = make_contact_full_assembler_new(msh, hdi, bnd);
+
+        assembler.imposed_dirichlet_boundary_conditions(msh, bnd, full_sol);
 
         auto cl_count = 0;
         for (auto& cl : msh)
@@ -134,8 +138,8 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun,
         mkl_pardiso(pparams, assembler.LHS, assembler.RHS, dsol);
 
 
-        T H1_error  = 0.0 ;
-        T L2_error  = 0.0 ;
+        T H1_increment  = 0.0 ;
+        T L2_increment  = 0.0 ;
 
         cl_count = 0;
         dynamic_vector<T> diff_sol = dynamic_vector<T>::Zero(num_full_dofs);
@@ -162,59 +166,95 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun,
                 Ah  = gr.second + stab;
             }
 
-            du_full = assembler.take_local_data(msh, cl, dsol);
+            //Erase this function, since it coulb be used to take data from full_sol
+            //dsol has zero dirichlet conditions so nothing is computed in this faces/
+            du_full = assembler.take_local_data_increment(msh, cl, dsol);
             diff_sol.block(cell_ofs, 0, num_total_dofs ,1) = du_full;
 
             auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
             matrix_type mass  = make_mass_matrix(msh, cl, cb);//, hdi.cell_degree());
             vector_type u_diff = du_full.block(0, 0, cbs, 1);
 
-            H1_error += du_full.dot(Ah * du_full);
-            L2_error += u_diff.dot(mass * u_diff);
+            H1_increment += du_full.dot(Ah * du_full);
+            L2_increment += u_diff.dot(mass * u_diff);
 
             cl_count++;
         }
 
+
         full_sol += diff_sol;
 
-        std::cout << "  "<< iter << "  "<< std::sqrt(H1_error)<< "   "<< std::sqrt(L2_error)<< std::endl;
+        std::cout << "  "<< iter << "  "<< std::scientific<< std::setprecision(3);
+        std::cout << std::sqrt(H1_increment)<< "   "<< std::sqrt(L2_increment)<< std::endl;
 
-        //if( std::sqrt(H1_error)  < tol)
+        if( std::sqrt(H1_increment)  < tol)
         {
             std::ofstream efs("solution_whho_cnew_i" + tostr(iter) + ".dat");
 
             if(!efs.is_open())
                 std::cout<< "Error opening file"<<std::endl;
 
+
+            T H1_error  = 0.0 ;
+            T L2_error  = 0.0 ;
+
+
             auto cl_count = 0;
             for(auto& cl : msh)
             {
-                auto num_total_dofs = cbs + howmany_faces(msh,cl) * fbs;
-                auto cell_ofs = offset_vector.at(cl_count);
-                vector_type u_bar = full_sol.block(cell_ofs, 0, 1, 1);
+                const auto cell_ofs = offset_vector.at(cl_count);
+                const auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
+
+                vector_type  u_full   = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
+                vector_type  du_full  = diff_sol.block(cell_ofs, 0, num_total_dofs, 1);
+                matrix_type  Ah  = matrix_type::Zero(num_total_dofs, num_total_dofs);
+
+                auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
+
+                if (is_contact_vector.at(cl_count)==1)
+                {
+                    auto gr  = make_hho_contact_scalar_laplacian(msh, cl, hdi, bnd);
+                    Ah  = gr.second + stab;
+                }
+                else
+                {
+                    auto gr  = make_hho_scalar_laplacian(msh, cl, hdi);
+                    Ah  = gr.second + stab;
+                }
+
+                vector_type realsol = project_function(msh, cl, hdi, sol_fun, 2);
+
+                vector_type diff = realsol - u_full;
+                H1_error += diff.dot(Ah*diff);
+
+                auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+                matrix_type mass  = make_mass_matrix(msh, cl, cb, hdi.cell_degree());
+                vector_type u_diff = diff.block(0, 0, cbs, 1);
+                L2_error += u_diff.dot(mass * u_diff);
+
+                //plot
                 auto bar = barycenter(msh, cl);
 
-                efs << bar.x() << " " << bar.y() <<" "<< u_bar(0) << std::endl;
+                efs << bar.x() << " " << bar.y() <<" "<< u_full(0) << " "<< du_full(0) << std::endl;
                 cl_count++;
+
             }
-
-
             efs.close();
 
-            //return full_sol;
+            return std::make_pair(std::sqrt(H1_error), std::sqrt(L2_error));
         }
 
     }
-    return full_sol;
+    return std::make_pair(0., 0.);
 }
 
 template<typename Mesh>
-void
-run_signorini_unknown(  const Mesh& msh, const algorithm_parameters<typename Mesh::scalar_type>& ap,
-                const typename Mesh::scalar_type& parameter)
+std::pair<typename Mesh::coordinate_type, typename Mesh::coordinate_type>
+run_signorini_unknown(  const Mesh& msh, const algorithm_parameters<typename Mesh::coordinate_type>& ap,
+                const typename Mesh::coordinate_type& parameter)
 {
     typedef typename Mesh::point_type  point_type;
-    using T =  typename Mesh::scalar_type;
+    using T =  typename Mesh::coordinate_type;
 
 
     dump_to_matlab(msh,"mesh.m");
@@ -247,22 +287,20 @@ run_signorini_unknown(  const Mesh& msh, const algorithm_parameters<typename Mes
     switch (ap.solver)
     {
         case EVAL_IN_CELLS_FULL:
-            solve_cells_full(msh, force, ap, bnd);
+            return solve_cells_full(msh, force, zero_fun, ap, bnd);
             break;
         default:
             throw std::invalid_argument("Invalid solver");
     }
-
-    return;
 }
 
 template<typename Mesh>
-void
-run_signorini_analytical(  const Mesh& msh, const algorithm_parameters<typename Mesh::scalar_type>& ap,
-                const typename Mesh::scalar_type& parameter)
+std::pair<typename Mesh::coordinate_type, typename Mesh::coordinate_type>
+run_signorini_analytical(  const Mesh& msh, const algorithm_parameters<typename Mesh::coordinate_type>& ap,
+                const typename Mesh::coordinate_type& parameter)
 {
     typedef typename Mesh::point_type  point_type;
-    using T =  typename Mesh::scalar_type;
+    using T =  typename Mesh::coordinate_type;
 
 
     dump_to_matlab(msh,"mesh.m");
@@ -322,19 +360,17 @@ run_signorini_analytical(  const Mesh& msh, const algorithm_parameters<typename 
     switch (ap.solver)
     {
         case EVAL_IN_CELLS_FULL:
-            solve_cells_full(msh, force, ap, bnd);
+            return solve_cells_full(msh, force, fun, ap, bnd);
             break;
         default:
             throw std::invalid_argument("Invalid solver");
     }
-
-    return;
 }
 
 template<typename Mesh>
-void
-run_signorini(  const Mesh& msh, const algorithm_parameters<typename Mesh::scalar_type>& ap,
-                const typename Mesh::scalar_type& parameter)
+std::pair<typename Mesh::coordinate_type, typename Mesh::coordinate_type>
+run_signorini(  const Mesh& msh, const algorithm_parameters<typename Mesh::coordinate_type>& ap,
+                const typename Mesh::coordinate_type& parameter)
 {
-    run_signorini_analytical(msh, ap, parameter);
+    return run_signorini_analytical(msh, ap, parameter);
 }
