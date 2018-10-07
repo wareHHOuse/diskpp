@@ -267,7 +267,7 @@ make_hho_gradrec_vector(const Mesh& msh, const typename Mesh::cell_type& cl, con
         }
     }
 
-    matrix_type oper = gr_lhs.llt().solve(gr_rhs);
+    matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type data = gr_rhs.transpose() * oper;
 
     return std::make_pair(oper, data);
@@ -344,7 +344,7 @@ make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
         }
     }
 
-    matrix_type oper = gr_lhs.llt().solve(gr_rhs);
+    matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type data = gr_rhs.transpose() * oper;
 
     return std::make_pair(oper, data);
@@ -548,7 +548,7 @@ make_hho_gradrec_matrix(const Mesh&                     msh,
       }
    }
 
-   matrix_type oper = gr_lhs.llt().solve(gr_rhs);
+   matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
    matrix_type data = gr_rhs.transpose() * oper;
 
    return std::make_pair(oper, data);
@@ -653,7 +653,7 @@ make_hho_sym_gradrec_matrix(const Mesh&                     msh,
         }
     }
 
-    matrix_type oper = gr_lhs.llt().solve(gr_rhs);
+    matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type data = gr_rhs.transpose() * oper;
 
     return std::make_pair(oper, data);
@@ -686,7 +686,7 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
     assert(dr_lhs.rows() == rbs && dr_lhs.cols() == rbs);
     assert(dr_rhs.rows() == rbs && dr_rhs.cols() == cbs + num_faces * fbs);
 
-    matrix_type oper = dr_lhs.llt().solve(dr_rhs);
+    matrix_type oper = dr_lhs.ldlt().solve(dr_rhs);
     matrix_type data = dr_rhs.transpose() * oper;
 
     return std::make_pair(oper, data);
@@ -801,7 +801,7 @@ make_hdg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
         tr.block(0, cbs + i * fbs, fbs, fbs) = -mass;
         tr.block(0, 0, fbs, cbs) = trace;
 
-        oper.block(0, 0, fbs, cbs) = mass.llt().solve(trace);
+        oper.block(0, 0, fbs, cbs) = mass.ldlt().solve(trace);
         data += oper.transpose() * tr * (1./h);
     }
 
@@ -855,7 +855,7 @@ diffusion_static_condensation_compute(const Mesh& msh,
     assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
     assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
 
-    auto K_TT_ldlt = K_TT.llt();
+    auto K_TT_ldlt = K_TT.ldlt();
     matrix_type AL = K_TT_ldlt.solve(K_TF);
     vector_type bL = K_TT_ldlt.solve(cell_rhs);
 
@@ -904,7 +904,7 @@ diffusion_static_condensation_compute_full(const Mesh& msh,
     vector_type cell_rhs = rhs.block(0, 0, num_cell_dofs, 1);
     vector_type face_rhs = rhs.block(num_cell_dofs, 0, num_faces*num_face_dofs, 1);
 
-    auto K_TT_ldlt = K_TT.llt();
+    auto K_TT_ldlt = K_TT.ldlt();
     matrix_type AL = K_TT_ldlt.solve(K_TF);
     vector_type bL = K_TT_ldlt.solve(cell_rhs);
 
@@ -950,7 +950,7 @@ diffusion_static_condensation_compute_vector(const Mesh& msh,
     assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
     assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
 
-    auto K_TT_ldlt = K_TT.llt();
+    auto K_TT_ldlt = K_TT.ldlt();
     matrix_type AL = K_TT_ldlt.solve(K_TF);
     vector_type bL = K_TT_ldlt.solve(cell_rhs);
 
@@ -1001,7 +1001,7 @@ diffusion_static_condensation_compute_vector_full(const Mesh& msh,
     if(rhs.cols() ==  num_cell_dofs + num_faces*num_face_dofs)
         face_rhs = rhs.block(num_cell_dofs, 0, num_faces*num_face_dofs, 1);
 
-    auto K_TT_ldlt = K_TT.llt();
+    auto K_TT_ldlt = K_TT.ldlt();
     matrix_type AL = K_TT_ldlt.solve(K_TF);
     vector_type bL = K_TT_ldlt.solve(cell_rhs);
 
@@ -1052,7 +1052,7 @@ diffusion_static_condensation_compute_alg(const Mesh& msh,
     vector_type cell_rhs = rhs.block(0, 0, num_cell_dofs, 1);
     vector_type face_rhs = rhs.block(num_cell_dofs, 0, num_faces*num_face_dofs, 1);
 
-    auto K_TT_ldlt = K_TT.llt();
+    auto K_TT_ldlt = K_TT.ldlt();
     matrix_type AL = K_TT_ldlt.solve(K_TF);
     vector_type bL = K_TT_ldlt.solve(cell_rhs);
 
@@ -1089,7 +1089,7 @@ diffusion_static_condensation_recover(const Mesh& msh,
     matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
     matrix_type K_TF = local_mat.topRightCorner(cell_size, all_faces_size);
 
-    vector_type solT = K_TT.llt().solve(cell_rhs - K_TF*solF);
+    vector_type solT = K_TT.ldlt().solve(cell_rhs - K_TF*solF);
 
     ret.head(cell_size)         = solT;
     ret.tail(all_faces_size)    = solF;
@@ -1125,7 +1125,7 @@ diffusion_static_condensation_recover_vector(const Mesh& msh,
     matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
     matrix_type K_TF = local_mat.topRightCorner(cell_size, all_faces_size);
 
-    vector_type solT = K_TT.llt().solve(cell_rhs - K_TF*solF);
+    vector_type solT = K_TT.ldlt().solve(cell_rhs - K_TF*solF);
 
     ret.head(cell_size)         = solT;
     ret.tail(all_faces_size)    = solF;
@@ -1160,7 +1160,7 @@ make_hho_scalar_stabilization(const Mesh&                                       
     // Step 1: compute \pi_T^k p_T^k v (third term).
     const matrix_type M1    = mass_mat.block(0, 0, cbs, cbs);
     const matrix_type M2    = mass_mat.block(0, 1, cbs, rbs - 1);
-    matrix_type       proj1 = -M1.llt().solve(M2 * reconstruction);
+    matrix_type       proj1 = -M1.ldlt().solve(M2 * reconstruction);
 
     assert(M2.cols() == reconstruction.rows());
 
@@ -1245,7 +1245,7 @@ make_hho_scalar_stabilization_2(const Mesh& msh, const typename Mesh::cell_type&
     //Step 1: compute \pi_T^k p_T^k v (third term).
     matrix_type M1 = mass_mat.block(0, 0, cbs, cbs);
     matrix_type M2 = mass_mat.block(0, 1, cbs, rbs-1);
-    matrix_type proj1 = -M1.llt().solve(M2*reconstruction);
+    matrix_type proj1 = -M1.ldlt().solve(M2*reconstruction);
 
     //Step 2: v_T - \pi_T^k p_T^k v (first term minus third term)
     matrix_type I_T = matrix_type::Identity(cbs, cbs);
@@ -1331,7 +1331,7 @@ make_hho_vector_stabilization(const Mesh&                                       
     // Step 1: compute \pi_T^k p_T^k v (third term).
     const matrix_type M1    = mass_mat.block(0, 0, cbs, cbs);
     const matrix_type M2    = mass_mat.block(0, N, cbs, rbs - N);
-    matrix_type       proj1 = -M1.llt().solve(M2 * reconstruction);
+    matrix_type       proj1 = -M1.ldlt().solve(M2 * reconstruction);
 
     assert(M2.cols() == reconstruction.rows());
 
@@ -1402,7 +1402,7 @@ project_function(const Mesh& msh, const typename Mesh::cell_type& cl,
     auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
     matrix_type cell_mm = make_mass_matrix(msh, cl, cb, di);
     vector_type cell_rhs = make_rhs(msh, cl, cb, f, di);
-    ret.block(0, 0, cbs, 1) = cell_mm.llt().solve(cell_rhs);
+    ret.block(0, 0, cbs, 1) = cell_mm.ldlt().solve(cell_rhs);
 
     auto fcs = faces(msh, cl);
     for (size_t i = 0; i < num_faces; i++)
@@ -1411,7 +1411,7 @@ project_function(const Mesh& msh, const typename Mesh::cell_type& cl,
         auto fb = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
         matrix_type face_mm = make_mass_matrix(msh, fc, fb, di);
         vector_type face_rhs = make_rhs(msh, fc, fb, f, di);
-        ret.block(cbs+i*fbs, 0, fbs, 1) = face_mm.llt().solve(face_rhs);
+        ret.block(cbs+i*fbs, 0, fbs, 1) = face_mm.ldlt().solve(face_rhs);
     }
 
     return ret;
@@ -1436,7 +1436,7 @@ project_function(const Mesh& msh, const typename Mesh::cell_type& cl,
     auto cb = make_vector_monomial_basis(msh, cl, hdi.cell_degree());
     matrix_type cell_mm = make_mass_matrix(msh, cl, cb, di);
     vector_type cell_rhs = make_rhs(msh, cl, cb, f, di);
-    ret.block(0, 0, cbs, 1) = cell_mm.llt().solve(cell_rhs);
+    ret.block(0, 0, cbs, 1) = cell_mm.ldlt().solve(cell_rhs);
 
     auto fcs = faces(msh, cl);
     for (size_t i = 0; i < num_faces; i++)
@@ -1466,7 +1466,7 @@ project_function(const Mesh&                      msh,
     auto  fb             = make_vector_monomial_basis(msh, fc, hdi.face_degree());
     matrix_type face_mm  = make_mass_matrix(msh, fc, fb, di);
     vector_type face_rhs = make_rhs(msh, fc, fb, f, di);
-    ret.block(0, 0, fbs, 1)  = face_mm.llt().solve(face_rhs);
+    ret.block(0, 0, fbs, 1)  = face_mm.ldlt().solve(face_rhs);
 
    return ret;
 }
@@ -1685,7 +1685,7 @@ public:
 
                 matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 vector_type rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
-                dirichlet_data.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
+                dirichlet_data.block(face_i*fbs, 0, fbs, 1) = mass.ldlt().solve(rhs);
             }
         }
 
@@ -1735,7 +1735,7 @@ public:
 
                 matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 vector_type rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
-                ret.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
+                ret.block(face_i*fbs, 0, fbs, 1) = mass.ldlt().solve(rhs);
             }
             else
             {
@@ -1892,7 +1892,7 @@ public:
                 auto dirichlet_fun = m_bnd.dirichlet_boundary_func(face_id);
                 matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 vector_type rhs = make_rhs(msh, fc, fb, dirichlet_fun, di.face_degree());
-                dirichlet_data.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
+                dirichlet_data.block(face_i*fbs, 0, fbs, 1) = mass.ldlt().solve(rhs);
             }
         }
 
@@ -2071,7 +2071,7 @@ public:
                 auto dirichlet_bf = m_bnd.dirichlet_boundary_func(face_id);
                 matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 vector_type rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
-                ret.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
+                ret.block(face_i*fbs, 0, fbs, 1) = mass.ldlt().solve(rhs);
             }
             else
             {
@@ -2234,7 +2234,7 @@ public:
 
                 matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 vector_type rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
-                dirichlet_data.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
+                dirichlet_data.block(face_i*fbs, 0, fbs, 1) = mass.ldlt().solve(rhs);
             }
         }
 
@@ -2284,7 +2284,7 @@ public:
 
                 matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 vector_type rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
-                ret.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
+                ret.block(face_i*fbs, 0, fbs, 1) = mass.ldlt().solve(rhs);
             }
             else
             {
@@ -2502,7 +2502,7 @@ public:
 
                 matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 vector_type rhs = make_rhs(msh, fc, fb, dirichlet_fun, di.face_degree());
-                dirichlet_data.block(cbs_A + face_i*fbs_A, 0, fbs_A, 1) = mass.llt().solve(rhs);
+                dirichlet_data.block(cbs_A + face_i*fbs_A, 0, fbs_A, 1) = mass.ldlt().solve(rhs);
             }
         }
 
@@ -2603,7 +2603,7 @@ public:
 
                 matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 vector_type rhs_bnd = make_rhs(msh, fc, fb, dirichlet_fun, di.face_degree());
-                dirichlet_data.block(cbs_A + face_i*fbs_A, 0, fbs_A, 1) = mass.llt().solve(rhs_bnd);
+                dirichlet_data.block(cbs_A + face_i*fbs_A, 0, fbs_A, 1) = mass.ldlt().solve(rhs_bnd);
             }
         }
 
@@ -2750,7 +2750,7 @@ public:
                 matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 auto velocity = m_bnd.dirichlet_boundary_func(face_id);
                 vector_type rhs = make_rhs(msh, fc, fb, velocity, di.face_degree());
-                svel.block(cbs_A + i * fbs_A, 0, fbs_A, 1) = mass.llt().solve(rhs);
+                svel.block(cbs_A + i * fbs_A, 0, fbs_A, 1) = mass.ldlt().solve(rhs);
             }
             else
             {
@@ -2963,7 +2963,7 @@ public:
 
                 matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 vector_type rhs_bnd = make_rhs(msh, fc, fb, dirichlet_fun, di.face_degree());
-                dirichlet_data.block(cbs_A + face_i*fbs_A, 0, fbs_A, 1) = mass.llt().solve(rhs_bnd);
+                dirichlet_data.block(cbs_A + face_i*fbs_A, 0, fbs_A, 1) = mass.ldlt().solve(rhs_bnd);
             }
         }
 
@@ -3100,7 +3100,7 @@ public:
                 matrix_type mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 auto velocity = m_bnd.dirichlet_boundary_func(face_id);
                 vector_type rhs = make_rhs(msh, fc, fb, velocity, di.face_degree());
-                svel.block(cbs_A + i * fbs_A, 0, fbs_A, 1) = mass.llt().solve(rhs);
+                svel.block(cbs_A + i * fbs_A, 0, fbs_A, 1) = mass.ldlt().solve(rhs);
             }
             else
             {
@@ -4011,7 +4011,7 @@ class static_condensation_vector
         assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
         assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
 
-        const auto K_TT_ldlt = K_TT.llt();
+        const auto K_TT_ldlt = K_TT.ldlt();
         AL                   = K_TT_ldlt.solve(K_TF);
         if (K_TT_ldlt.info() != Eigen::Success)
         {
@@ -4065,7 +4065,7 @@ class static_condensation_vector
         assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
         assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
 
-        const auto K_TT_ldlt = K_TT.llt();
+        const auto K_TT_ldlt = K_TT.ldlt();
         AL                   = K_TT_ldlt.solve(K_TF);
 
         if (K_TT_ldlt.info() != Eigen::Success)
