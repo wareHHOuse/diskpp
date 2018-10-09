@@ -110,7 +110,7 @@ public:
         assert(abs(theta_norm  - theta.norm())< 1.e-7);
 
         vector_type gamma = vector_type::Zero(sbs);
-        T epsilon = 0.001;
+        T epsilon = 1.e-6 *std::sqrt(2) * vp.yield ;
         if( theta_norm > std::sqrt(2) * vp.yield + epsilon )
             gamma =  value * theta * (1. - std::sqrt(2) * (vp.yield/theta_norm));
 
@@ -123,7 +123,7 @@ public:
                     const cell_type& cl,
                     const Assembler& assembler)
     {
-        auto G = revolution::make_hlow_stokes(msh, cl, di, true);
+        auto G  = revolution::make_hlow_stokes(msh, cl, di, true);
         auto cb = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
         auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
 
@@ -175,7 +175,7 @@ public:
         {
             auto gr = revolution::make_hho_stokes(msh, cl, di, true);
             auto G  = revolution::make_hlow_stokes(msh, cl, di, true);
-            auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
+            matrix_type dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
 
             matrix_type stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
             matrix_type A    = 2. *(vp.alpha * G.second + vp.mu * stab);
@@ -202,28 +202,38 @@ public:
 
         vector_type solution = vector_type::Zero(systsz);
         disk::solvers::pardiso_params<T> pparams;
-        pparams.report_factorization_Mflops = true;
+        pparams.report_factorization_Mflops = false;
         mkl_pardiso(pparams, assembler.LHS, assembler.RHS, solution);
+
+        sol = vector_type::Zero(systsz);
         sol = solution;
     }
 
     template<typename Assembler>
     void
-    update_multiplier(const mesh_type& msh, const Assembler& assembler)
+    update_multiplier(const mesh_type& msh, const Assembler& assembler,
+                        const size_t iter,
+                        const std::string& name)
     {
-        T conv_stress = 0.;
-        T conv_gamma = 0.;
+        T conv_residue = 0.;
+        T conv_stress  = 0.;
+        T conv_grad    = 0.;
+
         auto cell_id = 0;
         const auto dim = Mesh::dimension;
 
         for(auto cl: msh)
         {
-            vector_type u_TF = assembler.take_velocity(msh, cl, sol);
+            vector_type u_now = assembler.take_velocity(msh, cl, sol);
+            vector_type u_old = assembler.take_velocity(msh, cl, sol_old);
+
             auto G = revolution::make_hlow_stokes(msh, cl, di, true);
 
-            vector_type  Gu    = G.first * u_TF;
+            vector_type  Guold = G.first * u_old;
+            vector_type  Gunow = G.first * u_now;
+
             vector_type  gamma = auxiliar.block(cell_id * sbs, 0, sbs, 1);
-            vector_type  diff_stress = 2. * vp.alpha * (Gu - gamma);
+            vector_type  diff_stress = 2. * vp.alpha * (Gunow - gamma);
 
             //Updating multiplier
             multiplier.block(cell_id * sbs, 0, sbs, 1) += diff_stress;
@@ -231,30 +241,40 @@ public:
             //convergence:  | sigma^{n+1} -  sigma^n|^2
             auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
             matrix_type mass = make_mass_matrix(msh, cl, sb);
-            conv_stress     += diff_stress.dot(mass * diff_stress);
 
+            vector_type  diff_grad =  vp.alpha * (Gunow - Guold);
+
+            conv_stress  += diff_stress.dot(mass * diff_stress);
+            conv_grad    += diff_grad.dot(mass * diff_grad);
+            conv_residue += conv_stress +  conv_grad;
             cell_id++;
         }
 
-        convergence = std::make_pair(conv_stress, conv_gamma);
+        std::ofstream ifs(name, std::ofstream::app);
+        if(!ifs.is_open())
+            std::cout << "Error opening   " << std::endl;
 
+        ifs << tostr(iter) <<"  "<< std::sqrt(conv_residue) << "  ";
+        ifs << std::sqrt(conv_stress) <<"  "<< std::sqrt(conv_grad)<< std::endl;
+        ifs.close();
+
+        convergence = std::make_pair(std::sqrt(conv_residue), std::sqrt(conv_stress));
     }
 
 
     template<typename Assembler>
     void
-    post_processing(const mesh_type& msh, Assembler& assembler,
-                    const std::string & info,
-                    const vector_problem& problem)
+    post_processing(const mesh_type& msh, Assembler& assembler, const size_t iter)
     {
         auto dim = Mesh::dimension;
         auto rbs = vector_basis_size(di.reconstruction_degree(), dim, dim);
 
         vector_type sol_cell = vector_type::Zero(cbs * msh.cells_size());
-        vector_type sol_rec = vector_type::Zero(rbs * msh.cells_size());
+        vector_type sol_rec  = vector_type::Zero(rbs * msh.cells_size());
         vector_type pressure = vector_type::Zero(pbs * msh.cells_size());
 
-        std::ofstream ofs("data_" + info + ".data");
+        std::string  ext =  vp.info + "_i"+ tostr(iter) + ".data";
+        std::ofstream ofs("data_" + ext );
         if (!ofs.is_open())
             std::cout << "Error opening file"<<std::endl;
 
@@ -317,8 +337,8 @@ public:
         p_x = std::make_pair(point_type({0.0 + eps, 0.5 + eps}), point_type({1.0 + eps, 0.5 + eps}));
         p_y = std::make_pair(point_type({0.5 + eps, 0.0 + eps}), point_type({0.5 + eps, 1.0 + eps}));
 
-        //plot_over_line(msh, p_x, cell_rec_sol, di.reconstruction_degree(), "plot_over_x_" + info + ".data");
-        //plot_over_line(msh, p_y, cell_rec_sol, di.reconstruction_degree(), "plot_over_y_" + info + ".data");
+        //plot_over_line(msh, p_x, cell_rec_sol, di.reconstruction_degree(), "plot_over_x_" + ext);
+        //plot_over_line(msh, p_y, cell_rec_sol, di.reconstruction_degree(), "plot_over_y_" + ext);
 
         if (vp.problem == DRIVEN)
         {
@@ -329,56 +349,61 @@ public:
 
             for(size_t i = 0; i< 21; i++)
                 pts.push_back(point_type({0.5, py[i]}));
-            find_values_at_points(msh, pts, sol_rec, di.reconstruction_degree(), "error_rec" + info + ".data");
-            find_values_at_points(msh, pts, sol_cell, di.cell_degree(), "error_sol" + info + ".data");
-            plot_over_line(msh, p_y, sol_cell, di.cell_degree(), "plot_over_y_" + info + ".data");
+
+            find_values_at_points(msh, pts, sol_rec, di.reconstruction_degree(), "error_rec" + ext);
+            find_values_at_points(msh, pts, sol_cell, di.cell_degree(), "error_sol" + ext);
+            plot_over_line(msh, p_y, sol_cell, di.cell_degree(), "plot_over_y_" + ext);
         }
-        compute_discontinuous_velocity( msh, sol_cell, di, "velocity_" + info +".msh");
-        save_coords(msh, "Coords_"+ info + ".data");
-        quiver( msh, sol, assembler, di, "quiver_"+ info + ".data");
+        compute_discontinuous_velocity( msh, sol_cell, di, "velocity_" + vp.info +".msh");
+        save_coords(msh, "Coords_"+ ext);
+        quiver( msh, sol, assembler, di, "quiver_"+ ext);
 
         return;
     }
 
 
     bool
-    run(const mesh_type& msh, const std::string& info, const boundary_type& bnd)
+    run(const mesh_type& msh, const boundary_type& bnd)
     {
         auto assembler = revolution::make_stokes_assembler_alg(msh, di, bnd);
         auto systsz    = assembler.global_system_size();
 
         sol         =  vector_type::Zero(systsz);
+        sol_old     =  vector_type::Zero(systsz);
         multiplier  =  vector_type::Zero(sbs * msh.cells_size());
+        auxiliar    =  vector_type::Zero(sbs * msh.cells_size());
 
-        auto Ninf = 1.e+5;
-        auto max_iters = 50000;
-        auto tolerance = 1.e-8;
+        size_t max_iters = 50000;
+        T Ninf      = 100000;
+        T tolerance = 1.e-8;
+
+        std::string data_filename = "convg" + vp.info + ".data";
+        std::ofstream ofs(data_filename);
+        if( !ofs.is_open())
+            std::cout << "Error opening data-file" << std::endl;
+        ofs.close();
 
         for(size_t iter = 0; iter < max_iters; iter++)
         {
             sol_old   = sol;
             auxiliar  = vector_type::Zero(sbs * msh.cells_size());
-            //---------------------------------------------------------------------
+            //------------------------------------------------------------------
             run_stokes_like(msh, assembler, iter);
-            //---------------------------------------------------------------------
-            update_multiplier(msh, assembler);
-            //---------------------------------------------------------------------
+            //------------------------------------------------------------------
+            update_multiplier(msh, assembler, iter, data_filename);
+            //------------------------------------------------------------------
+            assert(convergence.first < Ninf);
 
-            T cvg_total = std::sqrt(convergence.first + convergence.second);
-            assert(cvg_total < Ninf);
+            bool stop = convergence.first < tolerance;
+            if(! (iter % 100 == 0 ||  stop))
+                continue;
 
-            if(iter % 100 == 0)
-            {
-                std::cout << "  i : "<< iter <<"  - " << cvg_total <<std::endl;
-                post_processing( msh, assembler, info +"_i" + tostr(iter), vp.problem);
-            }
-            if( cvg_total < tolerance)
-            {
-                std::cout << "  i : "<< iter <<"  - " << cvg_total <<std::endl;
-                post_processing( msh, assembler, info +"_i" + tostr(iter), vp.problem);
+            std::cout << "  i : "<< iter <<"  - " << convergence.first <<std::endl;
+            post_processing( msh, assembler, iter);
+
+            if( stop)
                 return true;
-            }
-            //---------------------------------------------------------------------
+            //------------------------------------------------------------------
         }
         return false;
     }

@@ -72,9 +72,11 @@ struct bingham_data
      T alpha;                /* ALG parameter*/
      T yield;
      ProblemType problem;
+     std::string info;
 
      friend std::ostream& operator<<(std::ostream& os, const bingham_data<T, ProblemType>& p)
      {
+         os << p.problem <<std::endl;
          os << "Bingham data: "<<std::endl;
          os << "* f      : "<< p.f<< std::endl;
          os << "* Lref   : "<< p.Lref<< std::endl;
@@ -83,8 +85,8 @@ struct bingham_data
          os << "* Bi     : "<< p.Bn<< std::endl;
          os << "* yield  : "<< p.yield<< std::endl;
          os << "* alpha  : "<< p.alpha<< std::endl;
+         os << "* info  : "<< p.info<< std::endl;
 
-         os << p.problem <<std::endl;
          return os;
      }
 

@@ -3,3 +3,4 @@
 #cmakedefine HAVE_INTEL_MKL
 #cmakedefine HAVE_AGMG
 #cmakedefine HAVE_SILO
+#cmakedefine HAVE_MOSEK

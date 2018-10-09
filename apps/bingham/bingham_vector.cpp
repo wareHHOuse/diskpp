@@ -80,7 +80,7 @@ run_bingham(const Mesh& msh, const hho_degree_info& hdi,
     };
 
     std::cout << "Im HERE  1 " << std::endl;
-    //#if 0
+
     switch (vp.problem)
     {
         case DRIVEN:
@@ -102,7 +102,6 @@ run_bingham(const Mesh& msh, const hho_degree_info& hdi,
             #endif
             //------------------------------------------------------------------
             bnd.addDirichletEverywhere(velocity);
-
             //------------------------------------------------------------------
             vp.yield = sqrt(2) * vp.Bn;
 
@@ -124,31 +123,11 @@ run_bingham(const Mesh& msh, const hho_degree_info& hdi,
             exit(1);
             break;
     }
-    //#endif
 
-    #if 0
-    //Temporal Vane definition
-    name = "vane";
 
-    std::cout << " I'm in VANE" << std::endl;
-
-    T omega = 1;
-    auto rotation = [&](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
-        omega = 1;
-       return Matrix<T, Mesh::dimension, 1>{omega * p.y(), -omega * p.x()};
-    };
-
-    bnd.addDirichletBC( 0, 2, wall);
-    bnd.addDirichletBC( 0, 1, rotation);
-    bnd.addNeumannBC(10, 3, symmetryPlane);
-
-    vp.yield = std::sqrt(2) * vp.Bn *  (vp.mu * omega);
-    #endif
-    std::string info = name + "_k" + tostr(hdi.cell_degree())  + "_B" + tostr(vp.Bn)
-                                                        + "_a" + tostr(vp.alpha);
 
     ADDM<Mesh> admmb(msh, hdi, vp);
-    return  admmb.run(msh, info, bnd);
+    return  admmb.run(msh, bnd);
 }
 
 template<typename T, typename ProblemType>
@@ -173,6 +152,8 @@ read_data(const std::string& config_fn )
 
     //Mesh
     std::string input_mesh  = lua["config"]["input_mesh"];
+    std::string hname = lua["bi"]["hname"];
+
     std::string alpha = lua["bi"]["alpha"];
     std::string Bn    = lua["bi"]["Bn"];
 
@@ -196,6 +177,9 @@ read_data(const std::string& config_fn )
     std::cout << vp << std::endl;
     std::cout << "DEGREE = ( "<< hdi.cell_degree() << " , ";
     std::cout << hdi.face_degree() <<" )" << std::endl;
+
+    vp.info = name + "_k" + tostr(hdi.cell_degree())  + "_B" + tostr(vp.Bn)
+                    + "_h"+ hname + "_a" + tostr(vp.alpha);
 
     return std::make_tuple(input_mesh, hdi, vp );
 }
