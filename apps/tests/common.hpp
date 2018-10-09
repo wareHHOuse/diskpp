@@ -600,11 +600,11 @@ public:
         if ( do_quads )
             test_quads();
 
-        if ( do_tetrahedra_netgen )
-            test_tetrahedra_netgen();
-
         if ( do_cartesian_diskpp )
             test_cartesian_diskpp();
+
+        if ( do_tetrahedra_netgen )
+            test_tetrahedra_netgen();
 
         if ( do_generic_fvca6 )
             test_generic_fvca6();
