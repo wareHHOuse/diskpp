@@ -278,6 +278,13 @@ public:
         if (!ofs.is_open())
             std::cout << "Error opening file"<<std::endl;
 
+        std::vector<T> ux;        ux.reserve(msh.cells_size());
+        std::vector<T> uy;        uy.reserve(msh.cells_size());
+        std::vector<T> e_press;   e_press.reserve(msh.cells_size());
+        std::vector<T> e_theta;   e_theta.reserve(msh.cells_size());
+        std::vector<T> e_sigma;   e_sigma.reserve(msh.cells_size());
+        //std::vector<T> div;     div.reserve(msh.cells_size());
+
         auto cell_id = 0;
         for(auto cl : msh)
         {
@@ -322,6 +329,13 @@ public:
             T divu = Gu_eval(0,0) + Gu_eval(1,1);
             T tr_stress = sigma_eval(0,0) + sigma_eval(1,1);
 
+            ux.push_back( ueval(0) );
+            uy.push_back( ueval(1) );
+            e_press.push_back( peval );
+            e_theta.push_back( theta_eval.norm() );
+            e_sigma.push_back( sigma_eval.norm() );
+            //div.push_back( divu );
+
             ofs << ueval(0)   << " " << ueval(1) << " " << peval<< " ";
             ofs << theta_eval.norm() << " " << sigma_eval.norm()   << " ";
             ofs << divu << " "<< tr_stress<<std::endl;
@@ -330,6 +344,27 @@ public:
         }
 
         ofs.close();
+
+        std::string silo_db_name = "bingham_" + tostr(iter) + ".silo";
+        disk::silo_database silo;
+        silo.create(silo_db_name);
+        silo.add_mesh(msh, "mesh");
+
+        disk::silo_zonal_variable<T> silo_ux("ux", ux);
+        disk::silo_zonal_variable<T> silo_uy("uy", uy);
+        disk::silo_zonal_variable<T> silo_press("pressure", e_press);
+        disk::silo_zonal_variable<T> silo_theta("theta", e_theta);
+        disk::silo_zonal_variable<T> silo_sigma("sigma", e_sigma);
+        //disk::silo_zonal_variable<T> silo_div("pressure", div);
+
+        silo.add_variable("mesh", silo_ux);
+        silo.add_variable("mesh", silo_uy);
+        silo.add_variable("mesh", silo_press);
+        silo.add_variable("mesh", silo_theta);
+        silo.add_variable("mesh", silo_sigma);
+
+        silo.close();
+
 
         std::pair<point_type, point_type> p_x, p_y;
         auto eps = 1.e-4;
