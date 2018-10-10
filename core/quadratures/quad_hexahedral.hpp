@@ -70,88 +70,83 @@ integrate_hexahedron_tens(const size_t degree, const std::array<point<T, 3>, 8>&
     assert(degree >= 0);
     const auto qps = disk::edge_quadrature<T>(degree);
 
+    //std::cout << "deg:" << degree << " nb : " << 3 * qps.size() << std::endl;
+
     std::vector<disk::quadrature_point<T, 3>> ret;
+    ret.reserve(3 * qps.size());
 
-    auto P = [&](T xi, T eta, T zeta) -> T {
-        return 0.125 * pts[0].x() * (1 - xi) * (1 - eta) * (1 - zeta) +
-               0.125 * pts[1].x() * (1 + xi) * (1 - eta) * (1 - zeta) +
-               0.125 * pts[2].x() * (1 + xi) * (1 + eta) * (1 - zeta) +
-               0.125 * pts[3].x() * (1 - xi) * (1 + eta) * (1 - zeta) +
-               0.125 * pts[4].x() * (1 - xi) * (1 - eta) * (1 + zeta) +
-               0.125 * pts[5].x() * (1 + xi) * (1 - eta) * (1 + zeta) +
-               0.125 * pts[6].x() * (1 + xi) * (1 + eta) * (1 + zeta) +
-               0.125 * pts[7].x() * (1 - xi) * (1 + eta) * (1 + zeta);
+    auto P = [&pts](T xi, T eta, T zeta) -> T {
+        const T val = pts[0].x() * (1 - xi) * (1 - eta) * (1 - zeta) + pts[1].x() * (1 + xi) * (1 - eta) * (1 - zeta) +
+                      pts[2].x() * (1 + xi) * (1 + eta) * (1 - zeta) + pts[3].x() * (1 - xi) * (1 + eta) * (1 - zeta) +
+                      pts[4].x() * (1 - xi) * (1 - eta) * (1 + zeta) + pts[5].x() * (1 + xi) * (1 - eta) * (1 + zeta) +
+                      pts[6].x() * (1 + xi) * (1 + eta) * (1 + zeta) + pts[7].x() * (1 - xi) * (1 + eta) * (1 + zeta);
+        return T(0.125) * val;
     };
 
-    auto Q = [&](T xi, T eta, T zeta) -> T {
-        return 0.125 * pts[0].y() * (1 - xi) * (1 - eta) * (1 - zeta) +
-               0.125 * pts[1].y() * (1 + xi) * (1 - eta) * (1 - zeta) +
-               0.125 * pts[2].y() * (1 + xi) * (1 + eta) * (1 - zeta) +
-               0.125 * pts[3].y() * (1 - xi) * (1 + eta) * (1 - zeta) +
-               0.125 * pts[4].y() * (1 - xi) * (1 - eta) * (1 + zeta) +
-               0.125 * pts[5].y() * (1 + xi) * (1 - eta) * (1 + zeta) +
-               0.125 * pts[6].y() * (1 + xi) * (1 + eta) * (1 + zeta) +
-               0.125 * pts[7].y() * (1 - xi) * (1 + eta) * (1 + zeta);
+    auto Q = [&pts](T xi, T eta, T zeta) -> T {
+        const T val = pts[0].y() * (1 - xi) * (1 - eta) * (1 - zeta) + pts[1].y() * (1 + xi) * (1 - eta) * (1 - zeta) +
+                      pts[2].y() * (1 + xi) * (1 + eta) * (1 - zeta) + pts[3].y() * (1 - xi) * (1 + eta) * (1 - zeta) +
+                      pts[4].y() * (1 - xi) * (1 - eta) * (1 + zeta) + pts[5].y() * (1 + xi) * (1 - eta) * (1 + zeta) +
+                      pts[6].y() * (1 + xi) * (1 + eta) * (1 + zeta) + pts[7].y() * (1 - xi) * (1 + eta) * (1 + zeta);
+        return T(0.125) * val;
     };
 
-    auto R = [&](T xi, T eta, T zeta) -> T {
-        return 0.125 * pts[0].z() * (1 - xi) * (1 - eta) * (1 - zeta) +
-               0.125 * pts[1].z() * (1 + xi) * (1 - eta) * (1 - zeta) +
-               0.125 * pts[2].z() * (1 + xi) * (1 + eta) * (1 - zeta) +
-               0.125 * pts[3].z() * (1 - xi) * (1 + eta) * (1 - zeta) +
-               0.125 * pts[4].z() * (1 - xi) * (1 - eta) * (1 + zeta) +
-               0.125 * pts[5].z() * (1 + xi) * (1 - eta) * (1 + zeta) +
-               0.125 * pts[6].z() * (1 + xi) * (1 + eta) * (1 + zeta) +
-               0.125 * pts[7].z() * (1 - xi) * (1 + eta) * (1 + zeta);
+    auto R = [&pts](T xi, T eta, T zeta) -> T {
+        const T val = pts[0].z() * (1 - xi) * (1 - eta) * (1 - zeta) + pts[1].z() * (1 + xi) * (1 - eta) * (1 - zeta) +
+                      pts[2].z() * (1 + xi) * (1 + eta) * (1 - zeta) + pts[3].z() * (1 - xi) * (1 + eta) * (1 - zeta) +
+                      pts[4].z() * (1 - xi) * (1 - eta) * (1 + zeta) + pts[5].z() * (1 + xi) * (1 - eta) * (1 + zeta) +
+                      pts[6].z() * (1 + xi) * (1 + eta) * (1 + zeta) + pts[7].z() * (1 - xi) * (1 + eta) * (1 + zeta);
+        return T(0.125) * val;
     };
 
-    auto J = [&](T xi, T eta, T zeta) -> T {
+    auto J = [&pts](T xi, T eta, T zeta) -> T {
         static_matrix<T, 3, 3> Jac = static_matrix<T, 3, 3>::Zero();
-        Jac(0, 0) = -0.125 * pts[0].x() * (1 - eta) * (1 - zeta) + 0.125 * pts[1].x() * (1 - eta) * (1 - zeta) +
-                    0.125 * pts[2].x() * (1 + eta) * (1 - zeta) - 0.125 * pts[3].x() * (1 + eta) * (1 - zeta) -
-                    0.125 * pts[4].x() * (1 - eta) * (1 + zeta) + 0.125 * pts[5].x() * (1 - eta) * (1 + zeta) +
-                    0.125 * pts[6].x() * (1 + eta) * (1 + zeta) - 0.125 * pts[7].x() * (1 + eta) * (1 + zeta);
+        Jac(0, 0) = - pts[0].x() * (1 - eta) * (1 - zeta) + pts[1].x() * (1 - eta) * (1 - zeta)
+                    + pts[2].x() * (1 + eta) * (1 - zeta) - pts[3].x() * (1 + eta) * (1 - zeta)
+                    - pts[4].x() * (1 - eta) * (1 + zeta) + pts[5].x() * (1 - eta) * (1 + zeta)
+                    + pts[6].x() * (1 + eta) * (1 + zeta) - pts[7].x() * (1 + eta) * (1 + zeta);
 
-        Jac(0, 1) = -0.125 * pts[0].y() * (1 - eta) * (1 - zeta) + 0.125 * pts[1].y() * (1 - eta) * (1 - zeta) +
-                    0.125 * pts[2].y() * (1 + eta) * (1 - zeta) - 0.125 * pts[3].y() * (1 + eta) * (1 - zeta) -
-                    0.125 * pts[4].y() * (1 - eta) * (1 + zeta) + 0.125 * pts[5].y() * (1 - eta) * (1 + zeta) +
-                    0.125 * pts[6].y() * (1 + eta) * (1 + zeta) - 0.125 * pts[7].y() * (1 + eta) * (1 + zeta);
+        Jac(0, 1) = - pts[0].y() * (1 - eta) * (1 - zeta) + pts[1].y() * (1 - eta) * (1 - zeta)
+                    + pts[2].y() * (1 + eta) * (1 - zeta) - pts[3].y() * (1 + eta) * (1 - zeta)
+                    - pts[4].y() * (1 - eta) * (1 + zeta) + pts[5].y() * (1 - eta) * (1 + zeta)
+                    + pts[6].y() * (1 + eta) * (1 + zeta) - pts[7].y() * (1 + eta) * (1 + zeta);
 
-        Jac(0, 2) = -0.125 * pts[0].z() * (1 - eta) * (1 - zeta) + 0.125 * pts[1].z() * (1 - eta) * (1 - zeta) +
-                    0.125 * pts[2].z() * (1 + eta) * (1 - zeta) - 0.125 * pts[3].z() * (1 + eta) * (1 - zeta) -
-                    0.125 * pts[4].z() * (1 - eta) * (1 + zeta) + 0.125 * pts[5].z() * (1 - eta) * (1 + zeta) +
-                    0.125 * pts[6].z() * (1 + eta) * (1 + zeta) - 0.125 * pts[7].z() * (1 + eta) * (1 + zeta);
+        Jac(0, 2) = - pts[0].z() * (1 - eta) * (1 - zeta) + pts[1].z() * (1 - eta) * (1 - zeta)
+                    + pts[2].z() * (1 + eta) * (1 - zeta) - pts[3].z() * (1 + eta) * (1 - zeta)
+                    - pts[4].z() * (1 - eta) * (1 + zeta) + pts[5].z() * (1 - eta) * (1 + zeta)
+                    + pts[6].z() * (1 + eta) * (1 + zeta) - pts[7].z() * (1 + eta) * (1 + zeta);
 
-        Jac(1, 0) = -0.125 * pts[0].x() * (1 - xi) * (1 - zeta) + 0.125 * pts[1].x() * (1 + xi) * (1 - zeta) +
-                    0.125 * pts[2].x() * (1 + xi) * (1 - zeta) - 0.125 * pts[3].x() * (1 - xi) * (1 - zeta) -
-                    0.125 * pts[4].x() * (1 - xi) * (1 + zeta) + 0.125 * pts[5].x() * (1 + xi) * (1 + zeta) +
-                    0.125 * pts[6].x() * (1 + xi) * (1 + zeta) - 0.125 * pts[7].x() * (1 - xi) * (1 + zeta);
+        Jac(1, 0) = - pts[0].x() * (1 - xi) * (1 - zeta) - pts[1].x() * (1 + xi) * (1 - zeta)
+                    + pts[2].x() * (1 + xi) * (1 - zeta) + pts[3].x() * (1 - xi) * (1 - zeta)
+                    - pts[4].x() * (1 - xi) * (1 + zeta) - pts[5].x() * (1 + xi) * (1 + zeta)
+                    + pts[6].x() * (1 + xi) * (1 + zeta) + pts[7].x() * (1 - xi) * (1 + zeta);
 
-        Jac(1, 1) = -0.125 * pts[0].y() * (1 - xi) * (1 - zeta) + 0.125 * pts[1].y() * (1 + xi) * (1 - zeta) +
-                    0.125 * pts[2].y() * (1 + xi) * (1 - zeta) - 0.125 * pts[3].y() * (1 - xi) * (1 - zeta) -
-                    0.125 * pts[4].y() * (1 - xi) * (1 + zeta) + 0.125 * pts[5].y() * (1 + xi) * (1 + zeta) +
-                    0.125 * pts[6].y() * (1 + xi) * (1 + zeta) - 0.125 * pts[7].y() * (1 - xi) * (1 + zeta);
+        Jac(1, 1) = - pts[0].y() * (1 - xi) * (1 - zeta) - pts[1].y() * (1 + xi) * (1 - zeta)
+                    + pts[2].y() * (1 + xi) * (1 - zeta) + pts[3].y() * (1 - xi) * (1 - zeta)
+                    - pts[4].y() * (1 - xi) * (1 + zeta) - pts[5].y() * (1 + xi) * (1 + zeta)
+                    + pts[6].y() * (1 + xi) * (1 + zeta) + pts[7].y() * (1 - xi) * (1 + zeta);
 
-        Jac(1, 2) = -0.125 * pts[0].z() * (1 - xi) * (1 - zeta) + 0.125 * pts[1].z() * (1 + xi) * (1 - zeta) +
-                    0.125 * pts[2].z() * (1 + xi) * (1 - zeta) - 0.125 * pts[3].z() * (1 - xi) * (1 - zeta) -
-                    0.125 * pts[4].z() * (1 - xi) * (1 + zeta) + 0.125 * pts[5].z() * (1 + xi) * (1 + zeta) +
-                    0.125 * pts[6].z() * (1 + xi) * (1 + zeta) - 0.125 * pts[7].z() * (1 - xi) * (1 + zeta);
+        Jac(1, 2) = - pts[0].z() * (1 - xi) * (1 - zeta) - pts[1].z() * (1 + xi) * (1 - zeta)
+                    + pts[2].z() * (1 + xi) * (1 - zeta) + pts[3].z() * (1 - xi) * (1 - zeta)
+                    - pts[4].z() * (1 - xi) * (1 + zeta) - pts[5].z() * (1 + xi) * (1 + zeta)
+                    + pts[6].z() * (1 + xi) * (1 + zeta) + pts[7].z() * (1 - xi) * (1 + zeta);
 
-        Jac(2, 0) = -0.125 * pts[0].x() * (1 - xi) * (1 - eta) - 0.125 * pts[1].x() * (1 + xi) * (1 - eta) -
-                    0.125 * pts[2].x() * (1 + xi) * (1 + eta) - 0.125 * pts[3].x() * (1 - xi) * (1 + eta) -
-                    0.125 * pts[4].x() * (1 - xi) * (1 - eta) + 0.125 * pts[5].x() * (1 + xi) * (1 - eta) +
-                    0.125 * pts[6].x() * (1 + xi) * (1 + eta) + 0.125 * pts[7].x() * (1 - xi) * (1 + eta);
+        Jac(2, 0) = - pts[0].x() * (1 - xi) * (1 - eta) - pts[1].x() * (1 + xi) * (1 - eta)
+                    - pts[2].x() * (1 + xi) * (1 + eta) - pts[3].x() * (1 - xi) * (1 + eta)
+                    + pts[4].x() * (1 - xi) * (1 - eta) + pts[5].x() * (1 + xi) * (1 - eta)
+                    + pts[6].x() * (1 + xi) * (1 + eta) + pts[7].x() * (1 - xi) * (1 + eta);
 
-        Jac(2, 1) = -0.125 * pts[0].y() * (1 - xi) * (1 - eta) - 0.125 * pts[1].y() * (1 + xi) * (1 - eta) -
-                    0.125 * pts[2].y() * (1 + xi) * (1 + eta) - 0.125 * pts[3].y() * (1 - xi) * (1 + eta) -
-                    0.125 * pts[4].y() * (1 - xi) * (1 - eta) + 0.125 * pts[5].y() * (1 + xi) * (1 - eta) +
-                    0.125 * pts[6].y() * (1 + xi) * (1 + eta) + 0.125 * pts[7].y() * (1 - xi) * (1 + eta);
+        Jac(2, 1) = - pts[0].y() * (1 - xi) * (1 - eta) - pts[1].y() * (1 + xi) * (1 - eta)
+                    - pts[2].y() * (1 + xi) * (1 + eta) - pts[3].y() * (1 - xi) * (1 + eta)
+                    + pts[4].y() * (1 - xi) * (1 - eta) + pts[5].y() * (1 + xi) * (1 - eta)
+                    + pts[6].y() * (1 + xi) * (1 + eta) + pts[7].y() * (1 - xi) * (1 + eta);
 
-        Jac(2, 2) = -0.125 * pts[0].z() * (1 - xi) * (1 - eta) - 0.125 * pts[1].z() * (1 + xi) * (1 - eta) -
-                    0.125 * pts[2].z() * (1 + xi) * (1 + eta) - 0.125 * pts[3].z() * (1 - xi) * (1 + eta) -
-                    0.125 * pts[4].z() * (1 - xi) * (1 - eta) + 0.125 * pts[5].z() * (1 + xi) * (1 - eta) +
-                    0.125 * pts[6].z() * (1 + xi) * (1 + eta) + 0.125 * pts[7].z() * (1 - xi) * (1 + eta);
+        Jac(2, 2) = - pts[0].z() * (1 - xi) * (1 - eta) - pts[1].z() * (1 + xi) * (1 - eta)
+                    - pts[2].z() * (1 + xi) * (1 + eta) - pts[3].z() * (1 - xi) * (1 + eta)
+                    + pts[4].z() * (1 - xi) * (1 - eta) + pts[5].z() * (1 + xi) * (1 - eta)
+                    + pts[6].z() * (1 + xi) * (1 + eta) + pts[7].z() * (1 - xi) * (1 + eta);
 
+        Jac *= T(0.125);
         return std::abs(Jac.determinant());
     };
 
@@ -172,6 +167,11 @@ integrate_hexahedron_tens(const size_t degree, const std::array<point<T, 3>, 8>&
                 const auto px = P(xi, eta, zeta);
                 const auto py = Q(xi, eta, zeta);
                 const auto pz = R(xi, eta, zeta);
+
+                // std::cout << xi << " " << px << std::endl;
+                // std::cout << eta << " " << py << std::endl;
+                // std::cout << zeta << " " << pz << std::endl;
+                // std::cout << J(xi, eta, zeta) << std::endl;
 
                 const auto w = qp_x.second * qp_y.second * qp_z.second * J(xi, eta, zeta);
 
@@ -197,6 +197,7 @@ integrate(const disk::cartesian_mesh<T, 3>& msh, const typename disk::cartesian_
     const auto pts = points(msh, cl);
     // transform arry to vector
     std::array<point<T, 3>, 8> ptsv{pts[0], pts[1], pts[3], pts[2], pts[4], pts[5], pts[7], pts[6]};
+    //std::cout << "pts : " << pts[0]<< pts[1]<< pts[3]  << pts[2]<< pts[4]<< pts[5]<< pts[7]<< pts[6] << std::endl;
     return priv::integrate_hexahedron_tens(degree, ptsv);
 }
 
