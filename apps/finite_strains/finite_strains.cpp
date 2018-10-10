@@ -202,14 +202,20 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&   msh,
 
         er /= er.norm();
 
-        return er;
+        return er/10000;
     };
 
+    // Sphere Hpp
+    // bnd.addDirichletBC(disk::mechanics::DX, 3, zero);
+    // bnd.addDirichletBC(disk::mechanics::DY, 13, zero);
+    // bnd.addDirichletBC(disk::mechanics::DZ, 24, zero);
+    // bnd.addNeumannBC(disk::mechanics::NEUMANN, 27, pres);
+
+    // // Sphere GDEF
     bnd.addDirichletBC(disk::mechanics::DX, 12, zero);
     bnd.addDirichletBC(disk::mechanics::DY, 24, zero);
     bnd.addDirichletBC(disk::mechanics::DZ, 19, zero);
-    // bnd.addNeumannBC(disk::mechanics::DIRICHLET, 27, pres);
-    bnd.addNeumannBC(disk::mechanics::NEUMANN, 27, pres);
+    bnd.addDirichletBC(disk::mechanics::DIRICHLET, 27, pres);
 
     // Cube + pres
     //    auto zero = [material_data](const point<T, 3>& p) -> result_type {
@@ -298,6 +304,9 @@ main(int argc, char** argv)
 
     ParamRun<RealType> rp;
 
+    const RealType MPa = 10E6;
+    const RealType GPa = 10E9;
+
     // Elasticity Parameters
     disk::MaterialData<RealType> material_data;
 
@@ -328,7 +337,7 @@ main(int argc, char** argv)
     // material_data.setSigma_y0(0.243);
 
     // Sphere Parameters (mm, GPa, kN)
-    RealType E  = 2.E11;
+    RealType E = 210000;
     RealType nu = 0.3;
     RealType ET = 0;
 
@@ -338,8 +347,8 @@ main(int argc, char** argv)
     material_data.setK(0);
     material_data.setH(0);
 
-    material_data.setSigma_y0(1.5E8);
-    ;
+    material_data.setSigma_y0(150);
+
     // Test aster Parameters (mm, GPa, kN)
     // RealType E  = 70;
     // RealType nu = 0.4999;
@@ -430,13 +439,13 @@ main(int argc, char** argv)
         return 0;
     }
 
-    // /* DiSk++ cartesian 3D */
-    // if (std::regex_match(mesh_filename, std::regex(".*\\.hex$"))) {
-    //    std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
-    //    auto msh = disk::load_cartesian_3d_mesh<RealType>(mesh_filename);
-    //    run_finite_strains_solver(msh, rp, material_data);
-    //    return 0;
-    // }
+    /* DiSk++ cartesian 3D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.hex$"))) {
+       std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
+       auto msh = disk::load_cartesian_3d_mesh<RealType>(mesh_filename);
+       run_finite_strains_solver(msh, rp, material_data);
+       return 0;
+    }
 
     // /* FVCA6 3D */
     // if (std::regex_match(mesh_filename, std::regex(".*\\.msh$"))) {
