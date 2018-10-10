@@ -212,14 +212,19 @@ integrate(const disk::cartesian_mesh<T, 3>& msh, const typename disk::cartesian_
 
     const auto pts               = points(msh, fc);
     const auto meas              = measure(msh, fc);
+    const auto bar               = barycenter(msh, fc);
     const auto m_quadrature_data = disk::quadrangle_quadrature<T>(degree);
 
     std::vector<disk::quadrature_point<T, 3>> ret(m_quadrature_data.size());
 
+    const auto v0 = (pts[1] - pts[0]) / T(2);
+    const auto v1 = (pts[3] - pts[0]) / T(2);
+    const T    meas4 = meas / T(4);
+
     for (auto& qp : m_quadrature_data)
     {
-        const auto point  = (pts[1] - pts[0]) * qp.first.x() + (pts[3] - pts[0]) * qp.first.y() + pts[0];
-        const auto weight = qp.second * meas;
+        const auto point  = v0 * qp.first.x() + v1 * qp.first.y() + bar;
+        const auto weight = qp.second * meas4;
         ret.push_back(disk::make_qp(point, weight));
     }
 
