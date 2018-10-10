@@ -286,20 +286,19 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         auto       p1  = pts[1];
 
 
-        if (std::abs(p1.x() - p0.x()) < 1E-8)
-        {
-            if (p1.y() < p0.y())
-            {
-                p0 = p1;
-            }
-        }
-        else if (p1.x() < p0.x())
-        {
-            p0 = p1;
-        }
+        // if (std::abs(p1.x() - p0.x()) < 1E-8)
+        // {
+        //     if (p1.y() < p0.y())
+        //     {
+        //         p0 = p1;
+        //     }
+        // }
+        // else if (p1.x() < p0.x())
+        // {
+        //     p0 = p1;
+        // }
 
         base     = face_bar - p0;
-        //std::cout << "base " << base.to_vector().transpose() << std::endl;
     }
 
     function_type
@@ -530,43 +529,36 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
         bool ok = false;
 
         const size_t npts = pts.size();
-        // for (size_t i = 1; i <= npts; i++)
-        // {
-             size_t i0, i1, i;
-             i  = 0;
-             i0 = 1;
-             //   (i + 1) % npts;
-             i1 = npts - 1;
-             // (i - 1) % npts;
-             v0 = (pts[i0] - pts[i]).to_vector();
-             v1 = (pts[i1] - pts[i]).to_vector();
+        for (size_t i = 1; i <= npts; i++)
+        {
+            const size_t i0 = (i + 1) % npts;
+            const size_t i1 = (i - 1) % npts;
+            v0              = (pts[i0] - pts[i]).to_vector();
+            v1              = (pts[i1] - pts[i]).to_vector();
 
-             const vector_type v0n = v0 / v0.norm();
-             const vector_type v1n = v1 / v1.norm();
+            const vector_type v0n = v0 / v0.norm();
+            const vector_type v1n = v1 / v1.norm();
 
-             // if (v0n.dot(v1n) < 0.99) // we want at least 8 degrees angle
-             // {
-             //     ok = true;
-             //     break;
-             // }
-             // }
+            if (v0n.dot(v1n) < 0.99) // we want at least 8 degrees angle
+            {
+                ok = true;
+                break;
+            }
+        }
 
-            //  if (!ok)
-            //      throw std::invalid_argument("Degenerate polyhedron, cannot proceed");
+        if (!ok)
+            throw std::invalid_argument("Degenerate polyhedron, cannot proceed");
 
-             vector_type e0 = v0 / v0.norm();
-             vector_type e1 = v1 - (v1.dot(v0) * v0) / (v0.dot(v0));
-             e1             = e1 / e1.norm();
+        vector_type e0 = v0 / v0.norm();
+        vector_type e1 = v1 - (v1.dot(v0) * v0) / (v0.dot(v0));
+        e1             = e1 / e1.norm();
 
-            //  std::cout << "eo " << e0.transpose() << std::endl;
-            //  std::cout << "e1 " << e1.transpose() << std::endl;
+        vector_type v = (pt - face_bar).to_vector();
 
-             vector_type v = (pt - face_bar).to_vector();
+        const auto eta = v.dot(e0);
+        const auto xi  = v.dot(e1);
 
-             const auto eta = v.dot(e0);
-             const auto xi  = v.dot(e1);
-
-             return point<T, 2>({eta, xi});
+        return point<T, 2>({eta, xi});
     }
 
   public:

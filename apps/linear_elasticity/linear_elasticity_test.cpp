@@ -43,8 +43,8 @@
 
 struct error_type
 {
-    int degree;
-    int nb_dof;
+    int    degree;
+    int    nb_dof;
     double h;
     double error_depl;
     double error_stress;
@@ -52,9 +52,9 @@ struct error_type
 
 struct run_params
 {
-    int degree;
-    int    l;
-    bool   verbose;
+    int  degree;
+    int  l;
+    bool verbose;
 };
 
 void
@@ -112,7 +112,6 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>& msh,
     };
 
     auto sigma = [material_data](const point<T, 2>& p) -> grad_type {
-
         const T lambda = material_data.lambda;
         const T mu     = material_data.mu;
 
@@ -209,7 +208,6 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>&  msh,
     };
 
     auto sigma = [material_data](const point<T, 3>& p) -> grad_type {
-
         const T lambda = material_data.lambda;
         const T mu     = material_data.mu;
 
@@ -564,8 +562,8 @@ main(int argc, char** argv)
 {
     using RealType = double;
 
-    int    degree = 1;
-    int    l      = 0;
+    int degree = 1;
+    int l      = 0;
     int dim    = 2;
 
     run_params rp;
@@ -637,26 +635,26 @@ main(int argc, char** argv)
         std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
         std::cout << " " << std::endl;
 
-        // tc.tic();
-        // std::cout << "-Tetrahedras netgen:" << std::endl;
-        // test_tetrahedra_netgen<RealType>(rp, material_data);
-        // tc.toc();
-        // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-        // std::cout << " " << std::endl;
+        tc.tic();
+        std::cout << "-Tetrahedras netgen:" << std::endl;
+        test_tetrahedra_netgen<RealType>(rp, material_data);
+        tc.toc();
+        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        std::cout << " " << std::endl;
 
-        // tc.tic();
-        // std::cout << "-Hexahedras fvca6:" << std::endl;
-        // test_hexahedra_fvca6<RealType>(rp, material_data);
-        // tc.toc();
-        // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-        // std::cout << " " << std::endl;
+        tc.tic();
+        std::cout << "-Hexahedras fvca6:" << std::endl;
+        test_hexahedra_fvca6<RealType>(rp, material_data);
+        tc.toc();
+        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        std::cout << " " << std::endl;
 
-        // tc.tic();
-        // std::cout << "-Hexahedras diskpp:" << std::endl;
-        // test_hexahedra_diskpp<RealType>(rp, material_data);
-        // tc.toc();
-        // std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
-        // std::cout << " " << std::endl;
+        tc.tic();
+        std::cout << "-Hexahedras diskpp:" << std::endl;
+        test_hexahedra_diskpp<RealType>(rp, material_data);
+        tc.toc();
+        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Polyhedra:" << std::endl;
