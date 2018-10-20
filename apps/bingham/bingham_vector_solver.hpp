@@ -387,11 +387,11 @@ public:
 
             find_values_at_points(msh, pts, sol_rec, di.reconstruction_degree(), "error_rec" + ext);
             find_values_at_points(msh, pts, sol_cell, di.cell_degree(), "error_sol" + ext);
-            plot_over_line(msh, p_y, sol_cell, di.cell_degree(), "plot_over_y_" + ext);
+            //plot_over_line(msh, p_y, sol_cell, di.cell_degree(), "plot_over_y_" + ext);
         }
-        compute_discontinuous_velocity( msh, sol_cell, di, "velocity_" + vp.info +".msh");
-        save_coords(msh, "Coords_"+ ext);
-        quiver( msh, sol, assembler, di, "quiver_"+ ext);
+        //compute_discontinuous_velocity( msh, sol_cell, di, "velocity_" + vp.info +".msh");
+        //save_coords(msh, "Coords_"+ ext);
+        //quiver( msh, sol, assembler, di, "quiver_"+ ext);
 
         return;
     }
