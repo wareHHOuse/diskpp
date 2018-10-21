@@ -2,9 +2,9 @@ config.degree_cell = 0
 config.degree_face = 0
 
 --config.input_mesh ="../../../diskpp/meshes/2D_quads/medit/square_h00125.medit2d"
-config.input_mesh ="../../../diskpp/meshes/2D_quads/diskpp/testmesh-256-256.quad"
+config.input_mesh ="../../../diskpp/meshes/2D_quads/diskpp/testmesh-32-32.quad"
 
-bi.hname = "256"; 
+bi.hname = "32"; 
 bi.alpha = 100;   --ALG augmentation parameter
 bi.Lref  = 1;     --Reference dimension
 bi.Vref  = 1;     --Reference velocity

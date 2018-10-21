@@ -222,7 +222,7 @@ public:
         auto cell_id = 0;
         const auto dim = Mesh::dimension;
 
-        for(auto cl: msh)
+        for(auto& cl : msh)
         {
             vector_type u_now = assembler.take_velocity(msh, cl, sol);
             vector_type u_old = assembler.take_velocity(msh, cl, sol_old);
@@ -417,13 +417,23 @@ public:
         if( !ofs.is_open())
             std::cout << "Error opening data-file" << std::endl;
         ofs.close();
-
+    
+        Eigen::PardisoLU<Eigen::SparseMatrix<T>>  solver;
+        
         for(size_t iter = 0; iter < max_iters; iter++)
         {
             sol_old   = sol;
             auxiliar  = vector_type::Zero(sbs * msh.cells_size());
             //------------------------------------------------------------------
-            run_stokes_like(msh, assembler, iter);
+            //run_stokes_like(msh, assembler, iter);
+            make_global_rhs(msh, assembler);
+            if (iter == 0)
+            {
+                make_global_matrix(msh, assembler);
+                solver.analyzePattern(assembler.LHS);
+                solver.factorize(assembler.LHS);
+            }
+            sol = solver.solve(assembler.RHS);
             //------------------------------------------------------------------
             update_multiplier(msh, assembler, iter, data_filename);
             //------------------------------------------------------------------
@@ -436,12 +446,11 @@ public:
             std::cout << "  i : "<< iter <<"  - " << convergence.first <<std::endl;
             post_processing( msh, assembler, iter);
 
-            if( stop)
+            if(stop)
                 return true;
             //------------------------------------------------------------------
         }
         return false;
     }
-
-
 };
+
