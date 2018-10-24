@@ -30,6 +30,9 @@
 namespace disk
 {
 
+// See https://trilinos.org/docs/r11.14/packages/intrepid/doc/html/Intrepid__MiniTensor__Tensor4_8t_8h_source.html
+// for details about operations
+
 // the fourth order tensor is stored like a Matrix
 // | A1111  A1112  A1211  A1212 |
 // | A1121  A1122  A1221  A1222 |
@@ -45,6 +48,16 @@ coeff(const static_tensor<T, DIM>& A, const int i, const int j, const int k, con
         throw std::invalid_argument("Invalid coefficient");
 
     return A(i * DIM + k, j * DIM + l);
+}
+
+template<typename T, int DIM>
+void
+coeff(static_tensor<T, DIM>& A, const int i, const int j, const int k, const int l, const T val)
+{
+    if (i < 0 || j < 0 || k < 0 || l < 0 || i >= DIM || j >= DIM || k >= DIM || l >= DIM)
+        throw std::invalid_argument("Invalid coefficient");
+
+    A(i * DIM + k, j * DIM + l) = val;
 }
 
 // Product Tensor - Matrix
@@ -120,7 +133,7 @@ tm_prod(const T& tens, const T& mat)
 
 template<typename T, int M, int N, int P, int Q>
 void
-computeKroneckerProduct(const static_matrix<T, M, N>& A, const static_matrix<T, P, Q>& B)
+Kronecker(const static_matrix<T, M, N>& A, const static_matrix<T, P, Q>& B)
 {
     static_assert((M == N && N == P && P == Q), "Kronecker product : Not yet develloped");
 }
@@ -129,7 +142,7 @@ computeKroneckerProduct(const static_matrix<T, M, N>& A, const static_matrix<T, 
 
 template<typename T, int DIM>
 static_tensor<T, DIM>
-computeKroneckerProduct(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DIM, DIM>& B)
+Kronecker(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DIM, DIM>& B)
 {
     static_tensor<T, DIM> ret = static_tensor<T, DIM>::Zero();
 
@@ -145,7 +158,7 @@ computeKroneckerProduct(const static_matrix<T, DIM, DIM>& A, const static_matrix
 
 template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
-computeKroneckerProduct(const static_vector<T, DIM>& A, const static_vector<T, DIM>& B)
+Kronecker(const static_vector<T, DIM>& A, const static_vector<T, DIM>& B)
 {
     return A * B.transpose();
 }
@@ -153,28 +166,28 @@ computeKroneckerProduct(const static_vector<T, DIM>& A, const static_vector<T, D
 // contracted product
 template<typename T, int DIM>
 T
-computeInnerProduct(const static_vector<T, DIM>& A, const static_vector<T, DIM>& B)
+InnerProduct(const static_vector<T, DIM>& A, const static_vector<T, DIM>& B)
 {
     return A.dot(B);
 }
 
 template<typename T, int DIM>
 T
-computeInnerProduct(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DIM, DIM>& B)
+InnerProduct(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DIM, DIM>& B)
 {
     return A.cwiseProduct(B).sum();
 }
 
 template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
-computeContractedProduct(const static_tensor<T, DIM>& Tens, const static_matrix<T, DIM, DIM>& B)
+ContractedProduct(const static_tensor<T, DIM>& Tens, const static_matrix<T, DIM, DIM>& B)
 {
     return tm_prod(Tens, B);
 }
 
 template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
-computeContractedProduct(const static_matrix<T, DIM, DIM>& B, const static_tensor<T, DIM>& Tens)
+ContractedProduct(const static_matrix<T, DIM, DIM>& B, const static_tensor<T, DIM>& Tens)
 {
     return tm_prod(B, Tens);
 }
@@ -182,7 +195,7 @@ computeContractedProduct(const static_matrix<T, DIM, DIM>& B, const static_tenso
 // Cijkl = Aijpq Bpqkl
 template<typename T, int DIM>
 static_tensor<T, DIM>
-computeContractedProduct(const static_tensor<T, DIM>& A, const static_tensor<T, DIM>& B)
+ContractedProduct(const static_tensor<T, DIM>& A, const static_tensor<T, DIM>& B)
 {
     static_tensor<T, DIM> ret = static_tensor<T, DIM>::Zero();
 
@@ -214,7 +227,7 @@ computeContractedProduct(const static_tensor<T, DIM>& A, const static_tensor<T, 
 
 template<typename T, int DIM>
 static_tensor<T, DIM>
-computeProductSup(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DIM, DIM>& B)
+ProductSup(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DIM, DIM>& B)
 {
     static_tensor<T, DIM> ret = static_tensor<T, DIM>::Zero();
 
@@ -239,7 +252,7 @@ computeProductSup(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DI
 
 template<typename T, int DIM>
 static_tensor<T, DIM>
-computeProductInf(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DIM, DIM>& B)
+ProductInf(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DIM, DIM>& B)
 {
     static_tensor<T, DIM> ret = static_tensor<T, DIM>::Zero();
 
@@ -261,7 +274,7 @@ computeProductInf(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DI
 
 template<typename T, int DIM>
 static_tensor<T, DIM>
-compute_IdentityTensor()
+IdentityTensor4()
 {
     static_tensor<T, DIM> ret = static_tensor<T, DIM>::Zero();
     T                     one = T{1};
@@ -295,7 +308,7 @@ compute_IdentityTensor()
 
 template<typename T, int DIM>
 static_tensor<T, DIM>
-compute_IdentitySymTensor()
+IdentitySymTensor4()
 {
     static_tensor<T, DIM> ret  = static_tensor<T, DIM>::Zero();
     T                     one  = T{1};
@@ -338,7 +351,7 @@ compute_IdentitySymTensor()
 
 template<typename T, int DIM>
 static_tensor<T, DIM>
-compute_IxI()
+IxI()
 {
     return static_tensor<T, DIM>::Identity();
 }
@@ -369,8 +382,25 @@ transpose(const static_tensor<T, DIM>& tens)
 
 template<typename T, int DIM>
 static_tensor<T, DIM>
-symetric_part(const static_tensor<T, DIM>& tens)
+Odot(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DIM, DIM>& B)
 {
-    return (tens + transpose<T, DIM>(tens)) / T(2);
+    static_tensor<T, DIM> ret = static_tensor<T, DIM>::Zero();
+
+    for (int i = 0; i < DIM; i++)
+    {
+        for (int j = 0; j < DIM; j++)
+        {
+            for (int k = 0; k < DIM; k++)
+            {
+                for (int l = 0; l < DIM; l++)
+                {
+                    T val = (A(i, k) * B(j, l) + A(i, l) * B(j, k)) / T(2);
+                    coeff<T,DIM>(ret, i, j, k, l, val);
+                }
+            }
+        }
+    }
+
+    return ret;
 }
 }

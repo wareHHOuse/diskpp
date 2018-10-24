@@ -76,8 +76,8 @@ class LinearLaw_qp
     elastic_modulus(const data_type& data) const
     {
 
-        return 2 * data.getMu() * compute_IdentitySymTensor<scalar_type, 3>() +
-               data.getLambda() * compute_IxI<scalar_type, 3>();
+        return 2 * data.getMu() * IdentitySymTensor4<scalar_type, 3>() +
+               data.getLambda() * IxI<scalar_type, 3>();
     }
 
   public:
@@ -161,7 +161,7 @@ class LinearLaw_qp
     std::pair<static_matrix_type3D, static_tensor<scalar_type, 3>>
     compute_whole3D(const static_matrix_type3D& F_curr, const data_type& data, bool tangentmodulus = true)
     {
-        static_tensor<scalar_type, 3> Cep = data.getLambda() * compute_IdentityTensor<scalar_type, 3>();
+        static_tensor<scalar_type, 3> Cep = data.getLambda() * IdentityTensor4<scalar_type, 3>();
 
         // is always elastic
         m_estrain_curr = F_curr;

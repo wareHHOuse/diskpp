@@ -92,8 +92,8 @@ class Neohookean_qp
     elastic_modulus(const data_type& data) const
     {
 
-        return 2 * data.getMu() * compute_IdentitySymTensor<scalar_type, DIM>() +
-               data.getLambda() * compute_IxI<scalar_type, DIM>();
+        return 2 * data.getMu() * IdentitySymTensor4<scalar_type, DIM>() +
+               data.getLambda() * IxI<scalar_type, DIM>();
     }
 
 
@@ -161,9 +161,9 @@ class Neohookean_qp
         const scalar_type T1 = compute_T1(J);
         const scalar_type T2 = compute_T2(J);
 
-        const static_tensor<scalar_type, DIM> I4          = compute_IdentityTensor<scalar_type, DIM>();
-        const static_tensor<scalar_type, DIM> invFt_invF  = computeProductInf(invFt, invF);
-        const static_tensor<scalar_type, DIM> invFt_invFt = computeKroneckerProduct(invFt, invFt);
+        const static_tensor<scalar_type, DIM> I4          = IdentityTensor4<scalar_type, DIM>();
+        const static_tensor<scalar_type, DIM> invFt_invF  = ProductInf(invFt, invF);
+        const static_tensor<scalar_type, DIM> invFt_invFt = Kronecker(invFt, invFt);
 
         return data.getMu() * (I4 + invFt_invF) + data.getLambda() * (T2 * invFt_invFt - T1 * invFt_invF);
     }

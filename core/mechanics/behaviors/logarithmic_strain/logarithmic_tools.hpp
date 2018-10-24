@@ -152,7 +152,7 @@ compute_zeta(const static_matrix<T, 3, 3>& stress_T, const std::array<static_vec
     {
         for (int i = 0; i < 3; i++)
         {
-            zeta(i, j) = computeInnerProduct(stress_T, computeKroneckerProduct(Ni[i], Ni[j]));
+            zeta(i, j) = InnerProduct(stress_T, Kronecker(Ni[i], Ni[j]));
         }
     }
     return zeta;
@@ -465,14 +465,14 @@ compute_projector(const static_matrix<T, 3, 3>& F,
     for (int i = 0; i < 3; i++)
     {
         const matrix_type Mii      = compute_Mij(Ni, ni, i, i);
-        const matrix_type di2_NiNi = di(i) / T(2) * computeKroneckerProduct(Ni[i], Ni[i]);
+        const matrix_type di2_NiNi = di(i) / T(2) * Kronecker(Ni[i], Ni[i]);
 
-        P += computeKroneckerProduct(di2_NiNi, Mii);
+        P += Kronecker(di2_NiNi, Mii);
 
         if (compute_TL)
         {
             const T fiZeta = fi(i) / T(4) * zeta(i, i);
-            TL += fiZeta * computeKroneckerProduct(Mii, Mii);
+            TL += fiZeta * Kronecker(Mii, Mii);
         }
 
         for (int j = 0; j < 3; j++)
@@ -480,19 +480,19 @@ compute_projector(const static_matrix<T, 3, 3>& F,
             if (j != i)
             {
                 const matrix_type Mij        = compute_Mij(Ni, ni, i, j);
-                const matrix_type theta_NiNj = theta(i, j) * computeKroneckerProduct(Ni[i], Ni[j]);
+                const matrix_type theta_NiNj = theta(i, j) * Kronecker(Ni[i], Ni[j]);
 
-                P += computeKroneckerProduct(theta_NiNj, Mij);
-
-                // for TL
-                const matrix_type zeta_Mjj    = zeta(i, j) * compute_Mij(Ni, ni, j, j);
-                const tensor_type zeta_MijMjj = computeKroneckerProduct(Mij, zeta_Mjj);
-                const tensor_type zeta_MjjMij = computeKroneckerProduct(zeta_Mjj, Mij);
-                const tensor_type MijMij      = computeKroneckerProduct(Mij, Mij);
+                P += Kronecker(theta_NiNj, Mij);
 
                 if (compute_TL)
                 {
-                    const T twoxi = T(2) * xi(i, j);
+                    // for TL
+                    const matrix_type zeta_Mjj    = zeta(i, j) * compute_Mij(Ni, ni, j, j);
+                    const tensor_type zeta_MijMjj = Kronecker(Mij, zeta_Mjj);
+                    const tensor_type zeta_MjjMij = Kronecker(zeta_Mjj, Mij);
+                    const tensor_type MijMij      = Kronecker(Mij, Mij);
+                    const T           twoxi       = T(2) * xi(i, j);
+
                     TL += twoxi * ((zeta_MijMjj + zeta_MjjMij) + zeta(j, j) * MijMij);
 
                     for (int k = 0; k < 3; k++)
@@ -503,7 +503,7 @@ compute_projector(const static_matrix<T, 3, 3>& F,
                             const matrix_type etaZeta_Mik = etaZeta * compute_Mij(Ni, ni, i, k);
                             const matrix_type Mjk         = compute_Mij(Ni, ni, j, k);
 
-                            TL += computeKroneckerProduct(etaZeta_Mik, Mjk);
+                            TL += Kronecker(etaZeta_Mik, Mjk);
                         }
                     }
                 }
@@ -515,9 +515,9 @@ compute_projector(const static_matrix<T, 3, 3>& F,
     {
         // last term partie symmetric
         const matrix_type inv_F   = F.inverse();
-        const matrix_type invF_TP = inv_F * computeContractedProduct<T, 3>(stress_T, P);
+        const matrix_type invF_TP = inv_F * ContractedProduct(stress_T, P);
         const matrix_type Id      = matrix_type::Identity();
-        TL += symetric_part<T, 3>(computeKroneckerProduct(invF_TP, Id));
+        TL += Odot(invF_TP, Id);
     }
     // std::cout << "P" << std::endl;
     // std::cout << P << std::endl;
@@ -570,25 +570,25 @@ compute_projector_PK2(const static_matrix<T, 3, 3>& F,
     for (int i = 0; i < 3; i++)
     {
         const matrix_type Mii  = compute_Mij(Ni, Ni, i, i);
-        const matrix_type NiNi = computeKroneckerProduct(Ni[i], Ni[i]);
+        const matrix_type NiNi = Kronecker(Ni[i], Ni[i]);
 
-        P += di(i) / T(2) * computeKroneckerProduct(NiNi, Mii);
-        TL += fi(i) / T(4) * zeta(i, i) * computeKroneckerProduct(Mii, Mii);
+        P += di(i) / T(2) * Kronecker(NiNi, Mii);
+        TL += fi(i) / T(4) * zeta(i, i) * Kronecker(Mii, Mii);
 
         for (int j = 0; j < 3; j++)
         {
             if (j != i)
             {
                 const matrix_type Mij  = compute_Mij(Ni, Ni, i, j);
-                const matrix_type NiNj = computeKroneckerProduct(Ni[i], Ni[j]);
+                const matrix_type NiNj = Kronecker(Ni[i], Ni[j]);
 
-                P += theta(i, j) * computeKroneckerProduct(NiNj, Mij);
+                P += theta(i, j) * Kronecker(NiNj, Mij);
 
                 // for TL
                 const matrix_type Mjj    = compute_Mij(Ni, Ni, j, j);
-                const tensor_type MijMjj = computeKroneckerProduct(Mij, Mjj);
-                const tensor_type MjjMij = computeKroneckerProduct(Mjj, Mij);
-                const tensor_type MijMij = computeKroneckerProduct(Mij, Mij);
+                const tensor_type MijMjj = Kronecker(Mij, Mjj);
+                const tensor_type MjjMij = Kronecker(Mjj, Mij);
+                const tensor_type MijMij = Kronecker(Mij, Mij);
 
                 TL += T(2) * xi(i, j) * (zeta(i, j) * (MijMjj + MjjMij) + zeta(j, j) * MijMij);
 
@@ -599,7 +599,7 @@ compute_projector_PK2(const static_matrix<T, 3, 3>& F,
                         const matrix_type Mik = compute_Mij(Ni, Ni, i, k);
                         const matrix_type Mjk = compute_Mij(Ni, Ni, j, k);
 
-                        TL += T(2) * eta * zeta(i, j) * computeKroneckerProduct(Mik, Mjk);
+                        TL += T(2) * eta * zeta(i, j) * Kronecker(Mik, Mjk);
                     }
                 }
             }

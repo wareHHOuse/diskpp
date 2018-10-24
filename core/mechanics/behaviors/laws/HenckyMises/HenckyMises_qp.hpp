@@ -102,8 +102,8 @@ class HenckyMises_qp
     elastic_modulus(const data_type& data) const
     {
 
-        return 2 * data.getMu() * compute_IdentitySymTensor<scalar_type, DIM>() +
-               data.getLambda() * compute_IxI<scalar_type, DIM>();
+        return 2 * data.getMu() * IdentitySymTensor4<scalar_type, DIM>() +
+               data.getLambda() * IxI<scalar_type, DIM>();
     }
 
   public:

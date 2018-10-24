@@ -72,8 +72,8 @@ class IsotropicHardeningVMis_qp
     elastic_modulus(const data_type& data) const
     {
 
-        return 2 * data.getMu() * compute_IdentitySymTensor<scalar_type, 3>() +
-               data.getLambda() * compute_IxI<scalar_type, 3>();
+        return 2 * data.getMu() * IdentitySymTensor4<scalar_type, 3>() +
+               data.getLambda() * IxI<scalar_type, 3>();
     }
 
     scalar_type
@@ -233,6 +233,11 @@ class IsotropicHardeningVMis_qp
             const scalar_type          se_eq      = sigmaeq(se);
             const scalar_type          Phi_trial0 = se_eq - Rp0 - H0 * (m_p_prev - p0);
 
+            // debug informations
+            // std::cout << "point: " << i0 << " on " << nb_point << std::endl;
+            // std::cout << "Rp0: " << Rp0 << ", p0: " << p0 << ", H0: " << H0 << std::endl;
+            // std::cout << "se_eq: " << se_eq << ", Rp " << Rp0 + H0 * (m_p_prev - p0) << ", Phi: " << Phi_trial0 << std::endl;
+
             assert(std::abs(se.trace()) <= 1E-8);
 
             // check
@@ -283,10 +288,9 @@ class IsotropicHardeningVMis_qp
                 if (tangentmodulus)
                 {
                     // compute cep coherent
-                    const static_tensor<scalar_type, 3> nxn  = computeKroneckerProduct(normal, normal);
-                    const static_tensor<scalar_type, 3> IxI  = compute_IxI<scalar_type, 3>();
-                    const static_tensor<scalar_type, 3> Is   = compute_IdentityTensor<scalar_type, 3>();
-                    const static_tensor<scalar_type, 3> Pdev = Is - IxI / scalar_type(3);
+                    const static_tensor<scalar_type, 3> nxn  = Kronecker(normal, normal);
+                    const static_tensor<scalar_type, 3> Is   = IdentitySymTensor4<scalar_type, 3>();
+                    const static_tensor<scalar_type, 3> Pdev = Is - IxI<scalar_type, 3>() / scalar_type(3);
                     const scalar_type                   mu2  = data.getMu() * data.getMu();
 
                     Cep += 4 * mu2 * (delta_p / se_eq - 1.0 / dem) * nxn - 6.0 * mu2 * delta_p / se_eq * Pdev;

@@ -90,8 +90,8 @@ class Cavitation_qp
     elastic_modulus(const data_type& data) const
     {
 
-        return 2 * data.getMu() * compute_IdentitySymTensor<scalar_type, DIM>() +
-               data.getLambda() * compute_IxI<scalar_type, DIM>();
+        return 2 * data.getMu() * IdentitySymTensor4<scalar_type, DIM>() +
+               data.getLambda() * IxI<scalar_type, DIM>();
     }
 
     scalar_type
@@ -160,10 +160,10 @@ class Cavitation_qp
         const scalar_type T1      = compute_T1(J);
         const scalar_type T2      = compute_T2(J);
 
-        const static_tensor<scalar_type, DIM> I4          = compute_IdentityTensor<scalar_type, DIM>();
-        const static_tensor<scalar_type, DIM> invFt_invF  = computeProductInf(invFt, invF);
-        const static_tensor<scalar_type, DIM> invFt_invFt = computeKroneckerProduct(invFt, invFt);
-        const static_tensor<scalar_type, DIM> F_F         = computeKroneckerProduct(m_F_curr, m_F_curr);
+        const static_tensor<scalar_type, DIM> I4          = IdentityTensor4<scalar_type, DIM>();
+        const static_tensor<scalar_type, DIM> invFt_invF  = ProductInf(invFt, invF);
+        const static_tensor<scalar_type, DIM> invFt_invFt = Kronecker(invFt, invFt);
+        const static_tensor<scalar_type, DIM> F_F         = Kronecker(m_F_curr, m_F_curr);
 
         const auto Aiso = data.getMu() * std::pow(3.0, -0.25) *
                           (std::pow(trace_C, -0.25) * I4 - 0.5 * std::pow(trace_C, -5.0 / 4.0) * F_F);

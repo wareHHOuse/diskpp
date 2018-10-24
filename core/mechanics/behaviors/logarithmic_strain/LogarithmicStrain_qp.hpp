@@ -74,7 +74,7 @@ class LogarithmicStrain_qp
     static_matrix_type3D
     compute_stress3D(const data_type& data) const
     {
-        return computeContractedProduct(this->compute_stress3D_T(data), Pn);
+        return ContractedProduct<scalar_type, 3>(this->compute_stress3D_T(data), Pn);
     }
 
     static_matrix_type3D
@@ -102,9 +102,9 @@ class LogarithmicStrain_qp
             throw std::invalid_argument(mess);
         }
 
-        const auto C    = convertFtoCauchyGreenRight(F_curr);
-        const auto ev_C = compute_eigenvalues(C);
-        const auto Elog = compute_Elog(ev_C.first, ev_C.second);
+        const static_matrix_type3D C    = convertFtoCauchyGreenRight(F_curr);
+        const auto                 ev_C = compute_eigenvalues(C);
+        const static_matrix_type3D Elog = compute_Elog(ev_C.first, ev_C.second);
 
         // std::cout << "C" << std::endl;
         // std::cout << C << std::endl;
@@ -114,10 +114,10 @@ class LogarithmicStrain_qp
         // std::cout << Elog << std::endl;
 
         const auto behavior3D_hpp = m_law_hpp_qp.compute_whole3D(Elog, data, tangentmodulus);
-        const auto projector      = compute_projector(F_curr, behavior3D_hpp.first, ev_C.first, ev_C.second);
+        const auto projector      = compute_projector(F_curr, behavior3D_hpp.first, ev_C.first, ev_C.second, true);
 
-        Pn             = projector.first;
-        const auto PK1 = this->compute_stress3D(data);
+        Pn                             = projector.first;
+        const static_matrix_type3D PK1 = this->compute_stress3D(data);
 
         // std::cout << "T" << std::endl;
         // std::cout << behavior3D_hpp.first << std::endl;
@@ -136,17 +136,27 @@ class LogarithmicStrain_qp
             return std::make_pair(PK1, behavior3D_hpp.second);
         }
 
-        const auto CP = computeContractedProduct<scalar_type, 3>(behavior3D_hpp.second, Pn);
-        const auto A  = computeContractedProduct<scalar_type, 3>(transpose<scalar_type, 3>(Pn), CP) + projector.second;
+        const static_tensor<scalar_type, 3> CP = ContractedProduct<scalar_type,3>(behavior3D_hpp.second, Pn);
+        const static_tensor<scalar_type, 3> Aalt  = ContractedProduct<scalar_type, 3>(transpose<scalar_type,
+        3>(Pn), CP) + projector.second;
 
-        // const auto projector2 = compute_projector_PK2(F_curr, behavior3D_hpp.first, ev_C.first, ev_C.second);
-        // const auto Pn2        = projector2.first;
-        // const auto CP2        = computeContractedProduct<scalar_type, 3>(behavior3D_hpp.second, Pn2);
-        // const auto A2  = computeContractedProduct<scalar_type, 3>(transpose<scalar_type, 3>(Pn2), CP2) +
-        // projector2.second;
+        const auto projector2 = compute_projector_PK2(F_curr, behavior3D_hpp.first, ev_C.first, ev_C.second);
+        const static_tensor<scalar_type, 3> Pn2 = projector2.first;
+        const static_tensor<scalar_type, 3> CP2 = ContractedProduct<scalar_type, 3>(behavior3D_hpp.second, Pn2);
+        const static_tensor<scalar_type, 3> A2 =
+          ContractedProduct<scalar_type, 3>(transpose<scalar_type, 3>(Pn2), CP2) + projector2.second;
+        const static_matrix_type3D          PK2 = convertPK1toPK2(PK1, F_curr);
+        const static_tensor<scalar_type, 3> A   = convertCtoA(A2, PK2, F_curr);
 
+        // std::cout << "dTdE" << std::endl;
+        // std::cout << convertTensorNotationMangel<scalar_type, 3>(behavior3D_hpp.second) << std::endl;
         // std::cout << "dPK2dC" << std::endl;
         // std::cout << convertTensorNotationMangel<scalar_type, 3>(A2) << std::endl;
+        // std::cout << "dPK1dF" << std::endl;
+        // std::cout << convertTensorNotationMangel<scalar_type, 3>(Aalt) << std::endl;
+        // std::cout << "dPK1dF alt" << std::endl;
+        // std::cout << convertTensorNotationMangel<scalar_type, 3>(convertCtoA<scalar_type>(A2, PK2 , F_curr)) <<
+        // std::endl;
         // std::cout << A2 << std::endl;
         // std::cout << "dPK1dF" << std::endl;
         // std::cout << A << std::endl;

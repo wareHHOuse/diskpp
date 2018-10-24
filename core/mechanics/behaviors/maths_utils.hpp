@@ -50,7 +50,7 @@ spheric(const static_matrix<T, DIM, DIM> mat)
 // compute the first derivate of the Frobenius-norm of the deviatoric part of a matrix
 template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
-computeNormFroFirstDerivate(const static_matrix<T, DIM, DIM>& dev)
+NormFroFirstDerivate(const static_matrix<T, DIM, DIM>& dev)
 {
     const T normFrodev    = dev.norm();
     const T normFrodev3_2 = normFrodev * std::sqrt(normFrodev);
