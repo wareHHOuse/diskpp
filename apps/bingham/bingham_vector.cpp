@@ -124,8 +124,6 @@ run_bingham(const Mesh& msh, const hho_degree_info& hdi,
             break;
     }
 
-
-
     ADDM<Mesh> admmb(msh, hdi, vp);
     return  admmb.run(msh, bnd);
 }

@@ -58,14 +58,14 @@ class ADDM
     typedef Matrix<T, Dynamic, Dynamic>         matrix_type;
     typedef Matrix<T, Dynamic, 1>               vector_type;
 
-    vector_type           multiplier, auxiliar;
+    vector_type             multiplier, auxiliar;
     bingham_data<T, vector_problem>     vp;
-    hho_degree_info             di;
+    hho_degree_info         di;
     size_t        cbs, fbs, pbs, sbs, dim;
 
 public:
-    vector_type        sol, sol_old;
-    std::pair<T, T>          convergence;
+    vector_type             sol, sol_old;
+    std::pair<T, T>         convergence;
 
     ADDM(const Mesh  & msh,
          const hho_degree_info  & hdi,
@@ -178,7 +178,7 @@ public:
             matrix_type dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
 
             matrix_type stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
-            matrix_type A    = 2. *(vp.alpha * G.second + vp.mu * stab);
+            matrix_type A    = 2. * (vp.alpha * G.second + vp.mu * stab);
 
             assembler.assemble_lhs(msh, cl, A, -dr);
         }
@@ -417,9 +417,9 @@ public:
         if( !ofs.is_open())
             std::cout << "Error opening data-file" << std::endl;
         ofs.close();
-    
+
         Eigen::PardisoLU<Eigen::SparseMatrix<T>>  solver;
-        
+
         for(size_t iter = 0; iter < max_iters; iter++)
         {
             sol_old   = sol;
@@ -453,4 +453,3 @@ public:
         return false;
     }
 };
-
