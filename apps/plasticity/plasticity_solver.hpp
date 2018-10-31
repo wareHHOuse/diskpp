@@ -66,8 +66,9 @@ class plasticity_solver
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
-    typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
-    typedef disk::IsotropicHardeningVMis<mesh_type>        law_type;
+    typedef disk::mechanics::BoundaryConditions<mesh_type>        bnd_type;
+    typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_type;
+    // typedef disk::IsotropicHardeningVMis<mesh_type> law_type;
 
     typename disk::hho_degree_info m_hdi;
     bnd_type                       m_bnd;
@@ -188,13 +189,12 @@ class plasticity_solver
         m_rp.m_face_degree = face_degree;
 
         int cell_degree = rp.m_cell_degree;
-        // if (face_degree - 1 > cell_degree or cell_degree > face_degree + 1) {
-        //    std::cout << "'cell_degree' should be 'face_degree + 1' => 'cell_degree' => 'face_degree
-        //    "
-        //                 "-1'. Reverting to 'face_degree'."
-        //              << std::endl;
-        //    cell_degree = face_degree;
-        // }
+        if ((face_degree - 1 > cell_degree) or (cell_degree > face_degree + 1))
+        {
+            std::cout << "'cell_degree' should be 'face_degree + 1' =>"
+                      << "'cell_degree' => 'face_degree -1'. Reverting to 'face_degree'." << std::endl;
+            cell_degree = face_degree;
+        }
 
         m_rp.m_cell_degree = cell_degree;
 
@@ -217,6 +217,9 @@ class plasticity_solver
             m_hdi.info_degree();
             m_rp.infos();
         }
+
+        // compute mesh for post-processing
+        post_mesh = disk::PostMesh<mesh_type>(m_msh);
 
         init();
     }
@@ -374,6 +377,26 @@ class plasticity_solver
                 {
                     if (m_rp.m_time_save.front() < old_time + 1E-5)
                     {
+
+                        std::cout << "** Save results" << std::endl;
+                        std::string name = "result" + std::to_string(dimension) + "D_k" +
+                                           std::to_string(m_hdi.face_degree()) + "_l" +
+                                           std::to_string(m_hdi.cell_degree()) + "_g" +
+                                           std::to_string(m_hdi.grad_degree()) + "_t" + std::to_string(old_time) + "_";
+
+                        // this->compute_discontinuous_displacement(name + "depl_disc.msh");
+                        this->compute_continuous_displacement(name + "depl_cont.msh");
+                        // this->compute_discontinuous_stress(name + "stress_disc.msh");
+                        // this->compute_continuous_stress(name + "stress_cont.msh");
+                        this->compute_stress_GP(name + "stress_GP.msh");
+                        // this->compute_discontinuous_equivalent_plastic_strain(name + "_disc.msh");
+                        // this->compute_continuous_equivalent_plastic_strain(name + "p_cont.msh");
+                        this->compute_equivalent_plastic_strain_GP(name + "p_GP.msh");
+                        this->compute_is_plastic_GP(name + "state_GP.msh");
+                        // this->compute_is_plastic_continuous(name + "state_cont.msh");
+                        // this->compute_continuous_deformed(name + "deformed_cont.msh");
+                        // this->compute_discontinuous_deformed(name + "deformed_disc.msh");
+
                         m_rp.m_time_save.pop_front();
                         if (m_rp.m_time_save.empty())
                             time_saving = false;
@@ -386,9 +409,6 @@ class plasticity_solver
 
         ttot.toc();
         si.m_time_solver = ttot.to_double();
-
-        // compute mesh for post-processing
-        post_mesh = disk::PostMesh<mesh_type>(m_msh);
 
         return si;
     }
@@ -1172,7 +1192,9 @@ class plasticity_solver
                << "\t"
                << "sigma_oo"
                << "\t"
-               << "sigma_trace" << std::endl;
+               << "sigma_trace"
+               << "\t"
+               << "p" << std::endl;
 
         size_t cell_i(0);
         for (auto& cl : m_msh)
@@ -1204,8 +1226,8 @@ class plasticity_solver
                 const scalar_type sigma_oo = (stress.trace() - sigma_rr) / 2.0;
                 const scalar_type ur       = depl.dot(er);
 
-                output << r << "\t" << ur << "\t" << sigma_rr << "\t" << sigma_oo << "\t" << stress.trace()
-                       << std ::endl;
+                output << r << "\t" << ur << "\t" << sigma_rr << "\t" << sigma_oo << "\t" << stress.trace() << "\t"
+                       << qp.getAccumulatedPlasticStrain() << std ::endl;
             }
             cell_i++;
         }

@@ -59,17 +59,19 @@ struct time_step
 template<typename Mesh>
 class finite_strains_solver
 {
-    typedef Mesh                                 mesh_type;
-    typedef typename mesh_type::coordinate_type  scalar_type;
-    typedef ParamRun<scalar_type>                param_type;
-    typedef disk::MaterialData<scalar_type>      data_type;
+    typedef Mesh                                mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef ParamRun<scalar_type>               param_type;
+    typedef disk::MaterialData<scalar_type>     data_type;
 
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
-    typedef disk::mechanics::BoundaryConditions<mesh_type>        bnd_type;
-    typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_hpp_type;
-    typedef disk::mechanics::LogarithmicStrain<law_hpp_type>      law_type;
+    typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
+    // typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_hpp_type;
+    typedef disk::LinearIsotropicHardeningwithHyper<mesh_type> law_hpp_type;
+    // typedef disk::IsotropicHardeningVMis<mesh_type> law_hpp_type;
+    typedef disk::mechanics::LogarithmicStrain<law_hpp_type> law_type;
 
     typename disk::hho_degree_info m_hdi;
     bnd_type                       m_bnd;
@@ -195,13 +197,12 @@ class finite_strains_solver
         m_rp.m_face_degree = face_degree;
 
         int cell_degree = rp.m_cell_degree;
-        // if (face_degree - 1 > cell_degree or cell_degree > face_degree + 1) {
-        //    std::cout << "'cell_degree' should be 'face_degree + 1' => 'cell_degree' => 'face_degree
-        //    "
-        //                 "-1'. Reverting to 'face_degree'."
-        //              << std::endl;
-        //    cell_degree = face_degree;
-        // }
+        if ((face_degree - 1 > cell_degree) or (cell_degree > face_degree + 1))
+        {
+            std::cout << "'cell_degree' should be 'face_degree + 1' =>"
+                      << "'cell_degree' => 'face_degree -1'. Reverting to 'face_degree'." << std::endl;
+            cell_degree = face_degree;
+        }
 
         m_rp.m_cell_degree = cell_degree;
 
@@ -218,6 +219,9 @@ class finite_strains_solver
 
         m_law = law_type(m_msh, 2 * m_hdi.grad_degree());
         m_law.addMaterialData(material_data);
+
+        // compute mesh for post-processing
+        post_mesh = disk::PostMesh<mesh_type>(m_msh);
 
         if (m_verbose)
         {
@@ -388,7 +392,7 @@ class finite_strains_solver
                                            std::to_string(m_hdi.grad_degree()) + "_t" + std::to_string(old_time) + "_";
 
                         // this->compute_discontinuous_displacement(name + "depl_disc.msh");
-                        // this->compute_continuous_displacement(name + "depl_cont.msh");
+                        this->compute_continuous_displacement(name + "depl_cont.msh");
                         // this->compute_discontinuous_stress(name + "stress_disc.msh");
                         // this->compute_continuous_stress(name + "stress_cont.msh");
                         this->compute_stress_GP(name + "stress_GP.msh");
@@ -412,9 +416,6 @@ class finite_strains_solver
 
         ttot.toc();
         si.m_time_solver = ttot.to_double();
-
-        // compute mesh for post-processing
-        post_mesh = disk::PostMesh<mesh_type>(m_msh);
 
         return si;
     }
@@ -645,15 +646,15 @@ class finite_strains_solver
         std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
         size_t                     nb_nodes(gmsh.getNumberofNodes());
 
-        const auto material_data = m_law.getMaterialData();
+        const auto   material_data = m_law.getMaterialData();
         const size_t grad_degree   = m_hdi.grad_degree();
 
         int cell_i = 0;
         for (auto& cl : m_msh)
         {
 
-            const auto law_quadpoints = m_law.getCellIVs(cell_i).getIVs();
-            const auto uTF            = m_solution_data.at(cell_i);
+            const auto     law_quadpoints = m_law.getCellIVs(cell_i).getIVs();
+            const auto     uTF            = m_solution_data.at(cell_i);
             matrix_dynamic gr;
             if (m_rp.m_precomputation)
             {
@@ -669,11 +670,11 @@ class finite_strains_solver
             // Loop on nodes
             for (auto& qp : law_quadpoints)
             {
-                const auto                gphi   = gb.eval_functions(qp.point());
-                const auto                GT_iqn = disk::eval(GTuTF, gphi);
-                const auto                FT_iqn = disk::mechanics::convertGtoF(GT_iqn);
+                const auto gphi   = gb.eval_functions(qp.point());
+                const auto GT_iqn = disk::eval(GTuTF, gphi);
+                const auto FT_iqn = disk::mechanics::convertGtoF(GT_iqn);
 
-                const auto                P = qp.compute_stress(material_data);
+                const auto                P      = qp.compute_stress(material_data);
                 const auto                stress = disk::mechanics::convertPK1toCauchy(P, FT_iqn);
                 const std::vector<double> tens   = disk::convertToVectorGmsh(stress);
 
@@ -702,7 +703,7 @@ class finite_strains_solver
         std::vector<gmsh::Data>          data;    // create data (not used)
         const std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
 
-        const auto material_data = m_law.getMaterialData();
+        const auto   material_data = m_law.getMaterialData();
         const size_t grad_degree   = m_hdi.grad_degree();
 
         int    cell_i   = 0;
@@ -779,7 +780,7 @@ class finite_strains_solver
         std::vector<std::pair<size_t, static_matrix<scalar_type, dimension, dimension>>> value(
           nb_nodes, std::make_pair(0, vzero));
 
-        const auto material_data = m_law.getMaterialData();
+        const auto   material_data = m_law.getMaterialData();
         const size_t grad_degree   = m_hdi.grad_degree();
 
         int cell_i = 0;
@@ -1243,6 +1244,8 @@ class finite_strains_solver
 
         output << "#R"
                << "\t"
+               << "r"
+               << "\t"
                << "ur"
                << "\t"
                << "sigma_rr"
@@ -1292,14 +1295,15 @@ class finite_strains_solver
                 er(1) = qp_pt.y();
                 er(2) = qp_pt.z();
 
-                const scalar_type r = er.norm();
-                er /= r;
+                const scalar_type R = er.norm();
+                const scalar_type r = (er + depl).norm();
+                er /= R;
 
                 const scalar_type sigma_rr = er.dot(stress * er);
                 const scalar_type sigma_oo = (stress.trace() - sigma_rr) / 2.0;
                 const scalar_type ur       = depl.dot(er);
 
-                output << r << "\t" << ur << "\t" << sigma_rr << "\t" << sigma_oo << "\t" << stress.trace()
+                output << R << "\t" << r << "\t" << ur << "\t" << sigma_rr << "\t" << sigma_oo << "\t" << stress.trace()
                        << std ::endl;
             }
             cell_i++;
