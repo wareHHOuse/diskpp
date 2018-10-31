@@ -32,6 +32,267 @@
 #include "common_temporal.hpp"
 #include "solvers/solver.hpp"
 
+
+template<typename Mesh, typename Function, typename Analytical>
+std::pair<typename Mesh::coordinate_type, typename Mesh::coordinate_type>
+solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun,
+    const algorithm_parameters<typename Mesh::scalar_type>& ap,
+    const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+{
+    using T = typename Mesh::scalar_type;
+
+    typedef Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>    matrix_type;
+    typedef Eigen::Matrix<T, Eigen::Dynamic, 1>                 vector_type;
+
+    auto is_contact_vector = make_is_contact_vector(msh, bnd);
+
+
+    hho_degree_info      hdi(ap.degree + 1, ap.degree); //Also allow (degree + 1, degree)
+    std::cout << " * cell degree :"<< hdi.cell_degree() << std::endl;
+    std::cout << " * face degree :"<< hdi.face_degree() << std::endl;
+
+    auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
+    auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+
+    auto num_full_dofs = cbs*msh.cells_size() + 2 * fbs*msh.faces_size()
+                                    - fbs*msh.boundary_faces_size() ;
+
+    auto offset_vector = full_offset(msh, hdi);
+
+    dynamic_vector<T>  full_sol = dynamic_vector<T>::Zero(num_full_dofs);
+
+
+    //-------------------------------------------------------------------------
+    //
+    // Initialization with projection of the anylitcal solution
+    //
+    //-------------------------------------------------------------------------
+    //#if 0
+    auto cl_count_0 = 0;
+    std::ofstream efs("solution_whho_fnew_init.dat");
+
+    if(!efs.is_open())
+        std::cout<< "Error opening file"<<std::endl;
+
+    for(auto& cl : msh)
+    {
+        auto cell_ofs = offset_vector.at(cl_count_0);
+        auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
+
+        vector_type  proj_fun = project_function(msh, cl, hdi, sol_fun);
+        full_sol.block(cell_ofs, 0, num_total_dofs, 1)= proj_fun;
+        cl_count_0++;
+
+        auto bar = barycenter(msh, cl);
+        auto fcs = faces(msh, cl);
+        auto face_count = 0;
+        vector_type u_full = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
+        for(auto fc: fcs)
+        {
+            auto offset_face = cbs + face_count * fbs;
+            auto barf = barycenter(msh, fc);
+            efs << barf.x() << " " << barf.y() <<" "<< u_full(offset_face)<<std::endl;
+            face_count++;
+        }
+    }
+    efs.close();
+    //#endif
+    //-------------------------------------------------------------------------
+
+
+
+    auto max_iter = 1000;
+    auto tol = 1.e-6;
+
+    for(size_t iter = 0; iter < max_iter; iter++)
+    {
+        auto cl_count = 0;
+        auto assembler =  make_contact_face_assembler_new(msh, hdi, bnd);
+        assembler.imposed_dirichlet_boundary_conditions(msh, bnd, full_sol);
+
+        for (auto& cl : msh)
+        {
+            auto cell_ofs = offset_vector.at(cl_count);
+            auto num_total_dofs  = cbs + howmany_faces(msh, cl) * fbs;
+            vector_type  u_full  = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
+
+            auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+            auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
+            auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+
+            vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
+            matrix_type Ah  = gr.second + stab;
+
+            vector_type Bnegative  = vector_type::Zero(num_total_dofs);
+            matrix_type Anitsche   = matrix_type::Zero(num_total_dofs, num_total_dofs);
+            matrix_type Aheaviside = matrix_type::Zero(num_total_dofs, num_total_dofs);
+
+            if (is_contact_vector.at(cl_count) == 1)
+            {
+                Anitsche   = make_hho_nitsche(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd );
+                Bnegative  = make_hho_negative_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd, u_full);
+                Aheaviside = make_hho_heaviside_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd, u_full);
+            }
+
+            matrix_type A =   Ah - Anitsche + Aheaviside;
+            vector_type b = -(Ah - Anitsche) * u_full - Bnegative;
+            b.block(0, 0, cbs, 1) += Lh;
+
+            auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, b);
+            assembler.assemble(msh, cl, sc.first, sc.second);
+            cl_count++;
+        }
+
+        //assembler.impose_neumann_boundary_conditions(msh, bnd);
+        assembler.finalize();
+
+        size_t systsz = assembler.LHS.rows();
+        size_t nnz = assembler.LHS.nonZeros();
+
+        //std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
+        //std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
+        //std::cout << "Dofs: " << systsz << std::endl;
+
+        dynamic_vector<T> dsol = dynamic_vector<T>::Zero(systsz);
+
+        disk::solvers::pardiso_params<T> pparams;
+        pparams.report_factorization_Mflops = true;
+        mkl_pardiso(pparams, assembler.LHS, assembler.RHS, dsol);
+
+        T H1_increment = 0.0 ;
+        T L2_increment = 0.0 ;
+
+        dynamic_vector<T> diff_sol = dynamic_vector<T>::Zero(num_full_dofs);
+
+        cl_count = 0;
+
+        for (auto& cl : msh)
+        {
+            auto cell_ofs = offset_vector.at(cl_count);
+            auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
+            vector_type  u_full = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
+
+
+            auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+            auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
+            auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+
+            vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
+            matrix_type Ah  = gr.second + stab;
+
+            vector_type Bnegative  = vector_type::Zero(num_total_dofs);
+            matrix_type Anitsche   = matrix_type::Zero(num_total_dofs, num_total_dofs);
+            matrix_type Aheaviside = matrix_type::Zero(num_total_dofs, num_total_dofs);
+
+            if (is_contact_vector.at(cl_count))
+            {
+                Anitsche   = make_hho_nitsche(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd );
+                Bnegative  = make_hho_negative_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd, u_full);
+                Aheaviside = make_hho_heaviside_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd, u_full);
+            }
+
+            matrix_type A =   Ah - Anitsche + Aheaviside;
+            vector_type b = -(Ah - Anitsche) * u_full - Bnegative;
+            b.block(0, 0, cbs, 1) += Lh;
+
+            vector_type cell_rhs = b.block(0, 0, cbs, 1);
+            vector_type du_faces = assembler.take_local_data_increment(msh, cl, dsol);
+            vector_type du_full  =
+                diffusion_static_condensation_recover(msh, cl, hdi, A, cell_rhs, du_faces);
+
+            diff_sol.block(cell_ofs, 0, num_total_dofs ,1) = du_full;
+
+            H1_increment += du_full.dot(A * du_full);
+
+            matrix_type mass  = make_mass_matrix(msh, cl, cb);//, hdi.cell_degree());
+
+            vector_type u_diff = du_full.block(0, 0, cbs, 1);
+            L2_increment += u_diff.dot(mass * u_diff);
+
+
+            cl_count++;
+        }
+
+        full_sol += diff_sol;
+
+        std::cout << "  "<< iter << "  "<< std::scientific<< std::setprecision(3);
+        std::cout << std::sqrt(H1_increment)<< "   "<< std::sqrt(L2_increment)<< std::endl;
+
+        //if( std::sqrt(H1_increment)  < tol)
+        {
+            std::ofstream efs("solution_whho_fnew_i" + tostr(iter) + ".dat");
+
+            if(!efs.is_open())
+                std::cout<< "Error opening file"<<std::endl;
+
+
+            T H1_error  = 0.0 ;
+            T L2_error  = 0.0 ;
+
+
+            auto cl_count = 0;
+            for(auto& cl : msh)
+            {
+                const auto cell_ofs = offset_vector.at(cl_count);
+                const auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
+                vector_type  u_full = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
+
+                auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
+                auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+
+                matrix_type Ah  = gr.second + stab;
+                matrix_type Anitsche   = matrix_type::Zero(num_total_dofs, num_total_dofs);
+                matrix_type Aheaviside = matrix_type::Zero(num_total_dofs, num_total_dofs);
+
+                if (is_contact_vector.at(cl_count))
+                {
+                    Anitsche   = make_hho_nitsche(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd );
+                    Aheaviside = make_hho_heaviside_faces(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd, u_full);
+                }
+
+                matrix_type A =   Ah - Anitsche + Aheaviside;
+
+                vector_type realsol = project_function(msh, cl, hdi, sol_fun, 2);
+
+                vector_type diff = realsol - u_full;
+                H1_error += diff.dot(Ah*diff);
+
+                auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+                matrix_type mass  = make_mass_matrix(msh, cl, cb, hdi.cell_degree());
+                vector_type u_diff = diff.block(0, 0, cbs, 1);
+                L2_error += u_diff.dot(mass * u_diff);
+
+                //plot
+                auto bar = barycenter(msh, cl);
+                efs << bar.x() << " " << bar.y() <<" "<< u_full(0) << std::endl; //<< " "<< du_full(0) << std::endl;
+
+                auto fcs = faces(msh, cl);
+                auto face_count = 0;
+                for(auto fc: fcs)
+                {
+                    auto offset_face = cbs + face_count * fbs;
+                    auto barf = barycenter(msh, fc);
+                    efs << barf.x() << " " << barf.y() <<" "<< u_full(offset_face)<< std::endl;
+                    //efs << " "<< du_full(offset_face) << std::endl;
+                    face_count++;
+                }
+                cl_count++;
+
+            }
+            efs.close();
+            if( std::sqrt(H1_increment)  < tol)
+                return std::make_pair(std::sqrt(H1_error), std::sqrt(L2_error));
+        }
+    }
+    return std::make_pair(0., 0.);
+}
+
+
+
+
+
+
+
 template<typename Mesh, typename Function, typename Analytical>
 //dynamic_vector<typename Mesh::coordinate_type> //This is for hierarchical (solve conflicts!!)
 std::pair<typename Mesh::coordinate_type, typename Mesh::coordinate_type>
@@ -62,6 +323,43 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
     auto offset_vector = full_offset(msh, hdi);
 
     dynamic_vector<T>  full_sol = dynamic_vector<T>::Zero(num_full_dofs);
+
+    //-------------------------------------------------------------------------
+    //
+    // Initialization with projection of the anylitcal solution
+    //
+    //-------------------------------------------------------------------------
+    #if 0
+    auto cl_count_0 = 0;
+    std::ofstream efs("solution_whho_cnew_init.dat");
+
+    if(!efs.is_open())
+        std::cout<< "Error opening file"<<std::endl;
+
+    for(auto& cl : msh)
+    {
+        auto cell_ofs = offset_vector.at(cl_count_0);
+        auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
+
+        vector_type  proj_fun = project_function(msh, cl, hdi, sol_fun);
+        full_sol.block(cell_ofs, 0, num_total_dofs, 1)= proj_fun;
+        cl_count_0++;
+
+        auto bar = barycenter(msh, cl);
+        auto fcs = faces(msh, cl);
+        auto face_count = 0;
+        vector_type u_full = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
+        for(auto fc: fcs)
+        {
+            auto offset_face = cbs + face_count * fbs;
+            auto barf = barycenter(msh, fc);
+            efs << barf.x() << " " << barf.y() <<" "<< u_full(offset_face)<<std::endl;
+            face_count++;
+        }
+    }
+    efs.close();
+    #endif
+    //-------------------------------------------------------------------------
 
 
     auto max_iter = 15;
@@ -206,41 +504,54 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
                 const auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
 
                 vector_type  u_full   = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
-                vector_type  du_full  = diff_sol.block(cell_ofs, 0, num_total_dofs, 1);
                 matrix_type  Ah  = matrix_type::Zero(num_total_dofs, num_total_dofs);
 
                 auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
 
+                #if 0
                 if (is_contact_vector.at(cl_count)==1)
                 {
                     auto gr  = make_hho_contact_scalar_laplacian(msh, cl, hdi, bnd);
                     Ah  = gr.second + stab;
                 }
                 else
+                #endif
                 {
                     auto gr  = make_hho_scalar_laplacian(msh, cl, hdi);
                     Ah  = gr.second + stab;
                 }
 
-                vector_type realsol = project_function(msh, cl, hdi, sol_fun, 2);
+                vector_type realsol = project_function(msh, cl, hdi, sol_fun, 4);
 
                 vector_type diff = realsol - u_full;
                 H1_error += diff.dot(Ah*diff);
 
                 auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
                 matrix_type mass  = make_mass_matrix(msh, cl, cb, hdi.cell_degree());
+
                 vector_type u_diff = diff.block(0, 0, cbs, 1);
                 L2_error += u_diff.dot(mass * u_diff);
 
                 //plot
                 auto bar = barycenter(msh, cl);
+                efs << bar.x() << " " << bar.y() <<" "<< u_full(0) << std::endl;
 
-                efs << bar.x() << " " << bar.y() <<" "<< u_full(0) << " "<< du_full(0) << std::endl;
+                auto fcs = faces(msh, cl);
+                auto face_count = 0;
+                for(auto fc: fcs)
+                {
+                    auto offset_face = cbs + face_count * fbs;
+                    auto barf = barycenter(msh, fc);
+                    efs << barf.x() << " " << barf.y() <<" "<< u_full(offset_face)<< std::endl;;
+                    //efs << " "<< du_full(offset_face) << std::endl;
+                    face_count++;
+                }
                 cl_count++;
 
             }
             efs.close();
 
+            std::cout << "(H1, L2) : "<< std::sqrt(H1_error) <<" - " <<std::sqrt(L2_error) << std::endl;
             return std::make_pair(std::sqrt(H1_error), std::sqrt(L2_error));
         }
 
@@ -283,9 +594,13 @@ run_signorini_unknown(  const Mesh& msh, const algorithm_parameters<typename Mes
     bnd.addNeumannBC(disk::mechanics::NEUMANN, 4, zero_fun); //
     //bnd.addNeumannBC(disk::mechanics::NEUMANN, 3, zero_fun); //TOP
     bnd.addContactBC(disk::mechanics::SIGNORINI,3); //BOTTOM
+    //bnd.addDirichletBC(disk::mechanics::DIRICHLET,3, zero_fun); //TOP
 
     switch (ap.solver)
     {
+        case EVAL_ON_FACES:
+            solve_faces(msh, force, zero_fun, ap, bnd);
+            break;
         case EVAL_IN_CELLS_FULL:
             return solve_cells_full(msh, force, zero_fun, ap, bnd);
             break;
@@ -334,7 +649,7 @@ run_signorini_analytical(  const Mesh& msh, const algorithm_parameters<typename 
         T radio = std::sqrt(p.x()*p.x() + p.y()*p.y());
         T theta = std::atan2(p.y(), p.x());
 
-        return  std::pow(radio, 4.5) * std::sin(4.5 *theta);
+        return  - std::pow(radio, 4.5) * std::sin(4.5 *theta);
     };
 
     typedef disk::mechanics::BoundaryConditionsScalar<Mesh> boundary_type;
@@ -349,19 +664,23 @@ run_signorini_analytical(  const Mesh& msh, const algorithm_parameters<typename 
     *-------------------------------------------------------------------------*/
 
     bnd.addDirichletBC(disk::mechanics::DIRICHLET,1, fun); //TOP
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET,2, fun); //TOP
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET,4, fun); //TOP
+    //bnd.addDirichletBC(disk::mechanics::DIRICHLET,2, fun); //TOP
+    //bnd.addDirichletBC(disk::mechanics::DIRICHLET,4, fun); //TOP
 
-    //bnd.addNeumannBC(disk::mechanics::NEUMANN, 2, left); //
-    //bnd.addNeumannBC(disk::mechanics::NEUMANN, 4, right); //
+    bnd.addNeumannBC(disk::mechanics::NEUMANN, 2, left); //
+    bnd.addNeumannBC(disk::mechanics::NEUMANN, 4, right); //
     //bnd.addNeumannBC(disk::mechanics::NEUMANN, 3, zero_fun); //TOP
     bnd.addContactBC(disk::mechanics::SIGNORINI,3); //BOTTOM
 
     switch (ap.solver)
     {
+        case EVAL_ON_FACES:
+            solve_faces(msh, force, fun, ap, bnd);
+            break;
         case EVAL_IN_CELLS_FULL:
             return solve_cells_full(msh, force, fun, ap, bnd);
             break;
+
         default:
             throw std::invalid_argument("Invalid solver");
     }
@@ -373,4 +692,5 @@ run_signorini(  const Mesh& msh, const algorithm_parameters<typename Mesh::coord
                 const typename Mesh::coordinate_type& parameter)
 {
     return run_signorini_analytical(msh, ap, parameter);
+    //return run_signorini_unknown(msh, ap, parameter);
 }

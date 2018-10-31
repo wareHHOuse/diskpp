@@ -99,7 +99,7 @@ solve_faces(const Mesh&  msh, const Function& rhs_fun,
             cl_count++;
         }
 
-        assembler.impose_neumann_boundary_conditions(msh, bnd);
+        //assembler.impose_neumann_boundary_conditions(msh, bnd);
         assembler.finalize();
 
         size_t systsz = assembler.LHS.rows();

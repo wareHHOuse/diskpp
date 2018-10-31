@@ -3417,8 +3417,8 @@ public:
             auto fb = make_scalar_monomial_basis(msh, face, di.face_degree());
             auto dirichlet_fun  = m_bnd.dirichlet_boundary_func(face_id);
 
-            matrix_type mass = make_mass_matrix(msh, face, fb);// di.face_degree());
-            vector_type rhs  = make_rhs(msh, face, fb, dirichlet_fun);// di.face_degree());
+            matrix_type mass = make_mass_matrix(msh, face, fb, di.face_degree());
+            vector_type rhs  = make_rhs(msh, face, fb, dirichlet_fun, di.face_degree());
 
             sol.block(face_ofs,  0, fbs, 1) = mass.llt().solve(rhs);
 
@@ -3464,7 +3464,7 @@ public:
                             asm_map.push_back( assembly_index(face_LHS_offset+i, eface) );
 
                         auto fb = make_scalar_monomial_basis(msh, bfc, face_degree);
-                        Matrix<T, Dynamic, 1> neumann = make_rhs(msh, bfc, fb, bnd.neumann_boundary_func(face_id));//, face_degree);
+                        Matrix<T, Dynamic, 1> neumann = make_rhs(msh, bfc, fb, bnd.neumann_boundary_func(face_id), face_degree);
 
                         assert(neumann.size() == num_face_dofs);
                         for (size_t i = 0; i < neumann.size() ; i++)
