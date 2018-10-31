@@ -44,74 +44,42 @@
 #include "solvers/solver.hpp"
 #include "viscoplasticity_utils.hpp"
 
-using namespace revolution;
-
-enum problem_type
-{
-    DRIVEN,
-    VANE
-};
 
 template<typename Mesh>
-class augmented_lagrangian_viscoplasticity
+class ADMM
 {
     typedef Mesh mesh_type;
+    typedef typename mesh_type::coordinate_type     T;
     typedef typename mesh_type::cell        cell_type;
     typedef typename mesh_type::face        face_type;
-    typedef typename mesh_type::scalar_type T;
+    typedef typename mesh_type::point_type  point_type;
 
     typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
-
-    using point_type = typename mesh_type::point_type;
-
     typedef Matrix<T, Mesh::dimension, Mesh::dimension>         tensor_type;
-    typedef Matrix<T, Mesh::dimension, 1>                       vector2d_type;
-
+    typedef Matrix<T, Mesh::dimension, 1>               vector2d_type;
     typedef Matrix<T, Dynamic, Dynamic>                 matrix_type;
     typedef Matrix<T, Dynamic, 1>                       vector_type;
 
-    typedef std::function<vector2d_type (const point_type &)>   vector_funtion_type;
-    typedef std::function<T   (const point_type &)>             scalar_funtion_type;
+    hho_degree_info     di;
+    size_t              cbs, fbs, pbs, sbs;
+    matrix_type         multiplier;
+    matrix_type         auxiliar;
+    matrix_type         auxiliar_old;
+    bingham_data<T, vector_problem>     vp;
 
-    hho_degree_info di;
-    T             viscosity, Bn;
-    T             alpha;
-    T             yield;
-    size_t        cbs, fbs, pbs, sbs;
-    vector_funtion_type                     rhs_fun;
     tensors_at_quad_pts_utils<mesh_type>    tsr_utils;
     std::vector<std::pair<size_t, size_t>>  tsr_offsets_vector;
 
-    dynamic_matrix<T>     multiplier, auxiliar, auxiliar_old;
 
 public:
     dynamic_vector<T>   sol_old;
     std::pair<T, T>     convergence;
-    //boundary_type           bnd;
 
-    augmented_lagrangian_viscoplasticity(const Mesh& msh,
-                            const hho_degree_info & hdi,
-                            const T& alpha_ext):
-                            di(hdi), alpha(alpha_ext)
+    ADMM(const  Mesh& msh,
+        const   hho_degree_info & hdi,
+        const   bingham_data< T , vector_problem> & vp_ext):
+        di(hdi), vp(vp_ext)
     {
-        //DRIVEN
-        //#if 0
-        viscosity = 1.;
-        T f     = 1;
-        T Lref  = 1.;
-        T Bn    =  2. * std::sqrt(2);
-        yield   =  Bn * f * Lref; // * viscosity;// * omegaExt; //* f * Lref;
-        //#endif
-
-        #if 0
-        //VANE
-        Bn = 10.;
-        T Lref = 4.02; //R
-        viscosity = 1.;
-        T omega = 1;
-        T Vref = omega * Lref;
-        yield = Bn * std::sqrt(2) * (viscosity * Vref) / Lref; // Bn/std::sqrt(2); // ;
-        #endif
         const auto dim =  Mesh::dimension;
 
         cbs = revolution::vector_basis_size(di.cell_degree(), dim, dim);
@@ -124,21 +92,15 @@ public:
         tsr_offsets_vector = tsr_utils.offsets_vector();
     };
 
-    #if 0
-    auto
-    define_problem(const mesh_type& msh, const problem_type& problem )
-    {   }
-    #endif
-
     template<typename Assembler>
     matrix_type
-    compute_auxiliar(   const mesh_type& msh,
-                        const cell_type& cl,
-                        const Assembler& assembler,
+    compute_auxiliar(   const mesh_type & msh,
+                        const cell_type & cl,
+                        const Assembler & assembler,
                         const vector_type& velocity_dofs)
     {
         vector_type u_TF  = assembler.take_velocity(msh, cl, velocity_dofs);
-        auto value = 1./(2. * (viscosity + alpha));
+        auto value = 1./(2. * (vp.mu + vp.alpha));
         auto G = revolution::make_hlow_stokes(msh, cl, di, true);
         vector_type   Gu = G.first * u_TF;
 
@@ -158,7 +120,7 @@ public:
         {
             auto s_phi  = sb.eval_functions(qp.point());
             vector_type stress_qp = stress.block( 0, qp_count, sbs, 1);
-            vector_type theta     = stress_qp  +  2. * alpha * Gu;
+            vector_type theta     = stress_qp  +  2. * vp.alpha * Gu;
 
             tensor_type theta_eval = revolution::eval(theta, s_phi);
 
@@ -166,10 +128,11 @@ public:
             T tol = 1.e-8;
 
             // A. Liquid
-            if( (theta_norm + tol) >  std::sqrt(2) * yield)
+            if( (theta_norm + tol) >  std::sqrt(2) * vp.yield)
+            {
                 gamma.block( 0, qp_count, sbs, 1) = value * theta *
-                                            (1. - std::sqrt(2)*(yield/theta_norm));
-
+                                        (1. - std::sqrt(2) * (vp.yield/theta_norm));
+            }
             qp_count++;
         }
         assert(qps.size() == qp_count);
@@ -180,11 +143,14 @@ public:
 
     template<typename Assembler>
     auto
-    update_multiplier(const mesh_type& msh, const Assembler& assembler, const dynamic_vector<T>& sol)
+    update_multiplier(const mesh_type& msh, const Assembler& assembler,
+                      const size_t iter,
+                      const dynamic_vector<T>& sol,
+                      const std::string& name)
     {
         T conv_stress = 0.;
         T conv_gamma = 0.;
-
+        T conv_total = 0;
         const auto dim = Mesh::dimension;
 
         for(auto cl: msh)
@@ -202,12 +168,12 @@ public:
 
             matrix_type     gamma_old = auxiliar_old.block(0, offset, sbs, qps.size());
             matrix_type     gamma     = auxiliar.block(0, offset, sbs, qps.size());
-            matrix_type     diff_gamma  = alpha * (gamma - gamma_old);
-            matrix_type     diff_stress = - 2. * alpha *  gamma;
+            matrix_type     diff_gamma  = vp.alpha * (gamma - gamma_old);
+            matrix_type     diff_stress = - 2. * vp.alpha *  gamma;
 
             //Update multiplier
             for(size_t i = 0; i < qps.size(); i++)
-                diff_stress.block(0, i++, sbs, 1) += 2. * alpha *  Gu;
+                diff_stress.block(0, i++, sbs, 1) += 2. * vp.alpha *  Gu;
             multiplier.block(0, offset, sbs, qps.size()) += diff_stress;
 
             //Error computations
@@ -222,11 +188,21 @@ public:
 
                 conv_stress += diff_stress_qp.dot(mm * diff_stress_qp);
                 conv_gamma  += diff_gamma_qp.dot(mm * diff_gamma_qp);
+                conv_total  += conv_stress + conv_gamma;
 
                 qp_count++;
             }
         }
-        convergence = std::make_pair(conv_stress, conv_gamma);
+
+        std::ofstream ifs(name, std::ofstream::app);
+        if(!ifs.is_open())
+            std::cout << "Error opening   " << std::endl;
+
+        ifs << tostr(iter) <<"  "<< std::sqrt(conv_total) << "  ";
+        ifs << std::sqrt(conv_stress) <<"  "<< std::sqrt(conv_gamma)<< std::endl;
+        ifs.close();
+
+        convergence = std::make_pair(std::sqrt(conv_total), std::sqrt(conv_stress));
 
         auxiliar_old = auxiliar;
         return;
@@ -234,7 +210,7 @@ public:
 
     template<typename Assembler>
     Matrix<T, Dynamic, 1>
-    make_rhs_alg(   const mesh_type& msh,
+    make_rhs_admm(   const mesh_type& msh,
                     const cell_type& cl,
                     const Assembler& assembler)
     {
@@ -257,7 +233,7 @@ public:
 
         auxiliar.block(0, offset, sbs, qps.size()) = gamma;
 
-        matrix_type str_agam = stress - 2. * alpha * gamma;
+        matrix_type str_agam = stress - 2. * vp.alpha * gamma;
 
         vector_type rhs = vector_type::Zero(cbs + num_faces * fbs);
         size_t qp_count = 0;
@@ -273,9 +249,12 @@ public:
             qp_count++;
         }
 
+        auto rhs_fun_test  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
+            return Matrix<T, Mesh::dimension, 1>::Zero();
+        };
 
         //(f, v_T)
-        rhs.block( 0, 0, cbs, 1) += make_rhs(msh, cl, cb, rhs_fun);
+        rhs.block( 0, 0, cbs, 1) += make_rhs(msh, cl, cb, rhs_fun_test);
 
         return rhs;
     }
@@ -289,7 +268,7 @@ public:
 
         for (auto cl : msh)
         {
-            vector_type local_rhs = make_rhs_alg(msh, cl, assembler);
+            vector_type local_rhs = make_rhs_admm(msh, cl, assembler);
             assembler.assemble_rhs(msh, cl, local_rhs);
         }
         assembler.finalize_rhs();
@@ -310,7 +289,7 @@ public:
             matrix_type stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
             auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
 
-            matrix_type A = 2.*(alpha * G.second + viscosity * stab);
+            matrix_type A = 2.* vp.alpha * ( G.second + stab);
 
             assembler.assemble_lhs(msh, cl, A, -dr);
         }
@@ -322,76 +301,110 @@ public:
 
     template<typename Assembler>
     void
-    post_processing(const mesh_type& msh, const Assembler& assembler,
-                    const std::string & info,
-                    const problem_type& problem)
+    post_processing(const mesh_type& msh, const Assembler& assembler, const size_t iter)
     {
         auto dim = Mesh::dimension;
         auto rbs = revolution::vector_basis_size(di.reconstruction_degree(), dim, dim);
 
-        dynamic_vector<T> cell_sol(cbs * msh.cells_size());
-        dynamic_vector<T> cell_rec_sol(rbs * msh.cells_size());
-        dynamic_vector<T> press_vec(pbs * msh.cells_size());
+        dynamic_vector<T> press_vec = dynamic_vector<T>::Zero(pbs * msh.cells_size());
+        dynamic_vector<T> cell_sol  = dynamic_vector<T>::Zero(cbs * msh.cells_size());
+        dynamic_vector<T> cell_rec_sol = dynamic_vector<T>::Zero(rbs * msh.cells_size());
 
-        auto infoall = info  + "_Bn"+ tostr(Bn);
-        std::ofstream ofs("data_" + infoall + ".data");
+        std::string  ext =  vp.info + "_i"+ tostr(iter) + ".data";
+        std::ofstream ofs("data_" + ext );
         if (!ofs.is_open())
             std::cout << "Error opening file"<<std::endl;
 
+        std::vector<T> ux;        ux.reserve(msh.cells_size());
+        std::vector<T> uy;        uy.reserve(msh.cells_size());
+        std::vector<T> e_press;   e_press.reserve(msh.cells_size());
+        std::vector<T> e_theta;   e_theta.reserve(msh.cells_size());
+        std::vector<T> e_sigma;   e_sigma.reserve(msh.cells_size());
+
+        auto cell_id = 0;
         for(auto cl : msh)
         {
             auto gr  = revolution::make_hho_stokes(msh, cl, di, true);
-            auto cell_ofs = revolution::priv::offset(msh, cl);
             vector_type svel =  assembler.take_velocity(msh, cl, sol_old);
             assert((gr.first * svel).rows() == rbs - dim);
-            cell_rec_sol.block(cell_ofs * rbs + dim, 0, rbs - dim, 1) = gr.first * svel;
-            cell_rec_sol.block(cell_ofs * rbs, 0, dim, 1) = svel.block(0,0, dim, 1);
-            cell_sol.block(cell_ofs * cbs, 0, cbs, 1)     = svel.block(0,0, cbs, 1);
 
-            //this is only for k = 0, since there is only one velocity;
-            auto bar = barycenter(msh, cl);
+            cell_rec_sol.block(cell_id * rbs + dim, 0, rbs - dim, 1) = gr.first * svel;
+            cell_rec_sol.block(cell_id * rbs, 0, dim, 1) = svel.block(0,0, dim, 1);
+            cell_sol.block(cell_id * cbs, 0, cbs, 1)     = svel.block(0,0, cbs, 1);
 
-            //Velocity
-            vector_type cell_vel = svel.block(0,0, cbs, 1);
-            auto cb  = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
-            auto phi = cb.eval_functions(bar);
-            vector_type ueval = revolution::eval(cell_vel, phi);
-
-            //Pressure
-            vector_type spress =  assembler.take_pressure(msh, cl, sol_old);
-            auto pb  = revolution::make_scalar_monomial_basis(msh, cl, di.face_degree());
-            auto p_phi = pb.eval_functions(bar);
-            T peval =  p_phi.dot(spress);
-
-            /***********************************************************************/
-            //#if 0
-            //Stress
+            auto G  = revolution::make_hlow_stokes(msh, cl, di, true);
+            auto cb = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
+            auto pb = revolution::make_scalar_monomial_basis(msh, cl, di.face_degree());
             auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
-            auto s_phi  = sb.eval_functions(bar);
-            auto G = revolution::make_hlow_stokes(msh, cl, di, true);
-            vector_type Gu = G.first * svel;
 
-            //*************************************************************
-            vector_type stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
-            vector_type theta  = stress  +  2. * alpha * Gu;
-            tensor_type theta_eval = revolution::eval(theta, s_phi);
-            tensor_type sigma_eval = revolution::eval(stress, s_phi);
-            //*************************************************************
 
-            //div
-            tensor_type grad_eval = revolution::eval(Gu, s_phi);
-            T divu = grad_eval(0,0) + grad_eval(1,1);
+            auto offset = tsr_offsets_vector.at(cell_id).first;
+            auto qps    = integrate(msh, cl, tsr_utils.quad_degree());
 
-            // tr_stress
-            T tr_stress = sigma_eval(0,0) + sigma_eval(1,1);
-            //#endif
+            vector_type Gu  = G.first * svel;
+            vector_type cell_vel = svel.block(0,0, cbs, 1);
+            vector_type spress   = assembler.take_pressure(msh, cl, sol_old);
+            matrix_type stress   = multiplier.block(0, offset, sbs, qps.size());
 
-            ofs << ueval(0)   << " " << ueval(1) << " " << peval<< " ";
-            ofs << theta_eval.norm() << " " << sigma_eval.norm()   << " ";
-            ofs << divu << " "<< tr_stress<<std::endl;
-            ofs <<std::endl;
+            auto qps_count = 0;
+
+            for(auto& qp : qps)
+            {
+                auto v_phi  = cb.eval_functions(qp.point());
+                auto p_phi  = pb.eval_functions(qp.point());
+                auto s_phi  = sb.eval_functions(qp.point());
+
+                vector_type vel_eval = revolution::eval(cell_vel, v_phi);
+                T press_eval =  p_phi.dot(spress);
+
+                //Stress
+                vector_type stress_qp  = stress.block(0, qps_count, sbs, 1);
+                vector_type theta_qp   = stress_qp  +  2. * vp.alpha * Gu;
+                tensor_type theta_eval = revolution::eval(theta_qp,  s_phi);
+                tensor_type sigma_eval = revolution::eval(stress_qp, s_phi);
+                tensor_type grad_eval  = revolution::eval(Gu, s_phi);
+
+                T divergence   = grad_eval(0,0)  + grad_eval(1,1);
+                T trace_stress = sigma_eval(0,0) + sigma_eval(1,1);
+
+                ofs << qp.point().x() << " " << qp.point().y() << " ";
+                ofs << vel_eval(0)    << " " << vel_eval(1) << " " << press_eval<< " ";
+                ofs << theta_eval.norm() << " " << sigma_eval.norm()   << " ";
+                ofs << divergence << " " << trace_stress << std::endl;
+
+                if( di.cell_degree() == 0 && di.face_degree() == 0 )
+                {
+                    ux.push_back( vel_eval(0) );
+                    uy.push_back( vel_eval(1) );
+                    e_press.push_back( press_eval );
+                    e_theta.push_back( theta_eval.norm() );
+                    e_sigma.push_back( sigma_eval.norm() );
+                }
+
+                qps_count++;
+            }
         }
         ofs.close();
+
+        std::string silo_db_name = "bingham_" + tostr(iter) + ".silo";
+        disk::silo_database silo;
+        silo.create(silo_db_name);
+        silo.add_mesh(msh, "mesh");
+
+        disk::silo_zonal_variable<T> silo_ux("ux", ux);
+        disk::silo_zonal_variable<T> silo_uy("uy", uy);
+        disk::silo_zonal_variable<T> silo_press("pressure", e_press);
+        disk::silo_zonal_variable<T> silo_theta("theta", e_theta);
+        disk::silo_zonal_variable<T> silo_sigma("sigma", e_sigma);
+        //disk::silo_zonal_variable<T> silo_div("pressure", div);
+
+        silo.add_variable("mesh", silo_ux);
+        silo.add_variable("mesh", silo_uy);
+        silo.add_variable("mesh", silo_press);
+        silo.add_variable("mesh", silo_theta);
+        silo.add_variable("mesh", silo_sigma);
+
+        silo.close();
 
         std::pair<point_type, point_type> p_x, p_y;
         auto eps = 1.e-4;
@@ -399,127 +412,79 @@ public:
 
         //plot_over_line(msh, p_x, cell_rec_sol, di.reconstruction_degree(), "plot_over_x_" + info + ".data");
         //plot_over_line(msh, p_y, cell_rec_sol, di.reconstruction_degree(), "plot_over_y_" + info + ".data");
-        plot_over_line(msh, p_y, cell_sol, di.cell_degree(), "plot_over_y_" + info + ".data");
+        plot_over_line(msh, p_y, cell_sol, di.cell_degree(), "plot_over_y_" + ext);
 
-        compute_discontinuous_velocity( msh, cell_sol, di, "velocity_" + infoall +".msh");
-        save_coords(msh, "Coords_"+ infoall + ".data");
-        quiver( msh, sol_old, assembler, di, "quiver_"+ infoall + ".data");
+        //compute_discontinuous_velocity( msh, cell_sol, di, "velocity_" + vp.info + "_i"+ tostr(iter) +".msh");
+        save_coords(msh, "Coords_"+ ext);
+        //quiver( msh, sol_old, assembler, di, "quiver_"+ vp.info + "_i"+ tostr(iter) + ".data");
 
         paraview<mesh_type> pw(di.cell_degree());
         //pp.paraview(msh, "Velocity_Magnitud", Vmagnitud, "scalar");
-        pw.make_file(msh, "Velocity_"+ infoall, cell_sol, "vector");
-        std::cout << "Velocity_"+ infoall << std::endl;
+        pw.make_file(msh, "Velocity_"+ vp.info + "_i"+ tostr(iter), cell_sol, "vector");
+        std::cout << "Velocity_"+ vp.info + "_i"+ tostr(iter) << std::endl;
 
         return;
     }
 
     bool
-    run_alg(const mesh_type& msh, const std::string& info, const problem_type& problem )
+    run(const mesh_type& msh, const boundary_type& bnd)
     {
-        boundary_type bnd(msh);
-
-        auto wall = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
-            return Matrix<T, Mesh::dimension, 1>::Zero();
-        };
-        auto movingWall = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
-            return Matrix<T, Mesh::dimension, 1>{1,0};
-        };
-
-        switch (problem)
-        {
-            case DRIVEN:
-                std::cout << " I'm in DRIVEN" << std::endl;
-
-                rhs_fun  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
-                    return Matrix<T, Mesh::dimension, 1>::Zero();
-                };
-
-                bnd.addDirichletBC(0, 1, movingWall);
-                bnd.addDirichletBC(0, 2, wall);
-                bnd.addDirichletBC(0, 3, wall);
-                bnd.addDirichletBC(0, 4, wall);
-                break;
-
-            case VANE:
-                std::cout << " I'm in VANE" << std::endl;
-
-                rhs_fun  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
-                   return Matrix<T, Mesh::dimension, 1>::Zero();
-                };
-
-                auto symmetryPlane = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
-                    return Matrix<T, Mesh::dimension, 1>{0,0};
-                };
-
-                auto rotation = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
-                    T omega = 1;
-                    auto theta  = std::atan2(p.y() , p.x());
-                    T r  =  std::sqrt(p.x()*p.x() + p.y()*p.y());
-                    T vx = -std::sin(theta) * omega * r;
-                    T vy =  std::cos(theta) * omega * r;
-                   return Matrix<T, Mesh::dimension, 1>{ vx, vy} ;
-                   //return Matrix<T, Mesh::dimension, 1>{omega * p.y(), -omega * p.x()};
-                };
-
-                bnd.addDirichletBC( 0, 2, wall);
-                bnd.addDirichletBC( 0, 1, rotation);
-                bnd.addNeumannBC(10, 3, symmetryPlane);
-                break;
-
-            default:
-                throw std::invalid_argument("Invalid problem");
-                break;
-        }
-
         auto assembler = revolution::make_stokes_assembler_alg(msh, di, bnd);
         auto systsz = assembler.global_system_size();
+
         sol_old = vector_type::Zero(systsz);
-        dynamic_vector<T> sol =  dynamic_vector<T>::Zero(systsz);
+        vector_type sol =  vector_type::Zero(systsz);
 
-        auto num_total_quads = tsr_utils.num_total_quad_points();
+        size_t num_total_quads = tsr_utils.num_total_quad_points();
 
-        multiplier   = dynamic_matrix<T>::Zero(sbs, num_total_quads);
-        auxiliar     = dynamic_matrix<T>::Zero(sbs, num_total_quads);
-        auxiliar_old = dynamic_matrix<T>::Zero(sbs, num_total_quads);
+        multiplier   = matrix_type::Zero(sbs, num_total_quads);
+        auxiliar     = matrix_type::Zero(sbs, num_total_quads);
+        auxiliar_old = matrix_type::Zero(sbs, num_total_quads);
 
-        auto max_iters = 50000;
         auto Ninf = 1.e+4;
+        auto max_iters = 50000;
         auto tolerance = 1.e-8;
+
+        std::string data_filename = "convg" + vp.info + ".data";
+        std::ofstream ofs(data_filename);
+        if( !ofs.is_open())
+            std::cout << "Error opening data-file" << std::endl;
+        ofs.close();
+
+        Eigen::PardisoLU<Eigen::SparseMatrix<T>>  solver;
 
         for(size_t iter = 0; iter < max_iters; iter++)
         {
+            //------------------------------------------------------------------
+            // Stokes-like system
             make_global_rhs(msh,assembler);
             if(iter == 0)
+            {
                 make_global_matrix(msh, assembler);
-
-            //dump_sparse_matrix(assembler.LHS, "stokes.txt");
-            size_t systsz = assembler.LHS.rows();
-            size_t nnz = assembler.LHS.nonZeros();
-
-            dynamic_vector<T> sol = dynamic_vector<T>::Zero(systsz);
-            disk::solvers::pardiso_params<T> pparams;
-            pparams.report_factorization_Mflops = true;
-            mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
-
-            update_multiplier(msh, assembler, sol);
-            //---------------------------------------------------------------------
-            T cvg_total = std::sqrt(convergence.first + convergence.second);
-
-            if(iter % 100 == 0)
-            {
-                std::cout << "  i : "<< iter <<"  - " << std::sqrt(cvg_total)<<std::endl;
-                post_processing( msh, assembler, info +"_i" + tostr(iter), problem);
+                solver.analyzePattern(assembler.LHS);
+                solver.factorize(assembler.LHS);
             }
+            vector_type sol = solver.solve(assembler.RHS);
+            //------------------------------------------------------------------
+            update_multiplier(msh, assembler, iter, sol,  data_filename);
+            //------------------------------------------------------------------
+            //Erase cout
+            std::cout << "  i : "<< iter <<"  - " << std::sqrt(convergence.first) << " ";
+                std::cout << std::sqrt(convergence.second) << std::endl;
 
-            assert(cvg_total < Ninf);
-            if( cvg_total < tolerance)
-            {
-                std::cout << "  i : "<< iter <<"  - " << cvg_total <<std::endl;
-                post_processing( msh, assembler, info +"_i" + tostr(iter), problem);
-                return true;
-            }
             sol_old = sol;
 
+            assert(convergence.first < Ninf);
+            bool stop = convergence.first < tolerance;
+            if(! (iter % 100 == 0 ||  stop))
+                continue;
+
+            std::cout << "  i : "<< iter <<"  - " << convergence.first <<std::endl;
+            post_processing( msh, assembler, iter);
+
+            if(stop)
+                return true;
+            //------------------------------------------------------------------
         }
         return false;
     }

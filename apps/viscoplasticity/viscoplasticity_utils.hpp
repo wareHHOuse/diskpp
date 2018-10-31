@@ -41,6 +41,62 @@ enum scalar_problem_type
     SQUARE
 };
 
+enum vector_problem
+{
+    DRIVEN,
+    COUETTE,
+    VANE
+};
+
+std::ostream& operator<<(std::ostream & os, const vector_problem & p)
+{
+    os << "Problem : "<<std::endl;
+    switch (p)
+    {
+        case DRIVEN : os << "* problem : DRIVEN"<< std::endl;         break;
+        case COUETTE: os << "* problem : COUETTE"<< std::endl;        break;
+        case VANE   : os << "* problem : VANE"<< std::endl;           break;
+        default:
+            os << "* problem : NOT SPECIFIED"<< std::endl;
+            exit(1);
+    }
+    return os;
+}
+
+template<typename T, typename ProblemType>
+struct bingham_data
+{
+     bingham_data(): Lref(1.), Vref(1.), Bn(0.), mu(1.), alpha(1.), yield(0.),
+                         f(1.),  problem(DRIVEN)
+     {}
+     T f;                    //WK: Cuidado porque f deberia ser el valor externo de la fuente.
+     T Lref;                 /* Charactetistic length */
+     T Vref;                 /* Reference velocity */
+     T Bn;                   /* Bingham number */
+     T mu;                   /* viscosity */
+     T alpha;                /* ALG parameter*/
+     T yield;
+     ProblemType problem;
+     std::string info;
+
+     friend std::ostream& operator<<(std::ostream& os, const bingham_data<T, ProblemType>& p)
+     {
+         os << p.problem <<std::endl;
+         os << "Bingham data: "<<std::endl;
+         os << "* f      : "<< p.f<< std::endl;
+         os << "* Lref   : "<< p.Lref<< std::endl;
+         os << "* Vref   : "<< p.Vref<< std::endl;
+         os << "* mu     : "<< p.mu<< std::endl;
+         os << "* Bi     : "<< p.Bn<< std::endl;
+         os << "* yield  : "<< p.yield<< std::endl;
+         os << "* alpha  : "<< p.alpha<< std::endl;
+         os << "* info  : "<< p.info<< std::endl;
+
+         return os;
+     }
+
+};
+
 
 template<typename T>
 struct viscoplasticity_data

@@ -12,7 +12,7 @@
 #add_subdirectory(poisson_solver)
 #add_subdirectory(hho_conditioning)
 #add_subdirectory(linear_elasticity)
-#add_subdirectory(viscoplasticity)
+add_subdirectory(viscoplasticity)
 #add_subdirectory(fvca5_meshinfo)
 #add_subdirectory(integration)
 #add_subdirectory(mesh_new)
