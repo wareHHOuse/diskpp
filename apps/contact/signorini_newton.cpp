@@ -30,7 +30,51 @@
 
  #include "geometry/geometry.hpp"
  #include "core/loaders/loader.hpp"
- #include "signorini_newton_solver_new.hpp"
+ #include "signorini_newton_solver.hpp"
+
+template<template<typename, size_t, typename> class Mesh,
+      typename T, typename Storage>
+void
+renumber_boundaries(Mesh<T,2,Storage>& msh)
+{
+    auto storage = msh.backend_storage();
+
+    for(size_t i = 0; i < msh.faces_size(); i++)
+    {
+        auto edge = *std::next(msh.faces_begin(), i);
+        auto bar = barycenter(msh, edge);
+
+        auto is_close_to = [](T val, T ref) -> bool {
+            T eps = 1e-7;
+            return std::abs(val - ref) < eps;
+        };
+
+        if (!storage->boundary_info.at(i).is_boundary)
+            continue;
+
+        size_t bid = 42;
+
+        #if 0
+        if ( is_close_to(bar.y(), 0.0) ) bid = 1;
+        if ( is_close_to(bar.x(), 1.0) ) bid = 2;
+        if ( is_close_to(bar.y(), -1.0) ) bid = 3;
+        if ( is_close_to(bar.x(), -1.0) ) bid = 4;
+        #endif
+
+        if ( is_close_to(bar.y(), 1.0) ) bid = 1;
+        if ( is_close_to(bar.x(), 1.0) ) bid = 2;
+        if ( is_close_to(bar.y(), 0.0) ) bid = 3;
+        if ( is_close_to(bar.x(), 0.0) ) bid = 4;
+
+        if (bid == 42)
+        {
+            std::cout << " bar = "<< bar << std::endl;
+            throw std::logic_error("Can not locate the edge");
+        }
+
+        storage->boundary_info.at(i).boundary_id = bid;
+    }
+}
 
 int main(int argc, char **argv)
 {
@@ -111,6 +155,7 @@ int main(int argc, char **argv)
     argv += optind;
 
     filename = argv[0];
+    auto run_exact = true;
 
     /* Netgen 2d*/
     if (std::regex_match(filename, std::regex(".*\\.mesh2d$") ))
@@ -126,8 +171,34 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        run_signorini(msh, ap, parameter);
+        run_signorini(msh, ap, parameter, run_exact);
     }
+
+    /* FVCA5 2D */
+    if (std::regex_match(filename, std::regex(".*\\.typ1$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
+        auto msh = disk::load_fvca5_2d_mesh<T>(filename);
+
+        renumber_boundaries(msh);
+
+        run_signorini(msh, ap, parameter, run_exact);
+
+        return 0;
+    }
+
+    /* DiSk++ cartesian 2D */
+    if (std::regex_match(filename, std::regex(".*\\.quad$") ))
+    {
+        std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
+        auto msh = disk::load_cartesian_2d_mesh<T>(filename);
+
+        renumber_boundaries(msh);
+        run_signorini(msh, ap, parameter, run_exact);
+
+        return 0;
+    }
+
 
     #if 0
     /* Medit 2d*/

@@ -45,11 +45,7 @@
 #include "contrib/colormanip.h"
 
 #include "core/output/hdf5_io.hpp"
-
-// #include "common.hpp"
-
-// #include "solvers/solver.hpp"
- #include "signorini_newton_solver_new.hpp"
+ #include "signorini_newton_solver.hpp"
 
 template<typename T>
 class hierarchical_contact_solver
@@ -579,8 +575,11 @@ public:
         auto bnd = pair.second;
         auto f = pair.first;
 
+        auto zero_fun = [](const typename disk::simplicial_mesh<T,2>::point_type& p) -> T {
+            return 0.;
+        };
         //Solve newton
-        full_sol = solve_cells_full(sol_msh, f, ap, bnd);
+        full_sol = solve_cells_full_hier(sol_msh, f, zero_fun, ap, bnd);
 
 
         std::vector<T> fem_grad_x, fem_grad_y, hho_grad_x, hho_grad_y;
