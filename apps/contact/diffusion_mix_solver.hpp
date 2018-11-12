@@ -52,21 +52,6 @@ struct rhs_functor< Mesh<T, 2, Storage> >
     }
 };
 
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-struct rhs_functor< Mesh<T, 3, Storage> >
-{
-    typedef Mesh<T,3,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
-    typedef typename mesh_type::point_type  point_type;
-
-    scalar_type operator()(const point_type& pt) const
-    {
-        auto sin_px = std::sin(M_PI * pt.x());
-        auto sin_py = std::sin(M_PI * pt.y());
-        auto sin_pz = std::sin(M_PI * pt.z());
-        return 3.0 * M_PI * M_PI * sin_px * sin_py * sin_pz;
-    }
-};
 
 template<typename Mesh>
 auto make_rhs_function(const Mesh& msh)
@@ -96,22 +81,6 @@ struct solution_functor< Mesh<T, 2, Storage> >
 
         return cos_px * cos_py;
         //return sin_px * sin_py;
-    }
-};
-
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-struct solution_functor< Mesh<T, 3, Storage> >
-{
-    typedef Mesh<T,3,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
-    typedef typename mesh_type::point_type  point_type;
-
-    scalar_type operator()(const point_type& pt) const
-    {
-        auto sin_px = std::sin(M_PI * pt.x());
-        auto sin_py = std::sin(M_PI * pt.y());
-        auto sin_pz = std::sin(M_PI * pt.z());
-        return sin_px * sin_py * sin_pz;
     }
 };
 
@@ -239,7 +208,6 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
         {
             auto gr   = make_hho_scalar_laplacian(msh, cl, hdi);
             auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
-            //auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
 
             vector_type rhs = make_rhs(msh, cl, cb, rhs_fun);//, hdi.cell_degree());
             A = gr.second + stab;
@@ -360,11 +328,11 @@ run_diffusion_solver(const Mesh& msh, const algorithm_parameters<T>& ap,
     *-------------------------------------------------------------------------*/
     //test 1
     //#if 0
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET,1,sol_fun); //TOP
-    bnd.addContactBC(disk::mechanics::SIGNORINI, 3); //
+    //bnd.addDirichletBC(disk::mechanics::DIRICHLET,1,sol_fun); //TOP
+    bnd.addContactBC(disk::mechanics::SIGNORINI, 1); //TOP
+    bnd.addContactBC(disk::mechanics::SIGNORINI,3); //
     bnd.addNeumannBC(disk::mechanics::NEUMANN, 4, neu_left); //
-    bnd.addNeumannBC(disk::mechanics::NEUMANN, 2, neu_right); //Bottom
-    //bnd.addContactBC(disk::mechanics::SIGNORINI,3); //BOTTOM
+    bnd.addNeumannBC(disk::mechanics::NEUMANN, 2, neu_right); //
     //#endif
 
     //test 2
@@ -376,28 +344,18 @@ run_diffusion_solver(const Mesh& msh, const algorithm_parameters<T>& ap,
     #endif
 
 
-
     std::tuple<T, T, T> error;
     switch (ap.solver)
     {
-        //case EVAL_IN_CELLS:
-        //    error = run_hho_diffusion_nitsche_cells(msh, ap, bnd, eta);
-        //    break;
-        case EVAL_IN_CELLS_FULL: //Temporal name
+        case EVAL_IN_CELLS_FULL:
             error = run_hho_diffusion_nitsche_cells_full(msh, ap, bnd, eta);
             break;
-        #if 0
+        case EVAL_IN_CELLS:
         case EVAL_ON_FACES:
-            error = run_hho_diffusion_nitsche_faces(msh, ap);
-            break;
         case EVAL_WITH_PARAMETER:
-            error = run_hho_diffusion_nitsche_par(msh, ap, bnd, eta);
-            break;
         case EVAL_IN_CELLS_AS_FACES:
-            std::cout << "Not valid in this case. Choose faces (f) or cells( c)" << std::endl;
-            break;
-        #endif
         default:
+            std::cout << "Not valid in this case. Choose only full cells (l)" << std::endl;
             throw std::invalid_argument("Invalid solver");
     }
     return error;
