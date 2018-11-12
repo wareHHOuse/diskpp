@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     T parameter = 1;
     size_t degree = 1;
 
-    while ( (ch = getopt(argc, argv, "k:g:npzfco")) != -1 )
+    while ( (ch = getopt(argc, argv, "k:g:npzfl")) != -1 )
     {
         switch(ch)
         {
@@ -76,7 +76,6 @@ int main(int argc, char **argv)
                 break;
             case 'p':
                 ap.theta = 1;
-                //ap.theta = atof(optarg);
                 break;
             case 'z':
                 ap.theta = 0.;
@@ -84,11 +83,14 @@ int main(int argc, char **argv)
             case 'f':
                 ap.solver = EVAL_ON_FACES;
                 break;
-            case 'c':
-                ap.solver = EVAL_IN_CELLS;
+            //case 'c':
+            //    ap.solver = EVAL_IN_CELLS;
+            //    break;
+            case 'l':
+                ap.solver = EVAL_IN_CELLS_FULL;
                 break;
-            case 'o':
-                ap.solver = EVAL_IN_CELLS_AS_FACES;
+            //case 'o':
+            //    ap.solver = EVAL_IN_CELLS_AS_FACES;
                 break;
             case '?':
             default:

@@ -27,7 +27,6 @@
 #include <unistd.h>
 #include <sstream>
 #include <iomanip>
-
 #include <map>
 
 #include "colormanip.h"
@@ -41,8 +40,7 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-//#include "diffusion_nitsche_solver.hpp"
-#include "diffusion_mix_solver.hpp"
+#include "diffusion_nitsche_solver.hpp"
 
 
 template<typename MeshType, typename LoaderType>
@@ -111,7 +109,7 @@ verify_convergence(const std::vector<std::string>& paths,
             std::cout << " " <<  std::scientific<< std::setprecision(3)<< L2_error;
             std::cout << "  "<<  std::fixed << std::setprecision(3)<< "        -   ";
             std::cout << " " <<  std::scientific<< std::setprecision(3)<<Linf_error;
-            std::cout << "  " << std::fixed << std::setprecision(3)<< "     " <<std::endl;            
+            std::cout << "  " << std::fixed << std::setprecision(3)<< "     " <<std::endl;
         }
 
         for (size_t i = 1; i < errdiams.size(); i++)
@@ -419,7 +417,6 @@ int main(int argc, char **argv)
     std::cout << bold << underline << "Triangles for contact" << reset << std::endl;
     test_triangles(tt, ap, parameter);
 
-    #if 0
     std::cout << bold << underline << "Triangles specialized" << reset << std::endl;
     test_triangles_specialized(tt, ap, parameter);
 
@@ -431,5 +428,4 @@ int main(int argc, char **argv)
 
     std::cout << bold << underline << "Kershaw 2D" << reset << std::endl;
     test_kershaw_2d(tt, ap, parameter);
-    #endif
 }
