@@ -29,6 +29,10 @@
  #include <unistd.h>
 
  #include "geometry/geometry.hpp"
+ #include "bases/bases.hpp"
+ #include "quadratures/quadratures.hpp"
+ #include "methods/hho"
+
  #include "core/loaders/loader.hpp"
  #include "signorini_newton_solver.hpp"
 

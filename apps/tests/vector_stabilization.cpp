@@ -29,9 +29,9 @@
 
 #include <unistd.h>
 
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "bases/bases.hpp"
+#include "quadratures/quadratures.hpp"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -41,13 +41,13 @@ template<typename Mesh>
 struct test_functor
 {
     /* Expect k+1 convergence (hho stabilization) */
-    typename Mesh::scalar_type
+    typename Mesh::coordinate_type
     operator()(const Mesh& msh, size_t degree) const
     {
         typedef Mesh mesh_type;
         typedef typename mesh_type::cell        cell_type;
         typedef typename mesh_type::face        face_type;
-        typedef typename mesh_type::scalar_type scalar_type;
+        typedef typename mesh_type::coordinate_type scalar_type;
         typedef typename mesh_type::point_type  point_type;
 
 
@@ -55,17 +55,17 @@ struct test_functor
 
         auto f = make_vector_testing_data(msh);
 
-        typename revolution::hho_degree_info hdi(degree);
+        typename disk::hho_degree_info hdi(degree);
 
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            auto gr = revolution::make_hho_vector_laplacian(msh, cl, hdi);
-            auto stab = revolution::make_hho_vector_stabilization(msh, cl, gr.first, hdi);
+            auto gr = disk::make_hho_vector_laplacian(msh, cl, hdi);
+            auto stab = disk::make_hho_vector_stabilization(msh, cl, gr.first, hdi);
 
-            size_t rec_size = revolution::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
+            size_t rec_size = disk::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
 
-            Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, hdi, f);
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
 
             error += proj.dot(stab*proj);
         }

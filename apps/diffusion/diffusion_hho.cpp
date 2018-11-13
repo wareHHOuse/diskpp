@@ -10,8 +10,10 @@
 
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
-#include "revolution/methods/hho"
+#include "methods/hho"
 #include "solvers/solver.hpp"
+
+#include "../tests/common.hpp"
 
 /***************************************************************************/
 /* RHS definition */
@@ -22,7 +24,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct rhs_functor< Mesh<T, 2, Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -37,7 +39,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct rhs_functor< Mesh<T, 3, Storage> >
 {
     typedef Mesh<T,3,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -64,7 +66,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct solution_functor< Mesh<T, 2, Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -79,7 +81,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct solution_functor< Mesh<T, 3, Storage> >
 {
     typedef Mesh<T,3,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -97,15 +99,15 @@ auto make_solution_function(const Mesh& msh)
     return solution_functor<Mesh>();
 }
 
-using namespace revolution;
+using namespace disk;
 
 template<typename Mesh>
-void
-run_hho_diffusion_solver(const Mesh& msh)
+typename Mesh::coordinate_type
+run_hho_diffusion_solver(const Mesh& msh, size_t degree)
 {
-    using T = typename Mesh::scalar_type;
+    using T = typename Mesh::coordinate_type;
 
-    size_t degree = 0;
+    //size_t degree = 0;
 
     hho_degree_info hdi(degree);
 
@@ -130,19 +132,19 @@ run_hho_diffusion_solver(const Mesh& msh)
     size_t systsz = assembler.LHS.rows();
     size_t nnz = assembler.LHS.nonZeros();
 
-    std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
-    std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
-    std::cout << "Dofs: " << systsz << std::endl;
+    //std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
+    //std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
+    //std::cout << "Dofs: " << systsz << std::endl;
 
     dynamic_vector<T> sol = dynamic_vector<T>::Zero(systsz);
 
     disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = true;
+    pparams.report_factorization_Mflops = false;
     mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
 
     T error = 0.0;
 
-    std::ofstream ofs("sol.dat");
+    //std::ofstream ofs("sol.dat");
 
     for (auto& cl : msh)
     {
@@ -158,32 +160,54 @@ run_hho_diffusion_solver(const Mesh& msh)
         Eigen::Matrix<T, Eigen::Dynamic, 1> fullsol =
             diffusion_static_condensation_recover(msh, cl, hdi, A, rhs, locsol);
 
-        Eigen::Matrix<T, Eigen::Dynamic, 1> realsol = project_function(msh, cl, hdi, sol_fun);
+        Eigen::Matrix<T, Eigen::Dynamic, 1> realsol = project_function(msh, cl, hdi, sol_fun, 2);
 
 
         auto diff = realsol - fullsol;
         error += diff.dot(A*diff);
 
-        auto bar = barycenter(msh, cl);
+        //auto bar = barycenter(msh, cl);
 
-        for (size_t i = 0; i < Mesh::dimension; i++)
-            ofs << bar[i] << " ";
-        ofs << fullsol(0) << std::endl;
+        //for (size_t i = 0; i < Mesh::dimension; i++)
+        //    ofs << bar[i] << " ";
+        //ofs << fullsol(0) << std::endl;
 
     }
 
-    std::cout << std::sqrt(error) << std::endl;
+    //std::cout << std::sqrt(error) << std::endl;
 
-    ofs.close();
+    //ofs.close();
+
+    return std::sqrt(error);
 }
+
+
+template<typename Mesh>
+struct test_functor
+{
+    /* Expect k+1 convergence (hho stabilization, energy norm) */
+    typename Mesh::coordinate_type
+    operator()(const Mesh& msh, size_t degree) const
+    {
+        return run_hho_diffusion_solver(msh, degree);
+    }
+
+    size_t
+    expected_rate(size_t k)
+    {
+        return k+1;
+    }
+};
+
 
 template<typename Mesh>
 void
 run_diffusion_solver(const Mesh& msh)
 {
-    run_hho_diffusion_solver(msh);
+    run_hho_diffusion_solver(msh, 0);
 }
 
+#if 0
 int main(int argc, char **argv)
 {
     using T = double;
@@ -246,5 +270,12 @@ int main(int argc, char **argv)
         return 0;
     }
     */
+}
+#endif
 
+int main(void)
+{
+    tester<test_functor> tstr;
+    tstr.run();
+    return 0;
 }

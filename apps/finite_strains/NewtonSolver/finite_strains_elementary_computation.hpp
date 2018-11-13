@@ -27,53 +27,25 @@
 
 #include <cassert>
 
+#include "bases/bases.hpp"
 #include "common/eigen.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "mechanics/deformation_tensors.hpp"
-#include "revolution/bases"
-#include "revolution/methods/hho"
-#include "revolution/quadratures"
+#include "methods/hho"
+#include "quadratures/quadratures.hpp"
 
 #include "timecounter.h"
 
 namespace NLE
 {
 
-template<typename T>
-struct MaterialParameters
-{
-    T lambda;
-    T mu;
-    T H;
-    T K;
-    T sigma_y0;
-
-    T
-    converttomu(const T E, const T nu)
-    {
-        return E / (2 * (1 + nu));
-    }
-
-    T
-    converttolambda(const T E, const T nu)
-    {
-        return E * nu / ((1 + nu) * (1 - 2 * nu));
-    }
-
-    T
-    converttoH(const T E, const T ET, const T K)
-    {
-        return E * ET / (E - ET) - 1.5 * K;
-    }
-};
-
 template<typename MeshType>
 class finite_strains
 {
-    typedef MeshType                             mesh_type;
-    typedef typename mesh_type::scalar_type      scalar_type;
-    typedef typename mesh_type::cell             cell_type;
-    typedef typename revolution::hho_degree_info hdi_type;
+    typedef MeshType                            mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename disk::hho_degree_info      hdi_type;
 
     const static int dimension = mesh_type::dimension;
 
@@ -154,9 +126,9 @@ class finite_strains
         const auto grad_degree = m_hdi.grad_degree();
         const auto face_degree = m_hdi.face_degree();
 
-        const auto cell_basis_size = revolution::vector_basis_size(cell_degree, dimension, dimension);
-        const auto grad_basis_size = revolution::matrix_basis_size(grad_degree, dimension, dimension);
-        const auto face_basis_size = revolution::vector_basis_size(face_degree, dimension - 1, dimension);
+        const auto cell_basis_size = disk::vector_basis_size(cell_degree, dimension, dimension);
+        const auto grad_basis_size = disk::matrix_basis_size(grad_degree, dimension, dimension);
+        const auto face_basis_size = disk::vector_basis_size(face_degree, dimension - 1, dimension);
 
         time_law = 0.0;
         timecounter tc;
@@ -175,42 +147,43 @@ class finite_strains
         assert(GT.cols() == uTF.rows());
         assert(GT.rows() == grad_basis_size);
 
-        // std::cout << "sol" << std::endl;
-        // std::cout << uTF.transpose() << std::endl;
+        //   std::cout << "sol" << std::endl;
+        //   std::cout << uTF.transpose() << std::endl;
 
         const vector_type GT_uTF = GT * uTF;
+        const auto        Id     = static_matrix<scalar_type, dimension, dimension>::Identity();
 
-        // std::cout << "ET: " << GsT.norm() << std::endl;
-        // std::cout << GsT << std::endl;
+        //  std::cout << "GT: " << GT.norm() << std::endl;
+        //  std::cout << "GT_Utf: " << GT_uTF.transpose() << std::endl;
 
-        auto& law_quadpoints = law.getQPs();
+         auto& law_quadpoints = law.getQPs();
 
-        auto gb = revolution::make_matrix_monomial_basis(m_msh, cl, grad_degree);
+         auto gb = disk::make_matrix_monomial_basis(m_msh, cl, grad_degree);
 
-        //std::cout << "nb: " << law_quadpoints.size() << std::endl;
-        for (auto& qp : law_quadpoints)
-        {
-            //std::cout << "qp: " << qp.point() << std::endl;
+         // std::cout << "nb: " << law_quadpoints.size() << std::endl;
+         for (auto& qp : law_quadpoints)
+         {
+            //  std::cout << "qp: " << qp.point() << std::endl;
             const auto gphi = gb.eval_functions(qp.point());
 
             assert(gphi.size() == grad_basis_size);
 
             // Compute local gradient and norm
-            //std::cout << "GT_utf: " << GsT_uTF << std::endl;
-            const auto GT_iqn = revolution::eval(GT_uTF, gphi);
-            const gvt  incr_F = GT_iqn - qp.getTotalStrainPrev();
-            // std::cout << "Em" << std::endl;
-            // std::cout << qp.getTotalStrainPrev() << std::endl;
-            // std::cout << "dE" << std::endl;
-            // std::cout << incr_strain << std::endl;
+            //  std::cout << "GT_utf: " << GT_uTF.transpose() << std::endl;
+            const auto GT_iqn = disk::eval(GT_uTF, gphi);
+            const gvt  F_curr = GT_iqn + Id;
+            // std::cout << "Gp" << std::endl;
+            // std::cout << GT_iqn << std::endl;
+            // std::cout << "Fp" << std::endl;
+            // std::cout << F_curr << std::endl;
 
             // Compute bahavior
             tc.tic();
-            const auto tensor_behavior = qp.compute_whole(incr_F, material_data, !elatic_modulus);
+            const auto tensor_behavior = qp.compute_whole(F_curr, material_data, !elatic_modulus);
             tc.toc();
             time_law += tc.to_double();
 
-            //std::cout << "module " << tensor_behavior.second << std::endl;
+            // std::cout << "module " << tensor_behavior.second << std::endl;
             const auto qp_A_gphi = compute_A_gphi(qp.weight() * tensor_behavior.second, gphi);
 
             for (int j = 0; j < grad_basis_size; j += dim_dofs)
@@ -229,10 +202,15 @@ class finite_strains
                 }
             }
 
+            // std::cout << "Tm" << std::endl;
+            // std::cout << qp.compute_stressPrev_T(material_data) << std::endl;
+            // std::cout << "Tp" << std::endl;
+            // std::cout << qp.compute_stress_T(material_data) << std::endl;
+
             // compute (PK1(u), G^k_T v)_T
-            const auto stress_qp = revolution::priv::inner_product(qp.weight(), tensor_behavior.first);
-            // std::cout << "stress" << std::endl;
-            // std::cout << tensor_behavior.first << std::endl;
+            const auto stress_qp = disk::priv::inner_product(qp.weight(), tensor_behavior.first);
+            //  std::cout << "stress" << std::endl;
+            //  std::cout << tensor_behavior.first << std::endl;
 
             for (int i = 0; i < grad_basis_size; i += dim_dofs)
             {
@@ -250,7 +228,7 @@ class finite_strains
         }
 
         // compute (f,v)_T
-        auto cb                         = revolution::make_vector_monomial_basis(m_msh, cl, cell_degree);
+        auto cb                         = disk::make_vector_monomial_basis(m_msh, cl, cell_degree);
         RTF.segment(0, cell_basis_size) = make_rhs(m_msh, cl, cb, load);
 
         // lower part AT
@@ -266,9 +244,9 @@ class finite_strains
         F_int = GT.transpose() * aT;
         RTF -= F_int;
 
-        // std::cout << "K: " << K_int.norm() << std::endl;
-        // std::cout << K_int << std::endl;
-        // std::cout << "F: " << F_int.norm() << std::endl;
+        //  std::cout << "K: " << K_int.norm() << std::endl;
+        // // std::cout << K_int << std::endl;
+        //  std::cout << "F: " << F_int.norm() << std::endl;
 
         assert(K_int.rows() == num_total_dofs);
         assert(K_int.cols() == num_total_dofs);

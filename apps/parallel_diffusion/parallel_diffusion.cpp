@@ -116,7 +116,7 @@ test_diffusion(MeshType& msh,               /* handle to the mesh */
     proc_mesh_partition<MeshType> pmp(msh, ctx);
 
     typedef MeshType                                   mesh_type;
-    typedef typename mesh_type::scalar_type            scalar_type;
+    typedef typename mesh_type::coordinate_type            scalar_type;
     typedef typename mesh_type::cell                   cell_type;
     typedef typename mesh_type::face                   face_type;
 

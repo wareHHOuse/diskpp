@@ -34,126 +34,21 @@ namespace disk
 // | A1111  A1112  A1211  A1212 |
 // | A1121  A1122  A1221  A1222 |
 // | A2111  A2112  A2211  A2212 |
-// | A2112  A2122  A2221  A2222 |
+// | A2121  A2122  A2221  A2222 |
 
-// Convert Matrix in Coulum vector
-
+// return Aijkl
 template<typename T, int DIM>
-void
-converttovector(const static_matrix<T, DIM, DIM>& mat)
+T
+coeff(const static_tensor<T, DIM>& A, const int i, const int j, const int k, const int l)
 {
-    static_assert((DIM == 2 || DIM == 3), "Can not compute conversion for this dimension");
-}
+    if (i < 0 || j < 0 || k < 0 || l < 0 || i >= DIM || j >= DIM || k >= DIM || l >= DIM)
+        throw std::invalid_argument("Invalid coefficient");
 
-template<typename T>
-static_vector<T, 4>
-converttovector(const static_matrix<T, 2, 2>& mat)
-{
-    return static_vector<T, 4>{mat(0, 0), mat(1, 0), mat(0, 1), mat(1, 1)};
-}
-
-template<typename T>
-static_vector<T, 9>
-converttovector(const static_matrix<T, 3, 3>& mat)
-{
-    return static_vector<T, 9>{
-      mat(0, 0), mat(1, 0), mat(2, 0), mat(0, 1), mat(1, 1), mat(2, 1), mat(0, 2), mat(1, 2), mat(2, 2)};
-}
-
-// Convert vector in matrix
-
-template<typename T, int DIM>
-void
-converttomatrix(const static_vector<T, DIM>& vec)
-{
-    static_assert((DIM == 4 || DIM == 9), "Can not compute conversion for this dimension");
-}
-
-template<typename T>
-static_matrix<T, 2, 2>
-converttomatrix(const static_vector<T, 4>& vec)
-{
-    static_matrix<T, 2, 2> mat;
-
-    mat(0, 0) = vec(0);
-    mat(1, 0) = vec(1);
-
-    mat(0, 1) = vec(2);
-    mat(1, 1) = vec(3);
-
-    return mat;
-}
-
-template<typename T>
-static_matrix<T, 3, 3>
-converttomatrix(const static_vector<T, 9>& vec)
-{
-    static_matrix<T, 3, 3> mat;
-
-    mat(1, 0) = vec(0);
-    mat(2, 0) = vec(1);
-    mat(3, 0) = vec(2);
-
-    mat(1, 1) = vec(3);
-    mat(2, 1) = vec(4);
-    mat(3, 1) = vec(5);
-
-    mat(1, 2) = vec(6);
-    mat(2, 2) = vec(7);
-    mat(3, 2) = vec(8);
-
-    return mat;
-}
-
-// Put it in Line
-template<typename T, int DIM2> // DIM2 = DIM*DIM
-static_matrix<T, DIM2, DIM2>
-changeFormatRowTensor(const static_matrix<T, DIM2, DIM2>& tens)
-{
-    int DIM = 0;
-    if (DIM2 == 1)
-        DIM = 1;
-    else if (DIM2 == 4)
-        DIM = 2;
-    else if (DIM2 == 9)
-        DIM = 3;
-    else
-        assert(false);
-
-    static_matrix<T, DIM2, DIM2> ret = static_matrix<T, DIM2, DIM2>::Zero();
-
-    for (int i = 0; i < DIM; i++)
-    {
-        for (int j = 0; j < DIM; j++)
-        {
-            const int row = i * DIM + j;
-            for (int k = 0; k < DIM; k++)
-            {
-                for (int l = 0; l < DIM; l++)
-                {
-                    ret(row, k * DIM + l) = tens(i * DIM + k, j * DIM + l);
-                }
-            }
-        }
-    }
-
-    //    for (size_t i = 0; i < DIM; i++)
-    //       for (size_t j = 0; j < DIM; j++)
-    //          ret.block(i*DIM + j, 0, 1, DIM2) = converttovector( tens.block(i*DIM, j*DIM, DIM,
-    //          DIM);
-
-    return ret;
-}
-
-template<typename T, int DIM2>
-static_matrix<T, DIM2, DIM2>
-changeFormatColTensor(const static_matrix<T, DIM2, DIM2>& tens)
-{
-    return changeFormatRowTensor(tens).transpose();
+    return A(i * DIM + k, j * DIM + l);
 }
 
 // Product Tensor - Matrix
-
+// aij = Aijkl Bkl
 template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
 tm_prod(const static_tensor<T, DIM>& tens, const static_matrix<T, DIM, DIM>& mat)
@@ -170,6 +65,31 @@ tm_prod(const static_tensor<T, DIM>& tens, const static_matrix<T, DIM, DIM>& mat
     return ret;
 }
 
+// aij = Bkl Aklij
+template<typename T, int DIM>
+static_matrix<T, DIM, DIM>
+tm_prod(const static_matrix<T, DIM, DIM>& mat, const static_tensor<T, DIM>& tens)
+{
+    static_matrix<T, DIM, DIM> ret = static_matrix<T, DIM, DIM>::Zero();
+
+    for (int i = 0; i < DIM; i++)
+    {
+        for (int j = 0; j < DIM; j++)
+        {
+            for (int k = 0; k < DIM; k++)
+            {
+                for (int l = 0; l < DIM; l++)
+                {
+                    ret(i, j) += mat(k, l) * coeff<T, DIM>(tens, k, l, i, j);
+                }
+            }
+        }
+    }
+
+    return ret;
+}
+
+// aij = Aijkl Bkl
 // optimization mat(row,col) neq 0, 0 else
 template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
@@ -182,7 +102,7 @@ tm_prod(const static_tensor<T, DIM>& tens, const static_matrix<T, DIM, DIM>& mat
     {
         for (int j = 0; j < DIM; j++)
         {
-            ret(i, j) *= tens(i * DIM + row, j * DIM + col);
+            ret(i, j) *= coeff<T, DIM>(tens, i, j, row, col);
         }
     }
 
@@ -220,6 +140,73 @@ computeKroneckerProduct(const static_matrix<T, DIM, DIM>& A, const static_matrix
             ret.block(i * DIM, j * DIM, DIM, DIM) = A(i, j) * B;
         }
     }
+    return ret;
+}
+
+template<typename T, int DIM>
+static_matrix<T, DIM, DIM>
+computeKroneckerProduct(const static_vector<T, DIM>& A, const static_vector<T, DIM>& B)
+{
+    return A * B.transpose();
+}
+
+// contracted product
+template<typename T, int DIM>
+T
+computeInnerProduct(const static_vector<T, DIM>& A, const static_vector<T, DIM>& B)
+{
+    return A.dot(B);
+}
+
+template<typename T, int DIM>
+T
+computeInnerProduct(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DIM, DIM>& B)
+{
+    return A.cwiseProduct(B).sum();
+}
+
+template<typename T, int DIM>
+static_matrix<T, DIM, DIM>
+computeContractedProduct(const static_tensor<T, DIM>& Tens, const static_matrix<T, DIM, DIM>& B)
+{
+    return tm_prod(Tens, B);
+}
+
+template<typename T, int DIM>
+static_matrix<T, DIM, DIM>
+computeContractedProduct(const static_matrix<T, DIM, DIM>& B, const static_tensor<T, DIM>& Tens)
+{
+    return tm_prod(B, Tens);
+}
+
+// Cijkl = Aijpq Bpqkl
+template<typename T, int DIM>
+static_tensor<T, DIM>
+computeContractedProduct(const static_tensor<T, DIM>& A, const static_tensor<T, DIM>& B)
+{
+    static_tensor<T, DIM> ret = static_tensor<T, DIM>::Zero();
+
+    for (int i = 0; i < DIM; i++)
+    {
+        for (int j = 0; j < DIM; j++)
+        {
+            for (int k = 0; k < DIM; k++)
+            {
+                for (int l = 0; l < DIM; l++)
+                {
+                    for (int p = 0; p < DIM; p++)
+                    {
+                        for (int q = 0; q < DIM; q++)
+                        {
+                            ret(i * DIM + k, j * DIM + l) +=
+                              coeff<T, DIM>(A, i, j, p, q) * coeff<T, DIM>(B, p, q, k, l);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     return ret;
 }
 
@@ -354,5 +341,36 @@ static_tensor<T, DIM>
 compute_IxI()
 {
     return static_tensor<T, DIM>::Identity();
+}
+
+//(A^T)ijkl = Aklij
+template<typename T, int DIM>
+static_tensor<T, DIM>
+transpose(const static_tensor<T, DIM>& tens)
+{
+    static_tensor<T, DIM> ret;
+
+    for (int i = 0; i < DIM; i++)
+    {
+        for (int j = 0; j < DIM; j++)
+        {
+            for (int k = 0; k < DIM; k++)
+            {
+                for (int l = 0; l < DIM; l++)
+                {
+                    ret(i * DIM + k, j * DIM + l) = coeff<T, DIM>(tens, k, l, i, j);
+                }
+            }
+        }
+    }
+
+    return ret;
+}
+
+template<typename T, int DIM>
+static_tensor<T, DIM>
+symetric_part(const static_tensor<T, DIM>& tens)
+{
+    return (tens + transpose<T, DIM>(tens)) / T(2);
 }
 }

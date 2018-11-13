@@ -30,50 +30,22 @@
 #include "common/eigen.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "mechanics/behaviors/maths_tensor.hpp"
-#include "revolution/bases"
-#include "revolution/methods/hho"
-#include "revolution/quadratures"
+#include "bases/bases.hpp"
+#include "methods/hho"
+#include "quadratures/quadratures.hpp"
 
 #include "timecounter.h"
 
 namespace NLE
 {
 
-template<typename T>
-struct MaterialParameters
-{
-    T lambda;
-    T mu;
-    T H;
-    T K;
-    T sigma_y0;
-
-    T
-    converttomu(const T E, const T nu)
-    {
-        return E / (2 * (1 + nu));
-    }
-
-    T
-    converttolambda(const T E, const T nu)
-    {
-        return E * nu / ((1 + nu) * (1 - 2 * nu));
-    }
-
-    T
-    converttoH(const T E, const T ET, const T K)
-    {
-        return E * ET / (E - ET) - 1.5 * K;
-    }
-};
-
 template<typename MeshType>
 class plasticity
 {
     typedef MeshType                             mesh_type;
-    typedef typename mesh_type::scalar_type      scalar_type;
+    typedef typename mesh_type::coordinate_type      scalar_type;
     typedef typename mesh_type::cell             cell_type;
-    typedef typename revolution::hho_degree_info hdi_type;
+    typedef typename disk::hho_degree_info hdi_type;
 
     const static int dimension = mesh_type::dimension;
 
@@ -126,9 +98,9 @@ class plasticity
         const auto grad_degree = m_hdi.grad_degree();
         const auto face_degree = m_hdi.face_degree();
 
-        const auto cell_basis_size = revolution::vector_basis_size(cell_degree, dimension, dimension);
-        const auto grad_basis_size = revolution::sym_matrix_basis_size(grad_degree, dimension, dimension);
-        const auto face_basis_size = revolution::vector_basis_size(face_degree, dimension - 1, dimension);
+        const auto cell_basis_size = disk::vector_basis_size(cell_degree, dimension, dimension);
+        const auto grad_basis_size = disk::sym_matrix_basis_size(grad_degree, dimension, dimension);
+        const auto face_basis_size = disk::vector_basis_size(face_degree, dimension - 1, dimension);
 
         time_law = 0.0;
         timecounter tc;
@@ -147,30 +119,29 @@ class plasticity
         assert(GsT.cols() == uTF.rows());
         assert(GsT.rows() == grad_basis_size);
 
-        // std::cout << "sol" << std::endl;
-        // std::cout << uTF.transpose() << std::endl;
+        //  std::cout << "sol" << std::endl;
+        //  std::cout << uTF.transpose() << std::endl;
 
         const vector_type GsT_uTF = GsT * uTF;
 
-        // std::cout << "ET: " << GsT.norm() << std::endl;
+        //  std::cout << "ET: " << GsT.norm() << std::endl;
         // std::cout << GsT << std::endl;
 
         auto& law_quadpoints = law.getQPs();
 
-        auto gb = revolution::make_sym_matrix_monomial_basis(m_msh, cl, grad_degree);
+        auto gb = disk::make_sym_matrix_monomial_basis(m_msh, cl, grad_degree);
 
         //std::cout << "nb: " << law_quadpoints.size() << std::endl;
         for (auto& qp : law_quadpoints)
         {
-            //std::cout << "qp: " << qp.point() << std::endl;
+            // std::cout << "qp: " << qp.point() << std::endl;
             const auto gphi = gb.eval_functions(qp.point());
 
             assert(gphi.size() == grad_basis_size);
 
             // Compute local gradient and norm
             //std::cout << "GT_utf: " << GsT_uTF << std::endl;
-            const auto GsT_iqn     = revolution::eval(GsT_uTF, gphi);
-            const gvt  incr_strain = GsT_iqn - qp.getTotalStrainPrev();
+            const auto GsT_iqn     = disk::eval(GsT_uTF, gphi);
             // std::cout << "Em" << std::endl;
             // std::cout << qp.getTotalStrainPrev() << std::endl;
             // std::cout << "dE" << std::endl;
@@ -178,7 +149,7 @@ class plasticity
 
             // Compute bahavior
             tc.tic();
-            const auto tensor_behavior = qp.compute_whole(incr_strain, material_data, !elatic_modulus);
+            const auto tensor_behavior = qp.compute_whole(GsT_iqn, material_data, !elatic_modulus);
             tc.toc();
             time_law += tc.to_double();
 
@@ -213,9 +184,9 @@ class plasticity
             }
 
             // compute (PK1(u), G^k_T v)_T
-            const auto stress_qp = revolution::priv::inner_product(qp.weight(), tensor_behavior.first);
-            // std::cout << "stress" << std::endl;
-            // std::cout << tensor_behavior.first << std::endl;
+            const auto stress_qp = disk::priv::inner_product(qp.weight(), tensor_behavior.first);
+            //  std::cout << "stress" << std::endl;
+            //  std::cout << tensor_behavior.first << std::endl;
 
 
             for (int i = 0; i < grad_basis_size; i += dim_dofs)
@@ -239,7 +210,7 @@ class plasticity
         }
 
         // compute (f,v)_T
-        auto cb                         = revolution::make_vector_monomial_basis(m_msh, cl, cell_degree);
+        auto cb                         = disk::make_vector_monomial_basis(m_msh, cl, cell_degree);
         RTF.segment(0, cell_basis_size) = make_rhs(m_msh, cl, cb, load);
 
         // lower part AT
@@ -247,16 +218,16 @@ class plasticity
             for (int i = j; i < grad_basis_size; i++)
                 AT(i, j) = AT(j, i);
 
-        // std::cout << "AT: " << AT.norm() << std::endl;
+        //  std::cout << "AT: " << AT.norm() << std::endl;
         // std::cout << AT << std::endl;
-        // std::cout << "at: " << aT.norm() << std::endl;
+        //  std::cout << "bt: " << aT.norm() << std::endl;
 
         K_int = GsT.transpose() * AT * GsT;
         F_int = GsT.transpose() * aT;
         RTF -= F_int;
 
         // std::cout << "K: " << K_int.norm() << std::endl;
-        // std::cout << K_int << std::endl;
+        //std::cout << K_int << std::endl;
         // std::cout << "F: " << F_int.norm() << std::endl;
 
         assert(K_int.rows() == num_total_dofs);

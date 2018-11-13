@@ -45,34 +45,10 @@ namespace disk {
 
 /* Compute an estimate of the mesh discretization step 'h' */
 template<typename Mesh>
-[[deprecated("Use average_diameter(). This is not the correct way to compute h.")]]
-typename Mesh::scalar_type
-mesh_h(const Mesh& msh)
-{
-    typename Mesh::scalar_type h{};
-    for (auto itor = msh.cells_begin(); itor != msh.cells_end(); itor++)
-    {
-        auto cell = *itor;
-        auto cell_measure = measure(msh, cell);
-
-        auto fcs = faces(msh, cell);
-        typename Mesh::scalar_type face_sum{};
-        for (auto& f : fcs)
-        {
-            auto m = measure(msh, f);
-            face_sum += m;
-        }
-        h = std::max(h, cell_measure/face_sum);
-    }
-
-    return h;
-}
-
-template<typename Mesh>
-typename Mesh::scalar_type
+typename Mesh::coordinate_type
 average_diameter(const Mesh& msh)
 {
-    typename Mesh::scalar_type h{};
+    typename Mesh::coordinate_type h{};
     for (auto& cl : msh)
     {
         h += diameter(msh, cl);
@@ -98,7 +74,9 @@ points(const Mesh& msh, const Element& elem)
     return pts;
 }
 
-/* Compute the barycenter of a cell */
+/* Compute the barycenter of a cell 
+ * This is crappy because it works only for simplicials and cartesian meshes
+ */
 template<typename Mesh, typename Element>
 point<typename Mesh::coordinate_type, Mesh::dimension>
 barycenter(const Mesh& msh, const Element& elm)
@@ -107,14 +85,33 @@ barycenter(const Mesh& msh, const Element& elm)
     auto bar = std::accumulate(std::next(pts.begin()), pts.end(), pts.front());
     return bar / typename Mesh::coordinate_type( pts.size() );
 }
+    
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+point<T,2>
+barycenter(const Mesh<T,2,Storage>& msh, const typename Mesh<T,2,Storage>::cell_type& cl)
+{
+    T tot_meas{};
+    point<T,2> tot_bar{};
+    auto pts = points(msh, cl);
+    for (size_t i = 1; i < pts.size()-1; i++)
+    {
+        auto d0 = pts[i] - pts[0];
+        auto d1 = pts[i+1] - pts[0];
+        auto meas = abs(d0.x()*d1.y() - d1.x()*d0.y());
+        tot_bar = tot_bar + meas*(pts[0]+pts[i]+pts[i+1]);
+        tot_meas += meas;
+    }
+    
+    return tot_bar/(tot_meas*T(3));
+}
 
 template<typename Mesh, typename Element>
-typename Mesh::scalar_type
+typename Mesh::coordinate_type
 diameter(const Mesh& msh, const Element& elem)
 {
     const auto pts = points(msh, elem);
 
-    typename Mesh::scalar_type diam = 0.;
+    typename Mesh::coordinate_type diam = 0.;
 
     for (size_t i = 0; i < pts.size(); i++)
         for (size_t j = i+1; j < pts.size(); j++)
@@ -129,12 +126,12 @@ diameter_boundingbox(const Mesh<T, 3, Storage>& msh, const typename Mesh<T, 3, S
 {
     const auto pts = points(msh, cl);
 
-    T xmin = 0;
-    T xmax = 0;
-    T ymin = 0;
-    T ymax = 0;
-    T zmin = 0;
-    T zmax = 0;
+    T xmin = pts[0].x();
+    T xmax = pts[0].x();
+    T ymin = pts[0].y();
+    T ymax = pts[0].y();
+    T zmin = pts[0].z();
+    T zmax = pts[0].z();
 
     for (auto& pt : pts)
     {
@@ -176,10 +173,10 @@ diameter_boundingbox(const Mesh<T, 2, Storage>&                      msh,
 {
     const auto pts = points(msh, cl);
 
-    T xmin = 0;
-    T xmax = 0;
-    T ymin = 0;
-    T ymax = 0;
+    T xmin = pts[0].x();
+    T xmax = pts[0].x();
+    T ymin = pts[0].y();
+    T ymax = pts[0].y();
 
     for (auto& pt : pts)
     {

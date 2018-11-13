@@ -1,6 +1,38 @@
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
+/*
+ *       /\         DISK++, a template library for DIscontinuous SKeletal
+ *      /__\        methods.
+ *     /_\/_\
+ *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
+ *   /__\  /__\     matteo.cicuttin@enpc.fr
+ *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
+ *
+ * This file is copyright of the following authors:
+ * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
+ * Karol Cascavita (C) 2018                     karol.cascavita@enpc.fr
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ *
+ * If you use this code or parts of it for scientific publications, you
+ * are required to cite it as following:
+ *
+ * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
+ * polytopal meshes using generic programming.
+ * M. Cicuttin, D. A. Di Pietro, A. Ern.
+ * Journal of Computational and Applied Mathematics.
+ * DOI: 10.1016/j.cam.2017.09.017
+ */
+
+#include <iostream>
+#include <iomanip>
+#include <regex>
+
+#include <unistd.h>
+
+#include "bases/bases.hpp"
+#include "quadratures/quadratures.hpp"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -52,7 +84,7 @@ run_viscoplasticity(size_t degree,
     if (!ofs.is_open())
         std::cout << "Error opening errors "<<std::endl;
 
-    typename revolution::hho_degree_info hdi(degree, degree);
+    typename disk::hho_degree_info hdi(degree, degree);
     augmented_lagrangian_viscoplasticity<mesh_type> als(msh, hdi, alpha);
 
     auto assembler = als.define_problem(msh, problem);

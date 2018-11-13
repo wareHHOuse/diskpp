@@ -44,7 +44,7 @@ struct generic_element_traits<generic_element<DIM, CODIM>>
     static_assert(CODIM < DIM, "generic_element_traits: CODIM must be less than DIM");
 
     typedef generic_element<DIM, CODIM+1>                           subelement_type;
-    typedef identifier<generic_element<DIM,CODIM>, ident_impl_t, 0> id_type;
+    typedef identifier<generic_element<DIM,CODIM>, ident_raw_t, 0> id_type;
     static const size_t dimension = DIM;
     static const size_t codimension = CODIM;
 };
@@ -52,7 +52,7 @@ struct generic_element_traits<generic_element<DIM, CODIM>>
 template<size_t DIM>
 struct generic_element_traits<generic_element<DIM, DIM>>
 {
-    typedef identifier<generic_element<DIM,DIM>, ident_impl_t, 0>   id_type;
+    typedef identifier<generic_element<DIM,DIM>, ident_raw_t, 0>   id_type;
     static const size_t dimension = DIM;
     static const size_t codimension = DIM;
 };

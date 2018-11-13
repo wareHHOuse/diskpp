@@ -34,6 +34,20 @@
 const size_t MIN_TEST_DEGREE = 0;
 const size_t MAX_TEST_DEGREE = 3;
 
+using namespace Eigen;
+
+template<class T>
+typename std::enable_if<!std::numeric_limits<T>::is_integer, bool>::type
+    almost_equal(T x, T y, T ulp)
+{
+    // the machine epsilon has to be scaled to the magnitude of the values used
+    // and multiplied by the desired precision in ULPs (units in the last place)
+    return std::abs(x-y) <= std::numeric_limits<T>::epsilon() * std::abs(x+y) * ulp
+    // unless the result is subnormal
+           || std::abs(x-y) < std::numeric_limits<T>::min();
+}
+
+
 /*****************************************************************************************/
 template<typename Mesh>
 struct scalar_testing_function;
@@ -42,7 +56,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct scalar_testing_function< Mesh<T,2,Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -55,7 +69,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct scalar_testing_function< Mesh<T,3,Storage> >
 {
     typedef Mesh<T,3,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -78,7 +92,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct vector_testing_function< Mesh<T,2,Storage> >
 {
 	typedef Mesh<T,2,Storage> 				mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
     typedef Matrix<scalar_type, 2, 1> 		ret_type;
 
@@ -95,7 +109,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct vector_testing_function< Mesh<T,3,Storage> >
 {
 	typedef Mesh<T,3,Storage> 				mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
     typedef Matrix<scalar_type, 3, 1> 		ret_type;
 
@@ -123,7 +137,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct vector_testing_function_div< Mesh<T,2,Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
     typedef Matrix<scalar_type, 2, 1>       ret_type;
 
@@ -138,7 +152,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct vector_testing_function_div< Mesh<T,3,Storage> >
 {
     typedef Mesh<T,3,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
     typedef Matrix<scalar_type, 3, 1>       ret_type;
 
@@ -290,7 +304,7 @@ get_tetrahedra_netgen_meshes(void)
 
 template<typename T>
 std::vector< disk::cartesian_mesh<T, 3> >
-get_cartesian_diskpp_meshes(void)
+get_cartesian_3d_diskpp_meshes(void)
 {
     std::vector<std::string> meshfiles;
     meshfiles.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-2-2-2.hex");
@@ -395,6 +409,38 @@ get_quad_generic_meshes(void)
     return ret;
 }
 
+template<typename T>
+std::vector< disk::cartesian_mesh<T, 2> >
+get_cartesian_2d_diskpp_meshes(void)
+{
+    std::vector<std::string> meshfiles;
+    meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-2-2.quad");
+    meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-4-4.quad");
+    meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-8-8.quad");
+    meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-16-16.quad");
+    meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-32-32.quad");
+
+    typedef disk::cartesian_mesh<T, 2>  mesh_type;
+
+    std::vector< mesh_type > ret;
+    for (size_t i = 0; i < meshfiles.size(); i++)
+    {
+        mesh_type msh;
+        disk::cartesian_mesh_loader<T, 2> loader;
+
+        if (!loader.read_mesh(meshfiles.at(i)))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            continue;
+        }
+        loader.populate_mesh(msh);
+
+        ret.push_back(msh);
+    }
+
+    return ret;
+}
+
 template<typename Mesh, typename Function>
 void
 do_testing(std::vector<Mesh>& meshes, const Function& run_test,
@@ -402,7 +448,7 @@ do_testing(std::vector<Mesh>& meshes, const Function& run_test,
            size_t min_test_degree = MIN_TEST_DEGREE,
            size_t max_test_degree = MAX_TEST_DEGREE)
 {
-	using T = typename Mesh::scalar_type;
+	using T = typename Mesh::coordinate_type;
 
 	for (size_t k = min_test_degree; k <= max_test_degree; k++)
     {
@@ -437,8 +483,10 @@ do_testing(std::vector<Mesh>& meshes, const Function& run_test,
                 std::cout << std::scientific << std::setprecision(5) << l2_errors.at(i) << "    ";
                 std::cout << std::defaultfloat << std::setprecision(3) << rate << "    ";
 
-                if ( rate < expected_rate(k)-0.5 || rate > expected_rate(k)+0.5 )
+                if ( rate < expected_rate(k)-0.5 )
                     std::cout << "[" << red << "FAIL" << nocolor << "]";
+                else if ( rate > expected_rate(k)+0.5 )
+                    std::cout << "[" << yellow << "FAIL" << nocolor << "]";
                 else
                     std::cout << "[" << green << " OK " << nocolor << "]";
 
@@ -506,6 +554,18 @@ class tester
         do_testing(meshes, tf, er);
     }
 
+    void test_cartesian_2d_diskpp(void)
+    {
+        std::cout << yellow << "Mesh under test: 2D cartesian mesh (DiSk++)";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_cartesian_2d_diskpp_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
+    }
+
     void test_tetrahedra_netgen(void)
     {
         std::cout << yellow << "Mesh under test: tetrahedra on netgen mesh";
@@ -518,13 +578,13 @@ class tester
         do_testing(meshes, tf, er);
     }
 
-    void test_cartesian_diskpp(void)
+    void test_cartesian_3d_diskpp(void)
     {
-        std::cout << yellow << "Mesh under test: cartesian mesh (DiSk++)";
+        std::cout << yellow << "Mesh under test: 3D cartesian mesh (DiSk++)";
         std::cout << nocolor << std::endl;
         using T = double;
 
-        auto meshes = get_cartesian_diskpp_meshes<T>();
+        auto meshes = get_cartesian_3d_diskpp_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
         do_testing(meshes, tf, er);
@@ -552,8 +612,9 @@ public:
         bool do_polygonal_generic   = true;
         bool do_triangles_netgen    = true;
         bool do_quads               = true;
+        bool do_cartesian_2d_diskpp = true;
         bool do_tetrahedra_netgen   = true;
-        bool do_cartesian_diskpp    = true;
+        bool do_cartesian_3d_diskpp = true;
         bool do_generic_fvca6       = true;
 
         auto r = lua.do_file("test_config.lua");
@@ -564,8 +625,9 @@ public:
             do_polygonal_generic    = lua["do_polygonal_generic"].get_or(false);
             do_triangles_netgen     = lua["do_triangles_netgen"].get_or(false);
             do_quads                = lua["do_quads"].get_or(false);
+            do_cartesian_2d_diskpp  = lua["do_cartesian_2d_diskpp"].get_or(false);
             do_tetrahedra_netgen    = lua["do_tetrahedra_netgen"].get_or(false);
-            do_cartesian_diskpp     = lua["do_cartesian_diskpp"].get_or(false);
+            do_cartesian_3d_diskpp  = lua["do_cartesian_3d_diskpp"].get_or(false);
             do_generic_fvca6        = lua["do_generic_fvca6"].get_or(false);
         }
 
@@ -584,11 +646,14 @@ public:
         if ( do_quads )
             test_quads();
 
+        if ( do_cartesian_2d_diskpp )
+            test_cartesian_2d_diskpp();
+
         if ( do_tetrahedra_netgen )
             test_tetrahedra_netgen();
 
-        if ( do_cartesian_diskpp )
-            test_cartesian_diskpp();
+        if ( do_cartesian_3d_diskpp )
+            test_cartesian_3d_diskpp();
 
         if ( do_generic_fvca6 )
             test_generic_fvca6();

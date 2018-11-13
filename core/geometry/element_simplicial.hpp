@@ -50,7 +50,7 @@ class simplicial_element
     node_array_type     m_pts_ptrs;
 
 public:
-    typedef identifier<simplicial_element, ident_impl_t, 0> id_type;
+    typedef identifier<simplicial_element, ident_raw_t, 0> id_type;
 
     simplicial_element() = default;
 

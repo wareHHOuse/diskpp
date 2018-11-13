@@ -162,22 +162,6 @@ namespace priv {
 
 } //namespace priv
 
-template<typename T>
-[[deprecated]]
-std::pair<bool, typename T::id_type>
-find_element_id(const std::vector<T>& elements, const T& element)
-{
-    auto itor = std::lower_bound(elements.begin(), elements.end(), element);
-
-    if (itor != elements.end() && !(element < *itor))
-    {
-        typename T::id_type id(std::distance(elements.begin(), itor));
-        return std::make_pair(true, id);
-    }
-
-    return std::make_pair(false, typename T::id_type());
-}
-
 template<typename T, typename Iterator>
 std::pair<bool, typename T::id_type>
 find_element_id(const Iterator& begin, const Iterator& end, const T& element)
@@ -192,8 +176,6 @@ find_element_id(const Iterator& begin, const Iterator& end, const T& element)
 
     return std::make_pair(false, typename T::id_type());
 }
-
-
 
 /****************************************************************************/
 namespace priv {
@@ -374,8 +356,6 @@ class mesh : public priv::mesh_base<T,DIM,Storage>
 
 public:
     static const size_t dimension = DIM;
-
-    [[deprecated("Use 'coordinate_type'")]] typedef T scalar_type;
 
     typedef T           coordinate_type;
     typedef Storage     storage_type;
@@ -587,20 +567,6 @@ public:
             throw std::invalid_argument(ss.str());
         }
         return fi.second;
-    }
-
-    /* Th->maximumNumberOfFaces() */
-    [[deprecated("subelement_size works only on generic_element")]]
-    size_t  max_faces_per_element(void) const
-    {
-        size_t mfpe = 0;
-        for (auto itor = this->cells_begin(); itor != this->cells_end(); itor++)
-        {
-            auto cell = *itor;
-            mfpe = std::max(mfpe, cell.subelement_size());
-        }
-
-        return mfpe;
     }
 
     void statistics(void) const

@@ -29,13 +29,15 @@
 #include <list>
 #include <vector>
 
-#include "revolution/bases"
-#include "revolution/methods/hho"
-#include "revolution/quadratures"
+#include "bases/bases.hpp"
+#include "methods/hho"
+#include "quadratures/quadratures.hpp"
 
 #include "Informations.hpp"
 #include "NewtonSolver/newton_solver.hpp"
 #include "Parameters.hpp"
+#include "core/mechanics/behaviors/laws/materialData.hpp"
+#include "core/mechanics/behaviors/logarithmic_strain/LogarithmicStrain.hpp"
 #include "mechanics/BoundaryConditions.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
 
@@ -58,19 +60,20 @@ template<typename Mesh>
 class finite_strains_solver
 {
     typedef Mesh                                 mesh_type;
-    typedef typename mesh_type::scalar_type      scalar_type;
+    typedef typename mesh_type::coordinate_type  scalar_type;
     typedef ParamRun<scalar_type>                param_type;
-    typedef NLE::MaterialParameters<scalar_type> data_type;
+    typedef disk::MaterialData<scalar_type>      data_type;
 
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
     typedef disk::mechanics::BoundaryConditions<mesh_type>        bnd_type;
-    typedef disk::LinearLaw<mesh_type> law_type;
+    typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_hpp_type;
+    typedef disk::mechanics::LogarithmicStrain<law_hpp_type>      law_type;
 
-    typename revolution::hho_degree_info m_hdi;
-    bnd_type                             m_bnd;
-    const mesh_type&                     m_msh;
+    typename disk::hho_degree_info m_hdi;
+    bnd_type                       m_bnd;
+    const mesh_type&               m_msh;
 
     disk::PostMesh<mesh_type> post_mesh;
 
@@ -99,8 +102,8 @@ class finite_strains_solver
         m_solution_cells.reserve(m_msh.cells_size());
         m_solution_faces.reserve(m_msh.faces_size());
 
-        const auto num_cell_dofs = revolution::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
-        const auto num_face_dofs = revolution::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
+        const auto num_cell_dofs = disk::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
+        const auto num_face_dofs = disk::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
         const auto total_dof     = m_msh.cells_size() * num_cell_dofs + m_msh.faces_size() * num_face_dofs;
 
         for (auto& cl : m_msh)
@@ -155,7 +158,8 @@ class finite_strains_solver
                     case HHO:
                     {
                         const auto recons_scalar = make_hho_scalar_laplacian(m_msh, cl, m_hdi);
-                        const auto stab_HHO = make_hho_vector_stabilization_optim(m_msh, cl, recons_scalar.first, m_hdi);
+                        const auto stab_HHO =
+                          make_hho_vector_stabilization_optim(m_msh, cl, recons_scalar.first, m_hdi);
                         m_stab_precomputed.push_back(stab_HHO);
                         break;
                     }
@@ -210,11 +214,10 @@ class finite_strains_solver
 
         m_rp.m_grad_degree = grad_degree;
 
-        m_hdi = revolution::hho_degree_info(cell_degree, face_degree, grad_degree);
+        m_hdi = disk::hho_degree_info(cell_degree, face_degree, grad_degree);
 
         m_law = law_type(m_msh, 2 * m_hdi.grad_degree());
-        m_law.addMaterialData(
-          material_data.lambda, material_data.mu);
+        m_law.addMaterialData(material_data);
 
         if (m_verbose)
         {
@@ -311,7 +314,7 @@ class finite_strains_solver
 
             auto rlf = [&lf, &current_time ](const point<scalar_type, dimension>& p) -> auto
             {
-                return revolution::priv::inner_product(current_time, lf(p));
+                return disk::priv::inner_product(current_time, lf(p));
             };
 
             m_bnd.multiplyAllFunctionsOfAFactor(current_time);
@@ -378,6 +381,25 @@ class finite_strains_solver
                 {
                     if (m_rp.m_time_save.front() < old_time + 1E-5)
                     {
+                        std::cout << "** Save results" << std::endl;
+                        std::string name = "result" + std::to_string(dimension) + "D_k" +
+                                           std::to_string(m_hdi.face_degree()) + "_l" +
+                                           std::to_string(m_hdi.cell_degree()) + "_g" +
+                                           std::to_string(m_hdi.grad_degree()) + "_t" + std::to_string(old_time) + "_";
+
+                        // this->compute_discontinuous_displacement(name + "depl_disc.msh");
+                        // this->compute_continuous_displacement(name + "depl_cont.msh");
+                        // this->compute_discontinuous_stress(name + "stress_disc.msh");
+                        // this->compute_continuous_stress(name + "stress_cont.msh");
+                        this->compute_stress_GP(name + "stress_GP.msh");
+                        // this->compute_discontinuous_equivalent_plastic_strain(name + "_disc.msh");
+                        // this->compute_continuous_equivalent_plastic_strain(name + "p_cont.msh");
+                        this->compute_equivalent_plastic_strain_GP(name + "p_GP.msh");
+                        this->compute_is_plastic_GP(name + "state_GP.msh");
+                        // this->compute_is_plastic_continuous(name + "state_cont.msh");
+                        // this->compute_continuous_deformed(name + "deformed_cont.msh");
+                        // this->compute_discontinuous_deformed(name + "deformed_disc.msh");
+
                         m_rp.m_time_save.pop_front();
                         if (m_rp.m_time_save.empty())
                             time_saving = false;
@@ -409,7 +431,8 @@ class finite_strains_solver
         return total_dof_depl_static;
     }
 
-    void printSolutionCell() const
+    void
+    printSolutionCell() const
     {
         int cell_i = 0;
         std::cout << "Solution at the cells:" << std::endl;
@@ -427,7 +450,7 @@ class finite_strains_solver
     {
         scalar_type err_dof = 0;
 
-        const auto cbs      = revolution::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
+        const auto cbs      = disk::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
         const int  diff_deg = m_hdi.face_degree() - m_hdi.cell_degree();
         const int  di       = std::max(diff_deg, 0);
 
@@ -437,10 +460,10 @@ class finite_strains_solver
         {
             const auto x = m_solution_cells.at(cell_i++);
 
-            const vector_dynamic true_dof = revolution::project_function(m_msh, cl, m_hdi.cell_degree(), as, di);
+            const vector_dynamic true_dof = disk::project_function(m_msh, cl, m_hdi.cell_degree(), as, di);
 
-            auto                 cb   = revolution::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
-            const matrix_dynamic mass = revolution::make_mass_matrix(m_msh, cl, cb);
+            auto                 cb   = disk::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
+            const matrix_dynamic mass = disk::make_mass_matrix(m_msh, cl, cb);
 
             const vector_dynamic comp_dof = x.head(cbs);
             const vector_dynamic diff_dof = (true_dof - comp_dof);
@@ -471,7 +494,7 @@ class finite_strains_solver
                 const auto stress_comp = qp.compute_stress(material_data);
                 const auto stress_diff = (stress(qp.point()) - stress_comp).eval();
 
-                error_stress += qp.weight() * revolution::priv::inner_product(stress_diff, stress_diff);
+                error_stress += qp.weight() * stress_diff.squaredNorm();
             }
         }
 
@@ -496,7 +519,7 @@ class finite_strains_solver
                 const auto                stress = qp.compute_stress(material_data);
                 const std::vector<double> tens   = disk::convertToVectorGmsh(stress);
 
-                energy += qp.weight() * revolution::priv::inner_product(stress, stress);
+                energy += qp.weight() * stress.squaredNorm();
             }
             cell_i++;
         }
@@ -519,7 +542,7 @@ class finite_strains_solver
         int nb_nodes = 0;
         for (auto& cl : m_msh)
         {
-            auto                    cb         = revolution::make_vector_monomial_basis(m_msh, cl, cell_degree);
+            auto                    cb         = disk::make_vector_monomial_basis(m_msh, cl, cell_degree);
             const vector_dynamic    x          = m_solution_cells.at(cell_i++);
             const auto              cell_nodes = disk::cell_nodes(m_msh, cl);
             std::vector<gmsh::Node> new_nodes;
@@ -533,7 +556,7 @@ class finite_strains_solver
 
                 const auto phi = cb.eval_functions(pt);
 
-                const auto depl = revolution::eval(x, phi);
+                const auto depl = disk::eval(x, phi);
 
                 const std::vector<double>   deplv = disk::convertToVectorGmsh(depl);
                 const std::array<double, 3> coor  = disk::init_coor(pt);
@@ -575,7 +598,7 @@ class finite_strains_solver
         int cell_i = 0;
         for (auto& cl : m_msh)
         {
-            auto                 cb         = revolution::make_vector_monomial_basis(m_msh, cl, cell_degree);
+            auto                 cb         = disk::make_vector_monomial_basis(m_msh, cl, cell_degree);
             const vector_dynamic x          = m_solution_cells.at(cell_i);
             const auto           cell_nodes = post_mesh.nodes_cell(cell_i);
 
@@ -585,7 +608,7 @@ class finite_strains_solver
                 const auto pt = storage->points[point_id];
 
                 const auto phi  = cb.eval_functions(pt);
-                const auto depl = revolution::eval(x, phi);
+                const auto depl = disk::eval(x, phi);
 
                 // Add displacement at node
                 value[point_id].first++;
@@ -623,17 +646,35 @@ class finite_strains_solver
         size_t                     nb_nodes(gmsh.getNumberofNodes());
 
         const auto material_data = m_law.getMaterialData();
+        const size_t grad_degree   = m_hdi.grad_degree();
 
         int cell_i = 0;
         for (auto& cl : m_msh)
         {
 
             const auto law_quadpoints = m_law.getCellIVs(cell_i).getIVs();
+            const auto uTF            = m_solution_data.at(cell_i);
+            matrix_dynamic gr;
+            if (m_rp.m_precomputation)
+            {
+                gr = m_gradient_precomputed.at(cell_i);
+            }
+            else
+            {
+                gr = make_hho_gradrec_matrix(m_msh, cl, m_hdi).first;
+            }
+            const vector_dynamic GTuTF = gr * uTF;
+            auto                 gb    = disk::make_matrix_monomial_basis(m_msh, cl, grad_degree);
 
             // Loop on nodes
             for (auto& qp : law_quadpoints)
             {
-                const auto                stress = qp.compute_stress(material_data);
+                const auto                gphi   = gb.eval_functions(qp.point());
+                const auto                GT_iqn = disk::eval(GTuTF, gphi);
+                const auto                FT_iqn = disk::mechanics::convertGtoF(GT_iqn);
+
+                const auto                P = qp.compute_stress(material_data);
+                const auto                stress = disk::mechanics::convertPK1toCauchy(P, FT_iqn);
                 const std::vector<double> tens   = disk::convertToVectorGmsh(stress);
 
                 // Add GP
@@ -662,12 +703,24 @@ class finite_strains_solver
         const std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
 
         const auto material_data = m_law.getMaterialData();
+        const size_t grad_degree   = m_hdi.grad_degree();
 
         int    cell_i   = 0;
         size_t nb_nodes = 0;
         for (auto& cl : m_msh)
         {
-            auto                    gb = revolution::make_sym_matrix_monomial_basis(m_msh, cl, m_hdi.grad_degree());
+            const auto     uTF = m_solution_data.at(cell_i);
+            matrix_dynamic gr;
+            if (m_rp.m_precomputation)
+            {
+                gr = m_gradient_precomputed.at(cell_i);
+            }
+            else
+            {
+                gr = make_hho_gradrec_matrix(m_msh, cl, m_hdi).first;
+            }
+            const vector_dynamic    GTuTF        = gr * uTF;
+            auto                    gb           = disk::make_matrix_monomial_basis(m_msh, cl, grad_degree);
             const auto              law_cell     = m_law.getCellIVs(cell_i);
             const vector_dynamic    stress_coeff = law_cell.projectStressOnCell(m_msh, cl, m_hdi, material_data);
             const auto              cell_nodes   = disk::cell_nodes(m_msh, cl);
@@ -681,7 +734,11 @@ class finite_strains_solver
                 const auto pt        = storage->points[point_ids];
 
                 const auto gphi   = gb.eval_functions(pt);
-                const auto stress = revolution::eval(stress_coeff, gphi);
+                const auto GT_iqn = disk::eval(GTuTF, gphi);
+                const auto FT_iqn = disk::mechanics::convertGtoF(GT_iqn);
+
+                const auto P      = disk::eval(stress_coeff, gphi);
+                const auto stress = disk::mechanics::convertPK1toCauchy(P, FT_iqn);
 
                 const std::vector<double>   tens = disk::convertToVectorGmsh(stress);
                 const std::array<double, 3> coor = disk::init_coor(pt);
@@ -723,13 +780,25 @@ class finite_strains_solver
           nb_nodes, std::make_pair(0, vzero));
 
         const auto material_data = m_law.getMaterialData();
+        const size_t grad_degree   = m_hdi.grad_degree();
 
         int cell_i = 0;
 
         for (auto& cl : m_msh)
         {
-            auto                 gb       = revolution::make_sym_matrix_monomial_basis(m_msh, cl, m_hdi.grad_degree());
-            const auto           law_cell = m_law.getCellIVs(cell_i);
+            const auto     uTF = m_solution_data.at(cell_i);
+            matrix_dynamic gr;
+            if (m_rp.m_precomputation)
+            {
+                gr = m_gradient_precomputed.at(cell_i);
+            }
+            else
+            {
+                gr = make_hho_gradrec_matrix(m_msh, cl, m_hdi).first;
+            }
+            const vector_dynamic GTuTF        = gr * uTF;
+            auto                 gb           = disk::make_matrix_monomial_basis(m_msh, cl, grad_degree);
+            const auto           law_cell     = m_law.getCellIVs(cell_i);
             const vector_dynamic stress_coeff = law_cell.projectStressOnCell(m_msh, cl, m_hdi, material_data);
             const auto           cell_nodes   = post_mesh.nodes_cell(cell_i);
 
@@ -739,7 +808,11 @@ class finite_strains_solver
                 const auto pt = storage->points[point_id];
 
                 const auto gphi   = gb.eval_functions(pt);
-                const auto stress = revolution::eval(stress_coeff, gphi);
+                const auto GT_iqn = disk::eval(GTuTF, gphi);
+                const auto FT_iqn = disk::mechanics::convertGtoF(GT_iqn);
+
+                const auto P      = disk::eval(stress_coeff, gphi);
+                const auto stress = disk::mechanics::convertPK1toCauchy(P, FT_iqn);
 
                 value[point_id].first++;
                 value[point_id].second += stress;
@@ -821,7 +894,7 @@ class finite_strains_solver
         size_t nb_nodes = 0;
         for (auto& cl : m_msh)
         {
-            auto       pb       = revolution::make_scalar_monomial_basis(m_msh, cl, grad_degree);
+            auto       pb       = disk::make_scalar_monomial_basis(m_msh, cl, grad_degree);
             const auto law_cell = m_law.getCellIVs(cell_i);
 
             const vector_dynamic    p_coeff    = law_cell.projectPOnCell(m_msh, cl, m_hdi);
@@ -836,7 +909,7 @@ class finite_strains_solver
                 const auto pt        = storage->points[point_ids];
 
                 const auto  pphi = pb.eval_functions(pt);
-                scalar_type p    = revolution::eval(p_coeff, pphi);
+                scalar_type p    = disk::eval(p_coeff, pphi);
 
                 if (p <= scalar_type(0))
                     p = 0;
@@ -881,7 +954,7 @@ class finite_strains_solver
         int cell_i = 0;
         for (auto& cl : m_msh)
         {
-            auto       pb       = revolution::make_scalar_monomial_basis(m_msh, cl, grad_degree);
+            auto       pb       = disk::make_scalar_monomial_basis(m_msh, cl, grad_degree);
             const auto law_cell = m_law.getCellIVs(cell_i);
 
             const dynamic_vector<scalar_type> p_coeff    = law_cell.projectPOnCell(m_msh, cl, m_hdi);
@@ -893,7 +966,7 @@ class finite_strains_solver
                 const auto pt = storage->points[point_id];
 
                 const auto  pphi = pb.eval_functions(pt);
-                scalar_type p    = revolution::eval(p_coeff, pphi);
+                scalar_type p    = disk::eval(p_coeff, pphi);
 
                 if (p <= scalar_type{0})
                     p = 0;
@@ -941,7 +1014,7 @@ class finite_strains_solver
         int cell_i = 0;
         for (auto& cl : m_msh)
         {
-            auto       pb       = revolution::make_scalar_monomial_basis(m_msh, cl, grad_degree);
+            auto       pb       = disk::make_scalar_monomial_basis(m_msh, cl, grad_degree);
             const auto law_cell = m_law.getCellIVs(cell_i);
 
             const vector_dynamic state_coeff = law_cell.projectStateOnCell(m_msh, cl, m_hdi);
@@ -953,7 +1026,7 @@ class finite_strains_solver
                 const auto pt = storage->points[point_id];
 
                 const auto  pphi = pb.eval_functions(pt);
-                scalar_type p    = revolution::eval(state_coeff, pphi);
+                scalar_type p    = disk::eval(state_coeff, pphi);
 
                 if (p <= scalar_type(0))
                 {
@@ -1050,7 +1123,7 @@ class finite_strains_solver
         int cell_i = 0;
         for (auto& cl : m_msh)
         {
-            auto                 cb         = revolution::make_vector_monomial_basis(m_msh, cl, cell_degree);
+            auto                 cb         = disk::make_vector_monomial_basis(m_msh, cl, cell_degree);
             const vector_dynamic x          = m_solution_cells.at(cell_i++);
             const auto           cell_nodes = disk::cell_nodes(m_msh, cl);
 
@@ -1061,7 +1134,7 @@ class finite_strains_solver
                 const auto pt        = storage->points[point_ids];
 
                 const auto phi  = cb.eval_functions(pt);
-                const auto depl = revolution::eval(x, phi);
+                const auto depl = disk::eval(x, phi);
 
                 // Add displacement at node
                 value[point_ids].first++;
@@ -1119,7 +1192,7 @@ class finite_strains_solver
         size_t nb_nodes = 0;
         for (auto& cl : m_msh)
         {
-            auto                    cb         = revolution::make_vector_monomial_basis(m_msh, cl, cell_degree);
+            auto                    cb         = disk::make_vector_monomial_basis(m_msh, cl, cell_degree);
             const vector_dynamic    x          = m_solution_cells.at(cell_i++);
             const auto              cell_nodes = disk::cell_nodes(m_msh, cl);
             std::vector<gmsh::Node> new_nodes;
@@ -1132,7 +1205,7 @@ class finite_strains_solver
                 const auto pt        = storage->points[point_ids];
 
                 const auto phi  = cb.eval_functions(pt);
-                const auto depl = revolution::eval(x, phi);
+                const auto depl = disk::eval(x, phi);
 
                 std::array<double, 3> coor = disk::init_coor(pt);
                 // Compute new coordinates
@@ -1149,5 +1222,89 @@ class finite_strains_solver
         }
         // Save mesh
         gmsh.writeGmesh(filename, 2);
+    }
+
+    // cas particuliers
+    // post traitement pour la sphere
+    void
+    compute_sphere(const std::string& filename) const
+    {
+        const size_t cell_degree   = m_hdi.cell_degree();
+        const size_t grad_degree   = m_hdi.grad_degree();
+        const auto   material_data = m_law.getMaterialData();
+
+        std::ofstream output;
+        output.open(filename, std::ofstream::out | std::ofstream::trunc);
+
+        if (!output.is_open())
+        {
+            std::cerr << "Unable to open file " << filename << std::endl;
+        }
+
+        output << "#R"
+               << "\t"
+               << "ur"
+               << "\t"
+               << "sigma_rr"
+               << "\t"
+               << "sigma_oo"
+               << "\t"
+               << "sigma_trace" << std::endl;
+
+        size_t cell_i(0);
+        for (auto& cl : m_msh)
+        {
+            const auto           uTF            = m_solution_data.at(cell_i);
+            const vector_dynamic x              = m_solution_cells.at(cell_i);
+            const auto           law_quadpoints = m_law.getCellIVs(cell_i).getIVs();
+
+            matrix_dynamic gr;
+            if (m_rp.m_precomputation)
+            {
+                gr = m_gradient_precomputed.at(cell_i);
+            }
+            else
+            {
+                gr = make_hho_gradrec_matrix(m_msh, cl, m_hdi).first;
+            }
+            const vector_dynamic GTuTF = gr * uTF;
+
+            // Loop on nodes
+            auto cb = disk::make_vector_monomial_basis(m_msh, cl, cell_degree);
+            auto gb = disk::make_matrix_monomial_basis(m_msh, cl, grad_degree);
+            for (auto& qp : law_quadpoints)
+            {
+                const auto qp_pt = qp.point();
+                const auto cphi  = cb.eval_functions(qp_pt);
+                const auto gphi  = gb.eval_functions(qp.point());
+
+                const auto depl   = disk::eval(x, cphi);
+                const auto GT_iqn = disk::eval(GTuTF, gphi);
+                const auto FT_iqn = disk::mechanics::convertGtoF(GT_iqn);
+
+                const auto P      = qp.compute_stress(material_data);
+                const auto stress = disk::mechanics::convertPK1toCauchy(P, FT_iqn);
+                const auto trace  = stress.trace();
+
+                static_vector<scalar_type, dimension> er = static_vector<scalar_type, dimension>::Zero();
+
+                er(0) = qp_pt.x();
+                er(1) = qp_pt.y();
+                er(2) = qp_pt.z();
+
+                const scalar_type r = er.norm();
+                er /= r;
+
+                const scalar_type sigma_rr = er.dot(stress * er);
+                const scalar_type sigma_oo = (stress.trace() - sigma_rr) / 2.0;
+                const scalar_type ur       = depl.dot(er);
+
+                output << r << "\t" << ur << "\t" << sigma_rr << "\t" << sigma_oo << "\t" << stress.trace()
+                       << std ::endl;
+            }
+            cell_i++;
+        }
+
+        output.close();
     }
 };

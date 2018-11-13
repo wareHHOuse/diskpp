@@ -124,5 +124,4 @@ operator<<(std::ostream& os, const identifier<T, impl, default_value>& id)
     return os;
 }
 
-typedef size_t          ident_impl_t;   /* deprecated */
-typedef ident_impl_t    ident_raw_t;    /* use this */
+typedef size_t      ident_raw_t;

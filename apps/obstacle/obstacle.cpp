@@ -1,10 +1,13 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
- *      /__\       matteo.cicuttin@enpc.fr
- *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
- *    /\    /\
- *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
- *  /_\/_\/_\/_\   methods.
+ *       /\         DISK++, a template library for DIscontinuous SKeletal
+ *      /__\        methods.
+ *     /_\/_\
+ *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
+ *   /__\  /__\     matteo.cicuttin@enpc.fr
+ *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
+ *
+ * This file is copyright of the following authors:
+ * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -26,7 +29,7 @@
 #include <unistd.h>
 
 #include "loaders/loader.hpp"
-#include "hho/hho.hpp"
+#include "methods/hho"
 #include "solvers/solver.hpp"
 
 #include "output/silo.hpp"
@@ -35,8 +38,6 @@ using namespace Eigen;
 
 
 #define THREE_DIMENSIONS
-
-
 
 size_t basis_size(size_t k, size_t d)
 {
@@ -575,7 +576,7 @@ bool
 hho_solver(const Mesh& msh, size_t degree)
 {
     typedef Mesh                                       mesh_type;
-    typedef typename mesh_type::scalar_type            scalar_type;
+    typedef typename mesh_type::coordinate_type            scalar_type;
     typedef typename mesh_type::cell                   cell_type;
     typedef typename mesh_type::face                   face_type;
 

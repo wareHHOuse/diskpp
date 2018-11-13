@@ -30,9 +30,9 @@
 
 #include <unistd.h>
 
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "bases/bases.hpp"
+#include "quadratures/quadratures.hpp"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -42,28 +42,28 @@ template<typename Mesh>
 struct test_functor
 {
     /* Expect k+1 convergence */
-    typename Mesh::scalar_type
+    typename Mesh::coordinate_type
     operator()(const Mesh& msh, size_t degree) const
     {
         typedef Mesh mesh_type;
         typedef typename mesh_type::cell        cell_type;
         typedef typename mesh_type::face        face_type;
-        typedef typename mesh_type::scalar_type scalar_type;
+        typedef typename mesh_type::coordinate_type scalar_type;
         typedef typename mesh_type::point_type  point_type;
 
         typedef Matrix<scalar_type, Mesh::dimension, 1> ret_type;
 
         auto f = make_vector_testing_data(msh);
 
-        typename revolution::hho_degree_info hdi(degree);
+        typename disk::hho_degree_info hdi(degree);
 
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, hdi, f);
-            auto gr = revolution::make_hho_vector_laplacian(msh, cl, hdi);
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
+            auto gr = disk::make_hho_vector_laplacian(msh, cl, hdi);
 
-            size_t rec_size = revolution::vector_basis_size(hdi.reconstruction_degree(), Mesh::dimension, Mesh::dimension);
+            size_t rec_size = disk::vector_basis_size(hdi.reconstruction_degree(), Mesh::dimension, Mesh::dimension);
 
             Matrix<scalar_type, Dynamic, 1> reconstr = Matrix<scalar_type, Dynamic, 1>::Zero(rec_size);
             reconstr.tail(rec_size-Mesh::dimension) = gr.first * proj;
@@ -71,14 +71,14 @@ struct test_functor
             for (size_t i = 0; i < Mesh::dimension; i++)
                 reconstr(i) = proj(i);
 
-            auto cb = revolution::make_vector_monomial_basis(msh, cl, hdi.reconstruction_degree());
-            Matrix<scalar_type, Dynamic, Dynamic> mass = revolution::make_mass_matrix(msh, cl, cb);
-            Matrix<scalar_type, Dynamic, 1> rhs = revolution::make_rhs(msh, cl, cb, f);
+            auto cb = disk::make_vector_monomial_basis(msh, cl, hdi.reconstruction_degree());
+            Matrix<scalar_type, Dynamic, Dynamic> mass = disk::make_mass_matrix(msh, cl, cb);
+            Matrix<scalar_type, Dynamic, 1> rhs = disk::make_rhs(msh, cl, cb, f);
             Matrix<scalar_type, Dynamic, 1> exp_reconstr = mass.llt().solve(rhs);
 
             Matrix<scalar_type, Dynamic, 1> diff = reconstr - exp_reconstr;
 
-            Matrix<scalar_type, Dynamic, Dynamic> stiffness = revolution::make_stiffness_matrix(msh, cl, cb);
+            Matrix<scalar_type, Dynamic, Dynamic> stiffness = disk::make_stiffness_matrix(msh, cl, cb);
 
             error += diff.dot(stiffness*diff);
         }

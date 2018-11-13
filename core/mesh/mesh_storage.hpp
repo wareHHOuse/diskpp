@@ -73,7 +73,7 @@ struct mesh_storage<T, 3, StorageClass>
     static const size_t                             dimension = 3;
     typedef point<coordinate_type,3>                point_type;
 
-    template<typename ET> using id = identifier<ET, ident_impl_t, 0>;
+    template<typename ET> using id = identifier<ET, ident_raw_t, 0>;
     typedef id<volume_type>                         volume_id_type;
     typedef id<surface_type>                        surface_id_type;
     typedef id<edge_type>                           edge_id_type;
@@ -118,7 +118,7 @@ struct mesh_storage<T, 2, StorageClass>
     static const size_t                             dimension = 2;
     typedef point<coordinate_type,2>                point_type;
 
-    template<typename ET> using id = identifier<ET, ident_impl_t, 0>;
+    template<typename ET> using id = identifier<ET, ident_raw_t, 0>;
     typedef id<surface_type>                        surface_id_type;
     typedef id<edge_type>                           edge_id_type;
     typedef id<node_type>                           node_id_type;
@@ -158,7 +158,7 @@ struct mesh_storage<T, 1, StorageClass>
     static const size_t                             dimension = 1;
     typedef point<coordinate_type,1>                point_type;
 
-    template<typename ET> using id = identifier<ET, ident_impl_t, 0>;
+    template<typename ET> using id = identifier<ET, ident_raw_t, 0>;
     typedef id<edge_type>                           edge_id_type;
     typedef id<node_type>                           node_id_type;
     //typedef id<point_type>                          point_id_type;
