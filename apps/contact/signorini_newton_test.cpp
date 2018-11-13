@@ -576,8 +576,8 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-    //std::cout << bold << underline << "Triangles for contact" << reset << std::endl;
-    //test_triangles(tt, ap, parameter);
+    std::cout << bold << underline << "Triangles for contact" << reset << std::endl;
+    test_triangles(tt, ap, parameter);
 
     std::cout << bold << underline << "Quadrangles" << reset << std::endl;
     test_quadrangles(tt, ap, parameter);

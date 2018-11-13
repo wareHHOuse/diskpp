@@ -1,9 +1,12 @@
-config.degree_cell = 2
-config.degree_face = 1
+config.degree_cell = 1
+config.degree_face = 0
+config.ref_degree_cell = 2
+config.ref_degree_face = 1
 
 config.input_mesh = "../../../diskpp/meshes/2D_triangles/netgen/square_tri1.mesh2d"
 config.visit_output = "eigs_hho.silo"
 config.eigval_output = "eigs_hho.txt"
+config.compute_reference = true -- Run computations for reference solution and save it; otherwise it is read it
 
 hs.levels = 6
 hs.sol_level_min = 0
@@ -14,7 +17,7 @@ hs.fem_gamma = 100 -- Gamma: 5 means 10^5
 
 hs.hho_theta = "p" -- Theta: p means 1; n means -1: z means 0
 hs.hho_gamma = 100 -- Gamma: 5 means 10^5
-
+hs.hho_trace = "l" -- Trace-type: f means face-based trace ; l means cell-based trace   
 
 -- Solver config for eigenvalue problems
 solver.feast.verbose = false -- Print solver logs

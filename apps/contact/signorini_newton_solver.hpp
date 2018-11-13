@@ -254,7 +254,8 @@ template<typename Mesh, typename Function, typename Analytical>
 dynamic_vector<typename Mesh::coordinate_type>
 solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun,
     const algorithm_parameters<typename Mesh::scalar_type>& ap,
-    const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+    const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+    const hho_degree_info& hdi)
 {
     std::cout << "INSIDE FACE-BASED TRACE" << std::endl;
     std::cout << ap << std::endl;
@@ -266,10 +267,14 @@ solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
 
     auto is_contact_vector = make_is_contact_vector(msh, bnd);
 
+    bool warning = (hdi.cell_degree() - 1 != hdi.face_degree())? true :false;
+    if (warning)    std::cout << magenta;
 
-    hho_degree_info      hdi(ap.degree + 1, ap.degree); //Also allow (degree + 1, degree)
     std::cout << " * cell degree :"<< hdi.cell_degree() << std::endl;
     std::cout << " * face degree :"<< hdi.face_degree() << std::endl;
+
+    if (warning)
+        std::cout << reset;
 
     auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
     auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
@@ -519,7 +524,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
 
     auto is_contact_vector = make_is_contact_vector(msh, bnd);
 
-    hho_degree_info      hdi(ap.degree +1, ap.degree); //Not allow (degree, degree)
+    hho_degree_info      hdi(ap.degree, ap.degree); //Not allow (degree, degree)
     std::cout << " * cell degree :"<< hdi.cell_degree() << std::endl;
     std::cout << " * face degree :"<< hdi.face_degree() << std::endl;
 
@@ -740,7 +745,8 @@ template<typename Mesh, typename Function, typename Analytical>
 dynamic_vector<typename Mesh::coordinate_type>
 solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun,
     const algorithm_parameters<typename Mesh::coordinate_type>& ap,
-    const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+    const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+    const hho_degree_info& hdi)
 {
     std::cout << "INSIDE CELL-BASED TRACE" << std::endl;
     std::cout << ap << std::endl;
@@ -751,9 +757,14 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
 
     auto is_contact_vector = make_is_contact_vector(msh, bnd);
 
-    hho_degree_info      hdi(ap.degree +1, ap.degree); //Not allow (degree, degree)
+    bool warning = (hdi.cell_degree() - 1 != hdi.face_degree())? true :false;
+    if (warning)    std::cout << red;
+
     std::cout << " * cell degree :"<< hdi.cell_degree() << std::endl;
     std::cout << " * face degree :"<< hdi.face_degree() << std::endl;
+
+    if (warning)
+        std::cout << reset;
 
     auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
     auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
@@ -779,6 +790,8 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
         auto cl_count = 0;
 
         auto res = 0.;
+
+        std::cout << " ** Before assembler" << std::endl;
 
         for (auto& cl : msh)
         {
@@ -829,19 +842,23 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
 
             cl_count++;
         }
+        std::cout << " ** After assembler" << std::endl;
 
         assembler.impose_neumann_boundary_conditions(msh, bnd);
         assembler.finalize();
+        std::cout << " ** After  neummann conditions" << std::endl;
 
         size_t systsz = assembler.LHS.rows();
         size_t nnz = assembler.LHS.nonZeros();
 
         dynamic_vector<T> dsol = dynamic_vector<T>::Zero(systsz);
 
+        std::cout << " ** Before solver" << std::endl;
         disk::solvers::pardiso_params<T> pparams;
         pparams.report_factorization_Mflops = false;
         mkl_pardiso(pparams, assembler.LHS, assembler.RHS, dsol);
-
+        std::cout << " ** After solver" << std::endl;
+        std::cout << " ** Before increment norm computations" << std::endl;
 
         T H1_increment  = 0.0 ;
         T L2_increment  = 0.0 ;
@@ -1111,7 +1128,7 @@ run_signorini_analytical(  const Mesh& msh, const algorithm_parameters<typename 
             break;
 
         default:
-            throw std::invalid_argument("Invalid solver");
+            throw std::invalid_argument("Invalid trace-type. Choose for face-based (f) or cell-based (l) trace versions.");
     }
 }
 
