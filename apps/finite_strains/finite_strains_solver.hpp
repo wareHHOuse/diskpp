@@ -68,8 +68,7 @@ class finite_strains_solver
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
     typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
-    // typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_hpp_type;
-    typedef disk::LinearIsotropicHardeningwithHyper<mesh_type> law_hpp_type;
+    typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_hpp_type;
     // typedef disk::IsotropicHardeningVMis<mesh_type> law_hpp_type;
     typedef disk::mechanics::LogarithmicStrain<law_hpp_type> law_type;
 
@@ -169,6 +168,12 @@ class finite_strains_solver
                     {
                         const auto stab_HDG = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
                         m_stab_precomputed.push_back(stab_HDG);
+                        break;
+                    }
+                    case DG:
+                    {
+                        const auto stab_DG = make_dg_vector_stabilization(m_msh, cl, m_hdi);
+                        m_stab_precomputed.push_back(stab_DG);
                         break;
                     }
                     case NO: { break;

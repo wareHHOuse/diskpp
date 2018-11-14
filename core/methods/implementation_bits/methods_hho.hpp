@@ -647,6 +647,7 @@ make_hho_divergence_reconstruction_stokes_rhs(const Mesh& msh, const typename Me
     return dr_rhs;
 }
 
+// we compute the stabilisation 1/h_F(uF-pi^k_F(uT), vF-pi^k_F(vT))_F
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
 make_hdg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
@@ -683,7 +684,7 @@ make_hdg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
 
         oper.block(0, cbs + i  * fbs, fbs, fbs) = -If;
 
-        const auto qps = integrate(msh, fc, facdeg + celdeg);
+        const auto qps = integrate(msh, fc, facdeg + std::max(celdeg,facdeg));
         for (auto& qp : qps)
         {
             const auto c_phi = cb.eval_functions(qp.point());
@@ -707,16 +708,86 @@ make_hdg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
     return data;
 }
 
-template<typename T, int M, int N>
-T estimate_conditioning(const Matrix<T,M,N>& m)
+// we compute the stabilisation 1/h_F(uF-uT, vF-vT)_F
+template<typename Mesh>
+Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+make_dg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
-    Eigen::JacobiSVD< Matrix<T,M,N> > svd(m);
-    T sigma_max = svd.singularValues()(0);
-    T sigma_min = svd.singularValues()(svd.singularValues().size()-1);
-    T cond =  sigma_max / sigma_min;
-    return cond;
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
+
+    const auto celdeg = di.cell_degree();
+    const auto facdeg = di.face_degree();
+
+    const auto cbs = scalar_basis_size(celdeg, Mesh::dimension);
+    const auto fbs = scalar_basis_size(facdeg, Mesh::dimension - 1);
+
+    const auto num_faces  = howmany_faces(msh, cl);
+    const auto total_dofs = cbs + num_faces * fbs;
+
+    matrix_type data = matrix_type::Zero(total_dofs, total_dofs);
+
+    auto cb = make_scalar_monomial_basis(msh, cl, celdeg);
+
+    const auto fcs = faces(msh, cl);
+
+    for (size_t i = 0; i < num_faces; i++)
+    {
+        const auto fc = fcs[i];
+        const auto hf = diameter(msh, fc);
+        auto       fb = make_scalar_monomial_basis(msh, fc, facdeg);
+
+        matrix_type mass_F = matrix_type::Zero(fbs, fbs);
+        matrix_type mass_T = matrix_type::Zero(cbs, cbs);
+        matrix_type trace  = matrix_type::Zero(fbs, cbs);
+
+        const auto qps = integrate(msh, fc, facdeg + std::max(celdeg, facdeg));
+        for (auto& qp : qps)
+        {
+            const auto c_phi = cb.eval_functions(qp.point());
+            const auto f_phi = fb.eval_functions(qp.point());
+
+            assert(c_phi.rows() == cbs);
+            assert(f_phi.rows() == fbs);
+            assert(c_phi.cols() == f_phi.cols());
+
+            mass_F += qp.weight() * f_phi * f_phi.transpose();
+            trace += qp.weight() * f_phi * c_phi.transpose();
+        }
+
+        const auto qps2 = integrate(msh, fc, 2 * celdeg);
+        for (auto& qp : qps2)
+        {
+            const auto c_phi = cb.eval_functions(qp.point());
+
+            assert(c_phi.rows() == cbs);
+
+            mass_T += qp.weight() * c_phi * c_phi.transpose();
+        }
+
+        const auto offset = cbs + i * fbs;
+
+        data.block(0, 0, cbs, cbs) += mass_T / hf;
+        data.block(offset, offset, fbs, fbs) += mass_F / hf;
+        data.block(0, offset, cbs, fbs) -= trace.transpose() / hf;
+        data.block(offset, 0, fbs, cbs) -= trace / hf;
+    }
+
+    return data;
 }
 
+template<typename T, int M, int N>
+T
+estimate_conditioning(const Matrix<T, M, N>& m)
+{
+    Eigen::JacobiSVD<Matrix<T, M, N>> svd(m);
+
+    T sigma_max = svd.singularValues()(0);
+    T sigma_min = svd.singularValues()(svd.singularValues().size() - 1);
+    T cond      = sigma_max / sigma_min;
+    return cond;
+}
 
 template<typename Mesh, typename T>
 auto
@@ -4204,6 +4275,15 @@ make_hdg_vector_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
     const auto hdg_scalar_stab = make_hdg_scalar_stabilization(msh, cl, di);
 
     return priv::compute_lhs_vector(msh, cl, di, hdg_scalar_stab);
+}
+
+template<typename Mesh>
+Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+make_dg_vector_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+{
+    const auto dg_scalar_stab = make_dg_scalar_stabilization(msh, cl, di);
+
+    return priv::compute_lhs_vector(msh, cl, di, dg_scalar_stab);
 }
 
 // doesn't work for symmetric gradient

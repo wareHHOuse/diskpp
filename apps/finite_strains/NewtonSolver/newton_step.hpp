@@ -235,6 +235,18 @@ class NewtonRaphson_step_finite_strains
                             rhs -= m_rp.m_beta * stab_HDG * m_solution_data.at(cell_i);
                             break;
                         }
+                        case DG:
+                        {
+                            const auto stab_DG = make_dg_vector_stabilization(m_msh, cl, m_hdi);
+                            assert(elem.K_int.rows() == stab_DG.rows());
+                            assert(elem.K_int.cols() == stab_DG.cols());
+                            assert(elem.RTF.rows() == stab_DG.rows());
+                            assert(elem.RTF.cols() == m_solution_data.at(cell_i).cols());
+
+                            lhs += m_rp.m_beta * stab_DG;
+                            rhs -= m_rp.m_beta * stab_DG * m_solution_data.at(cell_i);
+                            break;
+                        }
                         case NO: { break;
                         }
                         default: throw std::invalid_argument("Unknown stabilization");

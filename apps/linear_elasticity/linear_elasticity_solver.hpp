@@ -195,8 +195,7 @@ class linear_elasticity_solver
             matrix_dynamic stab;
             if (m_hdi.cell_degree() == (m_hdi.face_degree() + 1))
             {
-                //stab = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
-                stab = make_hho_vector_stabilization(m_msh, cl, sgr.first, m_hdi);
+                stab = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
             }
             else
             {

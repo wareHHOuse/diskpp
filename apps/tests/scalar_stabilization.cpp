@@ -30,6 +30,7 @@
 
 #include <unistd.h>
 
+#include "contrib/colormanip.h"
 #include <xmmintrin.h>
 
 #include "bases/bases.hpp"
@@ -41,7 +42,7 @@
 #include "common.hpp"
 
 template<typename Mesh>
-struct test_functor
+struct test_functor_hho
 {
     /* Expect k+1 convergence (hho stabilization) */
     typename Mesh::coordinate_type
@@ -63,7 +64,6 @@ struct test_functor
         {
             auto gr = disk::make_hho_scalar_laplacian(msh, cl, hdi);
             auto stab = disk::make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
-            //auto stab = disk::make_hdg_scalar_stabilization(msh, cl, hdi);
 
             Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
 
@@ -80,9 +80,92 @@ struct test_functor
     }
 };
 
+template<typename Mesh>
+struct test_functor_hdg
+{
+    /* Expect k+1 convergence (hdg stabilization) */
+    typename Mesh::coordinate_type
+    operator()(const Mesh& msh, size_t degree) const
+    {
+        typedef Mesh                                mesh_type;
+        typedef typename mesh_type::cell            cell_type;
+        typedef typename mesh_type::face            face_type;
+        typedef typename mesh_type::coordinate_type scalar_type;
+        typedef typename mesh_type::point_type      point_type;
+
+        auto f = make_scalar_testing_data(msh);
+
+        typename disk::hho_degree_info hdi(degree+1, degree);
+
+        scalar_type error = 0.0;
+        for (auto& cl : msh)
+        {
+            auto stab = disk::make_hdg_scalar_stabilization(msh, cl, hdi);
+
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
+
+            error += proj.dot(stab * proj);
+        }
+
+        return std::sqrt(error);
+    }
+
+    size_t
+    expected_rate(size_t k)
+    {
+        return k+1;
+    }
+};
+
+template<typename Mesh>
+struct test_functor_dg
+{
+    /* Expect k convergence (dg stabilization) */
+    typename Mesh::coordinate_type
+    operator()(const Mesh& msh, size_t degree) const
+    {
+        typedef Mesh                                mesh_type;
+        typedef typename mesh_type::cell            cell_type;
+        typedef typename mesh_type::face            face_type;
+        typedef typename mesh_type::coordinate_type scalar_type;
+        typedef typename mesh_type::point_type      point_type;
+
+        auto f = make_scalar_testing_data(msh);
+
+        typename disk::hho_degree_info hdi(degree);
+
+        scalar_type error = 0.0;
+        for (auto& cl : msh)
+        {
+            auto stab = disk::make_dg_scalar_stabilization(msh, cl, hdi);
+
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
+
+            error += proj.dot(stab * proj);
+        }
+
+        return std::sqrt(error);
+    }
+
+    size_t
+    expected_rate(size_t k)
+    {
+        return k;
+    }
+};
+
 int main(void)
 {
-    tester<test_functor> tstr;
-    tstr.run();
+    std::cout << red << "Test HHO-stabilization operator" << std::endl;
+    tester<test_functor_hho> tstr_hho;
+    tstr_hho.run();
+
+    std::cout << red << "Test HDG-stabilization operator" << std::endl;
+    tester<test_functor_hdg> tstr_hdg;
+    tstr_hdg.run();
+
+    std::cout << red << "Test dG-stabilization operator" << std::endl;
+    tester<test_functor_dg> tstr_dg;
+    tstr_dg.run();
     return 0;
 }

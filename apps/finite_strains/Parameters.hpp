@@ -35,7 +35,8 @@ enum StabilizationType : int
 {
     HDG = 0,
     HHO = 1,
-    NO  = 2
+    NO  = 2,
+    DG  = 3
 };
 
 template<typename T>
@@ -184,6 +185,8 @@ class ParamRun
                     m_stab_type = HDG;
                 else if (type == "HHO")
                     m_stab_type = HHO;
+                else if (type == "DG")
+                    m_stab_type = DG;
                 else if (type == "NO")
                     m_stab_type = NO;
             }
