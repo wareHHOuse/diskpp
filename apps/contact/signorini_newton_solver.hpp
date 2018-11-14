@@ -851,9 +851,12 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
         dynamic_vector<T> dsol = dynamic_vector<T>::Zero(systsz);
 
         std::cout << " ** Before solver" << std::endl;
-        disk::solvers::pardiso_params<T> pparams;
-        pparams.report_factorization_Mflops = false;
-        mkl_pardiso(pparams, assembler.LHS, assembler.RHS, dsol);
+        //disk::solvers::pardiso_params<T> pparams;
+        //pparams.report_factorization_Mflops = false;
+        //mkl_pardiso(pparams, assembler.LHS, assembler.RHS, dsol);
+        disk::solvers::conjugated_gradient_params<T> cgparams;
+        conjugated_gradient(cgparams, assembler.LHS, assembler.RHS, dsol);
+
         std::cout << " ** After solver" << std::endl;
         std::cout << " ** Before increment norm computations" << std::endl;
 

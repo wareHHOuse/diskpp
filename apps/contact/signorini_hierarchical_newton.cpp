@@ -780,7 +780,7 @@ public:
 
                 Eigen::Matrix<T,1,2> ref_grad = Eigen::Matrix<T,1,2>::Zero();
                 for (size_t i = 1; i < ref_cb.size(); i++)
-                    ref_grad += rec_sol(i-1) * ref_dphi.block(i,0,1,2);
+                    ref_grad += rec_ref(i-1) * ref_dphi.block(i,0,1,2);
 
                 //1.3. H1-error
                 Eigen::Matrix<T,1,2> diff = hho_grad - ref_grad;
@@ -815,7 +815,7 @@ public:
 
                 Eigen::Matrix<T,1,2> ref_grad = Eigen::Matrix<T,1,2>::Zero();
                 for (size_t i = 1; i < ref_cb.size(); i++)
-                    ref_grad += rec_sol(i-1) * ref_dphi.block(i,0,1,2);
+                    ref_grad += rec_ref(i-1) * ref_dphi.block(i,0,1,2);
 
                 hho_grad_x.push_back( hho_grad(0) );
                 hho_grad_y.push_back( hho_grad(1) );

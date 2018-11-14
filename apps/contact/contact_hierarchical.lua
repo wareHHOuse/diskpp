@@ -1,12 +1,12 @@
-config.degree_cell = 1
-config.degree_face = 0
+config.degree_cell = 3
+config.degree_face = 2
 config.ref_degree_cell = 3
 config.ref_degree_face = 2
 
 config.input_mesh = "../../../diskpp/meshes/2D_triangles/netgen/square_tri1.mesh2d"
 config.visit_output = "eigs_hho.silo"
 config.eigval_output = "eigs_hho.txt"
-config.compute_reference = true -- Run computations for reference solution and save it; otherwise it is read it
+config.compute_reference = false -- Run computations for reference solution and save it; otherwise it is read it
 
 hs.levels = 6
 hs.sol_level_min = 0
