@@ -233,6 +233,14 @@ class hierarchical_contact_solver
 
         disk::mechanics::BoundaryConditionsScalar<mesh_type> bnd(msh);
 
+        /*--------------------------------------------------------------------------
+        *  Check boundary labels for the unitary square domain
+        *          Netgen     _____          Medit     _____
+        *                4   |     | 2                |     |
+        *                    |_____|                  |_____|
+        *                       3                        2
+        *-------------------------------------------------------------------------*/
+
         bnd.addDirichletBC(disk::mechanics::DIRICHLET,1, zero_fun); //TOP
         bnd.addNeumannBC(disk::mechanics::NEUMANN, 2,zero_fun); //
         bnd.addNeumannBC(disk::mechanics::NEUMANN, 4,zero_fun); //

@@ -1,7 +1,7 @@
 config.degree_cell = 1
 config.degree_face = 0
-config.ref_degree_cell = 2
-config.ref_degree_face = 1
+config.ref_degree_cell = 3
+config.ref_degree_face = 2
 
 config.input_mesh = "../../../diskpp/meshes/2D_triangles/netgen/square_tri1.mesh2d"
 config.visit_output = "eigs_hho.silo"

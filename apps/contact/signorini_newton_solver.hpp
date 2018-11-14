@@ -521,7 +521,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
 
     auto is_contact_vector = make_is_contact_vector(msh, bnd);
 
-    hho_degree_info      hdi(ap.degree, ap.degree); //Not allow (degree, degree)
+    hho_degree_info      hdi(ap.degree +1, ap.degree); //Not allow (degree, degree)
     std::cout << " * cell degree :"<< hdi.cell_degree() << std::endl;
     std::cout << " * face degree :"<< hdi.face_degree() << std::endl;
 
@@ -1092,7 +1092,7 @@ run_signorini_analytical(  const Mesh& msh, const algorithm_parameters<typename 
         T radio = std::sqrt(p.x()*p.x() + p.y()*p.y());
         T theta = myatan(p); //realmod(atan2(p.y(), p.x()), (2 * M_PI)); //myatan(p));
 
-        return  -std::pow(radio, 3.5) * std::sin(3.5 *theta);
+        return  -std::pow(radio, 5.5) * std::sin(5.5 *theta);
     };
 
     typedef disk::mechanics::BoundaryConditionsScalar<Mesh> boundary_type;
