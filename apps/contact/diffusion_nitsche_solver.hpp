@@ -24,7 +24,7 @@
 */
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
-#include "revolution/methods/hho"
+#include "methods/hho"
 #include "solvers/solver.hpp"
  #include "common.hpp"
 /***************************************************************************/
@@ -36,7 +36,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct rhs_functor< Mesh<T, 2, Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -67,7 +67,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct solution_functor< Mesh<T, 2, Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -83,6 +83,7 @@ struct solution_functor< Mesh<T, 2, Storage> >
     }
 };
 
+using namespace disk;
 
 template<typename Mesh>
 auto make_solution_function(const Mesh& msh)
@@ -90,15 +91,12 @@ auto make_solution_function(const Mesh& msh)
     return solution_functor<Mesh>();
 }
 
-using namespace revolution;
-
-
 template<typename Mesh>
 auto
 run_hho_diffusion_nitsche_faces(const Mesh& msh,
-    const algorithm_parameters<typename Mesh::scalar_type>& ap)
+    const algorithm_parameters<typename Mesh::coordinate_type>& ap)
 {
-    using T =  typename Mesh::scalar_type;
+    using T =  typename Mesh::coordinate_type;
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
     using vector_type = Matrix<T, Dynamic, 1>;
 
@@ -251,11 +249,11 @@ run_hho_diffusion_nitsche_faces(const Mesh& msh,
 template<typename Mesh>
 auto
 run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
-    const algorithm_parameters<typename Mesh::scalar_type>& ap,
+    const algorithm_parameters<typename Mesh::coordinate_type>& ap,
     const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
-    const typename Mesh::scalar_type& eta)
+    const typename Mesh::coordinate_type& eta)
 {
-    using T =  typename Mesh::scalar_type;
+    using T =  typename Mesh::coordinate_type;
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
     using vector_type = Matrix<T, Dynamic, 1>;
 
@@ -506,7 +504,7 @@ run_diffusion_solver(const Mesh& msh, const algorithm_parameters<T>& ap,
     switch (ap.solver)
     {
         case EVAL_ON_FACES:
-            error = run_hho_diffusion_nitsche_faces(msh,  ap); // Just for test 1. 
+            error = run_hho_diffusion_nitsche_faces(msh,  ap); // Just for test 1.
             break;
         case EVAL_IN_CELLS_FULL:
             error = run_hho_diffusion_nitsche_cells_full(msh, ap, bnd, eta);

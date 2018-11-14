@@ -28,9 +28,7 @@
 
  #include <unistd.h>
 
- #include "revolution/bases"
- #include "revolution/quadratures"
- #include "revolution/methods/hho"
+ #include "methods/hho"
 
  #include "core/loaders/loader.hpp"
 
@@ -41,7 +39,7 @@
 template<typename Mesh>
 class hho_newton_solver
 {
-    using T = typename Mesh::scalar_type;
+    using T = typename Mesh::coordinate_type;
 
     typedef Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>    matrix_type;
     typedef Eigen::Matrix<T, Eigen::Dynamic, 1>                 vector_type;
@@ -82,11 +80,11 @@ public:
             {
                 auto cell_ofs = offset_vector.at(cl_count);
                 auto num_total_dofs  = cbs + howmany_faces(msh, cl) * fbs;
-                vector_type  u_full  = take_velocity(msh, cl, full_offset, full_sol);
-                
-                auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-                auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-                auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+                vector_type  u_full  = assembler.take_velocity(msh, cl, full_offset, full_sol);
+
+                auto cb     = disk::make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+                auto gr     = disk::make_hho_scalar_laplacian(msh, cl, hdi);
+                auto stab   = disk::make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
 
                 vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
                 matrix_type Ah  = gr.second + stab;

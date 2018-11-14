@@ -77,7 +77,7 @@ struct test_functor
             Matrix<scalar_type, Dynamic, 1> exp_reconstr = mass.llt().solve(rhs);
 
             auto quad_degree = 2 * std::max(hdi.cell_degree(), hdi.reconstruction_degree());
-            auto qps = revolution::integrate(msh, cl, quad_degree);
+            auto qps = disk::integrate(msh, cl, quad_degree);
 
             Matrix<scalar_type, Dynamic, Dynamic> stiffness = disk::make_stiffness_matrix(msh, cl, cb);
 
@@ -129,7 +129,7 @@ template<typename Mesh>
 std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
              Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
 make_hho_nitshce_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
-                          const revolution::hho_degree_info& di,
+                          const disk::hho_degree_info& di,
                           const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
 {
     using T = typename Mesh::coordinate_type;
@@ -143,11 +143,11 @@ make_hho_nitshce_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_typ
     const auto celdeg = di.cell_degree();
     const auto facdeg = di.face_degree();
 
-    auto cb = revolution::make_scalar_monomial_basis(msh, cl, recdeg);
+    auto cb = disk::make_scalar_monomial_basis(msh, cl, recdeg);
 
-    const auto rbs = revolution::scalar_basis_size(recdeg, Mesh::dimension);
-    const auto cbs = revolution::scalar_basis_size(celdeg, Mesh::dimension);
-    const auto fbs = revolution::scalar_basis_size(facdeg, Mesh::dimension-1);
+    const auto rbs = disk::scalar_basis_size(recdeg, Mesh::dimension);
+    const auto cbs = disk::scalar_basis_size(celdeg, Mesh::dimension);
+    const auto fbs = disk::scalar_basis_size(facdeg, Mesh::dimension-1);
 
     const auto num_faces = howmany_faces(msh, cl);
 
@@ -155,7 +155,7 @@ make_hho_nitshce_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_typ
     matrix_type gr_lhs = matrix_type::Zero(rbs-1, rbs-1);
     matrix_type gr_rhs = matrix_type::Zero(rbs-1, cbs + num_faces*fbs);
 
-    auto qps = revolution::integrate(msh, cl, 2 * (recdeg-1));
+    auto qps = disk::integrate(msh, cl, 2 * (recdeg-1));
     for (auto& qp : qps)
     {
         const auto dphi = cb.eval_gradients(qp.point());
@@ -178,10 +178,10 @@ make_hho_nitshce_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_typ
             continue;
 
         const auto n  = normal(msh, cl, fc);
-        auto fb = revolution::make_scalar_monomial_basis(msh, fc, facdeg);
+        auto fb = disk::make_scalar_monomial_basis(msh, fc, facdeg);
 
         size_t quad_degree = std::max(recdeg - 1 + std::max(facdeg,celdeg), size_t(0));
-        auto qps_f = revolution::integrate(msh, fc, quad_degree);
+        auto qps_f = disk::integrate(msh, fc, quad_degree);
         for (auto& qp : qps_f)
         {
             vector_type     c_phi_tmp = cb.eval_functions(qp.point());
@@ -218,7 +218,7 @@ struct test_functor_contact
 
         auto f = make_scalar_testing_data(msh);
 
-        typename revolution::hho_degree_info hdi(degree);
+        typename disk::hho_degree_info hdi(degree);
 
         scalar_type error = 0.0;
 
@@ -232,20 +232,20 @@ struct test_functor_contact
         {
             if(has_boundary_vector.at(cl_count) == 1)
             {
-                Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, hdi, f);
+                Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f);
                 auto gr = make_hho_nitshce_scalar_laplacian(msh, cl, hdi, bnd);
 
-                size_t rec_size = revolution::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
+                size_t rec_size = disk::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
 
                 Matrix<scalar_type, Dynamic, 1> reconstr = Matrix<scalar_type, Dynamic, 1>::Zero(rec_size);
                 reconstr.tail(rec_size-1) = gr.first * proj;
                 reconstr(0) = proj(0);
 
-                auto cb = revolution::make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
-                Matrix<scalar_type, Dynamic, Dynamic> mass = revolution::make_mass_matrix(msh, cl, cb);
+                auto cb = disk::make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+                Matrix<scalar_type, Dynamic, Dynamic> mass = disk::make_mass_matrix(msh, cl, cb);
 
                 auto quad_degree = 2 * std::max(hdi.cell_degree(), hdi.reconstruction_degree());
-                auto qps = revolution::integrate(msh, cl, quad_degree);
+                auto qps = disk::integrate(msh, cl, quad_degree);
 
                 for(auto& qp : qps)
                 {
@@ -258,20 +258,20 @@ struct test_functor_contact
             }
             else
             {
-                Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, hdi, f);
-                auto gr = revolution::make_hho_scalar_laplacian(msh, cl, hdi);
+                Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f);
+                auto gr = disk::make_hho_scalar_laplacian(msh, cl, hdi);
 
-                size_t rec_size = revolution::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
+                size_t rec_size = disk::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
 
                 Matrix<scalar_type, Dynamic, 1> reconstr = Matrix<scalar_type, Dynamic, 1>::Zero(rec_size);
                 reconstr.tail(rec_size-1) = gr.first * proj;
                 reconstr(0) = proj(0);
 
-                auto cb = revolution::make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
-                Matrix<scalar_type, Dynamic, Dynamic> mass = revolution::make_mass_matrix(msh, cl, cb);
+                auto cb = disk::make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+                Matrix<scalar_type, Dynamic, Dynamic> mass = disk::make_mass_matrix(msh, cl, cb);
 
                 auto quad_degree = 2 * std::max(hdi.cell_degree(), hdi.reconstruction_degree());
-                auto qps = revolution::integrate(msh, cl, quad_degree);
+                auto qps = disk::integrate(msh, cl, quad_degree);
 
                 for(auto& qp : qps)
                 {

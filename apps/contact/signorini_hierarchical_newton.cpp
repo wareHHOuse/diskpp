@@ -415,7 +415,7 @@ class hierarchical_contact_solver
     auto
     hho_newton_solver(const mesh_type& ref_msh)
     {
-        using namespace revolution;
+        using namespace disk;
 
         std::cout << green << "*  HHO-REFERENCE  *" << reset << std::endl;
         std::cout << "* Mesh size: " << average_diameter(ref_msh) << std::endl;

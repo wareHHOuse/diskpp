@@ -55,10 +55,10 @@ template<typename MeshType, typename LoaderType>
 bool
 verify_convergence(const std::vector<std::string>& paths,
                    size_t mindeg, size_t maxdeg,
-                    algorithm_parameters<typename MeshType::scalar_type>& ap,
-                    const typename MeshType::scalar_type& eta)
+                    algorithm_parameters<typename MeshType::coordinate_type>& ap,
+                    const typename MeshType::coordinate_type& eta)
 {
-    typedef typename MeshType::scalar_type scalar_type;
+    typedef typename MeshType::coordinate_type scalar_type;
     typedef std::tuple<scalar_type, scalar_type, scalar_type> tuple_type;
 
     bool success = true;

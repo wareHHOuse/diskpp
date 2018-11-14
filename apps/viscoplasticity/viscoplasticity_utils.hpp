@@ -33,7 +33,7 @@
  #include "quadratures/quadratures.hpp"
  #include "methods/hho"
 
- using namespace revolution;
+ using namespace disk;
 
  template<typename Mesh>
  class tensors_at_quad_pts_utils

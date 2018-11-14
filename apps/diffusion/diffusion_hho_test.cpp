@@ -39,7 +39,7 @@
 
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
-#include "revolution/methods/hho"
+#include "methods/hho"
 #include "solvers/solver.hpp"
 
 /***************************************************************************/
@@ -51,7 +51,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct rhs_functor< Mesh<T, 2, Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -66,7 +66,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct rhs_functor< Mesh<T, 3, Storage> >
 {
     typedef Mesh<T,3,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -93,7 +93,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct solution_functor< Mesh<T, 2, Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -108,7 +108,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct solution_functor< Mesh<T, 3, Storage> >
 {
     typedef Mesh<T,3,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -126,13 +126,13 @@ auto make_solution_function(const Mesh& msh)
     return solution_functor<Mesh>();
 }
 
-using namespace revolution;
+using namespace disk;
 
 template<typename Mesh>
 auto
 run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
 {
-    using T = typename Mesh::scalar_type;
+    using T = typename Mesh::coordinate_type;
 
     hho_degree_info hdi(degree);
 
@@ -227,13 +227,13 @@ bool
 verify_convergence(const std::vector<std::string>& paths,
                    size_t mindeg, size_t maxdeg)
 {
-    typedef typename MeshType::scalar_type scalar_type;
+    typedef typename MeshType::coordinate_type scalar_type;
 
-    auto f = [](const point<typename MeshType::scalar_type, MeshType::dimension>& p) -> auto {
+    auto f = [](const point<typename MeshType::coordinate_type, MeshType::dimension>& p) -> auto {
         return 2.0 * M_PI * M_PI * sin(p.x() * M_PI) * sin(p.y() * M_PI);
     };
 
-    auto sf = [](const point<typename MeshType::scalar_type, MeshType::dimension>& p) -> auto {
+    auto sf = [](const point<typename MeshType::coordinate_type, MeshType::dimension>& p) -> auto {
         return sin(p.x() * M_PI) * sin(p.y() * M_PI);
     };
 

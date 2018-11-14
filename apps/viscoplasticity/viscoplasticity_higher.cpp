@@ -30,9 +30,8 @@
 
 #include <unistd.h>
 
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
+
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 

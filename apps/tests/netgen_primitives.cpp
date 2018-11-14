@@ -53,7 +53,7 @@ void x(const Mesh& msh)
 {
     using R = rational<int>;
     using P = point<R,2>;
-    
+
     std::vector<P> mp;
     mp.resize(14);
     mp[0]  = P( R(0,10), R(0,10) );
@@ -70,20 +70,20 @@ void x(const Mesh& msh)
     mp[11] = P( R(2,10), R(10,10) );
     mp[12] = P( R(4,10), R(10,10) );
     mp[13] = P( R(6,10), R(10,10) );
-    
+
     for (auto& cl : msh)
     {
         auto ptids = cl.point_ids();
-        
+
         auto rbar = barycenter(mp, ptids[0], ptids[1], ptids[2]);
         auto rmeas = area(mp, ptids[0], ptids[1], ptids[2]);
-        
+
         auto bar = barycenter(msh, cl);
         auto meas = measure(msh, cl);
-        
+
         double ULP_max = 1;
         bool success = true;
-        
+
         if ( !almost_equal(bar.x(), double(rbar.x()), ULP_max) )
         {
             std::cout << "  pt.x() not accurate: ";
@@ -91,7 +91,7 @@ void x(const Mesh& msh)
             std::cout << rbar.x() << std::endl;
             success = false;
         }
-        
+
         if ( !almost_equal(bar.y(), double(rbar.y()), ULP_max) )
         {
             std::cout << "  pt.y() not accurate: ";
@@ -108,7 +108,7 @@ test(const Mesh& msh)
 {
     using R          = typename Mesh::coordinate_type;
     using point_type = typename Mesh::point_type;
-    
+
     R tot_meas = R(0);
     point_type tot_bar( R(0), R(0) );
     for (auto& cl : msh)
@@ -126,7 +126,7 @@ void
 add_triangle(Mesh& msh, size_t p0, size_t p1, size_t p2)
 {
     auto storage = msh.backend_storage();
-    
+
     using triangle = typename Mesh::surface_type;
     using edge = typename Mesh::edge_type;
     point_identifier<2> pi0(p0);
@@ -143,7 +143,7 @@ void
 create_geometry(Mesh& msh)
 {
     auto storage = msh.backend_storage();
-    
+
     add_triangle(msh,0,1,3);
     add_triangle(msh,0,2,3);
     add_triangle(msh,1,3,4);
@@ -154,19 +154,19 @@ create_geometry(Mesh& msh)
     add_triangle(msh,3,7,8);
     add_triangle(msh,3,8,9);
     add_triangle(msh,3,9,10);
-    
+
     disk::priv::sort_uniq(storage->edges);
     disk::priv::sort_uniq(storage->surfaces);
-    
+
     std::vector<typename Mesh::edge_type> boundary_edges;
-    
+
     auto add_bedge = [&](size_t p0, size_t p1) -> void {
         using edge = typename Mesh::edge_type;
         point_identifier<2> pi0(p0);
         point_identifier<2> pi1(p1);
         boundary_edges.push_back( edge({pi0, pi1}) );
     };
-    
+
     storage->boundary_info.resize( storage->edges.size() );
     for (auto& be : boundary_edges)
     {
@@ -198,34 +198,34 @@ compute_errors(disk::silo_database& silo, const std::string& prefix,
                const RMesh& rmsh, const FMesh& fmsh)
 {
     using T = typename FMesh::coordinate_type;
-    
+
     std::string meshname = prefix + "_mesh";
-    
+
     silo.add_mesh(rmsh, meshname.c_str());
-    
+
     assert( rmsh.cells_size() == fmsh.cells_size() );
-    
+
     std::vector<T> meas_err, bar_x_err, bar_y_err;
     for (size_t i = 0; i < rmsh.cells_size(); i++)
     {
         auto rcl = *std::next(rmsh.cells_begin(), i);
         auto fcl = *std::next(fmsh.cells_begin(), i);
-        
+
         auto rmeas = measure(rmsh, rcl);
         auto fmeas = measure(fmsh, fcl);
-        
+
         auto rbar = barycenter(rmsh, rcl);
         auto fbar = barycenter(fmsh, fcl);
-        
+
         meas_err.push_back( std::abs(fmeas - T(rmeas)) );
         bar_x_err.push_back( std::abs(fbar.x() - T(rbar.x())) );
         bar_y_err.push_back( std::abs(fbar.y() - T(rbar.y())) );
     }
-    
+
     disk::silo_zonal_variable<T> me(prefix + "_meas_err", meas_err);
     disk::silo_zonal_variable<T> bxe(prefix + "_bar_x_err", bar_x_err);
     disk::silo_zonal_variable<T> bye(prefix + "_bar_y_err", bar_y_err);
-    
+
     silo.add_variable(meshname.c_str(), me);
     silo.add_variable(meshname.c_str(), bxe);
     silo.add_variable(meshname.c_str(), bye);
@@ -233,16 +233,18 @@ compute_errors(disk::silo_database& silo, const std::string& prefix,
 
 int main(void)
 {
+    _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+    
     using T             = double;
     using R             = rational<int64_t>;
     using fmesh_type    = disk::simplicial_mesh<T, 2>;
     using rmesh_type    = disk::simplicial_mesh<R, 2>;
     using fpoint_type   = typename fmesh_type::point_type;
     using rpoint_type   = typename rmesh_type::point_type;
-    
+
     int64_t bnum = 74;
     int64_t bden = 100;
-    
+
     std::vector<rpoint_type>    rmesh_points;
     rmesh_points.push_back( rpoint_type(R(0), R(0)) );
     rmesh_points.push_back( rpoint_type(R(1), R(0)) );
@@ -255,41 +257,41 @@ int main(void)
     rmesh_points.push_back( rpoint_type( R(3,10), R(1) ) );
     rmesh_points.push_back( rpoint_type( R(1,2), R(1) ) );
     rmesh_points.push_back( rpoint_type(R(1), R(1)) );
-    
+
     auto transform_point = [](const rpoint_type& rpt) -> fpoint_type {
         auto x = typename fpoint_type::value_type(rpt.x());
         auto y = typename fpoint_type::value_type(rpt.y());
         return fpoint_type( x, y );
     };
-    
+
     std::vector<fpoint_type>    fmesh_points;
     fmesh_points.resize( rmesh_points.size() );
     std::transform( rmesh_points.begin(), rmesh_points.end(), fmesh_points.begin(), transform_point );
-    
+
     fmesh_type fmsh;
     rmesh_type rmsh;
-    
+
     add_points(fmsh, fmesh_points);
     add_points(rmsh, rmesh_points);
-    
+
     create_geometry(fmsh);
     create_geometry(rmsh);
-    
+
     test(rmsh);
     test(fmsh);
-    
+
     disk::silo_database silo;
     silo.create("netgen_primitives.silo");
-    
+
     compute_errors(silo, "level_0", rmsh, fmsh);
-    
+
     size_t mesh_levels = 6; /* Don't push too far with rational<> */
     disk::mesh_hierarchy<R> rhier;
     rhier.build_hierarchy(rmsh, mesh_levels);
-    
+
     disk::mesh_hierarchy<T> fhier;
     fhier.build_hierarchy(fmsh, mesh_levels);
-    
+
     for(size_t i = 0; i < mesh_levels; i++)
     {
         std::stringstream ss;
@@ -300,6 +302,6 @@ int main(void)
     }
 
     silo.close();
-    
+
     return 0;
 }

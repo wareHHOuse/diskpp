@@ -1224,7 +1224,7 @@ make_hho_heaviside_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
             auto cb  = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
             auto n = normal(msh, cl, fc);
             matrix_type stiff_n = matrix_type::Zero(rbs -1, rbs -1);
-            matrix_type mm  = revolution::make_mass_matrix(msh, fc, cb);
+            matrix_type mm  = disk::make_mass_matrix(msh, fc, cb);
 
             auto qps = integrate(msh, fc, 2 * recdeg);
             for (auto& qp : qps)
@@ -2600,7 +2600,7 @@ public:
     {
         auto num_faces = howmany_faces(msh, cl);
         auto dim = Mesh::dimension;
-        auto cell_ofs = revolution::priv::offset(msh, cl);
+        auto cell_ofs = disk::priv::offset(msh, cl);
 
         Matrix<T, Dynamic, 1> svel(cbs + num_faces * fbs );
         svel.block(0, 0, cbs, 1) = sol.block(cell_ofs * cbs, 0, cbs, 1);
@@ -2614,7 +2614,7 @@ public:
 
             if (m_bnd.is_dirichlet_face( face_id))
             {
-                auto fb = revolution::make_scalar_monomial_basis(msh, fc, di.face_degree());
+                auto fb = disk::make_scalar_monomial_basis(msh, fc, di.face_degree());
                 Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 auto velocity = m_bnd.dirichlet_boundary_func(face_id);
                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, velocity, di.face_degree());
@@ -2920,7 +2920,7 @@ public:
     {
         auto num_faces = howmany_faces(msh, cl);
         auto dim = Mesh::dimension;
-        auto cell_ofs = revolution::priv::offset(msh, cl);
+        auto cell_ofs = disk::priv::offset(msh, cl);
 
         Matrix<T, Dynamic, 1> svel(cbs + num_faces * fbs );
         svel.block(0, 0, cbs, 1) = sol.block(cell_ofs * cbs, 0, cbs, 1);
@@ -2934,7 +2934,7 @@ public:
 
             if (m_bnd.is_dirichlet_face( face_id))
             {
-                auto fb = revolution::make_scalar_monomial_basis(msh, fc, di.face_degree());
+                auto fb = disk::make_scalar_monomial_basis(msh, fc, di.face_degree());
                 Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 auto velocity = m_bnd.dirichlet_boundary_func(face_id);
                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, velocity, di.face_degree());
@@ -3241,7 +3241,7 @@ public:
     {
         auto num_faces = howmany_faces(msh, cl);
         auto dim = Mesh::dimension;
-        auto cell_ofs = revolution::priv::offset(msh, cl);
+        auto cell_ofs = disk::priv::offset(msh, cl);
         auto num_total_dofs  = cbs + num_faces * fbs;
         Matrix<T, Dynamic, 1> svel = Matrix<T, Dynamic, 1>::Zero(num_total_dofs);
         svel.block(0, 0, cbs, 1) = sol.block(cell_ofs * cbs, 0, cbs, 1);
@@ -3258,7 +3258,7 @@ public:
 
             if (dirichlet)
             {
-                auto fb = revolution::make_scalar_monomial_basis(msh, fc, di.face_degree());
+                auto fb = disk::make_scalar_monomial_basis(msh, fc, di.face_degree());
                 Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 auto velocity = m_bnd.dirichlet_boundary_func(face_id);
                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, velocity);//, di.face_degree());
@@ -3565,7 +3565,7 @@ public:
     {
         auto num_faces = howmany_faces(msh, cl);
         auto dim = Mesh::dimension;
-        auto cell_ofs = revolution::priv::offset(msh, cl);
+        auto cell_ofs = disk::priv::offset(msh, cl);
         auto num_total_dofs  = cbs + num_faces * fbs;
         Matrix<T, Dynamic, 1> svel = Matrix<T, Dynamic, 1>::Zero(num_total_dofs);
         svel.block(0, 0, cbs, 1) = sol.block(cell_ofs * cbs, 0, cbs, 1);

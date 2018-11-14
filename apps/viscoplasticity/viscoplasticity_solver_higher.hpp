@@ -30,9 +30,7 @@
 
 #include <unistd.h>
 
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -44,7 +42,7 @@
 #include "solvers/solver.hpp"
 #include "viscoplasticity_utils.hpp"
 
-using namespace revolution;
+using namespace disk;
 
 enum problem_type
 {
@@ -57,7 +55,7 @@ class augmented_lagrangian_viscoplasticity
     typedef Mesh mesh_type;
     typedef typename mesh_type::cell        cell_type;
     typedef typename mesh_type::face        face_type;
-    typedef typename mesh_type::scalar_type T;
+    typedef typename mesh_type::coordinate_type T;
 
     typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
 
@@ -101,10 +99,10 @@ public:
 
         const auto dim =  Mesh::dimension;
 
-        cbs = revolution::vector_basis_size(di.cell_degree(), dim, dim);
-        fbs = revolution::vector_basis_size(di.face_degree(), dim - 1, dim);
-        pbs = revolution::scalar_basis_size(di.face_degree(), dim);
-        sbs = revolution::sym_matrix_basis_size(di.face_degree(), dim, dim);
+        cbs = vector_basis_size(di.cell_degree(), dim, dim);
+        fbs = vector_basis_size(di.face_degree(), dim - 1, dim);
+        pbs = scalar_basis_size(di.face_degree(), dim);
+        sbs = sym_matrix_basis_size(di.face_degree(), dim, dim);
 
         size_t quad_degree = 2. * di.face_degree();
         tsr_utils = tensors_at_quad_pts_utils<mesh_type>(msh, quad_degree);
@@ -126,7 +124,7 @@ public:
     {
         vector_type u_TF  = assembler.take_velocity(msh, cl, velocity_dofs);
         auto value = 1./(2. * (viscosity + alpha));
-        auto G = revolution::make_hlow_stokes(msh, cl, di, true);
+        auto G = make_hlow_stokes(msh, cl, di, true);
         vector_type   Gu = G.first * u_TF;
 
         auto qps = integrate(msh, cl, tsr_utils.quad_degree());
@@ -135,7 +133,7 @@ public:
         auto offset = tsr_offsets_vector.at(cl_id).first;
         assert( tsr_offsets_vector.at(cl_id).second == qps.size()); //Take out this after
 
-        auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
+        auto sb = make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
 
         matrix_type stress = multiplier.block(0, offset, sbs, qps.size());
         matrix_type gamma  = matrix_type::Zero(sbs, qps.size());
@@ -147,7 +145,7 @@ public:
             vector_type stress_qp = stress.block( 0, qp_count, sbs, 1);
             vector_type theta     = stress_qp  +  2. * alpha * Gu;
 
-            tensor_type theta_eval = revolution::eval(theta, s_phi);
+            tensor_type theta_eval = eval(theta, s_phi);
 
             T theta_norm  = theta_eval.norm();
             T tol = 1.e-8;
@@ -176,10 +174,10 @@ public:
 
         for(auto cl: msh)
         {
-            auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
+            auto sb = make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
 
             vector_type u_TF = assembler.take_velocity(msh, cl, sol);
-            auto G = revolution::make_hlow_stokes(msh, cl, di, true);
+            auto G = make_hlow_stokes(msh, cl, di, true);
             vector_type Gu = G.first * u_TF;
 
             auto cl_id = msh.lookup(cl);
@@ -225,11 +223,11 @@ public:
                     const cell_type& cl,
                     const Assembler& assembler)
     {
-        auto G = revolution::make_hlow_stokes(msh, cl, di, true);
-        auto cb = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
-        auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
+        auto G = make_hlow_stokes(msh, cl, di, true);
+        auto cb = make_vector_monomial_basis(msh, cl, di.cell_degree());
+        auto sb = make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
 
-        auto cell_ofs =  revolution::priv::offset(msh, cl);
+        auto cell_ofs =  priv::offset(msh, cl);
         auto num_faces = howmany_faces(msh, cl);
 
         //(stress - alpha * gamma, Gv)
@@ -292,8 +290,8 @@ public:
 
         for (auto cl : msh)
         {
-            auto G  = revolution::make_hlow_stokes(msh, cl, di, true);
-            auto gr = revolution::make_hho_stokes(msh, cl, di, true);
+            auto G  = make_hlow_stokes(msh, cl, di, true);
+            auto gr = make_hho_stokes(msh, cl, di, true);
             matrix_type stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
             auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
 
@@ -314,7 +312,7 @@ public:
                     const problem_type& problem)
     {
         auto dim = Mesh::dimension;
-        auto rbs = revolution::vector_basis_size(di.reconstruction_degree(), dim, dim);
+        auto rbs = vector_basis_size(di.reconstruction_degree(), dim, dim);
 
         dynamic_vector<T> cell_sol(cbs * msh.cells_size());
         dynamic_vector<T> cell_rec_sol(rbs * msh.cells_size());
@@ -326,8 +324,8 @@ public:
 
         for(auto cl : msh)
         {
-            auto gr  = revolution::make_hho_stokes(msh, cl, di, true);
-            auto cell_ofs = revolution::priv::offset(msh, cl);
+            auto gr  = make_hho_stokes(msh, cl, di, true);
+            auto cell_ofs = priv::offset(msh, cl);
             vector_type svel =  assembler.take_velocity(msh, cl, sol_old);
             assert((gr.first * svel).rows() == rbs - dim);
             cell_rec_sol.block(cell_ofs * rbs + dim, 0, rbs - dim, 1) = gr.first * svel;
@@ -339,33 +337,33 @@ public:
 
             //Velocity
             vector_type cell_vel = svel.block(0,0, cbs, 1);
-            auto cb  = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
+            auto cb  = make_vector_monomial_basis(msh, cl, di.cell_degree());
             auto phi = cb.eval_functions(bar);
-            vector_type ueval = revolution::eval(cell_vel, phi);
+            vector_type ueval = eval(cell_vel, phi);
 
             //Pressure
             vector_type spress =  assembler.take_pressure(msh, cl, sol_old);
-            auto pb  = revolution::make_scalar_monomial_basis(msh, cl, di.face_degree());
+            auto pb  = make_scalar_monomial_basis(msh, cl, di.face_degree());
             auto p_phi = pb.eval_functions(bar);
             T peval =  p_phi.dot(spress);
 
             /***********************************************************************/
             #if 0
             //Stress
-            auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
+            auto sb = make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
             auto s_phi  = sb.eval_functions(bar);
-            auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
+            auto G = make_hlow_stokes(msh, cl, di, use_sym_grad);
             vector_type Gu = G.first * svel;
 
             //*************************************************************
             vector_type stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
             vector_type theta  = stress  +  factor * alpha * Gu;
-            tensor_type theta_eval = revolution::eval(theta, s_phi);
-            tensor_type sigma_eval = revolution::eval(stress, s_phi);
+            tensor_type theta_eval = eval(theta, s_phi);
+            tensor_type sigma_eval = eval(stress, s_phi);
             //*************************************************************
 
             //div
-            tensor_type grad_eval = revolution::eval(Gu, s_phi);
+            tensor_type grad_eval = eval(Gu, s_phi);
             T divu = grad_eval(0,0) + grad_eval(1,1);
 
             // tr_stress
@@ -421,7 +419,7 @@ public:
                 throw std::invalid_argument("Invalid problem");
         }
 
-        auto assembler = revolution::make_stokes_assembler_alg(msh, di, bnd);
+        auto assembler = make_stokes_assembler_alg(msh, di, bnd);
         auto systsz = assembler.global_system_size();
         sol_old = vector_type::Zero(systsz);
         dynamic_vector<T> sol =  dynamic_vector<T>::Zero(systsz);

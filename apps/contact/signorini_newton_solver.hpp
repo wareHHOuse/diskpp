@@ -23,26 +23,23 @@
 * DOI: 10.1016/j.cam.2017.09.017
 */
 
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
 
-
+#include "methods/hho"
 #include "output/silo.hpp"
 #include "common.hpp"
 #include "solvers/solver.hpp"
-
+#include "contrib/colormanip.h"
 
 template<typename Mesh, typename Function, typename Analytical>
 std::pair<typename Mesh::coordinate_type, typename Mesh::coordinate_type>
 solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun,
-    const algorithm_parameters<typename Mesh::scalar_type>& ap,
+    const algorithm_parameters<typename Mesh::coordinate_type>& ap,
     const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
 {
     std::cout << "INSIDE FACE-BASED TRACE" << std::endl;
     std::cout << ap << std::endl;
 
-    using T = typename Mesh::scalar_type;
+    using T = typename Mesh::coordinate_type;
 
     typedef Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>    matrix_type;
     typedef Eigen::Matrix<T, Eigen::Dynamic, 1>                 vector_type;
@@ -253,14 +250,14 @@ solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun
 template<typename Mesh, typename Function, typename Analytical>
 dynamic_vector<typename Mesh::coordinate_type>
 solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun,
-    const algorithm_parameters<typename Mesh::scalar_type>& ap,
+    const algorithm_parameters<typename Mesh::coordinate_type>& ap,
     const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
     const hho_degree_info& hdi)
 {
     std::cout << "INSIDE FACE-BASED TRACE" << std::endl;
     std::cout << ap << std::endl;
 
-    using T = typename Mesh::scalar_type;
+    using T = typename Mesh::coordinate_type;
 
     typedef Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>    matrix_type;
     typedef Eigen::Matrix<T, Eigen::Dynamic, 1>                 vector_type;
