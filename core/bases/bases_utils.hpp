@@ -82,38 +82,65 @@ outer_product(const eigen_compatible_stdvector<Matrix<T, N, N>>& a, const Matrix
 }
 
 template<typename T>
-Matrix<T, Dynamic, 1>
-inner_product(const T& a, const Matrix<T, Dynamic, 1>& b)
+T
+inner_product(const T& a, const T& b)
 {
     return a * b;
 }
 
 template<typename T, int N>
-Matrix<T, N, N>
-inner_product(const T& a, const Matrix<T, N, N>& b)
+Matrix<T, Dynamic, N>
+inner_product(const T& a, const Matrix<T, Dynamic, N>& b)
 {
     return a * b;
 }
 
 template<typename T, int N>
-Matrix<T, N, N>
-inner_product(const Matrix<T, N, N>& b, const T& a)
+Matrix<T, Dynamic, N>
+inner_product(const Matrix<T, Dynamic, N>& a, const T& b)
 {
     return a * b;
 }
 
-template<typename T, int N>
-Matrix<T, N, 1>
-inner_product(const Matrix<T, N, 1>& b, const T& a)
+template<typename T, int N, int M>
+Matrix<T, N, M>
+inner_product(const T& a, const Matrix<T, N, M>& b)
 {
     return a * b;
 }
 
-template<typename T, int N>
-Matrix<T, N, 1>
-inner_product(const T& a, const Matrix<T, N, 1>& b)
+template<typename T, int N, int M>
+Matrix<T, N, M>
+inner_product(const Matrix<T, N, M>& b, const T& a)
 {
     return a * b;
+}
+
+
+template<typename T, int N, int M>
+eigen_compatible_stdvector<Matrix<T, N, M>>
+inner_product(const eigen_compatible_stdvector<Matrix<T, N, M>>& a, const T& b)
+{
+
+    eigen_compatible_stdvector<Matrix<T, N, M>> ret = a;
+
+    for (size_t i = 0; i < a.size(); i++)
+        ret[i] *= b;
+
+    return ret;
+}
+
+template<typename T, int N, int M>
+eigen_compatible_stdvector<Matrix<T, N, M>>
+inner_product(const T& a, const eigen_compatible_stdvector<Matrix<T, N, M>>& b)
+{
+
+    eigen_compatible_stdvector<Matrix<T, N, M>> ret = b;
+
+    for (size_t i = 0; i < b.size(); i++)
+        ret[i] *= a;
+
+    return ret;
 }
 
 template<typename T, int N>
@@ -156,7 +183,8 @@ make_mass_matrix(const Mesh& msh, const Element& elem, const Basis& basis, size_
     for (auto& qp : qps)
     {
         auto phi = basis.eval_functions(qp.point());
-        ret += qp.weight() * priv::outer_product(phi, phi);
+        const auto qp_phi = priv::inner_product(qp.weight(), phi);
+        ret += priv::outer_product(qp_phi, phi);
     }
 
     return ret;
@@ -173,12 +201,13 @@ make_stiffness_matrix(const Mesh& msh, const Element& elem, const Basis& basis, 
 
     Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(basis_size, basis_size);
 
-    auto qps = integrate(msh, elem, 2 * (degree + di));
+    auto qps = integrate(msh, elem, 2 * (degree - 1 + di));
 
     for (auto& qp : qps)
     {
         auto dphi = basis.eval_gradients(qp.point());
-        ret += qp.weight() * priv::outer_product(dphi, dphi);
+        const auto qp_dphi = priv::inner_product(qp.weight(), dphi);
+        ret += priv::outer_product(qp_dphi, dphi);
     }
 
     return ret;
@@ -200,8 +229,8 @@ make_rhs(const Mesh& msh, const Element& elem, const Basis& basis, const Functio
     for (auto& qp : qps)
     {
         auto phi = basis.eval_functions(qp.point());
-        auto f   = rhs_fun(qp.point());
-        ret += qp.weight() * priv::inner_product(f, phi);
+        auto qp_f = priv::inner_product(qp.weight(), rhs_fun(qp.point()));
+        ret += priv::inner_product(qp_f, phi);
     }
 
     return ret;

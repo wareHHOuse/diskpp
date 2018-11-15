@@ -239,7 +239,9 @@ class hierarchical_eigval_solver
         {
             auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
             dynamic_matrix<T> stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
-            dynamic_matrix<T> mass   = make_hho_eigval_mass_matrix(msh, cl, hdi.cell_degree());
+
+            auto              cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+            dynamic_matrix<T> mass   = make_mass_matrix(msh, cl, cb);
 
             dynamic_matrix<T> K = gr.second + stab_weight * stab;
             dynamic_matrix<T> M = mass;
