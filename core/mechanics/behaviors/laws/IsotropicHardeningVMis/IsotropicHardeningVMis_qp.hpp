@@ -26,6 +26,7 @@
 #pragma once
 
 #include "common/eigen.hpp"
+#include "core/mechanics/behaviors/laws/law_qp_bones.hpp"
 #include "core/mechanics/behaviors/laws/materialData.hpp"
 #include "core/mechanics/behaviors/maths_tensor.hpp"
 #include "core/mechanics/behaviors/maths_utils.hpp"
@@ -43,7 +44,7 @@ namespace disk
 // see https://www.code-aster.org/doc/default/en/man_r/r5/r5.03.02.pdf section 3.1.2
 
 template<typename T, int DIM>
-class IsotropicHardeningVMis_qp
+class IsotropicHardeningVMis_qp : public law_qp_bones<T, DIM>
 {
   public:
     const static size_t                          dimension = DIM;
@@ -53,73 +54,32 @@ class IsotropicHardeningVMis_qp
     typedef MaterialData<scalar_type>            data_type;
 
   private:
-    // coordinat and weight of considered gauss point.
-    point<scalar_type, DIM> m_point;
-    scalar_type             m_weight;
-
     // internal variables at previous step
-    static_matrix_type3D m_estrain_prev; // elastic strain
     static_matrix_type3D m_pstrain_prev; // plastic strain
     scalar_type          m_p_prev;       // cumulate plastic strain
 
     // internal variables at current step
-    static_matrix_type3D m_estrain_curr;    // elastic strain
     static_matrix_type3D m_pstrain_curr;    // plastic strain
     scalar_type          m_p_curr;          // cumulate plastic strain
     bool                 m_is_plastic_curr; // the gauss point is plastic ?
 
-    static_tensor<scalar_type, 3>
-    elastic_modulus(const data_type& data) const
-    {
-
-        return 2 * data.getMu() * IdentitySymTensor4<scalar_type, 3>() +
-               data.getLambda() * IxI<scalar_type, 3>();
-    }
-
-    scalar_type
-    sigmaeq(const static_matrix_type3D& dev) const
-    {
-        return sqrt(scalar_type(1.5) * dev.squaredNorm());
-    }
-
   public:
     IsotropicHardeningVMis_qp() :
-      m_weight(0), m_estrain_prev(static_matrix_type3D::Zero()), m_pstrain_prev(static_matrix_type3D::Zero()),
-      m_p_prev(scalar_type(0)), m_estrain_curr(static_matrix_type3D::Zero()),
+      law_qp_bones<T, DIM>(), m_pstrain_prev(static_matrix_type3D::Zero()), m_p_prev(scalar_type(0)),
       m_pstrain_curr(static_matrix_type3D::Zero()), m_p_curr(scalar_type(0)), m_is_plastic_curr(false)
     {
     }
 
     IsotropicHardeningVMis_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) :
-      m_point(point), m_weight(weight), m_estrain_prev(static_matrix_type3D::Zero()),
-      m_pstrain_prev(static_matrix_type3D::Zero()), m_p_prev(scalar_type(0)),
-      m_estrain_curr(static_matrix_type3D::Zero()), m_pstrain_curr(static_matrix_type3D::Zero()),
-      m_p_curr(scalar_type(0)), m_is_plastic_curr(false)
+      law_qp_bones<T, DIM>(point, weight), m_pstrain_prev(static_matrix_type3D::Zero()), m_p_prev(scalar_type(0)),
+      m_pstrain_curr(static_matrix_type3D::Zero()), m_p_curr(scalar_type(0)), m_is_plastic_curr(false)
     {
-    }
-
-    point<scalar_type, DIM>
-    point() const
-    {
-        return m_point;
-    }
-
-    scalar_type
-    weight() const
-    {
-        return m_weight;
     }
 
     bool
     is_plastic() const
     {
         return m_is_plastic_curr;
-    }
-
-    static_matrix_type3D
-    getElasticStrain() const
-    {
-        return m_estrain_curr;
     }
 
     static_matrix_type3D
@@ -131,13 +91,13 @@ class IsotropicHardeningVMis_qp
     static_matrix_type
     getTotalStrain() const
     {
-        return convertMatrix<scalar_type, DIM>(m_estrain_curr + m_pstrain_curr);
+        return convertMatrix<scalar_type, DIM>(this->m_estrain_curr + m_pstrain_curr);
     }
 
     static_matrix_type
     getTotalStrainPrev() const
     {
-        return convertMatrix<scalar_type, DIM>(m_estrain_prev + m_pstrain_prev);
+        return convertMatrix<scalar_type, DIM>(this->m_estrain_prev + m_pstrain_prev);
     }
 
     scalar_type
@@ -149,7 +109,7 @@ class IsotropicHardeningVMis_qp
     void
     update()
     {
-        m_estrain_prev = m_estrain_curr;
+        law_qp_bones<T, DIM>::update();
         m_pstrain_prev = m_pstrain_curr;
         m_p_prev       = m_p_curr;
     }
@@ -159,7 +119,8 @@ class IsotropicHardeningVMis_qp
     {
         const static_matrix_type3D Id = static_matrix_type3D::Identity();
 
-        const auto stress = 2 * data.getMu() * m_estrain_curr + data.getLambda() * m_estrain_curr.trace() * Id;
+        const auto stress =
+          2 * data.getMu() * this->m_estrain_curr + data.getLambda() * this->m_estrain_curr.trace() * Id;
 
         return stress;
     }
@@ -175,7 +136,8 @@ class IsotropicHardeningVMis_qp
     {
         const static_matrix_type3D Id = static_matrix_type3D::Identity();
 
-        const auto stress = 2 * data.getMu() * m_estrain_prev + data.getLambda() * m_estrain_prev.trace() * Id;
+        const auto stress =
+          2 * data.getMu() * this->m_estrain_prev + data.getLambda() * this->m_estrain_prev.trace() * Id;
 
         return stress;
     }
@@ -185,7 +147,8 @@ class IsotropicHardeningVMis_qp
     {
         const static_matrix_type3D Id = static_matrix_type3D::Identity();
 
-        const auto stress = 2 * data.getMu() * m_estrain_prev + data.getLambda() * m_estrain_prev.trace() * Id;
+        const auto stress =
+          2 * data.getMu() * this->m_estrain_prev + data.getLambda() * this->m_estrain_prev.trace() * Id;
 
         return convertMatrix<scalar_type, DIM>(stress);
     }
@@ -193,12 +156,12 @@ class IsotropicHardeningVMis_qp
     std::pair<static_matrix_type3D, static_tensor<scalar_type, 3>>
     compute_whole3D(const static_matrix_type3D& strain_curr, const data_type& data, bool tangentmodulus = true)
     {
-        static_tensor<scalar_type, 3> Cep      = elastic_modulus(data);
+        static_tensor<scalar_type, 3> Cep      = this->elastic_modulus3D(data);
         const auto                    RpCurve  = data.getRpCurve();
         const auto                    nb_point = RpCurve.size();
 
         const static_matrix_type3D incr_strain   = strain_curr - convertMatrix3D(this->getTotalStrainPrev());
-        const static_matrix_type3D estrain_trial = m_estrain_prev + incr_strain; // elastic strain trial
+        const static_matrix_type3D estrain_trial = this->m_estrain_prev + incr_strain; // elastic strain trial
 
         if (nb_point == 0)
         {
@@ -207,9 +170,9 @@ class IsotropicHardeningVMis_qp
             // elastic evolution
             m_is_plastic_curr = false;
             // update
-            m_estrain_curr = estrain_trial;
-            m_pstrain_curr = m_pstrain_prev;
-            m_p_curr       = m_p_prev;
+            this->m_estrain_curr = estrain_trial;
+            m_pstrain_curr       = m_pstrain_prev;
+            m_p_curr             = m_p_prev;
         }
         else
         {
@@ -230,15 +193,20 @@ class IsotropicHardeningVMis_qp
 
             // prediction
             const static_matrix_type3D se         = 2 * data.getMu() * deviator(estrain_trial);
-            const scalar_type          se_eq      = sigmaeq(se);
+            const scalar_type          se_eq      = this->sigmaeq(se);
             const scalar_type          Phi_trial0 = se_eq - Rp0 - H0 * (m_p_prev - p0);
 
             // debug informations
             // std::cout << "point: " << i0 << " on " << nb_point << std::endl;
             // std::cout << "Rp0: " << Rp0 << ", p0: " << p0 << ", H0: " << H0 << std::endl;
-            // std::cout << "se_eq: " << se_eq << ", Rp " << Rp0 + H0 * (m_p_prev - p0) << ", Phi: " << Phi_trial0 << std::endl;
+            // std::cout << "se_eq: " << se_eq << ", Rp " << Rp0 + H0 * (m_p_prev - p0) << ", Phi: " << Phi_trial0 <<
+            // std::endl;
 
-            assert(std::abs(se.trace()) <= 1E-8);
+            if (std::abs(se.trace()) > 1E-8)
+            {
+                const std::string mess = "Se_trace= " + std::to_string(se.trace()) + " <= 0";
+                throw std::invalid_argument(mess);
+            }
 
             // check
             if (Phi_trial0 < scalar_type(0))
@@ -279,11 +247,9 @@ class IsotropicHardeningVMis_qp
                 const scalar_type          delta_p = Phi_trial1 / dem;
 
                 // update
-                m_p_curr       = m_p_prev + delta_p;
-                m_estrain_curr = estrain_trial - delta_p * normal;
-                m_pstrain_curr = m_pstrain_prev + delta_p * normal;
-
-                assert(std::abs(m_pstrain_curr.trace()) <= 1E-8);
+                m_p_curr             = m_p_prev + delta_p;
+                this->m_estrain_curr = estrain_trial - delta_p * normal;
+                m_pstrain_curr       = m_pstrain_prev + delta_p * normal;
 
                 if (tangentmodulus)
                 {
@@ -299,18 +265,24 @@ class IsotropicHardeningVMis_qp
             else
             {
                 // update
-                m_estrain_curr = estrain_trial;
-                m_pstrain_curr = m_pstrain_prev;
-                m_p_curr       = m_p_prev;
+                this->m_estrain_curr = estrain_trial;
+                m_pstrain_curr       = m_pstrain_prev;
+                m_p_curr             = m_p_prev;
             }
+        }
+
+        if (std::abs(m_pstrain_curr.trace()) > 1E-8)
+        {
+            const std::string mess = "eps_p= " + std::to_string(m_pstrain_curr.trace()) + " <= 0";
+            throw std::invalid_argument(mess);
         }
 
         // std::cout << "ep:" << std::endl;
         // std::cout << m_pstrain_curr << std::endl;
         // std::cout << "ee:" << std::endl;
-        // std::cout << m_estrain_curr << std::endl;
+        // std::cout << this->m_estrain_curr << std::endl;
         // std::cout << "e:" << std::endl;
-        // std::cout << m_estrain_curr + m_pstrain_curr << std::endl;
+        // std::cout << this->m_estrain_curr + m_pstrain_curr << std::endl;
         // std::cout << "p:" << std::endl;
         // std::cout << m_p_curr << std::endl;
 

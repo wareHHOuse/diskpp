@@ -26,6 +26,7 @@
 #pragma once
 
 #include "common/eigen.hpp"
+#include "core/mechanics/behaviors/laws/law_qp_bones.hpp"
 #include "core/mechanics/behaviors/laws/materialData.hpp"
 #include "core/mechanics/behaviors/maths_tensor.hpp"
 #include "core/mechanics/behaviors/maths_utils.hpp"
@@ -40,116 +41,27 @@ namespace disk
 
 // Law for LinearLaw (test of finite deformations)
 
-// Input : symetric stain tensor(Gs)
-
-//           dev = normL2(Gs - trace(Gs) / dim * Id)
-
-//             Stress : sigma = 2 *\tilde{mu}(dev(Gs)) * Gs + \tilde{lambda}(dev(Gs)) * trace(Gs) * Id
-// \tilde{mu}(dev(Gs)) = mu * (1 + (1 + dev(Gs)) ^ {-1 / 2})
-// \tilde{lambda}(dev(Gs)) = ((lambda + mu / 2) - mu / 2 * (1 + dev(Gs)) ^ {-1 / 2})
-
-//                          Tangent Moduli : C = 2 * mu * I4 + lambda * prod_Kronecker(Id, Id) /
-//                                                               it is the elastic moduli
-
 template<typename T, int DIM>
-class LinearLaw_qp
+class LinearLaw_qp : public law_qp_bones<T, DIM>
 {
   public:
     typedef T                                    scalar_type;
     typedef static_matrix<scalar_type, DIM, DIM> static_matrix_type;
     typedef static_matrix<scalar_type, 3, 3>     static_matrix_type3D;
-    const static size_t dimension = DIM;
+    const static size_t                          dimension = DIM;
     typedef MaterialData<scalar_type>            data_type;
 
-  private:
-    // coordinat and weight of considered gauss point.
-    point<scalar_type, DIM> m_point;
-    scalar_type             m_weight;
-
-    // internal variables at previous step
-    static_matrix_type3D m_estrain_prev; // elastic strain
-
-    // internal variables at current step
-    static_matrix_type3D m_estrain_curr; // elastic strain
-
-    static_tensor<scalar_type, 3>
-    elastic_modulus(const data_type& data) const
-    {
-
-        return 2 * data.getMu() * IdentitySymTensor4<scalar_type, 3>() +
-               data.getLambda() * IxI<scalar_type, 3>();
-    }
-
   public:
-    LinearLaw_qp() :
-      m_weight(0), m_estrain_prev(static_matrix_type3D::Zero()), m_estrain_curr(static_matrix_type3D::Zero())
-    {
-    }
+    LinearLaw_qp() : law_qp_bones<T, DIM>() {}
 
-    LinearLaw_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) :
-      m_point(point), m_weight(weight), m_estrain_prev(static_matrix_type3D::Zero()),
-      m_estrain_curr(static_matrix_type3D::Zero())
+    LinearLaw_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) : law_qp_bones<T, DIM>(point, weight)
     {
-    }
-
-    point<scalar_type, DIM>
-    point() const
-    {
-        return m_point;
-    }
-
-    scalar_type
-    weight() const
-    {
-        return m_weight;
-    }
-
-    bool
-    is_plastic() const
-    {
-        return false;
-    }
-
-    static_matrix_type3D
-    getElasticStrain() const
-    {
-        return m_estrain_curr;
-    }
-
-    static_matrix_type3D
-    getPlasticStrain() const
-    {
-        return static_matrix_type3D::Zero();
-    }
-
-    static_matrix_type
-    getTotalStrain() const
-    {
-        return convertMatrix<scalar_type, DIM>(m_estrain_curr);
-    }
-
-    static_matrix_type
-    getTotalStrainPrev() const
-    {
-        return convertMatrix<scalar_type, DIM>(m_estrain_prev);
-    }
-
-    scalar_type
-    getAccumulatedPlasticStrain() const
-    {
-        return scalar_type(0);
-    }
-
-    void
-    update()
-    {
-        m_estrain_prev = m_estrain_curr;
     }
 
     static_matrix_type3D
     compute_stress3D(const data_type& data) const
     {
-        return data.getLambda() * m_estrain_curr;
+        return data.getLambda() * this->m_estrain_curr;
     }
 
     static_matrix_type
@@ -164,7 +76,7 @@ class LinearLaw_qp
         static_tensor<scalar_type, 3> Cep = data.getLambda() * IdentityTensor4<scalar_type, 3>();
 
         // is always elastic
-        m_estrain_curr = F_curr;
+        this->m_estrain_curr = F_curr;
 
         // compute Cauchy stress
         const static_matrix_type3D stress = this->compute_stress3D(data);

@@ -157,6 +157,12 @@ class LogarithmicStrain_qp
         // std::cout << "dPK1dF alt" << std::endl;
         // std::cout << convertTensorNotationMangel<scalar_type, 3>(convertCtoA<scalar_type>(A2, PK2 , F_curr)) <<
         // std::endl;
+
+        // std::cout << "dPK1dF full" << std::endl;
+        // std::cout << Aalt << std::endl;
+        // std::cout << "dPK1dF alt full" << std::endl;
+        // std::cout << convertCtoA<scalar_type>(A2, PK2, F_curr)
+        //           << std::endl;
         // std::cout << A2 << std::endl;
         // std::cout << "dPK1dF" << std::endl;
         // std::cout << A << std::endl;

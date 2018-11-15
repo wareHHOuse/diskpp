@@ -41,3 +41,6 @@ target_link_libraries(primitives ${LINK_LIBS})
 add_executable(netgen_primitives netgen_primitives.cpp)
 target_link_libraries(netgen_primitives ${LINK_LIBS})
 
+add_executable(behaviors_test behaviors_test.cpp)
+target_link_libraries(behaviors_test ${LINK_LIBS})
+
