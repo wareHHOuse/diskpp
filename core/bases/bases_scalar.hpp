@@ -283,22 +283,19 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 
         const auto pts = points(msh, fc);
         auto       p0  = pts[0];
-        auto       p1  = pts[1];
 
-
-        // if (std::abs(p1.x() - p0.x()) < 1E-8)
+        // debug for code_aster
+        // auto   nodes_id = face_nodes(msh, fc);
+        // if (nodes_id[1] < nodes_id[0])
         // {
-        //     if (p1.y() < p0.y())
-        //     {
-        //         p0 = p1;
-        //     }
+        //         p0 = pts[1];
         // }
-        // else if (p1.x() < p0.x())
-        // {
-        //     p0 = p1;
-        // }
+        //std::cout << "p0: " << p0 << std::endl;
 
         base     = face_bar - p0;
+
+        //std::cout << "base: " << base << std::endl;
+
     }
 
     function_type

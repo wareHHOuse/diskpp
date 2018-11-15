@@ -49,24 +49,11 @@ class finite_strains
 
     const static int dimension = mesh_type::dimension;
 
-    typedef static_matrix<scalar_type, dimension, dimension> gvt;
-
     typedef dynamic_matrix<scalar_type> matrix_type;
     typedef dynamic_vector<scalar_type> vector_type;
 
     const mesh_type& m_msh;
     const hdi_type&  m_hdi;
-
-    bool two_dim;
-
-    int
-    num_dofs_dim() const
-    {
-        if (two_dim)
-            return 4;
-        else
-            return 9;
-    }
 
     template<int DIM>
     eigen_compatible_stdvector<static_matrix<scalar_type, DIM, DIM>>
@@ -102,15 +89,7 @@ class finite_strains
     vector_type F_int;
     double      time_law;
 
-    finite_strains(const mesh_type& msh, const hdi_type& hdi) : m_msh(msh), m_hdi(hdi)
-    {
-        if (dimension == 2)
-            two_dim = true;
-        else if (dimension == 3)
-            two_dim = false;
-        else
-            assert(false);
-    }
+    finite_strains(const mesh_type& msh, const hdi_type& hdi) : m_msh(msh), m_hdi(hdi) {}
 
     template<typename Function, typename LawCell, typename LawData>
     void
@@ -136,7 +115,7 @@ class finite_strains
         const auto fcs            = faces(m_msh, cl);
         const auto num_faces      = fcs.size();
         const auto num_total_dofs = cell_basis_size + num_faces * face_basis_size;
-        const auto dim_dofs       = num_dofs_dim();
+        const auto dim_dofs       = dimension * dimension;
 
         matrix_type AT = matrix_type::Zero(grad_basis_size, grad_basis_size);
         vector_type aT = vector_type::Zero(grad_basis_size);
@@ -151,18 +130,17 @@ class finite_strains
         //   std::cout << uTF.transpose() << std::endl;
 
         const vector_type GT_uTF = GT * uTF;
-        const auto        Id     = static_matrix<scalar_type, dimension, dimension>::Identity();
 
         //  std::cout << "GT: " << GT.norm() << std::endl;
         //  std::cout << "GT_Utf: " << GT_uTF.transpose() << std::endl;
 
-         auto& law_quadpoints = law.getQPs();
+        auto& law_quadpoints = law.getQPs();
 
-         auto gb = disk::make_matrix_monomial_basis(m_msh, cl, grad_degree);
+        auto gb = disk::make_matrix_monomial_basis(m_msh, cl, grad_degree);
 
-         // std::cout << "nb: " << law_quadpoints.size() << std::endl;
-         for (auto& qp : law_quadpoints)
-         {
+        // std::cout << "nb: " << law_quadpoints.size() << std::endl;
+        for (auto& qp : law_quadpoints)
+        {
             //  std::cout << "qp: " << qp.point() << std::endl;
             const auto gphi = gb.eval_functions(qp.point());
 
@@ -171,15 +149,15 @@ class finite_strains
             // Compute local gradient and norm
             //  std::cout << "GT_utf: " << GT_uTF.transpose() << std::endl;
             const auto GT_iqn = disk::eval(GT_uTF, gphi);
-            const gvt  F_curr = GT_iqn + Id;
+            const auto FT_iqn = disk::mechanics::convertGtoF(GT_iqn);
             // std::cout << "Gp" << std::endl;
             // std::cout << GT_iqn << std::endl;
             // std::cout << "Fp" << std::endl;
-            // std::cout << F_curr << std::endl;
+            // std::cout << FT_iqn << std::endl;
 
             // Compute bahavior
             tc.tic();
-            const auto tensor_behavior = qp.compute_whole(F_curr, material_data, !elatic_modulus);
+            const auto tensor_behavior = qp.compute_whole(FT_iqn, material_data, !elatic_modulus);
             tc.toc();
             time_law += tc.to_double();
 

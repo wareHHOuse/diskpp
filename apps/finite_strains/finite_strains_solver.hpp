@@ -64,10 +64,10 @@ class finite_strains_solver
     typedef ParamRun<scalar_type>               param_type;
     typedef disk::MaterialData<scalar_type>     data_type;
 
-    typedef dynamic_matrix<scalar_type> matrix_dynamic;
-    typedef dynamic_vector<scalar_type> vector_dynamic;
+    typedef dynamic_matrix<scalar_type> matrix_type;
+    typedef dynamic_vector<scalar_type> vector_type;
 
-    typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
+    typedef disk::mechanics::BoundaryConditions<mesh_type>        bnd_type;
     typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_hpp_type;
     // typedef disk::IsotropicHardeningVMis<mesh_type> law_hpp_type;
     typedef disk::mechanics::LogarithmicStrain<law_hpp_type> law_type;
@@ -78,9 +78,9 @@ class finite_strains_solver
 
     disk::PostMesh<mesh_type> post_mesh;
 
-    std::vector<vector_dynamic> m_solution_data;
-    std::vector<vector_dynamic> m_solution_cells, m_solution_faces;
-    std::vector<matrix_dynamic> m_gradient_precomputed, m_stab_precomputed;
+    std::vector<vector_type> m_solution_data;
+    std::vector<vector_type> m_solution_cells, m_solution_faces;
+    std::vector<matrix_type> m_gradient_precomputed, m_stab_precomputed;
 
     law_type m_law;
 
@@ -111,13 +111,13 @@ class finite_strains_solver
         {
             const auto fcs       = faces(m_msh, cl);
             const auto num_faces = fcs.size();
-            m_solution_data.push_back(vector_dynamic::Zero(num_cell_dofs + num_faces * num_face_dofs));
-            m_solution_cells.push_back(vector_dynamic::Zero(num_cell_dofs));
+            m_solution_data.push_back(vector_type::Zero(num_cell_dofs + num_faces * num_face_dofs));
+            m_solution_cells.push_back(vector_type::Zero(num_cell_dofs));
         }
 
         for (int i = 0; i < m_msh.faces_size(); i++)
         {
-            m_solution_faces.push_back(vector_dynamic::Zero(num_face_dofs));
+            m_solution_faces.push_back(vector_type::Zero(num_face_dofs));
         }
 
         if (m_verbose)
@@ -159,21 +159,18 @@ class finite_strains_solver
                     case HHO:
                     {
                         const auto recons_scalar = make_hho_scalar_laplacian(m_msh, cl, m_hdi);
-                        const auto stab_HHO =
-                          make_hho_vector_stabilization_optim(m_msh, cl, recons_scalar.first, m_hdi);
-                        m_stab_precomputed.push_back(stab_HHO);
+                        m_stab_precomputed.push_back(
+                          make_hho_vector_stabilization_optim(m_msh, cl, recons_scalar.first, m_hdi));
                         break;
                     }
                     case HDG:
                     {
-                        const auto stab_HDG = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
-                        m_stab_precomputed.push_back(stab_HDG);
+                        m_stab_precomputed.push_back(make_hdg_vector_stabilization(m_msh, cl, m_hdi));
                         break;
                     }
                     case DG:
                     {
-                        const auto stab_DG = make_dg_vector_stabilization(m_msh, cl, m_hdi);
-                        m_stab_precomputed.push_back(stab_DG);
+                        m_stab_precomputed.push_back(make_dg_vector_stabilization(m_msh, cl, m_hdi));
                         break;
                     }
                     case NO: { break;
@@ -182,6 +179,31 @@ class finite_strains_solver
                 }
             }
         }
+    }
+
+    std::list<time_step>
+    compute_time_step() const
+    {
+        // time step
+        std::list<time_step> list_step;
+
+        scalar_type prev_time = 0.0;
+        for (int n = 0; n < m_rp.m_time_step.size(); n++)
+        {
+            auto              time_info = m_rp.m_time_step[n];
+            const auto        time_curr = time_info.first;
+            const scalar_type delta_t   = (time_curr - prev_time) / time_info.second;
+            for (int i = 0; i < time_info.second; i++)
+            {
+                time_step step;
+                step.time  = prev_time + (i + 1) * delta_t;
+                step.level = 1;
+                list_step.push_back(step);
+            }
+            prev_time = time_curr;
+        }
+
+        return list_step;
     }
 
   public:
@@ -252,35 +274,17 @@ class finite_strains_solver
     SolverInfo
     compute(const LoadFunction& lf)
     {
-
         SolverInfo  si;
         timecounter ttot;
         ttot.tic();
 
         // time step
-        std::list<time_step> list_step;
-
-        scalar_type time1 = 0.0;
-        scalar_type time2 = 0.0;
-        for (int n = 0; n < m_rp.m_time_step.size(); n++)
-        {
-            auto time_info            = m_rp.m_time_step[n];
-            time2                     = time_info.first;
-            const scalar_type delta_t = (time2 - time1) / time_info.second;
-            for (int i = 0; i < time_info.second; i++)
-            {
-                time_step step;
-                step.time  = time1 + (i + 1) * delta_t;
-                step.level = 1;
-                list_step.push_back(step);
-            }
-            time1 = time2;
-        }
+        std::list<time_step> list_step = compute_time_step();
 
         int current_step = 0;
         int total_step   = list_step.size();
 
-        scalar_type old_time = 0.0;
+        scalar_type prev_time = 0.0;
 
         // time of saving
         bool time_saving(false);
@@ -302,14 +306,13 @@ class finite_strains_solver
 
         // Newton solver
         NLE::NewtonRaphson_solver_finite_strains<mesh_type> newton_solver(m_msh, m_hdi, m_bnd, m_rp);
-
         newton_solver.initialize(m_solution_cells, m_solution_faces, m_solution_data);
 
         // loading
         while (!list_step.empty())
         {
             current_step += 1;
-            time_step         step         = list_step.front();
+            const time_step   step         = list_step.front();
             const scalar_type current_time = step.time;
 
             if (m_verbose)
@@ -335,21 +338,7 @@ class finite_strains_solver
 
             if (m_verbose)
             {
-                std::cout << "** Time in this step " << newton_info.m_time_newton << " sec" << std::endl;
-                std::cout << "**** Assembly time: " << newton_info.m_assembly_info.m_time_assembly << " sec"
-                          << std::endl;
-                std::cout << "****** Gradient reconstruction: " << newton_info.m_assembly_info.m_time_gradrec << " sec"
-                          << std::endl;
-                std::cout << "****** Stabilisation: " << newton_info.m_assembly_info.m_time_stab << " sec" << std::endl;
-                std::cout << "****** Mechanical computation: " << newton_info.m_assembly_info.m_time_elem << " sec"
-                          << std::endl;
-                std::cout << "       *** Behavior computation: " << newton_info.m_assembly_info.m_time_law << " sec"
-                          << std::endl;
-                std::cout << "****** Static condensation: " << newton_info.m_assembly_info.m_time_statcond << " sec"
-                          << std::endl;
-                std::cout << "****** Postprocess time: " << newton_info.m_assembly_info.m_time_postpro << " sec"
-                          << std::endl;
-                std::cout << "**** Solver time: " << newton_info.m_solve_info.m_time_solve << " sec" << std::endl;
+                newton_info.printInfo();
             }
 
             m_convergence = newton_solver.test_convergence();
@@ -374,27 +363,27 @@ class finite_strains_solver
                     total_step += 1;
                     current_step -= 1;
                     time_step new_step;
-                    new_step.time  = old_time + (current_time - old_time) / 2.0;
+                    new_step.time  = prev_time + (current_time - prev_time) / 2.0;
                     new_step.level = step.level + 1;
                     list_step.push_front(new_step);
                 }
             }
             else
             {
-                old_time = current_time;
+                prev_time = current_time;
                 list_step.pop_front();
                 newton_solver.save_solutions(m_solution_cells, m_solution_faces, m_solution_data);
                 m_law.update();
 
                 if (time_saving)
                 {
-                    if (m_rp.m_time_save.front() < old_time + 1E-5)
+                    if (m_rp.m_time_save.front() < prev_time + 1E-5)
                     {
                         std::cout << "** Save results" << std::endl;
                         std::string name = "result" + std::to_string(dimension) + "D_k" +
                                            std::to_string(m_hdi.face_degree()) + "_l" +
                                            std::to_string(m_hdi.cell_degree()) + "_g" +
-                                           std::to_string(m_hdi.grad_degree()) + "_t" + std::to_string(old_time) + "_";
+                                           std::to_string(m_hdi.grad_degree()) + "_t" + std::to_string(prev_time) + "_";
 
                         // this->compute_discontinuous_displacement(name + "depl_disc.msh");
                         this->compute_continuous_displacement(name + "depl_cont.msh");
@@ -466,71 +455,18 @@ class finite_strains_solver
         {
             const auto x = m_solution_cells.at(cell_i++);
 
-            const vector_dynamic true_dof = disk::project_function(m_msh, cl, m_hdi.cell_degree(), as, di);
+            const vector_type true_dof = disk::project_function(m_msh, cl, m_hdi.cell_degree(), as, di);
 
             auto                 cb   = disk::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
-            const matrix_dynamic mass = disk::make_mass_matrix(m_msh, cl, cb);
+            const matrix_type mass = disk::make_mass_matrix(m_msh, cl, cb);
 
-            const vector_dynamic comp_dof = x.head(cbs);
-            const vector_dynamic diff_dof = (true_dof - comp_dof);
+            const vector_type comp_dof = x.head(cbs);
+            const vector_type diff_dof = (true_dof - comp_dof);
             assert(comp_dof.size() == true_dof.size());
             err_dof += diff_dof.dot(mass * diff_dof);
         }
 
         return sqrt(err_dof);
-    }
-
-    template<typename AnalyticalSolution>
-    scalar_type
-    compute_l2_stress_error(const AnalyticalSolution& stress) const
-    {
-        const auto face_degree   = m_hdi.face_degree();
-        const auto material_data = m_law.getMaterialData();
-
-        int         cell_i = 0;
-        scalar_type error_stress(0.0);
-
-        for (auto& cl : m_msh)
-        {
-            const auto law_quadpoints = m_law.getCellIVs(cell_i).getIVs();
-
-            // Loop on nodes
-            for (auto& qp : law_quadpoints)
-            {
-                const auto stress_comp = qp.compute_stress(material_data);
-                const auto stress_diff = (stress(qp.point()) - stress_comp).eval();
-
-                error_stress += qp.weight() * stress_diff.squaredNorm();
-            }
-        }
-
-        return sqrt(error_stress);
-    }
-
-    // post-processing
-    scalar_type
-    energy_mechanic() const
-    {
-        const auto  material_data = m_law.getMaterialData();
-        scalar_type energy        = 0.;
-
-        int cell_i = 0;
-        for (auto& cl : m_msh)
-        {
-            const auto law_quadpoints = m_law.getCellIVs(cell_i).getIVs();
-
-            // Loop on nodes
-            for (auto& qp : law_quadpoints)
-            {
-                const auto                stress = qp.compute_stress(material_data);
-                const std::vector<double> tens   = disk::convertToVectorGmsh(stress);
-
-                energy += qp.weight() * stress.squaredNorm();
-            }
-            cell_i++;
-        }
-
-        return sqrt(energy);
     }
 
     void
@@ -549,7 +485,7 @@ class finite_strains_solver
         for (auto& cl : m_msh)
         {
             auto                    cb         = disk::make_vector_monomial_basis(m_msh, cl, cell_degree);
-            const vector_dynamic    x          = m_solution_cells.at(cell_i++);
+            const vector_type    x          = m_solution_cells.at(cell_i++);
             const auto              cell_nodes = disk::cell_nodes(m_msh, cl);
             std::vector<gmsh::Node> new_nodes;
 
@@ -560,8 +496,7 @@ class finite_strains_solver
                 const auto point_ids = cell_nodes[i];
                 const auto pt        = storage->points[point_ids];
 
-                const auto phi = cb.eval_functions(pt);
-
+                const auto phi  = cb.eval_functions(pt);
                 const auto depl = disk::eval(x, phi);
 
                 const std::vector<double>   deplv = disk::convertToVectorGmsh(depl);
@@ -605,7 +540,7 @@ class finite_strains_solver
         for (auto& cl : m_msh)
         {
             auto                 cb         = disk::make_vector_monomial_basis(m_msh, cl, cell_degree);
-            const vector_dynamic x          = m_solution_cells.at(cell_i);
+            const vector_type x          = m_solution_cells.at(cell_i);
             const auto           cell_nodes = post_mesh.nodes_cell(cell_i);
 
             // Loop on the nodes of the cell
@@ -657,10 +592,9 @@ class finite_strains_solver
         int cell_i = 0;
         for (auto& cl : m_msh)
         {
-
             const auto     law_quadpoints = m_law.getCellIVs(cell_i).getIVs();
             const auto     uTF            = m_solution_data.at(cell_i);
-            matrix_dynamic gr;
+            matrix_type gr;
             if (m_rp.m_precomputation)
             {
                 gr = m_gradient_precomputed.at(cell_i);
@@ -669,7 +603,7 @@ class finite_strains_solver
             {
                 gr = make_hho_gradrec_matrix(m_msh, cl, m_hdi).first;
             }
-            const vector_dynamic GTuTF = gr * uTF;
+            const vector_type GTuTF = gr * uTF;
             auto                 gb    = disk::make_matrix_monomial_basis(m_msh, cl, grad_degree);
 
             // Loop on nodes
@@ -716,7 +650,7 @@ class finite_strains_solver
         for (auto& cl : m_msh)
         {
             const auto     uTF = m_solution_data.at(cell_i);
-            matrix_dynamic gr;
+            matrix_type gr;
             if (m_rp.m_precomputation)
             {
                 gr = m_gradient_precomputed.at(cell_i);
@@ -725,10 +659,10 @@ class finite_strains_solver
             {
                 gr = make_hho_gradrec_matrix(m_msh, cl, m_hdi).first;
             }
-            const vector_dynamic    GTuTF        = gr * uTF;
+            const vector_type    GTuTF        = gr * uTF;
             auto                    gb           = disk::make_matrix_monomial_basis(m_msh, cl, grad_degree);
             const auto              law_cell     = m_law.getCellIVs(cell_i);
-            const vector_dynamic    stress_coeff = law_cell.projectStressOnCell(m_msh, cl, m_hdi, material_data);
+            const vector_type    stress_coeff = law_cell.projectStressOnCell(m_msh, cl, m_hdi, material_data);
             const auto              cell_nodes   = disk::cell_nodes(m_msh, cl);
             std::vector<gmsh::Node> new_nodes;
 
@@ -793,7 +727,7 @@ class finite_strains_solver
         for (auto& cl : m_msh)
         {
             const auto     uTF = m_solution_data.at(cell_i);
-            matrix_dynamic gr;
+            matrix_type gr;
             if (m_rp.m_precomputation)
             {
                 gr = m_gradient_precomputed.at(cell_i);
@@ -802,10 +736,10 @@ class finite_strains_solver
             {
                 gr = make_hho_gradrec_matrix(m_msh, cl, m_hdi).first;
             }
-            const vector_dynamic GTuTF        = gr * uTF;
+            const vector_type GTuTF        = gr * uTF;
             auto                 gb           = disk::make_matrix_monomial_basis(m_msh, cl, grad_degree);
             const auto           law_cell     = m_law.getCellIVs(cell_i);
-            const vector_dynamic stress_coeff = law_cell.projectStressOnCell(m_msh, cl, m_hdi, material_data);
+            const vector_type stress_coeff = law_cell.projectStressOnCell(m_msh, cl, m_hdi, material_data);
             const auto           cell_nodes   = post_mesh.nodes_cell(cell_i);
 
             // Loop on the nodes of the cell
@@ -903,7 +837,7 @@ class finite_strains_solver
             auto       pb       = disk::make_scalar_monomial_basis(m_msh, cl, grad_degree);
             const auto law_cell = m_law.getCellIVs(cell_i);
 
-            const vector_dynamic    p_coeff    = law_cell.projectPOnCell(m_msh, cl, m_hdi);
+            const vector_type    p_coeff    = law_cell.projectPOnCell(m_msh, cl, m_hdi);
             const auto              cell_nodes = disk::cell_nodes(m_msh, cl);
             std::vector<gmsh::Node> new_nodes;
 
@@ -1023,7 +957,7 @@ class finite_strains_solver
             auto       pb       = disk::make_scalar_monomial_basis(m_msh, cl, grad_degree);
             const auto law_cell = m_law.getCellIVs(cell_i);
 
-            const vector_dynamic state_coeff = law_cell.projectStateOnCell(m_msh, cl, m_hdi);
+            const vector_type state_coeff = law_cell.projectStateOnCell(m_msh, cl, m_hdi);
             const auto           cell_nodes  = post_mesh.nodes_cell(cell_i);
 
             // Loop on the nodes of the cell
@@ -1130,7 +1064,7 @@ class finite_strains_solver
         for (auto& cl : m_msh)
         {
             auto                 cb         = disk::make_vector_monomial_basis(m_msh, cl, cell_degree);
-            const vector_dynamic x          = m_solution_cells.at(cell_i++);
+            const vector_type x          = m_solution_cells.at(cell_i++);
             const auto           cell_nodes = disk::cell_nodes(m_msh, cl);
 
             // Loop on the nodes of the cell
@@ -1199,7 +1133,7 @@ class finite_strains_solver
         for (auto& cl : m_msh)
         {
             auto                    cb         = disk::make_vector_monomial_basis(m_msh, cl, cell_degree);
-            const vector_dynamic    x          = m_solution_cells.at(cell_i++);
+            const vector_type    x          = m_solution_cells.at(cell_i++);
             const auto              cell_nodes = disk::cell_nodes(m_msh, cl);
             std::vector<gmsh::Node> new_nodes;
 
@@ -1263,10 +1197,10 @@ class finite_strains_solver
         for (auto& cl : m_msh)
         {
             const auto           uTF            = m_solution_data.at(cell_i);
-            const vector_dynamic x              = m_solution_cells.at(cell_i);
+            const vector_type x              = m_solution_cells.at(cell_i);
             const auto           law_quadpoints = m_law.getCellIVs(cell_i).getIVs();
 
-            matrix_dynamic gr;
+            matrix_type gr;
             if (m_rp.m_precomputation)
             {
                 gr = m_gradient_precomputed.at(cell_i);
@@ -1275,7 +1209,7 @@ class finite_strains_solver
             {
                 gr = make_hho_gradrec_matrix(m_msh, cl, m_hdi).first;
             }
-            const vector_dynamic GTuTF = gr * uTF;
+            const vector_type GTuTF = gr * uTF;
 
             // Loop on nodes
             auto cb = disk::make_vector_monomial_basis(m_msh, cl, cell_degree);
