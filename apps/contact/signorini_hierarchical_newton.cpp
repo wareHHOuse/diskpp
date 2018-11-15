@@ -765,7 +765,7 @@ public:
 
             auto sol_cb = make_scalar_monomial_basis(sol_msh, sol_cl, hdi.reconstruction_degree());
             auto ref_cb = make_scalar_monomial_basis(ref_msh, ref_cl, ref_hdi.reconstruction_degree());
-            auto qps = integrate(ref_msh, ref_cl, 2 * ref_hdi.reconstruction_degree());
+            auto qps = integrate(ref_msh, ref_cl, 4 * ref_hdi.reconstruction_degree());
             for (auto& qp : qps)
             {
                 //1.1. Grad current solution
