@@ -90,6 +90,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 point<T,2>
 barycenter(const Mesh<T,2,Storage>& msh, const typename Mesh<T,2,Storage>::cell_type& cl)
 {
+    using std::abs;
     T tot_meas{};
     point<T,2> tot_bar{};
     auto pts = points(msh, cl);
