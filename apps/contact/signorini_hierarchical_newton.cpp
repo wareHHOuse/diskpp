@@ -71,8 +71,8 @@ class hierarchical_contact_solver
     size_t  sol_level_min, sol_level_max;
     bool compute_ref;
 
-    mesh_type					initial_mesh;
-	disk::mesh_hierarchy<T> 	mesh_hier;
+    mesh_type                   initial_mesh;
+    disk::mesh_hierarchy<T>   mesh_hier;
 
     disk::silo_database silo_db;
 
@@ -87,23 +87,23 @@ class hierarchical_contact_solver
     {
         std::cout << "Inside init" << std::endl;
         sol::state lua;
-    	lua.open_libraries(sol::lib::math, sol::lib::base);
-    	lua["config"] = lua.create_table();
+        lua.open_libraries(sol::lib::math, sol::lib::base);
+        lua["config"] = lua.create_table();
         lua["hs"]  = lua.create_table();
         lua["fem"] = lua.create_table();
 
-    	disk::solvers::init_lua(lua);
-    	lua["solver"]["feast"] = lua.create_table();
+        disk::solvers::init_lua(lua);
+        lua["solver"]["feast"] = lua.create_table();
 
-    	auto r = lua.do_file(config_fn);
+        auto r = lua.do_file(config_fn);
 
-    	if ( !r.valid() )
-    	{
-        	std::cout << "Problems opening configuration file" << std::endl;
-        	return false;
-    	}
+        if ( !r.valid() )
+        {
+            std::cout << "Problems opening configuration file" << std::endl;
+            return false;
+        }
 
-    	std::string     input_mesh  = lua["config"]["input_mesh"];
+        std::string     input_mesh  = lua["config"]["input_mesh"];
 
         std::cout << "input_mesh: " << input_mesh << std::endl;
 
@@ -174,8 +174,8 @@ class hierarchical_contact_solver
         else
         {
             std::cout << "HEXP_GAMMA : "<< HEXP_GAMMA << std::endl;
-            std::cout << "Invalid gamma exponent. Falling back to 100" << std::endl;
-            hho_gamma_0 = 100;
+            std::cout << "Invalid gamma exponent. Falling back to 1000" << std::endl;
+            hho_gamma_0 = 1000;
         }
 
         std::cout << "hho gamma = "<< hho_gamma_0 << std::endl;
@@ -194,29 +194,29 @@ class hierarchical_contact_solver
         }
 
 
-	    if (std::regex_match(input_mesh, std::regex(".*\\.mesh2d$") ))
-	    {
-	        std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
+        if (std::regex_match(input_mesh, std::regex(".*\\.mesh2d$") ))
+        {
+            std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
 
-	        mesh_type msh;
-	        disk::netgen_mesh_loader<T, 2> loader;
-	        loader.verbose(verbose);
-	        if (!loader.read_mesh(input_mesh))
-	        {
-	            std::cout << "Problem loading mesh." << std::endl;
-	            return false;
-	        }
+            mesh_type msh;
+            disk::netgen_mesh_loader<T, 2> loader;
+            loader.verbose(verbose);
+            if (!loader.read_mesh(input_mesh))
+            {
+                std::cout << "Problem loading mesh." << std::endl;
+                return false;
+            }
 
-	        loader.populate_mesh(msh);
+            loader.populate_mesh(msh);
 
-	        mesh_hier.build_hierarchy(msh, hierarchy_levels);
+            mesh_hier.build_hierarchy(msh, hierarchy_levels);
 
-	        std::cout << "Mesh avg. diameter: " << average_diameter(msh) << std::endl;
-	    }
+            std::cout << "Mesh avg. diameter: " << average_diameter(msh) << std::endl;
+        }
 
 
-	    return true;
-	}
+        return true;
+    }
 
     auto
     set_test1(const mesh_type& msh)
@@ -480,15 +480,25 @@ class hierarchical_contact_solver
             auto num_total_dofs   = num_cell_dofs + num_faces * num_face_dofs;
             hho_vector sol_ufull  = ref_sol.block(cell_ofs, 0, num_total_dofs, 1);
 
+
+            auto ref_rec_deg = ref_hdi.reconstruction_degree();
+            auto rec_deg = hdi.reconstruction_degree();
+            auto ref_cbs = scalar_basis_size(ref_rec_deg, 2);
+            dynamic_vector<T> rec_ref_loc = dynamic_vector<T>::Zero(ref_cbs);
+
             if (is_contact_vector.at(cl_count) == 1 && ap.solver == EVAL_IN_CELLS_FULL)
             {
                 auto gr = make_hho_contact_scalar_laplacian(ref_msh, cl, ref_hdi, bnd);
-                rec_refs.push_back( gr.first * sol_ufull );
+                rec_ref_loc(0,0) =  sol_ufull(0);
+                rec_ref_loc.block(1, 0, ref_cbs -1, 1) = gr.first * sol_ufull;
+                rec_refs.push_back( rec_ref_loc );
             }
             else
             {
                 auto gr = make_hho_scalar_laplacian( ref_msh, cl, ref_hdi);
-                rec_refs.push_back( gr.first * sol_ufull );
+                rec_ref_loc(0,0) =  sol_ufull(0);
+                rec_ref_loc.block(1, 0, ref_cbs -1, 1) = gr.first * sol_ufull;
+                rec_refs.push_back( rec_ref_loc );
             }
 
             cl_count++;
@@ -500,9 +510,9 @@ class hierarchical_contact_solver
 public:
 
     hierarchical_contact_solver(const std::string& config_fn)
-	{
-		init(config_fn);
-	}
+    {
+        init(config_fn);
+    }
 
     void run_fem_hho(size_t level,
                  const disk::simplicial_mesh<T,2>& ref_msh,
@@ -572,6 +582,8 @@ public:
             sol_cl_count++;
         }
 
+
+
         T H1_error = 0.0; T L2_error = 0.0; T Linf_error = 0.0;
         size_t cell_i = 0;
         for (auto& ref_cl : ref_msh)
@@ -599,7 +611,7 @@ public:
             auto num_total_dofs = num_cell_dofs + 3 * num_face_dofs;
             hho_vector  sol_ufull = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
 
-            dynamic_vector<T> rec_sol = rec_sols.at(sol_cl_ofs);
+            dynamic_vector<T> rec_sol_loc = rec_sols.at(sol_cl_ofs);
 
             auto sol_cb = make_scalar_monomial_basis(sol_msh, sol_cl, hdi.reconstruction_degree());
             auto qps = integrate(ref_msh, ref_cl, 2 * (std::max(hdi.face_degree(), hdi.cell_degree())));
@@ -609,13 +621,13 @@ public:
 
                 Eigen::Matrix<T,1,2> hho_grad = Eigen::Matrix<T,1,2>::Zero();
                 for (size_t i = 1; i < sol_cb.size(); i++)
-                    hho_grad += rec_sol(i-1) * hho_dphi.block(i,0,1,2);
+                    hho_grad += rec_sol_loc(i-1) * hho_dphi.block(i,0,1,2);
 
                 auto hho_phi = sol_cb.eval_functions(qp.point());
 
                 T hho_ucell = sol_ufull(0);
                 for (size_t i = 1; i < sol_cb.size(); i++)
-                    hho_ucell += rec_sol(i-1) * hho_phi(i,0);
+                    hho_ucell += rec_sol_loc(i-1) * hho_phi(i,0);
 
                 Eigen::Matrix<T,1,2> diff = hho_grad - fem_grad;
 
@@ -636,7 +648,7 @@ public:
 
                 Eigen::Matrix<T,1,2> hho_grad = Eigen::Matrix<T,1,2>::Zero();
                 for (size_t i = 1; i < sol_cb.size(); i++)
-                    hho_grad += rec_sol(i-1) * hho_dphi.block(i,0,1,2);
+                    hho_grad += rec_sol_loc(i-1) * hho_dphi.block(i,0,1,2);
 
                 hho_grad_x.push_back( hho_grad(0) );
                 hho_grad_y.push_back( hho_grad(1) );
@@ -645,15 +657,17 @@ public:
             cell_i++;
         }
 
+        silo_db.add_mesh(ref_msh, "refmesh");
         disk::silo_zonal_variable<T> rgx("ref_grad_x", fem_grad_x);
         silo_db.add_variable("refmesh", rgx);
         disk::silo_zonal_variable<T> rgy("ref_grad_y", fem_grad_y);
         silo_db.add_variable("refmesh", rgy);
 
+        silo_db.add_mesh(ref_msh, "solmesh");
         disk::silo_zonal_variable<T> sgx("sol_grad_x", hho_grad_x);
-        silo_db.add_variable("refmesh", sgx);
+        silo_db.add_variable("solmesh", sgx);
         disk::silo_zonal_variable<T> sgy("sol_grad_y", hho_grad_y);
-        silo_db.add_variable("refmesh", sgy);
+        silo_db.add_variable("solmesh", sgy);
 
         std::cout << "(H1, L2): " << std::sqrt(H1_error);
         std::cout << "  -  " << std::sqrt(L2_error) << std::endl;
@@ -716,8 +730,8 @@ public:
         std::vector<T> ref_grad_x, ref_grad_y, hho_grad_x, hho_grad_y;
         ref_grad_x.reserve( ref_msh.cells_size() );
         ref_grad_y.reserve( ref_msh.cells_size() );
-        hho_grad_x.reserve( ref_msh.cells_size() );
-        hho_grad_y.reserve( ref_msh.cells_size() );
+        hho_grad_x.reserve( sol_msh.cells_size() );
+        hho_grad_y.reserve( sol_msh.cells_size() );
 
         size_t num_cell_dofs = scalar_basis_size(hdi.cell_degree(), 2);
         size_t num_face_dofs = scalar_basis_size(hdi.face_degree(), 1);
@@ -736,16 +750,38 @@ public:
             auto num_total_dofs   = num_cell_dofs + num_faces * num_face_dofs;
             hho_vector sol_ufull  = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
 
+            auto rec_deg = hdi.reconstruction_degree();
+            auto sol_cb  = make_scalar_monomial_basis(sol_msh, sol_cl, rec_deg);
+            auto sol_cbs = scalar_basis_size(rec_deg, 2);
+            dynamic_vector<T> rec_sol_loc = dynamic_vector<T>::Zero(sol_cbs);
+
             if (is_contact_vector.at(sol_cl_count) == 1 && ap.solver == EVAL_IN_CELLS_FULL)
             {
                 auto gr = make_hho_contact_scalar_laplacian(sol_msh, sol_cl, hdi, bnd);
-                rec_sols.push_back( gr.first * sol_ufull );
+                rec_sol_loc(0,0) =  sol_ufull(0);
+                rec_sol_loc.block(1, 0, sol_cbs -1, 1) = gr.first * sol_ufull;
+                rec_sols.push_back( rec_sol_loc );
             }
             else
             {
                 auto gr = make_hho_scalar_laplacian(sol_msh, sol_cl, hdi);
-                rec_sols.push_back( gr.first * sol_ufull );
+                rec_sol_loc(0,0) =  sol_ufull(0);
+                rec_sol_loc.block(1, 0, sol_cbs -1, 1) = gr.first * sol_ufull;
+                rec_sols.push_back( rec_sol_loc );
             }
+
+            auto qps = integrate(sol_msh, sol_cl, 2 * rec_deg);
+            Eigen::Matrix<T,1,2> hho_grad = Eigen::Matrix<T,1,2>::Zero();
+            for (auto& qp : qps)
+            {
+                //1.1. Grad current solution
+                auto hho_dphi = sol_cb.eval_gradients(qp.point());
+                for (size_t i = 1; i < sol_cb.size(); i++)
+                    hho_grad += rec_sol_loc(i) * hho_dphi.block(i,0,1,2);
+            }
+
+            hho_grad_x.push_back( hho_grad(0) );
+            hho_grad_y.push_back( hho_grad(1) );
 
             sol_cl_count++;
         }
@@ -760,8 +796,8 @@ public:
             size_t sol_cl_ofs = mesh_hier.locate_point(bar, level);
             auto sol_cl = *std::next(sol_msh.cells_begin(), sol_cl_ofs);
 
-            dynamic_vector<T> rec_ref = rec_refs.at(ref_cl_ofs);
-            dynamic_vector<T> rec_sol = rec_sols.at(sol_cl_ofs);
+            dynamic_vector<T> rec_ref_loc =rec_refs.at(ref_cl_ofs);
+            dynamic_vector<T> rec_sol_loc = rec_sols.at(sol_cl_ofs);
 
             auto sol_cb = make_scalar_monomial_basis(sol_msh, sol_cl, hdi.reconstruction_degree());
             auto ref_cb = make_scalar_monomial_basis(ref_msh, ref_cl, ref_hdi.reconstruction_degree());
@@ -773,14 +809,14 @@ public:
 
                 Eigen::Matrix<T,1,2> hho_grad = Eigen::Matrix<T,1,2>::Zero();
                 for (size_t i = 1; i < sol_cb.size(); i++)
-                    hho_grad += rec_sol(i-1) * hho_dphi.block(i,0,1,2);
+                    hho_grad += rec_sol_loc(i) * hho_dphi.block(i,0,1,2);
 
                 //1.2. Grad reference
                 auto ref_dphi = ref_cb.eval_gradients(qp.point());
 
                 Eigen::Matrix<T,1,2> ref_grad = Eigen::Matrix<T,1,2>::Zero();
                 for (size_t i = 1; i < ref_cb.size(); i++)
-                    ref_grad += rec_ref(i-1) * ref_dphi.block(i,0,1,2);
+                    ref_grad += rec_ref_loc(i) * ref_dphi.block(i,0,1,2);
 
                 //1.3. H1-error
                 Eigen::Matrix<T,1,2> diff = hho_grad - ref_grad;
@@ -789,13 +825,13 @@ public:
                 auto hho_phi = sol_cb.eval_functions(qp.point());
                 T hho_ucell = 0;
                 for (size_t i = 0; i < sol_cb.size(); i++)
-                    hho_ucell += rec_sol(i) * hho_phi(i,0);
+                    hho_ucell += rec_sol_loc(i) * hho_phi(i,0);
 
                 //2.2. Reference solution
                 auto ref_phi = ref_cb.eval_functions(qp.point());
                 T ref_ucell = 0;
                 for (size_t i = 0; i < ref_cb.size(); i++)
-                    ref_ucell += rec_ref(i) * ref_phi(i,0);
+                    ref_ucell += rec_ref_loc(i) * ref_phi(i,0);
 
                 //1.2. L2-error
                 T ucell = hho_ucell - ref_ucell;
@@ -809,16 +845,15 @@ public:
 
                 Eigen::Matrix<T,1,2> hho_grad = Eigen::Matrix<T,1,2>::Zero();
                 for (size_t i = 1; i < sol_cb.size(); i++)
-                    hho_grad += rec_sol(i-1) * hho_dphi.block(i,0,1,2);
+                    hho_grad += rec_sol_loc(i) * hho_dphi.block(i,0,1,2);
 
                 auto ref_dphi = ref_cb.eval_gradients(bar);
 
                 Eigen::Matrix<T,1,2> ref_grad = Eigen::Matrix<T,1,2>::Zero();
                 for (size_t i = 1; i < ref_cb.size(); i++)
-                    ref_grad += rec_ref(i-1) * ref_dphi.block(i,0,1,2);
+                    ref_grad += rec_ref_loc(i) * ref_dphi.block(i,0,1,2);
 
-                hho_grad_x.push_back( hho_grad(0) );
-                hho_grad_y.push_back( hho_grad(1) );
+
                 ref_grad_x.push_back( ref_grad(0) );
                 ref_grad_y.push_back( ref_grad(1) );
             }
@@ -826,16 +861,21 @@ public:
             cell_i++;
         }
 
+        silo_db.add_mesh(ref_msh, "ref_mesh");
+        silo_db.add_mesh(sol_msh, "sol_mesh");
+
         disk::silo_zonal_variable<T> rgx("ref_grad_x", ref_grad_x);
-        silo_db.add_variable("refmesh", rgx);
+        silo_db.add_variable("ref_mesh", rgx);
         disk::silo_zonal_variable<T> rgy("ref_grad_y", ref_grad_y);
-        silo_db.add_variable("refmesh", rgy);
+        silo_db.add_variable("ref_mesh", rgy);
 
+
+        //#if 0
         disk::silo_zonal_variable<T> sgx("sol_grad_x", hho_grad_x);
-        silo_db.add_variable("refmesh", sgx);
+        silo_db.add_variable("sol_mesh", sgx);
         disk::silo_zonal_variable<T> sgy("sol_grad_y", hho_grad_y);
-        silo_db.add_variable("refmesh", sgy);
-
+        silo_db.add_variable("sol_mesh", sgy);
+        //#endif
         std::cout << std::endl;
         std::cout << "(H1 error, L2 error) : " << std::sqrt(H1_error);
         std::cout << " - " << std::sqrt(L2_error) << std::endl;
@@ -935,8 +975,6 @@ public:
     {
         auto ref_msh = mesh_hier.finest_mesh();
 
-        std::string visit_output_filename = "hierarchical.silo";
-        silo_db.create(visit_output_filename);
         std::cout << green << "Reference solution, HHO" << reset << std::endl;
         std::cout << "Mesh size: " << average_diameter(ref_msh) << std::endl;
 
@@ -948,11 +986,14 @@ public:
         for (size_t level = sol_level_min; level <= sol_level_max; level++)
         {
             std::cout << "* Level : "<< level << std::endl;
+            std::string visit_output_filename = "hierarchical_l" + tostr(level) + ".silo";
+            silo_db.create(visit_output_filename);
+
             auto sol_msh = *std::next(mesh_hier.meshes_begin(), level);
             //run_fem_hho(level, ref_msh, sol_msh);
             run_hho_hho(level, ref_msh, sol_msh);
+            silo_db.close();
         }
-        silo_db.close();
 
         verify_convergence();
     }
