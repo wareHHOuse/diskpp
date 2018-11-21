@@ -259,7 +259,6 @@ public:
         return rhs;
     }
 
-
     template<typename Assembler>
     void
     make_global_rhs(const mesh_type& msh, Assembler& assembler)
@@ -374,15 +373,26 @@ public:
 
                 if( di.cell_degree() == 0 && di.face_degree() == 0 )
                 {
-                    ux.push_back( vel_eval(0) );
-                    uy.push_back( vel_eval(1) );
-                    e_press.push_back( press_eval );
                     e_theta.push_back( theta_eval.norm() );
                     e_sigma.push_back( sigma_eval.norm() );
                 }
 
                 qps_count++;
             }
+
+
+            auto bar = barycenter(msh, cl);
+            auto v_phi  = cb.eval_functions(bar);
+            auto p_phi  = pb.eval_functions(bar);
+
+            auto u_bar_x = cell_vel(0) * v_phi(0,0);
+            auto u_bar_y = cell_vel(1) * v_phi(1,1);
+            auto p_bar   = spress(0) * p_phi(0);
+
+            ux.push_back( u_bar_x);
+            uy.push_back( u_bar_y);
+            e_press.push_back( p_bar );
+
         }
         ofs.close();
 
@@ -441,8 +451,8 @@ public:
         auxiliar     = matrix_type::Zero(sbs, num_total_quads);
         auxiliar_old = matrix_type::Zero(sbs, num_total_quads);
 
-        auto Ninf = 1.e+4;
-        auto max_iters = 50000;
+        auto Ninf = 1.e+10;
+        auto max_iters = 500000;
         auto tolerance = 1.e-8;
 
         std::string data_filename = "convg" + vp.info + ".data";
