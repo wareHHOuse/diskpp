@@ -28,9 +28,9 @@
 
  #include <unistd.h>
 
- #include "revolution/bases"
- #include "revolution/quadratures"
- #include "revolution/methods/hho"
+ #include "bases/bases.hpp"
+ #include "quadratures/quadratures.hpp"
+ #include "methods/hho"
 
  #include "core/loaders/loader.hpp"
 
@@ -41,7 +41,7 @@
 template<typename Mesh>
 class hho_newton_solver
 {
-    using T = typename Mesh::scalar_type;
+    using T = typename Mesh::coordinate_type;
 
     typedef Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>    matrix_type;
     typedef Eigen::Matrix<T, Eigen::Dynamic, 1>                 vector_type;
@@ -444,7 +444,7 @@ int main(int argc, char **argv)
     int ch;
     algorithm_parameters<T> ap;
 
-    size_t degree = 1;
+    int degree = 1;
 
     while ( (ch = getopt(argc, argv, "k:g:npzfc")) != -1 )
     {

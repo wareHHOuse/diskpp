@@ -10,7 +10,7 @@
 
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
-#include "revolution/methods/hho"
+#include "methods/hho"
 #include "solvers/solver.hpp"
 
 /***************************************************************************/
@@ -22,7 +22,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct rhs_functor< Mesh<T, 2, Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     Matrix<scalar_type, 2, 1> operator()(const point_type& p) const
@@ -73,7 +73,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct solution_functor< Mesh<T, 2, Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     Matrix<scalar_type, 2, 1> operator()(const point_type& p) const
@@ -106,7 +106,7 @@ auto make_solution_function(const Mesh& msh)
     return solution_functor<Mesh>();
 }
 
-using namespace revolution;
+using namespace disk;
 
 #if 0
 template<typename Mesh, typename T>
@@ -143,7 +143,7 @@ template<typename Mesh>
 auto
 run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
 {
-    using T = typename Mesh::scalar_type;
+    using T = typename Mesh::coordinate_type;
 
     hho_degree_info hdi(degree, degree);
 
@@ -154,11 +154,12 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
 
     for (auto& cl : msh)
     {
-        auto cb = make_vector_monomial_basis(msh, cl, hdi.cell_degree());
-        auto G      = make_hlow_vector_laplacian(msh, cl, hdi);
+        auto cb     = make_vector_monomial_basis(msh, cl, hdi.cell_degree());
+        auto G      = make_hho_gradrec_matrix(msh, cl, hdi);
         auto gr     = make_hho_vector_laplacian(msh, cl, hdi);
         auto stab   = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
         auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
+
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = G.second + stab;
         //Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
         auto sc     = diffusion_static_condensation_compute_vector(msh, cl, hdi, A, rhs);
@@ -188,10 +189,11 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
     for (auto& cl : msh)
     {
         auto cb     = make_vector_monomial_basis(msh, cl, hdi.cell_degree());
-        auto G      = make_hlow_vector_laplacian(msh, cl, hdi);
+        auto G      = make_hho_gradrec_matrix(msh, cl, hdi);
         auto gr     = make_hho_vector_laplacian(msh, cl, hdi);
         auto stab   = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
         auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
+
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = G.second + stab;
         //Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
 
@@ -221,7 +223,7 @@ template<typename Mesh>
 auto
 run_diffusion_solver(const Mesh& msh, const size_t k)
 {
-    using T = typename Mesh::scalar_type;
+    using T = typename Mesh::coordinate_type;
 
     T error = run_hho_diffusion_solver(msh, k);
 

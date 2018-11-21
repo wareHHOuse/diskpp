@@ -172,7 +172,7 @@ class polytope<DIM, CODIM, UserData, fixed_storage_polytope<N>>
 
 public:
 
-    typedef identifier<polytope, ident_impl_t, 0> id_type;
+    typedef identifier<polytope, ident_raw_t, 0> id_type;
 
     polytope()
     {}

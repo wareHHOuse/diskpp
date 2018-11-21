@@ -26,8 +26,10 @@
 #pragma once
 
 #include "common/eigen.hpp"
-#include "mechanics/behaviors/maths_tensor.hpp"
-#include "mechanics/behaviors/maths_utils.hpp"
+#include "core/mechanics/behaviors/laws/materialData.hpp"
+#include "core/mechanics/behaviors/maths_tensor.hpp"
+#include "core/mechanics/behaviors/maths_utils.hpp"
+#include "core/mechanics/behaviors/tensor_conversion.hpp"
 #include "mesh/point.hpp"
 
 #define _USE_MATH_DEFINES
@@ -37,53 +39,6 @@ namespace disk
 {
 
 // Law for LinearLaw (test of finite deformations)
-
-template<typename scalar_type>
-class LinearLaw_Data
-{
-  private:
-    scalar_type m_lambda;
-    scalar_type m_mu;
-
-  public:
-    LinearLaw_Data() : m_lambda(1.0), m_mu(1.0) {}
-
-    LinearLaw_Data(const scalar_type& lambda, const scalar_type& mu) : m_lambda(lambda), m_mu(mu) {}
-
-    scalar_type
-    getE() const
-    {
-        return m_mu * (3 * m_lambda + 2 * m_mu) / (m_lambda + m_mu);
-    }
-
-    scalar_type
-    getNu() const
-    {
-        return m_lambda / (2 * (m_lambda + m_mu));
-    }
-
-    scalar_type
-    getLambda() const
-    {
-        return m_lambda;
-    }
-
-    scalar_type
-    getMu() const
-    {
-        return m_mu;
-    }
-
-    void
-    print() const
-    {
-        std::cout << "Material parameters: " << std::endl;
-        std::cout << "* E: " << getE() << std::endl;
-        std::cout << "* Nu: " << getNu() << std::endl;
-        std::cout << "* Lambda: " << getLambda() << std::endl;
-        std::cout << "* Mu: " << getMu() << std::endl;
-    }
-};
 
 // Input : symetric stain tensor(Gs)
 
@@ -96,46 +51,44 @@ class LinearLaw_Data
 //                          Tangent Moduli : C = 2 * mu * I4 + lambda * prod_Kronecker(Id, Id) /
 //                                                               it is the elastic moduli
 
-template<typename scalar_type, int DIM>
+template<typename T, int DIM>
 class LinearLaw_qp
 {
+  public:
+    typedef T                                    scalar_type;
     typedef static_matrix<scalar_type, DIM, DIM> static_matrix_type;
     typedef static_matrix<scalar_type, 3, 3>     static_matrix_type3D;
-    typedef LinearLaw_Data<scalar_type>               data_type;
+    const static size_t dimension = DIM;
+    typedef MaterialData<scalar_type>            data_type;
 
-    static_matrix_type zero_matrix = static_matrix_type::Zero();
-    static_matrix_type3D zero_matrix3D = static_matrix_type3D::Zero();
-
+  private:
     // coordinat and weight of considered gauss point.
     point<scalar_type, DIM> m_point;
     scalar_type             m_weight;
 
     // internal variables at previous step
-    static_matrix_type m_estrain_prev; // elastic strain
+    static_matrix_type3D m_estrain_prev; // elastic strain
 
     // internal variables at current step
-    static_matrix_type m_estrain_curr; // elastic strain
+    static_matrix_type3D m_estrain_curr; // elastic strain
 
-    static_tensor<scalar_type, DIM>
+    static_tensor<scalar_type, 3>
     elastic_modulus(const data_type& data) const
     {
 
-        return 2 * data.getMu() * compute_IdentitySymTensor<scalar_type, DIM>() +
-               data.getLambda() * compute_IxI<scalar_type, DIM>();
-    }
-
-    static_matrix_type3D
-    convert3D(const static_matrix_type& mat) const
-    {
-        static_matrix_type3D ret  = zero_matrix;
-        ret.block(0, 0, DIM, DIM) = mat;
-
-        return ret;
+        return 2 * data.getMu() * compute_IdentitySymTensor<scalar_type, 3>() +
+               data.getLambda() * compute_IxI<scalar_type, 3>();
     }
 
   public:
+    LinearLaw_qp() :
+      m_weight(0), m_estrain_prev(static_matrix_type3D::Zero()), m_estrain_curr(static_matrix_type3D::Zero())
+    {
+    }
+
     LinearLaw_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) :
-      m_point(point), m_weight(weight), m_estrain_prev(zero_matrix), m_estrain_curr(zero_matrix)
+      m_point(point), m_weight(weight), m_estrain_prev(static_matrix_type3D::Zero()),
+      m_estrain_curr(static_matrix_type3D::Zero())
     {
     }
 
@@ -160,25 +113,25 @@ class LinearLaw_qp
     static_matrix_type3D
     getElasticStrain() const
     {
-        return convert3D(m_estrain_curr);
+        return m_estrain_curr;
     }
 
     static_matrix_type3D
     getPlasticStrain() const
     {
-        return zero_matrix3D;
+        return static_matrix_type3D::Zero();
     }
 
     static_matrix_type
     getTotalStrain() const
     {
-        return m_estrain_curr;
+        return convertMatrix<scalar_type, DIM>(m_estrain_curr);
     }
 
     static_matrix_type
     getTotalStrainPrev() const
     {
-        return m_estrain_prev;
+        return convertMatrix<scalar_type, DIM>(m_estrain_prev);
     }
 
     scalar_type
@@ -193,22 +146,40 @@ class LinearLaw_qp
         m_estrain_prev = m_estrain_curr;
     }
 
-    static_matrix_type
-    compute_stress(const data_type& data) const
+    static_matrix_type3D
+    compute_stress3D(const data_type& data) const
     {
         return data.getLambda() * m_estrain_curr;
     }
 
-    std::pair<static_matrix_type, static_tensor<scalar_type, DIM>>
-    compute_whole(const static_matrix_type& incr_F, const data_type& data, bool tangentmodulus = true)
+    static_matrix_type
+    compute_stress(const data_type& data) const
     {
-        static_tensor<scalar_type, DIM> Cep = data.getLambda() * compute_IdentityTensor<scalar_type, DIM>();
+        return convertMatrix<scalar_type, DIM>(compute_stress3D(data));
+    }
+
+    std::pair<static_matrix_type3D, static_tensor<scalar_type, 3>>
+    compute_whole3D(const static_matrix_type3D& F_curr, const data_type& data, bool tangentmodulus = true)
+    {
+        static_tensor<scalar_type, 3> Cep = data.getLambda() * compute_IdentityTensor<scalar_type, 3>();
 
         // is always elastic
-        m_estrain_curr = m_estrain_prev + incr_F;
+        m_estrain_curr = F_curr;
 
         // compute Cauchy stress
-        const static_matrix_type stress = this->compute_stress(data);
+        const static_matrix_type3D stress = this->compute_stress3D(data);
+
+        return std::make_pair(stress, Cep);
+    }
+
+    std::pair<static_matrix_type, static_tensor<scalar_type, DIM>>
+    compute_whole(const static_matrix_type& F_curr, const data_type& data, bool tangentmodulus = true)
+    {
+        const static_matrix_type3D F3D         = convertMatrix3D(F_curr);
+        const auto                 behaviors3D = compute_whole3D(F3D, data, tangentmodulus);
+
+        const static_matrix_type              stress = convertMatrix<scalar_type, DIM>(behaviors3D.first);
+        const static_tensor<scalar_type, DIM> Cep    = convertTensor<scalar_type, DIM>(behaviors3D.second);
 
         return std::make_pair(stress, Cep);
     }

@@ -184,8 +184,8 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
 
     std::vector<point_type>                         m_points;
     std::vector<fvca5_poly>                         m_polys;
-    std::vector<std::array<ident_impl_t, 2>>        m_boundary_edges;
-    std::vector<std::array<ident_impl_t, 4>>        m_edges;
+    std::vector<std::array<ident_raw_t, 2>>        m_boundary_edges;
+    std::vector<std::array<ident_raw_t, 4>>        m_edges;
 
     bool fvca5_read_points(std::ifstream& ifs)
     {
@@ -222,7 +222,7 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
 
             for (size_t j = 0; j < polynum; j++)
             {
-                ident_impl_t val;
+                ident_raw_t val;
                 ifs >> val;
                 p.nodes.push_back(val-1);
             }
@@ -245,7 +245,7 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
 
         for (size_t i = 0; i < elements_to_read; i++)
         {
-            std::array<ident_impl_t, 2> b_edge;
+            std::array<ident_raw_t, 2> b_edge;
             ifs >> b_edge[0]; b_edge[0] -= 1;
             ifs >> b_edge[1]; b_edge[1] -= 1;
 
@@ -272,7 +272,7 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
 
         for (size_t i = 0; i < elements_to_read; i++)
         {
-            std::array<ident_impl_t, 4> edge;
+            std::array<ident_raw_t, 4> edge;
             ifs >> edge[0]; edge[0] -= 1;
             ifs >> edge[1]; edge[1] -= 1;
             ifs >> edge[2];
@@ -1907,9 +1907,9 @@ class medit_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
 
    std::vector<point_type>                                     m_points;
    std::vector<node_type>                                      m_nodes;
-   std::vector<std::array<ident_impl_t, 2>>                    m_edges;
+   std::vector<std::array<ident_raw_t, 2>>                    m_edges;
    std::vector<medit2d_poly>                                   m_polys;
-   std::vector<std::pair<std::array<ident_impl_t, 2>, size_t>> m_boundary_edges;
+   std::vector<std::pair<std::array<ident_raw_t, 2>, size_t>> m_boundary_edges;
 
    bool
    medit_read_vertices(std::ifstream& ifs)
@@ -1946,10 +1946,10 @@ class medit_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
 
       for (size_t i = 0; i < elements_to_read; i++) {
          medit2d_poly              p;
-         std::vector<ident_impl_t> nodes(polynum + 1, 0);
+         std::vector<ident_raw_t> nodes(polynum + 1, 0);
 
          for (size_t j = 0; j < polynum; j++) {
-            ident_impl_t val;
+            ident_raw_t val;
             ifs >> val;
             p.nodes.push_back(val - 1);
             nodes[j] = val - 1;
@@ -1964,7 +1964,7 @@ class medit_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
 
          // We have too create edges
          for (size_t j = 0; j < polynum; j++) {
-            std::array<ident_impl_t, 2> b_edge = {nodes[j], nodes[j + 1]};
+            std::array<ident_raw_t, 2> b_edge = {nodes[j], nodes[j + 1]};
             assert(b_edge[0] != b_edge[1]);
             if (b_edge[0] > b_edge[1]) std::swap(b_edge[0], b_edge[1]);
 
@@ -1988,7 +1988,7 @@ class medit_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
       m_boundary_edges.reserve(elements_to_read);
 
       for (size_t i = 0; i < elements_to_read; i++) {
-         std::array<ident_impl_t, 2> b_edge;
+         std::array<ident_raw_t, 2> b_edge;
          ifs >> b_edge[0];
          b_edge[0] -= 1;
          ifs >> b_edge[1];
@@ -1998,7 +1998,7 @@ class medit_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
 
          if (b_edge[0] > b_edge[1]) std::swap(b_edge[0], b_edge[1]);
 
-         std::array<ident_impl_t, 2> bnd = {b_edge[0], b_edge[1]};
+         std::array<ident_raw_t, 2> bnd = {b_edge[0], b_edge[1]};
 
          size_t b_id;
          ifs >> b_id;
@@ -2010,7 +2010,7 @@ class medit_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
    }
 
    bool
-   face_unique(const std::array<ident_impl_t, 2>& f1, const std::array<ident_impl_t, 2>& f2)
+   face_unique(const std::array<ident_raw_t, 2>& f1, const std::array<ident_raw_t, 2>& f2)
    {
       if (f1[0] == f2[0]) {
          if (f1[1] == f2[1]) {

@@ -34,6 +34,20 @@
 const size_t MIN_TEST_DEGREE = 0;
 const size_t MAX_TEST_DEGREE = 3;
 
+using namespace Eigen;
+
+template<class T>
+typename std::enable_if<!std::numeric_limits<T>::is_integer, bool>::type
+    almost_equal(T x, T y, T ulp)
+{
+    // the machine epsilon has to be scaled to the magnitude of the values used
+    // and multiplied by the desired precision in ULPs (units in the last place)
+    return std::abs(x-y) <= std::numeric_limits<T>::epsilon() * std::abs(x+y) * ulp
+    // unless the result is subnormal
+           || std::abs(x-y) < std::numeric_limits<T>::min();
+}
+
+
 /*****************************************************************************************/
 template<typename Mesh>
 struct scalar_testing_function;
@@ -42,7 +56,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct scalar_testing_function< Mesh<T,2,Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -55,7 +69,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct scalar_testing_function< Mesh<T,3,Storage> >
 {
     typedef Mesh<T,3,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     scalar_type operator()(const point_type& pt) const
@@ -78,7 +92,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct vector_testing_function< Mesh<T,2,Storage> >
 {
 	typedef Mesh<T,2,Storage> 				mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
     typedef Matrix<scalar_type, 2, 1> 		ret_type;
 
@@ -95,7 +109,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct vector_testing_function< Mesh<T,3,Storage> >
 {
 	typedef Mesh<T,3,Storage> 				mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
     typedef Matrix<scalar_type, 3, 1> 		ret_type;
 
@@ -123,7 +137,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct vector_testing_function_div< Mesh<T,2,Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
     typedef Matrix<scalar_type, 2, 1>       ret_type;
 
@@ -138,7 +152,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct vector_testing_function_div< Mesh<T,3,Storage> >
 {
     typedef Mesh<T,3,Storage>               mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
     typedef Matrix<scalar_type, 3, 1>       ret_type;
 
@@ -402,7 +416,7 @@ do_testing(std::vector<Mesh>& meshes, const Function& run_test,
            size_t min_test_degree = MIN_TEST_DEGREE,
            size_t max_test_degree = MAX_TEST_DEGREE)
 {
-	using T = typename Mesh::scalar_type;
+	using T = typename Mesh::coordinate_type;
 
 	for (size_t k = min_test_degree; k <= max_test_degree; k++)
     {
@@ -437,8 +451,10 @@ do_testing(std::vector<Mesh>& meshes, const Function& run_test,
                 std::cout << std::scientific << std::setprecision(5) << l2_errors.at(i) << "    ";
                 std::cout << std::defaultfloat << std::setprecision(3) << rate << "    ";
 
-                if ( rate < expected_rate(k)-0.5 || rate > expected_rate(k)+0.5 )
+                if ( rate < expected_rate(k)-0.5 )
                     std::cout << "[" << red << "FAIL" << nocolor << "]";
+                else if ( rate > expected_rate(k)+0.5 )
+                    std::cout << "[" << yellow << "FAIL" << nocolor << "]";
                 else
                     std::cout << "[" << green << " OK " << nocolor << "]";
 
@@ -520,7 +536,7 @@ class tester
 
     void test_cartesian_diskpp(void)
     {
-        std::cout << yellow << "Mesh under test: cartesian mesh (DiSk++)";
+        std::cout << yellow << "Mesh under test: 3D cartesian mesh (DiSk++)";
         std::cout << nocolor << std::endl;
         using T = double;
 
@@ -584,11 +600,11 @@ public:
         if ( do_quads )
             test_quads();
 
-        if ( do_tetrahedra_netgen )
-            test_tetrahedra_netgen();
-
         if ( do_cartesian_diskpp )
             test_cartesian_diskpp();
+
+        if ( do_tetrahedra_netgen )
+            test_tetrahedra_netgen();
 
         if ( do_generic_fvca6 )
             test_generic_fvca6();

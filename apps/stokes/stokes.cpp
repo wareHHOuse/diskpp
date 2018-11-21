@@ -30,9 +30,9 @@
 
 #include <unistd.h>
 
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "bases/bases.hpp"
+#include "quadratures/quadratures.hpp"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -43,15 +43,15 @@
 template<typename Mesh, typename Velocity, typename Pressure, typename Assembler>
 auto
 compute_errors(const Mesh& msh,
-                const dynamic_vector<typename Mesh::scalar_type>& sol,
-                const typename revolution::hho_degree_info & hdi,
+                const dynamic_vector<typename Mesh::coordinate_type>& sol,
+                const typename disk::hho_degree_info & hdi,
                 const Velocity& velocity,
                 const Pressure& pressure,
                 const Assembler& assembler,
                 const bool& use_sym_grad)
 {
     typedef Mesh mesh_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
 
     auto dim =  Mesh::dimension;
 
@@ -63,26 +63,26 @@ compute_errors(const Mesh& msh,
     {
     	auto bar = barycenter(msh, cl);
     	Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, velocity);
-    	auto cbs = revolution::vector_basis_size(hdi.cell_degree(), dim, dim);
-    	auto cell_ofs = revolution::priv::offset(msh, cl);
+    	auto cbs = disk::vector_basis_size(hdi.cell_degree(), dim, dim);
+    	auto cell_ofs = disk::priv::offset(msh, cl);
     	Matrix<scalar_type, Dynamic, 1> s = sol.block(cell_ofs * cbs, 0, cbs, 1);
     	Matrix<scalar_type, Dynamic, 1> diff = s - p.head(cbs);
-    	auto cb = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
-    	Matrix<scalar_type, Dynamic, Dynamic> mm = revolution::make_mass_matrix(msh, cl, cb);
+    	auto cb = disk::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
+    	Matrix<scalar_type, Dynamic, Dynamic> mm = disk::make_mass_matrix(msh, cl, cb);
     	error += diff.dot(mm * diff);
     	//ofs << bar.x() << " " << bar.y() << " " << s(0) << " " << s(1) << std::endl;
 
         //pressure error
-        Matrix<scalar_type, Dynamic, 1> ppres = revolution::project_function(msh, cl, hdi.face_degree(), pressure);
-        auto fbs = revolution::vector_basis_size(hdi.face_degree(), dim - 1, dim);
-        auto pbs = revolution::scalar_basis_size(hdi.face_degree(), dim);
-        auto pb  = revolution::make_scalar_monomial_basis(msh, cl, hdi.face_degree());
+        Matrix<scalar_type, Dynamic, 1> ppres = disk::project_function(msh, cl, hdi.face_degree(), pressure);
+        auto fbs = disk::vector_basis_size(hdi.face_degree(), dim - 1, dim);
+        auto pbs = disk::scalar_basis_size(hdi.face_degree(), dim);
+        auto pb  = disk::make_scalar_monomial_basis(msh, cl, hdi.face_degree());
         auto num_other_faces = assembler.num_assembled_faces();
         auto pres_ofs = cbs * msh.cells_size() + fbs * num_other_faces + pbs * cell_ofs;
 
         Matrix<scalar_type, Dynamic, 1> spres = sol.block(pres_ofs, 0, pbs, 1);
     	Matrix<scalar_type, Dynamic, 1> diff_pres = spres - ppres.head(pbs);
-    	Matrix<scalar_type, Dynamic, Dynamic> scalar_mm = revolution::make_mass_matrix(msh, cl, pb);
+    	Matrix<scalar_type, Dynamic, Dynamic> scalar_mm = disk::make_mass_matrix(msh, cl, pb);
     	error_pres += diff_pres.dot(scalar_mm*diff_pres);
 
         //energy error
@@ -96,7 +96,7 @@ compute_errors(const Mesh& msh,
 
             if (msh.is_boundary(fc))
             {
-                auto fb = revolution::make_vector_monomial_basis(msh, fc, hdi.face_degree());
+                auto fb = disk::make_vector_monomial_basis(msh, fc, hdi.face_degree());
                 Matrix<scalar_type, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, hdi.face_degree());
                 Matrix<scalar_type, Dynamic, 1> rhs = make_rhs(msh, fc, fb, velocity, hdi.face_degree());
                 svel.block(cbs + i * fbs, 0, fbs, 1) = mass.llt().solve(rhs);
@@ -108,7 +108,7 @@ compute_errors(const Mesh& msh,
             }
         }
         Matrix<scalar_type, Dynamic, 1> diff_vel = svel - p;
-        auto gr = revolution::make_hho_stokes(msh, cl, hdi, use_sym_grad);
+        auto gr = disk::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
         error_vel += diff_vel.dot(factor * (gr.second + stab)*diff_vel);
@@ -125,7 +125,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     typedef Mesh mesh_type;
     typedef typename mesh_type::cell        cell_type;
     typedef typename mesh_type::face        face_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
 
     typedef dynamic_matrix<scalar_type>     matrix_type;
     typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
@@ -171,21 +171,21 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
         return std::pow(p.x(), 5.)  +  std::pow(p.y(), 5.)  - 1./3.;
     };
 
-    typename revolution::hho_degree_info hdi(degree + 1, degree);
+    typename disk::hho_degree_info hdi(degree + 1, degree);
     boundary_type bnd(msh);
     bnd.addDirichletEverywhere(velocity);
 
-    auto assembler = revolution::make_stokes_assembler(msh, hdi, bnd);
+    auto assembler = disk::make_stokes_assembler(msh, hdi, bnd);
 
     scalar_type factor = (use_sym_grad)? 2. : 1.;
 
     for (auto cl : msh)
     {
-        auto gr = revolution::make_hho_stokes(msh, cl, hdi, use_sym_grad);
+        auto gr = disk::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
         auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, hdi);
-        auto cell_basis = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
+        auto cell_basis = disk::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
         auto rhs = make_rhs(msh, cl, cell_basis, rhs_fun);
         assembler.assemble(msh, cl, factor * (gr.second + stab), -dr, rhs);
     }

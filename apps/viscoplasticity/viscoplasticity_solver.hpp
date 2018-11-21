@@ -30,9 +30,9 @@
 
 #include <unistd.h>
 
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "bases/bases.hpp"
+#include "quadratures/quadratures.hpp"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -58,7 +58,7 @@ class augmented_lagrangian_viscoplasticity
     typedef Mesh mesh_type;
     typedef typename mesh_type::cell        cell_type;
     typedef typename mesh_type::face        face_type;
-    typedef typename mesh_type::scalar_type T;
+    typedef typename mesh_type::coordinate_type T;
 
     typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
 
@@ -75,7 +75,7 @@ class augmented_lagrangian_viscoplasticity
     vector_funtion_type     rhs_fun, velocity;
     dynamic_vector<T>             multiplier, auxiliar, auxiliar_old;
 
-    typename revolution::hho_degree_info di;
+    typename disk::hho_degree_info di;
     T             factor;
     T             viscosity;
     T             alpha;
@@ -88,7 +88,7 @@ public:
     bool                    use_sym_grad;
 
     augmented_lagrangian_viscoplasticity(const mesh_type& msh,
-                            const typename revolution::hho_degree_info & hdi,
+                            const typename disk::hho_degree_info & hdi,
                             const T& alpha_ext):
                             di(hdi), alpha(alpha_ext)
     {
@@ -112,10 +112,10 @@ public:
 
         dim =  Mesh::dimension;
 
-        cbs = revolution::vector_basis_size(di.cell_degree(), dim, dim);
-        fbs = revolution::vector_basis_size(di.face_degree(), dim - 1, dim);
-        pbs = revolution::scalar_basis_size(di.face_degree(), dim);
-        sbs = revolution::sym_matrix_basis_size(di.face_degree(), dim, dim);
+        cbs = disk::vector_basis_size(di.cell_degree(), dim, dim);
+        fbs = disk::vector_basis_size(di.face_degree(), dim - 1, dim);
+        pbs = disk::scalar_basis_size(di.face_degree(), dim);
+        sbs = disk::sym_matrix_basis_size(di.face_degree(), dim, dim);
     };
 
     auto
@@ -243,7 +243,7 @@ public:
                 throw std::invalid_argument("No problem defined");
         }
 
-        auto assembler = revolution::make_stokes_assembler_alg(msh, di, bnd);
+        auto assembler = disk::make_stokes_assembler_alg(msh, di, bnd);
 
         return assembler;
     }
@@ -287,13 +287,13 @@ public:
 
             //energy error
             vector_type svel = assembler.take_velocity(msh, cl, sol);
-            vector_type pvel = revolution::project_function(msh, cl, di, velocity);
+            vector_type pvel = disk::project_function(msh, cl, di, velocity);
             //vector_type  svel_old =  assembler.take_velocity(msh, cl, sol_old);
             vector_type diff_vel = svel - pvel;
-            auto gr = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
+            auto gr = disk::make_hho_stokes(msh, cl, di, use_sym_grad);
             matrix_type stab;
             stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
-            auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
+            auto G = disk::make_hlow_stokes(msh, cl, di, use_sym_grad);
 
             matrix_type B = factor * (viscosity*G.second + viscosity*stab);
 
@@ -318,20 +318,20 @@ public:
     {
         vector_type u_TF  = assembler.take_velocity(msh, cl, velocity_dofs);
         auto value = 1./(factor * (viscosity + alpha));
-        auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
+        auto G = disk::make_hlow_stokes(msh, cl, di, use_sym_grad);
 
-        auto cell_ofs    = revolution::priv::offset(msh, cl);
+        auto cell_ofs    = disk::priv::offset(msh, cl);
         vector_type Gu = G.first * u_TF;
         vector_type stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
 
         //Theta
-        auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
-        //barycenter only for k = 0;
+        auto sb = disk::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
+        //barycenter only for k = 0; fix this for higher orders
         auto bar = barycenter(msh, cl);
         auto s_phi  = sb.eval_functions(bar);
 
         vector_type  theta  = stress  +  factor * alpha * Gu;
-        Matrix<T, Mesh::dimension, Mesh::dimension> theta_eval = revolution::eval(theta, s_phi);
+        Matrix<T, Mesh::dimension, Mesh::dimension> theta_eval = disk::eval(theta, s_phi);
         T theta_norm  = std::sqrt((theta_eval.cwiseProduct(theta_eval)).sum());
 
         T theta_eigen = theta_eval.norm();
@@ -366,8 +366,8 @@ public:
         for(auto cl: msh)
         {
             vector_type u_TF = assembler.take_velocity(msh, cl, sol);
-            auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
-            auto cell_ofs = revolution::priv::offset(msh, cl);
+            auto G = disk::make_hlow_stokes(msh, cl, di, use_sym_grad);
+            auto cell_ofs = disk::priv::offset(msh, cl);
 
             vector_type Gu = G.first * u_TF;
             vector_type gamma_old = auxiliar_old.block(cell_ofs *sbs, 0, sbs, 1);
@@ -378,7 +378,7 @@ public:
 
             multiplier.block(cell_ofs * sbs, 0, sbs, 1) += diff_stress;
 
-            auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
+            auto sb = disk::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
             matrix_type mass = make_mass_matrix(msh, cl, sb);
 
             conv_stress += diff_stress.dot(mass * diff_stress);
@@ -397,11 +397,11 @@ public:
                     const cell_type& cl,
                     const Assembler& assembler)
     {
-        auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
-        auto cb = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
-        auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
+        auto G = disk::make_hlow_stokes(msh, cl, di, use_sym_grad);
+        auto cb = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
+        auto sb = disk::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
 
-        auto cell_ofs =  revolution::priv::offset(msh, cl);
+        auto cell_ofs =  disk::priv::offset(msh, cl);
         auto num_faces = howmany_faces(msh, cl);
 
         vector_type rhs = vector_type::Zero(cbs + fbs * num_faces);
@@ -414,7 +414,7 @@ public:
         vector_type gamma  = compute_auxiliar( msh,  cl, assembler, sol_old); //or sol at this point it's the same
         auxiliar.block(cell_ofs * sbs, 0, sbs, 1) = gamma;
         vector_type str_agam = stress - factor * alpha * gamma;
-        matrix_type mm = revolution::make_mass_matrix(msh, cl, sb);
+        matrix_type mm = disk::make_mass_matrix(msh, cl, sb);
 
         rhs -=  G.first.transpose() * mm * str_agam;
 
@@ -445,8 +445,8 @@ public:
 
         for (auto cl : msh)
         {
-            auto G  = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
-            auto gr = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
+            auto G  = disk::make_hlow_stokes(msh, cl, di, use_sym_grad);
+            auto gr = disk::make_hho_stokes(msh, cl, di, use_sym_grad);
             matrix_type stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
             auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
 
@@ -489,7 +489,7 @@ public:
                     const problem_type& problem)
     {
         auto dim = Mesh::dimension;
-        auto rbs = revolution::vector_basis_size(di.reconstruction_degree(), dim, dim);
+        auto rbs = disk::vector_basis_size(di.reconstruction_degree(), dim, dim);
 
         dynamic_vector<T> cell_sol(cbs * msh.cells_size());
         dynamic_vector<T> cell_rec_sol(rbs * msh.cells_size());
@@ -501,8 +501,8 @@ public:
 
         for(auto cl : msh)
         {
-            auto gr  = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
-            auto cell_ofs = revolution::priv::offset(msh, cl);
+            auto gr  = disk::make_hho_stokes(msh, cl, di, use_sym_grad);
+            auto cell_ofs = disk::priv::offset(msh, cl);
             vector_type svel =  assembler.take_velocity(msh, cl, sol);
             assert((gr.first * svel).rows() == rbs - dim);
             cell_rec_sol.block(cell_ofs * rbs + dim, 0, rbs - dim, 1) = gr.first * svel;
@@ -514,26 +514,26 @@ public:
 
             //Velocity
             vector_type cell_vel = svel.block(0,0, cbs, 1);
-            auto cb  = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
+            auto cb  = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
             auto phi = cb.eval_functions(bar);
-            Matrix<T, Mesh::dimension, 1> ueval = revolution::eval(cell_vel, phi);
+            Matrix<T, Mesh::dimension, 1> ueval = disk::eval(cell_vel, phi);
 
             //Pressure
             vector_type spress =  assembler.take_pressure(msh, cl, sol);
-            auto pb  = revolution::make_scalar_monomial_basis(msh, cl, di.face_degree());
+            auto pb  = disk::make_scalar_monomial_basis(msh, cl, di.face_degree());
             auto p_phi = pb.eval_functions(bar);
             T peval =  p_phi.dot(spress);
 
             //Stress
-            auto sb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
+            auto sb = disk::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
             auto s_phi  = sb.eval_functions(bar);
-            auto G = revolution::make_hlow_stokes(msh, cl, di, use_sym_grad);
+            auto G = disk::make_hlow_stokes(msh, cl, di, use_sym_grad);
             vector_type Gu = G.first * svel;
             vector_type stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
             vector_type theta  = stress  +  factor * alpha * Gu;
-            tensor_type theta_eval = revolution::eval(theta, s_phi);
-            tensor_type sigma_eval = revolution::eval(stress, s_phi);
-            tensor_type grad_eval = revolution::eval(Gu, s_phi);
+            tensor_type theta_eval = disk::eval(theta, s_phi);
+            tensor_type sigma_eval = disk::eval(stress, s_phi);
+            tensor_type grad_eval = disk::eval(Gu, s_phi);
 
             T divu = grad_eval(0,0) + grad_eval(1,1);
             T tr_stress = sigma_eval(0,0) + sigma_eval(1,1);

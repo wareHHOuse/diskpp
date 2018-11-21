@@ -149,7 +149,7 @@ class mesh_hierarchy
         for (auto& e : m_edges)
         {
             assert(!e.is_broken);
-            auto bar = (m_points[e.p0] + m_points[e.p1])*0.5;
+            auto bar = (m_points[e.p0] + m_points[e.p1])/T(2);
             e.pb = m_points.size();
             m_points.push_back(bar);
             e.is_broken = true;
@@ -392,9 +392,9 @@ public:
 
         for (size_t i = 0; i < levels; i++)
         {
-            std::cout << "Building level " << i+1 << " mesh. H = ";
+            //std::cout << "Building level " << i+1 << " mesh. H = ";
             auto next_mesh = build_next( meshes[i] );
-            std::cout << average_diameter(next_mesh) << std::endl;
+            //std::cout << average_diameter(next_mesh) << std::endl;
             //next_mesh.statistics();
             meshes.push_back( next_mesh );
             auto c2f = make_coarse_to_fine_map(meshes[i], meshes[i+1]);

@@ -35,13 +35,14 @@
 #include "../Parameters.hpp"
 #include "mechanics/BoundaryConditions.hpp"
 #include "plasticity_elementary_computation.hpp"
-#include "revolution/bases"
-#include "revolution/methods/hho"
-#include "revolution/quadratures"
+#include "bases/bases.hpp"
+#include "methods/hho"
+#include "quadratures/quadratures.hpp"
 
 #include "solvers/solver.hpp"
 
 #include "timecounter.h"
+#include <unsupported/Eigen/ArpackSupport>
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -53,9 +54,9 @@ template<typename MeshType>
 class NewtonRaphson_step_plasticity
 {
     typedef MeshType                                       mesh_type;
-    typedef typename mesh_type::scalar_type                scalar_type;
+    typedef typename mesh_type::coordinate_type                scalar_type;
     typedef ParamRun<scalar_type>                          param_type;
-    typedef typename revolution::hho_degree_info           hdi_type;
+    typedef typename disk::hho_degree_info           hdi_type;
     typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
 
     const static int dimension = mesh_type::dimension;
@@ -63,7 +64,7 @@ class NewtonRaphson_step_plasticity
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
-    typedef revolution::assembler_mechanics<mesh_type> assembler_type;
+    typedef disk::assembler_mechanics<mesh_type> assembler_type;
 
     typedef plasticity<mesh_type> elem_type;
 
@@ -99,7 +100,7 @@ class NewtonRaphson_step_plasticity
         m_bL.clear();
         m_bL.resize(m_msh.cells_size());
 
-        m_assembler = revolution::make_mechanics_assembler(m_msh, m_hdi, m_bnd);
+        m_assembler = disk::make_mechanics_assembler(m_msh, m_hdi, m_bnd);
     }
 
     bool
@@ -139,7 +140,7 @@ class NewtonRaphson_step_plasticity
              Law&                               law,
              bool                               elastic_modulus = false)
     {
-        typename revolution::static_condensation_vector<mesh_type> statcond;
+        typename disk::static_condensation_vector<mesh_type> statcond;
 
         elem_type    elem(m_msh, m_hdi);
         AssemblyInfo ai;
@@ -157,6 +158,7 @@ class NewtonRaphson_step_plasticity
 
         for (auto& cl : m_msh)
         {
+            // std::cout << "cell " << cl << std::endl;
             // Gradient Reconstruction
             matrix_dynamic GT;
             tc.tic();
@@ -246,6 +248,11 @@ class NewtonRaphson_step_plasticity
             tc.tic();
             auto scnp = statcond.compute_rhsfull(m_msh, cl, lhs, rhs, m_hdi);
 
+            // for (size_t k = 0; k < scnp.first.rows(); k++)
+            // {
+            //     std::cout << k << " " << scnp.first.row(k).sum() << " " << scnp.first.col(k).sum() << std::endl;
+            // }
+
             m_AL[cell_i] = statcond.AL;
             m_bL[cell_i] = statcond.bL;
 
@@ -276,9 +283,22 @@ class NewtonRaphson_step_plasticity
         tc.tic();
         m_system_solution = vector_dynamic::Zero(m_assembler.LHS.rows());
 
-        disk::solvers::pardiso_params<scalar_type> pparams;
-        mkl_pardiso(pparams, m_assembler.LHS, m_assembler.RHS, m_system_solution);
+        if(m_system_solution.size() > 0)
+        {
+            disk::solvers::pardiso_params<scalar_type> pparams;
+            mkl_pardiso(pparams, m_assembler.LHS, m_assembler.RHS, m_system_solution);
+        }
         tc.toc();
+
+        // Eigen::SelfAdjointEigenSolver<sparse_matrix<scalar_type>> svd;
+
+        // svd.compute(m_assembler.LHS);
+        // auto                                         sigma_min = svd.eigenvalues()(0);
+        // auto                                         sigma_max = svd.eigenvalues()(svd.eigenvalues().size() - 1);
+        // auto                                         cond      = sigma_max / sigma_min;
+        // std::cout << "Condition number: " << cond << std::endl;
+        // std::cout << "Sigma max: " << sigma_max << std::endl;
+        // std::cout << "Sigma min: " << sigma_min << std::endl;
 
         return SolveInfo(m_assembler.LHS.rows(), m_assembler.LHS.nonZeros(), tc.to_double());
     }
@@ -289,8 +309,8 @@ class NewtonRaphson_step_plasticity
         timecounter tc;
         tc.tic();
 
-        const int fbs = revolution::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
-        const int cbs = revolution::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
+        const int fbs = disk::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
+        const int cbs = disk::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
 
         const auto solF = m_assembler.expand_solution_nl(m_msh, m_bnd, m_system_solution, m_solution_faces);
 

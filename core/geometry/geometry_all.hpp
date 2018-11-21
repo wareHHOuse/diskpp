@@ -45,34 +45,10 @@ namespace disk {
 
 /* Compute an estimate of the mesh discretization step 'h' */
 template<typename Mesh>
-[[deprecated("Use average_diameter(). This is not the correct way to compute h.")]]
-typename Mesh::scalar_type
-mesh_h(const Mesh& msh)
-{
-    typename Mesh::scalar_type h{};
-    for (auto itor = msh.cells_begin(); itor != msh.cells_end(); itor++)
-    {
-        auto cell = *itor;
-        auto cell_measure = measure(msh, cell);
-
-        auto fcs = faces(msh, cell);
-        typename Mesh::scalar_type face_sum{};
-        for (auto& f : fcs)
-        {
-            auto m = measure(msh, f);
-            face_sum += m;
-        }
-        h = std::max(h, cell_measure/face_sum);
-    }
-
-    return h;
-}
-
-template<typename Mesh>
-typename Mesh::scalar_type
+typename Mesh::coordinate_type
 average_diameter(const Mesh& msh)
 {
-    typename Mesh::scalar_type h{};
+    typename Mesh::coordinate_type h{};
     for (auto& cl : msh)
     {
         h += diameter(msh, cl);
@@ -130,14 +106,13 @@ barycenter(const Mesh<T,2,Storage>& msh, const typename Mesh<T,2,Storage>::cell_
     return tot_bar/(tot_meas*T(3));
 }
 
-
 template<typename Mesh, typename Element>
-typename Mesh::scalar_type
+typename Mesh::coordinate_type
 diameter(const Mesh& msh, const Element& elem)
 {
     const auto pts = points(msh, elem);
 
-    typename Mesh::scalar_type diam = 0.;
+    typename Mesh::coordinate_type diam = 0.;
 
     for (size_t i = 0; i < pts.size(); i++)
         for (size_t j = i+1; j < pts.size(); j++)
@@ -152,12 +127,12 @@ diameter_boundingbox(const Mesh<T, 3, Storage>& msh, const typename Mesh<T, 3, S
 {
     const auto pts = points(msh, cl);
 
-    T xmin = 0;
-    T xmax = 0;
-    T ymin = 0;
-    T ymax = 0;
-    T zmin = 0;
-    T zmax = 0;
+    T xmin = pts[0].x();
+    T xmax = pts[0].x();
+    T ymin = pts[0].y();
+    T ymax = pts[0].y();
+    T zmin = pts[0].z();
+    T zmax = pts[0].z();
 
     for (auto& pt : pts)
     {
@@ -199,10 +174,10 @@ diameter_boundingbox(const Mesh<T, 2, Storage>&                      msh,
 {
     const auto pts = points(msh, cl);
 
-    T xmin = 0;
-    T xmax = 0;
-    T ymin = 0;
-    T ymax = 0;
+    T xmin = pts[0].x();
+    T xmax = pts[0].x();
+    T ymin = pts[0].y();
+    T ymax = pts[0].y();
 
     for (auto& pt : pts)
     {

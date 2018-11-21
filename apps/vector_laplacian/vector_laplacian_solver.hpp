@@ -29,9 +29,9 @@
 #include <iostream>
 #include <sstream>
 
-#include "revolution/bases"
-#include "revolution/methods/hho"
-#include "revolution/quadratures"
+#include "bases/bases.hpp"
+#include "methods/hho"
+#include "quadratures/quadratures.hpp"
 
 #include "solvers/solver.hpp"
 
@@ -71,7 +71,7 @@ template<typename Mesh>
 class vector_laplacian_solver
 {
    typedef Mesh                                           mesh_type;
-   typedef typename mesh_type::scalar_type                scalar_type;
+   typedef typename mesh_type::coordinate_type                scalar_type;
    typedef typename mesh_type::cell                       cell_type;
    typedef typename mesh_type::face                       face_type;
    typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
@@ -79,7 +79,7 @@ class vector_laplacian_solver
    typedef dynamic_matrix<scalar_type> matrix_dynamic;
    typedef dynamic_vector<scalar_type> vector_dynamic;
 
-   typedef revolution::assembler_mechanics<mesh_type> assembler_type;
+   typedef disk::assembler_mechanics<mesh_type> assembler_type;
 
    size_t m_cell_degree, m_face_degree;
 
@@ -87,7 +87,7 @@ class vector_laplacian_solver
 
    const bnd_type&                      m_bnd;
    const mesh_type&                     m_msh;
-   typename revolution::hho_degree_info m_hdi;
+   typename disk::hho_degree_info m_hdi;
    assembler_type                       m_assembler;
 
    std::vector<vector_dynamic> m_solution_data;
@@ -124,8 +124,8 @@ class vector_laplacian_solver
 
       m_parameters.lambda = data.lambda;
 
-      m_hdi       = revolution::hho_degree_info(m_cell_degree, m_face_degree);
-      m_assembler = revolution::make_mechanics_assembler(m_msh, m_hdi, m_bnd);
+      m_hdi       = disk::hho_degree_info(m_cell_degree, m_face_degree);
+      m_assembler = disk::make_mechanics_assembler(m_msh, m_hdi, m_bnd);
       m_AL.clear();
       m_AL.reserve(m_msh.cells_size());
 
@@ -156,7 +156,7 @@ class vector_laplacian_solver
    getDofs()
    {
       return m_msh.faces_size() *
-             revolution::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
+             disk::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
    }
 
    template<typename LoadFunction>
@@ -166,7 +166,7 @@ class vector_laplacian_solver
       assembly_info ai;
       bzero(&ai, sizeof(ai));
 
-      typename revolution::static_condensation_vector<mesh_type> statcond;
+      typename disk::static_condensation_vector<mesh_type> statcond;
 
       timecounter tc;
 
@@ -200,7 +200,7 @@ class vector_laplacian_solver
           ai.time_stab += tc.to_double();
 
           tc.tic();
-          auto                 cb       = revolution::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
+          auto                 cb       = disk::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
           const auto           cell_rhs = make_rhs(m_msh, cl, cb, lf, 2);
           const matrix_dynamic loc      = m_parameters.lambda * (gr.second + stab);
           const auto           scnp     = statcond.compute(m_msh, cl, loc, cell_rhs, m_hdi);
@@ -255,8 +255,8 @@ class vector_laplacian_solver
    postprocess(const LoadFunction& lf)
    {
       const size_t fbs =
-        revolution::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
-      const size_t cbs = revolution::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
+        disk::vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
+      const size_t cbs = disk::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
 
       postprocess_info pi;
 
@@ -303,7 +303,7 @@ class vector_laplacian_solver
    {
       scalar_type err_dof = 0;
 
-      const size_t cbs = revolution::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
+      const size_t cbs = disk::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
       const int    diff_deg = m_hdi.face_degree() - m_hdi.cell_degree();
       const int    di       = std::max(diff_deg, 1);
 
@@ -313,10 +313,10 @@ class vector_laplacian_solver
          const auto x = m_solution_data.at(cell_i++);
 
          const vector_dynamic true_dof =
-           revolution::project_function(m_msh, cl, m_hdi.cell_degree(), as, 2 * di);
+           disk::project_function(m_msh, cl, m_hdi.cell_degree(), as, 2 * di);
 
-         auto cb = revolution::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
-         const matrix_dynamic mass = revolution::make_mass_matrix(m_msh, cl, cb);
+         auto cb = disk::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
+         const matrix_dynamic mass = disk::make_mass_matrix(m_msh, cl, cb);
 
          const vector_dynamic comp_dof = x.head(cbs);
          const vector_dynamic diff_dof = (true_dof - comp_dof);
@@ -334,7 +334,7 @@ class vector_laplacian_solver
       scalar_type  err_dof = 0;
       const size_t recdeg  = m_hdi.reconstruction_degree();
 
-      const size_t rbs    = revolution::vector_basis_size(recdeg, dimension, dimension);
+      const size_t rbs    = disk::vector_basis_size(recdeg, dimension, dimension);
       const size_t N      = dimension;
       size_t       cell_i = 0;
 
@@ -348,14 +348,14 @@ class vector_laplacian_solver
 #endif
          const auto RTu = gr.first * x;
 
-         const vector_dynamic true_dof = revolution::project_gradient(m_msh, cl, recdeg, as);
+         const vector_dynamic true_dof = disk::project_gradient(m_msh, cl, recdeg, as);
 
-         auto cb = revolution::make_vector_monomial_basis(m_msh, cl, recdeg);
+         auto cb = disk::make_vector_monomial_basis(m_msh, cl, recdeg);
 
          const vector_dynamic diff_dof = (true_dof - RTu);
          assert(RTu.size() == true_dof.size());
 
-         const auto stiff = revolution::make_stiffness_matrix(m_msh, cl, cb);
+         const auto stiff = disk::make_stiffness_matrix(m_msh, cl, cb);
 
          err_dof += diff_dof.dot(stiff.block(N, N, rbs - N, rbs - N) * diff_dof);
       }
@@ -367,7 +367,7 @@ class vector_laplacian_solver
    compute_continuous_solution(const std::string& filename) const
    {
       const size_t cell_degree = m_hdi.cell_degree();
-      const size_t cbs         = revolution::vector_basis_size(cell_degree, dimension, dimension);
+      const size_t cbs         = disk::vector_basis_size(cell_degree, dimension, dimension);
 
       // compute mesh for post-processing
       disk::PostMesh<mesh_type> post_mesh = disk::PostMesh<mesh_type>(m_msh);
@@ -387,7 +387,7 @@ class vector_laplacian_solver
       for (auto& cl : m_msh) {
          vector_dynamic x          = m_solution_data.at(cell_i).head(cbs);
          const auto     cell_nodes = post_mesh.nodes_cell(cell_i);
-         auto           cbas       = revolution::make_vector_monomial_basis(m_msh, cl, cell_degree);
+         auto           cbas       = disk::make_vector_monomial_basis(m_msh, cl, cell_degree);
 
          // Loop on the nodes of the cell
          for (auto& point_id : cell_nodes) {
@@ -395,7 +395,7 @@ class vector_laplacian_solver
 
             const auto phi = cbas.eval_functions(pt);
             assert(phi.rows() == cbs);
-            const auto depl = revolution::eval(x, phi);
+            const auto depl = disk::eval(x, phi);
 
             // Add displacement at node
             value[point_id].first++;

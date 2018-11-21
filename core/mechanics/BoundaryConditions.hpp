@@ -28,9 +28,8 @@
 #include <tuple>
 #include <vector>
 
-#include "bases/bases_utils.hpp"
 #include "mesh/point.hpp"
-#include "revolution/bases"
+#include "bases/bases.hpp"
 
 namespace disk {
 namespace mechanics {
@@ -65,13 +64,36 @@ enum ContactType : size_t
     ELSE = 14,
 };
 
+namespace priv
+{
+template<typename T>
+T
+bnd_product(const T& fact, const T& func)
+{
+    return fact * func;
+}
+
+template<typename T, int N>
+Matrix<T, N, 1>
+bnd_product(const T& fact, const Matrix<T, N, 1>& func)
+{
+    return fact * func;
+}
+
+template<typename T, int N>
+Matrix<T, N, N>
+bnd_product(const T& fact, const Matrix<T, N, N>& func)
+{
+    return fact * func;
+}
+}
 
 template<typename MeshType>
 class BoundaryConditions
 {
  public:
     typedef MeshType                                         mesh_type;
-    typedef typename mesh_type::scalar_type                  scalar_type;
+    typedef typename mesh_type::coordinate_type                  scalar_type;
     typedef static_vector<scalar_type, mesh_type::dimension> function_type;
     typedef point<scalar_type, mesh_type::dimension>         point_type;
 
@@ -238,7 +260,7 @@ class BoundaryConditions
 
         auto rfunc = [ func, factor ](const point_type& p) -> auto
         {
-          return disk::mm_prod(factor, func(p));
+          return priv::bnd_product(factor, func(p));
         };
 
         return rfunc;
@@ -258,7 +280,7 @@ class BoundaryConditions
 
         auto rfunc = [ func, factor ](const point_type& p) -> auto
         {
-            return disk::mm_prod(factor, func(p));
+            return priv::bnd_product(factor, func(p));
         };
 
         return rfunc;
@@ -277,8 +299,7 @@ class BoundaryConditions
    dirichlet_imposed_dofs(const size_t& face_id, const size_t face_degree) const
    {
         const size_t dimension = mesh_type::dimension;
-        const size_t num_face_dofs =
-                revolution::vector_basis_size(face_degree, dimension - 1, dimension);
+        const size_t num_face_dofs = vector_basis_size(face_degree, dimension - 1, dimension);
         const size_t num_dim_dofs = num_face_dofs / dimension;
 
         if (is_dirichlet_face(face_id)) {
@@ -333,7 +354,7 @@ class BoundaryConditionsScalar
 {
  public:
     typedef MeshType                                         mesh_type;
-    typedef typename mesh_type::scalar_type                  scalar_type;
+    typedef typename mesh_type::coordinate_type                  scalar_type;
     typedef scalar_type                                      function_type;
     typedef point<scalar_type, mesh_type::dimension>         point_type;
 
@@ -605,7 +626,7 @@ class BoundaryConditionsScalar
 
         auto rfunc = [ func, factor ](const point_type& p) -> auto
         {
-          return disk::mm_prod(factor, func(p));
+            return priv::bnd_product(factor, func(p));
         };
 
         return rfunc;
@@ -625,7 +646,7 @@ class BoundaryConditionsScalar
 
         auto rfunc = [ func, factor ](const point_type& p) -> auto
         {
-            return disk::mm_prod(factor, func(p));
+            return priv::bnd_product(factor, func(p));
         };
 
         return rfunc;
@@ -645,7 +666,7 @@ class BoundaryConditionsScalar
 
         auto rfunc = [ func, factor ](const point_type& p) -> auto
         {
-            return disk::mm_prod(factor, func(p));
+            return disk::priv::inner_product(factor, func(p));
         };
         return rfunc;
     }
@@ -667,8 +688,7 @@ class BoundaryConditionsScalar
    dirichlet_imposed_dofs(const size_t& face_id, const size_t face_degree) const
    {
         const size_t dimension = mesh_type::dimension;
-        const size_t num_face_dofs =
-                revolution::scalar_basis_size(face_degree, dimension-1);
+        const size_t num_face_dofs = scalar_basis_size(face_degree, dimension-1);
 
         if (is_dirichlet_face(face_id)) {
             const size_t btype = dirichlet_boundary_type(face_id);

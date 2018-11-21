@@ -53,7 +53,7 @@ class cartesian_element
     node_array_type     m_pts_ptrs;
 
 public:
-    typedef identifier<cartesian_element, ident_impl_t, 0> id_type;
+    typedef identifier<cartesian_element, ident_raw_t, 0> id_type;
 
     cartesian_element() = default;
 

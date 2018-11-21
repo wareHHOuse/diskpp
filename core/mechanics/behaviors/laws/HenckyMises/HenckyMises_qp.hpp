@@ -26,8 +26,10 @@
 #pragma once
 
 #include "common/eigen.hpp"
-#include "mechanics/behaviors/maths_tensor.hpp"
-#include "mechanics/behaviors/maths_utils.hpp"
+#include "core/mechanics/behaviors/laws/materialData.hpp"
+#include "core/mechanics/behaviors/maths_tensor.hpp"
+#include "core/mechanics/behaviors/maths_utils.hpp"
+#include "core/mechanics/behaviors/tensor_conversion.hpp"
 #include "mesh/point.hpp"
 
 #define _USE_MATH_DEFINES
@@ -37,53 +39,6 @@ namespace disk
 {
 
 // Law for Linear Isotropic and Kinematic Hardening model with von Mises Criteria  in small
-
-template<typename scalar_type>
-class HenckyMises_Data
-{
-  private:
-    scalar_type m_lambda;
-    scalar_type m_mu;
-
-  public:
-    HenckyMises_Data() : m_lambda(1.0), m_mu(1.0) {}
-
-    HenckyMises_Data(const scalar_type& lambda, const scalar_type& mu) : m_lambda(lambda), m_mu(mu) {}
-
-    scalar_type
-    getE() const
-    {
-        return m_mu * (3 * m_lambda + 2 * m_mu) / (m_lambda + m_mu);
-    }
-
-    scalar_type
-    getNu() const
-    {
-        return m_lambda / (2 * (m_lambda + m_mu));
-    }
-
-    scalar_type
-    getLambda() const
-    {
-        return m_lambda;
-    }
-
-    scalar_type
-    getMu() const
-    {
-        return m_mu;
-    }
-
-    void
-    print() const
-    {
-        std::cout << "Material parameters: " << std::endl;
-        std::cout << "* E: " << getE() << std::endl;
-        std::cout << "* Nu: " << getNu() << std::endl;
-        std::cout << "* Lambda: " << getLambda() << std::endl;
-        std::cout << "* Mu: " << getMu() << std::endl;
-    }
-};
 
 // Input : symetric stain tensor(Gs)
 
@@ -96,15 +51,17 @@ class HenckyMises_Data
 //                          Tangent Moduli : C = 2 * mu * I4 + lambda * prod_Kronecker(Id, Id) /
 //                                                               it is the elastic moduli
 
-template<typename scalar_type, int DIM>
+template<typename T, int DIM>
 class HenckyMises_qp
 {
+  public:
+    typedef T                                    scalar_type;
     typedef static_matrix<scalar_type, DIM, DIM> static_matrix_type;
     typedef static_matrix<scalar_type, 3, 3>     static_matrix_type3D;
-    typedef HenckyMises_Data<scalar_type>        data_type;
+    const static size_t dimension = DIM;
+    typedef MaterialData<scalar_type>            data_type;
 
-    static_matrix_type3D zero_matrix = static_matrix_type3D::Zero();
-
+  private:
     // coordinat and weight of considered gauss point.
     point<scalar_type, DIM> m_point;
     scalar_type             m_weight;
@@ -149,18 +106,15 @@ class HenckyMises_qp
                data.getLambda() * compute_IxI<scalar_type, DIM>();
     }
 
-    static_matrix_type3D
-    convert3D(const static_matrix_type& mat) const
+  public:
+    HenckyMises_qp() :
+      m_weight(0), m_estrain_prev(static_matrix_type3D::Zero()), m_estrain_curr(static_matrix_type3D::Zero())
     {
-        static_matrix_type3D ret  = zero_matrix;
-        ret.block(0, 0, DIM, DIM) = mat;
-
-        return ret;
     }
 
-  public:
     HenckyMises_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) :
-      m_point(point), m_weight(weight), m_estrain_prev(zero_matrix), m_estrain_curr(zero_matrix)
+      m_point(point), m_weight(weight), m_estrain_prev(static_matrix_type3D::Zero()),
+      m_estrain_curr(static_matrix_type3D::Zero())
     {
     }
 
@@ -191,7 +145,7 @@ class HenckyMises_qp
     static_matrix_type3D
     getPlasticStrain() const
     {
-        return zero_matrix;
+        return static_matrix_type3D::Zero();
     }
 
     static_matrix_type
@@ -230,12 +184,12 @@ class HenckyMises_qp
     }
 
     std::pair<static_matrix_type, static_tensor<scalar_type, DIM>>
-    compute_whole(const static_matrix_type& incr_strain, const data_type& data, bool tangentmodulus = true)
+    compute_whole(const static_matrix_type& strain_curr, const data_type& data, bool tangentmodulus = true)
     {
         static_tensor<scalar_type, DIM> Cep = elastic_modulus(data);
 
         // is always elastic
-        m_estrain_curr = m_estrain_prev + convert3D(incr_strain);
+        m_estrain_curr = convertMatrix3D(strain_curr);
 
         // compute Cauchy stress
         const static_matrix_type stress = this->compute_stress(data);

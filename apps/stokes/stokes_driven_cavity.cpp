@@ -30,9 +30,9 @@
 
 #include <unistd.h>
 
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "bases/bases.hpp"
+#include "quadratures/quadratures.hpp"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -58,13 +58,13 @@ sort_by_polar_angle(const Mesh & msh,
                     const typename Mesh::cell &  cl,
                     const Points& pts)
 {
-    typedef point<typename Mesh::scalar_type,2> point_type;
+    typedef point<typename Mesh::coordinate_type,2> point_type;
     //Warningn this may work only on convex polygons
     auto h = barycenter(msh, cl);
     auto sorted_pts = pts;
 
     std::sort( sorted_pts.begin(), sorted_pts.end(),
-                            [&](const point<typename Mesh::scalar_type,2>& va, const point_type& vb )
+                            [&](const point<typename Mesh::coordinate_type,2>& va, const point_type& vb )
         {
             auto theta_a = to_angle(va, h);
             auto theta_b = to_angle(vb, h);
@@ -108,11 +108,11 @@ template<typename Mesh>
 bool
 wn_PnPoly(const Mesh& msh,
           const typename Mesh::cell& cl,
-          const point<typename Mesh::scalar_type,2>& P)
+          const point<typename Mesh::coordinate_type,2>& P)
 {
     auto vts = points(msh, cl);
 
-    typedef  typename Mesh::scalar_type scalar_type;
+    typedef  typename Mesh::coordinate_type scalar_type;
 
     std::vector< point<scalar_type,2>> svts(vts.size()+1);
     auto svts_temp = sort_by_polar_angle(msh, cl, vts);
@@ -152,14 +152,14 @@ wn_PnPoly(const Mesh& msh,
 template<typename Mesh>
 void
 plot_over_line(const Mesh    & msh,
-                const std::pair<point<typename Mesh::scalar_type,2>,
-                                point<typename Mesh::scalar_type,2>>   & e,
-                const Matrix<typename Mesh::scalar_type, Dynamic, 1> & sol,
-                const typename revolution::hho_degree_info& hdi,
+                const std::pair<point<typename Mesh::coordinate_type,2>,
+                                point<typename Mesh::coordinate_type,2>>   & e,
+                const Matrix<typename Mesh::coordinate_type, Dynamic, 1> & sol,
+                const typename disk::hho_degree_info& hdi,
                 const std::string & filename)
 {
-    typedef Matrix<typename Mesh::scalar_type, Dynamic, 1>  vector_type;
-    typedef point<typename Mesh::scalar_type,2>             point_type;
+    typedef Matrix<typename Mesh::coordinate_type, Dynamic, 1>  vector_type;
+    typedef point<typename Mesh::coordinate_type,2>             point_type;
 
     std::ofstream pfs(filename);
     if(!pfs.is_open())
@@ -178,11 +178,11 @@ plot_over_line(const Mesh    & msh,
         {
             if(wn_PnPoly( msh, cl, p))
             {
-                auto cbs   = revolution::vector_basis_size(hdi.cell_degree(), dim, dim);
-                auto cell_ofs = revolution::priv::offset(msh, cl);
+                auto cbs   = disk::vector_basis_size(hdi.cell_degree(), dim, dim);
+                auto cell_ofs = disk::priv::offset(msh, cl);
 
                 vector_type s = sol.block(cell_ofs * cbs, 0, cbs, 1);
-                auto cb = revolution::make_vector_monomial_basis(msh,
+                auto cb = disk::make_vector_monomial_basis(msh,
                                                         cl, hdi.cell_degree());
                 auto phi = cb.eval_functions(p);
                 vector_type vel = phi.transpose() * s;
@@ -199,14 +199,14 @@ plot_over_line(const Mesh    & msh,
 template<typename Mesh>
 void
 compute_discontinuous_velocity(const Mesh& msh,
-                        const dynamic_vector< typename Mesh::scalar_type>& sol,
-                        const typename revolution::hho_degree_info& hdi,
+                        const dynamic_vector< typename Mesh::coordinate_type>& sol,
+                        const typename disk::hho_degree_info& hdi,
                         const std::string& filename)
 {
     typedef Mesh mesh_type;
-    typedef typename Mesh::scalar_type scalar_type;
+    typedef typename Mesh::coordinate_type scalar_type;
     const size_t cell_degree   = hdi.cell_degree();
-    const size_t cbs = revolution::vector_basis_size(cell_degree,
+    const size_t cbs = disk::vector_basis_size(cell_degree,
                                     Mesh::dimension, Mesh::dimension);
     // compute mesh for post-processing
     disk::PostMesh<mesh_type> post_mesh = disk::PostMesh<mesh_type>(msh);
@@ -226,11 +226,11 @@ compute_discontinuous_velocity(const Mesh& msh,
 
     for (auto& cl : msh)
     {
-        auto cell_ofs = revolution::priv::offset(msh, cl);
+        auto cell_ofs = disk::priv::offset(msh, cl);
         Matrix<scalar_type, Dynamic, 1> x = sol.block(cell_ofs * cbs, 0, cbs, 1);
 
         const auto cell_nodes = post_mesh.nodes_cell(cell_i);
-        auto  cbas = revolution::make_vector_monomial_basis(msh, cl, cell_degree);
+        auto  cbas = disk::make_vector_monomial_basis(msh, cl, cell_degree);
 
        // Loop on the nodes of the cell
         for (auto& point_id : cell_nodes)
@@ -239,7 +239,7 @@ compute_discontinuous_velocity(const Mesh& msh,
 
             const auto phi = cbas.eval_functions(pt);
             assert(phi.rows() == cbs);
-            const auto depl = revolution::eval(x, phi);
+            const auto depl = disk::eval(x, phi);
 
             // Add displacement at node
             value[point_id].first++;
@@ -273,18 +273,18 @@ compute_discontinuous_velocity(const Mesh& msh,
 template<typename Mesh, typename Assembler>
 void
 post_processing(const Mesh& msh, const Assembler& assembler,
-                const typename revolution::hho_degree_info& di,
-                const dynamic_vector<typename Mesh::scalar_type>& sol,
+                const typename disk::hho_degree_info& di,
+                const dynamic_vector<typename Mesh::coordinate_type>& sol,
                 bool use_sym_grad = true)
 
 {
-    using T = typename Mesh::scalar_type;
+    using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, 1>  vector_type;
     typedef typename Mesh::point_type  point_type;
 
     size_t const dim = Mesh::dimension;
-    auto rbs = revolution::vector_basis_size(di.reconstruction_degree(), dim, dim);
-    auto cbs = revolution::vector_basis_size(di.cell_degree(), dim, dim);
+    auto rbs = disk::vector_basis_size(di.reconstruction_degree(), dim, dim);
+    auto cbs = disk::vector_basis_size(di.cell_degree(), dim, dim);
 
     std::ofstream ofs("data.data");
     if (!ofs.is_open())
@@ -293,7 +293,7 @@ post_processing(const Mesh& msh, const Assembler& assembler,
     for(auto cl : msh)
     {
 
-        auto gr  = revolution::make_hho_stokes(msh, cl, di, use_sym_grad);
+        auto gr  = disk::make_hho_stokes(msh, cl, di, use_sym_grad);
         vector_type svel =  assembler.take_velocity(msh, cl, sol);
 
         //this is only for k = 0 (for k >0, it is ok for plotting  but not for div u )
@@ -301,28 +301,28 @@ post_processing(const Mesh& msh, const Assembler& assembler,
 
         //Velocity
         vector_type cell_vel = svel.block(0,0, cbs, 1);
-        auto cb  = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
+        auto cb  = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
         auto phi = cb.eval_functions(bar);
-        Matrix<T, Mesh::dimension, 1> ueval = revolution::eval(cell_vel, phi);
+        Matrix<T, Mesh::dimension, 1> ueval = disk::eval(cell_vel, phi);
 
         //Stress
         Matrix<T, Dynamic,  DIM> c_dphi;
         if(use_sym_grad)
         {
-            auto cb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.reconstruction_degree());
+            auto cb = disk::make_sym_matrix_monomial_basis(msh, cl, di.reconstruction_degree());
             Matrix<T, Dynamic,  DIM> c_dphi_tmp = cb.eval_gradients(bar);
             c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
         }
         else
         {
-            auto cb = revolution::make_sym_matrix_monomial_basis(msh, cl, di.reconstruction_degree());
+            auto cb = disk::make_sym_matrix_monomial_basis(msh, cl, di.reconstruction_degree());
             Matrix<T, Dynamic,  DIM> c_dphi_tmp = cb.eval_gradients(bar);
             c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
         }
 
-        auto gr = revolution::make_hho_stokes(msh, cl, hdi, use_sym_grad);
+        auto gr = disk::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<T, Dynamic, 1> Gu = g.first * svel;
-        Matrix<T, dim, dim> grad_eval = revolution::eval(Gu, c_dphi);
+        Matrix<T, dim, dim> grad_eval = disk::eval(Gu, c_dphi);
         T divu = grad_eval(0,0) + grad_eval(1,1);
         ofs << ueval(0)   << " " << ueval(1) << " " << divu <<std::endl;
     }
@@ -344,7 +344,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     typedef Mesh mesh_type;
     typedef typename mesh_type::cell        cell_type;
     typedef typename mesh_type::face        face_type;
-    typedef typename mesh_type::scalar_type scalar_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
     typedef dynamic_matrix<scalar_type>     matrix_type;
@@ -362,7 +362,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
         return Matrix<scalar_type, 2, 1>{1,0};
     };
 
-    typename revolution::hho_degree_info hdi(degree, degree);
+    typename disk::hho_degree_info hdi(degree, degree);
     boundary_type bnd(msh);
 
     bnd.addDirichletBC(0, 1, movingWall);
@@ -370,18 +370,18 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     bnd.addDirichletBC(0, 3, wall);
     bnd.addDirichletBC(0, 4, wall);
 
-    auto assembler = revolution::make_stokes_assembler(msh, hdi, bnd);
+    auto assembler = disk::make_stokes_assembler(msh, hdi, bnd);
 
     auto viscosity = scalar_type(100);
     scalar_type factor = (use_sym_grad)? 2. * viscosity : viscosity;
 
     for (auto cl : msh)
     {
-        auto gr = revolution::make_hho_stokes(msh, cl, hdi, use_sym_grad);
+        auto gr = disk::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
         stab = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
         auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, hdi);
-        auto cb = revolution::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
+        auto cb = disk::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
         auto rhs = make_rhs(msh, cl, cb, rhs_fun);
         assembler.assemble(msh, cl, factor * (gr.second + stab), -dr, rhs);
     }

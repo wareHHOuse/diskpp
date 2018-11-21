@@ -25,9 +25,9 @@
 
 #include <xmmintrin.h>
 
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "bases/bases.hpp"
+#include "quadratures/quadratures.hpp"
+#include "methods/hho"
 
 #include "common.hpp"
 
@@ -35,13 +35,13 @@ template<typename Mesh>
 struct test_functor
 {
     /* Expect k+1 convergence on the cells and k+0.5 on the faces. */
-    typename Mesh::scalar_type
+    typename Mesh::coordinate_type
     operator()(const Mesh& msh, size_t degree) const
     {
         typedef Mesh mesh_type;
         typedef typename mesh_type::cell        cell_type;
         typedef typename mesh_type::face        face_type;
-        typedef typename mesh_type::scalar_type scalar_type;
+        typedef typename mesh_type::coordinate_type scalar_type;
         typedef typename mesh_type::point_type  point_type;
 
 
@@ -52,11 +52,11 @@ struct test_functor
         for (auto itor = msh.cells_begin(); itor != msh.cells_end(); itor++)
         {
             auto cl = *itor;
-            auto basis = revolution::make_scalar_monomial_basis(msh, cl, degree);
+            auto basis = disk::make_scalar_monomial_basis(msh, cl, degree);
 
-            Matrix<scalar_type, Dynamic, 1> proj = revolution::project_function(msh, cl, degree, f);
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, degree, f);
 
-            auto qps = revolution::integrate(msh, cl, 2*degree+2);
+            auto qps = disk::integrate(msh, cl, 2*degree+2);
             for (auto& qp : qps)
             {
                 auto tv = f(qp.point());

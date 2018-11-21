@@ -174,18 +174,19 @@ public:
     template<typename T>
     bool add_mesh(const simplicial_mesh<T,2>& msh, const std::string& name)
     {
-        std::vector<T> x_coords, y_coords;
+        std::vector<double> x_coords, y_coords;
         x_coords.reserve(msh.points_size());
         y_coords.reserve(msh.points_size());
 
         for (auto itor = msh.points_begin(); itor != msh.points_end(); itor++)
         {
             auto pt = *itor;
-            x_coords.push_back(pt.x());
-            y_coords.push_back(pt.y());
+            /* explicit cast to support rational<>. silo works in double anyways */
+            x_coords.push_back( double(pt.x()) );
+            y_coords.push_back( double(pt.y()) );
         }
 
-        T *coords[] = {x_coords.data(), y_coords.data()};
+        double *coords[] = {x_coords.data(), y_coords.data()};
 
         std::vector<int> nodelist;
         nodelist.reserve( 3*msh.cells_size() );

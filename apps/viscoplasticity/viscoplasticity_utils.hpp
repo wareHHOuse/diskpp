@@ -28,9 +28,9 @@
 
 #include <unistd.h>
 
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "bases/bases.hpp"
+#include "quadratures/quadratures.hpp"
+#include "methods/hho"
 
 using namespace revolution;
 
@@ -282,20 +282,18 @@ sort_by_polar_angle(const Mesh & msh,
                     const typename Mesh::cell &  cl,
                     const Points& pts)
 {
-    typedef point<typename Mesh::scalar_type,2> point_type;
+    typedef point<typename Mesh::coordinate_type, 2> point_type;
     //Warningn this may work only on convex polygons
     auto h = barycenter(msh, cl);
     auto sorted_pts = pts;
 
-    std::sort( sorted_pts.begin(), sorted_pts.end(),
-                            [&](const point<typename Mesh::scalar_type,2>& va,
-                                 const point_type& vb )
-        {
-            auto theta_a = to_angle(va, h);
-            auto theta_b = to_angle(vb, h);
-            return (theta_a < theta_b);
-        }
-    );
+    std::sort(sorted_pts.begin(),
+              sorted_pts.end(),
+              [&](const point<typename Mesh::coordinate_type, 2>& va, const point_type& vb) {
+                  auto theta_a = to_angle(va, h);
+                  auto theta_b = to_angle(vb, h);
+                  return (theta_a < theta_b);
+              });
     return sorted_pts;
 }
 /*
@@ -331,13 +329,11 @@ isLeft( const point<T,2>& P0, const point<T,2>& P1, const point<T,2>& P2 )
 */
 template<typename Mesh>
 bool
-wn_PnPoly(const Mesh& msh,
-          const typename Mesh::cell& cl,
-          const point<typename Mesh::scalar_type,2>& P)
+wn_PnPoly(const Mesh& msh, const typename Mesh::cell& cl, const point<typename Mesh::coordinate_type, 2>& P)
 {
     auto vts = points(msh, cl);
 
-    typedef typename Mesh::scalar_type T;
+    typedef typename Mesh::coordinate_type T;
 
     std::vector< point<T,2>> svts(vts.size()+1);
     auto svts_temp = sort_by_polar_angle(msh, cl, vts);
@@ -376,16 +372,16 @@ wn_PnPoly(const Mesh& msh,
 }
 template<typename Mesh>
 void
-plot_over_line(const Mesh    & msh,
-                const std::pair<point<typename Mesh::scalar_type,2>,
-                                point<typename Mesh::scalar_type,2>> & e,
-                const Matrix<typename Mesh::scalar_type, Dynamic, 1> & vec,
-                const size_t cell_degree,
-                const std::string & filename)
+plot_over_line(const Mesh&                                                                                          msh,
+               const std::pair<point<typename Mesh::coordinate_type, 2>,
+               const point<typename Mesh::coordinate_type, 2>>& e,
+               const Matrix<typename Mesh::coordinate_type, Dynamic, 1>&                                            vec,
+               const size_t       cell_degree,
+               const std::string& filename)
 {
 
-    typedef Matrix<typename Mesh::scalar_type, Dynamic, 1>  vector_type;
-    typedef point<typename Mesh::scalar_type,2>             point_type;
+    typedef Matrix<typename Mesh::coordinate_type, Dynamic, 1>   vector_type;
+    typedef point<typename Mesh::coordinate_type, 2>             point_type;
 
     std::ofstream pfs(filename);
     if(!pfs.is_open())
@@ -404,11 +400,11 @@ plot_over_line(const Mesh    & msh,
         {
             if(wn_PnPoly( msh, cl, p))
             {
-                auto cbs   = revolution::vector_basis_size(cell_degree, dim, dim);
-                auto cell_ofs = revolution::priv::offset(msh, cl);
+                auto cbs   = disk::vector_basis_size(cell_degree, dim, dim);
+                auto cell_ofs = disk::priv::offset(msh, cl);
 
                 vector_type s = vec.block(cell_ofs * cbs, 0, cbs, 1);
-                auto cb  = revolution::make_vector_monomial_basis(msh, cl, cell_degree);
+                auto cb  = disk::make_vector_monomial_basis(msh, cl, cell_degree);
                 auto phi = cb.eval_functions(p);
                 vector_type vel = phi.transpose() * s;
                 pfs<< p.x() << " "<< p.y() << " "<< vel(0) << " "<< vel(1)<< std::endl;
@@ -422,17 +418,17 @@ plot_over_line(const Mesh    & msh,
 
 template<typename Mesh>
 void
-compute_discontinuous_velocity(const Mesh& msh,
-                        const dynamic_vector< typename Mesh::scalar_type>& sol,
-                        const typename revolution::hho_degree_info& hdi,
-                        const std::string& filename)
+compute_discontinuous_velocity(const Mesh&                                           msh,
+                               const dynamic_vector<typename Mesh::coordinate_type>& sol,
+                               const typename disk::hho_degree_info&                 hdi,
+                               const std::string&                                    filename)
 {
     typedef Mesh mesh_type;
-    typedef typename Mesh::scalar_type T;
+    typedef typename Mesh::coordinate_type T;
     auto dim = Mesh::dimension;
 
     const size_t cell_degree   = hdi.cell_degree();
-    const size_t cbs = revolution::vector_basis_size(cell_degree,
+    const size_t cbs = disk::vector_basis_size(cell_degree,
                                     dim, dim);
     // compute mesh for post-processing
     disk::PostMesh<mesh_type> post_mesh = disk::PostMesh<mesh_type>(msh);
@@ -452,11 +448,11 @@ compute_discontinuous_velocity(const Mesh& msh,
 
     for (auto& cl : msh)
     {
-        auto cell_ofs = revolution::priv::offset(msh, cl);
+        auto cell_ofs = disk::priv::offset(msh, cl);
         Matrix<T, Dynamic, 1> x = sol.block(cell_ofs * cbs, 0, cbs, 1);
 
         const auto cell_nodes = post_mesh.nodes_cell(cell_i);
-        auto  cbas = revolution::make_vector_monomial_basis(msh, cl, cell_degree);
+        auto  cbas = disk::make_vector_monomial_basis(msh, cl, cell_degree);
 
        // Loop on the nodes of the cell
         for (auto& point_id : cell_nodes)
@@ -465,7 +461,7 @@ compute_discontinuous_velocity(const Mesh& msh,
 
             const auto phi = cbas.eval_functions(pt);
             assert(phi.rows() == cbs);
-            const auto depl = revolution::eval(x, phi);
+            const auto depl = disk::eval(x, phi);
 
             // Add displacement at node
             value[point_id].first++;
@@ -504,22 +500,22 @@ int sgn(T val) {
 template<typename Mesh, typename T, typename Assembler>
 void
 quiver( const Mesh& msh, const dynamic_vector<T>& sol, const Assembler& assembler,
-        const typename revolution::hho_degree_info & di, const std::string& filename)
+        const typename disk::hho_degree_info & di, const std::string& filename)
 {
     std::ofstream ofs(filename);
 
     if (!ofs.is_open())
         std::cout << "Error opening errors "<<std::endl;
 
-    auto cbs = revolution::vector_basis_size(di.cell_degree(),
+    auto cbs = disk::vector_basis_size(di.cell_degree(),
                                         Mesh::dimension, Mesh::dimension);
     for (auto& cl: msh)
     {
-        auto cell_ofs = revolution::priv::offset(msh, cl);
+        auto cell_ofs = disk::priv::offset(msh, cl);
         Matrix<T, Dynamic, 1>  s = assembler.take_velocity(msh, cl, sol);
 
-        auto cb  = revolution::make_vector_monomial_basis(msh, cl, di.cell_degree());
-        auto qps =  revolution::integrate(msh, cl, 2 * di.face_degree());
+        auto cb  = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
+        auto qps =  disk::integrate(msh, cl, 2 * di.face_degree());
         for (auto& qp : qps)
         {
             Matrix<T, Dynamic, 2>  phi = cb.eval_functions(qp.point());

@@ -133,13 +133,12 @@ measure(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::cell& cl
 {
     auto pts = points(msh, cl);
 
-    T acc{};
+    T acc = 0.0;
     for (size_t i = 1; i < pts.size() - 1; i++)
     {
-        auto u = (pts.at(i) - pts.at(0)).to_vector();
-        auto v = (pts.at(i+1) - pts.at(0)).to_vector();
-        auto n = cross(u, v);
-        acc += n.norm() / T(2);
+        auto d0 = pts.at(i) - pts.at(0);
+        auto d1 = pts.at(i+1) - pts.at(0);
+        acc += std::abs(d0.x()*d1.y() - d1.x()*d0.y())/T(2);
     }
 
     return acc;
