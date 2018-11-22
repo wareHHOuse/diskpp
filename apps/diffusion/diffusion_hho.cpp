@@ -132,9 +132,9 @@ run_hho_diffusion_solver(const Mesh& msh, size_t degree)
     size_t systsz = assembler.LHS.rows();
     size_t nnz = assembler.LHS.nonZeros();
 
-    std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
-    std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
-    std::cout << "Dofs: " << systsz << std::endl;
+    //std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
+    //std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
+    //std::cout << "Dofs: " << systsz << std::endl;
 
     dynamic_vector<T> sol = dynamic_vector<T>::Zero(systsz);
 
@@ -162,6 +162,7 @@ run_hho_diffusion_solver(const Mesh& msh, size_t degree)
 
         Eigen::Matrix<T, Eigen::Dynamic, 1> realsol = project_function(msh, cl, hdi, sol_fun, 2);
 
+
         auto diff = realsol - fullsol;
         error += diff.dot(A*diff);
 
@@ -173,7 +174,7 @@ run_hho_diffusion_solver(const Mesh& msh, size_t degree)
 
     }
 
-    std::cout << std::sqrt(error) << std::endl;
+    //std::cout << std::sqrt(error) << std::endl;
 
     //ofs.close();
 
@@ -206,6 +207,7 @@ run_diffusion_solver(const Mesh& msh)
     run_hho_diffusion_solver(msh, 0);
 }
 
+#if 0
 int main(int argc, char **argv)
 {
     using T = double;
@@ -269,12 +271,11 @@ int main(int argc, char **argv)
     }
     */
 }
+#endif
 
-#if 0
 int main(void)
 {
     tester<test_functor> tstr;
     tstr.run();
     return 0;
 }
-#endif

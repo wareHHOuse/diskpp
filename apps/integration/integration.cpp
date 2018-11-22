@@ -46,7 +46,7 @@ process_mesh(const MeshType& msh)
 
     for (auto& cl : msh)
     {
-        auto cb = make_scalar_monomial_basis(msh, cl, degree);
+        auto cb = disk::make_scalar_monomial_basis(msh, cl, degree);
 
         std::cout << "Diameter: " << diameter(msh, cl) << std::endl;
         std::cout << "Measure:  " << measure(msh, cl) << std::endl;

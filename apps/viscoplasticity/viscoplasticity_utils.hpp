@@ -32,7 +32,6 @@
 #include "quadratures/quadratures.hpp"
 #include "methods/hho"
 
-using namespace revolution;
 
 enum scalar_problem_type
 {
@@ -141,6 +140,9 @@ struct viscoplasticity_data
     }
 };
 
+
+using namespace disk;
+
 template<typename Mesh>
 auto
 make_scalar_solution_offset(const Mesh& msh, const hho_degree_info& hdi)
@@ -160,6 +162,8 @@ make_scalar_solution_offset(const Mesh& msh, const hho_degree_info& hdi)
     }
     return std::make_pair(sum, map);
 }
+
+
 
 
  template<typename Mesh>

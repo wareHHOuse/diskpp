@@ -98,7 +98,7 @@ barycenter(const Mesh<T,2,Storage>& msh, const typename Mesh<T,2,Storage>::cell_
     {
         auto d0 = pts[i] - pts[0];
         auto d1 = pts[i+1] - pts[0];
-        auto meas = abs(d0.x()*d1.y() - d1.x()*d0.y());
+        auto meas = std::abs(d0.x()*d1.y() - d1.x()*d0.y());
         tot_bar = tot_bar + meas*(pts[0]+pts[i]+pts[i+1]);
         tot_meas += meas;
     }
