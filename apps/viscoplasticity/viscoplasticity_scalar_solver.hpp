@@ -30,9 +30,9 @@
 
 #include <unistd.h>
 
-#include "revolution/bases"
-#include "revolution/quadratures"
-#include "revolution/methods/hho"
+#include "bases/bases.hpp"
+#include "quadratures/quadratures.hpp"
+#include "methods/hho"
 
 #include "core/loaders/loader.hpp"
 
@@ -44,14 +44,14 @@
 #include "solvers/solver.hpp"
 #include "viscoplasticity_utils.hpp"
 
-using namespace revolution;
+using namespace disk;
 
 
 template<typename Mesh>
 auto
 make_bnd(const Mesh& msh, const scalar_problem_type& problem)
 {
-    using T = typename Mesh::scalar_type;
+    using T = typename Mesh::coordinate_type;
 
 
     auto zero_fun  = [](const typename Mesh::point_type& p) -> T {
@@ -85,7 +85,7 @@ template<typename Mesh>
 auto
 make_rhs_functor(const Mesh& msh, const scalar_problem_type& problem)
 {
-    using T = typename Mesh::scalar_type;
+    using T = typename Mesh::coordinate_type;
     auto rhs_fun  = [](const typename Mesh::point_type& p) -> T {
         return 1.;
     };
@@ -99,7 +99,7 @@ class augmented_lagrangian_viscoplasticity
     typedef Mesh mesh_type;
     typedef typename mesh_type::cell        cell_type;
     typedef typename mesh_type::face        face_type;
-    typedef typename mesh_type::scalar_type T;
+    typedef typename mesh_type::coordinate_type T;
     typedef typename mesh_type::point_type  point_type;
     typedef disk::mechanics::BoundaryConditionsScalar<mesh_type> boundary_type;
 
@@ -160,7 +160,7 @@ public:
         vector_type u_TF    = full_solution.block(sol_offset, 0, num_total_dofs, 1);
 
         auto value = 1./(vp.mu + vp.alpha);
-        auto G = make_hlow_scalar_laplacian(msh, cl, di);
+        auto G = make_hho_gradrec_vector(msh, cl, di);
         vector_type   Gu = G.first * u_TF;
 
         auto qps = integrate(msh, cl, tsr_utils.quad_degree());
@@ -180,7 +180,7 @@ public:
             vector_type stress_qp = stress.block( 0, qp_count, sbs, 1);
             vector_type theta     = stress_qp  +  vp.alpha * Gu;
 
-            tensor_type theta_eval = revolution::eval(theta, s_phi);
+            tensor_type theta_eval = eval(theta, s_phi);
 
             T theta_norm  = theta_eval.norm();
             T tol = 1.e-8;
@@ -212,7 +212,7 @@ public:
             auto num_total_dofs = cbs + fbs * howmany_faces(msh, cl);
             auto sol_offset     = sol_offset_map.at(cl_id++);
             vector_type u_TF    = full_sol.block(sol_offset, 0, num_total_dofs, 1);
-            auto G = make_hlow_scalar_laplacian(msh, cl, di);
+            auto G = make_hho_gradrec_vector(msh, cl, di);
             vector_type Gu = G.first * u_TF;
 
             auto cl_id = msh.lookup(cl);
@@ -261,7 +261,7 @@ public:
                     const cell_type& cl,
                     const Assembler& assembler)
     {
-        auto G  = make_hlow_scalar_laplacian(msh, cl, di);
+        auto G  = make_hho_gradrec_vector(msh, cl, di);
         auto cb = make_scalar_monomial_basis(msh, cl, di.cell_degree());
         auto sb = make_vector_monomial_basis(msh, cl, di.face_degree());
 
@@ -313,7 +313,7 @@ public:
 
         for (auto cl : msh)
         {
-            auto G  = make_hlow_scalar_laplacian(msh, cl, di);
+            auto G  = make_hho_gradrec_vector(msh, cl, di);
             auto gr = make_hho_scalar_laplacian(msh, cl, di);
             matrix_type stab = make_hho_scalar_stabilization(msh, cl, gr.first, di);
             matrix_type A   = vp.alpha * G.second + vp.mu * stab;
@@ -339,7 +339,7 @@ public:
 
         for (auto cl : msh)
         {
-            auto G  = make_hlow_scalar_laplacian(msh, cl, di);
+            auto G  = make_hho_gradrec_vector(msh, cl, di);
             auto gr = make_hho_scalar_laplacian(msh, cl, di);
             matrix_type stab   = make_hho_scalar_stabilization(msh, cl, gr.first, di);
             matrix_type A = vp.alpha * G.second + vp.mu * stab;
@@ -365,7 +365,7 @@ public:
         size_t cl_id  = 0;
         for (auto& cl : msh)
         {
-            auto G  = make_hlow_scalar_laplacian(msh, cl, di);
+            auto G  = make_hho_gradrec_vector(msh, cl, di);
             auto gr = make_hho_scalar_laplacian(msh, cl, di);
             matrix_type stab = make_hho_scalar_stabilization(msh, cl, gr.first, di);
             matrix_type A   = vp.alpha * G.second + vp.mu * stab;
@@ -423,7 +423,7 @@ public:
             vector_type cell_vel = ufull.block(0,0, cbs, 1);
             auto cb  = make_scalar_monomial_basis(msh, cl, di.cell_degree());
             auto phi = cb.eval_functions(bar);
-            T ueval = revolution::eval(cell_vel, phi);
+            T ueval = eval(cell_vel, phi);
 
             ofs << bar.x()<< " "<< bar.y()<< " " << ueval << std::endl;
         }
@@ -440,7 +440,7 @@ public:
 
         boundary_type bnd = make_bnd(msh, vp.problem);
 
-        auto assembler = revolution::make_diffusion_assembler_alg(msh, di, bnd);
+        auto assembler = make_diffusion_assembler_alg(msh, di, bnd);
 
         auto systsz = assembler.global_system_size();
         dynamic_vector<T> sol =  dynamic_vector<T>::Zero(systsz);
