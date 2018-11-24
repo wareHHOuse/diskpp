@@ -684,7 +684,7 @@ class plasticity_solver
         size_t nb_nodes = 0;
         for (auto& cl : m_msh)
         {
-            auto                    gb           = disk::make_sym_matrix_monomial_basis(m_msh, cl, m_hdi.grad_degree());
+            auto                    gb           = disk::make_matrix_monomial_basis(m_msh, cl, m_hdi.grad_degree());
             const auto              law_cell     = m_law.getCellIVs(cell_i);
             const vector_dynamic    stress_coeff = law_cell.projectStressOnCell(m_msh, cl, m_hdi, material_data);
             const auto              cell_nodes   = disk::cell_nodes(m_msh, cl);
@@ -745,10 +745,10 @@ class plasticity_solver
 
         for (auto& cl : m_msh)
         {
-            auto                 gb           = disk::make_sym_matrix_monomial_basis(m_msh, cl, m_hdi.grad_degree());
+            auto                 gb           = disk::make_matrix_monomial_basis(m_msh, cl, m_hdi.grad_degree());
             const auto           law_cell     = m_law.getCellIVs(cell_i);
             const vector_dynamic stress_coeff = law_cell.projectStressOnCell(m_msh, cl, m_hdi, material_data);
-            const auto           cell_nodes   = post_mesh.nodes_cell(cell_i);
+            const auto cell_nodes = post_mesh.nodes_cell(cell_i);
 
             // Loop on the nodes of the cell
             for (auto& point_id : cell_nodes)

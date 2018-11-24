@@ -109,15 +109,16 @@ class LawTypeCellBones
                         const data_type&             material_data) const
     {
         const auto grad_degree     = hdi.grad_degree();
-        const int  grad_basis_size = disk::sym_matrix_basis_size(grad_degree, dimension, dimension);
-        auto       gb              = disk::make_sym_matrix_monomial_basis(msh, cl, grad_degree);
+        const int  grad_basis_size = disk::matrix_basis_size(grad_degree, dimension, dimension);
+        auto       gb              = disk::make_matrix_monomial_basis(msh, cl, grad_degree);
 
         matrix_type mass = matrix_type::Zero(grad_basis_size, grad_basis_size);
         vector_type rhs  = vector_type::Zero(grad_basis_size);
 
         for (auto& qp : m_list_qp)
         {
-            const auto gphi = gb.eval_functions(qp.point());
+            const auto stress = qp.compute_stress(material_data);
+            const auto gphi   = gb.eval_functions(qp.point());
             assert(gphi.size() == grad_basis_size);
 
             for (int j = 0; j < grad_basis_size; j++)
@@ -128,7 +129,7 @@ class LawTypeCellBones
                     mass(i, j) += disk::priv::inner_product(gphi[i], qp_gphi_j);
                 }
 
-                rhs(j) += disk::priv::inner_product(qp.compute_stress(material_data), qp_gphi_j);
+                rhs(j) += disk::priv::inner_product(stress, qp_gphi_j);
             }
         }
 

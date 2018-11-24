@@ -53,6 +53,11 @@ compute_eigenvalues(const static_matrix<T, N, N>& Mat)
 
     SelfAdjointEigenSolver<matrix_type> es(Mat);
 
+    // std::cout << "eigenvalues:" << std::endl;
+    // std::cout << es.eigenvalues() << std::endl;
+    // std::cout << "eigenvectors:" << std::endl;
+    // std::cout << es.eigenvectors() << std::endl;
+
     return std::make_pair(es.eigenvalues(), es.eigenvectors());
 }
 
@@ -533,7 +538,8 @@ std::pair<static_tensor<T, 3>, static_tensor<T, 3>>
 compute_projector_PK2(const static_matrix<T, 3, 3>& F,
                       const static_matrix<T, 3, 3>& stress_T,
                       const static_vector<T, 3>&    lambda_i,
-                      const static_matrix<T, 3, 3>& evec)
+                      const static_matrix<T, 3, 3>& evec,
+                      bool                          compute_TL = true)
 {
     typedef static_tensor<T, 3>    tensor_type;
     typedef static_matrix<T, 3, 3> matrix_type;
@@ -573,7 +579,11 @@ compute_projector_PK2(const static_matrix<T, 3, 3>& F,
         const matrix_type NiNi = Kronecker(Ni[i], Ni[i]);
 
         P += di(i) / T(2) * Kronecker(NiNi, Mii);
-        TL += fi(i) / T(4) * zeta(i, i) * Kronecker(Mii, Mii);
+
+        if (compute_TL)
+        {
+            TL += fi(i) / T(4) * zeta(i, i) * Kronecker(Mii, Mii);
+        }
 
         for (int j = 0; j < 3; j++)
         {
@@ -584,22 +594,25 @@ compute_projector_PK2(const static_matrix<T, 3, 3>& F,
 
                 P += theta(i, j) * Kronecker(NiNj, Mij);
 
-                // for TL
-                const matrix_type Mjj    = compute_Mij(Ni, Ni, j, j);
-                const tensor_type MijMjj = Kronecker(Mij, Mjj);
-                const tensor_type MjjMij = Kronecker(Mjj, Mij);
-                const tensor_type MijMij = Kronecker(Mij, Mij);
-
-                TL += T(2) * xi(i, j) * (zeta(i, j) * (MijMjj + MjjMij) + zeta(j, j) * MijMij);
-
-                for (int k = 0; k < 3; k++)
+                if (compute_TL)
                 {
-                    if (k != i && k != j)
-                    {
-                        const matrix_type Mik = compute_Mij(Ni, Ni, i, k);
-                        const matrix_type Mjk = compute_Mij(Ni, Ni, j, k);
+                    // for TL
+                    const matrix_type Mjj    = compute_Mij(Ni, Ni, j, j);
+                    const tensor_type MijMjj = Kronecker(Mij, Mjj);
+                    const tensor_type MjjMij = Kronecker(Mjj, Mij);
+                    const tensor_type MijMij = Kronecker(Mij, Mij);
 
-                        TL += T(2) * eta * zeta(i, j) * Kronecker(Mik, Mjk);
+                    TL += T(2) * xi(i, j) * (zeta(i, j) * (MijMjj + MjjMij) + zeta(j, j) * MijMij);
+
+                    for (int k = 0; k < 3; k++)
+                    {
+                        if (k != i && k != j)
+                        {
+                            const matrix_type Mik = compute_Mij(Ni, Ni, i, k);
+                            const matrix_type Mjk = compute_Mij(Ni, Ni, j, k);
+
+                            TL += T(2) * eta * zeta(i, j) * Kronecker(Mik, Mjk);
+                        }
                     }
                 }
             }
