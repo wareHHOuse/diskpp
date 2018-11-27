@@ -40,7 +40,7 @@ namespace disk
 {
 
 // Law for Isotropic Hardening model with von Mises Criteria in small deformation
-// where the curve R(p) is given point by point
+// where the curve (p, R(p)) is given point by point
 // see https://www.code-aster.org/doc/default/en/man_r/r5/r5.03.02.pdf section 3.1.2
 
 template<typename T, int DIM>
@@ -227,7 +227,7 @@ class IsotropicHardeningVMis_qp : public law_qp_bones<T, DIM>
                 size_t            i1      = nb_point - 2;
                 for (size_t i = i0 + 1; i < nb_point - 1; i++)
                 {
-                    const scalar_type eq = RpCurve[i].getRp() - troismu * (m_p_prev - RpCurve[i].getRp()) - se_eq;
+                    const scalar_type eq = RpCurve[i].getRp() - troismu * (m_p_prev - RpCurve[i].getP()) - se_eq;
 
                     if (eq > scalar_type(0))
                     {
@@ -245,6 +245,9 @@ class IsotropicHardeningVMis_qp : public law_qp_bones<T, DIM>
                 const scalar_type          dem     = troismu + H1;
                 const static_matrix_type3D normal  = scalar_type(3.) * se / (scalar_type(2.) * se_eq);
                 const scalar_type          delta_p = Phi_trial1 / dem;
+
+                // std::cout << "P: " << m_p_prev << ", Rp: " << Rp1 + H1 * (m_p_prev - p1) << ", H: " << H1
+                //           << ", Si: " << se_eq << ", dp: " << delta_p << std::endl;
 
                 // update
                 m_p_curr             = m_p_prev + delta_p;
