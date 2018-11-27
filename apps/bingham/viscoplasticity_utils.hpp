@@ -114,6 +114,30 @@ make_scalar_solution_offset(const Mesh& msh, const hho_degree_info& hdi)
 }
 
 
+
+template<typename Mesh>
+std::vector<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+tensor_initialize(const Mesh& msh, const size_t quad_degree, const size_t tsr_degree)
+{
+    using T = typename Mesh::coordinate_type;
+    std::vector<Matrix<T, Dynamic, Dynamic>> ret(msh.cells_size());
+
+    auto sbs = sym_matrix_basis_size(tsr_degree, Mesh::dimension, Mesh::dimension);
+    auto cell_i = 0;
+    for(auto cl : msh)
+    {
+        auto qps = integrate(msh, cl, quad_degree);
+        ret.at(cell_i++) = Matrix<T, Dynamic, Dynamic>::Zero(sbs, qps.size());
+    }
+    return ret;
+}
+
+#if 0
+template<typename Mesh>
+size_t
+tensor_quad_points_size(const Mesh& msh, const size_t quad_degree);
+{}
+
  template<typename Mesh>
  class tensors_at_quad_pts_utils
  {
@@ -158,7 +182,7 @@ make_scalar_solution_offset(const Mesh& msh, const hho_degree_info& hdi)
          return offsets_vec;
      }
  };
-
+#endif
 
  template< typename T>
  std::string
@@ -396,11 +420,11 @@ find_values_at_points(const Mesh    & msh,
         {
             if(wn_PnPoly( msh, cl, p))
             {
-                auto cbs   = disk::vector_basis_size(cell_degree, dim, dim);
+                auto cbs   = vector_basis_size(cell_degree, dim, dim);
                 auto cell_ofs = disk::priv::offset(msh, cl);
 
                 vector_type s = vec.block(cell_ofs * cbs, 0, cbs, 1);
-                auto cb  = disk::make_vector_monomial_basis(msh, cl, cell_degree);
+                auto cb  = make_vector_monomial_basis(msh, cl, cell_degree);
                 auto phi = cb.eval_functions(p);
                 vector_type vel = phi.transpose() * s;
                 pfs<< p.x() << " "<< p.y() << " "<< vel(0) << " "<< vel(1)<< std::endl;
