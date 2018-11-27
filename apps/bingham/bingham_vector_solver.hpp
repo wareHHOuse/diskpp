@@ -111,7 +111,7 @@ public:
 
         vector_type gamma = vector_type::Zero(sbs);
         T epsilon = 1.e-6 *std::sqrt(2) * vp.yield ;
-        if( theta_norm > std::sqrt(2) * vp.yield + epsilon )
+        if( theta_norm > std::sqrt(2) * vp.yield + epsilon & theta_norm > epsilon)
             gamma =  value * theta * (1. - std::sqrt(2) * (vp.yield/theta_norm));
 
         return gamma;
@@ -192,9 +192,11 @@ public:
                     const size_t iter)
     {
 
-        make_global_rhs(msh, assembler);
         if(iter == 0)
             make_global_matrix(msh, assembler);
+
+        //WARNINGS: This one must go after make_global_matrix!!!!!!
+        make_global_rhs(msh, assembler);
 
         //dump_sparse_matrix(assembler.LHS, "stokes.txt");
         size_t systsz = assembler.LHS.rows();
@@ -426,13 +428,18 @@ public:
             auxiliar  = vector_type::Zero(sbs * msh.cells_size());
             //------------------------------------------------------------------
             //run_stokes_like(msh, assembler, iter);
-            make_global_rhs(msh, assembler);
             if (iter == 0)
             {
                 make_global_matrix(msh, assembler);
                 solver.analyzePattern(assembler.LHS);
                 solver.factorize(assembler.LHS);
             }
+            //WARNINGS: This one must go after make_global_matrix!!!!!!
+            //WARNINGS: This one must go after make_global_matrix!!!!!!
+            //WARNINGS: This one must go after make_global_matrix!!!!!!
+            //WARNINGS: This one must go after make_global_matrix!!!!!!
+            make_global_rhs(msh, assembler);
+
             sol = solver.solve(assembler.RHS);
             //------------------------------------------------------------------
             update_multiplier(msh, assembler, iter, data_filename);

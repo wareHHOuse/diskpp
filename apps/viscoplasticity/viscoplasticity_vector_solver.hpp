@@ -142,7 +142,7 @@ public:
     auto
     update_multiplier(const mesh_type& msh, const Assembler& assembler,
                       const size_t iter,
-                      const dynamic_vector<T>& sol,
+                      const dynamic_vector<T>& velocity_dofs,
                       const std::string& name)
     {
         T conv_stress = 0.;
@@ -154,7 +154,7 @@ public:
         {
             auto sb = make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
 
-            vector_type u_TF = assembler.take_velocity(msh, cl, sol);
+            vector_type u_TF = assembler.take_velocity(msh, cl, velocity_dofs);
             auto G = make_hlow_stokes(msh, cl, di, true);
             vector_type Gu = G.first * u_TF;
 
@@ -170,7 +170,7 @@ public:
 
             //Update multiplier
             for(size_t i = 0; i < qps.size(); i++)
-                diff_stress.block(0, i++, sbs, 1) += 2. * vp.alpha *  Gu;
+                diff_stress.block(0, i, sbs, 1) += 2. * vp.alpha *  Gu;
             multiplier.block(0, offset, sbs, qps.size()) += diff_stress;
 
             //Error computations
@@ -465,13 +465,16 @@ public:
         {
             //------------------------------------------------------------------
             // Stokes-like system
-            make_global_rhs(msh,assembler);
+
             if(iter == 0)
             {
                 make_global_matrix(msh, assembler);
                 solver.analyzePattern(assembler.LHS);
                 solver.factorize(assembler.LHS);
             }
+            //WARNINGS: This one must go after make_global_matrix!!!!!!
+            make_global_rhs(msh,assembler);
+
             vector_type sol = solver.solve(assembler.RHS);
             //------------------------------------------------------------------
             update_multiplier(msh, assembler, iter, sol,  data_filename);

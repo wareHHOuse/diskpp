@@ -230,7 +230,7 @@ public:
 
             //Update multiplier
             for(size_t i = 0; i < qps.size(); i++)
-                diff_stress.block(0, i++, sbs, 1) += vp.alpha *  Gu;
+                diff_stress.block(0, i, sbs, 1) += vp.alpha *  Gu;
             multiplier.block(0, offset, sbs, qps.size()) += diff_stress;
 
             //Error computations
@@ -457,6 +457,10 @@ public:
 
         for(size_t iter = 0; iter < max_iters; iter++)
         {
+            //WARNINGS: This one must go after make_global_matrix!!!!!!
+            //WARNINGS: This one must go after make_global_matrix!!!!!!
+            //WARNINGS: This one must go after make_global_matrix!!!!!!
+            //WARNINGS: This one must go after make_global_matrix!!!!!!
             make_global_rhs(msh, assembler);
             if(iter == 0)
                 make_global_matrix(msh, assembler);
