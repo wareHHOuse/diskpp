@@ -508,22 +508,22 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
     mutable std::vector<scalar_type> power_cache;
 #endif
 
-    typedef decltype(points(mesh_type(), face_type())) pts_type;
-    pts_type                                           pts;
+    typedef static_vector<T, 3> vector_type;
+    vector_type                 e0, e1;
 
-    /* This function maps a 3D point on a face to a 2D reference system, to compute the
-     * face basis. It takes two edges of an element's face and uses them as the coordinate
+    /* It takes two edges of an element's face and uses them as the coordinate
      * axis of a 2D reference system. Those two edges are accepted only if they have an angle
      * between them greater than 8 degrees, then they are orthonormalized via G-S. */
-    point<T, 2>
-    map_face_point_3d_to_2d(const point_type& pt) const
-    {
-        typedef static_vector<T, 3> vector_type;
 
+    void
+    compute_axis(const mesh_type& msh, const face_type& fc, vector_type& e0, vector_type& e1)
+    {
         vector_type v0;
         vector_type v1;
 
         bool ok = false;
+
+        const auto pts = points(msh, fc);
 
         const size_t npts = pts.size();
         for (size_t i = 1; i <= npts; i++)
@@ -546,10 +546,19 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
         if (!ok)
             throw std::invalid_argument("Degenerate polyhedron, cannot proceed");
 
-        vector_type e0 = v0 / v0.norm();
-        vector_type e1 = v1 - (v1.dot(v0) * v0) / (v0.dot(v0));
-        e1             = e1 / e1.norm();
+        e0 = v0 / v0.norm();
+        e1 = v1 - (v1.dot(v0) * v0) / (v0.dot(v0));
+        e1 = e1 / e1.norm();
+    }
 
+    /* This function maps a 3D point on a face to a 2D reference system, to compute the
+     * face basis. It takes two edges of an element's face and uses them as the coordinate
+     * axis of a 2D reference system. Those two edges are accepted only if they have an angle
+     * between them greater than 8 degrees, then they are orthonormalized via G-S. */
+
+    point<T, 2>
+    map_face_point_3d_to_2d(const point_type& pt) const
+    {
         vector_type v = (pt - face_bar).to_vector();
 
         const auto eta = v.dot(e0);
@@ -565,7 +574,7 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
         face_h       = diameter(msh, fc);
         basis_degree = degree;
         basis_size   = scalar_basis_size(degree, 2);
-        pts          = points(msh, fc);
+        compute_axis(msh, fc, e0, e1);
     }
 
     function_type
