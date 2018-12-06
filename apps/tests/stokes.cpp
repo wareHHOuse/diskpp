@@ -50,7 +50,7 @@ run_stokes(const Mesh& msh, size_t degree)
     typedef typename mesh_type::coordinate_type scalar_type;
 
     typedef dynamic_matrix<scalar_type>     matrix_type;
-    typedef disk::BoundaryConditions<mesh_type, static_vector<scalar_type, mesh_type::dimension>> boundary_type;
+    typedef disk::BoundaryConditions<mesh_type, false> boundary_type;
 
     using point_type = typename mesh_type::point_type;
 
@@ -95,7 +95,7 @@ run_stokes(const Mesh& msh, size_t degree)
 
 
     typename disk::hho_degree_info hdi(degree);
-    boundary_type                        bnd(msh);
+    boundary_type                  bnd(msh);
     bnd.addDirichletEverywhere(sol_fun);
 
     auto assembler = disk::make_stokes_assembler(msh, hdi, bnd);

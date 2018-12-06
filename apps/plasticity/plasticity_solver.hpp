@@ -66,7 +66,7 @@ class plasticity_solver
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
-    typedef disk::BoundaryConditions<mesh_type, static_vector<scalar_type, mesh_type::dimension>> bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, false> bnd_type;
     typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_type;
     // typedef disk::IsotropicHardeningVMis<mesh_type> law_type;
 

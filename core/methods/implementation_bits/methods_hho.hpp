@@ -1541,7 +1541,7 @@ class diffusion_condensed_assembler2
     std::vector< Triplet<T> >           triplets;
     size_t      num_all_faces, num_dirichlet_faces, num_other_faces, system_size;
 
-    typedef disk::BoundaryConditions<Mesh, T> boundary_type;
+    typedef disk::BoundaryConditions<Mesh> boundary_type;
     boundary_type m_bnd;
 
     class assembly_index
@@ -2109,7 +2109,7 @@ template<typename Mesh>
 class stokes_assembler
 {
     using T = typename Mesh::coordinate_type;
-    typedef disk::BoundaryConditions<Mesh, static_vector<T, Mesh::dimension>>    boundary_type;
+    typedef disk::BoundaryConditions<Mesh, false>    boundary_type;
 
     std::vector<size_t>                 compress_table;
     std::vector<size_t>                 expand_table;
@@ -2198,7 +2198,7 @@ public:
       auto   num_face_dofs = vector_basis_size(di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
       size_t face_dofs     = 0;
       for (size_t face_id = 0; face_id < msh.faces_size(); face_id++)
-          face_dofs += num_face_dofs - m_bnd.dirichlet_imposed_dofs_vector(face_id, di.face_degree());
+          face_dofs += num_face_dofs - m_bnd.dirichlet_imposed_dofs(face_id, di.face_degree());
 
       assert(face_dofs == fbs_A * num_other_faces);
     }
@@ -2570,7 +2570,7 @@ template<typename Mesh>
 class stokes_assembler_alg
 {
     using T = typename Mesh::coordinate_type;
-    typedef disk::BoundaryConditions<Mesh, static_vector<T, Mesh::dimension>> boundary_type;
+    typedef disk::BoundaryConditions<Mesh, false> boundary_type;
 
     std::vector<size_t>                 compress_table;
     std::vector<size_t>                 expand_table;
@@ -2662,7 +2662,7 @@ public:
       auto   num_face_dofs = vector_basis_size(di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
       size_t face_dofs     = 0;
       for (size_t face_id = 0; face_id < msh.faces_size(); face_id++)
-          face_dofs += num_face_dofs - m_bnd.dirichlet_imposed_dofs_vector(face_id, di.face_degree());
+          face_dofs += num_face_dofs - m_bnd.dirichlet_imposed_dofs(face_id, di.face_degree());
 
       assert(face_dofs == fbs_A * num_other_faces);
     }
@@ -2902,7 +2902,7 @@ class assembler_mechanics
     typedef typename mesh_type::cell            cell_type;
     typedef typename mesh_type::face            face_type;
 
-    typedef disk::BoundaryConditions<Mesh, static_vector<scalar_type, Mesh::dimension>> bnd_type;
+    typedef disk::BoundaryConditions<Mesh, false> bnd_type;
 
     typedef dynamic_matrix<scalar_type> matrix_type;
     typedef dynamic_vector<scalar_type> vector_type;
@@ -2933,7 +2933,7 @@ class assembler_mechanics
         {
 
             face_compress_map.at(face_id) = total_dofs;
-            const auto free_dofs = num_face_dofs - bnd.dirichlet_imposed_dofs_vector(face_id, m_hdi.face_degree());
+            const auto free_dofs = num_face_dofs - bnd.dirichlet_imposed_dofs(face_id, m_hdi.face_degree());
             total_dofs += free_dofs;
         }
         m_num_unknowns = total_dofs;

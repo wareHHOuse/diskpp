@@ -69,7 +69,7 @@ class augmented_lagrangian_viscoplasticity
     typedef std::function<vector2d_type (const point_type &)>   vector_funtion_type;
     typedef std::function<T   (const point_type &)>             scalar_funtion_type;
 
-    typedef disk::BoundaryConditions<mesh_type, vector2d_type> boundary_type;
+    typedef disk::BoundaryConditions<mesh_type, false>          boundary_type;
 
     vector_funtion_type     rhs_fun, velocity;
     dynamic_vector<T>       multiplier, auxiliar, auxiliar_old;

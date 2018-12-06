@@ -87,16 +87,102 @@ bnd_product(const T& fact, const Matrix<T, N, M>& func)
 {
     return fact * func;
 }
+
+template<typename scalar_type, size_t DIM, bool FunctionScalarType>
+struct FunctionType
+{
+    typedef scalar_type function_type;
+};
+
+template<typename scalar_type, size_t DIM>
+struct FunctionType<scalar_type, DIM, false>
+{
+    typedef static_vector<scalar_type, DIM> function_type;
+};
+
+template<bool ScalarBoundary>
+struct num_face_dofs
+{
+    static size_t
+    size(const size_t& face_degree, const size_t dimension)
+    {
+        return scalar_basis_size(face_degree, dimension - 1);
+    }
+};
+
+template<>
+struct num_face_dofs<false>
+{
+    static size_t
+    size(const size_t& face_degree, const size_t dimension)
+    {
+        return vector_basis_size(face_degree, dimension - 1, dimension);
+    }
+};
+
+template<bool ScalarBoundary>
+struct imposed_dofs
+{
+   static  size_t
+    dirichlet_imposed_dofs(const size_t& btype, const size_t& num_face_dofs, const size_t dimension)
+    {
+        switch (btype)
+        {
+            case DIRICHLET: return num_face_dofs; break;
+            case NOTHING: return 0; break;
+            default: throw std::logic_error("Unknown Boundary condition"); break;
+        }
+    }
+};
+
+template<>
+struct imposed_dofs<false>
+{
+    static size_t
+    dirichlet_imposed_dofs(const size_t& btype, const size_t& num_face_dofs, const size_t dimension)
+    {
+        const size_t num_dim_dofs = num_face_dofs / dimension;
+        switch (btype)
+        {
+            case DIRICHLET: return num_face_dofs; break;
+            case CLAMPED: return num_face_dofs; break;
+            case DX: return num_dim_dofs; break;
+            case DY: return num_dim_dofs; break;
+            case DZ:
+                if (dimension != 3)
+                    throw std::invalid_argument("You are not in 3D");
+                return num_dim_dofs;
+                break;
+            case DXDY: return 2 * num_dim_dofs; break;
+            case DXDZ:
+                if (dimension != 3)
+                    throw std::invalid_argument("You are not in 3D");
+                return 2 * num_dim_dofs;
+                break;
+            case DYDZ:
+                if (dimension != 3)
+                    throw std::invalid_argument("You are not in 3D");
+                return 2 * num_dim_dofs;
+                break;
+            case NOTHING: return 0; break;
+            default: throw std::logic_error("Unknown Boundary condition"); break;
+        }
+    }
+};
 }
 
-template<typename MeshType, typename FunctionType>
+// class to create and impose boudary conditions
+// ScalarBoundary = true for scalar problem like diffusion
+// ScalarBoundary = false for vectorial problem like linear_elasticity
+
+template<typename MeshType, bool ScalarBoundary = true>
 class BoundaryConditions
 {
   public:
-    typedef MeshType                                 mesh_type;
-    typedef typename mesh_type::coordinate_type      scalar_type;
-    typedef FunctionType                             function_type;
-    typedef point<scalar_type, mesh_type::dimension> point_type;
+    typedef MeshType                                                                                      mesh_type;
+    typedef typename mesh_type::coordinate_type                                                           scalar_type;
+    typedef point<scalar_type, mesh_type::dimension>                                                      point_type;
+    typedef typename priv::FunctionType<scalar_type, mesh_type::dimension, ScalarBoundary>::function_type function_type;
 
   private:
     const mesh_type& m_msh;
@@ -400,65 +486,17 @@ class BoundaryConditions
         std::cout << " - Number of Contact faces: " << nb_faces_contact() << std::endl;
     }
 
-    // for vector basis function
     size_t
-    dirichlet_imposed_dofs_vector(const size_t& face_id, const size_t face_degree) const
+    dirichlet_imposed_dofs(const size_t& face_id, const size_t face_degree) const
     {
         const size_t dimension     = mesh_type::dimension;
-        const size_t num_face_dofs = vector_basis_size(face_degree, dimension - 1, dimension);
-        const size_t num_dim_dofs  = num_face_dofs / dimension;
+        const size_t num_face_dofs = priv::num_face_dofs<ScalarBoundary>::size(face_degree, dimension);
 
         if (is_dirichlet_face(face_id))
         {
             const size_t btype = dirichlet_boundary_type(face_id);
 
-            switch (btype)
-            {
-                case DIRICHLET: return num_face_dofs; break;
-                case CLAMPED: return num_face_dofs; break;
-                case DX: return num_dim_dofs; break;
-                case DY: return num_dim_dofs; break;
-                case DZ:
-                    if (dimension != 3)
-                        throw std::invalid_argument("You are not in 3D");
-                    return num_dim_dofs;
-                    break;
-                case DXDY: return 2 * num_dim_dofs; break;
-                case DXDZ:
-                    if (dimension != 3)
-                        throw std::invalid_argument("You are not in 3D");
-                    return 2 * num_dim_dofs;
-                    break;
-                case DYDZ:
-                    if (dimension != 3)
-                        throw std::invalid_argument("You are not in 3D");
-                    return 2 * num_dim_dofs;
-                    break;
-                case NOTHING: return 0; break;
-                default: throw std::logic_error("Unknown Boundary condition"); break;
-            }
-        }
-
-        return 0;
-    }
-
-    // for scalar basis function
-    size_t
-    dirichlet_imposed_dofs_scalar(const size_t& face_id, const size_t face_degree) const
-    {
-        const size_t dimension     = mesh_type::dimension;
-        const size_t num_face_dofs = scalar_basis_size(face_degree, dimension - 1);
-
-        if (is_dirichlet_face(face_id))
-        {
-            const size_t btype = dirichlet_boundary_type(face_id);
-
-            switch (btype)
-            {
-                case DIRICHLET: return num_face_dofs; break;
-                case NOTHING: return 0; break;
-                default: throw std::logic_error("Unknown Boundary condition"); break;
-            }
+            return priv::imposed_dofs<ScalarBoundary>::dirichlet_imposed_dofs(btype, num_face_dofs, dimension);
         }
 
         return 0;

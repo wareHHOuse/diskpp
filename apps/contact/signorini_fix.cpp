@@ -43,7 +43,7 @@
 template<typename Mesh, typename T, typename Function>
 auto
 fix_point_solver_faces(const Mesh& msh,
-                const disk::BoundaryConditions<Mesh, T>& bnd,
+                const disk::BoundaryConditions<Mesh>& bnd,
                 const algorithm_parameters<T>& ap,
                 const Function& rhs_fun)
 {
@@ -197,7 +197,7 @@ fix_point_solver_faces(const Mesh& msh,
 template<typename Mesh, typename T, typename Function>
 auto
 fix_point_solver_cells(const Mesh& msh,
-                const disk::BoundaryConditions<Mesh, T>& bnd,
+                const disk::BoundaryConditions<Mesh>& bnd,
                 const algorithm_parameters<T>& ap,
                 const Function& rhs_fun)
 {
@@ -389,7 +389,7 @@ run_signorini(  const Mesh& msh, const algorithm_parameters<T>& ap)
         return - 2.* M_PI *  std::sin(2. * M_PI * p.x());
     };
 
-    disk::BoundaryConditions<Mesh, T>     bnd(msh);
+    disk::BoundaryConditions<Mesh>     bnd(msh);
 
     bnd.addDirichletBC(disk::DIRICHLET,1,zero_fun); //TOP
     bnd.addNeumannBC(disk::NEUMANN,  2,  zero_fun); //

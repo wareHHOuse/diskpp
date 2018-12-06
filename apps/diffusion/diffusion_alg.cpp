@@ -49,8 +49,6 @@ class augmented_lagrangian_diffusion
     typedef typename mesh_type::face        face_type;
     typedef typename mesh_type::coordinate_type scalar_type;
 
-    typedef disk::BoundaryConditions<mesh_type, static_vector<scalar_type, mesh_type::dimension>> boundary_type;
-
     using point_type = typename mesh_type::point_type;
 
     typedef dynamic_vector<scalar_type>       vector_type;

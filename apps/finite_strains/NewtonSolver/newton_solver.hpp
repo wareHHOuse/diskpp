@@ -56,7 +56,7 @@ class NewtonRaphson_solver_finite_strains
     typedef dynamic_matrix<scalar_type> matrix_type;
     typedef dynamic_vector<scalar_type> vector_type;
 
-    typedef disk::BoundaryConditions<mesh_type, static_vector<scalar_type, mesh_type::dimension>> bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, false> bnd_type;
 
     const hdi_type& m_hdi;
     const bnd_type& m_bnd;

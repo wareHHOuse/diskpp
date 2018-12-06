@@ -55,7 +55,7 @@ class hierarchical_contact_solver
     typedef disk::simplicial_mesh<T, 2>     mesh_type;
     typedef Eigen::SparseMatrix<T>          sparse_matrix_type;
     typedef Eigen::Triplet<T>               triplet_type;
-    typedef disk::BoundaryConditions<mesh_type, T> boundary_type;
+    typedef disk::BoundaryConditions<mesh_type> boundary_type;
 
     typedef static_vector<T, 3>             fem_vector;
     typedef static_matrix<T, 3, 3>          fem_matrix;
@@ -209,7 +209,7 @@ class hierarchical_contact_solver
             return 0;
         };
 
-        disk::BoundaryConditions<mesh_type, T> bnd(msh);
+        disk::BoundaryConditions<mesh_type> bnd(msh);
 
         bnd.addDirichletBC(disk::DIRICHLET,1, zero_fun); //TOP
         bnd.addNeumannBC(disk::NEUMANN, 2,zero_fun); //
