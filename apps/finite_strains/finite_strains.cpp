@@ -34,9 +34,9 @@
 
 #include "Informations.hpp"
 #include "Parameters.hpp"
-#include "core/mechanics/behaviors/laws/materialData.hpp"
+#include "mechanics/behaviors/laws/materialData.hpp"
 #include "loaders/loader.hpp"
-#include "mechanics/BoundaryConditions.hpp"
+#include "boundary_conditions/boundary_conditions.hpp"
 
 #include "timecounter.h"
 
@@ -83,7 +83,7 @@ run_finite_strains_solver(const Mesh<T, 2, Storage>&   msh,
     typedef Mesh<T, 2, Storage>                            mesh_type;
     typedef static_vector<T, 2>                            result_type;
     typedef static_matrix<T, 2, 2>                         result_grad_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, result_type> Bnd_type;
 
     auto load = [material_data](const point<T, 2>& p) -> result_type { return result_type{0, 0}; };
 
@@ -93,32 +93,14 @@ run_finite_strains_solver(const Mesh<T, 2, Storage>&   msh,
 
     Bnd_type bnd(msh);
 
-    // Plaque with quadrilaterals
-    // auto zero = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
-
-    // auto trac = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 5}; };
-
-    // bnd.addDirichletBC(disk::mechanics::DX, 4, zero);
-    // bnd.addDirichletBC(disk::mechanics::DX, 14, zero);
-    // bnd.addDirichletBC(disk::mechanics::DY, 23, zero);
-    // bnd.addDirichletBC(disk::mechanics::DY, 16, trac);
 
     // Cook with quadrilaterals
     auto zero = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
 
-    auto trac     = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0.1125}; };
-    // auto depltest = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 1}; };
-    //
-    bnd.addDirichletBC(disk::mechanics::CLAMPED, 3, zero);
-    bnd.addNeumannBC(disk::mechanics::NEUMANN, 8, trac);
-    // bnd.addDirichletBC(disk::mechanics::DY, 8, depltest);
+    auto trac     = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0.3125}; };
 
-    // debug aster
-    // auto zero = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
-    // auto trac = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.1, 0.}; };
-
-    // bnd.addDirichletBC(disk::mechanics::CLAMPED, 3, zero);
-    // bnd.addDirichletBC(disk::mechanics::DX, 8, trac);
+    bnd.addDirichletBC(disk::CLAMPED, 3, zero);
+    bnd.addNeumannBC(disk::NEUMANN, 8, trac);
 
     finite_strains_solver<mesh_type> nl(msh, bnd, rp, material_data);
 
@@ -162,7 +144,7 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&   msh,
     typedef Mesh<T, 3, Storage>                            mesh_type;
     typedef static_vector<T, 3>                            result_type;
     typedef static_matrix<T, 3, 3>                         result_grad_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, result_type> Bnd_type;
 
     auto load = [material_data](const point<T, 3>& p) -> result_type { return result_type{0, 0, 0}; };
 
@@ -202,34 +184,34 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&   msh,
     };
 
     // Sphere Hpp
-    // bnd.addDirichletBC(disk::mechanics::DX, 3, zero);
-    // bnd.addDirichletBC(disk::mechanics::DY, 13, zero);
-    // bnd.addDirichletBC(disk::mechanics::DZ, 24, zero);
-    // bnd.addNeumannBC(disk::mechanics::NEUMANN, 27, pres);
+    // bnd.addDirichletBC(disk::DX, 3, zero);
+    // bnd.addDirichletBC(disk::DY, 13, zero);
+    // bnd.addDirichletBC(disk::DZ, 24, zero);
+    // bnd.addNeumannBC(disk::NEUMANN, 27, pres);
 
-    // // // Sphere GDEF
-    bnd.addDirichletBC(disk::mechanics::DX, 12, zero);
-    bnd.addDirichletBC(disk::mechanics::DY, 24, zero);
-    bnd.addDirichletBC(disk::mechanics::DZ, 19, zero);
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET, 27, deplr);
-    //bnd.addNeumannBC(disk::mechanics::NEUMANN, 27, pres);
+    // // Sphere GDEF
+    bnd.addDirichletBC(disk::DX, 12, zero);
+    bnd.addDirichletBC(disk::DY, 24, zero);
+    bnd.addDirichletBC(disk::DZ, 19, zero);
+    bnd.addDirichletBC(disk::DIRICHLET, 27, deplr);
+    //bnd.addNeumannBC(disk::NEUMANN, 27, pres);
 
     // Cylindre GDEF
     // auto depl = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 1.0}; };
-    // bnd.addDirichletBC(disk::mechanics::DZ, 125, zero);
-    // bnd.addDirichletBC(disk::mechanics::DZ, 50, zero);
-    // bnd.addDirichletBC(disk::mechanics::DZ, 96, zero);
-    // bnd.addDirichletBC(disk::mechanics::DX, 113, zero);
-    // bnd.addDirichletBC(disk::mechanics::DX, 91, zero);
-    // bnd.addDirichletBC(disk::mechanics::DX, 74, zero);
-    // bnd.addDirichletBC(disk::mechanics::DX, 120, zero);
-    // bnd.addDirichletBC(disk::mechanics::DY, 31, zero);
-    // bnd.addDirichletBC(disk::mechanics::DY, 108, zero);
-    // bnd.addDirichletBC(disk::mechanics::DY, 128, zero);
-    // bnd.addDirichletBC(disk::mechanics::DY, 55, zero);
-    // bnd.addDirichletBC(disk::mechanics::DZ, 103, depl);
-    // bnd.addDirichletBC(disk::mechanics::DZ, 14, depl);
-    // bnd.addDirichletBC(disk::mechanics::DZ, 69, depl);
+    // bnd.addDirichletBC(disk::DZ, 125, zero);
+    // bnd.addDirichletBC(disk::DZ, 50, zero);
+    // bnd.addDirichletBC(disk::DZ, 96, zero);
+    // bnd.addDirichletBC(disk::DX, 113, zero);
+    // bnd.addDirichletBC(disk::DX, 91, zero);
+    // bnd.addDirichletBC(disk::DX, 74, zero);
+    // bnd.addDirichletBC(disk::DX, 120, zero);
+    // bnd.addDirichletBC(disk::DY, 31, zero);
+    // bnd.addDirichletBC(disk::DY, 108, zero);
+    // bnd.addDirichletBC(disk::DY, 128, zero);
+    // bnd.addDirichletBC(disk::DY, 55, zero);
+    // bnd.addDirichletBC(disk::DZ, 103, depl);
+    // bnd.addDirichletBC(disk::DZ, 14, depl);
+    // bnd.addDirichletBC(disk::DZ, 69, depl);
 
     // Cube + pres
     //    auto zero = [material_data](const point<T, 3>& p) -> result_type {
@@ -240,15 +222,22 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&   msh,
     //       return result_type{0.0, 0.0, -356};
     //    };
 
-    //    bnd.addDirichletBC(disk::mechanics::CLAMPED, 69, zero);
-    //    bnd.addDirichletBC(disk::mechanics::CLAMPED, 55, zero);
-    //    bnd.addDirichletBC(disk::mechanics::CLAMPED, 31, zero);
-    //    bnd.addDirichletBC(disk::mechanics::CLAMPED, 96, zero);
-    //    bnd.addDirichletBC(disk::mechanics::DY, 62, zero);
-    //    bnd.addDirichletBC(disk::mechanics::DY, 14, zero);
-    //    bnd.addDirichletBC(disk::mechanics::DX, 4, zero);
-    //    bnd.addDirichletBC(disk::mechanics::DX, 38, zero);
-    //    bnd.addNeumannBC(disk::mechanics::NEUMANN, 21, pres);
+    //    bnd.addDirichletBC(disk::CLAMPED, 69, zero);
+    //    bnd.addDirichletBC(disk::CLAMPED, 55, zero);
+    //    bnd.addDirichletBC(disk::CLAMPED, 31, zero);
+    //    bnd.addDirichletBC(disk::CLAMPED, 96, zero);
+    //    bnd.addDirichletBC(disk::DY, 62, zero);
+    //    bnd.addDirichletBC(disk::DY, 14, zero);
+    //    bnd.addDirichletBC(disk::DX, 4, zero);
+    //    bnd.addDirichletBC(disk::DX, 38, zero);
+    //    bnd.addNeumannBC(disk::NEUMANN, 21, pres);
+
+
+    // auto trac = [material_data](const point<T, 3>& p) -> result_type {
+    //     return result_type { 0.0, 0.3125,  0.0}; };
+
+    // bnd.addDirichletBC(disk::CLAMPED, 3, zero);
+    // bnd.addNeumannBC(disk::NEUMANN, 20, trac);
 
     // Solver
 
@@ -303,18 +292,18 @@ main(int argc, char** argv)
     disk::MaterialData<RealType> material_data;
 
     // // Cook Parameters (mm, MPa, kN)
-    // RealType E  = 206.9;
-    // RealType nu = 0.29;
+    RealType E  = 206.9;
+    RealType nu = 0.29;
 
-    // material_data.setMu(E, nu);
-    // material_data.setLambda(E, nu);
+    material_data.setMu(E, nu);
+    material_data.setLambda(E, nu);
 
-    // // readCurve("VEM2_2d.dat", material_data);
+    readCurve("VEM2_2d.dat", material_data);
 
     // material_data.setK(0.0);
-    // material_data.setH(0.12924);
+    // material_data.setH(E, 0.13, 0.0);
 
-    // material_data.setSigma_y0(0.450);
+    material_data.setSigma_y0(0.450);
 
     // Old cook
     // RealType E  = 70;
@@ -326,16 +315,16 @@ main(int argc, char** argv)
     // material_data.setH(0.135);
     // material_data.setSigma_y0(0.243);
 
-    // // Sphere Parameters (mm, MPa, kN)
-    RealType E = 28.95;
-    RealType nu = 0.499;
-    RealType ET = 0;
+    // Sphere Parameters (mm, MPa, kN)
+    // RealType E = 28.95;
+    // RealType nu = 0.488;
+    // RealType ET = 0;
 
-    material_data.setMu(E, nu);
-    material_data.setLambda(E, nu);
-    material_data.setK(0);
-    material_data.setH(0);
-    material_data.setSigma_y0(6);
+    // material_data.setMu(E, nu);
+    // material_data.setLambda(E, nu);
+    // material_data.setK(0);
+    // material_data.setH(0.0);
+    // material_data.setSigma_y0(6);
 
 
     // Cylindre Parameters (mm, MPa, kN)

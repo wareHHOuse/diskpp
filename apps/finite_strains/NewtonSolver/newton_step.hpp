@@ -35,7 +35,7 @@
 #include "../Parameters.hpp"
 #include "bases/bases.hpp"
 #include "finite_strains_elementary_computation.hpp"
-#include "mechanics/BoundaryConditions.hpp"
+#include "boundary_conditions/boundary_conditions.hpp"
 #include "methods/hho"
 #include "quadratures/quadratures.hpp"
 
@@ -56,7 +56,7 @@ class NewtonRaphson_step_finite_strains
     typedef typename mesh_type::coordinate_type            scalar_type;
     typedef ParamRun<scalar_type>                          param_type;
     typedef typename disk::hho_degree_info                 hdi_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, static_vector<scalar_type, mesh_type::dimension>> bnd_type;
 
     const static int dimension = mesh_type::dimension;
 

@@ -34,7 +34,7 @@
 #include "../Informations.hpp"
 #include "../Parameters.hpp"
 
-#include "mechanics/BoundaryConditions.hpp"
+#include "boundary_conditions/boundary_conditions.hpp"
 #include "newton_step.hpp"
 
 #include "timecounter.h"
@@ -56,7 +56,7 @@ class NewtonRaphson_solver_plasticity
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
-    typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, static_vector<scalar_type, mesh_type::dimension>> bnd_type;
 
     const hdi_type& m_hdi;
     const bnd_type& m_bnd;

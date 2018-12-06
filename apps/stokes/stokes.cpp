@@ -128,7 +128,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     typedef typename mesh_type::coordinate_type scalar_type;
 
     typedef dynamic_matrix<scalar_type>     matrix_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
+    typedef disk::BoundaryConditions<mesh_type, static_vector<scalar_type, mesh_type::dimension>> boundary_type;
 
     using point_type = typename mesh_type::point_type;
 

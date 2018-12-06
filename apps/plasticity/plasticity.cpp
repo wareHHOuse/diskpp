@@ -34,9 +34,9 @@
 
 #include "Informations.hpp"
 #include "Parameters.hpp"
+#include "boundary_conditions/boundary_conditions.hpp"
 #include "core/mechanics/behaviors/laws/materialData.hpp"
 #include "loaders/loader.hpp"
-#include "mechanics/BoundaryConditions.hpp"
 
 #include "timecounter.h"
 
@@ -81,7 +81,7 @@ run_plasticity_solver(const Mesh<T, 2, Storage>& msh, const ParamRun<T>& rp, con
     typedef Mesh<T, 2, Storage>                            mesh_type;
     typedef static_vector<T, 2>                            result_type;
     typedef static_matrix<T, 2, 2>                         result_grad_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, result_type> Bnd_type;
 
     auto load = [material_data](const point<T, 2>& p) -> result_type { return result_type{0, 0}; };
 
@@ -96,10 +96,10 @@ run_plasticity_solver(const Mesh<T, 2, Storage>& msh, const ParamRun<T>& rp, con
 
     // auto trac = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 5}; };
 
-    // bnd.addDirichletBC(disk::mechanics::DX, 4, zero);
-    // bnd.addDirichletBC(disk::mechanics::DX, 14, zero);
-    // bnd.addDirichletBC(disk::mechanics::DY, 23, zero);
-    // bnd.addDirichletBC(disk::mechanics::DY, 16, trac);
+    // bnd.addDirichletBC(disk::DX, 4, zero);
+    // bnd.addDirichletBC(disk::DX, 14, zero);
+    // bnd.addDirichletBC(disk::DY, 23, zero);
+    // bnd.addDirichletBC(disk::DY, 16, trac);
 
     // Cook with quadrilaterals
     auto zero = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
@@ -107,9 +107,9 @@ run_plasticity_solver(const Mesh<T, 2, Storage>& msh, const ParamRun<T>& rp, con
     auto trac     = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0.1125}; };
     auto depltest = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 10}; };
 
-    bnd.addDirichletBC(disk::mechanics::CLAMPED, 3, zero);
-    bnd.addNeumannBC(disk::mechanics::NEUMANN, 8, trac);
-    // bnd.addDirichletBC(disk::mechanics::DY, 8, depltest);
+    bnd.addDirichletBC(disk::CLAMPED, 3, zero);
+    bnd.addNeumannBC(disk::NEUMANN, 8, trac);
+    // bnd.addDirichletBC(disk::DY, 8, depltest);
 
     plasticity_solver<mesh_type> nl(msh, bnd, rp, material_data);
 
@@ -174,7 +174,7 @@ run_plasticity_solver(const Mesh<T, 3, Storage>& msh, const ParamRun<T>& rp, con
     typedef Mesh<T, 3, Storage>                            mesh_type;
     typedef static_vector<T, 3>                            result_type;
     typedef static_matrix<T, 3, 3>                         result_grad_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, result_type> Bnd_type;
 
     auto load = [material_data](const point<T, 3>& p) -> result_type { return result_type{0, 0, 0}; };
 
@@ -190,30 +190,22 @@ run_plasticity_solver(const Mesh<T, 3, Storage>& msh, const ParamRun<T>& rp, con
     auto zero = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 0.0}; };
     auto un   = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 1.0}; };
 
-    // auto pres = [material_data](const point<T, 3>& p) -> result_type {
-    //     result_type er = result_type::Zero();
+    auto pres = [material_data](const point<T, 3>& p) -> result_type {
+        result_type er = result_type::Zero();
 
-    //     er(0) = p.x();
-    //     er(1) = p.y();
-    //     er(2) = p.z();
+        er(0) = p.x();
+        er(1) = p.y();
+        er(2) = p.z();
 
-    //     er /= er.norm();
+        er /= er.norm();
 
-    //     return er;
-    // };
+        return 330*er;
+    };
 
-    // bnd.addDirichletBC(disk::mechanics::DX, 3, zero);
-    // bnd.addDirichletBC(disk::mechanics::DY, 13, zero);
-    // bnd.addDirichletBC(disk::mechanics::DZ, 24, zero);
-    // bnd.addNeumannBC(disk::mechanics::NEUMANN, 27, pres);
-
-    // bnd.addDirichletBC(disk::mechanics::CLAMPED, 31, zero);
-    // bnd.addDirichletBC(disk::mechanics::DZ, 33, un);
-
-    bnd.addDirichletBC(disk::mechanics::CLAMPED, 1, zero);
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET, 2, un);
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET, 3, un);
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET, 4, un);
+    bnd.addDirichletBC(disk::DX, 3, zero);
+    bnd.addDirichletBC(disk::DY, 13, zero);
+    bnd.addDirichletBC(disk::DZ, 24, zero);
+    bnd.addNeumannBC(disk::NEUMANN, 27, pres);
 
     // Cube + pres
     //    auto zero = [material_data](const point<T, 3>& p) -> result_type {
@@ -224,15 +216,15 @@ run_plasticity_solver(const Mesh<T, 3, Storage>& msh, const ParamRun<T>& rp, con
     //       return result_type{0.0, 0.0, -356};
     //    };
 
-    //    bnd.addDirichletBC(disk::mechanics::CLAMPED, 69, zero);
-    //    bnd.addDirichletBC(disk::mechanics::CLAMPED, 55, zero);
-    //    bnd.addDirichletBC(disk::mechanics::CLAMPED, 31, zero);
-    //    bnd.addDirichletBC(disk::mechanics::CLAMPED, 96, zero);
-    //    bnd.addDirichletBC(disk::mechanics::DY, 62, zero);
-    //    bnd.addDirichletBC(disk::mechanics::DY, 14, zero);
-    //    bnd.addDirichletBC(disk::mechanics::DX, 4, zero);
-    //    bnd.addDirichletBC(disk::mechanics::DX, 38, zero);
-    //    bnd.addNeumannBC(disk::mechanics::NEUMANN, 21, pres);
+    //    bnd.addDirichletBC(disk::CLAMPED, 69, zero);
+    //    bnd.addDirichletBC(disk::CLAMPED, 55, zero);
+    //    bnd.addDirichletBC(disk::CLAMPED, 31, zero);
+    //    bnd.addDirichletBC(disk::CLAMPED, 96, zero);
+    //    bnd.addDirichletBC(disk::DY, 62, zero);
+    //    bnd.addDirichletBC(disk::DY, 14, zero);
+    //    bnd.addDirichletBC(disk::DX, 4, zero);
+    //    bnd.addDirichletBC(disk::DX, 38, zero);
+    //    bnd.addNeumannBC(disk::NEUMANN, 21, pres);
 
     // Beam 3D
 
@@ -240,8 +232,8 @@ run_plasticity_solver(const Mesh<T, 3, Storage>& msh, const ParamRun<T>& rp, con
 
     // auto pres = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, -3000.0}; };
 
-    // bnd.addDirichletBC(disk::mechanics::CLAMPED, 3, zero);
-    // bnd.addNeumannBC(disk::mechanics::NEUMANN, 13, pres);
+    // bnd.addDirichletBC(disk::CLAMPED, 3, zero);
+    // bnd.addNeumannBC(disk::NEUMANN, 13, pres);
 
     // Thin Plate 3D
 
@@ -249,11 +241,11 @@ run_plasticity_solver(const Mesh<T, 3, Storage>& msh, const ParamRun<T>& rp, con
 
     // auto pres = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, -2.0E-1}; };
 
-    // bnd.addDirichletBC(disk::mechanics::CLAMPED, 3, zero);
-    // bnd.addDirichletBC(disk::mechanics::CLAMPED, 13, zero);
-    // bnd.addDirichletBC(disk::mechanics::CLAMPED, 23, zero);
-    // bnd.addDirichletBC(disk::mechanics::CLAMPED, 27, zero);
-    // bnd.addNeumannBC(disk::mechanics::NEUMANN, 33, pres);
+    // bnd.addDirichletBC(disk::CLAMPED, 3, zero);
+    // bnd.addDirichletBC(disk::CLAMPED, 13, zero);
+    // bnd.addDirichletBC(disk::CLAMPED, 23, zero);
+    // bnd.addDirichletBC(disk::CLAMPED, 27, zero);
+    // bnd.addNeumannBC(disk::NEUMANN, 33, pres);
 
     // Solver
 

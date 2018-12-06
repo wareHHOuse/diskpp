@@ -30,9 +30,9 @@
 #include <sstream>
 #include <unistd.h>
 
+#include "boundary_conditions/boundary_conditions.hpp"
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
-#include "mechanics/BoundaryConditions.hpp"
 
 #include "timecounter.h"
 
@@ -56,7 +56,7 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>& msh,
 {
     typedef Mesh<T, 2, Storage>                            mesh_type;
     typedef static_vector<T, 2>                            result_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, result_type> Bnd_type;
 
     timecounter tc;
     tc.tic();
@@ -134,7 +134,7 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>& msh, run_params& rp, Ela
 {
     typedef Mesh<T, 3, Storage>                            mesh_type;
     typedef static_vector<T, 3>                            result_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, result_type> Bnd_type;
 
     timecounter tc;
     tc.tic();

@@ -33,7 +33,7 @@
 #include "common/eigen.hpp"
 #include "bases/bases.hpp"
 #include "quadratures/quadratures.hpp"
-#include "mechanics/BoundaryConditions.hpp"
+#include "boundary_conditions/boundary_conditions.hpp"
 
 using namespace Eigen;
 
@@ -1541,7 +1541,7 @@ class diffusion_condensed_assembler2
     std::vector< Triplet<T> >           triplets;
     size_t      num_all_faces, num_dirichlet_faces, num_other_faces, system_size;
 
-    typedef disk::mechanics::BoundaryConditionsScalar<Mesh> boundary_type;
+    typedef disk::BoundaryConditions<Mesh, T> boundary_type;
     boundary_type m_bnd;
 
     class assembly_index
@@ -1747,7 +1747,7 @@ public:
                     {
                         switch (bnd.neumann_boundary_type(face_id))
                         {
-                            case disk::mechanics::NEUMANN:
+                            case disk::NEUMANN:
                                 throw std::invalid_argument("You tried to impose both Neumann and Robin conditions on the same face");
                                 break;
                             default:
@@ -1760,7 +1760,7 @@ public:
                     {
                         switch (bnd.dirichlet_boundary_type(face_id))
                         {
-                            case disk::mechanics::DIRICHLET:
+                            case disk::DIRICHLET:
                                 throw std::invalid_argument("You tried to impose both Dirichlet and Robin conditions on the same face");
                                 break;
                             default:
@@ -2109,7 +2109,7 @@ template<typename Mesh>
 class stokes_assembler
 {
     using T = typename Mesh::coordinate_type;
-    typedef disk::mechanics::BoundaryConditions<Mesh>    boundary_type;
+    typedef disk::BoundaryConditions<Mesh, static_vector<T, Mesh::dimension>>    boundary_type;
 
     std::vector<size_t>                 compress_table;
     std::vector<size_t>                 expand_table;
@@ -2198,7 +2198,7 @@ public:
       auto   num_face_dofs = vector_basis_size(di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
       size_t face_dofs     = 0;
       for (size_t face_id = 0; face_id < msh.faces_size(); face_id++)
-          face_dofs += num_face_dofs - m_bnd.dirichlet_imposed_dofs(face_id, di.face_degree());
+          face_dofs += num_face_dofs - m_bnd.dirichlet_imposed_dofs_vector(face_id, di.face_degree());
 
       assert(face_dofs == fbs_A * num_other_faces);
     }
@@ -2457,7 +2457,7 @@ public:
                     {
                         switch (bnd.dirichlet_boundary_type(face_id))
                         {
-                            case disk::mechanics::DIRICHLET:
+                            case disk::DIRICHLET:
                                 throw std::invalid_argument("You tried to impose"
                                 "both Dirichlet and Neumann conditions on the same face");
                                 break;
@@ -2559,9 +2559,9 @@ public:
     }
 };
 
-template<typename Mesh>
+template<typename Mesh, typename BoundaryType>
 auto make_stokes_assembler(const Mesh& msh, hho_degree_info hdi,
-                            const  disk::mechanics::BoundaryConditions<Mesh>& bnd)
+                            const BoundaryType& bnd)
 {
     return stokes_assembler<Mesh>(msh, hdi, bnd);
 }
@@ -2570,7 +2570,7 @@ template<typename Mesh>
 class stokes_assembler_alg
 {
     using T = typename Mesh::coordinate_type;
-    typedef disk::mechanics::BoundaryConditions<Mesh>    boundary_type;
+    typedef disk::BoundaryConditions<Mesh, static_vector<T, Mesh::dimension>> boundary_type;
 
     std::vector<size_t>                 compress_table;
     std::vector<size_t>                 expand_table;
@@ -2662,7 +2662,7 @@ public:
       auto   num_face_dofs = vector_basis_size(di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
       size_t face_dofs     = 0;
       for (size_t face_id = 0; face_id < msh.faces_size(); face_id++)
-          face_dofs += num_face_dofs - m_bnd.dirichlet_imposed_dofs(face_id, di.face_degree());
+          face_dofs += num_face_dofs - m_bnd.dirichlet_imposed_dofs_vector(face_id, di.face_degree());
 
       assert(face_dofs == fbs_A * num_other_faces);
     }
@@ -2887,9 +2887,9 @@ public:
     }
 };
 
-template<typename Mesh>
-auto make_stokes_assembler_alg(const Mesh& msh, hho_degree_info hdi,
-                            const  disk::mechanics::BoundaryConditions<Mesh>& bnd)
+template<typename Mesh, typename BoundaryType>
+auto
+make_stokes_assembler_alg(const Mesh& msh, hho_degree_info hdi, const BoundaryType& bnd)
 {
     return stokes_assembler_alg<Mesh>(msh, hdi, bnd);
 }
@@ -2897,50 +2897,48 @@ auto make_stokes_assembler_alg(const Mesh& msh, hho_degree_info hdi,
 template<typename Mesh>
 class assembler_mechanics
 {
-   typedef disk::mechanics::BoundaryConditions<Mesh>    bnd_type;
-   typedef Mesh                                         mesh_type;
-   typedef typename mesh_type::coordinate_type              scalar_type;
-   typedef typename mesh_type::cell                     cell_type;
-   typedef typename mesh_type::face                     face_type;
+    typedef Mesh                                mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
 
-   typedef dynamic_matrix<scalar_type>  matrix_type;
-   typedef dynamic_vector<scalar_type>  vector_type;
-   typedef sparse_matrix<scalar_type>   sparse_type;
-   typedef triplet<scalar_type>         triplet_type;
+    typedef disk::BoundaryConditions<Mesh, static_vector<scalar_type, Mesh::dimension>> bnd_type;
 
-   const static size_t dimension = mesh_type::dimension;
+    typedef dynamic_matrix<scalar_type> matrix_type;
+    typedef dynamic_vector<scalar_type> vector_type;
+    typedef sparse_matrix<scalar_type>  sparse_type;
+    typedef triplet<scalar_type>        triplet_type;
 
-   std::vector<triplet_type> m_triplets;
-   size_t                    m_num_unknowns;
-   std::vector<size_t>       face_compress_map;
-   hho_degree_info           m_hdi;
+    const static size_t dimension = mesh_type::dimension;
 
- public:
+    std::vector<triplet_type> m_triplets;
+    size_t                    m_num_unknowns;
+    std::vector<size_t>       face_compress_map;
+    hho_degree_info           m_hdi;
 
-   sparse_type         LHS;
-   vector_type         RHS;
+  public:
+    sparse_type LHS;
+    vector_type RHS;
 
-   assembler_mechanics(){}
+    assembler_mechanics() {}
 
-   assembler_mechanics(const mesh_type&       msh,
-                       const hho_degree_info& hdi,
-                       const bnd_type&        bnd) :
-     m_hdi(hdi)
-   {
-      const auto num_face_dofs = vector_basis_size(m_hdi.face_degree(), dimension-1, dimension);
+    assembler_mechanics(const mesh_type& msh, const hho_degree_info& hdi, const bnd_type& bnd) : m_hdi(hdi)
+    {
+        const auto num_face_dofs = vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
 
-      face_compress_map.resize(msh.faces_size());
+        face_compress_map.resize(msh.faces_size());
 
-      size_t total_dofs = 0;
-      for (size_t face_id = 0; face_id < msh.faces_size(); face_id++) {
+        size_t total_dofs = 0;
+        for (size_t face_id = 0; face_id < msh.faces_size(); face_id++)
+        {
 
-         face_compress_map.at(face_id) = total_dofs;
-         const auto free_dofs = num_face_dofs - bnd.dirichlet_imposed_dofs(face_id, m_hdi.face_degree());
-         total_dofs += free_dofs;
-      }
-      m_num_unknowns = total_dofs;
-      LHS            = sparse_type(m_num_unknowns, m_num_unknowns);
-      RHS            = vector_type::Zero(m_num_unknowns);
+            face_compress_map.at(face_id) = total_dofs;
+            const auto free_dofs = num_face_dofs - bnd.dirichlet_imposed_dofs_vector(face_id, m_hdi.face_degree());
+            total_dofs += free_dofs;
+        }
+        m_num_unknowns = total_dofs;
+        LHS            = sparse_type(m_num_unknowns, m_num_unknowns);
+        RHS            = vector_type::Zero(m_num_unknowns);
    }
 
     // don't forget to reset RHS at each Newton iteration
@@ -2997,7 +2995,7 @@ class assembler_mechanics
                  lc.first.block(face_j * num_face_dofs, pos, num_face_dofs, num_face_dofs);
 
                switch (bnd.dirichlet_boundary_type(face_id)) {
-                  case disk::mechanics::DIRICHLET: {
+                  case disk::DIRICHLET: {
                      if (!ind_ok) {
                         for (size_t i = 0; i < num_face_dofs; i++) {
                            l2g.at(pos + i) = 0xDEADBEEF;
@@ -3007,7 +3005,7 @@ class assembler_mechanics
                      }
                      break;
                   }
-                  case disk::mechanics::CLAMPED: {
+                  case disk::CLAMPED: {
                      proj_bcf.setZero();
                      mat_Fj.setZero();
                      if (!ind_ok) {
@@ -3019,7 +3017,7 @@ class assembler_mechanics
                      }
                      break;
                   }
-                  case disk::mechanics::DX: {
+                  case disk::DX: {
                      for (size_t i = 0; i < num_face_dofs; i += dimension) {
                         mat_Fj.col(i + 1).setZero();
                         proj_bcf(i + 1) = zero;
@@ -3039,7 +3037,7 @@ class assembler_mechanics
                      ind_ok = true;
                      break;
                   }
-                  case disk::mechanics::DY: {
+                  case disk::DY: {
                      for (size_t i = 0; i < num_face_dofs; i += dimension) {
                         mat_Fj.col(i).setZero();
                         proj_bcf(i) = zero;
@@ -3059,7 +3057,7 @@ class assembler_mechanics
                      ind_ok = true;
                      break;
                   }
-                  case disk::mechanics::DZ: {
+                  case disk::DZ: {
                      if (dimension != 3) throw std::invalid_argument("You are not in 3D");
                      for (size_t i = 0; i < num_face_dofs; i += dimension) {
                         mat_Fj.col(i).setZero();
@@ -3076,7 +3074,7 @@ class assembler_mechanics
                      ind_ok = true;
                      break;
                   }
-                  case disk::mechanics::DXDY: {
+                  case disk::DXDY: {
                      for (size_t i = 0; i < num_face_dofs; i += dimension) {
                         if (dimension == 3) {
                            mat_Fj.col(i + 2).setZero();
@@ -3095,7 +3093,7 @@ class assembler_mechanics
                      ind_ok = true;
                      break;
                   }
-                  case disk::mechanics::DXDZ: {
+                  case disk::DXDZ: {
                      if (dimension != 3) throw std::invalid_argument("You are not in 3D");
                      for (size_t i = 0; i < num_face_dofs; i += dimension) {
                         mat_Fj.col(i + 1).setZero();
@@ -3111,7 +3109,7 @@ class assembler_mechanics
                      ind_ok = true;
                      break;
                   }
-                  case disk::mechanics::DYDZ: {
+                  case disk::DYDZ: {
                      if (dimension != 3) throw std::invalid_argument("You are not in 3D");
                      for (size_t i = 0; i < num_face_dofs; i += dimension) {
                         mat_Fj.col(i).setZero();
@@ -3194,15 +3192,15 @@ class assembler_mechanics
             assert(proj_bcf.size() == num_face_dofs);
 
             switch (bnd.dirichlet_boundary_type(face_id)) {
-               case disk::mechanics::DIRICHLET: {
+               case disk::DIRICHLET: {
                   ret.segment(face_offset, num_face_dofs) = proj_bcf;
                   break;
                }
-               case disk::mechanics::CLAMPED: {
+               case disk::CLAMPED: {
                   ret.segment(face_offset, num_face_dofs).setZero();
                   break;
                }
-               case disk::mechanics::DX: {
+               case disk::DX: {
 
                   for (size_t i = 0; i < num_face_dofs; i += dimension) {
                      ret(face_offset + i)     = proj_bcf(i);
@@ -3213,7 +3211,7 @@ class assembler_mechanics
                   }
                   break;
                }
-               case disk::mechanics::DY: {
+               case disk::DY: {
                   for (size_t i = 0; i < num_face_dofs; i += dimension) {
                      ret(face_offset + i)     = solution(compress_offset + sol_ind++);
                      ret(face_offset + i + 1) = proj_bcf(i + 1);
@@ -3223,7 +3221,7 @@ class assembler_mechanics
                   }
                   break;
                }
-               case disk::mechanics::DZ: {
+               case disk::DZ: {
                   if (dimension != 3) throw std::invalid_argument("You are not in 3D");
                   for (size_t i = 0; i < num_face_dofs; i += dimension) {
                      ret(face_offset + i)     = solution(compress_offset + sol_ind++);
@@ -3232,7 +3230,7 @@ class assembler_mechanics
                   }
                   break;
                }
-               case disk::mechanics::DXDY: {
+               case disk::DXDY: {
                   for (size_t i = 0; i < num_face_dofs; i += dimension) {
                      ret(face_offset + i)     = proj_bcf(i);
                      ret(face_offset + i + 1) = proj_bcf(i + 1);
@@ -3242,7 +3240,7 @@ class assembler_mechanics
                   }
                   break;
                }
-               case disk::mechanics::DXDZ: {
+               case disk::DXDZ: {
                   if (dimension != 3) throw std::invalid_argument("You are not in 3D");
                   for (size_t i = 0; i < num_face_dofs; i += dimension) {
                      ret(face_offset + i)     = proj_bcf(i);
@@ -3251,7 +3249,7 @@ class assembler_mechanics
                   }
                   break;
                }
-               case disk::mechanics::DYDZ: {
+               case disk::DYDZ: {
                   if (dimension != 3) throw std::invalid_argument("You are not in 3D");
                   for (size_t i = 0; i < num_face_dofs; i += dimension) {
                      ret(face_offset + i)     = solution(compress_offset + sol_ind++);
@@ -3329,7 +3327,7 @@ class assembler_mechanics
                  lc.first.block(face_j * num_face_dofs, pos, num_face_dofs, num_face_dofs);
 
                switch (bnd.dirichlet_boundary_type(face_id)) {
-                  case disk::mechanics::DIRICHLET: {
+                  case disk::DIRICHLET: {
                      if (!ind_ok) {
                         for (size_t i = 0; i < num_face_dofs; i++) {
                            l2g.at(pos + i) = 0xDEADBEEF;
@@ -3339,7 +3337,7 @@ class assembler_mechanics
                      }
                      break;
                   }
-                  case disk::mechanics::CLAMPED: {
+                  case disk::CLAMPED: {
                      incr = -sol_F[face_id];
                      if (!ind_ok) {
                         for (size_t i = 0; i < num_face_dofs; i++) {
@@ -3350,7 +3348,7 @@ class assembler_mechanics
                      }
                      break;
                   }
-                  case disk::mechanics::DX: {
+                  case disk::DX: {
                      for (size_t i = 0; i < num_face_dofs; i += dimension) {
                         mat_Fj.col(i + 1).setZero();
                         incr(i + 1) = zero;
@@ -3370,7 +3368,7 @@ class assembler_mechanics
                      ind_ok = true;
                      break;
                   }
-                  case disk::mechanics::DY: {
+                  case disk::DY: {
                      for (size_t i = 0; i < num_face_dofs; i += dimension) {
                         mat_Fj.col(i).setZero();
                         incr(i) = zero;
@@ -3390,7 +3388,7 @@ class assembler_mechanics
                      ind_ok = true;
                      break;
                   }
-                  case disk::mechanics::DZ: {
+                  case disk::DZ: {
                      if (dimension != 3) throw std::invalid_argument("You are not in 3D");
                      for (size_t i = 0; i < num_face_dofs; i += dimension) {
                         mat_Fj.col(i).setZero();
@@ -3407,7 +3405,7 @@ class assembler_mechanics
                      ind_ok = true;
                      break;
                   }
-                  case disk::mechanics::DXDY: {
+                  case disk::DXDY: {
                      for (size_t i = 0; i < num_face_dofs; i += dimension) {
                         if (dimension == 3) {
                            mat_Fj.col(i + 2).setZero();
@@ -3426,7 +3424,7 @@ class assembler_mechanics
                      ind_ok = true;
                      break;
                   }
-                  case disk::mechanics::DXDZ: {
+                  case disk::DXDZ: {
                      if (dimension != 3) throw std::invalid_argument("You are not in 3D");
                      for (size_t i = 0; i < num_face_dofs; i += dimension) {
                         mat_Fj.col(i + 1).setZero();
@@ -3442,7 +3440,7 @@ class assembler_mechanics
                      ind_ok = true;
                      break;
                   }
-                  case disk::mechanics::DYDZ: {
+                  case disk::DYDZ: {
                      if (dimension != 3) throw std::invalid_argument("You are not in 3D");
                      for (size_t i = 0; i < num_face_dofs; i += dimension) {
                         mat_Fj.col(i).setZero();
@@ -3530,16 +3528,16 @@ class assembler_mechanics
             assert(proj_bcf.size() == num_face_dofs);
 
             switch (bnd.dirichlet_boundary_type(face_id)) {
-               case disk::mechanics::DIRICHLET: {
+               case disk::DIRICHLET: {
                   ret.segment(face_offset, num_face_dofs) = incr;
                   break;
                }
-               case disk::mechanics::CLAMPED: {
+               case disk::CLAMPED: {
                   incr                                    = -sol_F[face_id];
                   ret.segment(face_offset, num_face_dofs) = incr;
                   break;
                }
-               case disk::mechanics::DX: {
+               case disk::DX: {
 
                   for (size_t i = 0; i < num_face_dofs; i += dimension) {
                      ret(face_offset + i)     = incr(i);
@@ -3550,7 +3548,7 @@ class assembler_mechanics
                   }
                   break;
                }
-               case disk::mechanics::DY: {
+               case disk::DY: {
                   for (size_t i = 0; i < num_face_dofs; i += dimension) {
                      ret(face_offset + i)     = solution(compress_offset + sol_ind++);
                      ret(face_offset + i + 1) = incr(i + 1);
@@ -3560,7 +3558,7 @@ class assembler_mechanics
                   }
                   break;
                }
-               case disk::mechanics::DZ: {
+               case disk::DZ: {
                   if (dimension != 3) throw std::invalid_argument("You are not in 3D");
                   for (size_t i = 0; i < num_face_dofs; i += dimension) {
                      ret(face_offset + i)     = solution(compress_offset + sol_ind++);
@@ -3569,7 +3567,7 @@ class assembler_mechanics
                   }
                   break;
                }
-               case disk::mechanics::DXDY: {
+               case disk::DXDY: {
                   for (size_t i = 0; i < num_face_dofs; i += dimension) {
                      ret(face_offset + i)     = incr(i);
                      ret(face_offset + i + 1) = incr(i + 1);
@@ -3579,7 +3577,7 @@ class assembler_mechanics
                   }
                   break;
                }
-               case disk::mechanics::DXDZ: {
+               case disk::DXDZ: {
                   if (dimension != 3) throw std::invalid_argument("You are not in 3D");
                   for (size_t i = 0; i < num_face_dofs; i += dimension) {
                      ret(face_offset + i)     = incr(i);
@@ -3588,7 +3586,7 @@ class assembler_mechanics
                   }
                   break;
                }
-               case disk::mechanics::DYDZ: {
+               case disk::DYDZ: {
                   if (dimension != 3) throw std::invalid_argument("You are not in 3D");
                   for (size_t i = 0; i < num_face_dofs; i += dimension) {
                      ret(face_offset + i)     = solution(compress_offset + sol_ind++);
@@ -3636,17 +3634,17 @@ class assembler_mechanics
 
                if (bnd.is_dirichlet_face(face_id)) {
                   switch (bnd.dirichlet_boundary_type(face_id)) {
-                     case disk::mechanics::DIRICHLET: {
+                     case disk::DIRICHLET: {
                         throw std::invalid_argument("You tried to impose both Dirichlet and "
                                                     "Neumann conditions on the same face");
                         break;
                      }
-                     case disk::mechanics::CLAMPED: {
+                     case disk::CLAMPED: {
                         throw std::invalid_argument("You tried to impose both Dirichlet and "
                                                     "Neumann conditions on the same face");
                         break;
                      }
-                     case disk::mechanics::DX: {
+                     case disk::DX: {
                         for (size_t i = 0; i < num_face_dofs; i += dimension) {
                            RHS(face_offset + i + 1) += neumann(i + 1);
                            if (dimension == 3) {
@@ -3655,7 +3653,7 @@ class assembler_mechanics
                         }
                         break;
                      }
-                     case disk::mechanics::DY: {
+                     case disk::DY: {
                         for (size_t i = 0; i < num_face_dofs; i += dimension) {
                            RHS(face_offset + i) = neumann(i);
                            if (dimension == 3) {
@@ -3665,7 +3663,7 @@ class assembler_mechanics
 
                         break;
                      }
-                     case disk::mechanics::DZ: {
+                     case disk::DZ: {
                         if (dimension != 3) throw std::invalid_argument("You are not in 3D");
                         for (size_t i = 0; i < num_face_dofs; i += dimension) {
                            RHS(face_offset + i) += neumann(i);
@@ -3673,7 +3671,7 @@ class assembler_mechanics
                         }
                         break;
                      }
-                     case disk::mechanics::DXDY: {
+                     case disk::DXDY: {
                         for (size_t i = 0; i < num_face_dofs; i += dimension) {
                            if (dimension == 3) {
                               RHS(face_offset + i + 2) += neumann(i + 2);
@@ -3681,14 +3679,14 @@ class assembler_mechanics
                         }
                         break;
                      }
-                     case disk::mechanics::DXDZ: {
+                     case disk::DXDZ: {
                         if (dimension != 3) throw std::invalid_argument("You are not in 3D");
                         for (size_t i = 0; i < num_face_dofs; i += dimension) {
                            RHS(face_offset + i + 1) += neumann(i + 1);
                         }
                         break;
                      }
-                     case disk::mechanics::DYDZ: {
+                     case disk::DYDZ: {
                         if (dimension != 3) throw std::invalid_argument("You are not in 3D");
                         for (size_t i = 0; i < num_face_dofs; i += dimension) {
                            RHS(face_offset + i) += neumann(i);
@@ -3716,11 +3714,9 @@ class assembler_mechanics
    }
 };
 
-template<typename Mesh>
+template<typename Mesh, typename BoundaryType>
 auto
-make_mechanics_assembler( const Mesh&           msh,
-                          const hho_degree_info hdi,
-                          const disk::mechanics::BoundaryConditions<Mesh>& bnd)
+make_mechanics_assembler(const Mesh& msh, const hho_degree_info hdi, const BoundaryType& bnd)
 {
    return assembler_mechanics<Mesh>(msh, hdi, bnd);
 }

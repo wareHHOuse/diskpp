@@ -36,8 +36,8 @@
 #include "Informations.hpp"
 #include "NewtonSolver/newton_solver.hpp"
 #include "Parameters.hpp"
+#include "boundary_conditions/boundary_conditions.hpp"
 #include "core/mechanics/behaviors/laws/materialData.hpp"
-#include "mechanics/BoundaryConditions.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
 
 #include "output/gmshConvertMesh.hpp"
@@ -66,7 +66,7 @@ class plasticity_solver
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
-    typedef disk::mechanics::BoundaryConditions<mesh_type>        bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, static_vector<scalar_type, mesh_type::dimension>> bnd_type;
     typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_type;
     // typedef disk::IsotropicHardeningVMis<mesh_type> law_type;
 
@@ -313,7 +313,7 @@ class plasticity_solver
                 return disk::priv::inner_product(current_time, lf(p));
             };
 
-            m_bnd.multiplyAllFunctionsOfAFactor(current_time);
+            m_bnd.multiplyAllFunctionsByAFactor(current_time);
 
             // correction
             NewtonSolverInfo newton_info =

@@ -36,10 +36,12 @@
 #include "Informations.hpp"
 #include "NewtonSolver/newton_solver.hpp"
 #include "Parameters.hpp"
-#include "core/mechanics/behaviors/laws/materialData.hpp"
-#include "core/mechanics/behaviors/logarithmic_strain/LogarithmicStrain.hpp"
-#include "mechanics/BoundaryConditions.hpp"
+
+#include "boundary_conditions/boundary_conditions.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "mechanics/behaviors/laws/materialData.hpp"
+#include "mechanics/behaviors/logarithmic_strain/LogarithmicStrain.hpp"
+#include "mechanics/behaviors/tensor_conversion.hpp"
 
 #include "output/gmshConvertMesh.hpp"
 #include "output/gmshDisk.hpp"
@@ -67,9 +69,9 @@ class finite_strains_solver
     typedef dynamic_matrix<scalar_type> matrix_type;
     typedef dynamic_vector<scalar_type> vector_type;
 
-    typedef disk::mechanics::BoundaryConditions<mesh_type>        bnd_type;
-    typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_hpp_type;
-    // typedef disk::IsotropicHardeningVMis<mesh_type> law_hpp_type;
+    typedef disk::BoundaryConditions<mesh_type, static_vector<scalar_type, mesh_type::dimension>> bnd_type;
+    //typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_hpp_type;
+    typedef disk::IsotropicHardeningVMis<mesh_type> law_hpp_type;
     typedef disk::mechanics::LogarithmicStrain<law_hpp_type> law_type;
 
     typename disk::hho_degree_info m_hdi;
@@ -329,7 +331,7 @@ class finite_strains_solver
                 return disk::priv::inner_product(current_time, lf(p));
             };
 
-            m_bnd.multiplyAllFunctionsOfAFactor(current_time);
+            m_bnd.multiplyAllFunctionsByAFactor(current_time);
 
             // correction
             NewtonSolverInfo newton_info =
@@ -612,9 +614,10 @@ class finite_strains_solver
                 const auto gphi   = gb.eval_functions(qp.point());
                 const auto GT_iqn = disk::eval(GTuTF, gphi);
                 const auto FT_iqn = disk::mechanics::convertGtoF(GT_iqn);
+                const auto FT_iqn_3D = disk::convertMatrix3DwithOne(FT_iqn);
 
-                const auto                P      = qp.compute_stress(material_data);
-                const auto                stress = disk::mechanics::convertPK1toCauchy(P, FT_iqn);
+                const auto                P      = qp.compute_stress3D(material_data);
+                const auto                stress = disk::mechanics::convertPK1toCauchy(P, FT_iqn_3D);
                 const std::vector<double> tens   = disk::convertToVectorGmsh(stress);
 
                 // Add GP

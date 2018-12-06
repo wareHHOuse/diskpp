@@ -75,7 +75,7 @@ run_vector_laplacian_solver(const Mesh<T, 2, Storage>& msh, const run_params& rp
     typedef Mesh<T, 2, Storage>                            mesh_type;
     typedef static_vector<T, 2>                            result_type;
     typedef static_matrix<T, 2, 2>                         result_grad_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, result_type> Bnd_type;
 
     timecounter tc;
     tc.tic();
@@ -131,7 +131,7 @@ run_vector_laplacian_solver(const Mesh<T, 3, Storage>& msh, const run_params& rp
     typedef Mesh<T, 3, Storage>                            mesh_type;
     typedef static_vector<T, 3>                            result_type;
     typedef static_matrix<T, 3, 3>                         result_grad_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, result_type> Bnd_type;
 
     timecounter tc;
     tc.tic();

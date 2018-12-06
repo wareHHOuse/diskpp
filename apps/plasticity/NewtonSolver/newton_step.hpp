@@ -33,10 +33,10 @@
 
 #include "../Informations.hpp"
 #include "../Parameters.hpp"
-#include "mechanics/BoundaryConditions.hpp"
-#include "plasticity_elementary_computation.hpp"
 #include "bases/bases.hpp"
+#include "boundary_conditions/boundary_conditions.hpp"
 #include "methods/hho"
+#include "plasticity_elementary_computation.hpp"
 #include "quadratures/quadratures.hpp"
 
 #include "solvers/solver.hpp"
@@ -54,10 +54,10 @@ template<typename MeshType>
 class NewtonRaphson_step_plasticity
 {
     typedef MeshType                                       mesh_type;
-    typedef typename mesh_type::coordinate_type                scalar_type;
+    typedef typename mesh_type::coordinate_type            scalar_type;
     typedef ParamRun<scalar_type>                          param_type;
-    typedef typename disk::hho_degree_info           hdi_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
+    typedef typename disk::hho_degree_info                 hdi_type;
+    typedef disk::BoundaryConditions<mesh_type, static_vector<scalar_type, mesh_type::dimension>> bnd_type;
 
     const static int dimension = mesh_type::dimension;
 

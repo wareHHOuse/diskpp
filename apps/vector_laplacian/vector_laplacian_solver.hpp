@@ -71,10 +71,11 @@ template<typename Mesh>
 class vector_laplacian_solver
 {
    typedef Mesh                                           mesh_type;
-   typedef typename mesh_type::coordinate_type                scalar_type;
+   typedef typename mesh_type::coordinate_type            scalar_type;
    typedef typename mesh_type::cell                       cell_type;
    typedef typename mesh_type::face                       face_type;
-   typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
+
+   typedef disk::BoundaryConditions<mesh_type, static_vector<scalar_type, mesh_type::dimension>> bnd_type;
 
    typedef dynamic_matrix<scalar_type> matrix_dynamic;
    typedef dynamic_vector<scalar_type> vector_dynamic;

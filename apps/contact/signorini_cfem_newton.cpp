@@ -37,7 +37,7 @@ class cfem_newton_solver
     typedef disk::simplicial_mesh<T, 2>     mesh_type;
     typedef Eigen::SparseMatrix<T>          sparse_matrix_type;
     typedef Eigen::Triplet<T>               triplet_type;
-    typedef disk::mechanics::BoundaryConditionsScalar<mesh_type> boundary_type;
+    typedef disk::BoundaryConditions<mesh_type, T> boundary_type;
     typedef static_vector<T, 3>             vector_type;
     typedef static_matrix<T, 3, 3>          matrix_type;
 
@@ -264,12 +264,12 @@ run_signorini(  const disk::simplicial_mesh<T, 2>& msh,
         return 0;
     };
 
-    disk::mechanics::BoundaryConditionsScalar<disk::simplicial_mesh<T, 2>> bnd(msh);
+    disk::BoundaryConditions<disk::simplicial_mesh<T, 2>, T> bnd(msh);
 
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET,1, zero_fun); //TOP
-    bnd.addNeumannBC(disk::mechanics::NEUMANN, 2,zero_fun); //
-    bnd.addNeumannBC(disk::mechanics::NEUMANN, 4,zero_fun); //
-    bnd.addContactBC(disk::mechanics::SIGNORINI,3); //BOTTOM
+    bnd.addDirichletBC(disk::DIRICHLET,1, zero_fun); //TOP
+    bnd.addNeumannBC(disk::NEUMANN, 2,zero_fun); //
+    bnd.addNeumannBC(disk::NEUMANN, 4,zero_fun); //
+    bnd.addContactBC(disk::SIGNORINI,3); //BOTTOM
 
     cfem_newton_solver<T> wfem(msh, bnd); //, ap, rhs_fun);
     wfem.solve(msh, force, bnd, ap);

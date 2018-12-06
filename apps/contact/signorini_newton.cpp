@@ -54,7 +54,7 @@ public:
     template<typename Function>
     auto
     solve_faces(const Mesh&  msh, const Function& rhs_fun,
-            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+            const disk::BoundaryConditions<Mesh, T>& bnd)
     {
 
         hho_degree_info      hdi(ap.degree); //Also allow (degree + 1, degree)
@@ -204,7 +204,7 @@ public:
     template<typename Function>
     auto
     solve_cells(const Mesh&  msh, const Function& rhs_fun,
-            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+            const disk::BoundaryConditions<Mesh, T>& bnd)
     {
 
         hho_degree_info      hdi(ap.degree +1, ap.degree); //Not allow (degree, degree)
@@ -377,7 +377,7 @@ public:
 
 
     hho_newton_solver(const Mesh& msh,
-                    const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+                    const disk::BoundaryConditions<Mesh, T>& bnd,
                     const algorithm_parameters<T>& alg_par):
                     ap(alg_par)
     {
@@ -401,7 +401,7 @@ run_signorini(  const Mesh& msh, const algorithm_parameters<T>& ap)
         return 0.;
     };
 
-    typedef disk::mechanics::BoundaryConditionsScalar<Mesh> boundary_type;
+    typedef disk::BoundaryConditions<Mesh, T> boundary_type;
     boundary_type  bnd(msh);
 
     /*--------------------------------------------------------------------------
@@ -412,11 +412,11 @@ run_signorini(  const Mesh& msh, const algorithm_parameters<T>& ap)
     *                       3                        2
     *-------------------------------------------------------------------------*/
 
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET,1, zero_fun); //TOP
-    bnd.addNeumannBC(disk::mechanics::NEUMANN, 2, zero_fun); //
-    bnd.addNeumannBC(disk::mechanics::NEUMANN, 4, zero_fun); //
-    //bnd.addNeumannBC(disk::mechanics::NEUMANN, 3, zero_fun); //TOP
-    bnd.addContactBC(disk::mechanics::SIGNORINI,3); //BOTTOM
+    bnd.addDirichletBC(disk::DIRICHLET,1, zero_fun); //TOP
+    bnd.addNeumannBC(disk::NEUMANN, 2, zero_fun); //
+    bnd.addNeumannBC(disk::NEUMANN, 4, zero_fun); //
+    //bnd.addNeumannBC(disk::NEUMANN, 3, zero_fun); //TOP
+    bnd.addContactBC(disk::SIGNORINI,3); //BOTTOM
 
     hho_newton_solver<Mesh> ns(msh, bnd, ap);
     switch (ap.solver)

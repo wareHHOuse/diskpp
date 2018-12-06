@@ -59,8 +59,6 @@ class augmented_lagrangian_viscoplasticity
     typedef typename mesh_type::face        face_type;
     typedef typename mesh_type::coordinate_type T;
 
-    typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
-
     using point_type = typename mesh_type::point_type;
 
     typedef Matrix<T, Mesh::dimension, Mesh::dimension>         tensor_type;
@@ -71,8 +69,10 @@ class augmented_lagrangian_viscoplasticity
     typedef std::function<vector2d_type (const point_type &)>   vector_funtion_type;
     typedef std::function<T   (const point_type &)>             scalar_funtion_type;
 
+    typedef disk::BoundaryConditions<mesh_type, vector2d_type> boundary_type;
+
     vector_funtion_type     rhs_fun, velocity;
-    dynamic_vector<T>             multiplier, auxiliar, auxiliar_old;
+    dynamic_vector<T>       multiplier, auxiliar, auxiliar_old;
 
     typename disk::hho_degree_info di;
     T             factor;
