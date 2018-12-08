@@ -76,7 +76,7 @@ public:
         for(size_t iter = 0; iter < max_iter; iter++)
         {
             auto cl_count = 0;
-            auto assembler = make_diffusion_assembler2(msh, hdi, bnd);
+            auto assembler = make_diffusion_assembler(msh, hdi, bnd);
 
             for (auto& cl : msh)
             {
@@ -227,7 +227,7 @@ public:
         for(size_t iter = 0; iter < max_iter; iter++)
         {
             auto cl_count = 0;
-            auto assembler = make_diffusion_assembler2(msh, hdi, bnd);
+            auto assembler = make_diffusion_assembler(msh, hdi, bnd);
 
             for (auto& cl : msh)
             {

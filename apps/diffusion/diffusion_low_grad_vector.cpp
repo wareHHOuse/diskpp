@@ -144,13 +144,17 @@ auto
 run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
 {
     using T = typename Mesh::coordinate_type;
+    typedef disk::BoundaryConditions<Mesh, false> boundary_type;
 
     hho_degree_info hdi(degree, degree);
 
     auto rhs_fun = make_rhs_function(msh);
     auto sol_fun = make_solution_function(msh);
 
-    auto assembler = make_diffusion_assembler_vector(msh, hdi);
+    boundary_type bnd(msh);
+    bnd.addDirichletEverywhere(sol_fun);
+
+    auto assembler = make_mechanics_assembler(msh, hdi, bnd);
 
     for (auto& cl : msh)
     {
@@ -163,7 +167,7 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = G.second + stab;
         //Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
         auto sc     = diffusion_static_condensation_compute_vector(msh, cl, hdi, A, rhs);
-        assembler.assemble(msh, cl, sc.first, sc.second, sol_fun);
+        assembler.assemble(msh, cl, bnd, sc);
     }
 
     assembler.finalize();
@@ -195,17 +199,14 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
         auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
 
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = G.second + stab;
-        //Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
 
-        Eigen::Matrix<T, Eigen::Dynamic, 1> locsol =
-            assembler.take_local_data(msh, cl, sol, sol_fun);
+        const auto fcs       = faces(msh, cl);
+        const auto num_faces = fcs.size();
+        const auto xFs       = assembler.take_local_data(msh, cl, bnd, sol);
+        const auto fullsol   = diffusion_static_condensation_recover_vector(msh, cl, hdi, A, rhs, xFs);
+        const auto realsol   = project_function(msh, cl, hdi, sol_fun);
+        const auto diff      = realsol - fullsol;
 
-        Eigen::Matrix<T, Eigen::Dynamic, 1> fullsol =
-            diffusion_static_condensation_recover_vector(msh, cl, hdi, A, rhs, locsol);
-
-        Eigen::Matrix<T, Eigen::Dynamic, 1> realsol = project_function(msh, cl, hdi, sol_fun);
-
-        Eigen::Matrix<T, Eigen::Dynamic, 1> diff = realsol - fullsol;
         error += diff.dot(A*diff);
 
         auto bar = barycenter(msh, cl);

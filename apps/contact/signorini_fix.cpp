@@ -71,7 +71,7 @@ fix_point_solver_faces(const Mesh& msh,
     for(size_t iter = 0; iter < max_iter; iter++)
     {
         int cl_count = 0;
-        auto assembler = make_diffusion_assembler2(msh, hdi, bnd);
+        auto assembler = make_diffusion_assembler(msh, hdi, bnd);
 
         for (auto& cl : msh)
         {
@@ -225,7 +225,7 @@ fix_point_solver_cells(const Mesh& msh,
     for(size_t iter = 0; iter < max_iter; iter++)
     {
         int cl_count = 0;
-        auto assembler = make_diffusion_assembler2(msh, hdi, bnd);
+        auto assembler = make_diffusion_assembler(msh, hdi, bnd);
 
         for (auto& cl : msh)
         {
