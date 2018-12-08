@@ -164,6 +164,20 @@ inner_product(const Matrix<T, N, 1>& a, const Matrix<T, Dynamic, N>& b)
     return b * a;
 }
 
+template<typename T, int N>
+Matrix<T, Dynamic, N>
+inner_product(const Matrix<T, N, N>& a, const Matrix<T, Dynamic, N>& b)
+{
+    return b * a;
+}
+
+template<typename T, int N>
+Matrix<T, Dynamic, N>
+inner_product(const Matrix<T, Dynamic, N>& b, const Matrix<T, N, N>& a)
+{
+    return b * a;
+}
+
 } // priv
 
 
@@ -185,6 +199,30 @@ make_mass_matrix(const Mesh& msh, const Element& elem, const Basis& basis, size_
         auto phi = basis.eval_functions(qp.point());
         const auto qp_phi = priv::inner_product(qp.weight(), phi);
         ret += priv::outer_product(qp_phi, phi);
+    }
+
+    return ret;
+}
+
+template<typename Mesh, typename Element, typename Basis, typename MaterialField>
+Matrix<typename Basis::scalar_type, Dynamic, Dynamic>
+make_mass_matrix(const Mesh& msh, const Element& elem, const Basis& basis, const MaterialField& material_tensor, size_t di = 0)
+{
+    auto degree     = basis.degree();
+    auto basis_size = basis.size();
+
+    using T = typename Basis::scalar_type;
+
+    Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(basis_size, basis_size);
+
+    auto qps = integrate(msh, elem, 2 * (degree + di));
+
+    for (auto& qp : qps)
+    {
+        auto       phi      = basis.eval_functions(qp.point());
+        const auto qp_m     = priv::inner_product(qp.weight(), material_tensor(qp.point()));
+        const auto qp_phi_m = priv::inner_product(phi, qp_m);
+        ret += priv::outer_product(qp_phi_m, phi);
     }
 
     return ret;

@@ -538,11 +538,11 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
     {
         function_type ret = function_type::Zero(basis_size, 3);
 
-        ret.block(0,0, vector_basis.size, 3) = vector_basis.eval_functions(pt);
+        ret.block(0,0, vector_basis.size(), 3) = vector_basis.eval_functions(pt);
 
         const auto sphi = scalar_basis.eval_functions(pt);
         const auto beg    = scalar_basis_size(basis_degree - 2, 3);
-        const auto offset = vector_basis.size;
+        const auto offset = vector_basis.size();
 
         // compute x P^(k-1)_H (monomial of degree exactly k - 1)
         for (size_t i = beg; i < scalar_basis.size(); i++)
@@ -608,11 +608,11 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
     {
         function_type ret = function_type::Zero(basis_size, 2);
 
-        ret.block(0, 0, vector_basis.size, 2) = vector_basis.eval_functions(pt);
+        ret.block(0, 0, vector_basis.size(), 2) = vector_basis.eval_functions(pt);
 
         const auto sphi   = scalar_basis.eval_functions(pt);
         const auto beg    = scalar_basis_size(basis_degree - 2, 2);
-        const auto offset = vector_basis.size;
+        const auto offset = vector_basis.size();
 
         // compute x P^(k-1)_H (monomial of degree exactly k - 1)
         for (size_t i = beg; i < scalar_basis.size(); i++)

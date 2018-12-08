@@ -366,6 +366,37 @@ get_generic_fvca6_meshes(void)
 }
 
 template<typename T>
+std::vector<disk::generic_mesh<T, 3>>
+get_tetrahedra_fvca6_meshes(void)
+{
+    std::vector<std::string> meshfiles;
+    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.0.msh");
+    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.1.msh");
+    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.2.msh");
+    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.3.msh");
+
+    typedef disk::generic_mesh<T, 3> mesh_type;
+
+    std::vector<mesh_type> ret;
+    for (size_t i = 0; i < meshfiles.size(); i++)
+    {
+        mesh_type                     msh;
+        disk::fvca6_mesh_loader<T, 3> loader;
+
+        if (!loader.read_mesh(meshfiles.at(i)))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            continue;
+        }
+        loader.populate_mesh(msh);
+
+        ret.push_back(msh);
+    }
+
+    return ret;
+}
+
+template<typename T>
 std::vector< disk::generic_mesh<T, 2> >
 get_quad_generic_meshes(void)
 {
@@ -657,6 +688,109 @@ public:
 
         if ( do_generic_fvca6 )
             test_generic_fvca6();
+
+        return 0;
+    }
+};
+
+template<template<typename> class TestFunctor>
+class tester_simplicial
+{
+    template<typename Mesh>
+    TestFunctor<Mesh>
+    get_test_functor(const std::vector<Mesh>& meshes)
+    {
+        return TestFunctor<Mesh>();
+    }
+
+    void
+    test_triangles_generic(void)
+    {
+        std::cout << yellow << "Mesh under test: triangles on generic mesh";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_triangle_generic_meshes<T>();
+        auto tf     = get_test_functor(meshes);
+        auto er     = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
+    }
+
+    void
+    test_triangles_netgen(void)
+    {
+        std::cout << yellow << "Mesh under test: triangles on netgen mesh";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_triangle_netgen_meshes<T>();
+        auto tf     = get_test_functor(meshes);
+        auto er     = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
+    }
+
+    void
+    test_tetrahedra_netgen(void)
+    {
+        std::cout << yellow << "Mesh under test: tetrahedra on netgen mesh";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_tetrahedra_netgen_meshes<T>();
+        auto tf     = get_test_functor(meshes);
+        auto er     = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
+    }
+
+    void
+    test_tetrahedra_fvca6(void)
+    {
+        std::cout << yellow << "Mesh under test: tetrahedra on generic mesh";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_tetrahedra_fvca6_meshes<T>();
+        auto tf     = get_test_functor(meshes);
+        auto er     = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
+    }
+
+  public:
+    int
+    run(void)
+    {
+        sol::state lua;
+
+        bool crash_on_nan         = false;
+        bool do_triangles_generic = true;
+        bool do_triangles_netgen  = true;
+        bool do_tetrahedra_netgen = true;
+        bool do_tetrahedra_fvca6  = true;
+
+        auto r = lua.do_file("test_config.lua");
+        if (r.valid())
+        {
+            crash_on_nan         = lua["crash_on_nan"].get_or(false);
+            do_triangles_generic = lua["do_triangles_generic"].get_or(false);
+            do_triangles_netgen  = lua["do_triangles_netgen"].get_or(false);
+            do_tetrahedra_netgen = lua["do_tetrahedra_netgen"].get_or(false);
+            do_tetrahedra_fvca6  = lua["do_tetrahedra_fvca6"].get_or(false);
+        }
+
+        if (crash_on_nan)
+            _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+
+        if (do_triangles_generic)
+            test_triangles_generic();
+
+        if (do_triangles_netgen)
+            test_triangles_netgen();
+
+        if (do_tetrahedra_netgen)
+            test_tetrahedra_netgen();
+
+        if (do_tetrahedra_fvca6)
+            test_tetrahedra_fvca6();
 
         return 0;
     }

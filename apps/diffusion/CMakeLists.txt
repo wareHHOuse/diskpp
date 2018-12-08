@@ -18,4 +18,6 @@ add_executable(diffusion_low_grad_vector diffusion_low_grad_vector.cpp)
 target_link_libraries(diffusion_low_grad_vector ${LINK_LIBS})
 install(TARGETS diffusion_low_grad_vector RUNTIME DESTINATION bin)
 
-
+add_executable(variable_diffusion_hho variable_diffusion_hho.cpp)
+target_link_libraries(variable_diffusion_hho ${LINK_LIBS})
+install(TARGETS variable_diffusion_hho RUNTIME DESTINATION bin)
