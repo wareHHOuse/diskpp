@@ -166,7 +166,7 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
 
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = G.second + stab;
         //Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
-        auto sc     = diffusion_static_condensation_compute_vector(msh, cl, hdi, A, rhs);
+        const auto sc = make_static_condensation_vector(msh, cl, hdi, A, rhs);
         assembler.assemble(msh, cl, bnd, sc);
     }
 
@@ -203,7 +203,7 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
         const auto fcs       = faces(msh, cl);
         const auto num_faces = fcs.size();
         const auto xFs       = assembler.take_local_data(msh, cl, bnd, sol);
-        const auto fullsol   = diffusion_static_condensation_recover_vector(msh, cl, hdi, A, rhs, xFs);
+        const auto fullsol   = make_static_decondensation_vector(msh, cl, hdi, A, rhs, xFs);
         const auto realsol   = project_function(msh, cl, hdi, sol_fun);
         const auto diff      = realsol - fullsol;
 

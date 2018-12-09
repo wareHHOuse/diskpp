@@ -123,7 +123,7 @@ run_hho_diffusion_solver(const Mesh& msh, size_t degree)
         auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
         auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
-        auto sc     = diffusion_static_condensation_compute(msh, cl, hdi, A, rhs);
+        auto sc     = make_static_condensation_scalar(msh, cl, hdi, A, rhs);
         assembler.assemble(msh, cl, sc.first, sc.second, sol_fun);
     }
 
@@ -157,8 +157,7 @@ run_hho_diffusion_solver(const Mesh& msh, size_t degree)
         Eigen::Matrix<T, Eigen::Dynamic, 1> locsol =
             assembler.take_local_data(msh, cl, sol, sol_fun);
 
-        Eigen::Matrix<T, Eigen::Dynamic, 1> fullsol =
-            diffusion_static_condensation_recover(msh, cl, hdi, A, rhs, locsol);
+        Eigen::Matrix<T, Eigen::Dynamic, 1> fullsol = make_static_decondensation_scalar(msh, cl, hdi, A, rhs, locsol);
 
         Eigen::Matrix<T, Eigen::Dynamic, 1> realsol = project_function(msh, cl, hdi, sol_fun, 2);
 

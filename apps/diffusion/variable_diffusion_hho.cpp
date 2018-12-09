@@ -216,7 +216,7 @@ run_hho_variable_diffusion_solver(const Mesh& msh, const size_t degree)
         const auto gr  = make_hho_gradrec_RT_vector(msh, cl, hdi, diffusion_tensor);
         const auto rhs = make_rhs(msh, cl, cb, rhs_fun, 2);
 
-        const auto sc = diffusion_static_condensation_compute(msh, cl, hdi, gr.second, rhs);
+        const auto sc = make_static_condensation_scalar(msh, cl, hdi, gr.second, rhs);
         assembler.assemble(msh, cl, sc.first, sc.second, sol_fun);
     }
 
@@ -245,7 +245,7 @@ run_hho_variable_diffusion_solver(const Mesh& msh, const size_t degree)
 
         vector_type locsol = assembler.take_local_data(msh, cl, sol, sol_fun);
 
-        vector_type sol = diffusion_static_condensation_recover(msh, cl, hdi, gr.second, rhs, locsol);
+        vector_type sol = make_static_decondensation_scalar(msh, cl, hdi, gr.second, rhs, locsol);
 
         vector_type realsol = project_function(msh, cl, hdi, sol_fun, 2);
 

@@ -139,8 +139,6 @@ class NewtonRaphson_step_finite_strains
              Law&                               law,
              bool                               elastic_modulus = false)
     {
-        typename disk::static_condensation_vector<mesh_type> statcond;
-
         elem_type    elem(m_msh, m_hdi);
         AssemblyInfo ai;
 
@@ -258,15 +256,15 @@ class NewtonRaphson_step_finite_strains
 
             // Static Condensation
             tc.tic();
-            auto scnp = statcond.compute_rhsfull(m_msh, cl, lhs, rhs, m_hdi);
+            const auto scnp = make_static_condensation_vector_withMatrix(m_msh, cl, m_hdi, lhs, rhs);
 
-            m_AL[cell_i] = statcond.AL;
-            m_bL[cell_i] = statcond.bL;
+            m_AL[cell_i] = std::get<1>(scnp);
+            m_bL[cell_i] = std::get<2>(scnp);
 
             tc.toc();
             ai.m_time_statcond += tc.to_double();
 
-            m_assembler.assemble_nl(m_msh, cl, m_bnd, scnp, m_solution_faces);
+            m_assembler.assemble_nl(m_msh, cl, m_bnd, std::get<0>(scnp), m_solution_faces);
 
             cell_i++;
         }

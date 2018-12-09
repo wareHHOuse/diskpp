@@ -106,8 +106,8 @@ public:
                 vector_type b = -(Ah - Anitsche) * u_full - Bnegative;
                 b.block(0, 0, cbs, 1) += Lh;
 
-                auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, b);
-                assembler.assemble(msh, cl, sc.first, sc.second);
+                const auto sc = make_static_condensation_scalar(msh, cl, hdi, A, b);
+                assembler.assemble(msh, cl, bnd, sc.first, sc.second);
                 cl_count++;
             }
 
@@ -162,9 +162,8 @@ public:
                 b.block(0, 0, cbs, 1) += Lh;
 
                 vector_type cell_rhs = b.block(0, 0, cbs, 1);
-                vector_type du_faces = assembler.take_local_data(msh, cl, dsol);
-                vector_type du_full  =
-                    diffusion_static_condensation_recover(msh, cl, hdi, A, cell_rhs, du_faces);
+                vector_type du_faces = assembler.take_local_data(msh, cl, bnd, dsol);
+                vector_type du_full  = make_static_decondensation_scalar(msh, cl, hdi, A, cell_rhs, du_faces);
 
                 diff_sol.block(cell_ofs, 0, num_total_dofs ,1) = du_full;
 
@@ -255,8 +254,8 @@ public:
                     vector_type b = -(Ah - Anitsche) * u_full - Bnegative;
                     b.block(0, 0, cbs, 1) += Lh;
 
-                    auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, b);
-                    assembler.assemble(msh, cl, sc.first, sc.second);
+                    const auto sc = make_static_condensation_scalar(msh, cl, hdi, A, b);
+                    assembler.assemble(msh, cl, bnd, sc.first, sc.second);
 
                 }
                 else
@@ -268,8 +267,8 @@ public:
                     vector_type Lh = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
                     matrix_type Ah = gr.second + stab;
 
-                    auto sc = diffusion_static_condensation_compute(msh, cl, hdi, Ah, Lh);
-                    assembler.assemble(msh, cl, sc.first, sc.second);
+                    const auto sc = make_static_condensation_scalar(msh, cl, hdi, Ah, Lh);
+                    assembler.assemble(msh, cl, bnd, sc.first, sc.second);
                 }
                 cl_count++;
             }
@@ -322,9 +321,8 @@ public:
                     b.block(0, 0, cbs, 1) += Lh;
 
                     vector_type cell_rhs = b.block(0, 0, cbs, 1);
-                    vector_type du_faces = assembler.take_local_data(msh, cl, dsol);
-                    vector_type du_full  =
-                        diffusion_static_condensation_recover(msh, cl, hdi, A, cell_rhs, du_faces);
+                    vector_type du_faces = assembler.take_local_data(msh, cl, bnd, dsol);
+                    vector_type du_full  = make_static_decondensation_scalar(msh, cl, hdi, A, cell_rhs, du_faces);
 
                     diff_sol.block(cell_ofs, 0, num_total_dofs ,1) = du_full;
                     error += du_full.dot(A * du_full);
@@ -338,9 +336,8 @@ public:
                     vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
                     matrix_type Ah  = gr.second + stab;
 
-                    vector_type du_faces = assembler.take_local_data(msh, cl, dsol);
-                    vector_type du_full  =
-                        diffusion_static_condensation_recover(msh, cl, hdi, Ah, Lh, du_faces);
+                    vector_type du_faces = assembler.take_local_data(msh, cl, bnd, dsol);
+                    vector_type du_full  = make_static_decondensation_scalar(msh, cl, hdi, Ah, Lh, du_faces);
 
                     diff_sol.block(cell_ofs, 0, num_total_dofs ,1) = du_full;
                     error += du_full.dot(Ah * du_full);

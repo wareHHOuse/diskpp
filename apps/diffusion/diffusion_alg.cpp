@@ -268,7 +268,7 @@ public:
             local_rhs = make_rhs_alg(msh, cl);
 
             Matrix<scalar_type, Dynamic, Dynamic> A = alpha * G.second + viscosity * stab;
-            auto sc = diffusion_static_condensation_compute_alg(msh, cl, di, A, local_rhs);
+            const auto                           sc = make_static_condensation_scalar(msh, cl, di, A, local_rhs);
             assembler.assemble(msh, cl, sc.first, sc.second, sol_fun);
 
             save_auxiliar(msh, cl);
@@ -311,7 +311,7 @@ public:
                 assembler.take_local_data(msh, cl, sol_faces, sol_fun);
 
             Matrix<scalar_type, Dynamic, 1> fullsol =
-                diffusion_static_condensation_recover(msh, cl, di,  A, cell_rhs, locsol);
+              make_static_decondensation_scalar(msh, cl, di, A, cell_rhs, locsol);
 
             sol.block(cell_ofs * num_total_dofs, 0, num_total_dofs, 1) = fullsol;
 

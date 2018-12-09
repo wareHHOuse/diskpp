@@ -99,8 +99,8 @@ fix_point_solver_faces(const Mesh& msh,
             vector_type b = - Bnegative;
             b.block(0, 0, cbs, 1) += Lh;
 
-            auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, b);
-            assembler.assemble(msh, cl, sc.first, sc.second);
+            auto sc = make_static_condensation_scalar(msh, cl, hdi, A, b);
+            assembler.assemble(msh, cl, bnd, sc.first, sc.second);
             cl_count++;
         }
 
@@ -150,9 +150,8 @@ fix_point_solver_faces(const Mesh& msh,
             matrix_type A = Ah - Anitsche;
             vector_type cell_rhs = Lh - Bnegative.block(0, 0, cbs, 1);
 
-            vector_type u_faces  = assembler.take_local_data(msh, cl, sol);
-            vector_type u_full   =
-                diffusion_static_condensation_recover(msh, cl, hdi, A, cell_rhs, u_faces);
+            vector_type u_faces  = assembler.take_local_data(msh, cl, bnd, sol);
+            vector_type u_full   = make_static_decondensation_scalar(msh, cl, hdi, A, cell_rhs, u_faces);
 
             full_sol.block(cell_ofs, 0, num_total_dofs, 1) = u_full;
             vector_type diff = u_full - u_full_old;
@@ -252,8 +251,8 @@ fix_point_solver_cells(const Mesh& msh,
                 vector_type b = - Bnegative;
                 b.block(0, 0, cbs, 1) += Lh;
 
-                auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, b);
-                assembler.assemble(msh, cl, sc.first, sc.second);
+                const auto sc = make_static_condensation_scalar(msh, cl, hdi, A, b);
+                assembler.assemble(msh, cl, bnd, sc.first, sc.second);
             }
             else
             {
@@ -264,8 +263,8 @@ fix_point_solver_cells(const Mesh& msh,
                 vector_type Lh = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
                 matrix_type Ah = gr.second + stab;
 
-                auto sc = diffusion_static_condensation_compute(msh, cl, hdi, Ah, Lh);
-                assembler.assemble(msh, cl, sc.first, sc.second);
+                const auto sc = make_static_condensation_scalar(msh, cl, hdi, Ah, Lh);
+                assembler.assemble(msh, cl, bnd, sc.first, sc.second);
             }
             cl_count++;
         }
@@ -315,8 +314,8 @@ fix_point_solver_cells(const Mesh& msh,
                 matrix_type A = Ah - Anitsche;
                 vector_type cell_rhs = Lh - Bnegative.block(0, 0, cbs, 1);
 
-                vector_type u_faces  = assembler.take_local_data(msh, cl, sol);
-                vector_type u_full   = diffusion_static_condensation_recover(msh, cl, hdi, A, cell_rhs, u_faces);
+                vector_type u_faces  = assembler.take_local_data(msh, cl, bnd, sol);
+                vector_type u_full   = make_static_decondensation_scalar(msh, cl, hdi, A, cell_rhs, u_faces);
 
                 vector_type diff = u_full - u_full_old;
                 error += diff.dot(A * diff);
@@ -331,8 +330,8 @@ fix_point_solver_cells(const Mesh& msh,
                 matrix_type Ah  = gr.second + stab;
                 vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
 
-                vector_type u_faces = assembler.take_local_data(msh, cl, sol);
-                vector_type u_full  = diffusion_static_condensation_recover(msh, cl, hdi, Ah, Lh, u_faces);
+                vector_type u_faces = assembler.take_local_data(msh, cl, bnd, sol);
+                vector_type u_full  = make_static_decondensation_scalar(msh, cl, hdi, Ah, Lh, u_faces);
 
                 vector_type diff = u_full - u_full_old;
                 error += diff.dot(Ah * diff);

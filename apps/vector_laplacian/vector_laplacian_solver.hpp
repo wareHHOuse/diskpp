@@ -166,8 +166,6 @@ class vector_laplacian_solver
       assembly_info ai;
       bzero(&ai, sizeof(ai));
 
-      typename disk::static_condensation_vector<mesh_type> statcond;
-
       timecounter tc;
 
       for (auto& cl : m_msh) {
@@ -203,14 +201,14 @@ class vector_laplacian_solver
           auto                 cb       = disk::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
           const auto           cell_rhs = make_rhs(m_msh, cl, cb, lf, 2);
           const matrix_dynamic loc      = m_parameters.lambda * (gr.second + stab);
-          const auto           scnp     = statcond.compute(m_msh, cl, loc, cell_rhs, m_hdi);
+          const auto           scnp     = make_static_condensation_vector_withMatrix(m_msh, cl, m_hdi, loc, cell_rhs);
 
-          m_AL.push_back(statcond.AL);
-          m_bL.push_back(statcond.bL);
+          m_AL.push_back(std::get<1>(scnp));
+          m_bL.push_back(std::get<2>(scnp));
           tc.toc();
           ai.time_statcond += tc.to_double();
 
-          m_assembler.assemble(m_msh, cl, m_bnd, scnp);
+          m_assembler.assemble(m_msh, cl, m_bnd, std::get<0>(scnp));
       }
 
       m_assembler.impose_neumann_boundary_conditions(m_msh, m_bnd);

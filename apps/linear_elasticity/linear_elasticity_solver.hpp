@@ -175,8 +175,6 @@ class linear_elasticity_solver
         assembly_info ai;
         bzero(&ai, sizeof(ai));
 
-        typename disk::static_condensation_vector<mesh_type> statcond;
-
         timecounter tc;
 
         for (auto& cl : m_msh)
@@ -210,14 +208,14 @@ class linear_elasticity_solver
             const auto           cell_rhs = make_rhs(m_msh, cl, cb, lf, 1);
             const matrix_dynamic loc =
               2.0 * m_elas_parameters.mu * (sg.second + stab) + m_elas_parameters.lambda * dr.second;
-            const auto scnp = statcond.compute(m_msh, cl, loc, cell_rhs, m_hdi);
+            const auto scnp = make_static_condensation_vector_withMatrix(m_msh, cl, m_hdi, loc, cell_rhs);
 
-            m_AL.push_back(statcond.AL);
-            m_bL.push_back(statcond.bL);
+            m_AL.push_back(std::get<1>(scnp));
+            m_bL.push_back(std::get<2>(scnp));
             tc.toc();
             ai.time_statcond += tc.to_double();
 
-            m_assembler.assemble(m_msh, cl, m_bnd, scnp, 2);
+            m_assembler.assemble(m_msh, cl, m_bnd, std::get<0>(scnp), 2);
         }
 
         m_assembler.impose_neumann_boundary_conditions(m_msh, m_bnd);

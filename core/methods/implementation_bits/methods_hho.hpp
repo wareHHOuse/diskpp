@@ -235,6 +235,7 @@ make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
     return std::make_pair(oper, data);
 }
 
+namespace priv {
 template<typename Mesh, typename GradBasis>
 std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
           Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
@@ -299,6 +300,7 @@ make_hho_gradrec_vector_impl(const Mesh&                     msh,
 
     return std::make_pair(oper, data);
 }
+}
 
 template<typename Mesh>
 std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
@@ -308,7 +310,7 @@ make_hho_gradrec_vector(const Mesh& msh, const typename Mesh::cell_type& cl, con
     const auto graddeg = di.grad_degree();
     const auto gb      = make_vector_monomial_basis(msh, cl, graddeg);
 
-    return make_hho_gradrec_vector_impl(msh, cl, di, gb);
+    return priv::make_hho_gradrec_vector_impl(msh, cl, di, gb);
 }
 
 template<typename Mesh, typename TensorField>
@@ -777,320 +779,6 @@ make_dg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
     return data;
 }
 
-template<typename Mesh, typename T>
-auto
-diffusion_static_condensation_compute(const Mesh& msh,
-        const typename Mesh::cell_type& cl, const hho_degree_info hdi,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& local_mat,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& cell_rhs)
-{
-    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-
-    auto cell_degree = hdi.cell_degree();
-    auto face_degree = hdi.face_degree();
-    auto num_cell_dofs = scalar_basis_size(cell_degree, Mesh::dimension);
-    auto num_face_dofs = scalar_basis_size(face_degree, Mesh::dimension-1);
-
-    auto fcs = faces(msh, cl);
-    auto num_faces = fcs.size();
-
-    assert(local_mat.rows() == local_mat.cols());
-    assert(local_mat.cols() == num_cell_dofs + num_faces*num_face_dofs);
-    assert(cell_rhs.rows() == num_cell_dofs);
-
-    size_t cell_size = num_cell_dofs;
-    size_t face_size = num_face_dofs * num_faces;
-
-    matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
-    matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
-    matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
-    matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
-
-    assert(K_TT.cols() == cell_size);
-    assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
-    assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
-    assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
-    assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
-
-    auto K_TT_ldlt = K_TT.ldlt();
-    matrix_type AL = K_TT_ldlt.solve(K_TF);
-    vector_type bL = K_TT_ldlt.solve(cell_rhs);
-
-    matrix_type AC = K_FF - K_FT * AL;
-    vector_type bC = /* no projection on faces, eqn. 26*/ - K_FT * bL;
-
-    return std::make_pair(AC, bC);
-}
-
-template<typename Mesh, typename T>
-auto
-diffusion_static_condensation_compute_full(const Mesh& msh,
-        const typename Mesh::cell_type& cl, const hho_degree_info hdi,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& local_mat,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& rhs)
-{
-    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-
-    auto cell_degree = hdi.cell_degree();
-    auto face_degree = hdi.face_degree();
-    auto num_cell_dofs = scalar_basis_size(cell_degree, Mesh::dimension);
-    auto num_face_dofs = scalar_basis_size(face_degree, Mesh::dimension-1);
-
-    auto fcs = faces(msh, cl);
-    auto num_faces = fcs.size();
-
-    assert(local_mat.rows() == local_mat.cols());
-    assert(local_mat.cols() == num_cell_dofs + num_faces*num_face_dofs);
-    assert(rhs.rows() == num_cell_dofs + num_faces*num_face_dofs);
-
-    size_t cell_size = num_cell_dofs;
-    size_t face_size = num_face_dofs * num_faces;
-
-    matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
-    matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
-    matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
-    matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
-
-    assert(K_TT.cols() == cell_size);
-    assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
-    assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
-    assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
-    assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
-
-    vector_type cell_rhs = rhs.block(0, 0, num_cell_dofs, 1);
-    vector_type face_rhs = rhs.block(num_cell_dofs, 0, num_faces*num_face_dofs, 1);
-
-    auto K_TT_ldlt = K_TT.ldlt();
-    matrix_type AL = K_TT_ldlt.solve(K_TF);
-    vector_type bL = K_TT_ldlt.solve(cell_rhs);
-
-    matrix_type AC = K_FF - K_FT * AL;
-    vector_type bC = /* no projection on faces, eqn. 26*/face_rhs - K_FT * bL;
-
-    return std::make_pair(AC, bC);
-}
-
-template<typename Mesh, typename T>
-auto
-diffusion_static_condensation_compute_vector(const Mesh& msh,
-        const typename Mesh::cell_type& cl, const hho_degree_info hdi,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& local_mat,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& cell_rhs)
-{
-    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-
-    auto cell_degree = hdi.cell_degree();
-    auto face_degree = hdi.face_degree();
-    auto num_cell_dofs = vector_basis_size(cell_degree, Mesh::dimension, Mesh::dimension);
-    auto num_face_dofs = vector_basis_size(face_degree, Mesh::dimension-1, Mesh::dimension);
-
-    auto fcs = faces(msh, cl);
-    auto num_faces = fcs.size();
-
-    assert(local_mat.rows() == local_mat.cols());
-    assert(local_mat.cols() == num_cell_dofs + num_faces*num_face_dofs);
-    assert(cell_rhs.rows() == num_cell_dofs);
-
-    size_t cell_size = num_cell_dofs;
-    size_t face_size = num_face_dofs * num_faces;
-
-    matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
-    matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
-    matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
-    matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
-
-    assert(K_TT.cols() == cell_size);
-    assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
-    assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
-    assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
-    assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
-
-    auto K_TT_ldlt = K_TT.ldlt();
-    matrix_type AL = K_TT_ldlt.solve(K_TF);
-    vector_type bL = K_TT_ldlt.solve(cell_rhs);
-
-    matrix_type AC = K_FF - K_FT * AL;
-    vector_type bC = /* no projection on faces, eqn. 26*/ - K_FT * bL;
-
-    return std::make_pair(AC, bC);
-}
-
-template<typename Mesh, typename T>
-auto
-diffusion_static_condensation_compute_vector_full(const Mesh& msh,
-        const typename Mesh::cell_type& cl, const hho_degree_info hdi,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& local_mat,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& rhs)
-{
-    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-
-    auto cell_degree = hdi.cell_degree();
-    auto face_degree = hdi.face_degree();
-    auto num_cell_dofs = vector_basis_size(cell_degree, Mesh::dimension, Mesh::dimension);
-    auto num_face_dofs = vector_basis_size(face_degree, Mesh::dimension-1, Mesh::dimension);
-
-    auto fcs = faces(msh, cl);
-    auto num_faces = fcs.size();
-
-    assert(local_mat.rows() == local_mat.cols());
-    assert(local_mat.cols() == num_cell_dofs + num_faces*num_face_dofs);
-
-    size_t cell_size = num_cell_dofs;
-    size_t face_size = num_face_dofs * num_faces;
-
-    matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
-    matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
-    matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
-    matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
-
-    assert(K_TT.cols() == cell_size);
-    assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
-    assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
-    assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
-    assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
-    assert((rhs.rows() == cell_size) || (rhs.rows() == cell_size + num_faces*num_face_dofs));
-
-    vector_type cell_rhs = rhs.block(0, 0, num_cell_dofs, 1);
-    vector_type face_rhs = vector_type::Zero(face_size);
-    if(rhs.cols() ==  num_cell_dofs + num_faces*num_face_dofs)
-        face_rhs = rhs.block(num_cell_dofs, 0, num_faces*num_face_dofs, 1);
-
-    auto K_TT_ldlt = K_TT.ldlt();
-    matrix_type AL = K_TT_ldlt.solve(K_TF);
-    vector_type bL = K_TT_ldlt.solve(cell_rhs);
-
-    matrix_type AC = K_FF - K_FT * AL;
-    vector_type bC = /* no projection on faces, eqn. 26*/face_rhs - K_FT * bL;
-
-    return std::make_pair(AC, bC);
-}
-
-template<typename Mesh>
-std::pair<Eigen::Matrix<typename Mesh::coordinate_type, Eigen::Dynamic, Eigen::Dynamic>,
-Eigen::Matrix<typename Mesh::coordinate_type, Eigen::Dynamic, 1>>
-diffusion_static_condensation_compute_alg(const Mesh& msh,
-        const typename Mesh::cell_type& cl, const hho_degree_info hdi,
-        const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& local_mat,
-        const Matrix<typename Mesh::coordinate_type, Dynamic, 1>& rhs)
-{
-    using T = typename Mesh::coordinate_type;
-    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-
-    auto cell_degree = hdi.cell_degree();
-    auto face_degree = hdi.face_degree();
-    auto num_cell_dofs = scalar_basis_size(cell_degree, Mesh::dimension);
-    auto num_face_dofs = scalar_basis_size(face_degree, Mesh::dimension-1);
-
-    auto fcs = faces(msh, cl);
-    auto num_faces = fcs.size();
-
-    assert(local_mat.rows() == local_mat.cols());
-    assert(local_mat.cols() == num_cell_dofs + num_faces*num_face_dofs);
-    assert(rhs.rows() == num_cell_dofs  + num_faces*num_face_dofs);
-
-    size_t cell_size = num_cell_dofs;
-    size_t face_size = num_face_dofs * num_faces;
-
-    matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
-    matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
-    matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
-    matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
-
-    assert(K_TT.cols() == cell_size);
-    assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
-    assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
-    assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
-    assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
-
-    vector_type cell_rhs = rhs.block(0, 0, num_cell_dofs, 1);
-    vector_type face_rhs = rhs.block(num_cell_dofs, 0, num_faces*num_face_dofs, 1);
-
-    auto K_TT_ldlt = K_TT.ldlt();
-    matrix_type AL = K_TT_ldlt.solve(K_TF);
-    vector_type bL = K_TT_ldlt.solve(cell_rhs);
-
-    matrix_type AC = K_FF - K_FT * AL;
-    vector_type bC = /* no projection on faces, eqn. 26*/ face_rhs - K_FT * bL ;
-
-    return std::make_pair(AC, bC);
-}
-
-template<typename Mesh, typename T>
-Eigen::Matrix<T, Eigen::Dynamic, 1>
-diffusion_static_condensation_recover(const Mesh& msh,
-    const typename Mesh::cell_type& cl, const hho_degree_info hdi,
-    const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& local_mat,
-    const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& cell_rhs,
-    const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& solF)
-{
-    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-
-    auto cell_degree = hdi.cell_degree();
-    auto face_degree = hdi.face_degree();
-    auto num_cell_dofs = scalar_basis_size(cell_degree, Mesh::dimension);
-    auto num_face_dofs = scalar_basis_size(face_degree, Mesh::dimension-1);
-
-    auto fcs = faces(msh, cl);
-    auto num_faces = fcs.size();
-
-    size_t cell_size        = num_cell_dofs;
-    size_t all_faces_size   = num_face_dofs * num_faces;
-
-    vector_type ret( cell_size + all_faces_size );
-
-    matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
-    matrix_type K_TF = local_mat.topRightCorner(cell_size, all_faces_size);
-
-    vector_type solT = K_TT.ldlt().solve(cell_rhs - K_TF*solF);
-
-    ret.head(cell_size)         = solT;
-    ret.tail(all_faces_size)    = solF;
-
-    return ret;
-}
-
-
-template<typename Mesh, typename T>
-Eigen::Matrix<T, Eigen::Dynamic, 1>
-diffusion_static_condensation_recover_vector(const Mesh& msh,
-    const typename Mesh::cell_type& cl, const hho_degree_info hdi,
-    const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& local_mat,
-    const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& cell_rhs,
-    const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& solF)
-{
-    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-
-    auto cell_degree = hdi.cell_degree();
-    auto face_degree = hdi.face_degree();
-    auto num_cell_dofs = vector_basis_size(cell_degree, Mesh::dimension, Mesh::dimension);
-    auto num_face_dofs = vector_basis_size(face_degree, Mesh::dimension-1, Mesh::dimension);
-
-    auto fcs = faces(msh, cl);
-    auto num_faces = fcs.size();
-
-    size_t cell_size        = num_cell_dofs;
-    size_t all_faces_size   = num_face_dofs * num_faces;
-
-    vector_type ret( cell_size + all_faces_size );
-
-    matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
-    matrix_type K_TF = local_mat.topRightCorner(cell_size, all_faces_size);
-
-    vector_type solT = K_TT.ldlt().solve(cell_rhs - K_TF*solF);
-
-    ret.head(cell_size)         = solT;
-    ret.tail(all_faces_size)    = solF;
-
-    return ret;
-}
-
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
 make_hho_scalar_stabilization(const Mesh&                                                     msh,
@@ -1337,6 +1025,224 @@ make_hho_vector_stabilization(const Mesh&                                       
     }
 
     return data;
+}
+
+namespace priv
+{
+// static condensation
+template<typename Mesh, typename T>
+auto
+static_condensation_impl(const Mesh&                                                      msh,
+                         const typename Mesh::cell_type&                                  cl,
+                         const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
+                         const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              rhs,
+                         const size_t                                                     num_cell_dofs,
+                         const size_t                                                     num_face_dofs)
+{
+    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+
+    const auto fcs            = faces(msh, cl);
+    const auto num_faces      = fcs.size();
+    const auto num_faces_dofs = num_faces * num_face_dofs;
+    const auto num_total_dofs = num_cell_dofs + num_faces_dofs;
+
+    assert(lhs.rows() == lhs.cols());
+    assert(lhs.cols() == num_total_dofs);
+
+    if ((rhs.size() != num_cell_dofs) && (rhs.size() != num_total_dofs))
+    {
+        throw std::invalid_argument("static condensation: incorrect size of the rhs");
+    }
+
+    const matrix_type K_TT = lhs.topLeftCorner(num_cell_dofs, num_cell_dofs);
+    const matrix_type K_TF = lhs.topRightCorner(num_cell_dofs, num_faces_dofs);
+    const matrix_type K_FT = lhs.bottomLeftCorner(num_faces_dofs, num_cell_dofs);
+    const matrix_type K_FF = lhs.bottomRightCorner(num_faces_dofs, num_faces_dofs);
+
+    assert(K_TT.cols() == num_cell_dofs);
+    assert(K_TT.cols() + K_TF.cols() == lhs.cols());
+    assert(K_TT.rows() + K_FT.rows() == lhs.rows());
+    assert(K_TF.rows() + K_FF.rows() == lhs.rows());
+    assert(K_FT.cols() + K_FF.cols() == lhs.cols());
+
+    const vector_type cell_rhs  = rhs.head(num_cell_dofs);
+    vector_type       faces_rhs = vector_type::Zero(num_faces_dofs);
+
+    if (rhs.size() == num_total_dofs)
+    {
+        faces_rhs = rhs.tail(num_faces_dofs);
+    }
+
+    const auto K_TT_ldlt = K_TT.ldlt();
+    if (K_TT_ldlt.info() != Eigen::Success)
+    {
+        throw std::invalid_argument("static condensation: K_TT is not positive definite");
+    }
+
+    const matrix_type AL = K_TT_ldlt.solve(K_TF);
+    const vector_type bL = K_TT_ldlt.solve(cell_rhs);
+
+    const matrix_type AC = K_FF - K_FT * AL;
+    const vector_type bC = faces_rhs - K_FT * bL;
+
+    return std::make_tuple(std::make_pair(AC, bC), AL, bL);
+}
+
+// static decondensation for primal scalar problem
+template<typename Mesh, typename T>
+Eigen::Matrix<T, Eigen::Dynamic, 1>
+static_decondensation_impl(const Mesh&                                                      msh,
+                           const typename Mesh::cell_type&                                  cl,
+                           const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
+                           const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              rhs,
+                           const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              solF,
+                           const size_t                                                     num_cell_dofs,
+                           const size_t                                                     num_face_dofs)
+{
+    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+
+    const auto fcs            = faces(msh, cl);
+    const auto num_faces      = fcs.size();
+    const auto num_faces_dofs = num_faces * num_face_dofs;
+    const auto num_total_dofs = num_cell_dofs + num_faces_dofs;
+
+    assert(lhs.rows() == lhs.cols());
+    assert(lhs.cols() == num_total_dofs);
+
+    if ((rhs.size() < num_cell_dofs))
+    {
+        throw std::invalid_argument("static condensation: incorrect size of the rhs");
+    }
+
+    const matrix_type K_TT = lhs.topLeftCorner(num_cell_dofs, num_cell_dofs);
+    const matrix_type K_TF = lhs.topRightCorner(num_cell_dofs, num_faces_dofs);
+
+    const vector_type solT = K_TT.ldlt().solve(rhs.head(num_cell_dofs) - K_TF * solF);
+
+    vector_type ret          = vector_type::Zero(num_total_dofs);
+    ret.head(num_cell_dofs)  = solT;
+    ret.tail(num_faces_dofs) = solF;
+
+    return ret;
+}
+}
+
+// static condensation for primal scalar problem like diffusion
+template<typename Mesh, typename T>
+auto
+make_static_condensation_scalar_withMatrix(const Mesh&                                                 msh,
+                                      const typename Mesh::cell_type&                                  cl,
+                                      const hho_degree_info&                                           hdi,
+                                      const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
+                                      const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              rhs)
+{
+    const auto num_cell_dofs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+    const auto num_face_dofs = scalar_basis_size(hdi.face_degree(), Mesh::dimension - 1);
+
+    return priv::static_condensation_impl(msh, cl, lhs, rhs, num_cell_dofs, num_face_dofs);
+}
+
+template<typename Mesh, typename T>
+auto
+make_static_condensation_scalar(const Mesh&                                                 msh,
+                           const typename Mesh::cell_type&                                  cl,
+                           const hho_degree_info&                                           hdi,
+                           const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
+                           const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              rhs)
+{
+    return std::get<0>(make_static_condensation_scalar_withMatrix(msh, cl, hdi, lhs, rhs));
+}
+
+// static decondensation for primal scalar problem
+template<typename Mesh, typename T>
+Eigen::Matrix<T, Eigen::Dynamic, 1>
+make_static_decondensation_scalar(const Mesh&                                                 msh,
+                             const typename Mesh::cell_type&                                  cl,
+                             const hho_degree_info                                            hdi,
+                             const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
+                             const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              rhs,
+                             const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              solF)
+{
+    const auto num_cell_dofs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+    const auto num_face_dofs = scalar_basis_size(hdi.face_degree(), Mesh::dimension - 1);
+
+    return static_decondensation_impl(msh, cl, lhs, rhs, solF, num_cell_dofs, num_face_dofs);
+}
+
+// static decondensation for primal scalar problem
+template<typename T>
+Eigen::Matrix<T, Eigen::Dynamic, 1>
+make_static_decondensation_scalar_withMatrix(const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& AL,
+                                             const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              bL,
+                                             const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              solF)
+{
+    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+
+    vector_type ret          = vector_type::Zero(bL.size() + solF.size());
+    ret.head(bL.size())      = bL - AL * solF;
+    ret.tail(solF.size())    = solF;
+
+    return ret;
+}
+
+// static condensation for primal vectorial problem like elasticity
+template<typename Mesh, typename T>
+auto
+make_static_condensation_vector_withMatrix(const Mesh&                                                 msh,
+                                      const typename Mesh::cell_type&                                  cl,
+                                      const hho_degree_info&                                           hdi,
+                                      const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
+                                      const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              rhs)
+{
+    const auto num_cell_dofs = vector_basis_size(hdi.cell_degree(), Mesh::dimension, Mesh::dimension);
+    const auto num_face_dofs = vector_basis_size(hdi.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+
+    return priv::static_condensation_impl(msh, cl, lhs, rhs, num_cell_dofs, num_face_dofs);
+}
+
+template<typename Mesh, typename T>
+auto
+make_static_condensation_vector(const Mesh&                                                 msh,
+                           const typename Mesh::cell_type&                                  cl,
+                           const hho_degree_info&                                           hdi,
+                           const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
+                           const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              rhs)
+{
+    return std::get<0>(make_static_condensation_vector_withMatrix(msh, cl, hdi, lhs, rhs));
+}
+
+// static decondensation for primal vector problem
+template<typename Mesh, typename T>
+Eigen::Matrix<T, Eigen::Dynamic, 1>
+make_static_decondensation_vector(const Mesh&                                                 msh,
+                             const typename Mesh::cell_type&                                  cl,
+                             const hho_degree_info                                            hdi,
+                             const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
+                             const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              rhs,
+                             const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              solF)
+{
+    const auto num_cell_dofs = vector_basis_size(hdi.cell_degree(), Mesh::dimension, Mesh::dimension);
+    const auto num_face_dofs = vector_basis_size(hdi.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+
+    return static_decondensation_impl(msh, cl, lhs, rhs, solF, num_cell_dofs, num_face_dofs);
+}
+
+// static decondensation for primal vector problem
+template<typename T>
+Eigen::Matrix<T, Eigen::Dynamic, 1>
+make_static_decondensation_vector_withMatrix(const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& AL,
+                                             const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              bL,
+                                             const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              solF)
+{
+    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+
+    vector_type ret          = vector_type::Zero(bL.size() + solF.size());
+    ret.head(bL.size())      = bL - AL * solF;
+    ret.tail(solF.size())    = solF;
+
+    return ret;
 }
 
 namespace priv
@@ -3641,141 +3547,6 @@ make_mechanics_assembler(const Mesh& msh, const hho_degree_info hdi, const Bound
 {
    return assembler_mechanics<Mesh>(msh, hdi, bnd);
 }
-
-template<typename Mesh>
-class static_condensation_vector
-{
-    typedef Mesh                                mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::cell            cell_type;
-
-    typedef dynamic_matrix<scalar_type> matrix_type;
-    typedef dynamic_vector<scalar_type> vector_type;
-
-    const static size_t dimension = mesh_type::dimension;
-
-  public:
-    matrix_type AL;
-    vector_type bL;
-    static_condensation_vector() {}
-
-    std::pair<matrix_type, vector_type>
-    compute(const mesh_type&      msh,
-            const cell_type&      cl,
-            const matrix_type&    local_mat,
-            const vector_type&    cell_rhs,
-            const hho_degree_info hdi)
-    {
-        const size_t num_cell_dofs = vector_basis_size(hdi.cell_degree(), dimension, dimension);
-        const size_t num_face_dofs = vector_basis_size(hdi.face_degree(), dimension - 1, dimension);
-
-        const auto   fcs       = faces(msh, cl);
-        const size_t num_faces = fcs.size();
-
-        const size_t cell_size = num_cell_dofs;
-        const size_t face_size = num_faces * num_face_dofs;
-
-        assert(cell_size == cell_rhs.rows() && "wrong rhs dimension");
-        assert((cell_size + face_size) == local_mat.rows() && "wrong lhs rows dimension");
-        assert((cell_size + face_size) == local_mat.cols() && "wrong lhs cols dimension");
-
-        const matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
-        const matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
-        const matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
-        const matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
-
-        assert(K_TT.cols() == cell_size && "wrong K_TT dimension");
-        assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
-        assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
-        assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
-        assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
-
-        const auto K_TT_ldlt = K_TT.ldlt();
-        AL                   = K_TT_ldlt.solve(K_TF);
-        if (K_TT_ldlt.info() != Eigen::Success)
-        {
-            throw std::invalid_argument("static_condenstion: the matrix is not symmetrix positive definite");
-        }
-        bL = K_TT_ldlt.solve(cell_rhs);
-        if (K_TT_ldlt.info() != Eigen::Success)
-        {
-            throw std::invalid_argument("static_condenstion: the matrix is not symmetrix positive definite");
-        }
-
-        const matrix_type AC = K_FF - K_FT * AL;
-        const vector_type bC = /* no projection on faces, eqn. 26*/ -K_FT * bL;
-
-        return std::make_pair(AC, bC);
-    }
-
-    std::pair<matrix_type, vector_type>
-    compute_rhsfull(const mesh_type&      msh,
-                    const cell_type&      cl,
-                    const matrix_type&    local_mat,
-                    const vector_type&    rhs,
-                    const hho_degree_info hdi)
-    {
-        const size_t num_cell_dofs = vector_basis_size(hdi.cell_degree(), dimension, dimension);
-        const size_t num_face_dofs = vector_basis_size(hdi.face_degree(), dimension - 1, dimension);
-
-        const auto   fcs       = faces(msh, cl);
-        const size_t num_faces = fcs.size();
-
-        const size_t cell_size        = num_cell_dofs;
-        const size_t total_faces_size = num_faces * num_face_dofs;
-
-        const vector_type cell_rhs  = rhs.head(cell_size);
-        const vector_type faces_rhs = rhs.tail(total_faces_size);
-
-        assert(cell_size + total_faces_size == rhs.rows() && "wrong  rhs dimension");
-        assert(cell_size == cell_rhs.rows() && "wrong cell rhs dimension");
-        assert(total_faces_size == faces_rhs.rows() && "wrong face rhs dimension");
-        assert((cell_size + total_faces_size) == local_mat.rows() && "wrong lhs rows dimension");
-        assert((cell_size + total_faces_size) == local_mat.cols() && "wrong lhs cols dimension");
-
-        const matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
-        const matrix_type K_TF = local_mat.topRightCorner(cell_size, total_faces_size);
-        const matrix_type K_FT = local_mat.bottomLeftCorner(total_faces_size, cell_size);
-        const matrix_type K_FF = local_mat.bottomRightCorner(total_faces_size, total_faces_size);
-
-        assert(K_TT.cols() == cell_size && "wrong K_TT dimension");
-        assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
-        assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
-        assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
-        assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
-
-        const auto K_TT_ldlt = K_TT.ldlt();
-        AL                   = K_TT_ldlt.solve(K_TF);
-
-        if (K_TT_ldlt.info() != Eigen::Success)
-        {
-            const auto K_TT_lu = K_TT.fullPivLu();
-
-            if(K_TT_lu.isInvertible())
-            {
-                AL = K_TT_lu.solve(K_TF);
-                bL = K_TT_lu.solve(cell_rhs);
-            }
-            else
-            {
-                throw std::invalid_argument("static_condenstion: the matrix is not inversible");
-            }
-        }
-        else
-        {
-            bL = K_TT_ldlt.solve(cell_rhs);
-            if (K_TT_ldlt.info() != Eigen::Success)
-            {
-                throw std::invalid_argument("static_condenstion: the matrix is not symmetrix positive definite");
-            }
-        }
-
-        const matrix_type AC = K_FF - K_FT * AL;
-        const vector_type bC = faces_rhs - K_FT * bL;
-
-        return std::make_pair(AC, bC);
-    }
-};
 
 // define some optimization
 namespace priv {

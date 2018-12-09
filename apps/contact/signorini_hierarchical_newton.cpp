@@ -446,8 +446,8 @@ class hierarchical_contact_solver
                 hho_vector b = -(Ah - Anitsche) * u_full - Bnegative;
                 b.block(0, 0, cbs, 1) += Lh;
 
-                auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, b);
-                assembler.assemble(msh, cl, sc.first, sc.second);
+                const auto sc = make_static_condensation_scalar(msh, cl, hdi, A, b);
+                assembler.assemble(msh, cl, bnd, sc.first, sc.second);
                 cl_count++;
             }
 
@@ -512,10 +512,9 @@ class hierarchical_contact_solver
                 b.block(0, 0, cbs, 1) += Lh;
 
                 hho_vector cell_rhs = b.block(0, 0, cbs, 1);
-                hho_vector du_faces = assembler.take_local_data(msh, cl, dsol);
+                hho_vector du_faces = assembler.take_local_data(msh, cl, bnd, dsol);
 
-                hho_vector du_full  =
-                    diffusion_static_condensation_recover(msh, cl, hdi, A, cell_rhs, du_faces);
+                hho_vector du_full = make_static_decondensation_scalar(msh, cl, hdi, A, cell_rhs, du_faces);
 
                 diff_sol.block(cell_ofs, 0, num_total_dofs ,1) = du_full;
 
