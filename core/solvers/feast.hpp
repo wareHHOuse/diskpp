@@ -174,7 +174,7 @@ generalized_eigenvalue_solver(feast_eigensolver_params<double>& params,
         return false;
     }
 
-    double  trace, eps;
+    double  eps;
     int     loop;
 
     Eigen::Matrix<double, Eigen::Dynamic, 1> res;

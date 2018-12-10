@@ -72,18 +72,6 @@ class LogarithmicStrain_qp
     static_tensor<scalar_type, 3> Pn; // Projector: to compute PK1 form T
 
     static_matrix_type3D
-    compute_stress3D(const data_type& data) const
-    {
-        return ContractedProduct<scalar_type, 3>(this->compute_stress3D_T(data), Pn);
-    }
-
-    static_matrix_type3D
-    compute_stress3D_T(const data_type& data) const
-    {
-        return m_law_hpp_qp.compute_stress3D(data);
-    }
-
-    static_matrix_type3D
     compute_stress3DPrev_T(const data_type& data) const
     {
         return m_law_hpp_qp.compute_stress3DPrev(data);
@@ -136,7 +124,7 @@ class LogarithmicStrain_qp
             return std::make_pair(PK1, behavior3D_hpp.second);
         }
 
-        const auto projector2 = compute_projector_PK2(F_curr, behavior3D_hpp.first, ev_C.first, ev_C.second, true);
+        const auto projector2 = compute_projector_PK2(behavior3D_hpp.first, ev_C.first, ev_C.second, true);
         const static_tensor<scalar_type, 3> CP2 = ContractedProduct<scalar_type, 3>(behavior3D_hpp.second, projector2.first);
         const static_tensor<scalar_type, 3> C2 =
           ContractedProduct<scalar_type, 3>(transpose<scalar_type, 3>(projector2.first), CP2) + projector2.second;
@@ -248,6 +236,18 @@ class LogarithmicStrain_qp
         const static_tensor<scalar_type, DIM> A   = convertTensor<scalar_type, DIM>(behaviors3D.second);
 
         return std::make_pair(PK1, A);
+    }
+
+    static_matrix_type3D
+    compute_stress3D(const data_type& data) const
+    {
+        return ContractedProduct<scalar_type, 3>(this->compute_stress3D_T(data), Pn);
+    }
+
+    static_matrix_type3D
+    compute_stress3D_T(const data_type& data) const
+    {
+        return m_law_hpp_qp.compute_stress3D(data);
     }
 };
 }

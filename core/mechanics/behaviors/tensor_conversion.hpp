@@ -39,13 +39,6 @@ namespace disk
 
 // Convert Matrix in Coulum vector
 
-template<typename T, int DIM>
-void
-converttovector(const static_matrix<T, DIM, DIM>& mat)
-{
-    static_assert((DIM == 2 || DIM == 3), "Can not compute conversion for this dimension");
-}
-
 template<typename T>
 static_vector<T, 4>
 converttovector(const static_matrix<T, 2, 2>& mat)
@@ -62,13 +55,6 @@ converttovector(const static_matrix<T, 3, 3>& mat)
 }
 
 // Convert vector in matrix
-
-template<typename T, int DIM>
-void
-converttomatrix(const static_vector<T, DIM>& vec)
-{
-    static_assert((DIM == 4 || DIM == 9), "Can not compute conversion for this dimension");
-}
 
 template<typename T>
 static_matrix<T, 2, 2>

@@ -84,13 +84,13 @@ class law_qp_bones
 
   public:
     law_qp_bones() :
-      m_weight(0), m_estrain_curr(static_matrix_type3D::Zero()), m_estrain_prev(static_matrix_type3D::Zero())
+      m_weight(0), m_estrain_prev(static_matrix_type3D::Zero()), m_estrain_curr(static_matrix_type3D::Zero())
     {
     }
 
     law_qp_bones(const point<scalar_type, DIM>& point, const scalar_type& weight) :
-      m_point(point), m_weight(weight), m_estrain_curr(static_matrix_type3D::Zero()),
-      m_estrain_prev(static_matrix_type3D::Zero())
+      m_point(point), m_weight(weight), m_estrain_prev(static_matrix_type3D::Zero()),
+      m_estrain_curr(static_matrix_type3D::Zero())
     {
     }
 

@@ -58,10 +58,9 @@ class NewtonRaphson_solver_finite_strains
 
     typedef disk::BoundaryConditions<mesh_type, false> bnd_type;
 
+    const mesh_type& m_msh;
     const hdi_type& m_hdi;
     const bnd_type& m_bnd;
-
-    const mesh_type&  m_msh;
     const param_type& m_rp;
 
     std::vector<vector_type> m_solution_data;
@@ -76,7 +75,7 @@ class NewtonRaphson_solver_finite_strains
                                         const bnd_type&   bnd,
                                         const param_type& rp) :
       m_msh(msh),
-      m_verbose(rp.m_verbose), m_convergence(false), m_rp(rp), m_hdi(hdi), m_bnd(bnd)
+      m_hdi(hdi), m_bnd(bnd), m_rp(rp), m_verbose(rp.m_verbose), m_convergence(false)
     {
     }
 

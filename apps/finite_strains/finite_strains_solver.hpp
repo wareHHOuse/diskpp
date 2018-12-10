@@ -1245,7 +1245,7 @@ class finite_strains_solver
                 const scalar_type sigma_oo = (stress.trace() - sigma_rr) / 2.0;
                 const scalar_type ur       = depl.dot(er);
 
-                output << R << "\t" << r << "\t" << ur << "\t" << sigma_rr << "\t" << sigma_oo << "\t" << stress.trace()
+                output << R << "\t" << r << "\t" << ur << "\t" << sigma_rr << "\t" << sigma_oo << "\t" << trace
                        << std ::endl;
             }
             cell_i++;

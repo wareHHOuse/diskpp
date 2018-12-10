@@ -121,7 +121,6 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 
         function_type dphi = scalar_basis.eval_gradients(pt);
 
-        size_t j = 0;
         for (size_t i = 0; i < scalar_basis.size(); i++)
         {
             const Matrix<scalar_type, 1, 3> dphi_i = dphi.row(i);
@@ -152,7 +151,6 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 
         function_type dphi = scalar_basis.eval_gradients(pt);
 
-        size_t j = 0;
         for (size_t i = 0; i < scalar_basis.size(); i++)
         {
             const Matrix<scalar_type, 1, 3> dphi_i = dphi.row(i);
@@ -324,7 +322,6 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 
         const function_type dphi = scalar_basis.eval_gradients(pt);
 
-        size_t j = 0;
         for (size_t i = 0; i < scalar_basis.size(); i++)
         {
             const Matrix<scalar_type, 1, 2> dphi_i = dphi.row(i);
@@ -351,7 +348,6 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 
         const function_type dphi = scalar_basis.eval_gradients(pt);
 
-        size_t j = 0;
         for (size_t i = 0; i < scalar_basis.size(); i++)
         {
             const Matrix<scalar_type, 1, 2> dphi_i = dphi.row(i);

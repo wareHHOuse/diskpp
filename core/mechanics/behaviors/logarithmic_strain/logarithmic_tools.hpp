@@ -535,8 +535,7 @@ compute_projector(const static_matrix<T, 3, 3>& F,
 // compute projector tensor
 template<typename T>
 std::pair<static_tensor<T, 3>, static_tensor<T, 3>>
-compute_projector_PK2(const static_matrix<T, 3, 3>& F,
-                      const static_matrix<T, 3, 3>& stress_T,
+compute_projector_PK2(const static_matrix<T, 3, 3>& stress_T,
                       const static_vector<T, 3>&    lambda_i,
                       const static_matrix<T, 3, 3>& evec,
                       bool                          compute_TL = true)
@@ -565,8 +564,6 @@ compute_projector_PK2(const static_matrix<T, 3, 3>& F,
 
     // std::cout << "T" << std::endl;
     // std::cout << stress_T << std::endl;
-    // std::cout << "F" << std::endl;
-    // std::cout << F << std::endl;
 
     // std::cout << "ei" << std::endl;
     // std::cout << ei.transpose() << std::endl;

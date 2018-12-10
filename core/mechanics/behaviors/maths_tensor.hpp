@@ -131,13 +131,6 @@ tm_prod(const T& tens, const T& mat)
 
 // Compute Kronecker product
 
-template<typename T, int M, int N, int P, int Q>
-void
-Kronecker(const static_matrix<T, M, N>& A, const static_matrix<T, P, Q>& B)
-{
-    static_assert((M == N && N == P && P == Q), "Kronecker product : Not yet develloped");
-}
-
 // T_ijkl = A_ij B_kl
 
 template<typename T, int DIM>

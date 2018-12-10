@@ -630,7 +630,6 @@ make_hho_negative(const Mesh&                                                   
                   const Matrix<typename Mesh::coordinate_type, Dynamic, 1>&             uloc)
 {
     using T = typename Mesh::coordinate_type;
-    using matrix_type = Matrix<T, Dynamic, Dynamic>;
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
@@ -656,7 +655,6 @@ make_hho_negative(const Mesh&                                                   
         if (bnd.is_contact_face(face_id))
         {
             auto cb  = make_scalar_monomial_basis(msh, cl, recdeg);
-            auto fb  = make_scalar_monomial_basis(msh, fc, facdeg);
             auto quad_degree = std::max( recdeg - 1, celdeg);
             auto qps = integrate (msh, fc, 2 * quad_degree);
             auto n = normal(msh, cl, fc);
@@ -700,7 +698,6 @@ make_hho_negative_faces(const Mesh&                                             
                         const Matrix<typename Mesh::coordinate_type, Dynamic, 1>&                   uloc)
 {
     using T = typename Mesh::coordinate_type;
-    using matrix_type = Matrix<T, Dynamic, Dynamic>;
     using vector_type = Matrix<T, Dynamic, 1>;
 
     const size_t DIM = Mesh::dimension;
@@ -800,7 +797,6 @@ make_hho_negative_trace(const Mesh&                                             
             auto cb = make_scalar_monomial_basis(msh, cl, recdeg);
             auto qps = integrate (msh, fc, 2 * recdeg);
             auto n = normal(msh, cl, fc);
-            auto face_ofs  = cbs  +  fc_count * fbs;
 
             for (auto& qp : qps)
             {

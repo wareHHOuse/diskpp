@@ -72,8 +72,6 @@ points(const cartesian_mesh<T, DIM>& msh, const cartesian_element<DIM, CODIM>& e
         return *itor;
     };
 
-    typedef point_identifier<DIM>       point_id_type;
-
     std::array<typename cartesian_mesh<T, DIM>::point_type, cartesian_priv::howmany<DIM, CODIM>::nodes> pts;
     std::transform(ptids.begin(), ptids.end(), pts.begin(), ptid_to_point);
 

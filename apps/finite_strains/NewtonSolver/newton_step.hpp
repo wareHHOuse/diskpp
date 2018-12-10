@@ -69,9 +69,9 @@ class NewtonRaphson_step_finite_strains
 
     vector_type m_system_solution;
 
-    const bnd_type&   m_bnd;
     const mesh_type&  m_msh;
     const hdi_type&   m_hdi;
+    const bnd_type&   m_bnd;
     const param_type& m_rp;
     assembler_type    m_assembler;
 
@@ -91,7 +91,7 @@ class NewtonRaphson_step_finite_strains
                                       const bnd_type&   bnd,
                                       const param_type& rp) :
       m_msh(msh),
-      m_verbose(rp.m_verbose), m_rp(rp), m_hdi(hdi), m_bnd(bnd)
+      m_hdi(hdi), m_rp(rp), m_bnd(bnd), m_verbose(rp.m_verbose)
     {
         m_AL.clear();
         m_AL.resize(m_msh.cells_size());

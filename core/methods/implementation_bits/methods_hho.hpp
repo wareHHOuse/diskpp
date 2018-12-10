@@ -396,7 +396,6 @@ make_vector_hho_symmetric_laplacian(const Mesh& msh,
     const auto num_faces = howmany_faces(msh, cl);
 
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
-    typedef Matrix<T, Dynamic, 1>       vector_type;
     typedef Matrix<T, N, N>             gradient_type;
     typedef Matrix<T, Dynamic, N>       function_type;
 
@@ -471,12 +470,11 @@ template<typename Mesh>
 std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
           Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
 make_matrix_symmetric_gradrec(const Mesh&                     msh,
-                        const typename Mesh::cell_type& cl,
-                        const hho_degree_info&          di)
+                              const typename Mesh::cell_type& cl,
+                              const hho_degree_info&          di)
 {
    using T        = typename Mesh::coordinate_type;
    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
-   typedef Matrix<T, Dynamic, 1>       vector_type;
 
    const size_t N = Mesh::dimension;
 
@@ -495,8 +493,6 @@ make_matrix_symmetric_gradrec(const Mesh&                     msh,
 
    matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);
    matrix_type gr_rhs = matrix_type::Zero(gbs, cbs + num_faces * fbs);
-
-   const size_t dim2 = N * N;
 
    // this is very costly to build it
    const auto qps = integrate(msh, cl, 2 * graddeg);
@@ -581,23 +577,10 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
 
-    const auto celdeg = di.cell_degree();
-    const auto facdeg = di.face_degree();
-    const auto recdeg = di.face_degree();
-
-    auto cbas_s = make_scalar_monomial_basis(msh, cl, recdeg);
-
-    const auto rbs = scalar_basis_size(recdeg, Mesh::dimension);
-    const auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
-    const auto fbs = vector_basis_size(facdeg, Mesh::dimension - 1, Mesh::dimension);
-
-    const auto num_faces = howmany_faces(msh, cl);
+    auto cbas_s = make_scalar_monomial_basis(msh, cl, di.face_degree());
 
     const auto dr_lhs = make_mass_matrix(msh, cl, cbas_s);
     const auto dr_rhs = make_hho_divergence_reconstruction_rhs(msh, cl, di);
-
-    assert(dr_lhs.rows() == rbs && dr_lhs.cols() == rbs);
-    assert(dr_rhs.rows() == rbs && dr_rhs.cols() == cbs + num_faces * fbs);
 
     matrix_type oper = dr_lhs.ldlt().solve(dr_rhs);
     matrix_type data = dr_rhs.transpose() * oper;
@@ -668,7 +651,6 @@ make_scalar_hdg_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
-    typedef Matrix<T, Dynamic, 1>       vector_type;
 
     const auto celdeg = di.cell_degree();
     const auto facdeg = di.face_degree();
@@ -728,7 +710,6 @@ make_scalar_dg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
-    typedef Matrix<T, Dynamic, 1>       vector_type;
 
     const auto celdeg = di.cell_degree();
     const auto facdeg = di.face_degree();
@@ -955,7 +936,6 @@ make_vector_hho_stabilization(const Mesh&                                       
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
-    typedef Matrix<T, Dynamic, 1>       vector_type;
 
     const auto recdeg = di.reconstruction_degree();
     const auto celdeg = di.cell_degree();
@@ -1658,7 +1638,6 @@ public:
                     const vector_type&              solution,
                     const Function&                 dirichlet_bf)
     {
-        const auto facdeg = di.face_degree();
         const auto fbs    = scalar_basis_size(di.face_degree(), Mesh::dimension - 1);
         const auto fcs    = faces(msh, cl);
 
@@ -1700,7 +1679,6 @@ public:
                     const boundary_type&            bnd,
                     const vector_type&              solution)
     {
-        const auto facdeg = di.face_degree();
         const auto fbs    = scalar_basis_size(di.face_degree(), Mesh::dimension - 1);
         const auto fcs    = faces(msh, cl);
 
@@ -2676,9 +2654,6 @@ class assembler_mechanics
                auto       eidj = find_element_id(msh.faces_begin(), msh.faces_end(), fcj);
                if (!eidj.first) throw std::invalid_argument("This is a bug: face not found");
 
-               const auto face_idj                  = eidj.second;
-               const bool fcj_is_dirichlet_boundary = bnd.is_dirichlet_face(face_idj);
-
                matrix_type mat_Fj =
                  lc.first.block(face_j * num_face_dofs, pos, num_face_dofs, num_face_dofs);
 
@@ -3146,9 +3121,6 @@ class assembler_mechanics
                const auto fcj  = fcs[face_j];
                auto       eidj = find_element_id(msh.faces_begin(), msh.faces_end(), fcj);
                if (!eidj.first) throw std::invalid_argument("This is a bug: face not found");
-
-               const auto face_idj                  = eidj.second;
-               const bool fcj_is_dirichlet_boundary = bnd.is_dirichlet_face(face_idj);
 
                matrix_type mat_Fj =
                  lc.first.block(face_j * num_face_dofs, pos, num_face_dofs, num_face_dofs);
