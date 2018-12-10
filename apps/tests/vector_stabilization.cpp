@@ -60,8 +60,8 @@ struct test_functor
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            auto gr = disk::make_hho_vector_laplacian(msh, cl, hdi);
-            auto stab = disk::make_hho_vector_stabilization(msh, cl, gr.first, hdi);
+            auto gr = disk::make_vector_hho_laplacian(msh, cl, hdi);
+            auto stab = disk::make_vector_hho_stabilization(msh, cl, gr.first, hdi);
 
             size_t rec_size = disk::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
 

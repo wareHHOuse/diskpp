@@ -425,8 +425,8 @@ class hierarchical_contact_solver
                 hho_vector  u_full  = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
 
                 auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-                auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-                auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+                auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+                auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
                 hho_vector Lh  = make_rhs(msh, cl, cb, f, hdi.cell_degree());
                 hho_matrix Ah  = gr.second + stab;
@@ -446,7 +446,7 @@ class hierarchical_contact_solver
                 hho_vector b = -(Ah - Anitsche) * u_full - Bnegative;
                 b.block(0, 0, cbs, 1) += Lh;
 
-                const auto sc = make_static_condensation_scalar(msh, cl, hdi, A, b);
+                const auto sc = make_scalar_static_condensation(msh, cl, hdi, A, b);
                 assembler.assemble(msh, cl, bnd, sc.first, sc.second);
                 cl_count++;
             }
@@ -490,8 +490,8 @@ class hierarchical_contact_solver
                 hho_vector  u_full = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
 
                 auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-                auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-                auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+                auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+                auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
                 hho_vector Lh  = make_rhs(msh, cl, cb, f, hdi.cell_degree());
                 hho_matrix Ah  = gr.second + stab;
@@ -514,7 +514,7 @@ class hierarchical_contact_solver
                 hho_vector cell_rhs = b.block(0, 0, cbs, 1);
                 hho_vector du_faces = assembler.take_local_data(msh, cl, bnd, dsol);
 
-                hho_vector du_full = make_static_decondensation_scalar(msh, cl, hdi, A, cell_rhs, du_faces);
+                hho_vector du_full = make_scalar_static_decondensation(msh, cl, hdi, A, cell_rhs, du_faces);
 
                 diff_sol.block(cell_ofs, 0, num_total_dofs ,1) = du_full;
 
@@ -574,7 +574,7 @@ public:
         size_t sol_cl_count = 0;
         for (auto& sol_cl : sol_msh)
         {
-            auto gr = make_hho_scalar_laplacian(sol_msh, sol_cl, hdi);
+            auto gr = make_scalar_hho_laplacian(sol_msh, sol_cl, hdi);
 
             auto cell_ofs = offset_vector.at(sol_cl_count);
             auto num_total_dofs = num_cell_dofs + 3 * num_face_dofs;

@@ -181,7 +181,7 @@ project_function(const Mesh&                      msh,
 template<typename Mesh>
 std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
              Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
-make_hho_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
                           const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
@@ -239,7 +239,7 @@ namespace priv {
 template<typename Mesh, typename GradBasis>
 std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
           Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
-make_hho_gradrec_vector_impl(const Mesh&                     msh,
+make_vector_hho_gradrec_impl(const Mesh&                     msh,
                              const typename Mesh::cell_type& cl,
                              const hho_degree_info&          di,
                              const GradBasis&                gb)
@@ -305,23 +305,23 @@ make_hho_gradrec_vector_impl(const Mesh&                     msh,
 template<typename Mesh>
 std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
           Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
-make_hho_gradrec_vector(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+make_vector_hho_gradrec(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
     const auto graddeg = di.grad_degree();
     const auto gb      = make_vector_monomial_basis(msh, cl, graddeg);
 
-    return priv::make_hho_gradrec_vector_impl(msh, cl, di, gb);
+    return priv::make_vector_hho_gradrec_impl(msh, cl, di, gb);
 }
 
 template<typename Mesh, typename TensorField>
 std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
           Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
-make_hho_gradrec_vector(const Mesh&                     msh,
+make_vector_hho_gradrec(const Mesh&                     msh,
                         const typename Mesh::cell_type& cl,
                         const hho_degree_info&          di,
                         const TensorField&              mfield)
 {
-    const auto gradrec = make_hho_gradrec_vector(msh, cl, di);
+    const auto gradrec = make_vector_hho_gradrec(msh, cl, di);
 
     const auto graddeg = di.grad_degree();
     const auto gb      = make_vector_monomial_basis(msh, cl, graddeg);
@@ -335,23 +335,23 @@ make_hho_gradrec_vector(const Mesh&                     msh,
 template<typename Mesh>
 std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
           Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
-make_hho_gradrec_RT_vector(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+make_vector_hho_gradrec_RT(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
     const auto graddeg = di.grad_degree();
     const auto gb      = make_vector_monomial_basis_RT(msh, cl, graddeg);
 
-    return make_hho_gradrec_vector_impl(msh, cl, di, gb);
+    return make_vector_hho_gradrec_impl(msh, cl, di, gb);
 }
 
 template<typename Mesh, typename TensorField>
 std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
           Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
-make_hho_gradrec_RT_vector(const Mesh&                     msh,
+make_vector_hho_gradrec_RT(const Mesh&                     msh,
                            const typename Mesh::cell_type& cl,
                            const hho_degree_info&          di,
                            const TensorField&              mfield)
 {
-    const auto gradrec_RT = make_hho_gradrec_RT_vector(msh, cl, di);
+    const auto gradrec_RT = make_vector_hho_gradrec_RT(msh, cl, di);
 
     const auto graddeg = di.grad_degree();
     const auto gb      = make_vector_monomial_basis_RT(msh, cl, graddeg);
@@ -376,7 +376,7 @@ nb_lag(const size_t dim)
 template<typename Mesh>
 std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
              Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
-make_hho_vector_symmetric_laplacian(const Mesh& msh,
+make_vector_hho_symmetric_laplacian(const Mesh& msh,
                           const typename Mesh::cell_type& cl,
                           const hho_degree_info& di)
 {
@@ -470,7 +470,7 @@ make_hho_vector_symmetric_laplacian(const Mesh& msh,
 template<typename Mesh>
 std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
           Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
-make_hho_sym_gradrec_matrix(const Mesh&                     msh,
+make_matrix_symmetric_gradrec(const Mesh&                     msh,
                         const typename Mesh::cell_type& cl,
                         const hho_degree_info&          di)
 {
@@ -594,7 +594,7 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
     const auto num_faces = howmany_faces(msh, cl);
 
     const auto dr_lhs = make_mass_matrix(msh, cl, cbas_s);
-    const auto dr_rhs = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
+    const auto dr_rhs = make_hho_divergence_reconstruction_rhs(msh, cl, di);
 
     assert(dr_lhs.rows() == rbs && dr_lhs.cols() == rbs);
     assert(dr_rhs.rows() == rbs && dr_rhs.cols() == cbs + num_faces * fbs);
@@ -607,7 +607,7 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
 
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_hho_divergence_reconstruction_stokes_rhs(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_hho_divergence_reconstruction_rhs(const Mesh& msh, const typename Mesh::cell_type& cl,
                                    const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
@@ -664,7 +664,7 @@ make_hho_divergence_reconstruction_stokes_rhs(const Mesh& msh, const typename Me
 // we compute the stabilisation 1/h_F(uF-pi^k_F(uT), vF-pi^k_F(vT))_F
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_hdg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+make_scalar_hdg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -724,7 +724,7 @@ make_hdg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
 // we compute the stabilisation 1/h_F(uF-uT, vF-vT)_F
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_dg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+make_scalar_dg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -781,7 +781,7 @@ make_dg_scalar_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
 
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_hho_scalar_stabilization(const Mesh&                                                     msh,
+make_scalar_hho_stabilization(const Mesh&                                                     msh,
                               const typename Mesh::cell_type&                                 cl,
                               const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& reconstruction,
                               const hho_degree_info&                                          di)
@@ -859,7 +859,7 @@ make_hho_scalar_stabilization(const Mesh&                                       
 
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_hho_scalar_stabilization_2(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_scalar_hho_stabilization_2(const Mesh& msh, const typename Mesh::cell_type& cl,
                                 const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> reconstruction,
                                 const hho_degree_info& di)
 {
@@ -948,7 +948,7 @@ make_hho_scalar_stabilization_2(const Mesh& msh, const typename Mesh::cell_type&
 
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_hho_vector_stabilization(const Mesh&                                                     msh,
+make_vector_hho_stabilization(const Mesh&                                                     msh,
                               const typename Mesh::cell_type&                                 cl,
                               const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& reconstruction,
                               const hho_degree_info&                                          di)
@@ -1132,7 +1132,7 @@ static_decondensation_impl(const Mesh&                                          
 // static condensation for primal scalar problem like diffusion
 template<typename Mesh, typename T>
 auto
-make_static_condensation_scalar_withMatrix(const Mesh&                                                 msh,
+make_scalar_static_condensation_withMatrix(const Mesh&                                                 msh,
                                       const typename Mesh::cell_type&                                  cl,
                                       const hho_degree_info&                                           hdi,
                                       const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
@@ -1146,19 +1146,19 @@ make_static_condensation_scalar_withMatrix(const Mesh&                          
 
 template<typename Mesh, typename T>
 auto
-make_static_condensation_scalar(const Mesh&                                                 msh,
+make_scalar_static_condensation(const Mesh&                                                 msh,
                            const typename Mesh::cell_type&                                  cl,
                            const hho_degree_info&                                           hdi,
                            const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
                            const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              rhs)
 {
-    return std::get<0>(make_static_condensation_scalar_withMatrix(msh, cl, hdi, lhs, rhs));
+    return std::get<0>(make_scalar_static_condensation_withMatrix(msh, cl, hdi, lhs, rhs));
 }
 
 // static decondensation for primal scalar problem
 template<typename Mesh, typename T>
 Eigen::Matrix<T, Eigen::Dynamic, 1>
-make_static_decondensation_scalar(const Mesh&                                                 msh,
+make_scalar_static_decondensation(const Mesh&                                                 msh,
                              const typename Mesh::cell_type&                                  cl,
                              const hho_degree_info                                            hdi,
                              const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
@@ -1174,7 +1174,7 @@ make_static_decondensation_scalar(const Mesh&                                   
 // static decondensation for primal scalar problem
 template<typename T>
 Eigen::Matrix<T, Eigen::Dynamic, 1>
-make_static_decondensation_scalar_withMatrix(const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& AL,
+make_scalar_static_decondensation_withMatrix(const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& AL,
                                              const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              bL,
                                              const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              solF)
 {
@@ -1190,7 +1190,7 @@ make_static_decondensation_scalar_withMatrix(const typename Eigen::Matrix<T, Eig
 // static condensation for primal vectorial problem like elasticity
 template<typename Mesh, typename T>
 auto
-make_static_condensation_vector_withMatrix(const Mesh&                                                 msh,
+make_vector_static_condensation_withMatrix(const Mesh&                                                 msh,
                                       const typename Mesh::cell_type&                                  cl,
                                       const hho_degree_info&                                           hdi,
                                       const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
@@ -1204,19 +1204,19 @@ make_static_condensation_vector_withMatrix(const Mesh&                          
 
 template<typename Mesh, typename T>
 auto
-make_static_condensation_vector(const Mesh&                                                 msh,
+make_vector_static_condensation(const Mesh&                                                 msh,
                            const typename Mesh::cell_type&                                  cl,
                            const hho_degree_info&                                           hdi,
                            const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
                            const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              rhs)
 {
-    return std::get<0>(make_static_condensation_vector_withMatrix(msh, cl, hdi, lhs, rhs));
+    return std::get<0>(make_vector_static_condensation_withMatrix(msh, cl, hdi, lhs, rhs));
 }
 
 // static decondensation for primal vector problem
 template<typename Mesh, typename T>
 Eigen::Matrix<T, Eigen::Dynamic, 1>
-make_static_decondensation_vector(const Mesh&                                                 msh,
+make_vector_static_decondensation(const Mesh&                                                 msh,
                              const typename Mesh::cell_type&                                  cl,
                              const hho_degree_info                                            hdi,
                              const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
@@ -1232,7 +1232,7 @@ make_static_decondensation_vector(const Mesh&                                   
 // static decondensation for primal vector problem
 template<typename T>
 Eigen::Matrix<T, Eigen::Dynamic, 1>
-make_static_decondensation_vector_withMatrix(const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& AL,
+make_vector_static_decondensation_withMatrix(const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& AL,
                                              const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              bL,
                                              const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              solF)
 {
@@ -1775,9 +1775,9 @@ make_hho_stokes(const Mesh& msh, const typename Mesh::cell_type& cl,
                 const hho_degree_info& hdi, const bool& use_sym_grad)
 {
     if(use_sym_grad)
-        return make_hho_vector_symmetric_laplacian(msh, cl, hdi);
+        return make_vector_hho_symmetric_laplacian(msh, cl, hdi);
     else
-        return make_hho_vector_laplacian(msh, cl, hdi);
+        return make_vector_hho_laplacian(msh, cl, hdi);
 }
 
 template<typename Mesh>
@@ -1786,9 +1786,9 @@ make_hlow_stokes(const Mesh& msh, const typename Mesh::cell_type& cl,
                 const hho_degree_info& hdi, const bool& use_sym_grad)
 {
     if(use_sym_grad)
-        return make_hho_sym_gradrec_matrix(msh, cl, hdi);
+        return make_matrix_symmetric_gradrec(msh, cl, hdi);
     else
-        return make_hho_gradrec_matrix(msh, cl, hdi);
+        return make_marix_hho_gradrec(msh, cl, hdi);
 }
 
 
@@ -3736,20 +3736,17 @@ compute_grad_matrix(const Mesh&                                           msh,
 template<typename Mesh>
 std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
           Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
-make_hho_vector_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
+make_vector_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
 {
-    const auto hho_scalar_laplacian = make_hho_scalar_laplacian(msh, cl, hdi);
+    const auto hho_scalar_laplacian = make_scalar_hho_laplacian(msh, cl, hdi);
 
-    const auto oper = priv::compute_grad_vector(msh, cl, hdi, hho_scalar_laplacian.first);
-    const auto data = priv::compute_lhs_vector(msh, cl, hdi, hho_scalar_laplacian.second);
-
-    return std::make_pair(oper, data);
+    return make_vector_hho_laplacian(msh, cl, hdi, hho_scalar_laplacian);
 }
 
 template<typename Mesh>
 std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
           Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
-make_hho_vector_laplacian(const Mesh&                     msh,
+make_vector_hho_laplacian(const Mesh&                     msh,
                           const typename Mesh::cell_type& cl,
                           const hho_degree_info&          hdi,
                           const std::pair < Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
@@ -3763,18 +3760,18 @@ make_hho_vector_laplacian(const Mesh&                     msh,
 
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_hdg_vector_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+make_vector_hdg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
-    const auto hdg_scalar_stab = make_hdg_scalar_stabilization(msh, cl, di);
+    const auto hdg_scalar_stab = make_scalar_hdg_stabilization(msh, cl, di);
 
     return priv::compute_lhs_vector(msh, cl, di, hdg_scalar_stab);
 }
 
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_dg_vector_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+make_vector_dg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
-    const auto dg_scalar_stab = make_dg_scalar_stabilization(msh, cl, di);
+    const auto dg_scalar_stab = make_scalar_dg_stabilization(msh, cl, di);
 
     return priv::compute_lhs_vector(msh, cl, di, dg_scalar_stab);
 }
@@ -3782,11 +3779,11 @@ make_dg_vector_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
 // doesn't work for symmetric gradient
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_hho_vector_stabilization_optim(const Mesh& msh, const typename Mesh::cell_type& cl,
+make_vector_hho_stabilization_optim(const Mesh& msh, const typename Mesh::cell_type& cl,
                               const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& reconstruction_scalar,
                               const hho_degree_info& hdi)
 {
-    const auto hho_scalar_stab = make_hho_scalar_stabilization(msh, cl, reconstruction_scalar, hdi);
+    const auto hho_scalar_stab = make_scalar_hho_stabilization(msh, cl, reconstruction_scalar, hdi);
 
     return priv::compute_lhs_vector(msh, cl, hdi, hho_scalar_stab);
 }
@@ -3795,10 +3792,10 @@ make_hho_vector_stabilization_optim(const Mesh& msh, const typename Mesh::cell_t
 template<typename Mesh>
 std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
           Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
-make_hho_gradrec_matrix(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
+make_marix_hho_gradrec(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
 
 {
-    const auto hho_gradrec_vector = make_hho_gradrec_vector(msh, cl, hdi);
+    const auto hho_gradrec_vector = make_vector_hho_gradrec(msh, cl, hdi);
     const auto lhs                = priv::compute_lhs_vector(msh, cl, hdi, hho_gradrec_vector.second);
     const auto oper               = priv::compute_grad_matrix(msh, cl, hdi, hho_gradrec_vector.first);
 
@@ -3809,7 +3806,7 @@ make_hho_gradrec_matrix(const Mesh& msh, const typename Mesh::cell_type& cl, con
 template<typename Mesh>
 std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
           Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
-make_hho_gradrec_matrix(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+make_marix_hho_gradrec(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;

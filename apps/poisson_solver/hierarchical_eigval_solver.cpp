@@ -237,8 +237,8 @@ class hierarchical_eigval_solver
         size_t elem_i = 0;
         for (auto& cl : msh)
         {
-            auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-            dynamic_matrix<T> stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+            auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+            dynamic_matrix<T> stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
             auto              cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
             dynamic_matrix<T> mass   = make_mass_matrix(msh, cl, cb);
@@ -471,7 +471,7 @@ public:
         for (auto& sol_cl : sol_msh)
         {
             hho_degree_info hdi(degree);
-            auto gr = make_hho_scalar_laplacian(sol_msh, sol_cl, hdi);
+            auto gr = make_scalar_hho_laplacian(sol_msh, sol_cl, hdi);
 
             dynamic_vector<T> hho_evec = dynamic_vector<T>::Zero(num_cell_dofs + 3*num_face_dofs);
             hho_evec.head(num_cell_dofs) = hho_exp_sol.block(sol_cell_i*num_cell_dofs, 0, num_cell_dofs, 1);

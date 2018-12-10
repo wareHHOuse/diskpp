@@ -166,7 +166,7 @@ class NewtonRaphson_step_plasticity
             }
             else
             {
-                const auto gradrec_full = make_hho_sym_gradrec_matrix(m_msh, cl, m_hdi);
+                const auto gradrec_full = make_matrix_symmetric_gradrec(m_msh, cl, m_hdi);
                 GT                      = gradrec_full.first;
             }
             tc.toc();
@@ -211,8 +211,8 @@ class NewtonRaphson_step_plasticity
                     {
                         case HHO:
                         {
-                            const auto recons   = make_hho_vector_symmetric_laplacian(m_msh, cl, m_hdi);
-                            const auto stab_HHO = make_hho_vector_stabilization(m_msh, cl, recons.first, m_hdi);
+                            const auto recons   = make_vector_hho_symmetric_laplacian(m_msh, cl, m_hdi);
+                            const auto stab_HHO = make_vector_hho_stabilization(m_msh, cl, recons.first, m_hdi);
                             assert(elem.K_int.rows() == stab_HHO.rows());
                             assert(elem.K_int.cols() == stab_HHO.cols());
                             assert(elem.RTF.rows() == (stab_HHO * m_solution_data.at(cell_i)).rows());
@@ -223,7 +223,7 @@ class NewtonRaphson_step_plasticity
                             break;
                         }
                         case HDG: {
-                            const auto stab_HDG = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
+                            const auto stab_HDG = make_vector_hdg_stabilization(m_msh, cl, m_hdi);
                             assert(elem.K_int.rows() == stab_HDG.rows());
                             assert(elem.K_int.cols() == stab_HDG.cols());
                             assert(elem.RTF.rows() == (stab_HDG * m_solution_data.at(cell_i)).rows());
@@ -244,7 +244,7 @@ class NewtonRaphson_step_plasticity
 
             // Static Condensation
             tc.tic();
-            const auto scnp = make_static_condensation_vector_withMatrix(m_msh, cl, m_hdi, lhs, rhs);
+            const auto scnp = make_vector_static_condensation_withMatrix(m_msh, cl, m_hdi, lhs, rhs);
 
             // for (size_t k = 0; k < scnp.first.rows(); k++)
             // {

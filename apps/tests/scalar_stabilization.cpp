@@ -62,8 +62,8 @@ struct test_functor_hho
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            auto gr = disk::make_hho_scalar_laplacian(msh, cl, hdi);
-            auto stab = disk::make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+            auto gr = disk::make_scalar_hho_laplacian(msh, cl, hdi);
+            auto stab = disk::make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
             Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
 
@@ -100,7 +100,7 @@ struct test_functor_hdg
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            auto stab = disk::make_hdg_scalar_stabilization(msh, cl, hdi);
+            auto stab = disk::make_scalar_hdg_stabilization(msh, cl, hdi);
 
             Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
 
@@ -137,7 +137,7 @@ struct test_functor_dg
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            auto stab = disk::make_dg_scalar_stabilization(msh, cl, hdi);
+            auto stab = disk::make_scalar_dg_stabilization(msh, cl, hdi);
 
             Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
 

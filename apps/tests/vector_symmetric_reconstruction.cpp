@@ -62,7 +62,7 @@ struct test_functor
         for (auto& cl : msh)
         {
             vector_type proj = disk::project_function(msh, cl, hdi, f, 2);
-            auto gr = disk::make_hho_vector_symmetric_laplacian(msh, cl, hdi);
+            auto gr = disk::make_vector_hho_symmetric_laplacian(msh, cl, hdi);
 
             size_t rec_size = disk::vector_basis_size(hdi.reconstruction_degree(), Mesh::dimension, Mesh::dimension);
 

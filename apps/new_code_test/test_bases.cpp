@@ -116,7 +116,7 @@ test_bases(const Mesh& msh)
 
         project_function(msh, cl, hdi, f1);
 
-        make_hho_scalar_laplacian(msh, cl, hdi);
+        make_scalar_hho_laplacian(msh, cl, hdi);
         */
 
     }
@@ -139,10 +139,10 @@ test_bases(const Mesh& msh)
 
         Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, v3);
 
-        auto gr = make_hho_vector_laplacian(msh, cl, hdi);
+        auto gr = make_vector_hho_laplacian(msh, cl, hdi);
 
         Matrix<scalar_type, Dynamic, Dynamic> stab;
-        stab = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
+        stab = make_vector_hho_stabilization(msh, cl, gr.first, hdi);
 
 
         auto dr = make_hho_divergence_reconstruction(msh, cl, hdi);

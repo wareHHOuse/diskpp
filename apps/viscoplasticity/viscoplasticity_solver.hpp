@@ -269,7 +269,7 @@ public:
             vector_type diff_vel = svel - pvel;
             auto gr = disk::make_hho_stokes(msh, cl, di, use_sym_grad);
             matrix_type stab;
-            stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
+            stab = make_vector_hho_stabilization(msh, cl, gr.first, di);
             auto G = disk::make_hlow_stokes(msh, cl, di, use_sym_grad);
 
             matrix_type B = factor * (viscosity*G.second + viscosity*stab);
@@ -424,8 +424,8 @@ public:
         {
             auto G  = disk::make_hlow_stokes(msh, cl, di, use_sym_grad);
             auto gr = disk::make_hho_stokes(msh, cl, di, use_sym_grad);
-            matrix_type stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
-            auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
+            matrix_type stab = make_vector_hho_stabilization(msh, cl, gr.first, di);
+            auto dr = make_hho_divergence_reconstruction_rhs(msh, cl, di);
 
             matrix_type A = factor *(alpha * G.second + viscosity * stab);
 

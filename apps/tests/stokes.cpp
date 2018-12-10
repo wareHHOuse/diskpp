@@ -102,12 +102,12 @@ run_stokes(const Mesh& msh, size_t degree)
 
     for (auto cl : msh)
     {
-        auto gr = make_hho_vector_laplacian(msh, cl, hdi);
+        auto gr = make_vector_hho_laplacian(msh, cl, hdi);
 
         Matrix<scalar_type, Dynamic, Dynamic> stab;
-        stab = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
+        stab = make_vector_hho_stabilization(msh, cl, gr.first, hdi);
 
-        auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, hdi);
+        auto dr = make_hho_divergence_reconstruction_rhs(msh, cl, hdi);
 
         auto face_basis = disk::make_vector_monomial_basis(msh, cl, hdi.face_degree());
 

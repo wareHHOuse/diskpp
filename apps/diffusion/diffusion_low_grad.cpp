@@ -115,13 +115,13 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
     for (auto& cl : msh)
     {
         auto cb   = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-        auto G    = make_hho_gradrec_vector(msh, cl, hdi);
-        auto gr   = make_hho_scalar_laplacian(msh, cl, hdi);
-        auto stab = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+        auto G    = make_vector_hho_gradrec(msh, cl, hdi);
+        auto gr   = make_scalar_hho_laplacian(msh, cl, hdi);
+        auto stab = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
         auto rhs  = make_rhs(msh, cl, cb, rhs_fun);
 
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = G.second + stab;
-        const auto sc  = make_static_condensation_scalar(msh, cl, hdi, A, rhs);
+        const auto sc  = make_scalar_static_condensation(msh, cl, hdi, A, rhs);
         assembler.assemble(msh, cl, sc.first, sc.second, sol_fun);
     }
 
@@ -148,9 +148,9 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
     for (auto& cl : msh)
     {
         auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-        auto G      = make_hho_gradrec_vector(msh, cl, hdi);
-        auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-        auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+        auto G      = make_vector_hho_gradrec(msh, cl, hdi);
+        auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+        auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
         auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
 
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = G.second + stab;
@@ -159,7 +159,7 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
             assembler.take_local_data(msh, cl, sol, sol_fun);
 
         Eigen::Matrix<T, Eigen::Dynamic, 1> fullsol =
-            make_static_decondensation_scalar(msh, cl, hdi, A, rhs, locsol);
+            make_scalar_static_decondensation(msh, cl, hdi, A, rhs, locsol);
 
         Eigen::Matrix<T, Eigen::Dynamic, 1> realsol = project_function(msh, cl, hdi, sol_fun);
 

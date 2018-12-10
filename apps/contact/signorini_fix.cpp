@@ -77,8 +77,8 @@ fix_point_solver_faces(const Mesh& msh,
         {
             auto num_total_dofs = cbs + howmany_faces(msh,cl) * fbs;
             auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-            auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-            auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+            auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+            auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
             matrix_type Ah  = gr.second + stab;
             vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
@@ -99,7 +99,7 @@ fix_point_solver_faces(const Mesh& msh,
             vector_type b = - Bnegative;
             b.block(0, 0, cbs, 1) += Lh;
 
-            auto sc = make_static_condensation_scalar(msh, cl, hdi, A, b);
+            auto sc = make_scalar_static_condensation(msh, cl, hdi, A, b);
             assembler.assemble(msh, cl, bnd, sc.first, sc.second);
             cl_count++;
         }
@@ -129,8 +129,8 @@ fix_point_solver_faces(const Mesh& msh,
         {
             auto num_total_dofs = cbs + howmany_faces(msh,cl) * fbs;
             auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-            auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-            auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+            auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+            auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
             matrix_type Ah  = gr.second + stab;
             vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
@@ -151,7 +151,7 @@ fix_point_solver_faces(const Mesh& msh,
             vector_type cell_rhs = Lh - Bnegative.block(0, 0, cbs, 1);
 
             vector_type u_faces  = assembler.take_local_data(msh, cl, bnd, sol);
-            vector_type u_full   = make_static_decondensation_scalar(msh, cl, hdi, A, cell_rhs, u_faces);
+            vector_type u_full   = make_scalar_static_decondensation(msh, cl, hdi, A, cell_rhs, u_faces);
 
             full_sol.block(cell_ofs, 0, num_total_dofs, 1) = u_full;
             vector_type diff = u_full - u_full_old;
@@ -237,9 +237,9 @@ fix_point_solver_cells(const Mesh& msh,
                 vector_type u_full = full_sol_old.block(cell_ofs, 0, num_total_dofs, 1);
 
                 auto gr   = make_hho_contact_scalar_laplacian(msh, cl, hdi, bnd);
-                auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
-                //auto gr    = make_hho_scalar_laplacian(msh, cl, hdi);
-                //auto stab  = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+                auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
+                //auto gr    = make_scalar_hho_laplacian(msh, cl, hdi);
+                //auto stab  = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
                 matrix_type Ah = gr.second + stab;
                 vector_type Lh = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
@@ -251,19 +251,19 @@ fix_point_solver_cells(const Mesh& msh,
                 vector_type b = - Bnegative;
                 b.block(0, 0, cbs, 1) += Lh;
 
-                const auto sc = make_static_condensation_scalar(msh, cl, hdi, A, b);
+                const auto sc = make_scalar_static_condensation(msh, cl, hdi, A, b);
                 assembler.assemble(msh, cl, bnd, sc.first, sc.second);
             }
             else
             {
-                auto gr   = make_hho_scalar_laplacian(msh, cl, hdi);
-                auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
-                //auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+                auto gr   = make_scalar_hho_laplacian(msh, cl, hdi);
+                auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
+                //auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
                 vector_type Lh = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
                 matrix_type Ah = gr.second + stab;
 
-                const auto sc = make_static_condensation_scalar(msh, cl, hdi, Ah, Lh);
+                const auto sc = make_scalar_static_condensation(msh, cl, hdi, Ah, Lh);
                 assembler.assemble(msh, cl, bnd, sc.first, sc.second);
             }
             cl_count++;
@@ -300,10 +300,10 @@ fix_point_solver_cells(const Mesh& msh,
             if (is_contact_vector.at(cl_count))
             {
                 auto gr   = make_hho_contact_scalar_laplacian(msh, cl, hdi, bnd);
-                auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
+                auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
 
-                //auto gr   = make_hho_scalar_laplacian(msh, cl, hdi);
-                //auto stab = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+                //auto gr   = make_scalar_hho_laplacian(msh, cl, hdi);
+                //auto stab = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
                 matrix_type Ah = gr.second + stab;
                 vector_type Lh = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
@@ -315,7 +315,7 @@ fix_point_solver_cells(const Mesh& msh,
                 vector_type cell_rhs = Lh - Bnegative.block(0, 0, cbs, 1);
 
                 vector_type u_faces  = assembler.take_local_data(msh, cl, bnd, sol);
-                vector_type u_full   = make_static_decondensation_scalar(msh, cl, hdi, A, cell_rhs, u_faces);
+                vector_type u_full   = make_scalar_static_decondensation(msh, cl, hdi, A, cell_rhs, u_faces);
 
                 vector_type diff = u_full - u_full_old;
                 error += diff.dot(A * diff);
@@ -323,15 +323,15 @@ fix_point_solver_cells(const Mesh& msh,
             }
             else
             {
-                auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-                auto stab   = make_hdg_scalar_stabilization(msh, cl, hdi);
-                //auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+                auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+                auto stab   = make_scalar_hdg_stabilization(msh, cl, hdi);
+                //auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
                 matrix_type Ah  = gr.second + stab;
                 vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
 
                 vector_type u_faces = assembler.take_local_data(msh, cl, bnd, sol);
-                vector_type u_full  = make_static_decondensation_scalar(msh, cl, hdi, Ah, Lh, u_faces);
+                vector_type u_full  = make_scalar_static_decondensation(msh, cl, hdi, Ah, Lh, u_faces);
 
                 vector_type diff = u_full - u_full_old;
                 error += diff.dot(Ah * diff);

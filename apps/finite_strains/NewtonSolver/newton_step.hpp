@@ -164,7 +164,7 @@ class NewtonRaphson_step_finite_strains
             }
             else
             {
-                const auto gradrec_full = make_hho_gradrec_matrix(m_msh, cl, m_hdi);
+                const auto gradrec_full = make_marix_hho_gradrec(m_msh, cl, m_hdi);
                 GT                      = gradrec_full.first;
             }
             tc.toc();
@@ -209,9 +209,9 @@ class NewtonRaphson_step_finite_strains
                     {
                         case HHO:
                         {
-                            const auto recons_scalar = make_hho_scalar_laplacian(m_msh, cl, m_hdi);
+                            const auto recons_scalar = make_scalar_hho_laplacian(m_msh, cl, m_hdi);
                             const auto stab_HHO =
-                              make_hho_vector_stabilization_optim(m_msh, cl, recons_scalar.first, m_hdi);
+                              make_vector_hho_stabilization_optim(m_msh, cl, recons_scalar.first, m_hdi);
                             assert(elem.K_int.rows() == stab_HHO.rows());
                             assert(elem.K_int.cols() == stab_HHO.cols());
                             assert(elem.RTF.rows() == stab_HHO.rows());
@@ -223,7 +223,7 @@ class NewtonRaphson_step_finite_strains
                         }
                         case HDG:
                         {
-                            const auto stab_HDG = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
+                            const auto stab_HDG = make_vector_hdg_stabilization(m_msh, cl, m_hdi);
                             assert(elem.K_int.rows() == stab_HDG.rows());
                             assert(elem.K_int.cols() == stab_HDG.cols());
                             assert(elem.RTF.rows() == stab_HDG.rows());
@@ -235,7 +235,7 @@ class NewtonRaphson_step_finite_strains
                         }
                         case DG:
                         {
-                            const auto stab_DG = make_dg_vector_stabilization(m_msh, cl, m_hdi);
+                            const auto stab_DG = make_vector_dg_stabilization(m_msh, cl, m_hdi);
                             assert(elem.K_int.rows() == stab_DG.rows());
                             assert(elem.K_int.cols() == stab_DG.cols());
                             assert(elem.RTF.rows() == stab_DG.rows());
@@ -256,7 +256,7 @@ class NewtonRaphson_step_finite_strains
 
             // Static Condensation
             tc.tic();
-            const auto scnp = make_static_condensation_vector_withMatrix(m_msh, cl, m_hdi, lhs, rhs);
+            const auto scnp = make_vector_static_condensation_withMatrix(m_msh, cl, m_hdi, lhs, rhs);
 
             m_AL[cell_i] = std::get<1>(scnp);
             m_bL[cell_i] = std::get<2>(scnp);

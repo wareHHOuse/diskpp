@@ -110,7 +110,7 @@ compute_errors(const Mesh& msh,
         Matrix<scalar_type, Dynamic, 1> diff_vel = svel - p;
         auto gr = disk::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
-        stab = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
+        stab = make_vector_hho_stabilization(msh, cl, gr.first, hdi);
         error_vel += diff_vel.dot(factor * (gr.second + stab)*diff_vel);
     }
 
@@ -183,8 +183,8 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     {
         auto gr = disk::make_hho_stokes(msh, cl, hdi, use_sym_grad);
         Matrix<scalar_type, Dynamic, Dynamic> stab;
-        stab = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
-        auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, hdi);
+        stab = make_vector_hho_stabilization(msh, cl, gr.first, hdi);
+        auto dr = make_hho_divergence_reconstruction_rhs(msh, cl, hdi);
         auto cell_basis = disk::make_vector_monomial_basis(msh, cl, hdi.cell_degree());
         auto rhs = make_rhs(msh, cl, cell_basis, rhs_fun);
         assembler.assemble(msh, cl, factor * (gr.second + stab), -dr, rhs);

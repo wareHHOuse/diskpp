@@ -147,7 +147,7 @@ class plasticity_solver
         for (auto& cl : m_msh)
         {
             /////// Gradient Reconstruction /////////
-            const auto sgr = make_hho_sym_gradrec_matrix(m_msh, cl, m_hdi);
+            const auto sgr = make_matrix_symmetric_gradrec(m_msh, cl, m_hdi);
             m_gradient_precomputed.push_back(sgr.first);
 
             if (m_rp.m_stab)
@@ -156,14 +156,14 @@ class plasticity_solver
                 {
                     case HHO:
                     {
-                        const auto recons   = make_hho_vector_symmetric_laplacian(m_msh, cl, m_hdi);
-                        const auto stab_HHO = make_hho_vector_stabilization(m_msh, cl, recons.first, m_hdi);
+                        const auto recons   = make_vector_hho_symmetric_laplacian(m_msh, cl, m_hdi);
+                        const auto stab_HHO = make_vector_hho_stabilization(m_msh, cl, recons.first, m_hdi);
                         m_stab_precomputed.push_back(stab_HHO);
                         break;
                     }
                     case HDG:
                     {
-                        const auto stab_HDG = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
+                        const auto stab_HDG = make_vector_hdg_stabilization(m_msh, cl, m_hdi);
                         m_stab_precomputed.push_back(stab_HDG);
                         break;
                     }
