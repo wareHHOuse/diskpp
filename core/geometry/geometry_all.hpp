@@ -74,7 +74,7 @@ points(const Mesh& msh, const Element& elem)
     return pts;
 }
 
-/* Compute the barycenter of a cell 
+/* Compute the barycenter of a cell
  * This is crappy because it works only for simplicials and cartesian meshes
  */
 template<typename Mesh, typename Element>
@@ -85,12 +85,13 @@ barycenter(const Mesh& msh, const Element& elm)
     auto bar = std::accumulate(std::next(pts.begin()), pts.end(), pts.front());
     return bar / typename Mesh::coordinate_type( pts.size() );
 }
-    
+
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 point<T,2>
 barycenter(const Mesh<T,2,Storage>& msh, const typename Mesh<T,2,Storage>::cell_type& cl)
 {
-    T tot_meas{};
+    using std::abs;
+    T          tot_meas{};
     point<T,2> tot_bar{};
     auto pts = points(msh, cl);
     for (size_t i = 1; i < pts.size()-1; i++)
@@ -101,7 +102,7 @@ barycenter(const Mesh<T,2,Storage>& msh, const typename Mesh<T,2,Storage>::cell_
         tot_bar = tot_bar + meas*(pts[0]+pts[i]+pts[i+1]);
         tot_meas += meas;
     }
-    
+
     return tot_bar/(tot_meas*T(3));
 }
 
