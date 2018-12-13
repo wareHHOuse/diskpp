@@ -8,7 +8,7 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Karol Cascavita (C) 2018                     klcascavitam@unal.edu.co
+ * Karol Cascavita (C) 2018                     karol.cascavita@enpc.fr
  * Nicolas Pignet (C) 2018                      nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
