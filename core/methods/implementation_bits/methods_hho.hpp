@@ -262,18 +262,21 @@ make_vector_hho_gradrec_impl(const Mesh&                     msh,
     const matrix_type gr_lhs = make_mass_matrix(msh, cl, gb);
     matrix_type       gr_rhs = matrix_type::Zero(gbs, cbs + num_faces * fbs);
 
-    if (celdeg > 0)
+    // (vT, div(tau))_T
+    if (graddeg > 0)
     {
-        const auto qps = integrate(msh, cl, celdeg - 1 + graddeg);
+        const auto qps = integrate(msh, cl, celdeg + graddeg - 1);
         for (auto& qp : qps)
         {
-            const auto c_dphi = cb.eval_gradients(qp.point());
-            const auto g_phi  = gb.eval_functions(qp.point());
+            const auto c_phi = cb.eval_functions(qp.point());
+            const auto g_dphi  = gb.eval_divergences(qp.point());
+            const vector_type qp_g_dphi = qp.weight() * g_dphi;
 
-            gr_rhs.block(0, 0, gbs, cbs) += qp.weight() * priv::outer_product(c_dphi, g_phi);
+            gr_rhs.block(0, 0, gbs, cbs) -= priv::outer_product(c_phi, qp_g_dphi);
         }
     }
 
+    // (vF, tau.n)_F
     const auto fcs = faces(msh, cl);
     for (size_t i = 0; i < fcs.size(); i++)
     {
@@ -281,16 +284,14 @@ make_vector_hho_gradrec_impl(const Mesh&                     msh,
         const auto n  = normal(msh, cl, fc);
         const auto fb = make_scalar_monomial_basis(msh, fc, facdeg);
 
-        const auto qps_f = integrate(msh, fc, graddeg + std::max(facdeg, celdeg));
+        const auto qps_f = integrate(msh, fc, graddeg + facdeg);
         for (auto& qp : qps_f)
         {
-            const vector_type c_phi      = cb.eval_functions(qp.point());
             const vector_type f_phi      = fb.eval_functions(qp.point());
             const auto        g_phi      = gb.eval_functions(qp.point());
-            const vector_type qp_g_phi_n = qp.weight() * g_phi * n;
+            const vector_type qp_g_phi_n = g_phi * (qp.weight() * n);
 
             gr_rhs.block(0, cbs + i * fbs, gbs, fbs) += qp_g_phi_n * f_phi.transpose();
-            gr_rhs.block(0, 0, gbs, cbs) -= qp_g_phi_n * c_phi.transpose();
         }
     }
 
