@@ -100,7 +100,7 @@ run_hho_diffusion_nitsche_faces(const Mesh& msh,
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
     using vector_type = Matrix<T, Dynamic, 1>;
 
-    hho_degree_info hdi(ap.degree + 1, ap.degree );
+    hho_degree_info hdi(ap.degree, ap.degree );
 
     auto cbs = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
     auto rhs_fun = make_rhs_function(msh);
@@ -203,7 +203,7 @@ run_hho_diffusion_nitsche_faces(const Mesh& msh,
         vector_type fullsol =
             diffusion_static_condensation_recover(msh, cl, hdi, A, rhs, locsol);
 
-        vector_type realsol = project_function(msh, cl, hdi, sol_fun);
+        vector_type realsol = project_function(msh, cl, hdi, sol_fun, 2);
 
         auto diff = realsol - fullsol;
         H1_error += diff.dot(A*diff);
@@ -369,7 +369,7 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
             fullsol = assembler.take_local_data(msh, cl, sol);
         }
 
-        vector_type realsol = project_function(msh, cl, hdi, sol_fun);
+        vector_type realsol = project_function(msh, cl, hdi, sol_fun, 2);
 
         auto diff = realsol - fullsol;
         H1_error += diff.dot(A*diff);
