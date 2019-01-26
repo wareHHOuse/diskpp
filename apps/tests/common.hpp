@@ -445,11 +445,12 @@ std::vector< disk::cartesian_mesh<T, 2> >
 get_cartesian_2d_diskpp_meshes(void)
 {
     std::vector<std::string> meshfiles;
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-2-2.quad");
+    //meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-2-2.quad");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-4-4.quad");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-8-8.quad");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-16-16.quad");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-32-32.quad");
+    meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-64-64.quad");
 
     typedef disk::cartesian_mesh<T, 2>  mesh_type;
 
@@ -537,7 +538,8 @@ class tester
         return TestFunctor<Mesh>();
     }
 
-    void test_triangles_generic(void)
+    void
+    test_triangles_generic(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
     {
         std::cout << yellow << "Mesh under test: triangles on generic mesh";
         std::cout << nocolor << std::endl;
@@ -546,10 +548,11 @@ class tester
         auto meshes = get_triangle_generic_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er);
+        do_testing(meshes, tf, er, min_degree, max_degree);
     }
 
-    void test_polygonal_generic(void)
+    void
+    test_polygonal_generic(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
     {
         std::cout << yellow << "Mesh under test: polygons on generic mesh";
         std::cout << nocolor << std::endl;
@@ -558,10 +561,11 @@ class tester
         auto meshes = get_polygonal_generic_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er);
+        do_testing(meshes, tf, er, min_degree, max_degree);
     }
 
-    void test_triangles_netgen(void)
+    void
+    test_triangles_netgen(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
     {
         std::cout << yellow << "Mesh under test: triangles on netgen mesh";
         std::cout << nocolor << std::endl;
@@ -570,10 +574,11 @@ class tester
         auto meshes = get_triangle_netgen_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er);
+        do_testing(meshes, tf, er, min_degree, max_degree);
     }
 
-    void test_quads(void)
+    void
+    test_quads(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
     {
         std::cout << yellow << "Mesh under test: quads on generic mesh";
         std::cout << nocolor << std::endl;
@@ -582,10 +587,11 @@ class tester
         auto meshes = get_quad_generic_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er);
+        do_testing(meshes, tf, er, min_degree, max_degree);
     }
 
-    void test_cartesian_2d_diskpp(void)
+    void
+    test_cartesian_2d_diskpp(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
     {
         std::cout << yellow << "Mesh under test: 2D cartesian mesh (DiSk++)";
         std::cout << nocolor << std::endl;
@@ -594,10 +600,11 @@ class tester
         auto meshes = get_cartesian_2d_diskpp_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er);
+        do_testing(meshes, tf, er, min_degree, max_degree);
     }
 
-    void test_tetrahedra_netgen(void)
+    void
+    test_tetrahedra_netgen(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
     {
         std::cout << yellow << "Mesh under test: tetrahedra on netgen mesh";
         std::cout << nocolor << std::endl;
@@ -606,10 +613,11 @@ class tester
         auto meshes = get_tetrahedra_netgen_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er);
+        do_testing(meshes, tf, er, min_degree, max_degree);
     }
 
-    void test_cartesian_3d_diskpp(void)
+    void
+    test_cartesian_3d_diskpp(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
     {
         std::cout << yellow << "Mesh under test: 3D cartesian mesh (DiSk++)";
         std::cout << nocolor << std::endl;
@@ -618,10 +626,11 @@ class tester
         auto meshes = get_cartesian_3d_diskpp_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er);
+        do_testing(meshes, tf, er, min_degree, max_degree);
     }
 
-    void test_generic_fvca6(void)
+    void
+    test_generic_fvca6(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
     {
         std::cout << yellow << "Mesh under test: polyhedra on generic mesh";
         std::cout << nocolor << std::endl;
@@ -630,66 +639,67 @@ class tester
         auto meshes = get_generic_fvca6_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er);
+        do_testing(meshes, tf, er, min_degree, max_degree);
     }
 
 public:
-    int run(void)
-    {
-        sol::state lua;
+  int
+  run(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
+  {
+      sol::state lua;
 
-        bool crash_on_nan           = false;
-        bool do_triangles_generic   = true;
-        bool do_polygonal_generic   = true;
-        bool do_triangles_netgen    = true;
-        bool do_quads               = true;
-        bool do_cartesian_2d_diskpp = true;
-        bool do_tetrahedra_netgen   = true;
-        bool do_cartesian_3d_diskpp = true;
-        bool do_generic_fvca6       = true;
+      bool crash_on_nan           = false;
+      bool do_triangles_generic   = true;
+      bool do_polygonal_generic   = true;
+      bool do_triangles_netgen    = true;
+      bool do_quads               = true;
+      bool do_cartesian_2d_diskpp = true;
+      bool do_tetrahedra_netgen   = true;
+      bool do_cartesian_3d_diskpp = true;
+      bool do_generic_fvca6       = true;
 
-        auto r = lua.do_file("test_config.lua");
-        if ( r.valid() )
-        {
-            crash_on_nan            = lua["crash_on_nan"].get_or(false);
-            do_triangles_generic    = lua["do_triangles_generic"].get_or(false);
-            do_polygonal_generic    = lua["do_polygonal_generic"].get_or(false);
-            do_triangles_netgen     = lua["do_triangles_netgen"].get_or(false);
-            do_quads                = lua["do_quads"].get_or(false);
-            do_cartesian_2d_diskpp  = lua["do_cartesian_2d_diskpp"].get_or(false);
-            do_tetrahedra_netgen    = lua["do_tetrahedra_netgen"].get_or(false);
-            do_cartesian_3d_diskpp  = lua["do_cartesian_3d_diskpp"].get_or(false);
-            do_generic_fvca6        = lua["do_generic_fvca6"].get_or(false);
-        }
+      auto r = lua.do_file("test_config.lua");
+      if (r.valid())
+      {
+          crash_on_nan           = lua["crash_on_nan"].get_or(false);
+          do_triangles_generic   = lua["do_triangles_generic"].get_or(false);
+          do_polygonal_generic   = lua["do_polygonal_generic"].get_or(false);
+          do_triangles_netgen    = lua["do_triangles_netgen"].get_or(false);
+          do_quads               = lua["do_quads"].get_or(false);
+          do_cartesian_2d_diskpp = lua["do_cartesian_2d_diskpp"].get_or(false);
+          do_tetrahedra_netgen   = lua["do_tetrahedra_netgen"].get_or(false);
+          do_cartesian_3d_diskpp = lua["do_cartesian_3d_diskpp"].get_or(false);
+          do_generic_fvca6       = lua["do_generic_fvca6"].get_or(false);
+      }
 
-        if ( crash_on_nan )
-            _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+      if (crash_on_nan)
+          _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
 
-        if ( do_triangles_generic )
-            test_triangles_generic();
+      if (do_triangles_generic)
+          test_triangles_generic(min_degree, max_degree);
 
-        if ( do_polygonal_generic )
-            test_polygonal_generic();
+      if (do_polygonal_generic)
+          test_polygonal_generic(min_degree, max_degree);
 
-        if ( do_triangles_netgen )
-            test_triangles_netgen();
+      if (do_triangles_netgen)
+          test_triangles_netgen(min_degree, max_degree);
 
-        if ( do_quads )
-            test_quads();
+      if (do_quads)
+          test_quads(min_degree, max_degree);
 
-        if ( do_cartesian_2d_diskpp )
-            test_cartesian_2d_diskpp();
+      if (do_cartesian_2d_diskpp)
+          test_cartesian_2d_diskpp(min_degree, max_degree);
 
-        if ( do_tetrahedra_netgen )
-            test_tetrahedra_netgen();
+      if (do_tetrahedra_netgen)
+          test_tetrahedra_netgen(min_degree, max_degree);
 
-        if ( do_cartesian_3d_diskpp )
-            test_cartesian_3d_diskpp();
+      if (do_cartesian_3d_diskpp)
+          test_cartesian_3d_diskpp(min_degree, max_degree);
 
-        if ( do_generic_fvca6 )
-            test_generic_fvca6();
+      if (do_generic_fvca6)
+          test_generic_fvca6(min_degree, max_degree);
 
-        return 0;
+      return 0;
     }
 };
 

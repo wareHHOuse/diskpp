@@ -302,8 +302,23 @@ project_function(const Mesh& msh, const Element& elem, size_t degree, const scal
     using T = typename Mesh::coordinate_type;
 
     auto                        basis = make_scalar_monomial_basis(msh, elem, degree);
-    Matrix<T, Dynamic, Dynamic> mass  = make_mass_matrix(msh, elem, basis, di);
+    Matrix<T, Dynamic, Dynamic> mass  = make_mass_matrix(msh, elem, basis);
     Matrix<T, Dynamic, 1>       rhs   = make_rhs(msh, elem, basis, f, di);
+    return mass.llt().solve(rhs);
+}
+
+template<typename Mesh, typename Element, typename Basis>
+Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+project_function(const Mesh&                      msh,
+                 const Element&                   elem,
+                 const Basis&                     basis,
+                 const scalar_rhs_function<Mesh>& f,
+                 size_t                           di = 0)
+{
+    using T = typename Mesh::coordinate_type;
+
+    const Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, elem, basis);
+    const Matrix<T, Dynamic, 1>       rhs  = make_rhs(msh, elem, basis, f, di);
     return mass.llt().solve(rhs);
 }
 
@@ -314,8 +329,23 @@ project_function(const Mesh& msh, const Element& elem, size_t degree, const vect
     using T = typename Mesh::coordinate_type;
 
     auto                        basis = make_vector_monomial_basis(msh, elem, degree);
-    Matrix<T, Dynamic, Dynamic> mass  = make_mass_matrix(msh, elem, basis, di);
+    Matrix<T, Dynamic, Dynamic> mass  = make_mass_matrix(msh, elem, basis);
     Matrix<T, Dynamic, 1>       rhs   = make_rhs(msh, elem, basis, f, di);
+    return mass.llt().solve(rhs);
+}
+
+template<typename Mesh, typename Element, typename Basis>
+Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+project_function(const Mesh&    msh,
+                 const Element& elem,
+                 const Basis& basis,
+                 const vector_rhs_function<Mesh>& f,
+                 size_t                           di = 0)
+{
+    using T = typename Mesh::coordinate_type;
+
+    const Matrix<T, Dynamic, Dynamic> mass  = make_mass_matrix(msh, elem, basis);
+    const Matrix<T, Dynamic, 1>       rhs   = make_rhs(msh, elem, basis, f, di);
     return mass.llt().solve(rhs);
 }
 
