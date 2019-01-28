@@ -8,6 +8,7 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
+ * Nicolas Pignet  (C) 2019                     nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -23,11 +24,11 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-
 #include <iostream>
 #include <iomanip>
 #include <regex>
 
+#include "contrib/colormanip.h"
 #include <unistd.h>
 
 #include <xmmintrin.h>
@@ -42,7 +43,7 @@
 
 
 template<typename Mesh>
-struct test_functor
+struct test_functor_equal_order
 {
     /* Expect k+1 convergence */
     typename Mesh::coordinate_type
@@ -93,9 +94,121 @@ struct test_functor
     }
 };
 
+template<typename Mesh>
+struct test_functor_mixed_order1
+{
+    /* Expect k+1 convergence */
+    typename Mesh::coordinate_type
+    operator()(const Mesh& msh, size_t degree) const
+    {
+        typedef Mesh                                mesh_type;
+        typedef typename mesh_type::cell            cell_type;
+        typedef typename mesh_type::face            face_type;
+        typedef typename mesh_type::coordinate_type scalar_type;
+        typedef typename mesh_type::point_type      point_type;
+
+        auto f = make_scalar_testing_data(msh);
+
+        typename disk::hho_degree_info hdi(degree+1, degree);
+
+        scalar_type error = 0.0;
+        for (auto& cl : msh)
+        {
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
+            auto                            gr   = disk::make_scalar_hho_laplacian(msh, cl, hdi);
+
+            size_t rec_size = disk::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
+
+            Matrix<scalar_type, Dynamic, 1> reconstr = Matrix<scalar_type, Dynamic, 1>::Zero(rec_size);
+            reconstr.tail(rec_size - 1)              = gr.first * proj;
+            reconstr(0)                              = proj(0);
+
+            auto cb = disk::make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+            Matrix<scalar_type, Dynamic, Dynamic> mass         = disk::make_mass_matrix(msh, cl, cb);
+            Matrix<scalar_type, Dynamic, 1>       rhs          = disk::make_rhs(msh, cl, cb, f);
+            Matrix<scalar_type, Dynamic, 1>       exp_reconstr = mass.llt().solve(rhs);
+
+            Matrix<scalar_type, Dynamic, 1> diff = reconstr - exp_reconstr;
+
+            Matrix<scalar_type, Dynamic, Dynamic> stiffness = disk::make_stiffness_matrix(msh, cl, cb);
+
+            error += diff.dot(stiffness * diff);
+        }
+
+        return std::sqrt(error);
+    }
+
+    size_t
+    expected_rate(size_t k)
+    {
+        return k + 1;
+    }
+};
+
+template<typename Mesh>
+struct test_functor_mixed_order2
+{
+    /* Expect k+1 convergence */
+    typename Mesh::coordinate_type
+    operator()(const Mesh& msh, size_t degree) const
+    {
+        typedef Mesh                                mesh_type;
+        typedef typename mesh_type::cell            cell_type;
+        typedef typename mesh_type::face            face_type;
+        typedef typename mesh_type::coordinate_type scalar_type;
+        typedef typename mesh_type::point_type      point_type;
+
+        auto f = make_scalar_testing_data(msh);
+
+        typename disk::hho_degree_info hdi(degree-1, degree);
+
+        scalar_type error = 0.0;
+        for (auto& cl : msh)
+        {
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
+            auto                            gr   = disk::make_scalar_hho_laplacian(msh, cl, hdi);
+
+            size_t rec_size = disk::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
+
+            Matrix<scalar_type, Dynamic, 1> reconstr = Matrix<scalar_type, Dynamic, 1>::Zero(rec_size);
+            reconstr.tail(rec_size - 1)              = gr.first * proj;
+            reconstr(0)                              = proj(0);
+
+            auto cb = disk::make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+            Matrix<scalar_type, Dynamic, Dynamic> mass         = disk::make_mass_matrix(msh, cl, cb);
+            Matrix<scalar_type, Dynamic, 1>       rhs          = disk::make_rhs(msh, cl, cb, f);
+            Matrix<scalar_type, Dynamic, 1>       exp_reconstr = mass.llt().solve(rhs);
+
+            Matrix<scalar_type, Dynamic, 1> diff = reconstr - exp_reconstr;
+
+            Matrix<scalar_type, Dynamic, Dynamic> stiffness = disk::make_stiffness_matrix(msh, cl, cb);
+
+            error += diff.dot(stiffness * diff);
+        }
+
+        return std::sqrt(error);
+    }
+
+    size_t
+    expected_rate(size_t k)
+    {
+        return k + 1;
+    }
+};
+
 int main(void)
 {
-    tester<test_functor> tstr;
-    tstr.run();
+    // face order: k, cell order: k
+    std::cout << blue << "Face order: k and Cell order: k" << std::endl;
+    tester<test_functor_equal_order> tstr1;
+    tstr1.run();
+    // face order: k, cell order: k+1
+    std::cout << blue << "Face order: k and Cell order: k+1" << std::endl;
+    tester<test_functor_mixed_order1> tstr2;
+    tstr2.run();
+    // face order: k, cell order: k-1
+    std::cout << blue << "Face order: k and Cell order: k-1" << std::endl;
+    tester<test_functor_mixed_order2> tstr3;
+    tstr3.run(1,3);
     return 0;
 }

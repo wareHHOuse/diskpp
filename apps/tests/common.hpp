@@ -678,11 +678,11 @@ public:
       if (do_triangles_generic)
           test_triangles_generic(min_degree, max_degree);
 
-      if (do_polygonal_generic)
-          test_polygonal_generic(min_degree, max_degree);
-
       if (do_triangles_netgen)
           test_triangles_netgen(min_degree, max_degree);
+
+      if (do_polygonal_generic)
+          test_polygonal_generic(min_degree, max_degree);
 
       if (do_quads)
           test_quads(min_degree, max_degree);

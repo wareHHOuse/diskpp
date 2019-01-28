@@ -60,7 +60,7 @@ struct test_functor_hho_equal_order
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            auto gr   = disk::make_vector_hho_laplacian(msh, cl, hdi);
+            auto gr   = disk::make_vector_hho_symmetric_laplacian(msh, cl, hdi);
             auto stab = disk::make_vector_hho_stabilization(msh, cl, gr.first, hdi);
 
             size_t rec_size = disk::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
@@ -102,7 +102,7 @@ struct test_functor_hho_mixed_order1
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            auto gr   = disk::make_vector_hho_laplacian(msh, cl, hdi);
+            auto gr   = disk::make_vector_hho_symmetric_laplacian(msh, cl, hdi);
             auto stab = disk::make_vector_hho_stabilization(msh, cl, gr.first, hdi);
 
             size_t rec_size = disk::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
@@ -144,7 +144,7 @@ struct test_functor_hho_mixed_order2
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            auto gr   = disk::make_vector_hho_laplacian(msh, cl, hdi);
+            auto gr   = disk::make_vector_hho_symmetric_laplacian(msh, cl, hdi);
             auto stab = disk::make_vector_hho_stabilization(msh, cl, gr.first, hdi);
 
             size_t rec_size = disk::scalar_basis_size(hdi.reconstruction_degree(), Mesh::dimension);
@@ -242,7 +242,7 @@ struct test_functor_dg
     size_t
     expected_rate(size_t k)
     {
-        return k;
+        return k + 1;
     }
 };
 
@@ -263,16 +263,5 @@ main(void)
     tester<test_functor_hho_mixed_order2> tstr3;
     tstr3.run(1, 3);
 
-    std::cout << red << "Test HDG-stabilization operator" << std::endl;
-    // face order: k, cell order: k+1
-    std::cout << blue << "Face order: k and Cell order: k+1" << std::endl;
-    tester<test_functor_hdg> tstr_hdg;
-    tstr_hdg.run();
-
-    std::cout << red << "Test dG-stabilization operator" << std::endl;
-    // face order: k, cell order: k
-    std::cout << blue << "Face order: k and Cell order: k" << std::endl;
-    tester<test_functor_dg> tstr_dg;
-    tstr_dg.run();
     return 0;
 }
