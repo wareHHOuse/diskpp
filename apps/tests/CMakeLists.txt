@@ -20,6 +20,9 @@ target_link_libraries(vector_symmetric_stabilization ${LINK_LIBS})
 add_executable(vector_stabilization vector_stabilization.cpp)
 target_link_libraries(vector_stabilization ${LINK_LIBS})
 
+add_executable(vector_gradient vector_gradient.cpp)
+target_link_libraries(vector_gradient ${LINK_LIBS})
+
 add_executable(perf perf.cpp)
 target_link_libraries(perf ${LINK_LIBS})
 

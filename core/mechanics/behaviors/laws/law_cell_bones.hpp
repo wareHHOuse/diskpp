@@ -7,7 +7,7 @@
  *  /_\/_\/_\/_\   methods.
  *
  * This file is copyright of the following authors:
- * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
+ * Nicolas Pignet  (C) 2018, 2019                 nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -64,7 +64,7 @@ class LawTypeCellBones
   public:
     LawTypeCellBones(const mesh_type& msh, const cell_type& cl, const size_t degree)
     {
-        const auto qps = disk::integrate(msh, cl, degree);
+        const auto qps = integrate(msh, cl, degree);
 
         m_list_qp.clear();
         m_list_qp.reserve(qps.size());
@@ -111,14 +111,14 @@ class LawTypeCellBones
     vector_type
     projectStressOnCell(const mesh_type&             msh,
                         const cell_type&             cl,
-                        const disk::hho_degree_info& hdi,
+                        const hho_degree_info&       hdi,
                         const data_type&             material_data) const
     {
         const auto grad_degree     = hdi.grad_degree();
-        const int  grad_basis_size = disk::matrix_basis_size(grad_degree, dimension, dimension);
-        auto       gb              = disk::make_matrix_monomial_basis(msh, cl, grad_degree);
+        const int  grad_basis_size = matrix_basis_size(grad_degree, dimension, dimension);
+        const auto gb              = make_matrix_monomial_basis(msh, cl, grad_degree);
 
-        matrix_type mass = matrix_type::Zero(grad_basis_size, grad_basis_size);
+        const matrix_type mass = make_mass_matrix(msh, cl, gb);
         vector_type rhs  = vector_type::Zero(grad_basis_size);
 
         for (auto& qp : m_list_qp)
@@ -127,49 +127,30 @@ class LawTypeCellBones
             const auto gphi   = gb.eval_functions(qp.point());
             assert(gphi.size() == grad_basis_size);
 
-            for (int j = 0; j < grad_basis_size; j++)
-            {
-                const auto qp_gphi_j = disk::priv::inner_product(qp.weight(), gphi[j]);
-                for (int i = j; i < grad_basis_size; i++)
-                {
-                    mass(i, j) += disk::priv::inner_product(gphi[i], qp_gphi_j);
-                }
+            const auto qp_stress = priv::inner_product(qp.weight(), stress);
 
-                rhs(j) += disk::priv::inner_product(stress, qp_gphi_j);
-            }
-        }
-
-        // lower part
-        for (int j = 0; j < grad_basis_size; j++)
-        {
-            for (int i = 0; i < j; i++)
-            {
-                mass(i, j) = mass(j, i);
-            }
+            rhs += priv::outer_product(gphi, qp_stress);
         }
 
         return mass.llt().solve(rhs);
     }
 
     vector_type
-    projectPOnCell(const mesh_type& msh, const cell_type& cl, const disk::hho_degree_info& hdi) const
+    projectPOnCell(const mesh_type& msh, const cell_type& cl, const hho_degree_info& hdi) const
     {
         const auto grad_degree = hdi.grad_degree();
-        const int  pbs         = disk::scalar_basis_size(grad_degree, dimension);
+        const int  pbs         = scalar_basis_size(grad_degree, dimension);
 
         if (PlasticBehavior)
         {
-            matrix_type mass = matrix_type::Zero(pbs, pbs);
-            vector_type rhs  = vector_type::Zero(pbs);
+            const auto pb = make_scalar_monomial_basis(msh, cl, grad_degree);
 
-            auto pb = disk::make_scalar_monomial_basis(msh, cl, grad_degree);
+            const matrix_type mass = make_mass_matrix(msh, cl, pb);
+            vector_type rhs  = vector_type::Zero(pbs);
 
             for (auto& qp : m_list_qp)
             {
                 const auto pphi = pb.eval_functions(qp.point());
-                assert(pphi.size() == pbs);
-
-                mass += qp.weight() * disk::priv::outer_product(pphi, pphi);
                 rhs += qp.weight() * qp.getAccumulatedPlasticStrain() * pphi;
             }
 
@@ -180,25 +161,23 @@ class LawTypeCellBones
     }
 
     vector_type
-    projectStateOnCell(const mesh_type& msh, const cell_type& cl, const disk::hho_degree_info& hdi) const
+    projectStateOnCell(const mesh_type& msh, const cell_type& cl, const hho_degree_info& hdi) const
     {
         const auto grad_degree = hdi.grad_degree();
-        const int  pbs         = disk::scalar_basis_size(grad_degree, dimension);
+        const int  pbs         = scalar_basis_size(grad_degree, dimension);
 
         if (PlasticBehavior)
         {
+            const auto pb = make_scalar_monomial_basis(msh, cl, grad_degree);
 
-            matrix_type mass = matrix_type::Zero(pbs, pbs);
+            const matrix_type mass = make_mass_matrix(msh, cl, pb);
             vector_type rhs  = vector_type::Zero(pbs);
-
-            auto pb = disk::make_scalar_monomial_basis(msh, cl, grad_degree);
 
             for (auto& qp : m_list_qp)
             {
                 const auto pphi = pb.eval_functions(qp.point());
                 assert(pphi.size() == pbs);
 
-                mass += qp.weight() * disk::priv::outer_product(pphi, pphi);
                 if (qp.is_plastic())
                 {
                     rhs += qp.weight() * pphi;

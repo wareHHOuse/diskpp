@@ -9,7 +9,7 @@
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
  * Karol Cascavita (C) 2018                     karol.cascavita@enpc.fr
- * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
+ * Nicolas Pignet  (C) 2018, 2019               nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -34,53 +34,10 @@ namespace disk {
 
 namespace priv
 {
-template<typename T, int N>
-Matrix<T, Dynamic, Dynamic>
-outer_product(const Matrix<T, Dynamic, N>& a, const Matrix<T, Dynamic, N>& b)
-{
-    return b * a.transpose();
-}
+// inner_product : generalisation of dot_product, scalar_product in l^p, matrix-vector product
+// multiplication by a scalar
 
-template<typename T, int N>
-Matrix<T, Dynamic, N>
-outer_product(const eigen_compatible_stdvector<Matrix<T, N, N>>& a, const Matrix<T, N, 1>& b)
-{
-    Matrix<T, Dynamic, N> ret(a.size(), N);
-    for (size_t i = 0; i < a.size(); i++)
-    {
-        Matrix<T, N, 1> t = a[i] * b;
-        ret.row(i)        = t.transpose();
-    }
-
-    return ret;
-}
-
-template<typename T, int N>
-Matrix<T, Dynamic, Dynamic>
-outer_product(const eigen_compatible_stdvector<Matrix<T, N, N>>& a,
-              const eigen_compatible_stdvector<Matrix<T, N, N>>& b)
-{
-    Matrix<T, Dynamic, Dynamic> ret(a.size(), b.size());
-
-    for (size_t i = 0; i < a.size(); i++)
-        for (size_t j = 0; j < b.size(); j++)
-            ret(i, j) = a[i].cwiseProduct(b[j]).sum();
-
-    return ret;
-}
-
-template<typename T, int N>
-Matrix<T, Dynamic, Dynamic>
-outer_product(const eigen_compatible_stdvector<Matrix<T, N, N>>& a, const Matrix<T, N, N>& b)
-{
-    Matrix<T, Dynamic, 1> ret(a.size());
-
-    for (size_t i = 0; i < a.size(); i++)
-        ret(i) = a[i].cwiseProduct(b).sum();
-
-    return ret;
-}
-
+// dot-product in R x R
 template<typename T>
 T
 inner_product(const T& a, const T& b)
@@ -88,6 +45,68 @@ inner_product(const T& a, const T& b)
     return a * b;
 }
 
+// dot-product in R^n x R^n
+template<typename T, int N>
+T
+inner_product(const Matrix<T, N, 1>& a, const Matrix<T, N, 1>& b)
+{
+    return a.dot(b);
+}
+
+// dot-product in R^(nxm) x R^(nxm)
+template<typename T, int N, int M>
+T
+inner_product(const Matrix<T, N, M>& b, const Matrix<T, N, M>& a)
+{
+    return a.cwiseProduct(b).sum();
+}
+
+// dot-product of a list of vector a with a vector b
+template<typename T, int N>
+Matrix<T, Dynamic, 1>
+inner_product(const Matrix<T, Dynamic, N>& a, const Matrix<T, N, 1>& b)
+{
+    return a * b;
+}
+
+// matrix-vector product
+template<typename T, int N>
+Matrix<T, N, 1>
+inner_product(const Matrix<T, N, N>& a, const Matrix<T, N, 1>& b)
+{
+
+    return a * b;
+}
+
+// matrix-vector product
+template<typename T, int N>
+Matrix<T, Dynamic, N>
+inner_product(const Matrix<T, N, N> a, const Matrix<T, Dynamic, N>& b)
+{
+    Matrix<T, Dynamic, N> ret(b.rows(), N);
+
+    for (size_t i = 0; i < b.rows(); i++)
+    {
+        ret.row(i) = (a * (b.row(i).transpose())).transpose();
+    }
+
+    return ret;
+}
+
+// matrix-vector product of a list of matrix a with a vector b
+template<typename T, int N>
+Matrix<T, Dynamic, N>
+inner_product(const eigen_compatible_stdvector<Matrix<T, N, N>>& a, const Matrix<T, N, 1>& b)
+{
+    Matrix<T, Dynamic, N> ret(a.size(), N);
+
+    for (size_t i = 0; i < a.size(); i++)
+        ret.row(i) = inner_product(a[i], b).transpose();
+
+    return ret;
+}
+
+// multiplication by a scalar
 template<typename T, int N>
 Matrix<T, Dynamic, N>
 inner_product(const T& a, const Matrix<T, Dynamic, N>& b)
@@ -95,13 +114,7 @@ inner_product(const T& a, const Matrix<T, Dynamic, N>& b)
     return a * b;
 }
 
-template<typename T, int N>
-Matrix<T, Dynamic, N>
-inner_product(const Matrix<T, Dynamic, N>& a, const T& b)
-{
-    return a * b;
-}
-
+// multiplication by a scalar
 template<typename T, int N, int M>
 Matrix<T, N, M>
 inner_product(const T& a, const Matrix<T, N, M>& b)
@@ -109,27 +122,7 @@ inner_product(const T& a, const Matrix<T, N, M>& b)
     return a * b;
 }
 
-template<typename T, int N, int M>
-Matrix<T, N, M>
-inner_product(const Matrix<T, N, M>& b, const T& a)
-{
-    return a * b;
-}
-
-
-template<typename T, int N, int M>
-eigen_compatible_stdvector<Matrix<T, N, M>>
-inner_product(const eigen_compatible_stdvector<Matrix<T, N, M>>& a, const T& b)
-{
-
-    eigen_compatible_stdvector<Matrix<T, N, M>> ret = a;
-
-    for (size_t i = 0; i < a.size(); i++)
-        ret[i] *= b;
-
-    return ret;
-}
-
+// multiplication by a scalar
 template<typename T, int N, int M>
 eigen_compatible_stdvector<Matrix<T, N, M>>
 inner_product(const T& a, const eigen_compatible_stdvector<Matrix<T, N, M>>& b)
@@ -143,39 +136,62 @@ inner_product(const T& a, const eigen_compatible_stdvector<Matrix<T, N, M>>& b)
     return ret;
 }
 
+// outer_product : equivalent to a scalar-product in L^p (.,.)_L^p or duality product <.,.>
 template<typename T, int N>
-T
-inner_product(const Matrix<T, N, 1>& a, const Matrix<T, N, 1>& b)
+Matrix<T, Dynamic, Dynamic>
+outer_product(const Matrix<T, Dynamic, N>& a, const Matrix<T, Dynamic, N>& b)
 {
-    return a.dot(b);
+    return a * b.transpose();
 }
 
-template<typename T, int N>
-T
-inner_product(const Matrix<T, N, N>& b, const Matrix<T, N, N>& a)
+template<typename T, int N, int M>
+Matrix<T, Dynamic, Dynamic>
+outer_product(const eigen_compatible_stdvector<Matrix<T, N, M>>& a,
+              const eigen_compatible_stdvector<Matrix<T, N, M>>& b)
 {
-    return a.cwiseProduct(b).sum();
+    Matrix<T, Dynamic, Dynamic> ret(a.size(), b.size());
+
+    for (size_t i = 0; i < a.size(); i++)
+        for (size_t j = 0; j < b.size(); j++)
+            ret(i, j) = inner_product(a[i], b[j]);
+
+    return ret;
 }
 
+template<typename T>
+T
+outer_product(const T& a, const T& b)
+{
+    return a * b;
+}
+
+// outer_product (b is a constant in this case) return a vector
+template<typename T>
+Matrix<T, Dynamic, 1>
+outer_product(const Matrix<T, Dynamic, 1>& a, const T& b)
+{
+    return a * b;
+}
+
+// outer_product (b is a constant in this case) return a vector
 template<typename T, int N>
 Matrix<T, Dynamic, 1>
-inner_product(const Matrix<T, N, 1>& a, const Matrix<T, Dynamic, N>& b)
+outer_product(const Matrix<T, Dynamic, N>& a, const Matrix<T, N, 1>& b)
 {
-    return b * a;
+    return a * b;
 }
 
+// outer_product (b is a constant in this case) return a vector
 template<typename T, int N>
-Matrix<T, Dynamic, N>
-inner_product(const Matrix<T, N, N>& a, const Matrix<T, Dynamic, N>& b)
+Matrix<T, Dynamic, 1>
+outer_product(const eigen_compatible_stdvector<Matrix<T, N, N>>& a, const Matrix<T, N, N>& b)
 {
-    return b * a;
-}
+    Matrix<T, Dynamic, 1> ret(a.size());
 
-template<typename T, int N>
-Matrix<T, Dynamic, N>
-inner_product(const Matrix<T, Dynamic, N>& b, const Matrix<T, N, N>& a)
-{
-    return b * a;
+    for (size_t i = 0; i < a.size(); i++)
+        ret(i) = inner_product(a[i], b);
+
+    return ret;
 }
 
 } // priv
@@ -183,20 +199,20 @@ inner_product(const Matrix<T, Dynamic, N>& b, const Matrix<T, N, N>& a)
 
 template<typename Mesh, typename Element, typename Basis>
 Matrix<typename Basis::scalar_type, Dynamic, Dynamic>
-make_mass_matrix(const Mesh& msh, const Element& elem, const Basis& basis, size_t di = 0)
+make_mass_matrix(const Mesh& msh, const Element& elem, const Basis& basis)
 {
-    auto degree     = basis.degree();
-    auto basis_size = basis.size();
+    const auto degree     = basis.degree();
+    const auto basis_size = basis.size();
 
     using T = typename Basis::scalar_type;
 
     Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(basis_size, basis_size);
 
-    auto qps = integrate(msh, elem, 2 * (degree + di));
+    const auto qps = integrate(msh, elem, 2 * degree);
 
     for (auto& qp : qps)
     {
-        auto phi = basis.eval_functions(qp.point());
+        const auto phi    = basis.eval_functions(qp.point());
         const auto qp_phi = priv::inner_product(qp.weight(), phi);
         ret += priv::outer_product(qp_phi, phi);
     }
@@ -208,21 +224,21 @@ template<typename Mesh, typename Element, typename Basis, typename MaterialField
 Matrix<typename Basis::scalar_type, Dynamic, Dynamic>
 make_mass_matrix(const Mesh& msh, const Element& elem, const Basis& basis, const MaterialField& material_tensor, size_t di = 0)
 {
-    auto degree     = basis.degree();
-    auto basis_size = basis.size();
+    const auto degree     = basis.degree();
+    const auto basis_size = basis.size();
 
     using T = typename Basis::scalar_type;
 
     Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(basis_size, basis_size);
 
-    auto qps = integrate(msh, elem, 2 * (degree + di));
+    const auto qps = integrate(msh, elem, 2 * (degree + di));
 
     for (auto& qp : qps)
     {
-        auto       phi      = basis.eval_functions(qp.point());
+        const auto phi      = basis.eval_functions(qp.point());
         const auto qp_m     = priv::inner_product(qp.weight(), material_tensor(qp.point()));
-        const auto qp_phi_m = priv::inner_product(phi, qp_m);
-        ret += priv::outer_product(qp_phi_m, phi);
+        const auto qp_phi_m = priv::inner_product(qp_m, phi);
+        ret += priv::outer_product(phi, qp_phi_m);
     }
 
     return ret;
@@ -230,23 +246,27 @@ make_mass_matrix(const Mesh& msh, const Element& elem, const Basis& basis, const
 
 template<typename Mesh, typename Element, typename Basis>
 Matrix<typename Basis::scalar_type, Dynamic, Dynamic>
-make_stiffness_matrix(const Mesh& msh, const Element& elem, const Basis& basis, size_t di = 0)
+make_stiffness_matrix(const Mesh& msh, const Element& elem, const Basis& basis)
 {
-    auto degree     = basis.degree();
-    auto basis_size = basis.size();
+    const auto degree     = basis.degree();
+    const auto basis_size = basis.size();
 
     using T = typename Basis::scalar_type;
 
     Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(basis_size, basis_size);
 
-    auto qps = integrate(msh, elem, 2 * (degree - 1 + di));
-
-    for (auto& qp : qps)
+    if(degree > 0)
     {
-        auto dphi = basis.eval_gradients(qp.point());
-        const auto qp_dphi = priv::inner_product(qp.weight(), dphi);
-        ret += priv::outer_product(qp_dphi, dphi);
+        const auto qps = integrate(msh, elem, 2 * (degree - 1));
+
+        for (auto& qp : qps)
+        {
+            const auto dphi    = basis.eval_gradients(qp.point());
+            const auto qp_dphi = priv::inner_product(qp.weight(), dphi);
+            ret += priv::outer_product(qp_dphi, dphi);
+        }
     }
+
 
     return ret;
 }
@@ -255,20 +275,20 @@ template<typename Mesh, typename Element, typename Basis, typename Function>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
 make_rhs(const Mesh& msh, const Element& elem, const Basis& basis, const Function& rhs_fun, size_t di = 0)
 {
-    auto degree     = basis.degree();
-    auto basis_size = basis.size();
+    const auto degree     = basis.degree();
+    const auto basis_size = basis.size();
 
     using T = typename Basis::scalar_type;
 
     Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(basis_size);
 
-    auto qps = integrate(msh, elem, 2 * (degree + di));
+    const auto qps = integrate(msh, elem, 2 * (degree + di));
 
     for (auto& qp : qps)
     {
-        auto phi = basis.eval_functions(qp.point());
-        auto qp_f = priv::inner_product(qp.weight(), rhs_fun(qp.point()));
-        ret += priv::inner_product(qp_f, phi);
+        const auto phi  = basis.eval_functions(qp.point());
+        const auto qp_f = priv::inner_product(qp.weight(), rhs_fun(qp.point()));
+        ret += priv::outer_product(phi, qp_f);
     }
 
     return ret;
@@ -297,13 +317,14 @@ using matrix_rhs_function = std::function<MRT<Mesh>(PT<Mesh>)>;
 
 template<typename Mesh, typename Element>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
-project_function(const Mesh& msh, const Element& elem, size_t degree, const scalar_rhs_function<Mesh>& f, size_t di = 0)
+project_function(const Mesh& msh, const Element& elem, const size_t degree, const scalar_rhs_function<Mesh>& f, size_t di = 0)
 {
     using T = typename Mesh::coordinate_type;
 
-    auto                        basis = make_scalar_monomial_basis(msh, elem, degree);
-    Matrix<T, Dynamic, Dynamic> mass  = make_mass_matrix(msh, elem, basis);
-    Matrix<T, Dynamic, 1>       rhs   = make_rhs(msh, elem, basis, f, di);
+    const auto                  basis       = make_scalar_monomial_basis(msh, elem, degree);
+    const Matrix<T, Dynamic, Dynamic> mass  = make_mass_matrix(msh, elem, basis);
+    const Matrix<T, Dynamic, 1>       rhs   = make_rhs(msh, elem, basis, f, di);
+
     return mass.llt().solve(rhs);
 }
 
@@ -319,18 +340,20 @@ project_function(const Mesh&                      msh,
 
     const Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, elem, basis);
     const Matrix<T, Dynamic, 1>       rhs  = make_rhs(msh, elem, basis, f, di);
+
     return mass.llt().solve(rhs);
 }
 
 template<typename Mesh, typename Element>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
-project_function(const Mesh& msh, const Element& elem, size_t degree, const vector_rhs_function<Mesh>& f, size_t di = 0)
+project_function(const Mesh& msh, const Element& elem, const size_t degree, const vector_rhs_function<Mesh>& f, size_t di = 0)
 {
     using T = typename Mesh::coordinate_type;
 
-    auto                        basis = make_vector_monomial_basis(msh, elem, degree);
-    Matrix<T, Dynamic, Dynamic> mass  = make_mass_matrix(msh, elem, basis);
-    Matrix<T, Dynamic, 1>       rhs   = make_rhs(msh, elem, basis, f, di);
+    const auto                        basis = make_vector_monomial_basis(msh, elem, degree);
+    const Matrix<T, Dynamic, Dynamic> mass  = make_mass_matrix(msh, elem, basis);
+    const Matrix<T, Dynamic, 1>       rhs   = make_rhs(msh, elem, basis, f, di);
+
     return mass.llt().solve(rhs);
 }
 
@@ -346,6 +369,7 @@ project_function(const Mesh&    msh,
 
     const Matrix<T, Dynamic, Dynamic> mass  = make_mass_matrix(msh, elem, basis);
     const Matrix<T, Dynamic, 1>       rhs   = make_rhs(msh, elem, basis, f, di);
+
     return mass.llt().solve(rhs);
 }
 
@@ -355,21 +379,22 @@ project_gradient(const Mesh& msh, const Element& elem, size_t degree, const matr
 {
     using T = typename Mesh::coordinate_type;
 
-    auto   basis = make_vector_monomial_basis(msh, elem, degree);
-    size_t N     = Mesh::dimension;
+    const auto basis = make_vector_monomial_basis(msh, elem, degree);
+    const size_t N     = Mesh::dimension;
 
-    auto basis_size = vector_basis_size(degree, Mesh::dimension, Mesh::dimension);
+    const auto basis_size = vector_basis_size(degree, Mesh::dimension, Mesh::dimension);
 
-    Matrix<T, Dynamic, Dynamic> stiff = make_stiffness_matrix(msh, elem, basis, di);
-    Matrix<T, Dynamic, 1>       rhs   = Matrix<T, Dynamic, 1>::Zero(basis_size);
+    const Matrix<T, Dynamic, Dynamic> stiff = make_stiffness_matrix(msh, elem, basis);
+    Matrix<T, Dynamic, 1>             rhs   = Matrix<T, Dynamic, 1>::Zero(basis_size);
 
-    auto qps = integrate(msh, elem, 2 * (degree + di));
+    const auto qps = integrate(msh, elem, 2 * (degree + di));
 
     for (auto& qp : qps)
     {
-        auto dphi     = basis.eval_gradients(qp.point());
-        auto rhs_func = f(qp.point());
-        rhs += qp.weight() * priv::outer_product(dphi, rhs_func);
+        const auto dphi        = basis.eval_gradients(qp.point());
+        const auto qp_rhs_func = priv::inner_product(qp.weight(), f(qp.point()));
+
+        rhs += priv::outer_product(dphi, qp_rhs_func);
     }
 
     return stiff.block(N, N, basis_size - N, basis_size - N).llt().solve(rhs.tail(basis_size - N));

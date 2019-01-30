@@ -96,10 +96,7 @@ compute_errors(const Mesh& msh,
 
             if (msh.is_boundary(fc))
             {
-                auto fb = disk::make_vector_monomial_basis(msh, fc, hdi.face_degree());
-                Matrix<scalar_type, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, hdi.face_degree());
-                Matrix<scalar_type, Dynamic, 1> rhs = make_rhs(msh, fc, fb, velocity, hdi.face_degree());
-                svel.block(cbs + i * fbs, 0, fbs, 1) = mass.llt().solve(rhs);
+                svel.block(cbs + i * fbs, 0, fbs, 1) = project_function(msh, fc, hdi.face_degree(), velocity, 2);
             }
             else
             {

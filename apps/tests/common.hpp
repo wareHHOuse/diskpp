@@ -86,6 +86,57 @@ auto make_scalar_testing_data(const Mesh& msh)
 
 /*****************************************************************************************/
 template<typename Mesh>
+struct scalar_testing_function_grad;
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+struct scalar_testing_function_grad<Mesh<T, 2, Storage>>
+{
+    typedef Mesh<T, 2, Storage>                 mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef Matrix<scalar_type, 2, 1>           vector_type;
+
+    vector_type
+    operator()(const point_type& pt) const
+    {
+        vector_type ret;
+        ret(0) = M_PI * std::cos(M_PI * pt.x()) * std::sin(M_PI * pt.y());
+        ret(1) = M_PI * std::sin(M_PI * pt.x()) * std::cos(M_PI * pt.y());
+
+        return ret;
+    }
+};
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+struct scalar_testing_function_grad<Mesh<T, 3, Storage>>
+{
+    typedef Mesh<T, 3, Storage>                 mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef Matrix<scalar_type, 3, 1>           vector_type;
+
+    vector_type
+    operator()(const point_type& pt) const
+    {
+        vector_type ret;
+        ret(0) = M_PI * std::cos(M_PI * pt.x()) * std::sin(M_PI * pt.y()) * std::sin(M_PI * pt.z());
+        ret(1) = M_PI * std::sin(M_PI * pt.x()) * std::cos(M_PI * pt.y()) * std::sin(M_PI * pt.z());
+        ret(2) = M_PI * std::sin(M_PI * pt.x()) * std::sin(M_PI * pt.y()) * std::cos(M_PI * pt.z());
+
+        return ret;
+    }
+};
+
+
+template<typename Mesh>
+auto
+make_scalar_testing_data_grad(const Mesh& msh)
+{
+    return scalar_testing_function_grad<Mesh>();
+}
+
+/*****************************************************************************************/
+template<typename Mesh>
 struct vector_testing_function;
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>

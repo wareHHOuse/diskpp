@@ -292,18 +292,18 @@ main(int argc, char** argv)
     disk::MaterialData<RealType> material_data;
 
     // // Cook Parameters (mm, MPa, kN)
-    RealType E  = 206.9;
-    RealType nu = 0.29;
+    // RealType E  = 206.9;
+    // RealType nu = 0.29;
 
-    material_data.setMu(E, nu);
-    material_data.setLambda(E, nu);
+    // material_data.setMu(E, nu);
+    // material_data.setLambda(E, nu);
 
-    readCurve("VEM2_2d.dat", material_data);
+    // readCurve("VEM2_2d.dat", material_data);
 
     // material_data.setK(0.0);
     // material_data.setH(E, 0.13, 0.0);
 
-    material_data.setSigma_y0(0.450);
+    // material_data.setSigma_y0(0.450);
 
     // Old cook
     // RealType E  = 70;
@@ -316,40 +316,15 @@ main(int argc, char** argv)
     // material_data.setSigma_y0(0.243);
 
     // Sphere Parameters (mm, MPa, kN)
-    // RealType E = 28.95;
-    // RealType nu = 0.488;
-    // RealType ET = 0;
+    RealType E = 28.95;
+    RealType nu = 0.3;
+    RealType ET = 0;
 
-    // material_data.setMu(E, nu);
-    // material_data.setLambda(E, nu);
-    // material_data.setK(0);
-    // material_data.setH(0.0);
-    // material_data.setSigma_y0(6);
-
-
-    // Cylindre Parameters (mm, MPa, kN)
-    // RealType E = 198000;
-    // RealType nu = 0.3;
-    //
-    // material_data.setMu(E, nu);
-    // material_data.setLambda(E, nu);
-    //
-    // material_data.setK(0);
-    // material_data.setH(1000.);
-    //
-    // material_data.setSigma_y0(1000);
-
-    // Test aster Parameters (mm, GPa, kN)
-    // RealType E  = 1;
-    // RealType nu = 0.32;
-    //
-    // material_data.setMu(E, nu);
-    // material_data.setLambda(E, nu);
-    //
-    // material_data.setK(0.0);
-    // material_data.setH(2000);
-    //
-    // material_data.setSigma_y0(0.5);
+    material_data.setMu(E, nu);
+    material_data.setLambda(E, nu);
+    material_data.setK(0);
+    material_data.setH(0.0);
+    material_data.setSigma_y0(6);
 
     int ch;
 
