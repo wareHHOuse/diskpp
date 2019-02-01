@@ -29,6 +29,8 @@
 
 #include <vector>
 
+#include "bases_scalar.hpp"
+#include "bases_vector.hpp"
 #include "common/eigen.hpp"
 
 namespace disk
@@ -678,16 +680,7 @@ matrix_basis_size_RT(size_t k, size_t sd, size_t md)
     if (k <= 0)
         throw std::invalid_argument("Raviart-Thomas basis: degree has to be > 0");
 
-    const auto mb_size = matrix_basis_size(k - 1, sd, md);
-
-    size_t deg = 0;
-    if (k > 2)
-        deg = k - 2;
-
-    const auto beg = scalar_basis_size(deg, sd);
-    const auto end = scalar_basis_size(k - 1, sd);
-
-    return mb_size + sd * (end - beg);
+    return sd * vector_basis_size_RT(k, sd, md);
 }
 
 // RT^{k}(T; R^{dxd}) = P^{k-1}(T;R^{dxd}) +  P^{k-1,H}(T;R^d) otimes x)
@@ -754,10 +747,9 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
         std::move(mb.begin(), mb.end(), std::back_inserter(ret));
 
         const auto sphi = scalar_basis.eval_functions(pt);
-        size_t     deg  = 0;
-        if (basis_degree > 2)
-            deg = basis_degree - 2;
-        const auto beg = scalar_basis_size(deg, 3);
+        size_t     beg  = 0;
+        if (basis_degree >= 2)
+            beg = scalar_basis_size(basis_degree - 2, 3);
 
         Matrix<scalar_type, 1, 3> row;
 
@@ -836,10 +828,9 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
         std::move(mb.begin(), mb.end(), std::back_inserter(ret));
 
         const auto sphi = scalar_basis.eval_functions(pt);
-        size_t     deg  = 0;
-        if (basis_degree > 2)
-            deg = basis_degree - 2;
-        const auto beg = scalar_basis_size(deg, 2);
+        size_t     beg  = 0;
+        if (basis_degree >= 2)
+            beg = scalar_basis_size(basis_degree - 2, 2);
 
         Matrix<scalar_type, 1, 2> row;
 
@@ -886,11 +877,9 @@ sym_matrix_basis_size_RT(size_t k, size_t sd, size_t md)
 
     const auto smb_size = sym_matrix_basis_size(k - 1, sd, md);
 
-    size_t deg = 0;
-    if (k > 2)
-        deg = k - 2;
-
-    const auto beg = scalar_basis_size(deg, sd);
+    size_t beg = 0;
+    if (k >= 2)
+        beg = scalar_basis_size(k - 2, sd);
     const auto end = scalar_basis_size(k - 1, sd);
 
     return smb_size + sd * (end - beg);
@@ -960,10 +949,9 @@ class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 
         std::move(smb.begin(), smb.end(), std::back_inserter(ret));
 
         const auto sphi = scalar_basis.eval_functions(pt);
-        size_t     deg  = 0;
-        if (basis_degree > 2)
-            deg = basis_degree - 2;
-        const auto beg = scalar_basis_size(deg, 3);
+        size_t     beg  = 0;
+        if (basis_degree >= 2)
+            beg = scalar_basis_size(basis_degree - 2, 2);
 
         function_type mat1 = function_type::Zero();
 
@@ -1056,10 +1044,9 @@ class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 
         std::move(smb.begin(), smb.end(), std::back_inserter(ret));
 
         const auto sphi = scalar_basis.eval_functions(pt);
-        size_t     deg  = 0;
-        if (basis_degree > 2)
-            deg = basis_degree - 2;
-        const auto beg = scalar_basis_size(deg, 2);
+        size_t     beg  = 0;
+        if (basis_degree >= 2)
+            beg = scalar_basis_size(basis_degree - 2, 2);
 
         function_type mat1 = function_type::Zero();
 

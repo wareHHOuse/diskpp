@@ -29,6 +29,7 @@
 
 #include <vector>
 
+#include "bases_scalar.hpp"
 #include "common/eigen.hpp"
 
 using namespace Eigen;
@@ -574,10 +575,9 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
         ret.block(0,0, vector_basis.size(), 3) = vector_basis.eval_functions(pt);
 
         const auto sphi = scalar_basis.eval_functions(pt);
-        size_t     deg    = 0;
-        if(basis_degree > 2)
-            deg = basis_degree - 2;
-        const auto beg    = scalar_basis_size(deg, 3);
+        size_t     beg  = 0;
+        if (basis_degree >= 2)
+            beg = scalar_basis_size(basis_degree - 2, 3);
         const auto offset = vector_basis.size();
 
         // compute x P^(k-1)_H (monomial of degree exactly k - 1)
@@ -600,10 +600,9 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
 
         const auto sphi   = scalar_basis.eval_functions(pt);
         const auto sdphi  = scalar_basis.eval_gradients(pt);
-        size_t     deg    = 0;
-        if (basis_degree > 2)
-            deg = basis_degree - 2;
-        const auto beg    = scalar_basis_size(deg, 3);
+        size_t     beg    = 0;
+        if (basis_degree >= 2)
+            beg = scalar_basis_size(basis_degree - 2, 3);
         const auto offset = vector_basis.size();
 
         /// compute P^(k-1)_H + x.grad(P^(k-1)_H) (monomial of degree exactly k - 1)
@@ -670,10 +669,9 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
         ret.block(0, 0, vector_basis.size(), 2) = vector_basis.eval_functions(pt);
 
         const auto sphi   = scalar_basis.eval_functions(pt);
-        size_t     deg    = 0;
-        if (basis_degree > 2)
-            deg = basis_degree - 2;
-        const auto beg    = scalar_basis_size(deg, 2);
+        size_t     beg    = 0;
+        if (basis_degree >= 2)
+            beg = scalar_basis_size(basis_degree - 2, 2);
         const auto offset = vector_basis.size();
 
         // compute x P^(k-1)_H (monomial of degree exactly k - 1)
@@ -695,10 +693,9 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
 
         const auto sphi   = scalar_basis.eval_functions(pt);
         const auto sdphi  = scalar_basis.eval_gradients(pt);
-        size_t     deg    = 0;
-        if (basis_degree > 2)
-            deg = basis_degree - 2;
-        const auto beg    = scalar_basis_size(deg, 2);
+        size_t     beg    = 0;
+        if (basis_degree >= 2)
+            beg = scalar_basis_size(basis_degree - 2, 2);
         const auto offset = vector_basis.size();
 
         /// compute P^(k-1)_H + x.grad(P^(k-1)_H) (monomial of degree exactly k - 1)
