@@ -50,7 +50,6 @@ test_mesh_format(const std::vector<std::string>& paths,
                  const std::string& output_basename)
 {}
 
-
 template<typename MeshType, typename LoaderType>
 bool
 verify_convergence(const std::vector<std::string>& paths,
@@ -85,8 +84,9 @@ verify_convergence(const std::vector<std::string>& paths,
                 return false;
             }
             loader.populate_mesh(msh);
+            renumber_boundaries(msh);
             auto diam = average_diameter(msh);
-            auto error_full = run_diffusion_solver(msh, ap, eta);
+            auto error_full = run_diffusion_solver(msh, ap);
 
             errdiams.push_back( std::make_pair(diam, error_full) );
 
@@ -287,6 +287,34 @@ void test_hexagons_generic(test_type tt, algorithm_parameters<double>& ap, const
     }
 }
 
+void test_quadrangles(test_type tt, algorithm_parameters<double>& ap, const double& eta)
+{
+    size_t runs = 2;
+
+    std::vector<std::string> paths;
+    paths.push_back("../../../diskpp/meshes/2D_quads/diskpp/test_x16_y8.quad");
+    paths.push_back("../../../diskpp/meshes/2D_quads/diskpp/test_x32_y16.quad");
+    paths.push_back("../../../diskpp/meshes/2D_quads/diskpp/test_x64_y32.quad");
+    paths.push_back("../../../diskpp/meshes/2D_quads/diskpp/test_x128_y64.quad");
+
+    typedef disk::cartesian_mesh<double, 2>       MT;
+    typedef disk::cartesian_mesh_loader<double, 2>  LT;
+    switch(tt)
+    {
+        case TEST_MEASURE_TIMES:
+            test_mesh_format<MT, LT>(paths, runs, 0, 3, "quadrangle_diskpp");
+            break;
+
+        case TEST_VERIFY_CONVERGENCE:
+            verify_convergence<MT, LT>(paths, 0, 3, ap, eta);
+            break;
+
+        default:
+            std::cout << "[ Unavailable Test ]" << std::endl;
+            return;
+    }
+}
+
 void test_hextri_generic(test_type tt, algorithm_parameters<double>& ap, const double& eta)
 {
     size_t runs = 2;
@@ -348,7 +376,6 @@ void test_kershaw_2d(test_type tt, algorithm_parameters<double>& ap, const doubl
     }
 }
 
-
 int main(int argc, char **argv)
 {
     test_type tt = TEST_VERIFY_CONVERGENCE;
@@ -356,7 +383,7 @@ int main(int argc, char **argv)
     algorithm_parameters<double> ap;
     double parameter = 1.;
 
-    while ( (ch = getopt(argc, argv, "g:npzfcle:tv")) != -1 )
+    while ( (ch = getopt(argc, argv, "g:npzfcltv")) != -1 )
     {
         switch(ch)
         {
@@ -387,17 +414,6 @@ int main(int argc, char **argv)
             case 'l':
                 ap.solver = EVAL_IN_CELLS_FULL;
                 break;
-            case 'e':
-                ap.solver = EVAL_WITH_PARAMETER;
-                std::cout << "choosing parameter" << std::endl;
-                parameter = atof(optarg);
-                if (parameter < 0  || parameter > 1 )
-                {
-                    std::cout << "parameter must be in [0 1]. Falling back to 0.5" << std::endl;
-                    parameter = 0.5;
-                }
-                std::cout << "parameter :"<< parameter << std::endl;
-                break;
             case 't':
                 tt = TEST_MEASURE_TIMES;
                 break;
@@ -414,6 +430,7 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
+    std::cout << ap << std::endl;
     std::cout << bold << underline << "Triangles for contact" << reset << std::endl;
     test_triangles(tt, ap, parameter);
 
@@ -423,9 +440,13 @@ int main(int argc, char **argv)
     std::cout << bold << underline << "Hexagons" << reset << std::endl;
     test_hexagons_generic(tt, ap, parameter);
 
-    std::cout << bold << underline << "Triangles generic" << reset << std::endl;
-    test_triangles_generic(tt, ap, parameter);
+    std::cout << bold << underline << "Quadrangles" << reset << std::endl;
+    test_quadrangles(tt, ap, parameter);
 
-    std::cout << bold << underline << "Kershaw 2D" << reset << std::endl;
-    test_kershaw_2d(tt, ap, parameter);
+
+    //std::cout << bold << underline << "Triangles generic" << reset << std::endl;
+    //test_triangles_generic(tt, ap, parameter);
+
+    //std::cout << bold << underline << "Kershaw 2D" << reset << std::endl;
+    //test_kershaw_2d(tt, ap, parameter);
 }

@@ -46,7 +46,6 @@ int main(int argc, char **argv)
 
     int ch;
     algorithm_parameters<T> ap;
-    T parameter = 1;
     size_t degree = 1;
 
     while ( (ch = getopt(argc, argv, "k:g:npzfl")) != -1 )
@@ -83,14 +82,8 @@ int main(int argc, char **argv)
             case 'f':
                 ap.solver = EVAL_ON_FACES;
                 break;
-            //case 'c':
-            //    ap.solver = EVAL_IN_CELLS;
-            //    break;
             case 'l':
                 ap.solver = EVAL_IN_CELLS_FULL;
-                break;
-            //case 'o':
-            //    ap.solver = EVAL_IN_CELLS_AS_FACES;
                 break;
             case '?':
             default:
@@ -110,7 +103,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
         auto msh = disk::load_fvca5_2d_mesh<T>(mesh_filename);
-        auto error = run_diffusion_solver(msh, ap, parameter);
+        auto error = run_diffusion_solver(msh, ap);
         return 0;
     }
 
@@ -119,19 +112,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
         auto msh = disk::load_netgen_2d_mesh<T>(mesh_filename);
-
-        std::cout << msh.faces_size() << std::endl;
-
-        auto error = run_diffusion_solver(msh, ap, parameter);
-
-        auto H1_error = std::get<0>(error);
-        auto L2_error = std::get<1>(error);
-        auto Linf_error = std::get<2>(error);
-
-        std::cout << average_diameter(msh) <<":    ";
-        std::cout << " " <<  H1_error << " " << L2_error <<"  " << Linf_error << "  ";
-        std::cout << std::endl;
-
+        auto error = run_diffusion_solver(msh, ap);
         return 0;
     }
 
@@ -140,7 +121,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
         auto msh = disk::load_cartesian_2d_mesh<T>(mesh_filename);
-        auto error = run_diffusion_solver(msh, ap, parameter);
+        auto error = run_diffusion_solver(msh, ap);
         return 0;
     }
 

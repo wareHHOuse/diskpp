@@ -223,7 +223,6 @@ run_hho_diffusion_nitsche_faces(const Mesh& msh,
             inf_errors.push_back( std::abs(hho_eval -realeval));
         }
 
-
         auto bar = barycenter(msh, cl);
 
         for (size_t i = 0; i < Mesh::dimension; i++)
@@ -250,8 +249,7 @@ template<typename Mesh>
 auto
 run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
     const algorithm_parameters<typename Mesh::coordinate_type>& ap,
-    const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
-    const typename Mesh::coordinate_type& eta)
+    const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
 {
     using T =  typename Mesh::coordinate_type;
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
@@ -266,6 +264,9 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
 
     auto rhs_fun = make_rhs_function(msh);
     auto sol_fun = make_solution_function(msh);
+
+    // Mixed assembler: to allow Dirichlet with Nitsche's method and by imposition
+    //                  of the values on the boundary faces
     auto assembler = make_mix_full_assembler(msh, hdi, bnd);
 
     auto cl_count = 0;
@@ -286,8 +287,8 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
             matrix_type Ah  = gr.second + stab;
             vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun);//, hdi.cell_degree());
 
-            matrix_type Aconsist   = make_hho_consist_mix_par(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, eta, bnd);
-            auto ntz   = make_hho_nitsche_mix_par(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun, eta, bnd );
+            matrix_type Aconsist = make_hho_consist_mix(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, bnd);
+            auto ntz  = make_hho_nitsche_mix(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun, bnd);
             matrix_type Anitsche  = ntz.first;
             vector_type Bnitsche  = ntz.second;
 
@@ -300,7 +301,6 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
         {
             auto gr   = make_hho_scalar_laplacian(msh, cl, hdi);
             auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
-            //auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
 
             vector_type Lh = make_rhs(msh, cl, cb, rhs_fun);//, hdi.cell_degree());
             matrix_type Ah = gr.second + stab;
@@ -347,8 +347,8 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
             matrix_type Ah  = gr.second + stab;
             vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun);//, hdi.cell_degree());
 
-            matrix_type Aconsist   = make_hho_consist_mix_par(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, eta, bnd);
-            auto ntz   = make_hho_nitsche_mix_par(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun, eta, bnd );
+            matrix_type Aconsist = make_hho_consist_mix(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta,  bnd);
+            auto ntz  = make_hho_nitsche_mix(msh, cl, hdi, gr.first, ap.gamma_0, ap.theta, sol_fun, bnd );
             matrix_type Anitsche  = ntz.first;
             vector_type Bnitsche  = ntz.second;
 
@@ -390,7 +390,6 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
             inf_errors.push_back( std::abs(hho_eval -realeval));
         }
 
-
         auto bar = barycenter(msh, cl);
 
         for (size_t i = 0; i < Mesh::dimension; i++)
@@ -415,19 +414,16 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
 
         cl_count++;
     }
+    ofs.close();
 
     auto itor = std::max_element(inf_errors.begin(), inf_errors.end());
     size_t distance = std::distance(inf_errors.begin(), itor);
     auto Linf_error = *std::next(inf_errors.begin(), distance);
 
-
-    ofs.close();
-
     H1_error = std::sqrt(H1_error);
     L2_error = std::sqrt(L2_error);
 
     auto error = std::make_tuple(H1_error, L2_error, Linf_error);
-    //std::cout << std::sqrt(error) << std::endl;
 
     return error;
 }
@@ -435,8 +431,7 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
 
 template<typename Mesh, typename T>
 auto
-run_diffusion_solver(const Mesh& msh, const algorithm_parameters<T>& ap,
-                     const T& eta)
+run_diffusion_solver(const Mesh& msh, const algorithm_parameters<T>& ap)
 {
 
     dump_to_matlab(msh,"mesh.m");
@@ -472,33 +467,22 @@ run_diffusion_solver(const Mesh& msh, const algorithm_parameters<T>& ap,
         //return  -M_PI * cos_px * sin_py;
     };
 
-    /*--------------------------------------------------------------------------
-    *  Check boundary labels for the unitary square domain
-    *          Netgen     __1__          Medit     __1__
-    *                4   |     | 2                |     |
-    *                    |_____|                  |_____|
-    *                       3                        2
-    *-------------------------------------------------------------------------*/
     /* DIRICHLET conditions can be enforced in strong way using addDirichletBC
     *  or in a weak form with Nitsche's method using addContactBC
     */
     //test 1:
-    //#if 0
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET,1, sol_fun); //TOP
-    //bnd.addContactBC(disk::mechanics::SIGNORINI, 1); //TOP
-    bnd.addContactBC(disk::mechanics::SIGNORINI, 3); //
-    bnd.addNeumannBC(disk::mechanics::NEUMANN, 4, neu_left); //
-    bnd.addNeumannBC(disk::mechanics::NEUMANN, 2, neu_right); //
-    //#endif
-
-    //test 2 : All boundaries with DIRICHLET enforced via Nitsche's method
     #if 0
-    bnd.addContactBC(disk::mechanics::SIGNORINI, 1); //
-    bnd.addContactBC(disk::mechanics::SIGNORINI, 2); //
-    bnd.addContactBC(disk::mechanics::SIGNORINI, 3); //
-    bnd.addContactBC(disk::mechanics::SIGNORINI, 4); //
+    bnd.addDirichletBC(disk::mechanics::DIRICHLET,1, sol_fun);
+    bnd.addContactBC(disk::mechanics::SIGNORINI, 3);
+    bnd.addNeumannBC(disk::mechanics::NEUMANN, 4, neu_left);
+    bnd.addNeumannBC(disk::mechanics::NEUMANN, 2, neu_right);
     #endif
 
+    //test 2 : All boundaries with DIRICHLET enforced via Nitsche's method
+    bnd.addContactBC(disk::mechanics::SIGNORINI, 1);
+    bnd.addContactBC(disk::mechanics::SIGNORINI, 2);
+    bnd.addContactBC(disk::mechanics::SIGNORINI, 3);
+    bnd.addContactBC(disk::mechanics::SIGNORINI, 4);
 
     std::tuple<T, T, T> error;
     switch (ap.solver)
@@ -507,10 +491,9 @@ run_diffusion_solver(const Mesh& msh, const algorithm_parameters<T>& ap,
             error = run_hho_diffusion_nitsche_faces(msh,  ap); // Just for test 1.
             break;
         case EVAL_IN_CELLS_FULL:
-            error = run_hho_diffusion_nitsche_cells_full(msh, ap, bnd, eta);
+            error = run_hho_diffusion_nitsche_cells_full(msh, ap, bnd);
             break;
         case EVAL_IN_CELLS:
-        case EVAL_WITH_PARAMETER:
         case EVAL_IN_CELLS_AS_FACES:
         default:
             std::cout << "Not valid in this case. Choose only full cells (l)" << std::endl;

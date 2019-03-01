@@ -44,7 +44,51 @@
 #include "contrib/colormanip.h"
 
 #include "core/output/hdf5_io.hpp"
- #include "signorini_newton_solver.hpp"
+#include "signorini_newton_solver.hpp"
+
+template<template<typename, size_t, typename> class Mesh,
+       typename T, typename Storage>
+void
+renumber_boundaries(Mesh<T,2,Storage>& msh)
+{
+    auto storage = msh.backend_storage();
+
+    for(size_t i = 0; i < msh.faces_size(); i++)
+    {
+        auto edge = *std::next(msh.faces_begin(), i);
+        auto bar = barycenter(msh, edge);
+
+        auto is_close_to = [](T val, T ref) -> bool {
+            T eps = 1e-7;
+            return std::abs(val - ref) < eps;
+        };
+
+        if (!storage->boundary_info.at(i).is_boundary)
+            continue;
+
+        size_t bid = 42;
+
+        #if 0
+         if ( is_close_to(bar.y(), 0.0) ) bid = 1;
+         if ( is_close_to(bar.x(), 1.0) ) bid = 2;
+         if ( is_close_to(bar.y(), -1.0) ) bid = 3;
+         if ( is_close_to(bar.x(), -1.0) ) bid = 4;
+         #endif
+
+         if ( is_close_to(bar.y(), 1.0) ) bid = 1;
+         if ( is_close_to(bar.x(), 1.0) ) bid = 2;
+         if ( is_close_to(bar.y(), 0.0) ) bid = 3;
+         if ( is_close_to(bar.x(), 0.0) ) bid = 4;
+
+         if (bid == 42)
+         {
+             std::cout << " bar = "<< bar << std::endl;
+             throw std::logic_error("Can not locate the edge");
+         }
+
+         storage->boundary_info.at(i).boundary_id = bid;
+     }
+ }
 
 template<typename T>
 class hierarchical_contact_solver
@@ -208,7 +252,7 @@ class hierarchical_contact_solver
             }
 
             loader.populate_mesh(msh);
-
+            renumber_boundaries(msh);
             mesh_hier.build_hierarchy(msh, hierarchy_levels);
 
             std::cout << "Mesh avg. diameter: " << average_diameter(msh) << std::endl;
@@ -990,6 +1034,7 @@ public:
             silo_db.create(visit_output_filename);
 
             auto sol_msh = *std::next(mesh_hier.meshes_begin(), level);
+            renumber_boundaries(sol_msh);
             //run_fem_hho(level, ref_msh, sol_msh);
             run_hho_hho(level, ref_msh, sol_msh);
             silo_db.close();

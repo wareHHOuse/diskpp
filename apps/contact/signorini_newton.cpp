@@ -36,49 +36,6 @@
  #include "core/loaders/loader.hpp"
  #include "signorini_newton_solver.hpp"
 
-template<template<typename, size_t, typename> class Mesh,
-      typename T, typename Storage>
-void
-renumber_boundaries(Mesh<T,2,Storage>& msh)
-{
-    auto storage = msh.backend_storage();
-
-    for(size_t i = 0; i < msh.faces_size(); i++)
-    {
-        auto edge = *std::next(msh.faces_begin(), i);
-        auto bar = barycenter(msh, edge);
-
-        auto is_close_to = [](T val, T ref) -> bool {
-            T eps = 1e-7;
-            return std::abs(val - ref) < eps;
-        };
-
-        if (!storage->boundary_info.at(i).is_boundary)
-            continue;
-
-        size_t bid = 42;
-
-        #if 0
-        if ( is_close_to(bar.y(), 0.0) ) bid = 1;
-        if ( is_close_to(bar.x(), 1.0) ) bid = 2;
-        if ( is_close_to(bar.y(), -1.0) ) bid = 3;
-        if ( is_close_to(bar.x(), -1.0) ) bid = 4;
-        #endif
-
-        if ( is_close_to(bar.y(), 1.0) ) bid = 1;
-        if ( is_close_to(bar.x(), 1.0) ) bid = 2;
-        if ( is_close_to(bar.y(), 0.0) ) bid = 3;
-        if ( is_close_to(bar.x(), 0.0) ) bid = 4;
-
-        if (bid == 42)
-        {
-            std::cout << " bar = "<< bar << std::endl;
-            throw std::logic_error("Can not locate the edge");
-        }
-
-        storage->boundary_info.at(i).boundary_id = bid;
-    }
-}
 
 int main(int argc, char **argv)
 {
@@ -135,17 +92,6 @@ int main(int argc, char **argv)
             case 'o':
                 ap.solver = EVAL_IN_CELLS_AS_FACES;
                 break;
-            case 'e':
-                ap.solver = EVAL_WITH_PARAMETER;
-                parameter = atof(optarg);
-                if (parameter < 0  || parameter > 1 )
-                {
-                    std::cout << "parameter must be in [0 1]. Falling back to 0.5" << std::endl;
-                    parameter = 0.5;
-                }
-                std::cout << "Choosing parameter: "<< parameter << std::endl;
-                break;
-
             case '?':
             default:
                 std::cout << "wrong arguments" << std::endl;
@@ -175,7 +121,8 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        run_signorini(msh, ap, parameter, run_exact);
+        run_signorini(msh, ap, run_exact);
+        return 0;
     }
 
     /* FVCA5 2D */
@@ -183,11 +130,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
         auto msh = disk::load_fvca5_2d_mesh<T>(filename);
-
-        renumber_boundaries(msh);
-
-        run_signorini(msh, ap, parameter, run_exact);
-
+        run_signorini(msh, ap, run_exact);
         return 0;
     }
 
@@ -196,10 +139,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
         auto msh = disk::load_cartesian_2d_mesh<T>(filename);
-
-        renumber_boundaries(msh);
-        run_signorini(msh, ap, parameter, run_exact);
-
+        run_signorini(msh, ap, run_exact);
         return 0;
     }
 
