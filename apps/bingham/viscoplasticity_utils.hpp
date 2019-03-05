@@ -93,6 +93,49 @@ struct bingham_data
 
 };
 
+template<template<typename, size_t, typename> class Mesh,
+      typename T, typename Storage>
+void
+renumber_boundaries(Mesh<T,2,Storage>& msh, T a = 1., T b = 1., T c = 0., T d = 0.)
+{
+    /*--------------------------------------------------------------------------
+    *  Unification of boundary labels for a square domain
+    *   Netgen     __1__          Medit     __1__              __1__
+    *         4   |     | 2                |     |    =>    4 |     | 2
+    *             |_____|                  |_____|            |____ |
+    *                3                        2                  3
+    *-------------------------------------------------------------------------*/
+
+    auto storage = msh.backend_storage();
+
+    for(size_t i = 0; i < msh.faces_size(); i++)
+    {
+        auto edge = *std::next(msh.faces_begin(), i);
+        auto bar = barycenter(msh, edge);
+
+        auto is_close_to = [](T val, T ref) -> bool {
+            T eps = 1e-7;
+            return std::abs(val - ref) < eps;
+        };
+
+        if (!storage->boundary_info.at(i).is_boundary)
+            continue;
+
+        size_t bid = 42;
+
+        if ( is_close_to(bar.y(), a) ) bid = 1;
+        if ( is_close_to(bar.x(), b) ) bid = 2;
+        if ( is_close_to(bar.y(), c) ) bid = 3;
+        if ( is_close_to(bar.x(), d) ) bid = 4;
+
+        if (bid == 42)
+            throw std::logic_error("Can not locate the edge");
+
+        storage->boundary_info.at(i).boundary_id = bid;
+    }
+}
+
+
 template<typename Mesh>
 auto
 make_scalar_solution_offset(const Mesh& msh, const hho_degree_info& hdi)
@@ -116,11 +159,11 @@ make_scalar_solution_offset(const Mesh& msh, const hho_degree_info& hdi)
 
 
 template<typename Mesh>
-std::vector<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+eigen_compatible_stdvector<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
 tensor_initialize(const Mesh& msh, const size_t quad_degree, const size_t tsr_degree)
 {
     using T = typename Mesh::coordinate_type;
-    std::vector<Matrix<T, Dynamic, Dynamic>> ret(msh.cells_size());
+    eigen_compatible_stdvector<Matrix<T, Dynamic, Dynamic>> ret(msh.cells_size());
 
     auto sbs = sym_matrix_basis_size(tsr_degree, Mesh::dimension, Mesh::dimension);
     auto cell_i = 0;

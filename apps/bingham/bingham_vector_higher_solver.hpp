@@ -43,7 +43,7 @@
 #include "viscoplasticity_utils.hpp"
 
 template<typename Mesh>
-class ADDM
+class ADMM
 {
     typedef Mesh mesh_type;
     typedef typename mesh_type::coordinate_type     T;
@@ -58,15 +58,15 @@ class ADDM
 
     hho_degree_info         di;
     bingham_data<T, vector_problem>     vp;
-    std::vector<matrix_type>         multiplier;
-    std::vector<matrix_type>         auxiliar;
-    std::vector<matrix_type>         auxiliar_old;
+    eigen_compatible_stdvector<matrix_type>         multiplier;
+    eigen_compatible_stdvector<matrix_type>         auxiliar;
+    eigen_compatible_stdvector<matrix_type>         auxiliar_old;
 
 public:
     vector_type             sol_old, sol;
     std::tuple<T, T, T, T, T>         convergence;
 
-    ADDM(const Mesh  & msh,
+    ADMM(const Mesh  & msh,
          const hho_degree_info  & hdi,
          const bingham_data< typename Mesh::coordinate_type , vector_problem> & vp_ext):
          di(hdi), vp(vp_ext)
@@ -85,7 +85,8 @@ public:
         {
             vector_type u_TF  = assembler.take_velocity(msh, cl, sol_old);
             auto value = 1./(2. * (vp.mu + vp.alpha));
-            auto G = make_hlow_stokes(msh, cl, di, true);
+            //auto G = make_hlow_stokes(msh, cl, di, true);
+            auto G  = make_hho_sym_gradrec_matrix(msh, cl, di);
             auto cl_id = msh.lookup(cl);
 
             auto sb  = make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
@@ -114,7 +115,9 @@ public:
                 bool running_stokes = (vp.yield < 1.e-12 || iter == 0)? true : false;
 
                 if( theta_norm > std::sqrt(2) * vp.yield * (1 + epsilon) && !running_stokes)
+                {
                     gamma.block( 0, qp_count, sbs, 1) =  value * theta_qp * (1. - std::sqrt(2) * (vp.yield/theta_norm));
+                }
 
                 qp_count++;
             }
@@ -134,6 +137,7 @@ public:
         {
             auto cl_id = msh.lookup(cl);
             auto G   = disk::make_hlow_stokes(msh, cl, di, true);
+            //auto G   = make_hho_sym_gradrec_matrix(msh, cl, di);
             auto qps = integrate(msh, cl, 2 * di.face_degree());
             vector_type unow = assembler.take_velocity(msh, cl, sol);
             matrix_type gamma = matrix_type::Zero(sbs, qps.size());
@@ -173,8 +177,8 @@ public:
             vector_type u_now = assembler.take_velocity(msh, cl, sol);
             vector_type u_old = assembler.take_velocity(msh, cl, sol_old);
 
-            auto G = disk::make_hlow_stokes(msh, cl, di, true);
-
+            //auto G = disk::make_hlow_stokes(msh, cl, di, true);
+            auto G = make_hho_sym_gradrec_matrix(msh, cl, di);
             vector_type  Guold = G.first * u_old;
             vector_type  Gunow = G.first * u_now;
             vector_type  diff_grad =  coef_admm * (Gunow - Guold);
@@ -252,7 +256,7 @@ public:
 
     template<typename Assembler>
     vector_type
-    make_rhs_addm(  const mesh_type& msh,
+    make_rhs_admm(  const mesh_type& msh,
                     const cell_type& cl,
                     const Assembler& assembler,
                     const size_t iter)
@@ -263,6 +267,7 @@ public:
         auto sbs = sym_matrix_basis_size(di.face_degree(), dim, dim);
 
         auto G  = make_hlow_stokes(msh, cl, di, true);
+        //auto G  = make_hho_sym_gradrec_matrix(msh, cl, di);
         auto cb = make_vector_monomial_basis(msh, cl, di.cell_degree());
         auto sb = make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
 
@@ -277,7 +282,6 @@ public:
         };
         rhs.block( 0, 0, cbs, 1) = make_rhs(msh, cl, cb, rhs_fun_test);
 
-
         //2. (stress - 2 alpha * gamma, Gv)
         matrix_type   stress = multiplier.at(cl_id);
         matrix_type   gamma  = auxiliar.at(cl_id);
@@ -291,7 +295,6 @@ public:
             auto s_phi  = sb.eval_functions(qp.point());
             matrix_type mm = priv::outer_product(s_phi, s_phi);
             vector_type str_agam_qp  = str_agam.block(0, qp_count, sbs, 1);
-
             rhs -= qp.weight() * G.first.transpose() * mm * str_agam_qp;
             qp_count++;
         }
@@ -307,7 +310,7 @@ public:
 
         for (auto& cl : msh)
         {
-            vector_type local_rhs = make_rhs_addm(msh, cl, assembler, iter);
+            vector_type local_rhs = make_rhs_admm(msh, cl, assembler, iter);
             assembler.assemble_rhs(msh, cl, local_rhs);
         }
         assembler.finalize_rhs();
@@ -325,9 +328,9 @@ public:
         for (auto& cl : msh)
         {
             auto gr = disk::make_hho_stokes(msh, cl, di, true);
-            auto G  = disk::make_hlow_stokes(msh, cl, di, true);
-            matrix_type dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
-
+            //auto G  = disk::make_hlow_stokes(msh, cl, di, true);
+            auto G  = make_hho_sym_gradrec_matrix(msh, cl, di);
+            matrix_type dr   = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
             matrix_type stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
             matrix_type A    = 2. * ( coef_admm * G.second +  vp.mu * stab);
 
@@ -342,6 +345,7 @@ public:
     post_processing(const mesh_type& msh, Assembler& assembler, const size_t iter,
                     const bool stop)
     {
+
         auto dim = Mesh::dimension;
         auto rbs = vector_basis_size(di.reconstruction_degree(), dim, dim);
         auto cbs = vector_basis_size(di.cell_degree(), dim, dim);
@@ -376,7 +380,8 @@ public:
             cell_rec_sol.block(cell_id * rbs, 0, dim, 1)  = svel.block(0,0, dim, 1);
             cell_sol.block(cell_id * cbs, 0, cbs, 1) = svel.block(0,0, cbs, 1);
 
-            auto G  = make_hlow_stokes(msh, cl, di, true);
+            //auto G  = make_hlow_stokes(msh, cl, di, true);
+            auto G  = make_hho_sym_gradrec_matrix(msh, cl, di);
             auto cb = make_vector_monomial_basis(msh, cl, di.cell_degree());
             auto pb = make_scalar_monomial_basis(msh, cl, di.face_degree());
             auto sb = make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
@@ -414,16 +419,9 @@ public:
                 ofs << theta_eval.norm() << " " << sigma_eval.norm()   << " ";
                 ofs << divergence << " " << trace_stress << std::endl;
 
-                if( di.cell_degree() == 0 && di.face_degree() == 0 )
-                {
-                    e_theta.push_back( theta_eval.norm() );
-                    e_sigma.push_back( sigma_eval.norm() );
-                }
-
                 qps_count++;
             }
-
-                auto bar = barycenter(msh, cl);
+            auto bar = barycenter(msh, cl);
             auto v_phi  = cb.eval_functions(bar);
             auto p_phi  = pb.eval_functions(bar);
 
@@ -434,6 +432,19 @@ public:
             ux.push_back( u_bar_x);
             uy.push_back( u_bar_y);
             e_press.push_back( p_bar );
+
+            if( di.face_degree() == 0)
+            {
+                //Stress
+                auto s_phi  = sb.eval_functions(bar);
+                vector_type stress_bar  = stress.block(0, 0, sbs, 1);
+                vector_type theta_bar  = stress_bar  +  2. * vp.alpha * Gu;
+                tensor_type theta_eval = eval(theta_bar,  s_phi);
+                tensor_type sigma_eval = eval(stress_bar, s_phi);
+
+                e_theta.push_back( theta_eval.norm() );
+                e_sigma.push_back( sigma_eval.norm() );
+            }
 
             cell_id++;
         }
@@ -484,6 +495,8 @@ public:
             pw.make_file(msh, "Velocity_"+ vp.info + "_i"+ tostr(iter), cell_rec_sol, "vector");
         }
 
+        //compute_discontinuous_velocity( msh, cell_sol, di, "depl2d.msh");
+
         return;
     }
 
@@ -513,7 +526,7 @@ public:
             std::cout << "Error opening data-file" << std::endl;
         ofs.close();
 
-        Eigen::PardisoLU<Eigen::SparseMatrix<T>>  solver;
+        Eigen::PardisoLDLT<Eigen::SparseMatrix<T>>  solver;
 
         for(size_t iter = 0; iter < max_iters; iter++)
         {
@@ -537,12 +550,12 @@ public:
             update_multiplier(msh, assembler, iter,  data_filename);
             //------------------------------------------------------------------
             if(iter == 0 )
-                initialize_auxiliar(msh, assembler); // Just to decrease gamma error when iter = 1 (this doesnt the convergence or behaviour afterwards)
+                initialize_auxiliar(msh, assembler); // Just to decrease gamma error when iter = 1 (this doesnt change the convergence or behaviour afterwards)
 
             assert(std::get<0>(convergence) < Ninf && std::get<1>(convergence) < Ninf);
 
             bool stop = std::get<0>(convergence)< tolerance;
-            if(! (iter % 100 == 0 ||  stop))
+            if(! (iter % 100 == 0 ||  stop || iter == max_iters -1))
                 continue;
 
             std::cout << "  i : "<< iter <<"  - " << std::get<0>(convergence)<<" ";
@@ -558,4 +571,118 @@ public:
     }
 };
 
-//size_t tsr_qps  =  tensor_quad_points_size(msh, quad_degree);
+
+template<typename Mesh>
+class STOKES
+{
+    typedef Mesh mesh_type;
+    typedef typename mesh_type::coordinate_type     T;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
+    typedef typename mesh_type::point_type      point_type;
+
+    typedef disk::mechanics::BoundaryConditions<mesh_type>      boundary_type;
+    typedef Matrix<T, Mesh::dimension, Mesh::dimension>         tensor_type;
+    typedef Matrix<T, Dynamic, Dynamic>                         matrix_type;
+    typedef Matrix<T, Dynamic, 1>                               vector_type;
+
+    hho_degree_info         di;
+    bingham_data<T, vector_problem>     vp;
+
+public:
+    vector_type             sol_old, sol;
+    std::tuple<T, T, T, T, T>         convergence;
+
+    STOKES(const Mesh  & msh,
+         const hho_degree_info  & hdi,
+         const bingham_data< typename Mesh::coordinate_type , vector_problem> & vp_ext):
+         di(hdi), vp(vp_ext)
+         {}
+
+        template<typename Assembler>
+        void
+        make_global_rhs(const mesh_type& msh, Assembler& assembler, const size_t iter)
+        {
+            assembler.initialize_rhs();
+            assembler.finalize_rhs();
+        }
+
+        template<typename Assembler>
+        void
+        make_global_matrix(const mesh_type& msh, Assembler& assembler, const size_t iter)
+        {
+            assembler.initialize_lhs();
+
+            //iter = 0 => Stokes, iter > 0 => Bingham
+            auto coef_admm = (iter == 0)? vp.mu : vp.alpha;
+
+            for (auto& cl : msh)
+            {
+                auto gr = disk::make_hho_stokes(msh, cl, di, true);
+                auto G  = disk::make_hlow_stokes(msh, cl, di, true);
+                //auto G  = make_hho_sym_gradrec_matrix(msh, cl, di);
+                matrix_type dr   = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
+                matrix_type stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
+                matrix_type A    = 2. *  vp.mu * ( G.second +   stab);
+
+                assembler.assemble_lhs(msh, cl, A, -dr);
+            }
+
+            assembler.finalize_lhs();
+        }
+
+        template<typename Assembler>
+        void
+        post_processing(const mesh_type& msh, Assembler& assembler, const size_t iter,
+                        const bool stop)
+        {
+            auto dim = Mesh::dimension;
+            auto rbs = vector_basis_size(di.reconstruction_degree(), dim, dim);
+            auto cbs = vector_basis_size(di.cell_degree(), dim, dim);
+
+            vector_type cell_sol = vector_type::Zero(cbs * msh.cells_size());
+            vector_type cell_rec_sol  = vector_type::Zero(rbs * msh.cells_size());
+
+            auto cell_id = 0;
+            for(auto cl : msh)
+            {
+                auto gr  = make_hho_stokes(msh, cl, di, true);
+                vector_type svel =  assembler.take_velocity(msh, cl, sol);
+                assert((gr.first * svel).rows() == rbs - dim);
+
+                cell_rec_sol.block(cell_id * rbs + dim, 0, rbs - dim, 1) = gr.first * svel;
+                cell_rec_sol.block(cell_id * rbs, 0, dim, 1)  = svel.block(0,0, dim, 1);
+                cell_sol.block(cell_id * cbs, 0, cbs, 1) = svel.block(0,0, cbs, 1);
+                cell_id++;
+            }
+
+            compute_discontinuous_velocity( msh, cell_sol, di, "depl2d.msh");
+
+            return;
+        }
+
+        bool
+        run(const mesh_type& msh, const boundary_type& bnd)
+        {
+            auto assembler = disk::make_stokes_assembler_alg(msh, di, bnd);
+            auto systsz    = assembler.global_system_size();
+
+            sol_old = vector_type::Zero(systsz);
+            sol =  vector_type::Zero(systsz);
+
+            Eigen::PardisoLU<Eigen::SparseMatrix<T>>  solver;
+
+            size_t iter = 0;
+
+            make_global_matrix(msh, assembler, iter);
+            //WARNINGS: This one must go after make_global_matrix!!!!!!
+            make_global_rhs(msh, assembler, iter);
+
+            disk::solvers::pardiso_params<T> pparams;
+            mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);
+
+            post_processing( msh, assembler, iter, true);
+
+            return true;
+        }
+    };

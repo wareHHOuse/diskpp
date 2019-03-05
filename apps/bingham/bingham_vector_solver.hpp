@@ -391,6 +391,7 @@ public:
             find_values_at_points(msh, pts, sol_cell, di.cell_degree(), "error_sol" + ext);
             //plot_over_line(msh, p_y, sol_cell, di.cell_degree(), "plot_over_y_" + ext);
         }
+
         //compute_discontinuous_velocity( msh, sol_cell, di, "velocity_" + vp.info +".msh");
         //save_coords(msh, "Coords_"+ ext);
         //quiver( msh, sol, assembler, di, "quiver_"+ ext);
@@ -410,7 +411,7 @@ public:
         multiplier  =  vector_type::Zero(sbs * msh.cells_size());
         auxiliar    =  vector_type::Zero(sbs * msh.cells_size());
 
-        size_t max_iters = 50000;
+        size_t max_iters = 10000;
         T Ninf      = 100000;
         T tolerance = 1.e-8;
 
@@ -434,8 +435,6 @@ public:
                 solver.analyzePattern(assembler.LHS);
                 solver.factorize(assembler.LHS);
             }
-            //WARNINGS: This one must go after make_global_matrix!!!!!!
-            //WARNINGS: This one must go after make_global_matrix!!!!!!
             //WARNINGS: This one must go after make_global_matrix!!!!!!
             //WARNINGS: This one must go after make_global_matrix!!!!!!
             make_global_rhs(msh, assembler);

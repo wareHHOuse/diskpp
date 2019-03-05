@@ -46,7 +46,7 @@
 
 template<typename Mesh>
 bool
-run_bingham(const Mesh& msh, const hho_degree_info& hdi,
+run_bingham(Mesh& msh, const hho_degree_info& hdi,
             bingham_data<typename Mesh::coordinate_type, vector_problem> & vp)
 {
     using T = typename Mesh::coordinate_type;
@@ -71,50 +71,29 @@ run_bingham(const Mesh& msh, const hho_degree_info& hdi,
        return Matrix<T, Mesh::dimension, 1>{omega * p.y(), -omega * p.x()};
     };
 
-    //to run with cartesian
-    auto velocity  = [](const point_type& p) -> Matrix<T, Mesh::dimension, 1> {
-        if( std::abs(p.y() - 1.) < 1.e-8 )
-            return Matrix<T, Mesh::dimension, 1>{1,0};
-        else
-            return Matrix<T, Mesh::dimension, 1>{0,0};
-    };
-
-    std::cout << "Im HERE  1 " << std::endl;
-
     switch (vp.problem)
     {
         case DRIVEN:
-        std::cout << " I'm in DRIVEN" << std::endl;
 
             name = "driven";
-            /*------------------------------------------------------------------
-            *  Check boundary labels for the unitary square domain
-            *          Netgen     _____          Medit     _____
-            *                4   |     | 2                |     |
-            *                    |_____|                  |_____|
-            *                       3                        2
-            *-------------------------------------------------------------------*/
-            #if 0
-            bnd.addDirichletBC(disk::mechanics::DIRICHLET,1, movingWall); //TOP
-            bnd.addDirichletBC(disk::mechanics::DIRICHLET,2, wall); //TOP
-            bnd.addDirichletBC(disk::mechanics::DIRICHLET,3, wall); //TOP
-            bnd.addDirichletBC(disk::mechanics::DIRICHLET,4, wall); //TOP
-            #endif
             //------------------------------------------------------------------
-            bnd.addDirichletEverywhere(velocity);
+            renumber_boundaries(msh);
+            bnd.addDirichletBC(disk::mechanics::DIRICHLET,1, movingWall);
+            bnd.addDirichletBC(disk::mechanics::DIRICHLET,2, wall);
+            bnd.addDirichletBC(disk::mechanics::DIRICHLET,3, wall);
+            bnd.addDirichletBC(disk::mechanics::DIRICHLET,4, wall);
             //------------------------------------------------------------------
             vp.yield = std::sqrt(2) * vp.Bn;
-
             break;
+
         case VANE:
+
             name = "vane";
-
-            std::cout << " I'm in VANE" << std::endl;
-
+            //------------------------------------------------------------------
             bnd.addDirichletBC( 0, 2, wall);
             bnd.addDirichletBC( 0, 1, rotation);
             bnd.addNeumannBC(10, 3, symmetryPlane);
-
+            //------------------------------------------------------------------
             vp.yield = std::sqrt(2) * vp.Bn *  (vp.mu * omega);
             break;
 
@@ -124,8 +103,8 @@ run_bingham(const Mesh& msh, const hho_degree_info& hdi,
             break;
     }
 
-    ADDM<Mesh> addm_bingham(msh, hdi, vp);
-    return addm_bingham.run(msh, bnd);
+    ADMM<Mesh> admm_bingham(msh, hdi, vp);
+    return admm_bingham.run(msh, bnd);
 }
 
 
@@ -185,7 +164,7 @@ read_data(const std::string& config_fn )
 
 int main(int argc, char **argv)
 {
-    using RealType = double;
+    using T = double;
 
     _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
 
@@ -195,7 +174,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    auto rd = read_data<RealType, vector_problem>(argv[1]);
+    auto rd = read_data<T, vector_problem>(argv[1]);
     auto vp  = std::get<2>(rd);
     auto hdi = std::get<1>(rd);
     auto input_mesh =std::get<0>(rd);
@@ -204,20 +183,7 @@ int main(int argc, char **argv)
     if (std::regex_match(input_mesh, std::regex(".*\\.medit2d$")))
     {
         std::cout << "Guessed mesh format: Medit format" << std::endl;
-        typedef disk::generic_mesh<RealType, 2>  mesh_type;
-        //mesh_type msh = disk::load_medit_2d_mesh<RealType>(input_mesh);
-
-        //#if 0
-        mesh_type  msh;
-        disk::medit_mesh_loader<RealType, 2> loader;
-        if (!loader.read_mesh(input_mesh))
-        {
-            std::cout << "Problem loading mesh." << std::endl;
-            return 0;
-        }
-        loader.populate_mesh(msh);
-        //#endif
-
+        auto msh = disk::load_medit_2d_mesh<T>(input_mesh.c_str());
         if(!run_bingham(msh, hdi, vp))
             std::cout << "No convergence" << std::endl;
 
@@ -228,18 +194,7 @@ int main(int argc, char **argv)
     if (std::regex_match(input_mesh, std::regex(".*\\.mesh2d$") ))
     {
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
-
-        typedef disk::simplicial_mesh<RealType, 2>  mesh_type;
-
-        mesh_type msh;
-        disk::netgen_mesh_loader<RealType, 2> loader;
-        if (!loader.read_mesh(input_mesh))
-        {
-            std::cout << "Problem loading mesh." << std::endl;
-            return 0;
-        }
-        loader.populate_mesh(msh);
-
+        auto msh = disk::load_netgen_2d_mesh<T>(input_mesh.c_str());
         if(!run_bingham(msh, hdi, vp))
             std::cout << "No convergence" << std::endl;
 
@@ -250,18 +205,7 @@ int main(int argc, char **argv)
     if (std::regex_match(input_mesh, std::regex(".*\\.quad$") ))
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
-
-        typedef disk::cartesian_mesh<RealType, 2>  mesh_type;
-
-        mesh_type msh;
-        disk::cartesian_mesh_loader<RealType, 2> loader;
-        if (!loader.read_mesh(input_mesh))
-        {
-            std::cout << "Problem loading mesh." << std::endl;
-            return 0;
-        }
-        loader.populate_mesh(msh);
-
+        auto msh = disk::load_cartesian_2d_mesh<T>(input_mesh.c_str());
         if(!run_bingham(msh, hdi, vp))
             std::cout << "No convergence" << std::endl;
 
