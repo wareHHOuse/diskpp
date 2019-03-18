@@ -33,12 +33,9 @@
 #include "methods/hho"
 
 
-enum scalar_problem_type
-{
-    CIRCULAR,
-    ANNULUS,
-    SQUARE
-};
+using namespace disk;
+
+
 
 enum vector_problem
 {
@@ -96,52 +93,48 @@ struct bingham_data
 
 };
 
-
-template<typename T>
-struct viscoplasticity_data
+template<template<typename, size_t, typename> class Mesh,
+      typename T, typename Storage>
+void
+renumber_boundaries(Mesh<T,2,Storage>& msh, T a = 1., T b = 1., T c = 0., T d = 0.)
 {
-     viscoplasticity_data(): Lref(1.), Vref(1.), Bn(0.), mu(1.), alpha(1.),
-                         f(1.),  problem(CIRCULAR)
-     {}
-     T f;                    //WK: Cuidado porque f deberia ser el valor externo de la fuente.
-     T Lref;                 /* Charactetistic length */
-     T Vref;                 /* Reference velocity */
-     T Bn;                   /* Bingham number */
-     T mu;                   /* viscosity */
-     T alpha;                /* ALG parameter*/
-     scalar_problem_type problem;
+    /*--------------------------------------------------------------------------
+    *  Unification of boundary labels for a square domain
+    *   Netgen     __1__          Medit     __1__              __1__
+    *         4   |     | 2                |     |    =>    4 |     | 2
+    *             |_____|                  |_____|            |____ |
+    *                3                        2                  3
+    *-------------------------------------------------------------------------*/
 
-    friend std::ostream& operator<<(std::ostream& os, const viscoplasticity_data<T>& p)
+    auto storage = msh.backend_storage();
+
+    for(size_t i = 0; i < msh.faces_size(); i++)
     {
-        os << "Viscoplastic data: "<<std::endl;
-        os << "* f      : "<< p.f<< std::endl;
-        os << "* Lref   : "<< p.Lref<< std::endl;
-        os << "* Vref   : "<< p.Vref<< std::endl;
-        os << "* mu     : "<< p.mu<< std::endl;
-        os << "* Bingham: "<< p.Bn<< std::endl;
-        os << "* alpha  : "<< p.alpha<< std::endl;
-        switch (p.problem)
-        {
-            case CIRCULAR:
-                os << "* problem : CIRCULAR"<< std::endl;
-                break;
-            case ANNULUS:
-                os << "* problem : ANNULUS"<< std::endl;
-                break;
-            case SQUARE:
-                os << "* problem : SQUARE"<< std::endl;
-                break;
+        auto edge = *std::next(msh.faces_begin(), i);
+        auto bar = barycenter(msh, edge);
 
-            default:
-                 os << "* problem : NOT SPECIFIED"<< std::endl;
-                 exit(1);
-        }
-        return os;
+        auto is_close_to = [](T val, T ref) -> bool {
+            T eps = 1e-7;
+            return std::abs(val - ref) < eps;
+        };
+
+        if (!storage->boundary_info.at(i).is_boundary)
+            continue;
+
+        size_t bid = 42;
+
+        if ( is_close_to(bar.y(), a) ) bid = 1;
+        if ( is_close_to(bar.x(), b) ) bid = 2;
+        if ( is_close_to(bar.y(), c) ) bid = 3;
+        if ( is_close_to(bar.x(), d) ) bid = 4;
+
+        if (bid == 42)
+            throw std::logic_error("Can not locate the edge");
+
+        storage->boundary_info.at(i).boundary_id = bid;
     }
-};
+}
 
-
-using namespace disk;
 
 template<typename Mesh>
 auto
@@ -165,6 +158,28 @@ make_scalar_solution_offset(const Mesh& msh, const hho_degree_info& hdi)
 
 
 
+template<typename Mesh>
+eigen_compatible_stdvector<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+tensor_initialize(const Mesh& msh, const size_t quad_degree, const size_t tsr_degree)
+{
+    using T = typename Mesh::coordinate_type;
+    eigen_compatible_stdvector<Matrix<T, Dynamic, Dynamic>> ret(msh.cells_size());
+
+    auto sbs = sym_matrix_basis_size(tsr_degree, Mesh::dimension, Mesh::dimension);
+    auto cell_i = 0;
+    for(auto cl : msh)
+    {
+        auto qps = integrate(msh, cl, quad_degree);
+        ret.at(cell_i++) = Matrix<T, Dynamic, Dynamic>::Zero(sbs, qps.size());
+    }
+    return ret;
+}
+
+#if 0
+template<typename Mesh>
+size_t
+tensor_quad_points_size(const Mesh& msh, const size_t quad_degree);
+{}
 
  template<typename Mesh>
  class tensors_at_quad_pts_utils
@@ -210,7 +225,7 @@ make_scalar_solution_offset(const Mesh& msh, const hho_degree_info& hdi)
          return offsets_vec;
      }
  };
-
+#endif
 
  template< typename T>
  std::string
@@ -286,18 +301,20 @@ sort_by_polar_angle(const Mesh & msh,
                     const typename Mesh::cell &  cl,
                     const Points& pts)
 {
-    typedef point<typename Mesh::coordinate_type, 2> point_type;
+    typedef point<typename Mesh::coordinate_type,2> point_type;
     //Warningn this may work only on convex polygons
     auto h = barycenter(msh, cl);
     auto sorted_pts = pts;
 
-    std::sort(sorted_pts.begin(),
-              sorted_pts.end(),
-              [&](const point<typename Mesh::coordinate_type, 2>& va, const point_type& vb) {
-                  auto theta_a = to_angle(va, h);
-                  auto theta_b = to_angle(vb, h);
-                  return (theta_a < theta_b);
-              });
+    std::sort( sorted_pts.begin(), sorted_pts.end(),
+                            [&](const point<typename Mesh::coordinate_type,2>& va,
+                                 const point_type& vb )
+        {
+            auto theta_a = to_angle(va, h);
+            auto theta_b = to_angle(vb, h);
+            return (theta_a < theta_b);
+        }
+    );
     return sorted_pts;
 }
 /*
@@ -333,7 +350,9 @@ isLeft( const point<T,2>& P0, const point<T,2>& P1, const point<T,2>& P2 )
 */
 template<typename Mesh>
 bool
-wn_PnPoly(const Mesh& msh, const typename Mesh::cell& cl, const point<typename Mesh::coordinate_type, 2>& P)
+wn_PnPoly(const Mesh& msh,
+          const typename Mesh::cell& cl,
+          const point<typename Mesh::coordinate_type,2>& P)
 {
     auto vts = points(msh, cl);
 
@@ -374,18 +393,19 @@ wn_PnPoly(const Mesh& msh, const typename Mesh::cell& cl, const point<typename M
         return true;
     return false;
 }
+
 template<typename Mesh>
 void
-plot_over_line(const Mesh&                                                                                          msh,
-               const std::pair<point<typename Mesh::coordinate_type, 2>,
-               const point<typename Mesh::coordinate_type, 2>>& e,
-               const Matrix<typename Mesh::coordinate_type, Dynamic, 1>&                                            vec,
-               const size_t       cell_degree,
-               const std::string& filename)
+plot_over_line(const Mesh    & msh,
+                const std::pair<point<typename Mesh::coordinate_type,2>,
+                                point<typename Mesh::coordinate_type,2>> & e,
+                const Matrix<typename Mesh::coordinate_type, Dynamic, 1> & vec,
+                const size_t cell_degree,
+                const std::string & filename)
 {
 
-    typedef Matrix<typename Mesh::coordinate_type, Dynamic, 1>   vector_type;
-    typedef point<typename Mesh::coordinate_type, 2>             point_type;
+    typedef Matrix<typename Mesh::coordinate_type, Dynamic, 1>  vector_type;
+    typedef point<typename Mesh::coordinate_type,2>             point_type;
 
     std::ofstream pfs(filename);
     if(!pfs.is_open())
@@ -422,10 +442,48 @@ plot_over_line(const Mesh&                                                      
 
 template<typename Mesh>
 void
-compute_discontinuous_velocity(const Mesh&                                           msh,
-                               const dynamic_vector<typename Mesh::coordinate_type>& sol,
-                               const typename disk::hho_degree_info&                 hdi,
-                               const std::string&                                    filename)
+find_values_at_points(const Mesh    & msh,
+                const std::vector<typename Mesh::point_type>& pts,
+                const Matrix<typename Mesh::coordinate_type, Dynamic, 1> & vec,
+                const size_t cell_degree,
+                const std::string & filename)
+{
+
+    typedef Matrix<typename Mesh::coordinate_type, Dynamic, 1>  vector_type;
+    typedef point<typename Mesh::coordinate_type,2>             point_type;
+
+    std::ofstream pfs(filename);
+    if(!pfs.is_open())
+        std::cout << "Error opening file :"<< filename <<std::endl;
+
+    auto dim = Mesh::dimension;
+    for(auto& p: pts)
+    {
+        for(auto cl: msh)
+        {
+            if(wn_PnPoly( msh, cl, p))
+            {
+                auto cbs   = vector_basis_size(cell_degree, dim, dim);
+                auto cell_ofs = disk::priv::offset(msh, cl);
+
+                vector_type s = vec.block(cell_ofs * cbs, 0, cbs, 1);
+                auto cb  = make_vector_monomial_basis(msh, cl, cell_degree);
+                auto phi = cb.eval_functions(p);
+                vector_type vel = phi.transpose() * s;
+                pfs<< p.x() << " "<< p.y() << " "<< vel(0) << " "<< vel(1)<< std::endl;
+            }
+        }
+    }
+    pfs.close();
+    return;
+}
+
+template<typename Mesh>
+void
+compute_discontinuous_velocity(const Mesh& msh,
+                        const dynamic_vector< typename Mesh::coordinate_type>& sol,
+                        const typename disk::hho_degree_info& hdi,
+                        const std::string& filename)
 {
     typedef Mesh mesh_type;
     typedef typename Mesh::coordinate_type T;

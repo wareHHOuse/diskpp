@@ -270,7 +270,7 @@ public:
             local_rhs = make_rhs_alg(msh, cl);
 
             Matrix<scalar_type, Dynamic, Dynamic> A = alpha * G.second + viscosity * stab;
-            auto sc = diffusion_static_condensation_compute_alg(msh, cl, di, A, local_rhs);
+            auto sc = diffusion_static_condensation_compute_full(msh, cl, di, A, local_rhs);
             assembler.assemble(msh, cl, sc.first, sc.second, sol_fun);
 
             save_auxiliar(msh, cl);
