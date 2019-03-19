@@ -51,7 +51,7 @@ class ADMM
     typedef typename mesh_type::face            face_type;
     typedef typename mesh_type::point_type      point_type;
 
-    typedef disk::BoundaryConditions<mesh_type>      boundary_type;
+    typedef disk::BoundaryConditions<mesh_type, false>              boundary_type;
     typedef Matrix<T, Mesh::dimension, Mesh::dimension>         tensor_type;
     typedef Matrix<T, Dynamic, Dynamic>                         matrix_type;
     typedef Matrix<T, Dynamic, 1>                               vector_type;
@@ -86,7 +86,7 @@ public:
             vector_type u_TF  = assembler.take_velocity(msh, cl, sol_old);
             auto value = 1./(2. * (vp.mu + vp.alpha));
             //auto G = make_hlow_stokes(msh, cl, di, true);
-            auto G  = make_hho_sym_gradrec_matrix(msh, cl, di);
+            auto G  = make_matrix_symmetric_gradrec(msh, cl, di);
             auto cl_id = msh.lookup(cl);
 
             auto sb  = make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
@@ -178,7 +178,7 @@ public:
             vector_type u_old = assembler.take_velocity(msh, cl, sol_old);
 
             //auto G = disk::make_hlow_stokes(msh, cl, di, true);
-            auto G = make_hho_sym_gradrec_matrix(msh, cl, di);
+            auto G = make_matrix_symmetric_gradrec(msh, cl, di);
             vector_type  Guold = G.first * u_old;
             vector_type  Gunow = G.first * u_now;
             vector_type  diff_grad =  coef_admm * (Gunow - Guold);
@@ -329,9 +329,9 @@ public:
         {
             auto gr = disk::make_hho_stokes(msh, cl, di, true);
             //auto G  = disk::make_hlow_stokes(msh, cl, di, true);
-            auto G  = make_hho_sym_gradrec_matrix(msh, cl, di);
-            matrix_type dr   = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
-            matrix_type stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
+            auto G  = make_matrix_symmetric_gradrec(msh, cl, di);
+            matrix_type dr   = make_hho_divergence_reconstruction_rhs(msh, cl, di);
+            matrix_type stab = make_vector_hho_stabilization(msh, cl, gr.first, di);
             matrix_type A    = 2. * ( coef_admm * G.second +  vp.mu * stab);
 
             assembler.assemble_lhs(msh, cl, A, -dr);
@@ -381,7 +381,7 @@ public:
             cell_sol.block(cell_id * cbs, 0, cbs, 1) = svel.block(0,0, cbs, 1);
 
             //auto G  = make_hlow_stokes(msh, cl, di, true);
-            auto G  = make_hho_sym_gradrec_matrix(msh, cl, di);
+            auto G  = make_matrix_symmetric_gradrec(msh, cl, di);
             auto cb = make_vector_monomial_basis(msh, cl, di.cell_degree());
             auto pb = make_scalar_monomial_basis(msh, cl, di.face_degree());
             auto sb = make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
@@ -620,9 +620,9 @@ public:
             {
                 auto gr = disk::make_hho_stokes(msh, cl, di, true);
                 auto G  = disk::make_hlow_stokes(msh, cl, di, true);
-                //auto G  = make_hho_sym_gradrec_matrix(msh, cl, di);
-                matrix_type dr   = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
-                matrix_type stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
+                //auto G  = make_matrix_symmetric_gradrec(msh, cl, di);
+                matrix_type dr   = make_hho_divergence_reconstruction_rhs(msh, cl, di);
+                matrix_type stab = make_vector_hho_stabilization(msh, cl, gr.first, di);
                 matrix_type A    = 2. *  vp.mu * ( G.second +   stab);
 
                 assembler.assemble_lhs(msh, cl, A, -dr);
