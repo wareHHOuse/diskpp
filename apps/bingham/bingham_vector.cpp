@@ -51,7 +51,7 @@ run_bingham(Mesh& msh, const hho_degree_info& hdi,
 {
     using T = typename Mesh::coordinate_type;
     typedef typename Mesh::point_type      point_type;
-    typedef disk::mechanics::BoundaryConditions<Mesh> boundary_type;
+    typedef disk::BoundaryConditions<Mesh> boundary_type;
 
     boundary_type   bnd(msh);
     std::string     name;
@@ -78,10 +78,10 @@ run_bingham(Mesh& msh, const hho_degree_info& hdi,
             name = "driven";
             //------------------------------------------------------------------
             renumber_boundaries(msh);
-            bnd.addDirichletBC(disk::mechanics::DIRICHLET,1, movingWall);
-            bnd.addDirichletBC(disk::mechanics::DIRICHLET,2, wall);
-            bnd.addDirichletBC(disk::mechanics::DIRICHLET,3, wall);
-            bnd.addDirichletBC(disk::mechanics::DIRICHLET,4, wall);
+            bnd.addDirichletBC(disk::DIRICHLET,1, movingWall);
+            bnd.addDirichletBC(disk::DIRICHLET,2, wall);
+            bnd.addDirichletBC(disk::DIRICHLET,3, wall);
+            bnd.addDirichletBC(disk::DIRICHLET,4, wall);
             //------------------------------------------------------------------
             vp.yield = sqrt(2) * vp.Bn;
             break;
