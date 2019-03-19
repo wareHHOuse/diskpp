@@ -54,7 +54,7 @@ class ADDM
     typedef typename mesh_type::face            face_type;
     typedef typename mesh_type::point_type      point_type;
 
-    typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
+    typedef disk::mechanics::BoundaryConditions<mesh_type, false> boundary_type;
     typedef Matrix<T, Dynamic, Dynamic>         matrix_type;
     typedef Matrix<T, Dynamic, 1>               vector_type;
 
@@ -175,9 +175,9 @@ public:
         {
             auto gr = disk::make_hho_stokes(msh, cl, di, true);
             auto G  = disk::make_hlow_stokes(msh, cl, di, true);
-            matrix_type dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
+            matrix_type dr = make_hho_divergence_reconstruction_rhs(msh, cl, di);
 
-            matrix_type stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
+            matrix_type stab = make_vector_hho_stabilization(msh, cl, gr.first, di);
             matrix_type A    = 2. * (vp.alpha * G.second + vp.mu * stab);
 
             assembler.assemble_lhs(msh, cl, A, -dr);
