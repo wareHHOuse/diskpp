@@ -25,6 +25,8 @@
 
 #pragma once
 
+#include <iostream>
+
 class AssemblyInfo
 {
   public:
@@ -82,6 +84,20 @@ class NewtonSolverInfo
         m_solve_info.m_nonzeros           = solve_info.m_nonzeros;
         m_solve_info.m_time_solve += solve_info.m_time_solve;
     }
+
+    void
+    printInfo() const
+    {
+        std::cout << "** Time in this step " << m_time_newton << " sec" << std::endl;
+        std::cout << "**** Assembly time: " << m_assembly_info.m_time_assembly << " sec" << std::endl;
+        std::cout << "****** Gradient reconstruction: " << m_assembly_info.m_time_gradrec << " sec" << std::endl;
+        std::cout << "****** Stabilisation: " << m_assembly_info.m_time_stab << " sec" << std::endl;
+        std::cout << "****** Mechanical computation: " << m_assembly_info.m_time_elem << " sec" << std::endl;
+        std::cout << "       *** Behavior computation: " << m_assembly_info.m_time_law << " sec" << std::endl;
+        std::cout << "****** Static condensation: " << m_assembly_info.m_time_statcond << " sec" << std::endl;
+        std::cout << "****** Postprocess time: " << m_assembly_info.m_time_postpro << " sec" << std::endl;
+        std::cout << "**** Solver time: " << m_solve_info.m_time_solve << " sec" << std::endl;
+    }
 };
 
 class SolverInfo
@@ -100,5 +116,30 @@ class SolverInfo
         m_newton_info.updateAssemblyInfo(newton_solver_info.m_assembly_info);
         m_newton_info.updateSolveInfo(newton_solver_info.m_solve_info);
         m_newton_info.m_time_newton += newton_solver_info.m_time_newton;
+    }
+
+    void
+    printInfo() const
+    {
+        std::cout << " " << std::endl;
+        std::cout << "------------------------------------------------------- " << std::endl;
+        std::cout << "Summaring: " << std::endl;
+        std::cout << "Total Newton's iterations: " << m_iter << " in " << m_time_step << " load increments"
+                  << std::endl;
+        std::cout << "Total time to solve the problem: " << m_time_solver << " sec" << std::endl;
+        std::cout << "**** Assembly time: " << m_newton_info.m_assembly_info.m_time_assembly << " sec" << std::endl;
+        std::cout << "****** Gradient reconstruction: " << m_newton_info.m_assembly_info.m_time_gradrec << " sec"
+                  << std::endl;
+        std::cout << "****** Stabilisation: " << m_newton_info.m_assembly_info.m_time_stab << " sec" << std::endl;
+        std::cout << "****** Elementary computation: " << m_newton_info.m_assembly_info.m_time_elem << " sec"
+                  << std::endl;
+        std::cout << "       *** Behavior computation: " << m_newton_info.m_assembly_info.m_time_law << " sec"
+                  << std::endl;
+        std::cout << "****** Static condensation: " << m_newton_info.m_assembly_info.m_time_statcond << " sec"
+                  << std::endl;
+        std::cout << "**** Postprocess time: " << m_newton_info.m_assembly_info.m_time_postpro << " sec" << std::endl;
+        std::cout << "**** Solver time: " << m_newton_info.m_solve_info.m_time_solve << " sec" << std::endl;
+        std::cout << "------------------------------------------------------- " << std::endl;
+        std::cout << " " << std::endl;
     }
 };

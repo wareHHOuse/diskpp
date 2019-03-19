@@ -36,8 +36,8 @@
 #include "Informations.hpp"
 #include "NewtonSolver/newton_solver.hpp"
 #include "Parameters.hpp"
+#include "boundary_conditions/boundary_conditions.hpp"
 #include "core/mechanics/behaviors/laws/materialData.hpp"
-#include "mechanics/BoundaryConditions.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
 
 #include "output/gmshConvertMesh.hpp"
@@ -66,8 +66,9 @@ class plasticity_solver
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
-    typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
-    typedef disk::IsotropicHardeningVMis<mesh_type>        law_type;
+    typedef disk::BoundaryConditions<mesh_type, false> bnd_type;
+    typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_type;
+    // typedef disk::IsotropicHardeningVMis<mesh_type> law_type;
 
     typename disk::hho_degree_info m_hdi;
     bnd_type                       m_bnd;
@@ -146,7 +147,7 @@ class plasticity_solver
         for (auto& cl : m_msh)
         {
             /////// Gradient Reconstruction /////////
-            const auto sgr = make_hho_sym_gradrec_matrix(m_msh, cl, m_hdi);
+            const auto sgr = make_matrix_symmetric_gradrec(m_msh, cl, m_hdi);
             m_gradient_precomputed.push_back(sgr.first);
 
             if (m_rp.m_stab)
@@ -155,14 +156,14 @@ class plasticity_solver
                 {
                     case HHO:
                     {
-                        const auto recons   = make_hho_vector_symmetric_laplacian(m_msh, cl, m_hdi);
-                        const auto stab_HHO = make_hho_vector_stabilization(m_msh, cl, recons.first, m_hdi);
+                        const auto recons   = make_vector_hho_symmetric_laplacian(m_msh, cl, m_hdi);
+                        const auto stab_HHO = make_vector_hho_stabilization(m_msh, cl, recons.first, m_hdi);
                         m_stab_precomputed.push_back(stab_HHO);
                         break;
                     }
                     case HDG:
                     {
-                        const auto stab_HDG = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
+                        const auto stab_HDG = make_vector_hdg_stabilization(m_msh, cl, m_hdi);
                         m_stab_precomputed.push_back(stab_HDG);
                         break;
                     }
@@ -188,13 +189,12 @@ class plasticity_solver
         m_rp.m_face_degree = face_degree;
 
         int cell_degree = rp.m_cell_degree;
-        // if (face_degree - 1 > cell_degree or cell_degree > face_degree + 1) {
-        //    std::cout << "'cell_degree' should be 'face_degree + 1' => 'cell_degree' => 'face_degree
-        //    "
-        //                 "-1'. Reverting to 'face_degree'."
-        //              << std::endl;
-        //    cell_degree = face_degree;
-        // }
+        if ((face_degree - 1 > cell_degree) or (cell_degree > face_degree + 1))
+        {
+            std::cout << "'cell_degree' should be 'face_degree + 1' =>"
+                      << "'cell_degree' => 'face_degree -1'. Reverting to 'face_degree'." << std::endl;
+            cell_degree = face_degree;
+        }
 
         m_rp.m_cell_degree = cell_degree;
 
@@ -217,6 +217,9 @@ class plasticity_solver
             m_hdi.info_degree();
             m_rp.infos();
         }
+
+        // compute mesh for post-processing
+        post_mesh = disk::PostMesh<mesh_type>(m_msh);
 
         init();
     }
@@ -310,7 +313,7 @@ class plasticity_solver
                 return disk::priv::inner_product(current_time, lf(p));
             };
 
-            m_bnd.multiplyAllFunctionsOfAFactor(current_time);
+            m_bnd.multiplyAllFunctionsByAFactor(current_time);
 
             // correction
             NewtonSolverInfo newton_info =
@@ -374,6 +377,26 @@ class plasticity_solver
                 {
                     if (m_rp.m_time_save.front() < old_time + 1E-5)
                     {
+
+                        std::cout << "** Save results" << std::endl;
+                        std::string name = "result" + std::to_string(dimension) + "D_k" +
+                                           std::to_string(m_hdi.face_degree()) + "_l" +
+                                           std::to_string(m_hdi.cell_degree()) + "_g" +
+                                           std::to_string(m_hdi.grad_degree()) + "_t" + std::to_string(old_time) + "_";
+
+                        // this->compute_discontinuous_displacement(name + "depl_disc.msh");
+                        this->compute_continuous_displacement(name + "depl_cont.msh");
+                        // this->compute_discontinuous_stress(name + "stress_disc.msh");
+                        // this->compute_continuous_stress(name + "stress_cont.msh");
+                        this->compute_stress_GP(name + "stress_GP.msh");
+                        // this->compute_discontinuous_equivalent_plastic_strain(name + "_disc.msh");
+                        // this->compute_continuous_equivalent_plastic_strain(name + "p_cont.msh");
+                        this->compute_equivalent_plastic_strain_GP(name + "p_GP.msh");
+                        this->compute_is_plastic_GP(name + "state_GP.msh");
+                        // this->compute_is_plastic_continuous(name + "state_cont.msh");
+                        // this->compute_continuous_deformed(name + "deformed_cont.msh");
+                        // this->compute_discontinuous_deformed(name + "deformed_disc.msh");
+
                         m_rp.m_time_save.pop_front();
                         if (m_rp.m_time_save.empty())
                             time_saving = false;
@@ -386,9 +409,6 @@ class plasticity_solver
 
         ttot.toc();
         si.m_time_solver = ttot.to_double();
-
-        // compute mesh for post-processing
-        post_mesh = disk::PostMesh<mesh_type>(m_msh);
 
         return si;
     }
@@ -664,7 +684,7 @@ class plasticity_solver
         size_t nb_nodes = 0;
         for (auto& cl : m_msh)
         {
-            auto                    gb           = disk::make_sym_matrix_monomial_basis(m_msh, cl, m_hdi.grad_degree());
+            auto                    gb           = disk::make_matrix_monomial_basis(m_msh, cl, m_hdi.grad_degree());
             const auto              law_cell     = m_law.getCellIVs(cell_i);
             const vector_dynamic    stress_coeff = law_cell.projectStressOnCell(m_msh, cl, m_hdi, material_data);
             const auto              cell_nodes   = disk::cell_nodes(m_msh, cl);
@@ -725,10 +745,10 @@ class plasticity_solver
 
         for (auto& cl : m_msh)
         {
-            auto                 gb           = disk::make_sym_matrix_monomial_basis(m_msh, cl, m_hdi.grad_degree());
+            auto                 gb           = disk::make_matrix_monomial_basis(m_msh, cl, m_hdi.grad_degree());
             const auto           law_cell     = m_law.getCellIVs(cell_i);
             const vector_dynamic stress_coeff = law_cell.projectStressOnCell(m_msh, cl, m_hdi, material_data);
-            const auto           cell_nodes   = post_mesh.nodes_cell(cell_i);
+            const auto cell_nodes = post_mesh.nodes_cell(cell_i);
 
             // Loop on the nodes of the cell
             for (auto& point_id : cell_nodes)
@@ -1172,7 +1192,9 @@ class plasticity_solver
                << "\t"
                << "sigma_oo"
                << "\t"
-               << "sigma_trace" << std::endl;
+               << "sigma_trace"
+               << "\t"
+               << "p" << std::endl;
 
         size_t cell_i(0);
         for (auto& cl : m_msh)
@@ -1204,8 +1226,8 @@ class plasticity_solver
                 const scalar_type sigma_oo = (stress.trace() - sigma_rr) / 2.0;
                 const scalar_type ur       = depl.dot(er);
 
-                output << r << "\t" << ur << "\t" << sigma_rr << "\t" << sigma_oo << "\t" << stress.trace()
-                       << std ::endl;
+                output << r << "\t" << ur << "\t" << sigma_rr << "\t" << sigma_oo << "\t" << stress.trace() << "\t"
+                       << qp.getAccumulatedPlasticStrain() << std ::endl;
             }
             cell_i++;
         }

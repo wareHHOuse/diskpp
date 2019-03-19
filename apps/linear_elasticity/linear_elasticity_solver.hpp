@@ -74,11 +74,12 @@ struct ElasticityParameters
 template<typename Mesh>
 class linear_elasticity_solver
 {
-    typedef Mesh                                           mesh_type;
-    typedef typename mesh_type::coordinate_type                scalar_type;
-    typedef typename mesh_type::cell                       cell_type;
-    typedef typename mesh_type::face                       face_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
+    typedef Mesh                                mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
+
+    typedef disk::BoundaryConditions<mesh_type, false> bnd_type;
 
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
@@ -174,15 +175,13 @@ class linear_elasticity_solver
         assembly_info ai;
         bzero(&ai, sizeof(ai));
 
-        typename disk::static_condensation_vector<mesh_type> statcond;
-
         timecounter tc;
 
         for (auto& cl : m_msh)
         {
             tc.tic();
-            const auto sgr = make_hho_vector_symmetric_laplacian(m_msh, cl, m_hdi);
-            const auto sg  = make_hho_sym_gradrec_matrix(m_msh, cl, m_hdi);
+            const auto sgr = make_vector_hho_symmetric_laplacian(m_msh, cl, m_hdi);
+            const auto sg  = make_matrix_symmetric_gradrec(m_msh, cl, m_hdi);
             tc.toc();
             ai.time_gradrec += tc.to_double();
 
@@ -195,12 +194,11 @@ class linear_elasticity_solver
             matrix_dynamic stab;
             if (m_hdi.cell_degree() == (m_hdi.face_degree() + 1))
             {
-                //stab = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
-                stab = make_hho_vector_stabilization(m_msh, cl, sgr.first, m_hdi);
+                stab = make_vector_hdg_stabilization(m_msh, cl, m_hdi);
             }
             else
             {
-                stab = make_hho_vector_stabilization(m_msh, cl, sgr.first, m_hdi);
+                stab = make_vector_hho_stabilization(m_msh, cl, sgr.first, m_hdi);
             }
             tc.toc();
             ai.time_stab += tc.to_double();
@@ -210,14 +208,14 @@ class linear_elasticity_solver
             const auto           cell_rhs = make_rhs(m_msh, cl, cb, lf, 1);
             const matrix_dynamic loc =
               2.0 * m_elas_parameters.mu * (sg.second + stab) + m_elas_parameters.lambda * dr.second;
-            const auto scnp = statcond.compute(m_msh, cl, loc, cell_rhs, m_hdi);
+            const auto scnp = make_vector_static_condensation_withMatrix(m_msh, cl, m_hdi, loc, cell_rhs);
 
-            m_AL.push_back(statcond.AL);
-            m_bL.push_back(statcond.bL);
+            m_AL.push_back(std::get<1>(scnp));
+            m_bL.push_back(std::get<2>(scnp));
             tc.toc();
             ai.time_statcond += tc.to_double();
 
-            m_assembler.assemble(m_msh, cl, m_bnd, scnp, 2);
+            m_assembler.assemble(m_msh, cl, m_bnd, std::get<0>(scnp), 2);
         }
 
         m_assembler.impose_neumann_boundary_conditions(m_msh, m_bnd);
@@ -350,7 +348,7 @@ class linear_elasticity_solver
         for (auto& cl : m_msh)
         {
             const auto           x   = m_solution_data.at(cell_i++);
-            const auto           sgr = make_hho_vector_symmetric_laplacian(m_msh, cl, m_hdi);
+            const auto           sgr = make_vector_hho_symmetric_laplacian(m_msh, cl, m_hdi);
             const vector_dynamic GTu = sgr.first * x;
 
             const auto           dr   = make_hho_divergence_reconstruction(m_msh, cl, m_hdi);

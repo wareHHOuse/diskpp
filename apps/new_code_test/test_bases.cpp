@@ -8,7 +8,7 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Karol Cascavita (C) 2018                     klcascavitam@unal.edu.co
+ * Karol Cascavita (C) 2018                     karol.cascavita@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -116,7 +116,7 @@ test_bases(const Mesh& msh)
 
         project_function(msh, cl, hdi, f1);
 
-        make_hho_scalar_laplacian(msh, cl, hdi);
+        make_scalar_hho_laplacian(msh, cl, hdi);
         */
 
     }
@@ -139,10 +139,10 @@ test_bases(const Mesh& msh)
 
         Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, v3);
 
-        auto gr = make_hho_vector_laplacian(msh, cl, hdi);
+        auto gr = make_vector_hho_laplacian(msh, cl, hdi);
 
         Matrix<scalar_type, Dynamic, Dynamic> stab;
-        stab = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
+        stab = make_vector_hho_stabilization(msh, cl, gr.first, hdi);
 
 
         auto dr = make_hho_divergence_reconstruction(msh, cl, hdi);

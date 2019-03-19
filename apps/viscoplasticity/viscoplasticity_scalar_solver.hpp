@@ -58,20 +58,20 @@ make_bnd(const Mesh& msh, const scalar_problem_type& problem)
         return 0.;
     };
 
-    disk::mechanics::BoundaryConditionsScalar<Mesh> bnd(msh);
+    disk::BoundaryConditions<Mesh> bnd(msh);
 
     switch(problem)
     {
         case ANNULUS:
             //bnd.addDirichletEverywhere(zero_fun); //TOP
             //#if 0
-            bnd.addDirichletBC(disk::mechanics::DIRICHLET,1, zero_fun); //TOP
-            bnd.addNeumannBC(disk::mechanics::NEUMANN, 2, zero_fun); //
+            bnd.addDirichletBC(disk::DIRICHLET,1, zero_fun); //TOP
+            bnd.addNeumannBC(disk::NEUMANN, 2, zero_fun); //
             //#endif
             break;
         case CIRCULAR:
-            bnd.addDirichletBC(disk::mechanics::DIRICHLET,2, zero_fun); //TOP
-            bnd.addNeumannBC(disk::mechanics::NEUMANN, 1, zero_fun); //
+            bnd.addDirichletBC(disk::DIRICHLET,2, zero_fun); //TOP
+            bnd.addNeumannBC(disk::NEUMANN, 1, zero_fun); //
             break;
         case SQUARE:
             bnd.addDirichletEverywhere(zero_fun); //TOP
@@ -101,7 +101,7 @@ class augmented_lagrangian_viscoplasticity
     typedef typename mesh_type::face        face_type;
     typedef typename mesh_type::coordinate_type T;
     typedef typename mesh_type::point_type  point_type;
-    typedef disk::mechanics::BoundaryConditionsScalar<mesh_type> boundary_type;
+    typedef disk::BoundaryConditions<mesh_type> boundary_type;
 
     typedef Matrix<T, Mesh::dimension, 1>      tensor_type;
     typedef Matrix<T, Dynamic, Dynamic>        matrix_type;

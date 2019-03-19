@@ -33,10 +33,10 @@
 
 #include "../Informations.hpp"
 #include "../Parameters.hpp"
-#include "mechanics/BoundaryConditions.hpp"
-#include "plasticity_elementary_computation.hpp"
 #include "bases/bases.hpp"
+#include "boundary_conditions/boundary_conditions.hpp"
 #include "methods/hho"
+#include "plasticity_elementary_computation.hpp"
 #include "quadratures/quadratures.hpp"
 
 #include "solvers/solver.hpp"
@@ -54,10 +54,10 @@ template<typename MeshType>
 class NewtonRaphson_step_plasticity
 {
     typedef MeshType                                       mesh_type;
-    typedef typename mesh_type::coordinate_type                scalar_type;
+    typedef typename mesh_type::coordinate_type            scalar_type;
     typedef ParamRun<scalar_type>                          param_type;
-    typedef typename disk::hho_degree_info           hdi_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
+    typedef typename disk::hho_degree_info                 hdi_type;
+    typedef disk::BoundaryConditions<mesh_type, false> bnd_type;
 
     const static int dimension = mesh_type::dimension;
 
@@ -140,8 +140,6 @@ class NewtonRaphson_step_plasticity
              Law&                               law,
              bool                               elastic_modulus = false)
     {
-        typename disk::static_condensation_vector<mesh_type> statcond;
-
         elem_type    elem(m_msh, m_hdi);
         AssemblyInfo ai;
 
@@ -168,7 +166,7 @@ class NewtonRaphson_step_plasticity
             }
             else
             {
-                const auto gradrec_full = make_hho_sym_gradrec_matrix(m_msh, cl, m_hdi);
+                const auto gradrec_full = make_matrix_symmetric_gradrec(m_msh, cl, m_hdi);
                 GT                      = gradrec_full.first;
             }
             tc.toc();
@@ -213,8 +211,8 @@ class NewtonRaphson_step_plasticity
                     {
                         case HHO:
                         {
-                            const auto recons   = make_hho_vector_symmetric_laplacian(m_msh, cl, m_hdi);
-                            const auto stab_HHO = make_hho_vector_stabilization(m_msh, cl, recons.first, m_hdi);
+                            const auto recons   = make_vector_hho_symmetric_laplacian(m_msh, cl, m_hdi);
+                            const auto stab_HHO = make_vector_hho_stabilization(m_msh, cl, recons.first, m_hdi);
                             assert(elem.K_int.rows() == stab_HHO.rows());
                             assert(elem.K_int.cols() == stab_HHO.cols());
                             assert(elem.RTF.rows() == (stab_HHO * m_solution_data.at(cell_i)).rows());
@@ -225,7 +223,7 @@ class NewtonRaphson_step_plasticity
                             break;
                         }
                         case HDG: {
-                            const auto stab_HDG = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
+                            const auto stab_HDG = make_vector_hdg_stabilization(m_msh, cl, m_hdi);
                             assert(elem.K_int.rows() == stab_HDG.rows());
                             assert(elem.K_int.cols() == stab_HDG.cols());
                             assert(elem.RTF.rows() == (stab_HDG * m_solution_data.at(cell_i)).rows());
@@ -246,20 +244,20 @@ class NewtonRaphson_step_plasticity
 
             // Static Condensation
             tc.tic();
-            auto scnp = statcond.compute_rhsfull(m_msh, cl, lhs, rhs, m_hdi);
+            const auto scnp = make_vector_static_condensation_withMatrix(m_msh, cl, m_hdi, lhs, rhs);
 
             // for (size_t k = 0; k < scnp.first.rows(); k++)
             // {
             //     std::cout << k << " " << scnp.first.row(k).sum() << " " << scnp.first.col(k).sum() << std::endl;
             // }
 
-            m_AL[cell_i] = statcond.AL;
-            m_bL[cell_i] = statcond.bL;
+            m_AL[cell_i] = std::get<1>(scnp);
+            m_bL[cell_i] = std::get<2>(scnp);
 
             tc.toc();
             ai.m_time_statcond += tc.to_double();
 
-            m_assembler.assemble_nl(m_msh, cl, m_bnd, scnp, m_solution_faces);
+            m_assembler.assemble_nl(m_msh, cl, m_bnd, std::get<0>(scnp), m_solution_faces);
 
             cell_i++;
         }

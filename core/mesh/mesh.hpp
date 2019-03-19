@@ -682,7 +682,6 @@ public:
     {
         face_cell_connectivity.resize( msh.faces_size() );
 
-        size_t cell_i = 0;
         for (auto& cl : msh)
         {
             auto fcs = faces(msh, cl);

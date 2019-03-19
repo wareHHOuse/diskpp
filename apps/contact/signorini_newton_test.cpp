@@ -425,6 +425,7 @@ verify_gamma(const std::vector<std::string>& paths,
             auto error_full = run_signorini(msh, ap, run_exact);
         }
     }
+    return true;
 }
 
 void test_gamma_varying(algorithm_parameters<double>& ap,

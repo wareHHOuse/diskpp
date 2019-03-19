@@ -41,14 +41,14 @@ namespace disk
 
 template<typename T, int DIM>
 void
-computeJacobianFirstDerivate(const static_matrix<T, DIM, DIM>& M)
+JacobianFirstDerivate(const static_matrix<T, DIM, DIM>& M)
 {
     static_assert((DIM == 2 || DIM == 3), "Can not compute jacobian derivate for this dimension");
 }
 
 template<typename T>
 static_matrix<T, 2, 2>
-computeJacobianFirstDerivate(const static_matrix<T, 2, 2>& M)
+JacobianFirstDerivate(const static_matrix<T, 2, 2>& M)
 {
     static_matrix<T, 2, 2> ret = static_matrix<T, 2, 2>::Zero();
 
@@ -63,7 +63,7 @@ computeJacobianFirstDerivate(const static_matrix<T, 2, 2>& M)
 
 template<typename T>
 static_matrix<T, 3, 3>
-computeJacobianFirstDerivate(const static_matrix<T, 3, 3>& M)
+JacobianFirstDerivate(const static_matrix<T, 3, 3>& M)
 {
     static_matrix<T, 3, 3> ret = static_matrix<T, 3, 3>::Zero();
 
@@ -86,14 +86,14 @@ computeJacobianFirstDerivate(const static_matrix<T, 3, 3>& M)
 
 template<typename T, int DIM>
 void
-computeJacobianSecondDerivate(const static_matrix<T, DIM, DIM>& M)
+JacobianSecondDerivate(const static_matrix<T, DIM, DIM>& M)
 {
     static_assert((DIM == 2 || DIM == 3), "Can not compute jacobian derivate for this dimension");
 }
 
 template<typename T>
 static_tensor<T, 2>
-computeJacobianSecondDerivate(const static_matrix<T, 2, 2>& M)
+JacobianSecondDerivate(const static_matrix<T, 2, 2>& M)
 {
     static_tensor<T, 2> ret = static_tensor<T, 2>::Zero();
     T                   one = T(1);
@@ -108,7 +108,7 @@ computeJacobianSecondDerivate(const static_matrix<T, 2, 2>& M)
 
 template<typename T>
 static_tensor<T, 3>
-computeJacobianSecondDerivate(const static_matrix<T, 3, 3>& M)
+JacobianSecondDerivate(const static_matrix<T, 3, 3>& M)
 {
     static_tensor<T, 3> ret = static_tensor<T, 3>::Zero();
 

@@ -49,8 +49,6 @@ class augmented_lagrangian_diffusion
     typedef typename mesh_type::face        face_type;
     typedef typename mesh_type::coordinate_type scalar_type;
 
-    typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
-
     using point_type = typename mesh_type::point_type;
 
     typedef dynamic_vector<scalar_type>       vector_type;
@@ -147,9 +145,9 @@ public:
 
             Matrix<scalar_type, Dynamic, 1> diff_vel = svel - p;
 
-            auto gr   = make_hho_scalar_laplacian(msh, cl, di);
-            auto stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
-            auto G    = make_hho_gradrec_vector(msh, cl, di);
+            auto gr   = make_scalar_hho_laplacian(msh, cl, di);
+            auto stab = make_vector_hho_stabilization(msh, cl, gr.first, di);
+            auto G    = make_vector_hho_gradrec(msh, cl, di);
 
             error_vel += diff_vel.dot( viscosity * (G.second + stab)*diff_vel);
         }
@@ -181,7 +179,7 @@ public:
             sol_old.block( cell_ofs * num_total_dofs, 0, num_total_dofs, 1);
 
         auto value = 1./ (viscosity + alpha);
-        auto G     = make_hho_gradrec_vector(msh, cl, di);
+        auto G     = make_vector_hho_gradrec(msh, cl, di);
 
         Matrix<scalar_type, Dynamic, 1> Gu = G.first * u_TF;
         Matrix<scalar_type, Dynamic, 1> stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
@@ -204,7 +202,7 @@ public:
             Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> u_TF =
                 sol.block(cell_ofs * num_total_dofs, 0, num_total_dofs, 1);
 
-            auto                            G         = make_hho_gradrec_vector(msh, cl, di);
+            auto                            G         = make_vector_hho_gradrec(msh, cl, di);
             Matrix<scalar_type, Dynamic, 1> Gu        = G.first * u_TF;
             Matrix<scalar_type, Dynamic, 1> gamma     = compute_auxiliar(msh, cl);
             Matrix<scalar_type, Dynamic, 1> gamma_old = auxiliar.block(cell_ofs * sbs, 0, sbs, 1);
@@ -227,7 +225,7 @@ public:
     make_rhs_alg(   const mesh_type& msh,
                     const cell_type& cl)
     {
-        auto G         = make_hho_gradrec_vector(msh, cl, di);
+        auto G         = make_vector_hho_gradrec(msh, cl, di);
         auto cb = disk::make_scalar_monomial_basis(msh, cl, di.cell_degree());
         auto sb = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
         auto cell_ofs  = disk::priv::offset(msh, cl);
@@ -261,16 +259,16 @@ public:
         for (auto& cl : msh)
         {
             auto cb = disk::make_scalar_monomial_basis(msh, cl, di.cell_degree());
-            auto G    = make_hho_gradrec_vector(msh, cl, di);
-            auto gr   = make_hho_scalar_laplacian(msh, cl, di);
-            auto stab = make_hho_scalar_stabilization(msh, cl, gr.first, di);
+            auto G    = make_vector_hho_gradrec(msh, cl, di);
+            auto gr   = make_scalar_hho_laplacian(msh, cl, di);
+            auto stab = make_scalar_hho_stabilization(msh, cl, gr.first, di);
 
             Matrix<scalar_type, Dynamic, 1> local_rhs =
                 Matrix<scalar_type, Dynamic, 1>::Zero(cbs + fbs * howmany_faces(msh,cl));
             local_rhs = make_rhs_alg(msh, cl);
 
             Matrix<scalar_type, Dynamic, Dynamic> A = alpha * G.second + viscosity * stab;
-            auto sc = diffusion_static_condensation_compute_full(msh, cl, di, A, local_rhs);
+            const auto                           sc = make_scalar_static_condensation(msh, cl, di, A, local_rhs);
             assembler.assemble(msh, cl, sc.first, sc.second, sol_fun);
 
             save_auxiliar(msh, cl);
@@ -298,9 +296,9 @@ public:
         for (auto& cl : msh)
         {
             auto cb = disk::make_scalar_monomial_basis(msh, cl, di.cell_degree());
-            auto G    = make_hho_gradrec_vector(msh, cl, di);
-            auto gr   = make_hho_scalar_laplacian(msh, cl, di);
-            auto stab = make_hho_scalar_stabilization(msh, cl, gr.first, di);
+            auto G    = make_vector_hho_gradrec(msh, cl, di);
+            auto gr   = make_scalar_hho_laplacian(msh, cl, di);
+            auto stab = make_scalar_hho_stabilization(msh, cl, gr.first, di);
 
             auto cell_ofs  = disk::priv::offset(msh, cl);
             auto num_total_dofs = cbs + fbs * howmany_faces(msh, cl);
@@ -313,7 +311,7 @@ public:
                 assembler.take_local_data(msh, cl, sol_faces, sol_fun);
 
             Matrix<scalar_type, Dynamic, 1> fullsol =
-                diffusion_static_condensation_recover(msh, cl, di,  A, cell_rhs, locsol);
+              make_scalar_static_decondensation(msh, cl, di, A, cell_rhs, locsol);
 
             sol.block(cell_ofs * num_total_dofs, 0, num_total_dofs, 1) = fullsol;
 

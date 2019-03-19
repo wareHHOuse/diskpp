@@ -46,6 +46,7 @@
 #include "core/output/hdf5_io.hpp"
 #include "signorini_newton_solver.hpp"
 
+#if 0
 template<template<typename, size_t, typename> class Mesh,
        typename T, typename Storage>
 void
@@ -89,6 +90,7 @@ renumber_boundaries(Mesh<T,2,Storage>& msh)
          storage->boundary_info.at(i).boundary_id = bid;
      }
  }
+#endif
 
 template<typename T>
 class hierarchical_contact_solver
@@ -96,7 +98,7 @@ class hierarchical_contact_solver
     typedef disk::simplicial_mesh<T, 2>     mesh_type;
     typedef Eigen::SparseMatrix<T>          sparse_matrix_type;
     typedef Eigen::Triplet<T>               triplet_type;
-    typedef disk::mechanics::BoundaryConditionsScalar<mesh_type> boundary_type;
+    typedef disk::BoundaryConditions<mesh_type> boundary_type;
 
     typedef static_vector<T, 3>             fem_vector;
     typedef static_matrix<T, 3, 3>          fem_matrix;
@@ -275,7 +277,7 @@ class hierarchical_contact_solver
             return 0;
         };
 
-        disk::mechanics::BoundaryConditionsScalar<mesh_type> bnd(msh);
+        disk::BoundaryConditions<mesh_type> bnd(msh);
 
         /*--------------------------------------------------------------------------
         *  Check boundary labels for the unitary square domain
@@ -285,11 +287,10 @@ class hierarchical_contact_solver
         *                       3                        2
         *-------------------------------------------------------------------------*/
 
-        bnd.addDirichletBC(disk::mechanics::DIRICHLET,1, zero_fun); //TOP
-        bnd.addNeumannBC(disk::mechanics::NEUMANN, 2,zero_fun); //
-        bnd.addNeumannBC(disk::mechanics::NEUMANN, 4,zero_fun); //
-        bnd.addContactBC(disk::mechanics::SIGNORINI,3); //BOTTOM
-
+        bnd.addDirichletBC(disk::DIRICHLET,1, zero_fun); //TOP
+        bnd.addNeumannBC(disk::NEUMANN, 2,zero_fun); //
+        bnd.addNeumannBC(disk::NEUMANN, 4,zero_fun); //
+        bnd.addContactBC(disk::SIGNORINI,3); //BOTTOM
 
         return std::make_pair(f, bnd);
     }
@@ -524,7 +525,6 @@ class hierarchical_contact_solver
             auto num_total_dofs   = num_cell_dofs + num_faces * num_face_dofs;
             hho_vector sol_ufull  = ref_sol.block(cell_ofs, 0, num_total_dofs, 1);
 
-
             auto ref_rec_deg = ref_hdi.reconstruction_degree();
             auto rec_deg = hdi.reconstruction_degree();
             auto ref_cbs = scalar_basis_size(ref_rec_deg, 2);
@@ -539,7 +539,7 @@ class hierarchical_contact_solver
             }
             else
             {
-                auto gr = make_hho_scalar_laplacian( ref_msh, cl, ref_hdi);
+                auto gr = make_scalar_hho_laplacian( ref_msh, cl, ref_hdi);
                 rec_ref_loc(0,0) =  sol_ufull(0);
                 rec_ref_loc.block(1, 0, ref_cbs -1, 1) = gr.first * sol_ufull;
                 rec_refs.push_back( rec_ref_loc );
@@ -619,7 +619,7 @@ public:
             }
             else
             {
-                auto gr = make_hho_scalar_laplacian(sol_msh, sol_cl, hdi);
+                auto gr = make_scalar_hho_laplacian(sol_msh, sol_cl, hdi);
                 rec_sols.push_back( gr.first * sol_ufull );
             }
 
@@ -808,7 +808,7 @@ public:
             }
             else
             {
-                auto gr = make_hho_scalar_laplacian(sol_msh, sol_cl, hdi);
+                auto gr = make_scalar_hho_laplacian(sol_msh, sol_cl, hdi);
                 rec_sol_loc(0,0) =  sol_ufull(0);
                 rec_sol_loc.block(1, 0, sol_cbs -1, 1) = gr.first * sol_ufull;
                 rec_sols.push_back( rec_sol_loc );

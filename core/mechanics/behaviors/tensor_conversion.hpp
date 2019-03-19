@@ -39,13 +39,6 @@ namespace disk
 
 // Convert Matrix in Coulum vector
 
-template<typename T, int DIM>
-void
-converttovector(const static_matrix<T, DIM, DIM>& mat)
-{
-    static_assert((DIM == 2 || DIM == 3), "Can not compute conversion for this dimension");
-}
-
 template<typename T>
 static_vector<T, 4>
 converttovector(const static_matrix<T, 2, 2>& mat)
@@ -62,13 +55,6 @@ converttovector(const static_matrix<T, 3, 3>& mat)
 }
 
 // Convert vector in matrix
-
-template<typename T, int DIM>
-void
-converttomatrix(const static_vector<T, DIM>& vec)
-{
-    static_assert((DIM == 4 || DIM == 9), "Can not compute conversion for this dimension");
-}
 
 template<typename T>
 static_matrix<T, 2, 2>
@@ -225,5 +211,45 @@ convertTensorNotationMangel(const static_tensor<T, DIM>& tens)
     }
 
     return ret;
+}
+
+template<typename T>
+static_tensor<T, 3>
+convertCtoA(const static_tensor<T, 3>& C, const static_matrix<T, 3, 3>& PK2, const static_matrix<T, 3, 3>& F)
+{
+    static_tensor<T, 3> A = static_tensor<T, 3>::Zero();
+
+    for (int i = 0; i < 3; i++)
+    {
+        for (int J = 0; J < 3; J++)
+        {
+            for (int k = 0; k < 3; k++)
+            {
+                for (int L = 0; L < 3; L++)
+                {
+                    T sum = T(0);
+                    for (int M = 0; M < 3; M++)
+                    {
+                        T sum1 = T(0);
+                        for (int N = 0; N < 3; N++)
+                        {
+                            sum1 += coeff<T, 3>(C, M, J, N, L) * F(k, N);
+                        }
+                        sum += sum1 * F(i, M);
+                    }
+
+                    if (i == k)
+                    {
+                        sum += PK2(J, L);
+                    }
+
+                    coeff<T, 3>(A, i, J, k, L, sum);
+                    coeff<T, 3>(A, k, L, i, J, sum);
+                }
+            }
+        }
+    }
+
+    return A;
 }
 }

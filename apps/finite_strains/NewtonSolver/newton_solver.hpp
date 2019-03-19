@@ -34,7 +34,7 @@
 #include "../Informations.hpp"
 #include "../Parameters.hpp"
 
-#include "mechanics/BoundaryConditions.hpp"
+#include "boundary_conditions/boundary_conditions.hpp"
 #include "newton_step.hpp"
 
 #include "timecounter.h"
@@ -53,19 +53,18 @@ class NewtonRaphson_solver_finite_strains
     typedef ParamRun<scalar_type>               param_type;
     typedef typename disk::hho_degree_info      hdi_type;
 
-    typedef dynamic_matrix<scalar_type> matrix_dynamic;
-    typedef dynamic_vector<scalar_type> vector_dynamic;
+    typedef dynamic_matrix<scalar_type> matrix_type;
+    typedef dynamic_vector<scalar_type> vector_type;
 
-    typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, false> bnd_type;
 
+    const mesh_type& m_msh;
     const hdi_type& m_hdi;
     const bnd_type& m_bnd;
-
-    const mesh_type&  m_msh;
     const param_type& m_rp;
 
-    std::vector<vector_dynamic> m_solution_data;
-    std::vector<vector_dynamic> m_solution_cells, m_solution_faces;
+    std::vector<vector_type> m_solution_data;
+    std::vector<vector_type> m_solution_cells, m_solution_faces;
 
     bool m_verbose;
     bool m_convergence;
@@ -76,7 +75,7 @@ class NewtonRaphson_solver_finite_strains
                                         const bnd_type&   bnd,
                                         const param_type& rp) :
       m_msh(msh),
-      m_verbose(rp.m_verbose), m_convergence(false), m_rp(rp), m_hdi(hdi), m_bnd(bnd)
+      m_hdi(hdi), m_bnd(bnd), m_rp(rp), m_verbose(rp.m_verbose), m_convergence(false)
     {
     }
 
@@ -92,9 +91,9 @@ class NewtonRaphson_solver_finite_strains
     }
 
     void
-    initialize(const std::vector<vector_dynamic>& initial_solution_cells,
-               const std::vector<vector_dynamic>& initial_solution_faces,
-               const std::vector<vector_dynamic>& initial_solution)
+    initialize(const std::vector<vector_type>& initial_solution_cells,
+               const std::vector<vector_type>& initial_solution_faces,
+               const std::vector<vector_type>& initial_solution)
     {
         m_solution_cells.clear();
         m_solution_cells = initial_solution_cells;
@@ -112,8 +111,8 @@ class NewtonRaphson_solver_finite_strains
     template<typename LoadIncrement, typename Law>
     NewtonSolverInfo
     compute(const LoadIncrement&               lf,
-            const std::vector<matrix_dynamic>& gradient_precomputed,
-            const std::vector<matrix_dynamic>& stab_precomputed,
+            const std::vector<matrix_type>& gradient_precomputed,
+            const std::vector<matrix_type>& stab_precomputed,
             Law&                               law)
     {
         NewtonSolverInfo ni;
@@ -152,7 +151,12 @@ class NewtonRaphson_solver_finite_strains
             // test convergence
             m_convergence = newton_step.test_convergence(iter);
             if (m_convergence)
-                break;
+            {
+                newton_step.save_solutions(m_solution_cells, m_solution_faces, m_solution_data);
+                tc.toc();
+                ni.m_time_newton = tc.to_double();
+                return ni;
+            }
 
             // solve the global system
             SolveInfo solve_info = newton_step.solve();
@@ -162,9 +166,6 @@ class NewtonRaphson_solver_finite_strains
 
             ni.m_iter++;
         }
-
-        if (m_convergence)
-            newton_step.save_solutions(m_solution_cells, m_solution_faces, m_solution_data);
 
         tc.toc();
         ni.m_time_newton = tc.to_double();
@@ -178,9 +179,9 @@ class NewtonRaphson_solver_finite_strains
     }
 
     void
-    save_solutions(std::vector<vector_dynamic>& solution_cells,
-                   std::vector<vector_dynamic>& solution_faces,
-                   std::vector<vector_dynamic>& solution)
+    save_solutions(std::vector<vector_type>& solution_cells,
+                   std::vector<vector_type>& solution_faces,
+                   std::vector<vector_type>& solution)
     {
         solution_cells.clear();
         solution_cells = m_solution_cells;

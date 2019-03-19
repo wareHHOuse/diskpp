@@ -60,8 +60,6 @@ class augmented_lagrangian_viscoplasticity
     typedef typename mesh_type::face        face_type;
     typedef typename mesh_type::coordinate_type T;
 
-    typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
-
     using point_type = typename mesh_type::point_type;
 
     typedef Matrix<T, Mesh::dimension, Mesh::dimension>         tensor_type;
@@ -72,8 +70,10 @@ class augmented_lagrangian_viscoplasticity
     typedef std::function<vector2d_type (const point_type &)>   vector_funtion_type;
     typedef std::function<T   (const point_type &)>             scalar_funtion_type;
 
+    typedef disk::BoundaryConditions<mesh_type, false>          boundary_type;
+
     vector_funtion_type     rhs_fun, velocity;
-    dynamic_vector<T>             multiplier, auxiliar, auxiliar_old;
+    dynamic_vector<T>       multiplier, auxiliar, auxiliar_old;
 
     typename disk::hho_degree_info di;
     T             factor;
@@ -292,7 +292,7 @@ public:
             vector_type diff_vel = svel - pvel;
             auto gr = disk::make_hho_stokes(msh, cl, di, use_sym_grad);
             matrix_type stab;
-            stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
+            stab = make_vector_hho_stabilization(msh, cl, gr.first, di);
             auto G = disk::make_hlow_stokes(msh, cl, di, use_sym_grad);
 
             matrix_type B = factor * (viscosity*G.second + viscosity*stab);
@@ -447,8 +447,8 @@ public:
         {
             auto G  = disk::make_hlow_stokes(msh, cl, di, use_sym_grad);
             auto gr = disk::make_hho_stokes(msh, cl, di, use_sym_grad);
-            matrix_type stab = make_hho_vector_stabilization(msh, cl, gr.first, di);
-            auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, di);
+            matrix_type stab = make_vector_hho_stabilization(msh, cl, gr.first, di);
+            auto dr = make_hho_divergence_reconstruction_rhs(msh, cl, di);
 
             matrix_type A = factor *(alpha * G.second + viscosity * stab);
 

@@ -86,8 +86,6 @@ points(const simplicial_mesh<T,DIM>& msh, const simplicial_element<DIM, CODIM>& 
         return *std::next(points_begin, pi);
     };
 
-    typedef point_identifier<DIM>       point_id_type;
-
     std::array<typename simplicial_mesh<T,DIM>::point_type, priv::howmany<DIM, CODIM>::nodes> pts;
     std::transform(ptids.begin(), ptids.end(), pts.begin(), ptid_to_point);
 
@@ -192,7 +190,7 @@ measure(const simplicial_mesh<T, 2>& msh,
 
     auto d0 = (pts[1] - pts[0]);
     auto d1 = (pts[2] - pts[0]);
-    
+
     return abs(d0.x()*d1.y() - d1.x()*d0.y())/T(2);
 }
 

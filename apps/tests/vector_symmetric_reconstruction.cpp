@@ -58,18 +58,19 @@ struct test_functor
 
         typename disk::hho_degree_info hdi(degree);
 
+        const auto DIM = mesh_type::dimension;
+
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
             vector_type proj = disk::project_function(msh, cl, hdi, f, 2);
-            auto gr = disk::make_hho_vector_symmetric_laplacian(msh, cl, hdi);
+            auto gr = disk::make_vector_hho_symmetric_laplacian(msh, cl, hdi);
 
             size_t rec_size = disk::vector_basis_size(hdi.reconstruction_degree(), Mesh::dimension, Mesh::dimension);
 
             vector_type reconstr = vector_type::Zero(rec_size);
-            reconstr.tail(rec_size-2) = gr.first * proj;
-            reconstr(0) = proj(0);
-            reconstr(1) = proj(1);
+            reconstr.tail(rec_size-DIM) = gr.first * proj;
+            reconstr.head(DIM) = proj.head(DIM);
 
             auto cb = disk::make_vector_monomial_basis(msh, cl, hdi.reconstruction_degree());
             Matrix<scalar_type, Dynamic, Dynamic> mass = disk::make_mass_matrix(msh, cl, cb);

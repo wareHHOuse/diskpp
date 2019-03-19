@@ -36,7 +36,6 @@
  #include "core/loaders/loader.hpp"
  #include "signorini_newton_solver.hpp"
 
-
 int main(int argc, char **argv)
 {
     _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);

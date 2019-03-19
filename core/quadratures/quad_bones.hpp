@@ -194,7 +194,6 @@ edge_quadrature(const size_t doe)
 std::vector<std::pair<point<double,3>, double>>
 tetrahedron_quadrature(size_t degree)
 {
-    int dimension = 3;
 
 #ifdef USE_ARBQ
     int rule = degree;
@@ -208,6 +207,7 @@ tetrahedron_quadrature(size_t degree)
 #ifdef USE_ARBQ
     point_num = tetrahedron_arbq_size(rule);
 #else
+    int dimension = 3;
     point_num = gm_rule_size(rule, dimension);
 #endif
     std::vector<double> ws(point_num);
@@ -377,7 +377,7 @@ namespace priv {
 template<typename T>
 std::vector<quadrature_point<T,2>>
 triangle_quadrature_low_order(const point<T,2>& p0,
-                              const point<T,2>& p1, 
+                              const point<T,2>& p1,
                               const point<T,2>& p2, size_t deg)
 {
     std::vector<quadrature_point<T,2>>   ret;
@@ -428,7 +428,7 @@ triangle_quadrature_low_order(const point<T,2>& p0,
             qp = a2*p0 + (1-2*a2)*p1 + a2*p2;   ret.push_back( make_qp(qp, qw) );
             qp = (1-2*a2)*p0 + a2*p1 + a2*p2;   ret.push_back( make_qp(qp, qw) );
             return ret;
-            
+
         default:
             throw std::invalid_argument("Triangle quadrature: requested order too high");
     }
@@ -498,13 +498,13 @@ integrate_quadrangle_tens(size_t degree, const std::vector<point<T, 2>>& pts)
     auto J = [&](T xi, T eta) -> T {
         auto j11 = 0.25 * ( (pts[1].x() - pts[0].x()) * (1 - eta) +
                             (pts[2].x() - pts[3].x()) * (1 + eta) );
-        
+
         auto j12 = 0.25 * ( (pts[1].y() - pts[0].y()) * (1 - eta) +
                             (pts[2].y() - pts[3].y()) * (1 + eta) );
-        
+
         auto j21 = 0.25 * ( (pts[3].x() - pts[0].x()) * (1 - xi) +
                             (pts[2].x() - pts[1].x()) * (1 + xi) );
-        
+
         auto j22 = 0.25 * ( (pts[3].y() - pts[0].y()) * (1 - xi) +
                             (pts[2].y() - pts[1].y()) * (1 + xi) );
 
@@ -526,57 +526,10 @@ integrate_quadrangle_tens(size_t degree, const std::vector<point<T, 2>>& pts)
     return ret;
 }
 
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename PtA>
-std::vector<disk::quadrature_point<T, 2>>
-integrate_quadrangle(const Mesh<T, 2, Storage>&                msh,
-                     const typename Mesh<T, 2, Storage>::cell& cl,
-                     size_t                                    degree,
-                     const PtA&                                pts)
-{
-    assert(pts.size() == 4);
-
-    using mesh_type      = Mesh<T, 2, Storage>;
-    using quadpoint_type = disk::quadrature_point<T, 2>;
-
-    const auto qps = disk::triangle_quadrature(degree);
-
-    std::vector<quadpoint_type> ret;
-
-    ret.resize(qps.size() * 2);
-
-    for (size_t i = 1; i < 3; i++)
-    {
-        const auto pt1  = pts[i];
-        const auto pt2  = pts[i + 1];
-        const auto col1 = pt1 - pts[0];
-        const auto col2 = pt2 - pts[0];
-
-        /* Compute the area of the sub-triangle */
-        const auto tm = (col1.x() * col2.y() - col2.x() * col1.y()) / 2.;
-
-        auto tr = [&](const std::pair<point<T, 2>, T>& qd) -> auto
-        {
-            const auto point  = col1 * qd.first.x() + col2 * qd.first.y() + pts[0];
-            const auto weight = qd.second * std::abs(tm);
-            return disk::make_qp(point, weight);
-        };
-
-        auto retbegin = ret.begin();
-        std::advance(retbegin, qps.size() * (i - 1));
-
-        std::transform(qps.begin(), qps.end(), retbegin, tr);
-    }
-
-    return ret;
-}
-
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 std::vector<disk::quadrature_point<T, 2>>
 integrate_2D_face(const Mesh<T, 2, Storage>& msh, const typename Mesh<T, 2, Storage>::face& fc, size_t degree)
 {
-    using mesh_type  = disk::simplicial_mesh<T, 2>;
-    using point_type = typename mesh_type::point_type;
-
     const auto qps = disk::edge_quadrature<T>(degree);
     const auto pts = points(msh, fc);
 

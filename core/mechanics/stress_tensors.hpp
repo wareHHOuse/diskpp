@@ -8,7 +8,7 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Karol Cascavita (C) 2018                     klcascavitam@unal.edu.co
+ * Karol Cascavita (C) 2018                     karol.cascavita@enpc.fr
  * Nicolas Pignet (C) 2018                      nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include "mechanics/behaviors/maths_utils.hpp"
 #include "common/eigen.hpp"
 
 // Function to convert Stress to an other
@@ -87,6 +88,15 @@ static_matrix<T, DIM, DIM>
 convertPK2toCauchy(const static_matrix<T, DIM, DIM>& PK2, const static_matrix<T, DIM, DIM>& F)
 {
     return F * PK2 * F.transpose() / F.determinant();
+}
+
+// Compute criteria of Von Mises
+template<typename T, int DIM>
+T
+VonMisesCriteria(const static_matrix<T, DIM, DIM> mat)
+{
+    const auto dev = deviator(mat);
+    return sqrt(T(1.5) * dev.squaredNorm());
 }
 
 } // end mechanics

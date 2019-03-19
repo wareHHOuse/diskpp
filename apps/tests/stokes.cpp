@@ -8,7 +8,7 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Karol Cascavita (C) 2018                     klcascavitam@unal.edu.co
+ * Karol Cascavita (C) 2018                     karol.cascavita@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -50,7 +50,7 @@ run_stokes(const Mesh& msh, size_t degree)
     typedef typename mesh_type::coordinate_type scalar_type;
 
     typedef dynamic_matrix<scalar_type>     matrix_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
+    typedef disk::BoundaryConditions<mesh_type, false> boundary_type;
 
     using point_type = typename mesh_type::point_type;
 
@@ -95,19 +95,19 @@ run_stokes(const Mesh& msh, size_t degree)
 
 
     typename disk::hho_degree_info hdi(degree);
-    boundary_type                        bnd(msh);
+    boundary_type                  bnd(msh);
     bnd.addDirichletEverywhere(sol_fun);
 
     auto assembler = disk::make_stokes_assembler(msh, hdi, bnd);
 
     for (auto cl : msh)
     {
-        auto gr = make_hho_vector_laplacian(msh, cl, hdi);
+        auto gr = make_vector_hho_laplacian(msh, cl, hdi);
 
         Matrix<scalar_type, Dynamic, Dynamic> stab;
-        stab = make_hho_vector_stabilization(msh, cl, gr.first, hdi);
+        stab = make_vector_hho_stabilization(msh, cl, gr.first, hdi);
 
-        auto dr = make_hho_divergence_reconstruction_stokes_rhs(msh, cl, hdi);
+        auto dr = make_hho_divergence_reconstruction_rhs(msh, cl, hdi);
 
         auto face_basis = disk::make_vector_monomial_basis(msh, cl, hdi.face_degree());
 

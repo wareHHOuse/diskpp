@@ -816,7 +816,7 @@ template<typename T>
 point<T,2>
 read_2d_point_line(const char *str, char **endptr, T scalefactor)
 {
-    T t1, t2, t3;
+    T t1, t2;
 
     t1 = strtot<T>(str, endptr);
     t2 = strtot<T>(*endptr, endptr);

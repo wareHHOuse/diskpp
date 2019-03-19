@@ -71,10 +71,10 @@ template<typename Mesh>
 class vector_laplacian_solver
 {
    typedef Mesh                                           mesh_type;
-   typedef typename mesh_type::coordinate_type                scalar_type;
+   typedef typename mesh_type::coordinate_type            scalar_type;
    typedef typename mesh_type::cell                       cell_type;
    typedef typename mesh_type::face                       face_type;
-   typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
+   typedef disk::BoundaryConditions<mesh_type, false>     bnd_type;
 
    typedef dynamic_matrix<scalar_type> matrix_dynamic;
    typedef dynamic_vector<scalar_type> vector_dynamic;
@@ -166,18 +166,16 @@ class vector_laplacian_solver
       assembly_info ai;
       bzero(&ai, sizeof(ai));
 
-      typename disk::static_condensation_vector<mesh_type> statcond;
-
       timecounter tc;
 
       for (auto& cl : m_msh) {
 
           tc.tic();
 #ifdef USE_OPTIM
-          const auto gr_scalar = make_hho_scalar_laplacian(m_msh, cl, m_hdi);
-          const auto gr    = make_hho_vector_laplacian(m_msh, cl, m_hdi, gr_scalar);
+          const auto gr_scalar = make_scalar_hho_laplacian(m_msh, cl, m_hdi);
+          const auto gr    = make_vector_hho_laplacian(m_msh, cl, m_hdi, gr_scalar);
 #else
-          const auto gr = make_hho_vector_laplacian(m_msh, cl, m_hdi);
+          const auto gr = make_vector_hho_laplacian(m_msh, cl, m_hdi);
 #endif
           tc.toc();
           ai.time_gradrec += tc.to_double();
@@ -186,14 +184,14 @@ class vector_laplacian_solver
           matrix_dynamic stab;
           if(m_hdi.cell_degree() == (m_hdi.face_degree() + 1))
           {
-              stab = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
+              stab = make_vector_hdg_stabilization(m_msh, cl, m_hdi);
           }
           else
           {
 #ifdef USE_OPTIM
-          stab = make_hho_vector_stabilization_optim(m_msh, cl, gr_scalar.first, m_hdi);
+          stab = make_vector_hho_stabilization_optim(m_msh, cl, gr_scalar.first, m_hdi);
 #else
-          stab = make_hho_vector_stabilization(m_msh, cl, gr.first, m_hdi);
+          stab = make_vector_hho_stabilization(m_msh, cl, gr.first, m_hdi);
 #endif
           }
           tc.toc();
@@ -203,14 +201,14 @@ class vector_laplacian_solver
           auto                 cb       = disk::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
           const auto           cell_rhs = make_rhs(m_msh, cl, cb, lf, 2);
           const matrix_dynamic loc      = m_parameters.lambda * (gr.second + stab);
-          const auto           scnp     = statcond.compute(m_msh, cl, loc, cell_rhs, m_hdi);
+          const auto           scnp     = make_vector_static_condensation_withMatrix(m_msh, cl, m_hdi, loc, cell_rhs);
 
-          m_AL.push_back(statcond.AL);
-          m_bL.push_back(statcond.bL);
+          m_AL.push_back(std::get<1>(scnp));
+          m_bL.push_back(std::get<2>(scnp));
           tc.toc();
           ai.time_statcond += tc.to_double();
 
-          m_assembler.assemble(m_msh, cl, m_bnd, scnp);
+          m_assembler.assemble(m_msh, cl, m_bnd, std::get<0>(scnp));
       }
 
       m_assembler.impose_neumann_boundary_conditions(m_msh, m_bnd);
@@ -341,10 +339,10 @@ class vector_laplacian_solver
       for (auto& cl : m_msh) {
          const auto x   = m_solution_data.at(cell_i++);
 #ifdef USE_OPTIM
-         const auto gr_scalar = make_hho_scalar_laplacian(m_msh, cl, m_hdi);
-         const auto gr        = make_hho_vector_laplacian(m_msh, cl, m_hdi, gr_scalar);
+         const auto gr_scalar = make_scalar_hho_laplacian(m_msh, cl, m_hdi);
+         const auto gr        = make_vector_hho_laplacian(m_msh, cl, m_hdi, gr_scalar);
 #else
-         const auto gr = make_hho_vector_laplacian(m_msh, cl, m_hdi);
+         const auto gr = make_vector_hho_laplacian(m_msh, cl, m_hdi);
 #endif
          const auto RTu = gr.first * x;
 

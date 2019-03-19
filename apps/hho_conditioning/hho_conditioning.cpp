@@ -63,9 +63,9 @@ estimate_element_cond(sol::state& lua, const Mesh& msh)
 
     for (auto& cl : msh)
     {
-        const auto cb   = disk::make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-        const auto gr   = make_hho_scalar_laplacian(msh, cl, hdi);
-        const auto stab = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+        const auto cb   = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        const auto gr   = make_scalar_hho_laplacian(msh, cl, hdi);
+        const auto stab = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
         const auto rhs  = make_rhs(msh, cl, cb, rhs_fun);
         const auto A    = gr.second + stab;
 

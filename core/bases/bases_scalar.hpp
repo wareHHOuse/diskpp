@@ -8,7 +8,7 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Karol Cascavita (C) 2018                     klcascavitam@unal.edu.co
+ * Karol Cascavita (C) 2018                     karol.cascavita@enpc.fr
  * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
@@ -116,12 +116,12 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 {
 
   public:
-    typedef Mesh<T, 2, Storage>             mesh_type;
+    typedef Mesh<T, 2, Storage>                 mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::cell        cell_type;
-    typedef typename mesh_type::point_type  point_type;
-    typedef Matrix<scalar_type, Dynamic, 2> gradient_type;
-    typedef Matrix<scalar_type, Dynamic, 1> function_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef Matrix<scalar_type, Dynamic, 2>     gradient_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     function_type;
 
   private:
     point_type                 cell_bar;
@@ -257,11 +257,11 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 {
 
   public:
-    typedef Mesh<T, 2, Storage>             mesh_type;
+    typedef Mesh<T, 2, Storage>                 mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::point_type  point_type;
-    typedef typename mesh_type::face        face_type;
-    typedef Matrix<scalar_type, Dynamic, 1> function_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef typename mesh_type::face            face_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     function_type;
 
   private:
     point_type  face_bar;
@@ -282,23 +282,8 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         basis_size   = degree + 1;
 
         const auto pts = points(msh, fc);
-        auto       p0  = pts[0];
-        auto       p1  = pts[1];
 
-
-        // if (std::abs(p1.x() - p0.x()) < 1E-8)
-        // {
-        //     if (p1.y() < p0.y())
-        //     {
-        //         p0 = p1;
-        //     }
-        // }
-        // else if (p1.x() < p0.x())
-        // {
-        //     p0 = p1;
-        // }
-
-        base     = face_bar - p0;
+        base = face_bar - pts[0];
     }
 
     function_type
@@ -314,7 +299,7 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         for (size_t i = 0; i <= basis_degree; i++)
         {
             const auto bv = iexp_pow(ep, i);
-            ret(i)  = bv;
+            ret(i)        = bv;
         }
         return ret;
     }
@@ -341,12 +326,12 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 {
 
   public:
-    typedef Mesh<T, 3, Storage>             mesh_type;
+    typedef Mesh<T, 3, Storage>                 mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::cell        cell_type;
-    typedef typename mesh_type::point_type  point_type;
-    typedef Matrix<scalar_type, Dynamic, 3> gradient_type;
-    typedef Matrix<scalar_type, Dynamic, 1> function_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef Matrix<scalar_type, Dynamic, 3>     gradient_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     function_type;
 
   private:
     point_type                 cell_bar;
@@ -496,11 +481,11 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 {
 
   public:
-    typedef Mesh<T, 3, Storage>             mesh_type;
+    typedef Mesh<T, 3, Storage>                 mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::point_type  point_type;
-    typedef typename mesh_type::face        face_type;
-    typedef Matrix<scalar_type, Dynamic, 1> function_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef typename mesh_type::face            face_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     function_type;
 
   private:
     point_type  face_bar;
@@ -511,22 +496,22 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
     mutable std::vector<scalar_type> power_cache;
 #endif
 
-    typedef decltype(points(mesh_type(), face_type())) pts_type;
-    pts_type                                           pts;
+    typedef static_vector<T, 3> vector_type;
+    vector_type                 e0, e1;
 
-    /* This function maps a 3D point on a face to a 2D reference system, to compute the
-     * face basis. It takes two edges of an element's face and uses them as the coordinate
+    /* It takes two edges of an element's face and uses them as the coordinate
      * axis of a 2D reference system. Those two edges are accepted only if they have an angle
      * between them greater than 8 degrees, then they are orthonormalized via G-S. */
-    point<T, 2>
-    map_face_point_3d_to_2d(const point_type& pt) const
-    {
-        typedef static_vector<T, 3> vector_type;
 
+    void
+    compute_axis(const mesh_type& msh, const face_type& fc, vector_type& e0, vector_type& e1)
+    {
         vector_type v0;
         vector_type v1;
 
         bool ok = false;
+
+        const auto pts = points(msh, fc);
 
         const size_t npts = pts.size();
         for (size_t i = 1; i <= npts; i++)
@@ -549,10 +534,19 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
         if (!ok)
             throw std::invalid_argument("Degenerate polyhedron, cannot proceed");
 
-        vector_type e0 = v0 / v0.norm();
-        vector_type e1 = v1 - (v1.dot(v0) * v0) / (v0.dot(v0));
-        e1             = e1 / e1.norm();
+        e0 = v0 / v0.norm();
+        e1 = v1 - (v1.dot(v0) * v0) / (v0.dot(v0));
+        e1 = e1 / e1.norm();
+    }
 
+    /* This function maps a 3D point on a face to a 2D reference system, to compute the
+     * face basis. It takes two edges of an element's face and uses them as the coordinate
+     * axis of a 2D reference system. Those two edges are accepted only if they have an angle
+     * between them greater than 8 degrees, then they are orthonormalized via G-S. */
+
+    point<T, 2>
+    map_face_point_3d_to_2d(const point_type& pt) const
+    {
         vector_type v = (pt - face_bar).to_vector();
 
         const auto eta = v.dot(e0);
@@ -568,7 +562,7 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
         face_h       = diameter(msh, fc);
         basis_degree = degree;
         basis_size   = scalar_basis_size(degree, 2);
-        pts          = points(msh, fc);
+        compute_axis(msh, fc, e0, e1);
     }
 
     function_type
@@ -651,11 +645,11 @@ class scaled_legendre_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 {
 
   public:
-    typedef Mesh<T, 2, Storage>             mesh_type;
+    typedef Mesh<T, 2, Storage>                 mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::point_type  point_type;
-    typedef typename mesh_type::face        face_type;
-    typedef Matrix<scalar_type, Dynamic, 1> function_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef typename mesh_type::face            face_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     function_type;
 
   private:
     point_type  face_bar;
@@ -697,7 +691,7 @@ class scaled_legendre_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
             throw std::invalid_argument("Sorry, I don't have a Legendre basis of order > 10.");
 
         const auto pts = points(msh, fc);
-        base     = face_bar - pts[0];
+        base           = face_bar - pts[0];
     }
 
     function_type

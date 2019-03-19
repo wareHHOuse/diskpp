@@ -35,7 +35,7 @@
 #include "../Parameters.hpp"
 #include "bases/bases.hpp"
 #include "finite_strains_elementary_computation.hpp"
-#include "mechanics/BoundaryConditions.hpp"
+#include "boundary_conditions/boundary_conditions.hpp"
 #include "methods/hho"
 #include "quadratures/quadratures.hpp"
 
@@ -56,30 +56,30 @@ class NewtonRaphson_step_finite_strains
     typedef typename mesh_type::coordinate_type            scalar_type;
     typedef ParamRun<scalar_type>                          param_type;
     typedef typename disk::hho_degree_info                 hdi_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, false>     bnd_type;
 
     const static int dimension = mesh_type::dimension;
 
-    typedef dynamic_matrix<scalar_type> matrix_dynamic;
-    typedef dynamic_vector<scalar_type> vector_dynamic;
+    typedef dynamic_matrix<scalar_type> matrix_type;
+    typedef dynamic_vector<scalar_type> vector_type;
 
     typedef disk::assembler_mechanics<mesh_type> assembler_type;
 
     typedef finite_strains<mesh_type> elem_type;
 
-    vector_dynamic m_system_solution;
+    vector_type m_system_solution;
 
-    const bnd_type&   m_bnd;
     const mesh_type&  m_msh;
     const hdi_type&   m_hdi;
+    const bnd_type&   m_bnd;
     const param_type& m_rp;
     assembler_type    m_assembler;
 
-    std::vector<vector_dynamic> m_bL;
-    std::vector<matrix_dynamic> m_AL;
+    std::vector<vector_type> m_bL;
+    std::vector<matrix_type> m_AL;
 
-    std::vector<vector_dynamic> m_postprocess_data, m_solution_data;
-    std::vector<vector_dynamic> m_solution_cells, m_solution_faces;
+    std::vector<vector_type> m_postprocess_data, m_solution_data;
+    std::vector<vector_type> m_solution_cells, m_solution_faces;
 
     scalar_type m_F_int;
 
@@ -91,7 +91,7 @@ class NewtonRaphson_step_finite_strains
                                       const bnd_type&   bnd,
                                       const param_type& rp) :
       m_msh(msh),
-      m_verbose(rp.m_verbose), m_rp(rp), m_hdi(hdi), m_bnd(bnd)
+      m_hdi(hdi), m_rp(rp), m_bnd(bnd), m_verbose(rp.m_verbose)
     {
         m_AL.clear();
         m_AL.resize(m_msh.cells_size());
@@ -114,9 +114,9 @@ class NewtonRaphson_step_finite_strains
     }
 
     void
-    initialize(const std::vector<vector_dynamic>& initial_solution_cells,
-               const std::vector<vector_dynamic>& initial_solution_faces,
-               const std::vector<vector_dynamic>& initial_solution)
+    initialize(const std::vector<vector_type>& initial_solution_cells,
+               const std::vector<vector_type>& initial_solution_faces,
+               const std::vector<vector_type>& initial_solution)
     {
         m_solution_cells.clear();
         m_solution_cells = initial_solution_cells;
@@ -134,13 +134,11 @@ class NewtonRaphson_step_finite_strains
     template<typename LoadFunction, typename Law>
     AssemblyInfo
     assemble(const LoadFunction&                lf,
-             const std::vector<matrix_dynamic>& gradient_precomputed,
-             const std::vector<matrix_dynamic>& stab_precomputed,
+             const std::vector<matrix_type>& gradient_precomputed,
+             const std::vector<matrix_type>& stab_precomputed,
              Law&                               law,
              bool                               elastic_modulus = false)
     {
-        typename disk::static_condensation_vector<mesh_type> statcond;
-
         elem_type    elem(m_msh, m_hdi);
         AssemblyInfo ai;
 
@@ -158,7 +156,7 @@ class NewtonRaphson_step_finite_strains
         for (auto& cl : m_msh)
         {
             // Gradient Reconstruction
-            matrix_dynamic GT;
+            matrix_type GT;
             tc.tic();
             if (m_rp.m_precomputation)
             {
@@ -166,7 +164,7 @@ class NewtonRaphson_step_finite_strains
             }
             else
             {
-                const auto gradrec_full = make_hho_gradrec_matrix(m_msh, cl, m_hdi);
+                const auto gradrec_full = make_marix_hho_gradrec(m_msh, cl, m_hdi);
                 GT                      = gradrec_full.first;
             }
             tc.toc();
@@ -181,8 +179,8 @@ class NewtonRaphson_step_finite_strains
             tc.tic();
             elem.compute(cl, lf, GT, m_solution_data.at(cell_i), law_cell, material_data, elastic_modulus);
 
-            matrix_dynamic lhs = elem.K_int;
-            vector_dynamic rhs = elem.RTF;
+            matrix_type lhs = elem.K_int;
+            vector_type rhs = elem.RTF;
             m_F_int += elem.F_int.squaredNorm();
 
             tc.toc();
@@ -196,7 +194,7 @@ class NewtonRaphson_step_finite_strains
             {
                 if (m_rp.m_precomputation)
                 {
-                    const matrix_dynamic stab = stab_precomputed.at(cell_i);
+                    const matrix_type stab = stab_precomputed.at(cell_i);
                     assert(elem.K_int.rows() == stab.rows());
                     assert(elem.K_int.cols() == stab.cols());
                     assert(elem.RTF.rows() == stab.rows());
@@ -211,9 +209,9 @@ class NewtonRaphson_step_finite_strains
                     {
                         case HHO:
                         {
-                            const auto recons_scalar = make_hho_scalar_laplacian(m_msh, cl, m_hdi);
+                            const auto recons_scalar = make_scalar_hho_laplacian(m_msh, cl, m_hdi);
                             const auto stab_HHO =
-                              make_hho_vector_stabilization_optim(m_msh, cl, recons_scalar.first, m_hdi);
+                              make_vector_hho_stabilization_optim(m_msh, cl, recons_scalar.first, m_hdi);
                             assert(elem.K_int.rows() == stab_HHO.rows());
                             assert(elem.K_int.cols() == stab_HHO.cols());
                             assert(elem.RTF.rows() == stab_HHO.rows());
@@ -225,7 +223,7 @@ class NewtonRaphson_step_finite_strains
                         }
                         case HDG:
                         {
-                            const auto stab_HDG = make_hdg_vector_stabilization(m_msh, cl, m_hdi);
+                            const auto stab_HDG = make_vector_hdg_stabilization(m_msh, cl, m_hdi);
                             assert(elem.K_int.rows() == stab_HDG.rows());
                             assert(elem.K_int.cols() == stab_HDG.cols());
                             assert(elem.RTF.rows() == stab_HDG.rows());
@@ -233,6 +231,18 @@ class NewtonRaphson_step_finite_strains
 
                             lhs += m_rp.m_beta * stab_HDG;
                             rhs -= m_rp.m_beta * stab_HDG * m_solution_data.at(cell_i);
+                            break;
+                        }
+                        case DG:
+                        {
+                            const auto stab_DG = make_vector_dg_stabilization(m_msh, cl, m_hdi);
+                            assert(elem.K_int.rows() == stab_DG.rows());
+                            assert(elem.K_int.cols() == stab_DG.cols());
+                            assert(elem.RTF.rows() == stab_DG.rows());
+                            assert(elem.RTF.cols() == m_solution_data.at(cell_i).cols());
+
+                            lhs += m_rp.m_beta * stab_DG;
+                            rhs -= m_rp.m_beta * stab_DG * m_solution_data.at(cell_i);
                             break;
                         }
                         case NO: { break;
@@ -246,15 +256,15 @@ class NewtonRaphson_step_finite_strains
 
             // Static Condensation
             tc.tic();
-            auto scnp = statcond.compute_rhsfull(m_msh, cl, lhs, rhs, m_hdi);
+            const auto scnp = make_vector_static_condensation_withMatrix(m_msh, cl, m_hdi, lhs, rhs);
 
-            m_AL[cell_i] = statcond.AL;
-            m_bL[cell_i] = statcond.bL;
+            m_AL[cell_i] = std::get<1>(scnp);
+            m_bL[cell_i] = std::get<2>(scnp);
 
             tc.toc();
             ai.m_time_statcond += tc.to_double();
 
-            m_assembler.assemble_nl(m_msh, cl, m_bnd, scnp, m_solution_faces);
+            m_assembler.assemble_nl(m_msh, cl, m_bnd, std::get<0>(scnp), m_solution_faces);
 
             cell_i++;
         }
@@ -276,7 +286,7 @@ class NewtonRaphson_step_finite_strains
         timecounter tc;
 
         tc.tic();
-        m_system_solution = vector_dynamic::Zero(m_assembler.LHS.rows());
+        m_system_solution = vector_type::Zero(m_assembler.LHS.rows());
 
         disk::solvers::pardiso_params<scalar_type> pparams;
         mkl_pardiso(pparams, m_assembler.LHS, m_assembler.RHS, m_system_solution);
@@ -312,7 +322,7 @@ class NewtonRaphson_step_finite_strains
             const auto num_faces       = fcs.size();
             const auto total_faces_dof = num_faces * fbs;
 
-            vector_dynamic xFs = vector_dynamic::Zero(total_faces_dof);
+            vector_type xFs = vector_type::Zero(total_faces_dof);
 
             for (int face_i = 0; face_i < num_faces; face_i++)
             {
@@ -326,7 +336,7 @@ class NewtonRaphson_step_finite_strains
                 xFs.segment(face_i * fbs, fbs) = solF.segment(face_id * fbs, fbs);
             }
 
-            const vector_dynamic xT = m_bL[cell_i] - m_AL[cell_i] * xFs;
+            const vector_type xT = m_bL[cell_i] - m_AL[cell_i] * xFs;
 
             assert(xT.size() == cbs);
             assert(m_solution_data.at(cell_i).size() == xT.size() + xFs.size());
@@ -430,9 +440,9 @@ class NewtonRaphson_step_finite_strains
     }
 
     void
-    save_solutions(std::vector<vector_dynamic>& solution_cells,
-                   std::vector<vector_dynamic>& solution_faces,
-                   std::vector<vector_dynamic>& solution)
+    save_solutions(std::vector<vector_type>& solution_cells,
+                   std::vector<vector_type>& solution_faces,
+                   std::vector<vector_type>& solution)
     {
         solution_cells.clear();
         solution_cells = m_solution_cells;

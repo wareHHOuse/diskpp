@@ -8,7 +8,7 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Karol Cascavita (C) 2018                     klcascavitam@unal.edu.co
+ * Karol Cascavita (C) 2018                     karol.cascavita@enpc.fr
  * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
@@ -29,6 +29,7 @@
 
 #include <vector>
 
+#include "bases_scalar.hpp"
 #include "common/eigen.hpp"
 
 using namespace Eigen;
@@ -75,12 +76,13 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 {
 
   public:
-    typedef Mesh<T, 3, Storage>             mesh_type;
+    typedef Mesh<T, 3, Storage>                 mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::cell        cell_type;
-    typedef typename mesh_type::point_type  point_type;
-    typedef Matrix<scalar_type, 3, 3>       gradient_type;
-    typedef Matrix<scalar_type, Dynamic, 3> function_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef Matrix<scalar_type, 3, 3>           gradient_type;
+    typedef Matrix<scalar_type, Dynamic, 3>     function_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     divergence_type;
 
   private:
     size_t basis_degree, basis_size;
@@ -121,11 +123,10 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 
         function_type dphi = scalar_basis.eval_gradients(pt);
 
-        size_t j = 0;
         for (size_t i = 0; i < scalar_basis.size(); i++)
         {
             const Matrix<scalar_type, 1, 3> dphi_i = dphi.row(i);
-            gradient_type             g;
+            gradient_type                   g;
 
             g        = gradient_type::Zero();
             g.row(0) = dphi_i;
@@ -152,7 +153,6 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 
         function_type dphi = scalar_basis.eval_gradients(pt);
 
-        size_t j = 0;
         for (size_t i = 0; i < scalar_basis.size(); i++)
         {
             const Matrix<scalar_type, 1, 3> dphi_i = dphi.row(i);
@@ -203,6 +203,23 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
         return ret;
     }
 
+    divergence_type
+    eval_divergences(const point_type& pt) const
+    {
+        divergence_type ret = divergence_type::Zero(basis_size);
+
+        const function_type dphi = scalar_basis.eval_gradients(pt);
+
+        for (size_t i = 0; i < scalar_basis.size(); i++)
+        {
+            ret(3 * i)     = dphi(i, 0);
+            ret(3 * i + 1) = dphi(i, 1);
+            ret(3 * i + 2) = dphi(i, 2);
+        }
+
+        return ret;
+    }
+
     size_t
     size() const
     {
@@ -222,11 +239,11 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 {
 
   public:
-    typedef Mesh<T, 3, Storage>             mesh_type;
+    typedef Mesh<T, 3, Storage>                 mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::point_type  point_type;
-    typedef typename mesh_type::face        face_type;
-    typedef Matrix<scalar_type, Dynamic, 3> function_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef typename mesh_type::face            face_type;
+    typedef Matrix<scalar_type, Dynamic, 3>     function_type;
 
   private:
     size_t basis_degree, basis_size;
@@ -279,12 +296,13 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 {
 
   public:
-    typedef Mesh<T, 2, Storage>             mesh_type;
+    typedef Mesh<T, 2, Storage>                 mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::cell        cell_type;
-    typedef typename mesh_type::point_type  point_type;
-    typedef Matrix<scalar_type, 2, 2>       gradient_type;
-    typedef Matrix<scalar_type, Dynamic, 2> function_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef Matrix<scalar_type, 2, 2>           gradient_type;
+    typedef Matrix<scalar_type, Dynamic, 2>     function_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     divergence_type;
 
   private:
     size_t basis_degree, basis_size;
@@ -324,7 +342,6 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 
         const function_type dphi = scalar_basis.eval_gradients(pt);
 
-        size_t j = 0;
         for (size_t i = 0; i < scalar_basis.size(); i++)
         {
             const Matrix<scalar_type, 1, 2> dphi_i = dphi.row(i);
@@ -351,11 +368,10 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 
         const function_type dphi = scalar_basis.eval_gradients(pt);
 
-        size_t j = 0;
         for (size_t i = 0; i < scalar_basis.size(); i++)
         {
             const Matrix<scalar_type, 1, 2> dphi_i = dphi.row(i);
-            gradient_type             g;
+            gradient_type                   g;
 
             g        = gradient_type::Zero();
             g.row(0) = dphi_i;
@@ -388,6 +404,22 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         return ret;
     }
 
+    divergence_type
+    eval_divergences(const point_type& pt) const
+    {
+        divergence_type ret = divergence_type::Zero(basis_size);
+
+        const function_type dphi = scalar_basis.eval_gradients(pt);
+
+        for (size_t i = 0; i < scalar_basis.size(); i++)
+        {
+            ret(2 * i)     = dphi(i, 0);
+            ret(2 * i + 1) = dphi(i, 1);
+        }
+
+        return ret;
+    }
+
     size_t
     size() const
     {
@@ -407,11 +439,11 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 {
 
   public:
-    typedef Mesh<T, 2, Storage>             mesh_type;
+    typedef Mesh<T, 2, Storage>                 mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::point_type  point_type;
-    typedef typename mesh_type::face        face_type;
-    typedef Matrix<scalar_type, Dynamic, 2> function_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef typename mesh_type::face            face_type;
+    typedef Matrix<scalar_type, Dynamic, 2>     function_type;
 
   private:
     size_t basis_degree, basis_size;
@@ -456,4 +488,237 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         return basis_degree;
     }
 };
+
+///////////////////////////////////////////////////
+//// Raviart-Thomas elements on simplicial ////////
+///////////////////////////////////////////////////
+
+/* Compute the size of a vector basis of degree k in dimension d. */
+size_t
+vector_basis_size_RT(const size_t k, const size_t sd, const size_t vd)
+{
+    if(k == 0)
+        throw std::invalid_argument("Raviart-Thomas basis: degree has to be > 0");
+
+    if (sd == 3 && vd == 3)
+    {
+        return (k + 1) * (k + 2) * (k + 4) / 2;
+    }
+    else if (sd == 2 && vd == 2)
+    {
+        return (k + 1) * (k + 3);
+    }
+
+    throw std::invalid_argument("Raviart-Thomas basis: unknown case");
+
+    return 0;
+}
+
+// RT^{k}(T; R^d) = P^{k-1}(T;R^d) + x * P^{k-1,H}(T;R)
+
+/* Generic template for RT bases. */
+template<typename MeshType, typename Element>
+struct scaled_monomial_vector_basis_RT
+{
+    static_assert(sizeof(MeshType) == -1, "scaled_monomial_vector_basis_RT: not suitable for the requested kind of mesh");
+    static_assert(sizeof(Element) == -1,
+                  "scaled_monomial_vector_basis_RT: not suitable for the requested kind of element");
+};
+
+/* RT Basis 'factory'. */
+template<typename MeshType, typename ElementType>
+auto
+make_vector_monomial_basis_RT(const MeshType& msh, const ElementType& elem, const size_t degree)
+{
+    return scaled_monomial_vector_basis_RT<MeshType, ElementType>(msh, elem, degree);
+}
+
+/* Specialization for 3D meshes, cells */
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class scaled_monomial_vector_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell>
+{
+
+  public:
+    typedef Mesh<T, 3, Storage>                 mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef Matrix<scalar_type, Dynamic, 3>     function_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     divergence_type;
+
+  private:
+    size_t basis_degree, basis_size;
+
+    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
+    scalar_basis_type                                          scalar_basis;
+
+    typedef scaled_monomial_vector_basis<mesh_type, cell_type> vector_basis_type;
+    vector_basis_type                                        vector_basis;
+
+  public:
+    scaled_monomial_vector_basis_RT(const mesh_type& msh, const cell_type& cl, const size_t degree) :
+      basis_degree(degree), basis_size(vector_basis_size_RT(degree, 3, 3)), scalar_basis(msh, cl, degree - 1),
+      vector_basis(msh, cl, degree - 1)
+    {
+        if (degree <= 0)
+            throw std::invalid_argument("Raviart-Thomas basis: degree has to be > 0");
+
+        if (points(msh, cl).size() != 4)
+            throw std::invalid_argument("Raviart-Thomas basis: available only on tetrahedron");
+    }
+
+    function_type
+    eval_functions(const point_type& pt) const
+    {
+        function_type ret = function_type::Zero(basis_size, 3);
+
+        ret.block(0,0, vector_basis.size(), 3) = vector_basis.eval_functions(pt);
+
+        const auto sphi = scalar_basis.eval_functions(pt);
+        size_t     beg  = 0;
+        if (basis_degree >= 2)
+            beg = scalar_basis_size(basis_degree - 2, 3);
+        const auto offset = vector_basis.size();
+
+        // compute x P^(k-1)_H (monomial of degree exactly k - 1)
+        for (size_t i = beg; i < scalar_basis.size(); i++)
+        {
+            ret(offset + i - beg, 0)     = pt.x() * sphi(i);
+            ret(offset + i - beg, 1)     = pt.y() * sphi(i);
+            ret(offset + i - beg, 2)     = pt.z() * sphi(i);
+        }
+
+        return ret;
+    }
+
+    divergence_type
+    eval_divergences(const point_type& pt) const
+    {
+        divergence_type ret = divergence_type::Zero(basis_size);
+
+        ret.head(vector_basis.size()) = vector_basis.eval_divergences(pt);
+
+        const auto sphi   = scalar_basis.eval_functions(pt);
+        const auto sdphi  = scalar_basis.eval_gradients(pt);
+        size_t     beg    = 0;
+        if (basis_degree >= 2)
+            beg = scalar_basis_size(basis_degree - 2, 3);
+        const auto offset = vector_basis.size();
+
+        /// compute P^(k-1)_H + x.grad(P^(k-1)_H) (monomial of degree exactly k - 1)
+        for (size_t i = beg; i < scalar_basis.size(); i++)
+        {
+            ret(offset + i - beg) = 3 * sphi(i) + pt.x() * sdphi(i, 0) + pt.y() * sdphi(i, 1) + pt.z() * sdphi(i, 2);
+        }
+
+        return ret;
+    }
+
+    size_t
+    size() const
+    {
+        return basis_size;
+    }
+
+    size_t
+    degree() const
+    {
+        return basis_degree;
+    }
+};
+
+/* Specialization for 2D meshes, cells */
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class scaled_monomial_vector_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell>
+{
+
+  public:
+    typedef Mesh<T, 2, Storage>                 mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef Matrix<scalar_type, Dynamic, 2>     function_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     divergence_type;
+
+  private:
+    size_t basis_degree, basis_size;
+
+    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
+    scalar_basis_type                                          scalar_basis;
+
+    typedef scaled_monomial_vector_basis<mesh_type, cell_type> vector_basis_type;
+    vector_basis_type                                        vector_basis;
+
+  public:
+    scaled_monomial_vector_basis_RT(const mesh_type& msh, const cell_type& cl, const size_t degree) :
+      basis_degree(degree), basis_size(vector_basis_size_RT(degree, 2, 2)), scalar_basis(msh, cl, degree - 1),
+      vector_basis(msh, cl, degree - 1)
+    {
+        if (degree <= 0)
+            throw std::invalid_argument("Raviart-Thomas basis: degree has to be > 0");
+
+        if (points(msh, cl).size() != 3)
+            throw std::invalid_argument("Raviart-Thomas basis: available only on triangles");
+    }
+
+    function_type
+    eval_functions(const point_type& pt) const
+    {
+        function_type ret = function_type::Zero(basis_size, 2);
+
+        ret.block(0, 0, vector_basis.size(), 2) = vector_basis.eval_functions(pt);
+
+        const auto sphi   = scalar_basis.eval_functions(pt);
+        size_t     beg    = 0;
+        if (basis_degree >= 2)
+            beg = scalar_basis_size(basis_degree - 2, 2);
+        const auto offset = vector_basis.size();
+
+        // compute x P^(k-1)_H (monomial of degree exactly k - 1)
+        for (size_t i = beg; i < scalar_basis.size(); i++)
+        {
+            ret(offset + i - beg, 0) = pt.x() * sphi(i);
+            ret(offset + i - beg, 1) = pt.y() * sphi(i);
+        }
+
+        return ret;
+    }
+
+    divergence_type
+    eval_divergences(const point_type& pt) const
+    {
+        divergence_type ret = divergence_type::Zero(basis_size);
+
+        ret.head(vector_basis.size()) = vector_basis.eval_divergences(pt);
+
+        const auto sphi   = scalar_basis.eval_functions(pt);
+        const auto sdphi  = scalar_basis.eval_gradients(pt);
+        size_t     beg    = 0;
+        if (basis_degree >= 2)
+            beg = scalar_basis_size(basis_degree - 2, 2);
+        const auto offset = vector_basis.size();
+
+        /// compute P^(k-1)_H + x.grad(P^(k-1)_H) (monomial of degree exactly k - 1)
+        for (size_t i = beg; i < scalar_basis.size(); i++)
+        {
+            ret(offset + i - beg) = 2 * sphi(i) + pt.x() * sdphi(i, 0) + pt.y() * sdphi(i, 1);
+        }
+
+        return ret;
+    }
+
+    size_t
+    size() const
+    {
+        return basis_size;
+    }
+
+    size_t
+    degree() const
+    {
+        return basis_degree;
+    }
+};
+
+
 }

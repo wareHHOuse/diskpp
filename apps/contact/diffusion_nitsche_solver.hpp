@@ -110,8 +110,8 @@ run_hho_diffusion_nitsche_faces(const Mesh& msh,
     for (auto& cl : msh)
     {
         auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-        auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-        auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+        auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+        auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
         auto Lh     = make_rhs(msh, cl, cb, rhs_fun);
         matrix_type Ah = gr.second + stab;
 
@@ -141,7 +141,7 @@ run_hho_diffusion_nitsche_faces(const Mesh& msh,
         matrix_type A = Ah - Anitsche - Aconsist;
         vector_type rhs = -Bnitsche;
         rhs.block(0, 0, cbs, 1) += Lh;
-        auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, rhs);
+        auto sc = make_scalar_static_condensation(msh, cl, hdi, A, rhs);
         assembler.assemble(msh, cl, sc.first, sc.second);
     }
 
@@ -167,8 +167,8 @@ run_hho_diffusion_nitsche_faces(const Mesh& msh,
     for (auto& cl : msh)
     {
         auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-        auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-        auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+        auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+        auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
         auto Lh     = make_rhs(msh, cl, cb, rhs_fun);
         matrix_type Ah = gr.second + stab;
 
@@ -201,7 +201,7 @@ run_hho_diffusion_nitsche_faces(const Mesh& msh,
         vector_type locsol = assembler.take_local_data(msh, cl, sol);
 
         vector_type fullsol =
-            diffusion_static_condensation_recover(msh, cl, hdi, A, rhs, locsol);
+            make_scalar_static_decondensation(msh, cl, hdi, A, rhs, locsol);
 
         vector_type realsol = project_function(msh, cl, hdi, sol_fun, 2);
 
@@ -249,7 +249,7 @@ template<typename Mesh>
 auto
 run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
     const algorithm_parameters<typename Mesh::coordinate_type>& ap,
-    const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+    const disk::BoundaryConditions<Mesh>& bnd)
 {
     using T =  typename Mesh::coordinate_type;
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
@@ -299,8 +299,8 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
         }
         else
         {
-            auto gr   = make_hho_scalar_laplacian(msh, cl, hdi);
-            auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
+            auto gr   = make_scalar_hho_laplacian(msh, cl, hdi);
+            auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
 
             vector_type Lh = make_rhs(msh, cl, cb, rhs_fun);//, hdi.cell_degree());
             matrix_type Ah = gr.second + stab;
@@ -359,8 +359,8 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
         }
         else
         {
-            auto gr   = make_hho_scalar_laplacian(msh, cl, hdi);
-            auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
+            auto gr   = make_scalar_hho_laplacian(msh, cl, hdi);
+            auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
 
             vector_type rhs = make_rhs(msh, cl, cb, rhs_fun);//, hdi.cell_degree());
             A = gr.second + stab;
@@ -436,7 +436,7 @@ run_diffusion_solver(const Mesh& msh, const algorithm_parameters<T>& ap)
 
     dump_to_matlab(msh,"mesh.m");
 
-    typedef disk::mechanics::BoundaryConditionsScalar<Mesh> boundary_type;
+    typedef disk::BoundaryConditions<Mesh> boundary_type;
     boundary_type  bnd(msh);
 
     auto sol_fun = make_solution_function(msh);
@@ -472,17 +472,17 @@ run_diffusion_solver(const Mesh& msh, const algorithm_parameters<T>& ap)
     */
     //test 1:
     #if 0
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET,1, sol_fun);
-    bnd.addContactBC(disk::mechanics::SIGNORINI, 3);
-    bnd.addNeumannBC(disk::mechanics::NEUMANN, 4, neu_left);
-    bnd.addNeumannBC(disk::mechanics::NEUMANN, 2, neu_right);
+    bnd.addDirichletBC(disk::DIRICHLET,1, sol_fun);
+    bnd.addContactBC(disk::SIGNORINI, 3);
+    bnd.addNeumannBC(disk::NEUMANN, 4, neu_left);
+    bnd.addNeumannBC(disk::NEUMANN, 2, neu_right);
     #endif
 
     //test 2 : All boundaries with DIRICHLET enforced via Nitsche's method
-    bnd.addContactBC(disk::mechanics::SIGNORINI, 1);
-    bnd.addContactBC(disk::mechanics::SIGNORINI, 2);
-    bnd.addContactBC(disk::mechanics::SIGNORINI, 3);
-    bnd.addContactBC(disk::mechanics::SIGNORINI, 4);
+    bnd.addContactBC(disk::SIGNORINI, 1);
+    bnd.addContactBC(disk::SIGNORINI, 2);
+    bnd.addContactBC(disk::SIGNORINI, 3);
+    bnd.addContactBC(disk::SIGNORINI, 4);
 
     std::tuple<T, T, T> error;
     switch (ap.solver)

@@ -26,6 +26,7 @@
 #pragma once
 
 #include "common/eigen.hpp"
+#include "core/mechanics/behaviors/laws/law_qp_bones.hpp"
 #include "core/mechanics/behaviors/laws/materialData.hpp"
 #include "core/mechanics/behaviors/maths_tensor.hpp"
 #include "core/mechanics/behaviors/maths_utils.hpp"
@@ -66,34 +67,16 @@ namespace disk
  * */
 
 template<typename T, int DIM>
-class Cavitation_qp
+class Cavitation_qp : public law_qp_bones<T, DIM>
 {
   public:
     typedef T                                    scalar_type;
     typedef static_matrix<scalar_type, DIM, DIM> static_matrix_type;
     typedef static_matrix<scalar_type, 3, 3>     static_matrix_type3D;
-    const static size_t dimension = DIM;
+    const static size_t                          dimension = DIM;
     typedef MaterialData<scalar_type>            data_type;
 
   private:
-    // coordinat and weight of considered gauss point.
-    point<scalar_type, DIM> m_point;
-    scalar_type             m_weight;
-
-    // internal variables at previous step
-    static_matrix_type m_F_prev; // elastic strain
-
-    // internal variables at current step
-    static_matrix_type m_F_curr; // elastic strain
-
-    static_tensor<scalar_type, DIM>
-    elastic_modulus(const data_type& data) const
-    {
-
-        return 2 * data.getMu() * compute_IdentitySymTensor<scalar_type, DIM>() +
-               data.getLambda() * compute_IxI<scalar_type, DIM>();
-    }
-
     scalar_type
     compute_U(const data_type& data, scalar_type J) const
     {
@@ -145,25 +128,25 @@ class Cavitation_qp
     static_tensor<scalar_type, DIM>
     compute_tangent_moduli_A(const data_type& data) const
     {
-        const scalar_type J = m_F_curr.determinant();
+        const scalar_type J = this->m_estrain_curr.determinant();
         if (J <= 0.0)
         {
             const std::string mess = "J= " + std::to_string(J) + " <= 0";
             throw std::invalid_argument(mess);
         }
 
-        const static_matrix_type invF  = m_F_curr.inverse();
+        const static_matrix_type invF  = this->m_estrain_curr.inverse();
         const static_matrix_type invFt = invF.transpose();
-        const static_matrix_type C     = convertFtoCauchyGreenRight(m_F_curr);
+        const static_matrix_type C     = convertFtoCauchyGreenRight(this->m_estrain_curr);
 
         const scalar_type trace_C = C.trace();
         const scalar_type T1      = compute_T1(J);
         const scalar_type T2      = compute_T2(J);
 
-        const static_tensor<scalar_type, DIM> I4          = compute_IdentityTensor<scalar_type, DIM>();
-        const static_tensor<scalar_type, DIM> invFt_invF  = computeProductInf(invFt, invF);
-        const static_tensor<scalar_type, DIM> invFt_invFt = computeKroneckerProduct(invFt, invFt);
-        const static_tensor<scalar_type, DIM> F_F         = computeKroneckerProduct(m_F_curr, m_F_curr);
+        const static_tensor<scalar_type, DIM> I4          = IdentityTensor4<scalar_type, DIM>();
+        const static_tensor<scalar_type, DIM> invFt_invF  = ProductInf(invFt, invF);
+        const static_tensor<scalar_type, DIM> invFt_invFt = Kronecker(invFt, invFt);
+        const static_tensor<scalar_type, DIM> F_F         = Kronecker(this->m_estrain_curr, this->m_estrain_curr);
 
         const auto Aiso = data.getMu() * std::pow(3.0, -0.25) *
                           (std::pow(trace_C, -0.25) * I4 - 0.5 * std::pow(trace_C, -5.0 / 4.0) * F_F);
@@ -173,82 +156,27 @@ class Cavitation_qp
     }
 
   public:
-    Cavitation_qp() : m_weight(0), m_F_prev(static_matrix_type::Zero()), m_F_curr(static_matrix_type::Zero()) {}
+    Cavitation_qp() : law_qp_bones<T, DIM>() {}
 
-    Cavitation_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) :
-      m_point(point), m_weight(weight), m_F_prev(static_matrix_type::Zero()), m_F_curr(static_matrix_type::Zero())
+    Cavitation_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) : law_qp_bones<T, DIM>(point, weight)
     {
-    }
-
-    point<scalar_type, DIM>
-    point() const
-    {
-        return m_point;
-    }
-
-    scalar_type
-    weight() const
-    {
-        return m_weight;
-    }
-
-    bool
-    is_plastic() const
-    {
-        return false;
-    }
-
-    static_matrix_type3D
-    getElasticStrain() const
-    {
-        return convertMatrix3DwithOne(m_F_curr);
-    }
-
-    static_matrix_type3D
-    getPlasticStrain() const
-    {
-        return static_matrix_type3D::Zero();
-    }
-
-    static_matrix_type
-    getTotalStrain() const
-    {
-        return m_F_curr;
-    }
-
-    static_matrix_type
-    getTotalStrainPrev() const
-    {
-        return m_F_prev;
-    }
-
-    scalar_type
-    getAccumulatedPlasticStrain() const
-    {
-        return scalar_type(0);
-    }
-
-    void
-    update()
-    {
-        m_F_prev = m_F_curr;
     }
 
     static_matrix_type
     compute_stress(const data_type& data) const
     {
-        const scalar_type J = m_F_curr.determinant();
+        const scalar_type J = this->m_estrain_curr.determinant();
         if (J <= 0.0)
         {
             const std::string mess = "J= " + std::to_string(J) + " <= 0";
             throw std::invalid_argument(mess);
         }
 
-        const static_matrix_type invF = m_F_curr.inverse();
+        const static_matrix_type invF = this->m_estrain_curr.inverse();
         const scalar_type        T1   = compute_T1(J);
-        const static_matrix_type C    = m_F_curr.transpose() * m_F_curr;
+        const static_matrix_type C    = this->m_estrain_curr.transpose() * this->m_estrain_curr;
 
-        const auto Piso = data.getMu() * std::pow(3.0 * C.trace(), -1.0 / 4.0) * m_F_curr;
+        const auto Piso = data.getMu() * std::pow(3.0 * C.trace(), -1.0 / 4.0) * this->m_estrain_curr;
         const auto Pvol = (data.getLambda() * T1 - data.getMu()) * invF.transpose();
 
         return Piso + Pvol;
@@ -257,18 +185,18 @@ class Cavitation_qp
     static_matrix_type
     compute_stressPrev(const data_type& data) const
     {
-        const scalar_type J = m_F_prev.determinant();
+        const scalar_type J = this->m_estrain_prev.determinant();
         if (J <= 0.0)
         {
             const std::string mess = "J= " + std::to_string(J) + " <= 0";
             throw std::invalid_argument(mess);
         }
 
-        const static_matrix_type invF = m_F_prev.inverse();
+        const static_matrix_type invF = this->m_estrain_prev.inverse();
         const scalar_type        T1   = compute_T1(J);
-        const static_matrix_type C    = m_F_prev.transpose() * m_F_prev;
+        const static_matrix_type C    = this->m_estrain_prev.transpose() * this->m_estrain_prev;
 
-        const auto Piso = data.getMu() * std::pow(3.0 * C.trace(), -1.0 / 4.0) * m_F_prev;
+        const auto Piso = data.getMu() * std::pow(3.0 * C.trace(), -1.0 / 4.0) * this->m_estrain_prev;
         const auto Pvol = (data.getLambda() * T1 - data.getMu()) * invF.transpose();
 
         return Piso + Pvol;
@@ -277,14 +205,14 @@ class Cavitation_qp
     scalar_type
     compute_energy(const data_type& data) const
     {
-        const scalar_type J = m_F_curr.determinant();
+        const scalar_type J = this->m_estrain_curr.determinant();
         if (J <= 0.0)
         {
             const std::string mess = "J= " + std::to_string(J) + " <= 0";
             throw std::invalid_argument(mess);
         }
 
-        const static_matrix_type C = m_F_curr.transpose() * m_F_curr;
+        const static_matrix_type C = this->m_estrain_curr.transpose() * this->m_estrain_curr;
 
         const scalar_type Wiso = 2.0 * data.getMu() / std::pow(3.0, 5.0 / 4.0) * std::pow(C.trace(), 3.0 / 4.0);
         const scalar_type Wvol = data.getLambda() / 2.0 * compute_U(J) * compute_U(J) - data.getMu() * log(J);
@@ -296,7 +224,7 @@ class Cavitation_qp
     compute_whole(const static_matrix_type& F_curr, const data_type& data, bool tangentmodulus = true)
     {
         // is always elastic
-        m_F_curr = F_curr;
+        this->m_estrain_curr = F_curr;
 
         const auto PK1 = this->compute_stress(data);
         const auto A   = this->compute_tangent_moduli_A(data);

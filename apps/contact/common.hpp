@@ -243,7 +243,7 @@ full_offset(const Mesh& msh, const hho_degree_info& hdi)
 template<typename Mesh>
 auto
 make_is_dirichlet_vector(const Mesh& msh,
-                const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+                const disk::BoundaryConditions<Mesh>& bnd)
 {
     //cells with contact faces
     auto num_cells = msh.cells_size();
@@ -272,7 +272,7 @@ make_is_dirichlet_vector(const Mesh& msh,
 template<typename Mesh>
 std::vector<size_t>
 make_is_contact_vector(const Mesh& msh,
-                const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+                const disk::BoundaryConditions<Mesh>& bnd)
 {
     //cells with contact faces
     auto num_cells = msh.cells_size();
@@ -302,7 +302,7 @@ make_is_contact_vector(const Mesh& msh,
 template<typename Mesh>
 std::vector<std::pair<size_t,size_t >>
 dirichlet_offset(const Mesh& msh, const hho_degree_info& hdi,
-                const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+                const disk::BoundaryConditions<Mesh>& bnd)
 {
     auto ofsets = full_offset(msh, hdi);
 
@@ -401,7 +401,7 @@ make_hho_consist_mix(const Mesh& msh, const typename Mesh::cell_type& cl,
             const Matrix<T, Dynamic, Dynamic>& rec,
             const T& gamma_0,
             const T& theta,
-            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+            const disk::BoundaryConditions<Mesh>& bnd)
 {
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
     using vector_type = Matrix<T, Dynamic, 1>;
@@ -648,7 +648,7 @@ make_hho_nitsche_mix(const Mesh& msh, const typename Mesh::cell_type& cl,
             const T & gamma_0,
             const T & theta,
             const Function& dirichlet_bf,
-            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+            const disk::BoundaryConditions<Mesh>& bnd)
 {
     T eta = 1.;
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
@@ -723,7 +723,7 @@ template<typename T>
 static_matrix<T, 3, 3>
 make_fem_nitsche(const disk::simplicial_mesh<T, 2>& msh,
         const typename disk::simplicial_mesh<T, 2>::cell& cl,
-        const disk::mechanics::BoundaryConditionsScalar<disk::simplicial_mesh<T, 2>>& bnd,
+        const disk::BoundaryConditions<disk::simplicial_mesh<T, 2>>& bnd,
         const T & gamma_0,
         const T & theta)
 {
@@ -757,7 +757,7 @@ make_hho_nitsche(const Mesh& msh, const typename Mesh::cell_type& cl,
             const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& rec,
             const typename Mesh::coordinate_type& gamma_0,
             const typename Mesh::coordinate_type& theta,
-            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+            const disk::BoundaryConditions<Mesh>& bnd)
 {
     using T = typename Mesh::coordinate_type;
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
@@ -804,7 +804,7 @@ template<typename T>
 static_matrix<T, 3, 3>
 make_fem_heaviside(const disk::simplicial_mesh<T, 2>& msh,
         const typename disk::simplicial_mesh<T, 2>::cell& cl,
-        const disk::mechanics::BoundaryConditionsScalar<disk::simplicial_mesh<T, 2>>& bnd,
+        const disk::BoundaryConditions<disk::simplicial_mesh<T, 2>>& bnd,
         const T & gamma_0,
         const T & theta,
         const static_vector<T,3>& uloc)
@@ -854,7 +854,7 @@ make_hho_heaviside_other(const Mesh& msh, const typename Mesh::cell_type& cl,
             const Matrix<T, Dynamic, Dynamic>& rec,
             const T & gamma_0,
             const T& theta,
-            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+            const disk::BoundaryConditions<Mesh>& bnd,
             const Matrix<T, Dynamic, 1>& uloc)
 {
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
@@ -927,7 +927,7 @@ make_hho_heaviside(const Mesh& msh, const typename Mesh::cell_type& cl,
             const Matrix<T, Dynamic, Dynamic>& rec,
             const T & gamma_0,
             const T& theta,
-            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+            const disk::BoundaryConditions<Mesh>& bnd,
             const Matrix<T, Dynamic, 1>& uloc)
 {
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
@@ -1003,7 +1003,7 @@ make_hho_heaviside_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
             const Matrix<T, Dynamic, Dynamic>& rec,
             const T & gamma_0,
             const T& theta,
-            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+            const disk::BoundaryConditions<Mesh>& bnd,
             const Matrix<T, Dynamic, 1>& uloc)
 {
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
@@ -1076,7 +1076,7 @@ make_hho_heaviside_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
             const Matrix<T, Dynamic, Dynamic>& rec,
             const T & gamma_0,
             const T& theta,
-            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+            const disk::BoundaryConditions<Mesh>& bnd,
             const Matrix<T, Dynamic, 1>& uloc)
 {
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
@@ -1149,7 +1149,7 @@ template <typename T>
 static_vector<T, 3>
 make_fem_negative(const disk::simplicial_mesh<T, 2>& msh,
     const typename disk::simplicial_mesh<T, 2>::cell& cl,
-    const disk::mechanics::BoundaryConditionsScalar<disk::simplicial_mesh<T, 2>>& bnd,
+    const disk::BoundaryConditions<disk::simplicial_mesh<T, 2>>& bnd,
     const T & gamma_0,
     const T & theta,
     const static_vector<T, 3>& uloc)
@@ -1200,7 +1200,7 @@ make_hho_negative(const Mesh& msh, const typename Mesh::cell_type& cl,
             const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& rec,
             const typename Mesh::coordinate_type& gamma_0,
             const typename Mesh::coordinate_type& theta,
-            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+            const disk::BoundaryConditions<Mesh>& bnd,
             const Matrix<typename Mesh::coordinate_type, Dynamic, 1>& uloc)
 {
     using T = typename Mesh::coordinate_type;
@@ -1269,7 +1269,7 @@ make_hho_negative_borrar(const Mesh& msh, const typename Mesh::cell_type& cl,
             const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& rec,
             const typename Mesh::coordinate_type& gamma_0,
             const typename Mesh::coordinate_type& theta,
-            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+            const disk::BoundaryConditions<Mesh>& bnd,
             const Matrix<typename Mesh::coordinate_type, Dynamic, 1>& uloc)
 {
     using T = typename Mesh::coordinate_type;
@@ -1342,7 +1342,7 @@ make_hho_negative_faces(const Mesh& msh, const typename Mesh::cell_type& cl,
             const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& rec,
             const typename Mesh::coordinate_type& gamma_0,
             const typename Mesh::coordinate_type& theta,
-            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+            const disk::BoundaryConditions<Mesh>& bnd,
             const Matrix<typename Mesh::coordinate_type, Dynamic, 1>& uloc)
 {
     using T = typename Mesh::coordinate_type;
@@ -1408,7 +1408,7 @@ make_hho_negative_trace(const Mesh& msh, const typename Mesh::cell_type& cl,
             const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& rec,
             const typename Mesh::coordinate_type& gamma_0,
             const typename Mesh::coordinate_type& theta,
-            const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+            const disk::BoundaryConditions<Mesh>& bnd,
             const Matrix<typename Mesh::coordinate_type, Dynamic, 1>& uloc)
 {
     using T = typename Mesh::coordinate_type;
@@ -1480,7 +1480,7 @@ std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
              Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
 make_hho_contact_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
                           const hho_degree_info& di,
-                          const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+                          const disk::BoundaryConditions<Mesh>& bnd)
 {
     using T = typename Mesh::coordinate_type;
     const size_t DIM = Mesh::dimension;
@@ -1556,7 +1556,7 @@ std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
              Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
 make_hho_nitsche_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
                           const hho_degree_info& di,
-                          const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+                          const disk::BoundaryConditions<Mesh>& bnd)
 {
     using T = typename Mesh::coordinate_type;
     const size_t DIM = Mesh::dimension;
@@ -1631,7 +1631,7 @@ template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
 make_hdg_nitsche_stabilization(const Mesh& msh,
         const typename Mesh::cell_type& cl, const hho_degree_info& di,
-        const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+        const disk::BoundaryConditions<Mesh>& bnd)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -1700,7 +1700,7 @@ template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
 make_hdg_contact_stabilization(const Mesh& msh,
         const typename Mesh::cell_type& cl, const hho_degree_info& di,
-        const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+        const disk::BoundaryConditions<Mesh>& bnd)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -1771,7 +1771,7 @@ class diffusion_condensed_assembler_nitsche_cells
 {
     using T = typename Mesh::coordinate_type;
 
-    typedef disk::mechanics::BoundaryConditionsScalar<Mesh> boundary_type;
+    typedef disk::BoundaryConditions<Mesh> boundary_type;
 
     boundary_type                       m_bnd;
 
@@ -1968,7 +1968,7 @@ class diffusion_condensed_assembler_nitsche_cells
 
 template<typename Mesh>
 auto make_diffusion_assembler_nitsche_cells(const Mesh& msh, hho_degree_info hdi,
-                const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+                const disk::BoundaryConditions<Mesh>& bnd)
 {
     return diffusion_condensed_assembler_nitsche_cells<Mesh>(msh, hdi, bnd);
 }
@@ -1980,7 +1980,7 @@ class diffusion_condensed_assembler_nitsche_faces
 {
     using T = typename Mesh::coordinate_type;
 
-    typedef disk::mechanics::BoundaryConditionsScalar<Mesh> boundary_type;
+    typedef disk::BoundaryConditions<Mesh> boundary_type;
 
     std::vector<size_t>                 compress_table;
     std::vector<size_t>                 expand_table;
@@ -2159,7 +2159,7 @@ template<typename Mesh>
 class diffusion_full_assembler
 {
     using T = typename Mesh::coordinate_type;
-    typedef disk::mechanics::BoundaryConditionsScalar<Mesh>    boundary_type;
+    typedef disk::BoundaryConditions<Mesh>    boundary_type;
 
     std::vector<size_t>                 compress_table;
     std::vector<size_t>                 expand_table;
@@ -2361,7 +2361,7 @@ public:
 
 template<typename Mesh>
 auto make_diffusion_full_assembler(const Mesh& msh, hho_degree_info hdi,
-                            const  disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+                            const  disk::BoundaryConditions<Mesh>& bnd)
 {
     return diffusion_full_assembler<Mesh>(msh, hdi, bnd);
 }
@@ -2371,7 +2371,7 @@ template<typename Mesh>
 class diffusion_mix_full_assembler
 {
     using T = typename Mesh::coordinate_type;
-    typedef disk::mechanics::BoundaryConditionsScalar<Mesh>    boundary_type;
+    typedef disk::BoundaryConditions<Mesh>    boundary_type;
 
     std::vector<size_t>                 compress_table;
     std::vector<size_t>                 expand_table;
@@ -2683,7 +2683,7 @@ public:
 
 template<typename Mesh>
 auto make_mix_full_assembler(const Mesh& msh, hho_degree_info hdi,
-                            const  disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+                            const  disk::BoundaryConditions<Mesh>& bnd)
 {
     return diffusion_mix_full_assembler<Mesh>(msh, hdi, bnd);
 }
@@ -2693,7 +2693,7 @@ template<typename Mesh>
 class contact_full_assembler
 {
     using T = typename Mesh::coordinate_type;
-    typedef disk::mechanics::BoundaryConditionsScalar<Mesh>    boundary_type;
+    typedef disk::BoundaryConditions<Mesh>    boundary_type;
 
     typedef Matrix<T, Dynamic, 1>       vector_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -3008,7 +3008,7 @@ public:
 
 template<typename Mesh>
 auto make_contact_full_assembler(const Mesh& msh, hho_degree_info hdi,
-                            const  disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+                            const  disk::BoundaryConditions<Mesh>& bnd)
 {
     return contact_full_assembler<Mesh>(msh, hdi, bnd);
 }
@@ -3017,7 +3017,7 @@ template<typename Mesh>
 class contact_full_assembler_new
 {
     using T = typename Mesh::coordinate_type;
-    typedef disk::mechanics::BoundaryConditionsScalar<Mesh>    boundary_type;
+    typedef disk::BoundaryConditions<Mesh>    boundary_type;
 
     typedef Matrix<T, Dynamic, 1>       vector_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -3323,7 +3323,7 @@ public:
 
 template<typename Mesh>
 auto make_contact_full_assembler_new(const Mesh& msh, hho_degree_info hdi,
-                            const  disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+                            const  disk::BoundaryConditions<Mesh>& bnd)
 {
     return contact_full_assembler_new<Mesh>(msh, hdi, bnd);
 }
@@ -3340,7 +3340,7 @@ class contact_face_assembler_new
     std::vector< Triplet<T> >           triplets;
     size_t      num_all_faces, num_dirichlet_faces, num_other_faces, system_size;
 
-    typedef disk::mechanics::BoundaryConditionsScalar<Mesh> boundary_type;
+    typedef disk::BoundaryConditions<Mesh> boundary_type;
     boundary_type m_bnd;
 
     class assembly_index
@@ -3534,7 +3534,7 @@ public:
                     {
                         switch (bnd.neumann_boundary_type(face_id))
                         {
-                            case disk::mechanics::NEUMANN:
+                            case disk::NEUMANN:
                                 throw std::invalid_argument("You tried to impose both Neumann and Robin conditions on the same face");
                                 break;
                             default:
@@ -3547,7 +3547,7 @@ public:
                     {
                         switch (bnd.dirichlet_boundary_type(face_id))
                         {
-                            case disk::mechanics::DIRICHLET:
+                            case disk::DIRICHLET:
                                 throw std::invalid_argument("You tried to impose both Dirichlet and Robin conditions on the same face");
                                 break;
                             default:

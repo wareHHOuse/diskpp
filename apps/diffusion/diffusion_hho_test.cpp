@@ -145,8 +145,8 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
     for (auto& cl : msh)
     {
         auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-        auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-        auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+        auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+        auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
         auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
         auto sc     = diffusion_static_condensation_compute(msh, cl, hdi, A, rhs);
@@ -171,8 +171,8 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
     for (auto& cl : msh)
     {
         auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-        auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-        auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+        auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+        auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
         auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
 

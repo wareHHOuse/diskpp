@@ -34,7 +34,7 @@ template<typename Mesh, typename Function, typename Analytical>
 std::pair<typename Mesh::coordinate_type, typename Mesh::coordinate_type>
 solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun,
     const algorithm_parameters<typename Mesh::coordinate_type>& ap,
-    const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+    const disk::BoundaryConditions<Mesh>& bnd)
 {
     std::cout << "INSIDE FACE-BASED TRACE" << std::endl;
 
@@ -75,8 +75,8 @@ solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun
             vector_type  u_full  = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
 
             auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-            auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-            auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+            auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+            auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
             vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
             matrix_type Ah  = gr.second + stab;
@@ -96,7 +96,7 @@ solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun
             vector_type b = -(Ah - Anitsche) * u_full - Bnegative;
             b.block(0, 0, cbs, 1) += Lh;
 
-            auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, b);
+            auto sc = make_scalar_static_condensation(msh, cl, hdi, A, b);
             assembler.assemble(msh, cl, sc.first, sc.second);
             cl_count++;
         }
@@ -128,8 +128,8 @@ solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun
 
 
             auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-            auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-            auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+            auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+            auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
             vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
             matrix_type Ah  = gr.second + stab;
@@ -152,7 +152,7 @@ solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun
             vector_type cell_rhs = b.block(0, 0, cbs, 1);
             vector_type du_faces = assembler.take_local_data_increment(msh, cl, dsol);
             vector_type du_full  =
-                diffusion_static_condensation_recover(msh, cl, hdi, A, cell_rhs, du_faces);
+                make_scalar_static_decondensation(msh, cl, hdi, A, cell_rhs, du_faces);
 
             diff_sol.block(cell_ofs, 0, num_total_dofs ,1) = du_full;
 
@@ -191,8 +191,8 @@ solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun
                 const auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
                 vector_type  u_full = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
 
-                auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-                auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+                auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+                auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
                 matrix_type Ah  = gr.second + stab;
                 matrix_type Anitsche   = matrix_type::Zero(num_total_dofs, num_total_dofs);
@@ -249,7 +249,7 @@ template<typename Mesh, typename Function, typename Analytical>
 dynamic_vector<typename Mesh::coordinate_type>
 solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun,
     const algorithm_parameters<typename Mesh::coordinate_type>& ap,
-    const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+    const disk::BoundaryConditions<Mesh>& bnd,
     const hho_degree_info& hdi)
 {
     std::cout << "INSIDE FACE-BASED TRACE" << std::endl;
@@ -337,8 +337,8 @@ solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
             vector_type  u_full  = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
 
             auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-            auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-            auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+            auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+            auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
             vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
             matrix_type Ah  = gr.second + stab;
@@ -358,7 +358,7 @@ solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
             vector_type b = -(Ah - Anitsche) * u_full - Bnegative;
             b.block(0, 0, cbs, 1) += Lh;
 
-            auto sc = diffusion_static_condensation_compute_full(msh, cl, hdi, A, b);
+            auto sc = make_scalar_static_condensation(msh, cl, hdi, A, b);
             assembler.assemble(msh, cl, sc.first, sc.second);
             cl_count++;
         }
@@ -390,8 +390,8 @@ solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
 
 
             auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-            auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-            auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+            auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+            auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
             vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun, hdi.cell_degree());
             matrix_type Ah  = gr.second + stab;
@@ -414,7 +414,7 @@ solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
             vector_type cell_rhs = b.block(0, 0, cbs, 1);
             vector_type du_faces = assembler.take_local_data_increment(msh, cl, dsol);
             vector_type du_full  =
-                diffusion_static_condensation_recover(msh, cl, hdi, A, cell_rhs, du_faces);
+                make_scalar_static_decondensation(msh, cl, hdi, A, cell_rhs, du_faces);
 
             diff_sol.block(cell_ofs, 0, num_total_dofs ,1) = du_full;
 
@@ -453,8 +453,8 @@ solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
                 const auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
                 vector_type  u_full = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
 
-                auto gr     = make_hho_scalar_laplacian(msh, cl, hdi);
-                auto stab   = make_hho_scalar_stabilization(msh, cl, gr.first, hdi);
+                auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+                auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
                 matrix_type Ah  = gr.second + stab;
                 matrix_type Anitsche   = matrix_type::Zero(num_total_dofs, num_total_dofs);
@@ -508,7 +508,7 @@ template<typename Mesh, typename Function, typename Analytical>
 std::pair<typename Mesh::coordinate_type, typename Mesh::coordinate_type>
 solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun,
     const algorithm_parameters<typename Mesh::coordinate_type>& ap,
-    const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+    const disk::BoundaryConditions<Mesh>& bnd)
 {
     std::cout << "INSIDE CELL-BASED TRACE" << std::endl;
     std::cout << ap << std::endl;
@@ -561,7 +561,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
             if (is_contact_vector.at(cl_count) == 1)
             {
                 auto gr   = make_hho_contact_scalar_laplacian(msh, cl, hdi, bnd);
-                auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
+                auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
 
                 matrix_type Ah  = gr.second + stab;
                 vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun);//, hdi.cell_degree());
@@ -579,8 +579,8 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
             }
             else
             {
-                auto gr   = make_hho_scalar_laplacian(msh, cl, hdi);
-                auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
+                auto gr   = make_scalar_hho_laplacian(msh, cl, hdi);
+                auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
 
                 matrix_type Ah = gr.second + stab;
                 vector_type Lh = make_rhs(msh, cl, cb, rhs_fun);//, hdi.cell_degree());
@@ -625,7 +625,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
             matrix_type  Ah  = matrix_type::Zero(num_total_dofs, num_total_dofs);
             vector_type  du_full  = vector_type::Zero(num_total_dofs);
 
-            auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
+            auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
 
             if (is_contact_vector.at(cl_count)==1)
             {
@@ -634,7 +634,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
             }
             else
             {
-                auto gr  = make_hho_scalar_laplacian(msh, cl, hdi);
+                auto gr  = make_scalar_hho_laplacian(msh, cl, hdi);
                 Ah  = gr.second + stab;
             }
 
@@ -678,7 +678,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
                 vector_type  u_full   = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
                 matrix_type  Ah  = matrix_type::Zero(num_total_dofs, num_total_dofs);
 
-                auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
+                auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
 
 
                 if (is_contact_vector.at(cl_count)==1)
@@ -688,7 +688,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
                 }
                 else
                 {
-                    auto gr  = make_hho_scalar_laplacian(msh, cl, hdi);
+                    auto gr  = make_scalar_hho_laplacian(msh, cl, hdi);
                     Ah  = gr.second + stab;
                 }
 
@@ -766,7 +766,7 @@ template<typename Mesh, typename Function, typename Analytical>
 dynamic_vector<typename Mesh::coordinate_type>
 solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun,
     const algorithm_parameters<typename Mesh::coordinate_type>& ap,
-    const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd,
+    const disk::BoundaryConditions<Mesh>& bnd,
     const hho_degree_info& hdi)
 {
     std::cout << "INSIDE CELL-BASED TRACE HIERARCHICAL" << std::endl;
@@ -827,7 +827,7 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
             if (is_contact_vector.at(cl_count) == 1)
             {
                 auto gr   = make_hho_contact_scalar_laplacian(msh, cl, hdi, bnd);
-                auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
+                auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
 
                 matrix_type Ah  = gr.second + stab;
                 vector_type Lh  = make_rhs(msh, cl, cb, rhs_fun);//, hdi.cell_degree());
@@ -844,8 +844,8 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
             }
             else
             {
-                auto gr   = make_hho_scalar_laplacian(msh, cl, hdi);
-                auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
+                auto gr   = make_scalar_hho_laplacian(msh, cl, hdi);
+                auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
 
                 matrix_type Ah = gr.second + stab;
                 vector_type Lh = make_rhs(msh, cl, cb, rhs_fun);//, hdi.cell_degree());
@@ -893,7 +893,7 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
             matrix_type  Ah  = matrix_type::Zero(num_total_dofs, num_total_dofs);
             vector_type  du_full  = vector_type::Zero(num_total_dofs);
 
-            auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
+            auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
 
             if (is_contact_vector.at(cl_count)==1)
             {
@@ -902,7 +902,7 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
             }
             else
             {
-                auto gr  = make_hho_scalar_laplacian(msh, cl, hdi);
+                auto gr  = make_scalar_hho_laplacian(msh, cl, hdi);
                 Ah  = gr.second + stab;
             }
 
@@ -947,7 +947,7 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
                 vector_type  u_full   = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
                 matrix_type  Ah  = matrix_type::Zero(num_total_dofs, num_total_dofs);
 
-                auto stab = make_hdg_scalar_stabilization(msh, cl, hdi);
+                auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
 
 
                 if (is_contact_vector.at(cl_count)==1)
@@ -957,7 +957,7 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
                 }
                 else
                 {
-                    auto gr  = make_hho_scalar_laplacian(msh, cl, hdi);
+                    auto gr  = make_scalar_hho_laplacian(msh, cl, hdi);
                     Ah  = gr.second + stab;
                 }
 
@@ -1027,7 +1027,7 @@ run_signorini_unknown( Mesh& msh,
         return 0.;
     };
 
-    typedef disk::mechanics::BoundaryConditionsScalar<Mesh> boundary_type;
+    typedef disk::BoundaryConditions<Mesh> boundary_type;
     boundary_type  bnd(msh);
 
     /*--------------------------------------------------------------------
@@ -1037,10 +1037,10 @@ run_signorini_unknown( Mesh& msh,
     *          3
     *-------------------------------------------------------------------*/
 
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET,1, zero_fun);
-    bnd.addNeumannBC(disk::mechanics::NEUMANN,  2, zero_fun);
-    bnd.addNeumannBC(disk::mechanics::NEUMANN,  4, zero_fun);
-    bnd.addContactBC(disk::mechanics::SIGNORINI,3);
+    bnd.addDirichletBC(disk::DIRICHLET,1, zero_fun);
+    bnd.addNeumannBC(disk::NEUMANN,  2, zero_fun);
+    bnd.addNeumannBC(disk::NEUMANN,  4, zero_fun);
+    bnd.addContactBC(disk::SIGNORINI,3);
 
     switch (ap.solver)
     {
@@ -1117,14 +1117,14 @@ run_signorini_analytical(Mesh& msh,
         return  -std::pow(radio, 5.5) * std::sin(5.5 *theta);
     };
 
-    typedef disk::mechanics::BoundaryConditionsScalar<Mesh> boundary_type;
+    typedef disk::BoundaryConditions<Mesh> boundary_type;
     boundary_type  bnd(msh);
 
 
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET,4, fun);
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET,2, fun);
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET,3, fun);
-    bnd.addContactBC(disk::mechanics::SIGNORINI,1);
+    bnd.addDirichletBC(disk::DIRICHLET,4, fun);
+    bnd.addDirichletBC(disk::DIRICHLET,2, fun);
+    bnd.addDirichletBC(disk::DIRICHLET,3, fun);
+    bnd.addContactBC(disk::SIGNORINI,1);
 
     switch (ap.solver)
     {

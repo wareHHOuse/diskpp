@@ -14,8 +14,14 @@ target_link_libraries(divergence_reconstruction ${LINK_LIBS})
 add_executable(vector_symmetric_reconstruction vector_symmetric_reconstruction.cpp)
 target_link_libraries(vector_symmetric_reconstruction ${LINK_LIBS})
 
+add_executable(vector_symmetric_stabilization vector_symmetric_stabilization.cpp)
+target_link_libraries(vector_symmetric_stabilization ${LINK_LIBS})
+
 add_executable(vector_stabilization vector_stabilization.cpp)
 target_link_libraries(vector_stabilization ${LINK_LIBS})
+
+add_executable(vector_gradient vector_gradient.cpp)
+target_link_libraries(vector_gradient ${LINK_LIBS})
 
 add_executable(perf perf.cpp)
 target_link_libraries(perf ${LINK_LIBS})
@@ -40,3 +46,7 @@ target_link_libraries(primitives ${LINK_LIBS})
 
 add_executable(netgen_primitives netgen_primitives.cpp)
 target_link_libraries(netgen_primitives ${LINK_LIBS})
+
+add_executable(behaviors_test behaviors_test.cpp)
+target_link_libraries(behaviors_test ${LINK_LIBS})
+

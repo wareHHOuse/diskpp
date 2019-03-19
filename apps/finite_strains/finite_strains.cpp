@@ -34,9 +34,9 @@
 
 #include "Informations.hpp"
 #include "Parameters.hpp"
-#include "core/mechanics/behaviors/laws/materialData.hpp"
+#include "mechanics/behaviors/laws/materialData.hpp"
 #include "loaders/loader.hpp"
-#include "mechanics/BoundaryConditions.hpp"
+#include "boundary_conditions/boundary_conditions.hpp"
 
 #include "timecounter.h"
 
@@ -83,7 +83,7 @@ run_finite_strains_solver(const Mesh<T, 2, Storage>&   msh,
     typedef Mesh<T, 2, Storage>                            mesh_type;
     typedef static_vector<T, 2>                            result_type;
     typedef static_matrix<T, 2, 2>                         result_grad_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, false>     Bnd_type;
 
     auto load = [material_data](const point<T, 2>& p) -> result_type { return result_type{0, 0}; };
 
@@ -93,25 +93,14 @@ run_finite_strains_solver(const Mesh<T, 2, Storage>&   msh,
 
     Bnd_type bnd(msh);
 
-    // Plaque with quadrilaterals
-    // auto zero = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
-
-    // auto trac = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 5}; };
-
-    // bnd.addDirichletBC(disk::mechanics::DX, 4, zero);
-    // bnd.addDirichletBC(disk::mechanics::DX, 14, zero);
-    // bnd.addDirichletBC(disk::mechanics::DY, 23, zero);
-    // bnd.addDirichletBC(disk::mechanics::DY, 16, trac);
 
     // Cook with quadrilaterals
     auto zero = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
 
-    auto trac     = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0.1125}; };
-    auto depltest = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 1}; };
+    auto trac     = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0.3125}; };
 
-    bnd.addDirichletBC(disk::mechanics::CLAMPED, 3, zero);
-    bnd.addNeumannBC(disk::mechanics::NEUMANN, 8, trac);
-    // bnd.addDirichletBC(disk::mechanics::DY, 8, depltest);
+    bnd.addDirichletBC(disk::CLAMPED, 3, zero);
+    bnd.addNeumannBC(disk::NEUMANN, 8, trac);
 
     finite_strains_solver<mesh_type> nl(msh, bnd, rp, material_data);
 
@@ -124,35 +113,12 @@ run_finite_strains_solver(const Mesh<T, 2, Storage>&   msh,
 
     if (nl.verbose())
     {
-        std::cout << " " << std::endl;
-        std::cout << "------------------------------------------------------- " << std::endl;
-        std::cout << "Summaring: " << std::endl;
-        std::cout << "Total Newton's iterations: " << solve_info.m_iter << " in " << solve_info.m_time_step
-                  << " load increments" << std::endl;
-        std::cout << "Total time to solve the problem: " << solve_info.m_time_solver << " sec" << std::endl;
-        std::cout << "**** Assembly time: " << solve_info.m_newton_info.m_assembly_info.m_time_assembly << " sec"
-                  << std::endl;
-        std::cout << "****** Gradient reconstruction: " << solve_info.m_newton_info.m_assembly_info.m_time_gradrec
-                  << " sec" << std::endl;
-        std::cout << "****** Stabilisation: " << solve_info.m_newton_info.m_assembly_info.m_time_stab << " sec"
-                  << std::endl;
-        std::cout << "****** Elementary computation: " << solve_info.m_newton_info.m_assembly_info.m_time_elem << " sec"
-                  << std::endl;
-        std::cout << "       *** Behavior computation: " << solve_info.m_newton_info.m_assembly_info.m_time_law
-                  << " sec" << std::endl;
-        std::cout << "****** Static condensation: " << solve_info.m_newton_info.m_assembly_info.m_time_statcond
-                  << " sec" << std::endl;
-        std::cout << "**** Postprocess time: " << solve_info.m_newton_info.m_assembly_info.m_time_postpro << " sec"
-                  << std::endl;
-        std::cout << "**** Solver time: " << solve_info.m_newton_info.m_solve_info.m_time_solve << " sec" << std::endl;
-        std::cout << "------------------------------------------------------- " << std::endl;
-        std::cout << " " << std::endl;
+        solve_info.printInfo();
     }
 
     if (nl.test_convergence())
     {
         std::cout << "average diameter h: " << average_diameter(msh) << std::endl;
-        std::cout << "energy mechanic: " << nl.energy_mechanic() << std::endl;
     }
 
     nl.compute_discontinuous_displacement("depl2D_disc.msh");
@@ -178,7 +144,7 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&   msh,
     typedef Mesh<T, 3, Storage>                            mesh_type;
     typedef static_vector<T, 3>                            result_type;
     typedef static_matrix<T, 3, 3>                         result_grad_type;
-    typedef disk::mechanics::BoundaryConditions<mesh_type> Bnd_type;
+    typedef disk::BoundaryConditions<mesh_type, false>     Bnd_type;
 
     auto load = [material_data](const point<T, 3>& p) -> result_type { return result_type{0, 0, 0}; };
 
@@ -202,20 +168,50 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&   msh,
 
         er /= er.norm();
 
-        return er/10000;
+        return 3*er;
+    };
+
+    auto deplr = [material_data](const point<T, 3>& p) -> result_type {
+        result_type er = result_type::Zero();
+
+        er(0) = p.x();
+        er(1) = p.y();
+        er(2) = p.z();
+
+        er /= er.norm();
+
+        return 0.157*er;
     };
 
     // Sphere Hpp
-    // bnd.addDirichletBC(disk::mechanics::DX, 3, zero);
-    // bnd.addDirichletBC(disk::mechanics::DY, 13, zero);
-    // bnd.addDirichletBC(disk::mechanics::DZ, 24, zero);
-    // bnd.addNeumannBC(disk::mechanics::NEUMANN, 27, pres);
+    // bnd.addDirichletBC(disk::DX, 3, zero);
+    // bnd.addDirichletBC(disk::DY, 13, zero);
+    // bnd.addDirichletBC(disk::DZ, 24, zero);
+    // bnd.addNeumannBC(disk::NEUMANN, 27, pres);
 
     // // Sphere GDEF
-    bnd.addDirichletBC(disk::mechanics::DX, 12, zero);
-    bnd.addDirichletBC(disk::mechanics::DY, 24, zero);
-    bnd.addDirichletBC(disk::mechanics::DZ, 19, zero);
-    bnd.addDirichletBC(disk::mechanics::DIRICHLET, 27, pres);
+    bnd.addDirichletBC(disk::DX, 12, zero);
+    bnd.addDirichletBC(disk::DY, 24, zero);
+    bnd.addDirichletBC(disk::DZ, 19, zero);
+    bnd.addDirichletBC(disk::DIRICHLET, 27, deplr);
+    //bnd.addNeumannBC(disk::NEUMANN, 27, pres);
+
+    // Cylindre GDEF
+    // auto depl = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 1.0}; };
+    // bnd.addDirichletBC(disk::DZ, 125, zero);
+    // bnd.addDirichletBC(disk::DZ, 50, zero);
+    // bnd.addDirichletBC(disk::DZ, 96, zero);
+    // bnd.addDirichletBC(disk::DX, 113, zero);
+    // bnd.addDirichletBC(disk::DX, 91, zero);
+    // bnd.addDirichletBC(disk::DX, 74, zero);
+    // bnd.addDirichletBC(disk::DX, 120, zero);
+    // bnd.addDirichletBC(disk::DY, 31, zero);
+    // bnd.addDirichletBC(disk::DY, 108, zero);
+    // bnd.addDirichletBC(disk::DY, 128, zero);
+    // bnd.addDirichletBC(disk::DY, 55, zero);
+    // bnd.addDirichletBC(disk::DZ, 103, depl);
+    // bnd.addDirichletBC(disk::DZ, 14, depl);
+    // bnd.addDirichletBC(disk::DZ, 69, depl);
 
     // Cube + pres
     //    auto zero = [material_data](const point<T, 3>& p) -> result_type {
@@ -226,15 +222,22 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&   msh,
     //       return result_type{0.0, 0.0, -356};
     //    };
 
-    //    bnd.addDirichletBC(disk::mechanics::CLAMPED, 69, zero);
-    //    bnd.addDirichletBC(disk::mechanics::CLAMPED, 55, zero);
-    //    bnd.addDirichletBC(disk::mechanics::CLAMPED, 31, zero);
-    //    bnd.addDirichletBC(disk::mechanics::CLAMPED, 96, zero);
-    //    bnd.addDirichletBC(disk::mechanics::DY, 62, zero);
-    //    bnd.addDirichletBC(disk::mechanics::DY, 14, zero);
-    //    bnd.addDirichletBC(disk::mechanics::DX, 4, zero);
-    //    bnd.addDirichletBC(disk::mechanics::DX, 38, zero);
-    //    bnd.addNeumannBC(disk::mechanics::NEUMANN, 21, pres);
+    //    bnd.addDirichletBC(disk::CLAMPED, 69, zero);
+    //    bnd.addDirichletBC(disk::CLAMPED, 55, zero);
+    //    bnd.addDirichletBC(disk::CLAMPED, 31, zero);
+    //    bnd.addDirichletBC(disk::CLAMPED, 96, zero);
+    //    bnd.addDirichletBC(disk::DY, 62, zero);
+    //    bnd.addDirichletBC(disk::DY, 14, zero);
+    //    bnd.addDirichletBC(disk::DX, 4, zero);
+    //    bnd.addDirichletBC(disk::DX, 38, zero);
+    //    bnd.addNeumannBC(disk::NEUMANN, 21, pres);
+
+
+    // auto trac = [material_data](const point<T, 3>& p) -> result_type {
+    //     return result_type { 0.0, 0.3125,  0.0}; };
+
+    // bnd.addDirichletBC(disk::CLAMPED, 3, zero);
+    // bnd.addNeumannBC(disk::NEUMANN, 20, trac);
 
     // Solver
 
@@ -249,29 +252,7 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&   msh,
 
     if (nl.verbose())
     {
-        std::cout << " " << std::endl;
-        std::cout << "------------------------------------------------------- " << std::endl;
-        std::cout << "Summaring: " << std::endl;
-        std::cout << "Total Newton's iterations: " << solve_info.m_iter << " in " << solve_info.m_time_step
-                  << " load increments" << std::endl;
-        std::cout << "Total time to solve the problem: " << solve_info.m_time_solver << " sec" << std::endl;
-        std::cout << "**** Assembly time: " << solve_info.m_newton_info.m_assembly_info.m_time_assembly << " sec"
-                  << std::endl;
-        std::cout << "****** Gradient reconstruction: " << solve_info.m_newton_info.m_assembly_info.m_time_gradrec
-                  << " sec" << std::endl;
-        std::cout << "****** Stabilisation: " << solve_info.m_newton_info.m_assembly_info.m_time_stab << " sec"
-                  << std::endl;
-        std::cout << "****** Elementary computation: " << solve_info.m_newton_info.m_assembly_info.m_time_elem << " sec"
-                  << std::endl;
-        std::cout << "       *** Behavior computation: " << solve_info.m_newton_info.m_assembly_info.m_time_law
-                  << " sec" << std::endl;
-        std::cout << "****** Static condensation: " << solve_info.m_newton_info.m_assembly_info.m_time_statcond
-                  << " sec" << std::endl;
-        std::cout << "**** Postprocess time: " << solve_info.m_newton_info.m_assembly_info.m_time_postpro << " sec"
-                  << std::endl;
-        std::cout << "**** Solver time: " << solve_info.m_newton_info.m_solve_info.m_time_solve << " sec" << std::endl;
-        std::cout << "------------------------------------------------------- " << std::endl;
-        std::cout << " " << std::endl;
+        solve_info.printInfo();
     }
 
     if (nl.test_convergence())
@@ -310,56 +291,40 @@ main(int argc, char** argv)
     // Elasticity Parameters
     disk::MaterialData<RealType> material_data;
 
-    //    material_data.mu       = 82E4;
-    //    material_data.lambda   = 11E5;
-    //    RealType E  = 200000.;
-    //    RealType nu = 0.3;
-    //    RealType ET = 40000;
+    // // Cook Parameters (mm, MPa, kN)
+    // RealType E  = 206.9;
+    // RealType nu = 0.29;
 
-    //    material_data.setMu(E, nu);
-    //    material_data.setLambda(E, nu);
+    // material_data.setMu(E, nu);
+    // material_data.setLambda(E, nu);
 
-    //    material_data.setK(20000);
-    //    material_data.setH(E, ET, material_data.getK());
+    // readCurve("VEM2_2d.dat", material_data);
 
-    //    material_data.setSigma_y0(400);
+    // material_data.setK(0.0);
+    // material_data.setH(E, 0.13, 0.0);
 
-    // // Cook Parameters (mm, GPa, kN)
+    // material_data.setSigma_y0(0.450);
+
+    // Old cook
     // RealType E  = 70;
     // RealType nu = 0.4999;
 
     // material_data.setMu(E, nu);
     // material_data.setLambda(E, nu);
-
     // material_data.setK(0.0);
     // material_data.setH(0.135);
-
     // material_data.setSigma_y0(0.243);
 
-    // Sphere Parameters (mm, GPa, kN)
-    RealType E = 210000;
+    // Sphere Parameters (mm, MPa, kN)
+    RealType E = 28.95;
     RealType nu = 0.3;
     RealType ET = 0;
 
     material_data.setMu(E, nu);
     material_data.setLambda(E, nu);
-
     material_data.setK(0);
-    material_data.setH(0);
-
-    material_data.setSigma_y0(150);
-
-    // Test aster Parameters (mm, GPa, kN)
-    // RealType E  = 70;
-    // RealType nu = 0.4999;
-
-    // material_data.mu     = material_data.converttomu(E, nu);
-    // material_data.lambda = material_data.converttolambda(E, nu);
-
-    // material_data.K = 0.0;
-    // material_data.H = 70;
-
-    // material_data.sigma_y0 = 0.5;
+    material_data.setH(0.0);
+    material_data.setSigma_y0(6);
 
     int ch;
 
@@ -421,15 +386,15 @@ main(int argc, char** argv)
         return 0;
     }
 
-    /* Netgen 3D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$")))
-    {
-        std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-        auto msh = disk::load_netgen_3d_mesh<RealType>(mesh_filename);
-        run_finite_strains_solver(msh, rp, material_data);
-        return 0;
-    }
-
+    // /* Netgen 3D */
+    // if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$")))
+    // {
+    //     std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
+    //     auto msh = disk::load_netgen_3d_mesh<RealType>(mesh_filename);
+    //     run_finite_strains_solver(msh, rp, material_data);
+    //     return 0;
+    // }
+    //
     /* Medit 3d*/
     if (std::regex_match(mesh_filename, std::regex(".*\\.medit3d$")))
     {
@@ -438,14 +403,14 @@ main(int argc, char** argv)
         run_finite_strains_solver(msh, rp, material_data);
         return 0;
     }
-
-    /* DiSk++ cartesian 3D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.hex$"))) {
-       std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
-       auto msh = disk::load_cartesian_3d_mesh<RealType>(mesh_filename);
-       run_finite_strains_solver(msh, rp, material_data);
-       return 0;
-    }
+    //
+    // /* DiSk++ cartesian 3D */
+    // if (std::regex_match(mesh_filename, std::regex(".*\\.hex$"))) {
+    //    std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
+    //    auto msh = disk::load_cartesian_3d_mesh<RealType>(mesh_filename);
+    //    run_finite_strains_solver(msh, rp, material_data);
+    //    return 0;
+    //}
 
     // /* FVCA6 3D */
     // if (std::regex_match(mesh_filename, std::regex(".*\\.msh$"))) {
