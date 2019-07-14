@@ -249,7 +249,7 @@ template<typename Mesh>
 auto
 run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
     const algorithm_parameters<typename Mesh::coordinate_type>& ap,
-    const disk::BoundaryConditions<Mesh>& bnd)
+    const disk::scalar_boundary_conditions<Mesh>& bnd)
 {
     using T =  typename Mesh::coordinate_type;
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
@@ -436,7 +436,7 @@ run_diffusion_solver(const Mesh& msh, const algorithm_parameters<T>& ap)
 
     dump_to_matlab(msh,"mesh.m");
 
-    typedef disk::BoundaryConditions<Mesh> boundary_type;
+    typedef disk::scalar_boundary_conditions<Mesh> boundary_type;
     boundary_type  bnd(msh);
 
     auto sol_fun = make_solution_function(msh);

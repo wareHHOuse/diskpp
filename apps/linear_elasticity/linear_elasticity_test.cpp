@@ -77,7 +77,7 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>& msh,
     typedef Mesh<T, 2, Storage>                            mesh_type;
     typedef static_vector<T, 2>                            result_type;
     typedef static_matrix<T, 2, 2>                         grad_type;
-    typedef disk::BoundaryConditions<mesh_type, false>     Bnd_type;
+    typedef disk::vector_boundary_conditions<mesh_type>     Bnd_type;
 
     timecounter tc;
     tc.tic();
@@ -173,7 +173,7 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>&  msh,
     typedef Mesh<T, 3, Storage>                            mesh_type;
     typedef static_vector<T, 3>                            result_type;
     typedef static_matrix<T, 3, 3>                         grad_type;
-    typedef disk::BoundaryConditions<mesh_type, false>     Bnd_type;
+    typedef disk::vector_boundary_conditions<mesh_type>     Bnd_type;
 
     timecounter tc;
     tc.tic();

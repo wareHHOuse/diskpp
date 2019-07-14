@@ -34,7 +34,7 @@ template<typename Mesh, typename Function, typename Analytical>
 std::pair<typename Mesh::coordinate_type, typename Mesh::coordinate_type>
 solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun,
     const algorithm_parameters<typename Mesh::coordinate_type>& ap,
-    const disk::BoundaryConditions<Mesh>& bnd)
+    const disk::scalar_boundary_conditions<Mesh>& bnd)
 {
     std::cout << "INSIDE FACE-BASED TRACE" << std::endl;
 
@@ -249,7 +249,7 @@ template<typename Mesh, typename Function, typename Analytical>
 dynamic_vector<typename Mesh::coordinate_type>
 solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun,
     const algorithm_parameters<typename Mesh::coordinate_type>& ap,
-    const disk::BoundaryConditions<Mesh>& bnd,
+    const disk::scalar_boundary_conditions<Mesh>& bnd,
     const hho_degree_info& hdi)
 {
     std::cout << "INSIDE FACE-BASED TRACE" << std::endl;
@@ -508,7 +508,7 @@ template<typename Mesh, typename Function, typename Analytical>
 std::pair<typename Mesh::coordinate_type, typename Mesh::coordinate_type>
 solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun,
     const algorithm_parameters<typename Mesh::coordinate_type>& ap,
-    const disk::BoundaryConditions<Mesh>& bnd)
+    const disk::scalar_boundary_conditions<Mesh>& bnd)
 {
     std::cout << "INSIDE CELL-BASED TRACE" << std::endl;
     std::cout << ap << std::endl;
@@ -766,7 +766,7 @@ template<typename Mesh, typename Function, typename Analytical>
 dynamic_vector<typename Mesh::coordinate_type>
 solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun,
     const algorithm_parameters<typename Mesh::coordinate_type>& ap,
-    const disk::BoundaryConditions<Mesh>& bnd,
+    const disk::scalar_boundary_conditions<Mesh>& bnd,
     const hho_degree_info& hdi)
 {
     std::cout << "INSIDE CELL-BASED TRACE HIERARCHICAL" << std::endl;
@@ -1027,7 +1027,7 @@ run_signorini_unknown( Mesh& msh,
         return 0.;
     };
 
-    typedef disk::BoundaryConditions<Mesh> boundary_type;
+    typedef disk::scalar_boundary_conditions<Mesh> boundary_type;
     boundary_type  bnd(msh);
 
     /*--------------------------------------------------------------------
@@ -1117,7 +1117,7 @@ run_signorini_analytical(Mesh& msh,
         return  -std::pow(radio, 5.5) * std::sin(5.5 *theta);
     };
 
-    typedef disk::BoundaryConditions<Mesh> boundary_type;
+    typedef disk::scalar_boundary_conditions<Mesh> boundary_type;
     boundary_type  bnd(msh);
 
 

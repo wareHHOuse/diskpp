@@ -1533,7 +1533,7 @@ template<typename Mesh>
 class diffusion_condensed_assembler
 {
     using T = typename Mesh::coordinate_type;
-    typedef disk::BoundaryConditions<Mesh, true> boundary_type;
+    typedef disk::scalar_boundary_conditions<Mesh> boundary_type;
 
     std::vector<size_t>     compress_table;
     std::vector<size_t>     expand_table;
@@ -1781,7 +1781,7 @@ class diffusion_condensed_assembler2
 {
     using T = typename Mesh::coordinate_type;
 
-    typedef disk::BoundaryConditions<Mesh> boundary_type;
+    typedef disk::scalar_boundary_conditions<Mesh> boundary_type;
 
     std::vector<size_t>                 compress_table;
     std::vector<size_t>                 expand_table;
@@ -2132,7 +2132,7 @@ class diffusion_assembler_alg
     using vector_type = Matrix<T, Dynamic, 1>;
     using matrix_type = Matrix<T, Dynamic, Dynamic>;
 
-    typedef disk::BoundaryConditions<Mesh>    boundary_type;
+    typedef disk::scalar_boundary_conditions<Mesh>    boundary_type;
 
     std::vector<size_t>                 compress_table;
     std::vector<size_t>                 expand_table;
@@ -2379,7 +2379,7 @@ public:
 
 template<typename Mesh>
 auto make_diffusion_assembler_alg(const Mesh& msh, hho_degree_info hdi,
-                            const  disk::BoundaryConditions<Mesh>& bnd)
+                            const  disk::scalar_boundary_conditions<Mesh>& bnd)
 {
     return diffusion_assembler_alg<Mesh>(msh, hdi, bnd);
 }
@@ -2595,7 +2595,7 @@ make_diffusion_assembler(const Mesh& msh, const hho_degree_info& hdi)
 
 template<typename Mesh>
 auto
-make_diffusion_assembler(const Mesh& msh, const hho_degree_info& hdi, const BoundaryConditions<Mesh>& bnd)
+make_diffusion_assembler(const Mesh& msh, const hho_degree_info& hdi, const scalar_boundary_conditions<Mesh>& bnd)
 {
     return diffusion_condensed_assembler<Mesh>(msh, hdi, bnd);
 }
@@ -2628,7 +2628,7 @@ template<typename Mesh>
 class stokes_assembler
 {
     using T = typename Mesh::coordinate_type;
-    typedef disk::BoundaryConditions<Mesh, false>    boundary_type;
+    typedef disk::vector_boundary_conditions<Mesh> boundary_type;
 
     std::vector<size_t>                 compress_table;
     std::vector<size_t>                 expand_table;
@@ -3076,7 +3076,7 @@ template<typename Mesh>
 class stokes_assembler_alg
 {
     using T = typename Mesh::coordinate_type;
-    typedef disk::BoundaryConditions<Mesh, false> boundary_type;
+    typedef disk::vector_boundary_conditions<Mesh> boundary_type;
 
     std::vector<size_t>                 compress_table;
     std::vector<size_t>                 expand_table;
@@ -3403,7 +3403,7 @@ class assembler_mechanics
     typedef typename mesh_type::cell            cell_type;
     typedef typename mesh_type::face            face_type;
 
-    typedef disk::BoundaryConditions<Mesh, false> bnd_type;
+    typedef disk::vector_boundary_conditions<Mesh> bnd_type;
 
     typedef dynamic_matrix<scalar_type> matrix_type;
     typedef dynamic_vector<scalar_type> vector_type;

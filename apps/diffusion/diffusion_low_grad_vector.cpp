@@ -144,7 +144,7 @@ auto
 run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
 {
     using T = typename Mesh::coordinate_type;
-    typedef disk::BoundaryConditions<Mesh, false> boundary_type;
+    typedef disk::vector_boundary_conditions<Mesh> boundary_type;
 
     hho_degree_info hdi(degree, degree);
 

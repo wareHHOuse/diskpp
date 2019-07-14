@@ -98,7 +98,7 @@ struct test_functor
 template<typename Mesh>
 auto
 make_is_dirichlet_vector(const Mesh& msh,
-                const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+                const disk::scalar_boundary_conditions<Mesh>& bnd)
 {
     //cells with contact faces
     auto num_cells = msh.cells_size();
@@ -130,7 +130,7 @@ std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
              Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
 make_hho_nitshce_scalar_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
                           const disk::hho_degree_info& di,
-                          const disk::mechanics::BoundaryConditionsScalar<Mesh>& bnd)
+                          const disk::scalar_boundary_conditions<Mesh>& bnd)
 {
     using T = typename Mesh::coordinate_type;
     const size_t DIM = Mesh::dimension;
@@ -222,7 +222,7 @@ struct test_functor_contact
 
         scalar_type error = 0.0;
 
-        typedef disk::mechanics::BoundaryConditionsScalar<Mesh> boundary_type;
+        typedef disk::scalar_boundary_conditions<Mesh> boundary_type;
         boundary_type  bnd(msh);
         bnd.addDirichletEverywhere(f); //TOP
         auto has_boundary_vector = make_is_dirichlet_vector(msh, bnd);

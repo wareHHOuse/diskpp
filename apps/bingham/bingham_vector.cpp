@@ -51,7 +51,7 @@ run_bingham(Mesh& msh, const hho_degree_info& hdi,
 {
     using T = typename Mesh::coordinate_type;
     typedef typename Mesh::point_type      point_type;
-    typedef disk::BoundaryConditions<Mesh, false> boundary_type;
+    typedef disk::vector_boundary_conditions<Mesh> boundary_type;
 
     boundary_type   bnd(msh);
     std::string     name;
