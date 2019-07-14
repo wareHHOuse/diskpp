@@ -325,7 +325,7 @@ project_function(const Mesh& msh, const Element& elem, const size_t degree, cons
     const Matrix<T, Dynamic, Dynamic> mass  = make_mass_matrix(msh, elem, basis);
     const Matrix<T, Dynamic, 1>       rhs   = make_rhs(msh, elem, basis, f, di);
 
-    return mass.llt().solve(rhs);
+    return mass.ldlt().solve(rhs);
 }
 
 template<typename Mesh, typename Element, typename Basis>
@@ -341,7 +341,7 @@ project_function(const Mesh&                      msh,
     const Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, elem, basis);
     const Matrix<T, Dynamic, 1>       rhs  = make_rhs(msh, elem, basis, f, di);
 
-    return mass.llt().solve(rhs);
+    return mass.ldlt().solve(rhs);
 }
 
 template<typename Mesh, typename Element>
@@ -354,7 +354,7 @@ project_function(const Mesh& msh, const Element& elem, const size_t degree, cons
     const Matrix<T, Dynamic, Dynamic> mass  = make_mass_matrix(msh, elem, basis);
     const Matrix<T, Dynamic, 1>       rhs   = make_rhs(msh, elem, basis, f, di);
 
-    return mass.llt().solve(rhs);
+    return mass.ldlt().solve(rhs);
 }
 
 template<typename Mesh, typename Element, typename Basis>
@@ -370,7 +370,7 @@ project_function(const Mesh&    msh,
     const Matrix<T, Dynamic, Dynamic> mass  = make_mass_matrix(msh, elem, basis);
     const Matrix<T, Dynamic, 1>       rhs   = make_rhs(msh, elem, basis, f, di);
 
-    return mass.llt().solve(rhs);
+    return mass.ldlt().solve(rhs);
 }
 
 template<typename Mesh, typename Element>
@@ -397,7 +397,7 @@ project_gradient(const Mesh& msh, const Element& elem, size_t degree, const matr
         rhs += priv::outer_product(dphi, qp_rhs_func);
     }
 
-    return stiff.block(N, N, basis_size - N, basis_size - N).llt().solve(rhs.tail(basis_size - N));
+    return stiff.block(N, N, basis_size - N, basis_size - N).ldlt().solve(rhs.tail(basis_size - N));
 }
 
 template<typename T>

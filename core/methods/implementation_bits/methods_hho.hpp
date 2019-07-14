@@ -2266,7 +2266,7 @@ public:
                 auto dirichlet_fun  = m_bnd.dirichlet_boundary_func(face_id);
                 matrix_type mass    = make_mass_matrix(msh, fc, fb, di.face_degree());
                 vector_type rhs_bnd = make_rhs(msh, fc, fb, dirichlet_fun, di.face_degree());
-                dirichlet_data.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs_bnd);
+                dirichlet_data.block(face_i*fbs, 0, fbs, 1) = mass.ldlt().solve(rhs_bnd);
             }
         }
 
@@ -2364,7 +2364,7 @@ public:
                 matrix_type   mass = make_mass_matrix(msh, fc, fb, di.face_degree());
                 auto dirichlet_fun = m_bnd.dirichlet_boundary_func(face_id);
                 vector_type    rhs = make_rhs(msh, fc, fb, dirichlet_fun, di.face_degree());
-                ret.block(i * fbs, 0, fbs, 1) = mass.llt().solve(rhs);
+                ret.block(i * fbs, 0, fbs, 1) = mass.ldlt().solve(rhs);
             }
             else
             {
