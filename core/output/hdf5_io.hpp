@@ -29,6 +29,8 @@
 
 #include "common/eigen.hpp"
 
+namespace disk{
+
 class hdf5_context
 {
     std::string     hdf5_filename;
@@ -72,3 +74,5 @@ hdf5_open_or_create(const char *filename)
 
     return file_id;
 }
+
+} // end disk

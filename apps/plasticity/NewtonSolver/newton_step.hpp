@@ -57,12 +57,12 @@ class NewtonRaphson_step_plasticity
     typedef typename mesh_type::coordinate_type            scalar_type;
     typedef ParamRun<scalar_type>                          param_type;
     typedef typename disk::hho_degree_info                 hdi_type;
-    typedef disk::vector_boundary_conditions<mesh_type> bnd_type;
+    typedef disk::vector_boundary_conditions<mesh_type>    bnd_type;
 
     const static int dimension = mesh_type::dimension;
 
-    typedef dynamic_matrix<scalar_type> matrix_dynamic;
-    typedef dynamic_vector<scalar_type> vector_dynamic;
+    typedef disk::dynamic_matrix<scalar_type> matrix_dynamic;
+    typedef disk::dynamic_vector<scalar_type> vector_dynamic;
 
     typedef disk::assembler_mechanics<mesh_type> assembler_type;
 

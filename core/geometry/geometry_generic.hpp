@@ -67,7 +67,15 @@ using generic_mesh_storage = mesh_storage<T, DIM, generic_storage_class<DIM>>;
 template<typename T, size_t DIM>
 using generic_mesh = mesh<T, DIM, generic_mesh_storage<T, DIM>>;
 
-/* Return the number of elements of the specified cell */
+/**
+  * \brief Return the number of faces of the specified cell
+  *
+  * \param msh a mesh
+  * \param cl a  cell
+  * \return Return the number of faces of the specified cell
+  *
+  */
+
 template<typename T, size_t DIM>
 size_t
 howmany_faces(const generic_mesh<T,DIM>& msh,
@@ -76,7 +84,15 @@ howmany_faces(const generic_mesh<T,DIM>& msh,
     return cl.subelement_size();
 }
 
-/* Return the actual faces of the specified element */
+/**
+  * \brief Return the actual faces of the specified cell
+  *
+  * \param msh a mesh
+  * \param cl a  cell
+  * \return Return the actual faces of the specified cell
+  *
+  */
+
 template<typename T, size_t DIM>
 std::vector<typename generic_mesh<T, DIM>::face>
 faces(const generic_mesh<T, DIM>& msh,
@@ -96,6 +112,15 @@ faces(const generic_mesh<T, DIM>& msh,
     return ret;
 }
 
+/**
+  * \brief Return the volume of the specified 3D cell
+  *
+  * \param msh a mesh
+  * \param cl a 3D cell
+  * \return Return the volume of the specified 3D cell
+  *
+  */
+
 template<typename T>
 T
 measure(const generic_mesh<T,3>& msh, const typename generic_mesh<T,3>::cell& cl)
@@ -107,6 +132,15 @@ measure(const generic_mesh<T,3>& msh, const typename generic_mesh<T,3>::cell& cl
 
     return vol;
 }
+
+/**
+  * \brief Return the area of the specified 3D face
+  *
+  * \param msh a mesh
+  * \param fc a 3D face
+  * \return Return the area of the specified 3D face
+  *
+  */
 
 template<typename T>
 T
@@ -126,7 +160,14 @@ measure(const generic_mesh<T,3>& msh, const typename generic_mesh<T,3>::face& fc
     return acc;
 }
 
-/* Compute the measure of a 2-cell (= area) */
+/**
+  * \brief Return the area of the specified 2D cell
+  *
+  * \param msh a mesh
+  * \param cl a 2D cell
+  * \return Return the area of the specified 2D cell
+  *
+  */
 template<typename T>
 T
 measure(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::cell& cl)
@@ -144,7 +185,15 @@ measure(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::cell& cl
     return acc;
 }
 
-/* Compute the measure of a 2-face (= length) */
+/**
+  * \brief Return the length of the specified 2D face
+  *
+  * \param msh a mesh
+  * \param fc a 2D face
+  * \return Return the length of the specified 2D face
+  *
+  */
+
 template<typename T>
 T
 measure(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::face& fc)
@@ -154,7 +203,14 @@ measure(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::face& fc
     return (pts[1] - pts[0]).to_vector().norm();
 }
 
-/* Compute the measure of a 1-cell (= area) */
+/**
+  * \brief Return the length of the specified 1D cell
+  *
+  * \param msh a mesh
+  * \param cl a 1D cell
+  * \return Return the length of the specified 1D cell
+  *
+  */
 template<typename T>
 T
 measure(const generic_mesh<T,1>& msh, const typename generic_mesh<T,1>::cell& cl)
@@ -164,7 +220,14 @@ measure(const generic_mesh<T,1>& msh, const typename generic_mesh<T,1>::cell& cl
     return (pts[1] - pts[0]).to_vector().norm();
 }
 
-/* Compute the measure of a 1-face (= length) */
+/**
+  * \brief Return the measure, i.e. 1, of the specified 1D face
+  *
+  * \param msh a mesh
+  * \param fc a 1D face
+  * \return Return 1.0
+  *
+  */
 template<typename T>
 T
 measure(const generic_mesh<T,1>& msh, const typename generic_mesh<T,1>::face& fc)
@@ -177,47 +240,6 @@ T
 diameter(const generic_mesh<T,1>&, const typename generic_mesh<T,1>::face&)
 {
     return 1.;
-}
-
-
-template<typename T>
-static_vector<T, 2>
-normal(const generic_mesh<T,2>& msh,
-       const typename generic_mesh<T,2>::cell& cl,
-       const typename generic_mesh<T,2>::face& fc)
-{
-    auto pts = points(msh, fc);
-    assert(pts.size() == 2);
-
-    auto v = pts[1] - pts[0];
-    auto n = (point<T,2>({-v.y(), v.x()})).to_vector();
-
-    auto cell_bar = barycenter(msh, cl);
-    auto face_bar = barycenter(msh, fc);
-    auto outward_vector = (face_bar - cell_bar).to_vector();
-
-    if ( n.dot(outward_vector) < T(0) )
-        return -n/n.norm();
-
-    return n/n.norm();
-}
-
-template<typename T>
-T
-normal(const generic_mesh<T,1>& msh,
-       const typename generic_mesh<T,1>::cell& cl,
-       const typename generic_mesh<T,1>::face& fc)
-{
-    auto fcs = faces(msh, cl);
-    assert(fcs.size() == 2);
-
-    if (fc == fcs[0])
-        return -1.;
-
-    if (fc == fcs[1])
-        return 1.;
-
-    throw std::logic_error("shouldn't have arrived here");
 }
 
 

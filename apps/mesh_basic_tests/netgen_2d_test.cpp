@@ -241,7 +241,7 @@ class mesh_hierarchy
         bs_refined->nodes.reserve(bs_refined->points.size());
         for (size_t i = 0; i < bs_refined->points.size(); i++)
         {
-            auto point_id = point_identifier<2>(i);
+            auto point_id = disk::point_identifier<2>(i);
             bs_refined->nodes.push_back(typename mesh_type::node_type({point_id}));
         }
         bs_refined->edges.resize( m_edges.size() );
@@ -249,7 +249,7 @@ class mesh_hierarchy
 
         for (size_t i = 0; i < m_edges.size(); i++)
         {
-            typedef point_identifier<2>    point_id_type;
+            typedef disk::point_identifier<2>    point_id_type;
 
             auto p0 = point_id_type(m_edges[i].p0);
             auto p1 = point_id_type(m_edges[i].p1);
@@ -260,7 +260,7 @@ class mesh_hierarchy
 
         bs_refined->surfaces.resize( m_triangles.size() );
         auto tri_tr = [](const triangle& t) -> mesh_triangle_type {
-            typedef point_identifier<2>    point_id_type;
+            typedef disk::point_identifier<2>    point_id_type;
             auto p0 = point_id_type(t.p[0]);
             auto p1 = point_id_type(t.p[1]);
             auto p2 = point_id_type(t.p[2]);
@@ -282,9 +282,9 @@ class mesh_hierarchy
 
         for (auto& c2fi : coarse_to_fine_int)
         {
-            point_identifier<2> p0(c2fi.first.p[0]);
-            point_identifier<2> p1(c2fi.first.p[1]);
-            point_identifier<2> p2(c2fi.first.p[2]);
+            disk::point_identifier<2> p0(c2fi.first.p[0]);
+            disk::point_identifier<2> p1(c2fi.first.p[1]);
+            disk::point_identifier<2> p2(c2fi.first.p[2]);
 
             mesh_triangle_type tri({p0, p1, p2});
 
@@ -294,9 +294,9 @@ class mesh_hierarchy
             size_t i = 0;
             for (auto& ft : c2fi.second)
             {
-                point_identifier<2> q0(ft.p[0]);
-                point_identifier<2> q1(ft.p[1]);
-                point_identifier<2> q2(ft.p[2]);
+                disk::point_identifier<2> q0(ft.p[0]);
+                disk::point_identifier<2> q1(ft.p[1]);
+                disk::point_identifier<2> q2(ft.p[2]);
 
                 mesh_triangle_type ftri({q0, q1, q2});
                 auto fine_triangle_id = fine.lookup(ftri);

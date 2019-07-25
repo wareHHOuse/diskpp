@@ -56,7 +56,7 @@ solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun
 
     auto offset_vector = full_offset(msh, hdi);
 
-    dynamic_vector<T>  full_sol = dynamic_vector<T>::Zero(num_full_dofs);
+    disk::dynamic_vector<T>  full_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
 
     auto max_iter = 1000;
@@ -107,7 +107,7 @@ solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun
         size_t systsz = assembler.LHS.rows();
         size_t nnz = assembler.LHS.nonZeros();
 
-        dynamic_vector<T> dsol = dynamic_vector<T>::Zero(systsz);
+        disk::dynamic_vector<T> dsol = disk::dynamic_vector<T>::Zero(systsz);
 
         disk::solvers::pardiso_params<T> pparams;
         pparams.report_factorization_Mflops = false;
@@ -116,7 +116,7 @@ solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun
         T H1_increment = 0.0 ;
         T L2_increment = 0.0 ;
 
-        dynamic_vector<T> diff_sol = dynamic_vector<T>::Zero(num_full_dofs);
+        disk::dynamic_vector<T> diff_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
         cl_count = 0;
 
@@ -279,7 +279,7 @@ solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
 
     auto offset_vector = full_offset(msh, hdi);
 
-    dynamic_vector<T>  full_sol = dynamic_vector<T>::Zero(num_full_dofs);
+    disk::dynamic_vector<T>  full_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
 
     //-------------------------------------------------------------------------
@@ -369,7 +369,7 @@ solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
         size_t systsz = assembler.LHS.rows();
         size_t nnz = assembler.LHS.nonZeros();
 
-        dynamic_vector<T> dsol = dynamic_vector<T>::Zero(systsz);
+        disk::dynamic_vector<T> dsol = disk::dynamic_vector<T>::Zero(systsz);
 
         disk::solvers::pardiso_params<T> pparams;
         pparams.report_factorization_Mflops = false;
@@ -378,7 +378,7 @@ solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
         T H1_increment = 0.0 ;
         T L2_increment = 0.0 ;
 
-        dynamic_vector<T> diff_sol = dynamic_vector<T>::Zero(num_full_dofs);
+        disk::dynamic_vector<T> diff_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
         cl_count = 0;
 
@@ -530,7 +530,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
 
     auto offset_vector = full_offset(msh, hdi);
 
-    dynamic_vector<T>  full_sol = dynamic_vector<T>::Zero(num_full_dofs);
+    disk::dynamic_vector<T>  full_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
 
     auto max_iter = 500;
@@ -603,7 +603,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
         size_t systsz = assembler.LHS.rows();
         size_t nnz = assembler.LHS.nonZeros();
 
-        dynamic_vector<T> dsol = dynamic_vector<T>::Zero(systsz);
+        disk::dynamic_vector<T> dsol = disk::dynamic_vector<T>::Zero(systsz);
 
         disk::solvers::pardiso_params<T> pparams;
         pparams.report_factorization_Mflops = false;
@@ -614,7 +614,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
         T L2_increment  = 0.0 ;
 
         cl_count = 0;
-        dynamic_vector<T> diff_sol = dynamic_vector<T>::Zero(num_full_dofs);
+        disk::dynamic_vector<T> diff_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
         for (auto& cl : msh)
         {
@@ -796,7 +796,7 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
 
     auto offset_vector = full_offset(msh, hdi);
 
-    dynamic_vector<T>  full_sol = dynamic_vector<T>::Zero(num_full_dofs);
+    disk::dynamic_vector<T>  full_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
 
     auto max_iter = 100;
@@ -868,7 +868,7 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
         size_t systsz = assembler.LHS.rows();
         size_t nnz = assembler.LHS.nonZeros();
 
-        dynamic_vector<T> dsol = dynamic_vector<T>::Zero(systsz);
+        disk::dynamic_vector<T> dsol = disk::dynamic_vector<T>::Zero(systsz);
 
         std::cout << "here" << std::endl;
         disk::solvers::pardiso_params<T> pparams;
@@ -882,7 +882,7 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
         T L2_increment  = 0.0 ;
 
         cl_count = 0;
-        dynamic_vector<T> diff_sol = dynamic_vector<T>::Zero(num_full_dofs);
+        disk::dynamic_vector<T> diff_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
         for (auto& cl : msh)
         {

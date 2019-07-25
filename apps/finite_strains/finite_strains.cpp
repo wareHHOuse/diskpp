@@ -81,23 +81,23 @@ run_finite_strains_solver(const Mesh<T, 2, Storage>&   msh,
                           const disk::MaterialData<T>& material_data)
 {
     typedef Mesh<T, 2, Storage>                            mesh_type;
-    typedef static_vector<T, 2>                            result_type;
-    typedef static_matrix<T, 2, 2>                         result_grad_type;
-    typedef disk::vector_boundary_conditions<mesh_type>     Bnd_type;
+    typedef disk::static_vector<T, 2>                      result_type;
+    typedef disk::static_matrix<T, 2, 2>                   result_grad_type;
+    typedef disk::vector_boundary_conditions<mesh_type>    Bnd_type;
 
-    auto load = [material_data](const point<T, 2>& p) -> result_type { return result_type{0, 0}; };
+    auto load = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0, 0}; };
 
-    auto solution = [material_data](const point<T, 2>& p) -> result_type { return result_type{0, 0}; };
+    auto solution = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0, 0}; };
 
-    auto gradient = [material_data](const point<T, 2>& p) -> result_grad_type { return result_grad_type::Zero(); };
+    auto gradient = [material_data](const disk::point<T, 2>& p) -> result_grad_type { return result_grad_type::Zero(); };
 
     Bnd_type bnd(msh);
 
 
     // Cook with quadrilaterals
-    auto zero = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
+    auto zero = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
 
-    auto trac     = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0.3125}; };
+    auto trac = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0.0, 0.3125}; };
 
     bnd.addDirichletBC(disk::CLAMPED, 3, zero);
     bnd.addNeumannBC(disk::NEUMANN, 8, trac);
@@ -142,24 +142,24 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&   msh,
                           const disk::MaterialData<T>& material_data)
 {
     typedef Mesh<T, 3, Storage>                            mesh_type;
-    typedef static_vector<T, 3>                            result_type;
-    typedef static_matrix<T, 3, 3>                         result_grad_type;
-    typedef disk::vector_boundary_conditions<mesh_type>     Bnd_type;
+    typedef disk::static_vector<T, 3>                      result_type;
+    typedef disk::static_matrix<T, 3, 3>                   result_grad_type;
+    typedef disk::vector_boundary_conditions<mesh_type>    Bnd_type;
 
-    auto load = [material_data](const point<T, 3>& p) -> result_type { return result_type{0, 0, 0}; };
+    auto load = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0, 0, 0}; };
 
-    auto solution = [material_data](const point<T, 3>& p) -> result_type { return result_type{0, 0, 0}; };
+    auto solution = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0, 0, 0}; };
 
-    auto gradient = [material_data](const point<T, 3>& p) -> result_grad_type { return result_grad_type::Zero(); };
+    auto gradient = [material_data](const disk::point<T, 3>& p) -> result_grad_type { return result_grad_type::Zero(); };
 
     Bnd_type bnd(msh);
     // bnd.addDirichletEverywhere(solution);
 
     // // Sphere
 
-    auto zero = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 0.0}; };
+    auto zero = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 0.0}; };
 
-    auto pres = [material_data](const point<T, 3>& p) -> result_type {
+    auto pres = [material_data](const disk::point<T, 3>& p) -> result_type {
         result_type er = result_type::Zero();
 
         er(0) = p.x();
@@ -171,7 +171,7 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&   msh,
         return 3*er;
     };
 
-    auto deplr = [material_data](const point<T, 3>& p) -> result_type {
+    auto deplr = [material_data](const disk::point<T, 3>& p) -> result_type {
         result_type er = result_type::Zero();
 
         er(0) = p.x();
@@ -197,7 +197,7 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&   msh,
     //bnd.addNeumannBC(disk::NEUMANN, 27, pres);
 
     // Cylindre GDEF
-    // auto depl = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 1.0}; };
+    // auto depl = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 1.0}; };
     // bnd.addDirichletBC(disk::DZ, 125, zero);
     // bnd.addDirichletBC(disk::DZ, 50, zero);
     // bnd.addDirichletBC(disk::DZ, 96, zero);
@@ -214,11 +214,11 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&   msh,
     // bnd.addDirichletBC(disk::DZ, 69, depl);
 
     // Cube + pres
-    //    auto zero = [material_data](const point<T, 3>& p) -> result_type {
+    //    auto zero = [material_data](const disk::point<T, 3>& p) -> result_type {
     //       return result_type{0.0, 0.0, 0.0};
     //    };
 
-    //    auto pres = [material_data](const point<T, 3>& p) -> result_type {
+    //    auto pres = [material_data](const disk::point<T, 3>& p) -> result_type {
     //       return result_type{0.0, 0.0, -356};
     //    };
 
@@ -233,7 +233,7 @@ run_finite_strains_solver(const Mesh<T, 3, Storage>&   msh,
     //    bnd.addNeumannBC(disk::NEUMANN, 21, pres);
 
 
-    // auto trac = [material_data](const point<T, 3>& p) -> result_type {
+    // auto trac = [material_data](const disk::point<T, 3>& p) -> result_type {
     //     return result_type { 0.0, 0.3125,  0.0}; };
 
     // bnd.addDirichletBC(disk::CLAMPED, 3, zero);

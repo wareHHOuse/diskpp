@@ -75,14 +75,14 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>& msh,
                              const ElasticityParameters material_data)
 {
     typedef Mesh<T, 2, Storage>                            mesh_type;
-    typedef static_vector<T, 2>                            result_type;
-    typedef static_matrix<T, 2, 2>                         grad_type;
-    typedef disk::vector_boundary_conditions<mesh_type>     Bnd_type;
+    typedef disk::static_vector<T, 2>                      result_type;
+    typedef disk::static_matrix<T, 2, 2>                   grad_type;
+    typedef disk::vector_boundary_conditions<mesh_type>    Bnd_type;
 
     timecounter tc;
     tc.tic();
 
-    auto load = [material_data](const point<T, 2>& p) -> result_type {
+    auto load = [material_data](const disk::point<T, 2>& p) -> result_type {
         const T lambda = material_data.lambda;
         const T mu     = material_data.mu;
 
@@ -102,7 +102,7 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>& msh,
         return -M_PI * M_PI / (lambda + 1) * result_type{fx, fy};
     };
 
-    auto solution = [material_data](const point<T, 2>& p) -> result_type {
+    auto solution = [material_data](const disk::point<T, 2>& p) -> result_type {
         T fx = sin(2 * M_PI * p.y()) * (cos(2 * M_PI * p.x()) - 1) +
                1.0 / (1 + material_data.lambda) * sin(M_PI * p.x()) * sin(M_PI * p.y());
         T fy = -sin(2 * M_PI * p.x()) * (cos(2 * M_PI * p.y()) - 1) +
@@ -111,7 +111,7 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>& msh,
         return result_type{fx, fy};
     };
 
-    auto sigma = [material_data](const point<T, 2>& p) -> grad_type {
+    auto sigma = [material_data](const disk::point<T, 2>& p) -> grad_type {
         const T lambda = material_data.lambda;
         const T mu     = material_data.mu;
 
@@ -139,7 +139,7 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>& msh,
 
         const T divu = gs.trace();
 
-        return 2 * mu * gs + lambda * divu * static_matrix<T, 2, 2>::Identity();
+        return 2 * mu * gs + lambda * divu * disk::static_matrix<T, 2, 2>::Identity();
     };
 
     Bnd_type bnd(msh);
@@ -171,14 +171,14 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>&  msh,
                              const ElasticityParameters& material_data)
 {
     typedef Mesh<T, 3, Storage>                            mesh_type;
-    typedef static_vector<T, 3>                            result_type;
-    typedef static_matrix<T, 3, 3>                         grad_type;
-    typedef disk::vector_boundary_conditions<mesh_type>     Bnd_type;
+    typedef disk::static_vector<T, 3>                      result_type;
+    typedef disk::static_matrix<T, 3, 3>                   grad_type;
+    typedef disk::vector_boundary_conditions<mesh_type>    Bnd_type;
 
     timecounter tc;
     tc.tic();
 
-    auto load = [material_data](const point<T, 3>& p) -> result_type {
+    auto load = [material_data](const disk::point<T, 3>& p) -> result_type {
         const T lambda = material_data.lambda;
         const T mu     = material_data.mu;
 
@@ -198,7 +198,7 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>&  msh,
         return -M_PI * M_PI / (lambda + 1) * result_type{fx, fy, 0};
     };
 
-    auto solution = [material_data](const point<T, 3>& p) -> result_type {
+    auto solution = [material_data](const disk::point<T, 3>& p) -> result_type {
         T fx = sin(2 * M_PI * p.y()) * (cos(2 * M_PI * p.x()) - 1) +
                1.0 / (1 + material_data.lambda) * sin(M_PI * p.x()) * sin(M_PI * p.y());
         T fy = -sin(2 * M_PI * p.x()) * (cos(2 * M_PI * p.y()) - 1) +
@@ -207,7 +207,7 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>&  msh,
         return result_type{fx, fy, 0};
     };
 
-    auto sigma = [material_data](const point<T, 3>& p) -> grad_type {
+    auto sigma = [material_data](const disk::point<T, 3>& p) -> grad_type {
         const T lambda = material_data.lambda;
         const T mu     = material_data.mu;
 
@@ -235,7 +235,7 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>&  msh,
 
         const T divu = gs.trace();
 
-        return 2 * mu * gs + lambda * divu * static_matrix<T, 3, 3>::Identity();
+        return 2 * mu * gs + lambda * divu * disk::static_matrix<T, 3, 3>::Identity();
     };
 
     Bnd_type bnd(msh);

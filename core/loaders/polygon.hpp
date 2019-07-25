@@ -25,6 +25,8 @@
 #include <vector>
 #include <iostream>
 
+namespace disk{
+
 class polygon
 {
     std::vector<size_t>::const_iterator   m_my_position;
@@ -145,3 +147,5 @@ public:
         return priv::polygon_iterator(m_data.end(), m_data.end());
     }
 };
+
+} // end disk

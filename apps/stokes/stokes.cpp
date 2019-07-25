@@ -43,7 +43,7 @@
 template<typename Mesh, typename Velocity, typename Pressure, typename Assembler>
 auto
 compute_errors(const Mesh& msh,
-                const dynamic_vector<typename Mesh::coordinate_type>& sol,
+                const disk::dynamic_vector<typename Mesh::coordinate_type>& sol,
                 const typename disk::hho_degree_info & hdi,
                 const Velocity& velocity,
                 const Pressure& pressure,
@@ -124,7 +124,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     typedef typename mesh_type::face        face_type;
     typedef typename mesh_type::coordinate_type scalar_type;
 
-    typedef dynamic_matrix<scalar_type>     matrix_type;
+    typedef disk::dynamic_matrix<scalar_type>     matrix_type;
     typedef disk::vector_boundary_conditions<mesh_type> boundary_type;
 
     using point_type = typename mesh_type::point_type;
@@ -194,7 +194,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     size_t systsz = assembler.LHS.rows();
     size_t nnz = assembler.LHS.nonZeros();
 
-    dynamic_vector<scalar_type> sol = dynamic_vector<scalar_type>::Zero(systsz);
+    disk::dynamic_vector<scalar_type> sol = disk::dynamic_vector<scalar_type>::Zero(systsz);
 
     disk::solvers::pardiso_params<scalar_type> pparams;
     mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);

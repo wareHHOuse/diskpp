@@ -43,6 +43,8 @@
 
 #pragma clang diagnostic pop
 
+namespace disk{
+
 template<typename T>
 using dynamic_matrix = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 
@@ -167,3 +169,5 @@ void dump_sparse_matrix(Eigen::SparseMatrix<double>& M, const std::string& filen
 
     ofs.close();
 }
+
+} // end disk

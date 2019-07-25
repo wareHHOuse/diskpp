@@ -32,7 +32,7 @@ public:
 };
 */
 
-typedef point<simpleps_real,2> ps_point;
+typedef disk::point<simpleps_real,2> ps_point;
 
 class postscript_object
 {

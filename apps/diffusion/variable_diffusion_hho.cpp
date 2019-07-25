@@ -151,7 +151,7 @@ struct diffusion_tensor<Mesh<T, 2, Storage>>
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type      point_type;
 
-    typedef static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> tensor_type;
+    typedef disk::static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> tensor_type;
 
     tensor_type
     operator()(const point_type& pt) const
@@ -170,7 +170,7 @@ struct diffusion_tensor<Mesh<T, 3, Storage>>
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type      point_type;
 
-    typedef static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> tensor_type;
+    typedef disk::static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> tensor_type;
 
     tensor_type
     operator()(const point_type& pt) const

@@ -29,6 +29,8 @@
 #include "geometry/geometry.hpp"
 #include "mesh/point.hpp"
 
+namespace disk{
+
 
 template<typename PtT, size_t N>
 class raw_simplex
@@ -198,4 +200,6 @@ split_in_raw_tetrahedra(const Mesh& msh, const typename Mesh::cell& cl)
     }
 
     return raw_simplices;
+}
+
 }

@@ -199,7 +199,7 @@ plot_over_line(const Mesh    & msh,
 template<typename Mesh>
 void
 compute_discontinuous_velocity(const Mesh& msh,
-                        const dynamic_vector< typename Mesh::coordinate_type>& sol,
+                        const disk::dynamic_vector< typename Mesh::coordinate_type>& sol,
                         const typename disk::hho_degree_info& hdi,
                         const std::string& filename)
 {
@@ -274,7 +274,7 @@ template<typename Mesh, typename Assembler>
 void
 post_processing(const Mesh& msh, const Assembler& assembler,
                 const typename disk::hho_degree_info& di,
-                const dynamic_vector<typename Mesh::coordinate_type>& sol,
+                const disk::dynamic_vector<typename Mesh::coordinate_type>& sol,
                 bool use_sym_grad = true)
 
 {
@@ -347,7 +347,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
-    typedef dynamic_matrix<scalar_type>     matrix_type;
+    typedef disk::dynamic_matrix<scalar_type>     matrix_type;
     typedef disk::vector_boundary_conditions<mesh_type> boundary_type;
 
     auto rhs_fun = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
@@ -392,7 +392,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     size_t systsz = assembler.LHS.rows();
     size_t nnz = assembler.LHS.nonZeros();
 
-    dynamic_vector<scalar_type> sol = dynamic_vector<scalar_type>::Zero(systsz);
+    disk::dynamic_vector<scalar_type> sol = disk::dynamic_vector<scalar_type>::Zero(systsz);
 
     disk::solvers::pardiso_params<scalar_type> pparams;
     mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);

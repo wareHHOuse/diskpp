@@ -88,9 +88,9 @@ int main(int argc, char **argv)
     }
 
     sparse_matrix_type              gA(system_size, system_size);
-    dynamic_vector<T>               gb(system_size), gx(system_size);
+    disk::dynamic_vector<T>               gb(system_size), gx(system_size);
 
-    gb = dynamic_vector<T>::Zero(system_size);
+    gb = disk::dynamic_vector<T>::Zero(system_size);
 
 
     std::vector<triplet_type>       triplets;
@@ -135,7 +135,7 @@ int main(int argc, char **argv)
     pparams.report_factorization_Mflops = true;
     mkl_pardiso(pparams, gA, gb, gx);
 
-    dynamic_vector<T> sol = dynamic_vector<T>::Zero( msh.points_size() );
+    disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero( msh.points_size() );
 
     for (size_t i = 0; i < gx.size(); i++)
         sol(expand_map.at(i)) = gx(i);

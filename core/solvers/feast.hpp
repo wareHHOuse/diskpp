@@ -125,6 +125,8 @@ void zfeast_hcsrgv(const char& uplo, const int& n,
 
 #define FEASTPARM_LEN   128
 
+namespace disk{
+
 template<typename T>
 struct feast_eigensolver_params
 {
@@ -280,3 +282,5 @@ bool test_eigenvalue_solver(void)
 }
 
 */
+
+} // end disk

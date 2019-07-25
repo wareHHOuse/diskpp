@@ -76,8 +76,8 @@ class vector_laplacian_solver
    typedef typename mesh_type::face                       face_type;
    typedef disk::vector_boundary_conditions<mesh_type>     bnd_type;
 
-   typedef dynamic_matrix<scalar_type> matrix_dynamic;
-   typedef dynamic_vector<scalar_type> vector_dynamic;
+   typedef disk::dynamic_matrix<scalar_type> matrix_dynamic;
+   typedef disk::dynamic_vector<scalar_type> vector_dynamic;
 
    typedef disk::assembler_mechanics<mesh_type> assembler_type;
 
@@ -372,13 +372,13 @@ class vector_laplacian_solver
       gmsh::Gmesh               gmsh      = disk::convertMesh(post_mesh);
       auto                      storage   = post_mesh.mesh().backend_storage();
 
-      const static_vector<scalar_type, dimension> vzero =
-        static_vector<scalar_type, dimension>::Zero();
+      const disk::static_vector<scalar_type, dimension> vzero =
+        disk::static_vector<scalar_type, dimension>::Zero();
 
       const size_t nb_nodes(gmsh.getNumberofNodes());
 
       // first(number of data at this node), second(cumulated value)
-      std::vector<std::pair<size_t, static_vector<scalar_type, dimension>>> value(
+      std::vector<std::pair<size_t, disk::static_vector<scalar_type, dimension>>> value(
         nb_nodes, std::make_pair(0, vzero));
 
       size_t cell_i = 0;
@@ -408,7 +408,7 @@ class vector_laplacian_solver
 
       // Compute the average value and save it
       for (size_t i_node = 0; i_node < value.size(); i_node++) {
-         const static_vector<scalar_type, dimension> depl_avr =
+         const disk::static_vector<scalar_type, dimension> depl_avr =
            value[i_node].second / double(value[i_node].first);
 
          const gmsh::Data tmp_data(i_node + 1, disk::convertToVectorGmsh(depl_avr));

@@ -48,7 +48,7 @@ test_quadrature_loop(MeshType& msh, size_t degree)
     typedef typename mesh_type::cell                   cell_type;
     typedef typename mesh_type::face                   face_type;
 
-    typedef dynamic_matrix<scalar_type> matrix_type;
+    typedef disk::dynamic_matrix<scalar_type> matrix_type;
 
     const auto cbs = disk::scalar_basis_size(degree, mesh_type::dimension);
 
@@ -134,12 +134,12 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+        auto f = [](const disk::point<RealType, mesh_type::dimension>& p) -> auto {
             return M_PI * M_PI * sin(p.x() * M_PI);
             //return 6. * p.x();
         };
 
-        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+        auto sf = [](const disk::point<RealType, mesh_type::dimension>& p) -> auto {
             return sin(p.x() * M_PI);
             //return - p.x() * p.x() * p.x();
         };
@@ -163,12 +163,12 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+        auto f = [](const disk::point<RealType, mesh_type::dimension>& p) -> auto {
             return M_PI * M_PI * sin(p.x() * M_PI);
             //return 6. * p.x();
         };
 
-        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+        auto sf = [](const disk::point<RealType, mesh_type::dimension>& p) -> auto {
             return sin(p.x() * M_PI);
             //return - p.x() * p.x() * p.x();
         };
@@ -194,12 +194,12 @@ int main(int argc, char **argv)
         /*
         loader.populate_mesh(msh);
 
-        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+        auto f = [](const disk::point<RealType, mesh_type::dimension>& p) -> auto {
             return M_PI * M_PI * sin(p.x() * M_PI);
             //return 1.0;
         };
 
-        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+        auto sf = [](const disk::point<RealType, mesh_type::dimension>& p) -> auto {
             return sin(p.x() * M_PI);
             //return -p.x() * p.x() * 0.5;
         };
@@ -224,12 +224,12 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+        auto f = [](const disk::point<RealType, mesh_type::dimension>& p) -> auto {
             return M_PI * M_PI * sin(p.x() * M_PI);
             //return 1.0;
         };
 
-        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+        auto sf = [](const disk::point<RealType, mesh_type::dimension>& p) -> auto {
             return sin(p.x() * M_PI);
             //return -p.x() * p.x() * 0.5;
         };
@@ -252,12 +252,12 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+        auto f = [](const disk::point<RealType, mesh_type::dimension>& p) -> auto {
             return M_PI * M_PI * sin(p.x() * M_PI);
             //return 1.0;
         };
 
-        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+        auto sf = [](const disk::point<RealType, mesh_type::dimension>& p) -> auto {
             return sin(p.x() * M_PI);
             //return -p.x() * p.x() * 0.5;
         };
@@ -281,12 +281,12 @@ int main(int argc, char **argv)
         }
         loader.populate_mesh(msh);
 
-        auto f = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+        auto f = [](const disk::point<RealType, mesh_type::dimension>& p) -> auto {
             return M_PI * M_PI * sin(p.x() * M_PI);
             //return 1.0;
         };
 
-        auto sf = [](const point<RealType, mesh_type::dimension>& p) -> auto {
+        auto sf = [](const disk::point<RealType, mesh_type::dimension>& p) -> auto {
             return sin(p.x() * M_PI);
             //return -p.x() * p.x() * 0.5;
         };

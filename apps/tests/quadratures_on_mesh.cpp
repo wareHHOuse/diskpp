@@ -34,30 +34,30 @@ test_integration_on_mesh(const Mesh<T, 2, Storage>& msh)
      * means testing up to degree 2*k, because we consider the
      * monomial x^m y^n where m and n go from 0 to k. */
     size_t max_test_degree = 8;
-    
+
     /* max error in ULP */
     T ULP_max = 100;
-    
+
     /* ASSUMES THAT THE MESH REPRESENTS THE DOMAIN [0,1]^d */
     auto analytic_integral = [](size_t m, size_t n) -> auto {
         return 1./((m+1)*(n+1));
     };
-    
-    auto monomial = [](const point<T,2>& pt, size_t m, size_t n) -> T {
+
+    auto monomial = [](const disk::point<T,2>& pt, size_t m, size_t n) -> T {
         return iexp_pow(pt.x(), m)*iexp_pow(pt.y(), n);
     };
-    
+
     T area = 0.0;
     for (auto& cl : msh)
         area += measure(msh, cl);
-    
+
     if ( !almost_equal(area, 1.0, 2.0/* Max 2ULP for area */) )
     {
         std::cout << bold << magenta << "  Area not computed accurately: ";
-        std::cout << std::setprecision(16) << area << reset << std::endl; 
+        std::cout << std::setprecision(16) << area << reset << std::endl;
         //return false;
     }
-    
+
     for (size_t m = 0; m < max_test_degree; m++)
     {
         for (size_t n = 0; n < max_test_degree; n++)
@@ -69,9 +69,9 @@ test_integration_on_mesh(const Mesh<T, 2, Storage>& msh)
                 for (auto& qp : qps)
                     int_num += qp.weight()*monomial(qp.point(),m,n);
             }
-                
+
             T int_ana = analytic_integral(m,n);
-                
+
             if ( not almost_equal(int_ana, int_num, ULP_max) )
             {
                 std::cout << "  Test FAIL for monomial x^" << m << " y^";
@@ -83,7 +83,7 @@ test_integration_on_mesh(const Mesh<T, 2, Storage>& msh)
             }
         }
     }
-    
+
     return true;
 }
 
@@ -95,30 +95,30 @@ test_integration_on_mesh(const Mesh<T, 3, Storage>& msh)
      * means testing up to degree 3*k, because we consider the
      * monomial x^m y^n z^k where m, n and k go from 0 to k. */
     size_t max_test_degree = 5;
-    
+
     /* max error in ULP */
     T ULP_max = 50;
-    
+
     /* ASSUMES THAT THE MESH REPRESENTS THE DOMAIN [0,1]^d */
     auto analytic_integral = [](size_t m, size_t n, size_t k) -> auto {
         return 1./((m+1)*(n+1)*(k+1));
     };
-    
-    auto monomial = [](const point<T,3>& pt, size_t m, size_t n, size_t k) -> T {
+
+    auto monomial = [](const disk::point<T,3>& pt, size_t m, size_t n, size_t k) -> T {
         return iexp_pow(pt.x(), m)*iexp_pow(pt.y(), n)*iexp_pow(pt.z(), k);
     };
-    
+
     T volume = 0.0;
     for (auto& cl : msh)
         volume += measure(msh, cl);
-    
+
     if ( !almost_equal(volume, 1.0, 2.0/* Max 2ULP for volume */) )
     {
         std::cout << bold << magenta << "  Volume not computed accurately: ";
-        std::cout << std::setprecision(16) << volume << reset << std::endl; 
+        std::cout << std::setprecision(16) << volume << reset << std::endl;
         //return false;
     }
-    
+
     for (size_t m = 0; m < max_test_degree; m++)
     {
         for (size_t n = 0; n < max_test_degree; n++)
@@ -132,9 +132,9 @@ test_integration_on_mesh(const Mesh<T, 3, Storage>& msh)
                     for (auto& qp : qps)
                         int_num += qp.weight()*monomial(qp.point(),m,n,k);
                 }
-                
+
                 T int_ana = analytic_integral(m,n,k);
-                
+
                 if ( not almost_equal(int_ana, int_num, ULP_max) )
                 {
                 std::cout << "  Test FAIL for monomial x^" << m << " y^";
@@ -147,7 +147,7 @@ test_integration_on_mesh(const Mesh<T, 3, Storage>& msh)
             }
         }
     }
-    
+
     return true;
 }
 
@@ -178,5 +178,5 @@ int main(void)
     std::cout << bold << yellow << "Testing tetrahedral meshes" << reset << std::endl;
     test( get_tetrahedra_netgen_meshes<double>() );
 }
-    
+
 

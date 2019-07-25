@@ -39,7 +39,7 @@ template<typename T, typename Storage>
 void mesh_to_postscript(const disk::mesh<T, 2, Storage>& msh, const std::string& filename)
 {
     auto storage = msh.backend_storage();
-    point<T, 2> min, max;
+    disk::point<T, 2> min, max;
 
     for (auto& pt : storage->points)
     {

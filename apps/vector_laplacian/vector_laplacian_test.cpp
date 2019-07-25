@@ -73,28 +73,28 @@ error_type
 run_vector_laplacian_solver(const Mesh<T, 2, Storage>& msh, const run_params& rp, const Parameters material_data)
 {
     typedef Mesh<T, 2, Storage>                            mesh_type;
-    typedef static_vector<T, 2>                            result_type;
-    typedef static_matrix<T, 2, 2>                         result_grad_type;
-    typedef disk::vector_boundary_conditions<mesh_type>     Bnd_type;
+    typedef disk::static_vector<T, 2>                            result_type;
+    typedef disk::static_matrix<T, 2, 2>                         result_grad_type;
+    typedef disk::vector_boundary_conditions<mesh_type>    Bnd_type;
 
     timecounter tc;
     tc.tic();
 
-    auto load = [material_data](const point<T, 2>& p) -> result_type {
+    auto load = [material_data](const disk::point<T, 2>& p) -> result_type {
         T fx = 2. * material_data.lambda * M_PI * M_PI * sin(M_PI * p.x()) * sin(M_PI * p.y());
         T fy = 2. * material_data.lambda * M_PI * M_PI * cos(M_PI * p.x()) * cos(M_PI * p.y());
 
         return result_type{fx, fy};
     };
 
-    auto solution = [material_data](const point<T, 2>& p) -> result_type {
+    auto solution = [material_data](const disk::point<T, 2>& p) -> result_type {
         T fx = sin(M_PI * p.x()) * sin(M_PI * p.y());
         T fy = cos(M_PI * p.x()) * cos(M_PI * p.y());
 
         return result_type{fx, fy};
     };
 
-    auto gradient = [material_data](const point<T, 2>& p) -> result_grad_type {
+    auto gradient = [material_data](const disk::point<T, 2>& p) -> result_grad_type {
         result_grad_type grad = result_grad_type::Zero();
 
         grad(0, 0) = cos(M_PI * p.x()) * sin(M_PI * p.y());
@@ -129,14 +129,14 @@ error_type
 run_vector_laplacian_solver(const Mesh<T, 3, Storage>& msh, const run_params& rp, const Parameters& material_data)
 {
     typedef Mesh<T, 3, Storage>                            mesh_type;
-    typedef static_vector<T, 3>                            result_type;
-    typedef static_matrix<T, 3, 3>                         result_grad_type;
+    typedef disk::static_vector<T, 3>                             result_type;
+    typedef disk::static_matrix<T, 3, 3>                          result_grad_type;
     typedef disk::vector_boundary_conditions<mesh_type>     Bnd_type;
 
     timecounter tc;
     tc.tic();
 
-    auto load = [material_data](const point<T, 3>& p) -> auto
+    auto load = [material_data](const disk::point<T, 3>& p) -> auto
     {
         T fx = 2. * material_data.lambda * M_PI * M_PI * cos(M_PI * p.x()) * sin(M_PI * p.y());
 
@@ -147,7 +147,7 @@ run_vector_laplacian_solver(const Mesh<T, 3, Storage>& msh, const run_params& rp
         return result_type{fx, fy, fz};
     };
 
-    auto solution = [material_data](const point<T, 3>& p) -> auto
+    auto solution = [material_data](const disk::point<T, 3>& p) -> auto
     {
         T fx = cos(M_PI * p.x()) * sin(M_PI * p.y());
         T fy = cos(M_PI * p.y()) * sin(M_PI * p.z());
@@ -155,7 +155,7 @@ run_vector_laplacian_solver(const Mesh<T, 3, Storage>& msh, const run_params& rp
         return result_type{fx, fy, fz};
     };
 
-    auto gradient = [material_data](const point<T, 3>& p) -> result_grad_type {
+    auto gradient = [material_data](const disk::point<T, 3>& p) -> result_grad_type {
         result_grad_type grad = result_grad_type::Zero();
 
         grad(0, 0) = -sin(M_PI * p.x()) * sin(M_PI * p.y());

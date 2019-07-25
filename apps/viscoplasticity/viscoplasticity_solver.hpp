@@ -73,7 +73,7 @@ class augmented_lagrangian_viscoplasticity
     typedef disk::vector_boundary_conditions<mesh_type>          boundary_type;
 
     vector_funtion_type     rhs_fun, velocity;
-    dynamic_vector<T>       multiplier, auxiliar, auxiliar_old;
+    disk::dynamic_vector<T>       multiplier, auxiliar, auxiliar_old;
 
     typename disk::hho_degree_info di;
     T             factor;
@@ -83,7 +83,7 @@ class augmented_lagrangian_viscoplasticity
     size_t        cbs, fbs, pbs, sbs, dim;
 
 public:
-    dynamic_vector<T>       sol, sol_old;
+    disk::dynamic_vector<T>       sol, sol_old;
     std::tuple<T, T, T>     convergence;
     bool                    use_sym_grad;
 
@@ -253,12 +253,12 @@ public:
     initialize(const mesh_type& msh, const Assembler& assembler)
     {
         auto systsz = assembler.global_system_size();
-        sol = dynamic_vector<T>::Zero(systsz);
-        sol_old = dynamic_vector<T>::Zero(systsz);
+        sol = disk::dynamic_vector<T>::Zero(systsz);
+        sol_old = disk::dynamic_vector<T>::Zero(systsz);
 
-        multiplier = dynamic_vector<T>::Zero(msh.cells_size() * sbs);
-        auxiliar   = dynamic_vector<T>::Zero(msh.cells_size() * sbs);
-        auxiliar_old = dynamic_vector<T>::Zero(msh.cells_size() * sbs);
+        multiplier = disk::dynamic_vector<T>::Zero(msh.cells_size() * sbs);
+        auxiliar   = disk::dynamic_vector<T>::Zero(msh.cells_size() * sbs);
+        auxiliar_old = disk::dynamic_vector<T>::Zero(msh.cells_size() * sbs);
 
         return;
     }
@@ -314,7 +314,7 @@ public:
     compute_auxiliar(   const mesh_type& msh,
                         const cell_type& cl,
                         const Assembler& assembler,
-                        const dynamic_vector<T>& velocity_dofs)
+                        const disk::dynamic_vector<T>& velocity_dofs)
     {
         vector_type u_TF  = assembler.take_velocity(msh, cl, velocity_dofs);
         auto value = 1./(factor * (viscosity + alpha));
@@ -475,7 +475,7 @@ public:
         size_t systsz = assembler.LHS.rows();
         size_t nnz = assembler.LHS.nonZeros();
 
-        sol = dynamic_vector<T>::Zero(systsz);
+        sol = disk::dynamic_vector<T>::Zero(systsz);
         disk::solvers::pardiso_params<T> pparams;
         mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);
 
@@ -491,9 +491,9 @@ public:
         auto dim = Mesh::dimension;
         auto rbs = disk::vector_basis_size(di.reconstruction_degree(), dim, dim);
 
-        dynamic_vector<T> cell_sol(cbs * msh.cells_size());
-        dynamic_vector<T> cell_rec_sol(rbs * msh.cells_size());
-        dynamic_vector<T> press_vec(pbs * msh.cells_size());
+        disk::dynamic_vector<T> cell_sol(cbs * msh.cells_size());
+        disk::dynamic_vector<T> cell_rec_sol(rbs * msh.cells_size());
+        disk::dynamic_vector<T> press_vec(pbs * msh.cells_size());
 
         std::ofstream ofs("data_" + info + ".data");
         if (!ofs.is_open())

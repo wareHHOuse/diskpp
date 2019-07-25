@@ -410,7 +410,7 @@ cfem_eigenvalue_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
             std::vector<T> solution_vals;
             solution_vals.resize(msh.points_size());
 
-            dynamic_vector<T> gx = eigvecs.block(0,i,eigvecs.rows(),1);
+            disk::dynamic_vector<T> gx = eigvecs.block(0,i,eigvecs.rows(),1);
             for (size_t i = 0; i < gx.size(); i++)
                 solution_vals.at( expand_map.at(i) ) = gx(i);
 
@@ -474,9 +474,9 @@ cfem_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
     }
 
     sparse_matrix_type              gA(system_size, system_size);
-    dynamic_vector<T>               gb(system_size), gx(system_size);
+    disk::dynamic_vector<T>               gb(system_size), gx(system_size);
 
-    gb = dynamic_vector<T>::Zero(system_size);
+    gb = disk::dynamic_vector<T>::Zero(system_size);
 
 
     std::vector<triplet_type>       triplets;
@@ -540,8 +540,8 @@ cfem_solver(sol::state& lua, const disk::simplicial_mesh<T, 2>& msh)
 
     disk::solvers::linear_solver(lua, gA, gb, gx);
 
-    dynamic_vector<T> e_gx(msh.points_size());
-    e_gx = dynamic_vector<T>::Zero(msh.points_size());
+    disk::dynamic_vector<T> e_gx(msh.points_size());
+    e_gx = disk::dynamic_vector<T>::Zero(msh.points_size());
 
     for (size_t i = 0; i < gx.size(); i++)
         e_gx( expand_map.at(i) ) = gx(i);

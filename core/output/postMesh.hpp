@@ -90,7 +90,7 @@ class PostMesh<Mesh<T, 2, Storage>>
    typedef typename mesh_type::node_type    node_type;
    typedef typename mesh_type::edge_type    edge_type;
    typedef typename mesh_type::surface_type surface_type;
-   typedef std::vector<point_identifier<2>> list_type;
+   typedef std::vector<disk::point_identifier<2>> list_type;
 
  private:
    // post-mesh
@@ -113,7 +113,7 @@ class PostMesh<Mesh<T, 2, Storage>>
 
       for (size_t i = 0; i < num_points; i++) {
          storage_out->points.push_back(storage_in->points[i]);
-         const auto point_id = point_identifier<2>(i);
+         const auto point_id = disk::point_identifier<2>(i);
          storage_out->nodes.push_back(node_type({point_id}));
       }
 
@@ -144,7 +144,7 @@ class PostMesh<Mesh<T, 2, Storage>>
             // we split element  in triangles with barycenter as node
             const auto bar = barycenter(msh, cl);
             storage_out->points.push_back(bar);
-            const auto bar_id = point_identifier<2>(num_points++);
+            const auto bar_id = disk::point_identifier<2>(num_points++);
             pts.push_back(bar_id);
             storage_out->nodes.push_back(node_type({bar_id}));
 
@@ -184,7 +184,7 @@ class PostMesh<Mesh<T, 3, Storage>>
    typedef typename mesh_type::edge_type    edge_type;
    typedef typename mesh_type::surface_type surface_type;
    typedef typename mesh_type::volume_type  volume_type;
-   typedef point_identifier<3>              point_ident;
+   typedef disk::point_identifier<3>              point_ident;
    typedef std::vector<point_ident>         list_type;
 
  private:

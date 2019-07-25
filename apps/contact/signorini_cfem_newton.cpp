@@ -44,7 +44,7 @@ class cfem_newton_solver
     std::vector<bool> dirichlet_nodes;
     std::vector<size_t> compress_map, expand_map;
     size_t system_size;
-    dynamic_vector<T>     e_gx;
+    disk::dynamic_vector<T>     e_gx;
 public:
 
     cfem_newton_solver(const disk::simplicial_mesh<T, 2>& msh,
@@ -87,13 +87,13 @@ public:
     {
         T tolerance = 5.e-8;
         T maxiter   = 1000;
-        e_gx = dynamic_vector<T>(msh.points_size());
+        e_gx = disk::dynamic_vector<T>(msh.points_size());
 
         for(size_t iter= 0; iter < maxiter ; iter++)
         {
             sparse_matrix_type              gA(system_size, system_size);
-            dynamic_vector<T>               gb(system_size), gx(system_size);
-            gb = dynamic_vector<T>::Zero(system_size);
+            disk::dynamic_vector<T>               gb(system_size), gx(system_size);
+            gb = disk::dynamic_vector<T>::Zero(system_size);
             std::vector<triplet_type>       triplets;
 
             auto is_contact_vector = make_is_contact_vector(msh, bnd);
@@ -161,7 +161,7 @@ public:
             solver.factorize(gA);
             gx = solver.solve(gb);
 
-            dynamic_vector<T> diff_gx = dynamic_vector<T>::Zero(msh.points_size());
+            disk::dynamic_vector<T> diff_gx = disk::dynamic_vector<T>::Zero(msh.points_size());
 
             for (size_t i = 0; i < gx.size(); i++)
                 diff_gx( expand_map.at(i) ) = gx(i);

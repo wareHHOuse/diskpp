@@ -51,8 +51,8 @@ class augmented_lagrangian_diffusion
 
     using point_type = typename mesh_type::point_type;
 
-    typedef dynamic_vector<scalar_type>       vector_type;
-    typedef dynamic_matrix<scalar_type>       matrix_type;
+    typedef disk::dynamic_vector<scalar_type> vector_type;
+    typedef disk::dynamic_matrix<scalar_type> matrix_type;
 
     typedef Matrix<scalar_type, 2, 1>         tensor_type;
     typedef Matrix<scalar_type, 2, 1>         vector2d_type;
@@ -62,7 +62,7 @@ class augmented_lagrangian_diffusion
     vector_type             sol, sol_old;
     vector_type             multiplier;
     vector_type             auxiliar;
-    Matrix<scalar_type, Dynamic, 1> rhs_all;
+    vector_type             rhs_all;
     typename disk::hho_degree_info di;
     scalar_type             viscosity;
     scalar_type             alpha;
@@ -110,7 +110,7 @@ public:
         sol = vector_type::Zero(full_dofs);
         sol_old = vector_type::Zero(full_dofs);
 
-        rhs_all = Matrix<scalar_type, Dynamic, 1>::Zero(msh.cells_size() * cbs);
+        rhs_all = vector_type::Zero(msh.cells_size() * cbs);
 
         multiplier = vector_type::Zero(msh.cells_size() * sbs);
         auxiliar  = vector_type::Zero(msh.cells_size() * sbs);
@@ -128,22 +128,21 @@ public:
         for (auto& cl : msh)
         {
         	auto bar = barycenter(msh, cl);
-        	Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, di, sol_fun);
+        	vector_type p = project_function(msh, cl, di, sol_fun);
         	auto cell_ofs = disk::priv::offset(msh, cl);
-        	Matrix<scalar_type, Dynamic, 1> s = sol.block(cell_ofs * cbs, 0, cbs, 1);
-        	Matrix<scalar_type, Dynamic, 1> diff = s - p.head(cbs);
+        	vector_type s = sol.block(cell_ofs * cbs, 0, cbs, 1);
+        	vector_type diff = s - p.head(cbs);
         	auto cb = disk::make_scalar_monomial_basis(msh, cl, di.cell_degree());
-        	Matrix<scalar_type, Dynamic, Dynamic> mm = disk::make_mass_matrix(msh, cl, cb);
+        	matrix_type mm = disk::make_mass_matrix(msh, cl, cb);
         	error += diff.dot(mm*diff);
         	//ofs << bar.x() << " " << bar.y() << " " << s(0) << " " << s(1) << std::endl;
 
             //energy error
 
             auto num_total_dofs = cbs + fbs * howmany_faces(msh, cl);
-            Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> svel =
-                sol.block(cell_ofs * num_total_dofs, 0, num_total_dofs, 1);
+            vector_type svel = sol.block(cell_ofs * num_total_dofs, 0, num_total_dofs, 1);
 
-            Matrix<scalar_type, Dynamic, 1> diff_vel = svel - p;
+            vector_type diff_vel = svel - p;
 
             auto gr   = make_scalar_hho_laplacian(msh, cl, di);
             auto stab = make_vector_hho_stabilization(msh, cl, gr.first, di);
@@ -166,7 +165,7 @@ public:
         return;
     }
 
-    Matrix<scalar_type, Dynamic, 1>
+    vector_type
     compute_auxiliar(   const mesh_type& msh,
                         const cell_type& cl)
     {
@@ -175,15 +174,15 @@ public:
         auto cell_ofs  = disk::priv::offset(msh, cl);
         auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
 
-        Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> u_TF =
+        vector_type u_TF =
             sol_old.block( cell_ofs * num_total_dofs, 0, num_total_dofs, 1);
 
         auto value = 1./ (viscosity + alpha);
         auto G     = make_vector_hho_gradrec(msh, cl, di);
 
-        Matrix<scalar_type, Dynamic, 1> Gu = G.first * u_TF;
-        Matrix<scalar_type, Dynamic, 1> stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
-        Matrix<scalar_type, Dynamic, 1> gamma = value * (stress +  alpha * Gu);
+        vector_type Gu = G.first * u_TF;
+        vector_type stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
+        vector_type gamma = value * (stress +  alpha * Gu);
 
         return gamma;
     }
@@ -199,19 +198,19 @@ public:
             auto cell_ofs  = disk::priv::offset(msh, cl);
             auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
 
-            Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> u_TF =
+            vector_type u_TF =
                 sol.block(cell_ofs * num_total_dofs, 0, num_total_dofs, 1);
 
-            auto                            G         = make_vector_hho_gradrec(msh, cl, di);
-            Matrix<scalar_type, Dynamic, 1> Gu        = G.first * u_TF;
-            Matrix<scalar_type, Dynamic, 1> gamma     = compute_auxiliar(msh, cl);
-            Matrix<scalar_type, Dynamic, 1> gamma_old = auxiliar.block(cell_ofs * sbs, 0, sbs, 1);
+            auto        G         = make_vector_hho_gradrec(msh, cl, di);
+            vector_type Gu        = G.first * u_TF;
+            vector_type gamma     = compute_auxiliar(msh, cl);
+            vector_type gamma_old = auxiliar.block(cell_ofs * sbs, 0, sbs, 1);
 
-            Matrix<scalar_type, Dynamic, 1> diff_stress  = alpha * (Gu - gamma);
-            Matrix<scalar_type, Dynamic, 1> diff_gamma   = alpha * (gamma - gamma_old);
+            vector_type diff_stress  = alpha * (Gu - gamma);
+            vector_type diff_gamma   = alpha * (gamma - gamma_old);
 
             auto sb =  disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
-            Matrix<scalar_type, Dynamic, Dynamic> mass = disk::make_mass_matrix(msh, cl, sb);
+            matrix_type mass = disk::make_mass_matrix(msh, cl, sb);
 
             convergence += diff_stress.dot(mass * diff_stress) + diff_gamma.dot(mass * diff_gamma);
 
@@ -221,7 +220,7 @@ public:
         return;
     }
 
-    Matrix<scalar_type, Dynamic, 1>
+    vector_type
     make_rhs_alg(   const mesh_type& msh,
                     const cell_type& cl)
     {
@@ -235,10 +234,10 @@ public:
         auto gamma  = compute_auxiliar( msh,  cl);
         vector_type str_agam = stress - alpha * gamma;
 
-        Matrix<scalar_type, Dynamic, Dynamic> mm = disk::make_mass_matrix(msh, cl, sb);
+        matrix_type mm = disk::make_mass_matrix(msh, cl, sb);
 
-        Matrix<scalar_type, Dynamic, 1> rhs =
-                    Matrix<scalar_type, Dynamic, 1>::Zero(cbs + fbs * num_faces);
+        vector_type rhs =
+                    vector_type::Zero(cbs + fbs * num_faces);
 
         //(f, v_T)
         rhs.block( 0, 0, cbs, 1) = make_rhs(msh, cl, cb, rhs_fun);
@@ -263,11 +262,11 @@ public:
             auto gr   = make_scalar_hho_laplacian(msh, cl, di);
             auto stab = make_scalar_hho_stabilization(msh, cl, gr.first, di);
 
-            Matrix<scalar_type, Dynamic, 1> local_rhs =
-                Matrix<scalar_type, Dynamic, 1>::Zero(cbs + fbs * howmany_faces(msh,cl));
+            vector_type local_rhs =
+                vector_type::Zero(cbs + fbs * howmany_faces(msh,cl));
             local_rhs = make_rhs_alg(msh, cl);
 
-            Matrix<scalar_type, Dynamic, Dynamic> A = alpha * G.second + viscosity * stab;
+            matrix_type A = alpha * G.second + viscosity * stab;
             const auto                           sc = make_scalar_static_condensation(msh, cl, di, A, local_rhs);
             assembler.assemble(msh, cl, sc.first, sc.second, sol_fun);
 
@@ -283,7 +282,7 @@ public:
         //std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
         //std::cout << "Dofs: " << systsz << std::endl;
 
-        dynamic_vector<scalar_type> sol_faces = dynamic_vector<scalar_type>::Zero(systsz);
+        vector_type sol_faces = vector_type::Zero(systsz);
 
         disk::solvers::pardiso_params<scalar_type> pparams;
         pparams.report_factorization_Mflops = false;
@@ -303,23 +302,23 @@ public:
             auto cell_ofs  = disk::priv::offset(msh, cl);
             auto num_total_dofs = cbs + fbs * howmany_faces(msh, cl);
 
-            Matrix<scalar_type, Dynamic, 1> cell_rhs = rhs_all.block( cbs*cell_ofs, 0, cbs, 1);
+            vector_type cell_rhs = rhs_all.block( cbs*cell_ofs, 0, cbs, 1);
 
-            Matrix<scalar_type, Dynamic, Dynamic> A = alpha*G.second + viscosity*stab;
+            matrix_type A = alpha*G.second + viscosity*stab;
 
-            Matrix<scalar_type, Dynamic, 1> locsol =
+            vector_type locsol =
                 assembler.take_local_data(msh, cl, sol_faces, sol_fun);
 
-            Matrix<scalar_type, Dynamic, 1> fullsol =
+            vector_type fullsol =
               make_scalar_static_decondensation(msh, cl, di, A, cell_rhs, locsol);
 
             sol.block(cell_ofs * num_total_dofs, 0, num_total_dofs, 1) = fullsol;
 
-            Matrix<scalar_type, Dynamic, 1> realsol = project_function(msh, cl, di, sol_fun);
+            vector_type realsol = project_function(msh, cl, di, sol_fun);
 
             auto diff = realsol - fullsol;
 
-            Matrix<scalar_type, Dynamic, Dynamic> B = viscosity*G.second + viscosity*stab;
+            matrix_type B = viscosity*G.second + viscosity*stab;
 
             error += diff.dot( B *diff);
         }

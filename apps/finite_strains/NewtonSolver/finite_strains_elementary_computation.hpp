@@ -49,21 +49,21 @@ class finite_strains
 
     const static int dimension = mesh_type::dimension;
 
-    typedef dynamic_matrix<scalar_type> matrix_type;
-    typedef dynamic_vector<scalar_type> vector_type;
+    typedef disk::dynamic_matrix<scalar_type> matrix_type;
+    typedef disk::dynamic_vector<scalar_type> vector_type;
 
     const mesh_type& m_msh;
     const hdi_type&  m_hdi;
 
     template<int DIM>
-    eigen_compatible_stdvector<static_matrix<scalar_type, DIM, DIM>>
-    compute_A_gphi(const static_tensor<scalar_type, DIM>&                                  tens,
-                   const eigen_compatible_stdvector<static_matrix<scalar_type, DIM, DIM>>& gphi) const
+    disk::eigen_compatible_stdvector<disk::static_matrix<scalar_type, DIM, DIM>>
+    compute_A_gphi(const disk::static_tensor<scalar_type, DIM>&                                  tens,
+                   const disk::eigen_compatible_stdvector<disk::static_matrix<scalar_type, DIM, DIM>>& gphi) const
     {
         const int grad_basis_size = gphi.size();
         const int DIM2            = DIM * DIM;
 
-        eigen_compatible_stdvector<static_matrix<scalar_type, DIM, DIM>> Aphi;
+        disk::eigen_compatible_stdvector<disk::static_matrix<scalar_type, DIM, DIM>> Aphi;
         Aphi.reserve(grad_basis_size);
 
         // poly classique

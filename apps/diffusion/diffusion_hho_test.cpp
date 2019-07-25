@@ -158,7 +158,7 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
     size_t systsz = assembler.LHS.rows();
     size_t nnz = assembler.LHS.nonZeros();
 
-    dynamic_vector<T> sol = dynamic_vector<T>::Zero(systsz);
+    disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
 
     disk::solvers::pardiso_params<T> pparams;
     pparams.report_factorization_Mflops = true;

@@ -404,7 +404,7 @@ public:
         /* Nodes */
         std::vector<node_type> nodes(nodes_size);
         for (size_t i = 0; i < nodes_size; i++)
-            nodes[i] = node_type(point_identifier<2>(i));
+            nodes[i] = node_type(disk::point_identifier<2>(i));
 
         storage->nodes = std::move(nodes);
 
@@ -580,7 +580,7 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
             T x, y, z;
             ifs >> x >> y >> z;
             m_points.push_back( point_type({x, y, z}) );
-            m_nodes.push_back( node_type( point_identifier<3>(i) ) );
+            m_nodes.push_back( node_type( disk::point_identifier<3>(i) ) );
         }
 
         /* Volume to face data */
@@ -742,7 +742,7 @@ public:
         {
             auto fe = faces_to_edges[i];
             surface_type s( convert_to<typename edge_type::id_type>(fe.second) );
-            s.set_point_ids( convert_to<point_identifier<3>>(faces_to_vts.at(fe.first)) );
+            s.set_point_ids( convert_to<disk::point_identifier<3>>(faces_to_vts.at(fe.first)) );
             faces.push_back(s);
             conv_table[fe.first] = i;
         }
@@ -768,7 +768,7 @@ public:
         {
             auto vf = vol_to_faces[i];
             volume_type v( convert_to<typename surface_type::id_type>(vf.second) );
-            v.set_point_ids( convert_to<point_identifier<3>>(vol_to_vts.at(vf.first)) );
+            v.set_point_ids( convert_to<disk::point_identifier<3>>(vol_to_vts.at(vf.first)) );
             volumes.push_back(v);
         }
 
@@ -936,7 +936,7 @@ class netgen_mesh_loader<T,2> : public mesh_loader<simplicial_mesh<T,2>>
 
             points.push_back( point );
 
-            auto point_id = point_identifier<2>( linecount );
+            auto point_id = disk::point_identifier<2>( linecount );
             auto node = node_type( { point_id } );
 
             nodes.push_back(node);
@@ -969,9 +969,9 @@ class netgen_mesh_loader<T,2> : public mesh_loader<simplicial_mesh<T,2>>
 
             auto t = priv::read_triangle_line<size_t>(endptr, &endptr);
 
-            point_identifier<2>     p0(std::get<1>(t));
-            point_identifier<2>     p1(std::get<2>(t));
-            point_identifier<2>     p2(std::get<3>(t));
+            disk::point_identifier<2>     p0(std::get<1>(t));
+            disk::point_identifier<2>     p1(std::get<2>(t));
+            disk::point_identifier<2>     p2(std::get<3>(t));
             //domain_id_type      d(std::get<0>(t));
 
             edges.push_back( edge_type( { p0, p1 } ) );
@@ -1006,8 +1006,8 @@ class netgen_mesh_loader<T,2> : public mesh_loader<simplicial_mesh<T,2>>
 
             auto t = priv::read_edge_line<size_t>(endptr, &endptr);
 
-            point_identifier<2>     p0(std::get<1>(t));
-            point_identifier<2>     p1(std::get<2>(t));
+            disk::point_identifier<2>     p0(std::get<1>(t));
+            disk::point_identifier<2>     p1(std::get<2>(t));
 
             edge_type   edge( { p0, p1 } );
 
@@ -1156,7 +1156,7 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
 */
             points.push_back( point );
 
-            auto point_id = point_identifier<3>( linecount );
+            auto point_id = disk::point_identifier<3>( linecount );
             auto node = node_type( { point_id } );
 
             nodes.push_back(node);
@@ -1191,10 +1191,10 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
 
             auto t = priv::read_tetrahedron_line<size_t>(endptr, &endptr);
 
-            point_identifier<3>     p0(std::get<1>(t));
-            point_identifier<3>     p1(std::get<2>(t));
-            point_identifier<3>     p2(std::get<3>(t));
-            point_identifier<3>     p3(std::get<4>(t));
+            disk::point_identifier<3>     p0(std::get<1>(t));
+            disk::point_identifier<3>     p1(std::get<2>(t));
+            disk::point_identifier<3>     p2(std::get<3>(t));
+            disk::point_identifier<3>     p3(std::get<4>(t));
             //domain_id_type      d(std::get<0>(t));
 
             edges.push_back( edge_type( { p0, p1 } ) );
@@ -1241,9 +1241,9 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
 
             auto t = priv::read_triangle_line<size_t>(endptr, &endptr);
 
-            point_identifier<3>     p0(std::get<1>(t));
-            point_identifier<3>     p1(std::get<2>(t));
-            point_identifier<3>     p2(std::get<3>(t));
+            disk::point_identifier<3>     p0(std::get<1>(t));
+            disk::point_identifier<3>     p1(std::get<2>(t));
+            disk::point_identifier<3>     p2(std::get<3>(t));
 
             surface_type   tri( { p0, p1, p2 } );
 
@@ -1464,7 +1464,7 @@ class cartesian_mesh_loader<T,3> : public mesh_loader<cartesian_mesh<T,3>>
 
             points.push_back( point );
 
-            auto point_id = point_identifier<3>( linecount );
+            auto point_id = disk::point_identifier<3>( linecount );
             auto node = node_type( { point_id } );
 
             nodes.push_back(node);
@@ -1499,14 +1499,14 @@ class cartesian_mesh_loader<T,3> : public mesh_loader<cartesian_mesh<T,3>>
 
             auto t = priv::read_hexahedron_line<size_t>(endptr, &endptr);
 
-            point_identifier<3>     p0(std::get<0>(t));
-            point_identifier<3>     p1(std::get<1>(t));
-            point_identifier<3>     p2(std::get<2>(t));
-            point_identifier<3>     p3(std::get<3>(t));
-            point_identifier<3>     p4(std::get<4>(t));
-            point_identifier<3>     p5(std::get<5>(t));
-            point_identifier<3>     p6(std::get<6>(t));
-            point_identifier<3>     p7(std::get<7>(t));
+            disk::point_identifier<3>     p0(std::get<0>(t));
+            disk::point_identifier<3>     p1(std::get<1>(t));
+            disk::point_identifier<3>     p2(std::get<2>(t));
+            disk::point_identifier<3>     p3(std::get<3>(t));
+            disk::point_identifier<3>     p4(std::get<4>(t));
+            disk::point_identifier<3>     p5(std::get<5>(t));
+            disk::point_identifier<3>     p6(std::get<6>(t));
+            disk::point_identifier<3>     p7(std::get<7>(t));
 
             edges.push_back( edge_type( { p0, p1 } ) );
             edges.push_back( edge_type( { p0, p2 } ) );
@@ -1557,10 +1557,10 @@ class cartesian_mesh_loader<T,3> : public mesh_loader<cartesian_mesh<T,3>>
 
             auto t = priv::read_hex_face_line<size_t>(endptr, &endptr);
 
-            point_identifier<3>     p0(std::get<0>(t));
-            point_identifier<3>     p1(std::get<1>(t));
-            point_identifier<3>     p2(std::get<2>(t));
-            point_identifier<3>     p3(std::get<3>(t));
+            disk::point_identifier<3>     p0(std::get<0>(t));
+            disk::point_identifier<3>     p1(std::get<1>(t));
+            disk::point_identifier<3>     p2(std::get<2>(t));
+            disk::point_identifier<3>     p3(std::get<3>(t));
 
             surface_type   quad( { p0, p1, p2, p3 } );
 
@@ -1713,7 +1713,7 @@ class cartesian_mesh_loader<T,2> : public mesh_loader<cartesian_mesh<T,2>>
 
          points.push_back( point );
 
-         auto point_id = point_identifier<2>( linecount );
+         auto point_id = disk::point_identifier<2>( linecount );
          auto node = node_type( { point_id } );
 
          nodes.push_back(node);
@@ -1747,10 +1747,10 @@ class cartesian_mesh_loader<T,2> : public mesh_loader<cartesian_mesh<T,2>>
 
          auto t = priv::read_quad_line<size_t>(endptr, &endptr);
 
-         point_identifier<2>     p0(std::get<0>(t));
-         point_identifier<2>     p1(std::get<1>(t));
-         point_identifier<2>     p2(std::get<2>(t));
-         point_identifier<2>     p3(std::get<3>(t));
+         disk::point_identifier<2>     p0(std::get<0>(t));
+         disk::point_identifier<2>     p1(std::get<1>(t));
+         disk::point_identifier<2>     p2(std::get<2>(t));
+         disk::point_identifier<2>     p3(std::get<3>(t));
 
          edges.push_back( edge_type( { p0, p1 } ) );
          edges.push_back( edge_type( { p0, p2 } ) );
@@ -1786,8 +1786,8 @@ class cartesian_mesh_loader<T,2> : public mesh_loader<cartesian_mesh<T,2>>
 
             auto t = priv::read_quad_face_line<size_t>(endptr, &endptr);
 
-            point_identifier<2>     p0(std::get<0>(t));
-            point_identifier<2>     p1(std::get<1>(t));
+            disk::point_identifier<2>     p0(std::get<0>(t));
+            disk::point_identifier<2>     p1(std::get<1>(t));
 
             edge_type   bnd( { p0, p1 } );
 
@@ -1929,7 +1929,7 @@ class medit_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
       for (size_t i = 0; i < elements_to_read; i++) {
          ifs >> x >> y >> z >> id;
          m_points.push_back(point_type{x, y});
-         m_nodes.push_back(node_type(point_identifier<2>(i)));
+         m_nodes.push_back(node_type(disk::point_identifier<2>(i)));
       }
 
       return true;
@@ -2294,7 +2294,7 @@ class medit_mesh_loader<T, 3> : public mesh_loader<generic_mesh<T, 3>>
          T x, y, z;
          ifs >> x >> y >> z;
          m_points.push_back(point_type({x, y, z}));
-         m_nodes.push_back(node_type(point_identifier<3>(i)));
+         m_nodes.push_back(node_type(disk::point_identifier<3>(i)));
       }
 
       /* Volume to face data */
@@ -2439,7 +2439,7 @@ class medit_mesh_loader<T, 3> : public mesh_loader<generic_mesh<T, 3>>
       for (size_t i = 0; i < faces_to_edges.size(); i++) {
          auto         fe = faces_to_edges[i];
          surface_type s(convert_to<typename edge_type::id_type>(fe.second));
-         s.set_point_ids(convert_to<point_identifier<3>>(faces_to_vts.at(fe.first)));
+         s.set_point_ids(convert_to<disk::point_identifier<3>>(faces_to_vts.at(fe.first)));
          faces.push_back(s);
          conv_table[fe.first] = i;
       }
@@ -2460,7 +2460,7 @@ class medit_mesh_loader<T, 3> : public mesh_loader<generic_mesh<T, 3>>
       for (size_t i = 0; i < vol_to_faces.size(); i++) {
          auto        vf = vol_to_faces[i];
          volume_type v(convert_to<typename surface_type::id_type>(vf.second));
-         v.set_point_ids(convert_to<point_identifier<3>>(vol_to_vts.at(vf.first)));
+         v.set_point_ids(convert_to<disk::point_identifier<3>>(vol_to_vts.at(vf.first)));
          volumes.push_back(v);
       }
 
