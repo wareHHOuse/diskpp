@@ -99,17 +99,33 @@ faces(const generic_mesh<T, DIM>& msh,
       const typename generic_mesh<T, DIM>::cell& cl)
 {
     auto faces_begin = msh.faces_begin();
-    auto id_to_face = [&](const typename generic_mesh<T, DIM>::face::id_type& id) -> auto {
+    auto id_to_face  = [&](const typename generic_mesh<T, DIM>::face::id_type& id) -> auto
+    {
         return *std::next(faces_begin, id);
     };
 
     std::vector<typename generic_mesh<T, DIM>::face> ret;
-    ret.resize( cl.subelement_size() );
+    ret.resize(cl.subelement_size());
 
-    std::transform(cl.subelement_id_begin(), cl.subelement_id_end(),
-                   ret.begin(), id_to_face);
+    std::transform(cl.subelement_id_begin(), cl.subelement_id_end(), ret.begin(), id_to_face);
 
     return ret;
+}
+
+/**
+ * \brief Return the actual faces id of the specified cell
+ *
+ * \param msh a mesh
+ * \param cl a  cell
+ * \return Return the actual faces id of the specified cell
+ *
+ */
+
+template<typename T, size_t DIM>
+std::vector<typename generic_mesh<T, DIM>::face::id_type>
+faces_id(const generic_mesh<T, DIM>& msh, const typename generic_mesh<T, DIM>::cell& cl)
+{
+    return cl.faces_ids();
 }
 
 /**
@@ -235,6 +251,12 @@ measure(const generic_mesh<T,1>& msh, const typename generic_mesh<T,1>::face& fc
     return T(1);
 }
 
+/**
+ * @brief
+ *
+ * @tparam T
+ * @return T
+ */
 template<typename T>
 T
 diameter(const generic_mesh<T,1>&, const typename generic_mesh<T,1>::face&)

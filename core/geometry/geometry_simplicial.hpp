@@ -147,6 +147,43 @@ faces(const simplicial_mesh<T, 2>&,
 }
 
 template<typename T>
+std::array<typename simplicial_mesh<T, 3>::face::id_type, 4>
+faces_id(const simplicial_mesh<T, 3>& msh, const typename simplicial_mesh<T, 3>::cell& cl)
+{
+    typedef typename simplicial_mesh<T, 3>::face face_type;
+    std::array<typename face_type::id_type, 4>   ret;
+
+    auto ptids = cl.point_ids();
+    assert(ptids.size() == 4);
+
+    ret[0] = msh.lookup(face_type({ptids[1], ptids[2], ptids[3]}));
+    ret[1] = msh.lookup(face_type({ptids[0], ptids[2], ptids[3]}));
+    ret[2] = msh.lookup(face_type({ptids[0], ptids[1], ptids[3]}));
+    ret[3] = msh.lookup(face_type({ptids[0], ptids[1], ptids[2]}));
+
+    return ret;
+}
+
+template<typename T>
+std::array<typename simplicial_mesh<T, 2>::face::id_type, 3>
+faces_id(const simplicial_mesh<T, 2>& msh, const typename simplicial_mesh<T, 2>::cell& cl)
+{
+    typedef typename simplicial_mesh<T, 2>::face face_type;
+    std::array<typename face_type::id_type, 3>   ret;
+
+    auto ptids = cl.point_ids();
+    assert(ptids.size() == 3);
+
+    assert(ptids[0] < ptids[1] && ptids[1] < ptids[2]);
+
+    ret[0] = msh.lookup(face_type({ptids[0], ptids[1]}));
+    ret[1] = msh.lookup(face_type({ptids[1], ptids[2]}));
+    ret[2] = msh.lookup(face_type({ptids[0], ptids[2]}));
+
+    return ret;
+}
+
+template<typename T>
 T
 measure(const simplicial_mesh<T, 3>& msh,
         const typename simplicial_mesh<T, 3>::cell& cl,

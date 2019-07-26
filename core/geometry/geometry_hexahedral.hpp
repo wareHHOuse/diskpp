@@ -133,6 +133,26 @@ faces(const cartesian_mesh<T, 3>&,
     return ret;
 }
 
+template<typename T>
+std::array<typename cartesian_mesh<T, 3>::face::id_type, 6>
+faces_id(const cartesian_mesh<T, 3>& msh, const typename cartesian_mesh<T, 3>::cell& cl)
+{
+    typedef typename cartesian_mesh<T, 3>::face face_type;
+    std::array<typename face_type::id_type, 6>   ret;
+
+    auto ptids = cl.point_ids();
+    assert(ptids.size() == 8);
+
+    ret[0] = msh.lookup(face_type({ptids[0], ptids[2], ptids[6], ptids[4]}));
+    ret[1] = msh.lookup(face_type({ptids[1], ptids[3], ptids[7], ptids[5]}));
+    ret[2] = msh.lookup(face_type({ptids[0], ptids[1], ptids[3], ptids[2]}));
+    ret[3] = msh.lookup(face_type({ptids[4], ptids[5], ptids[7], ptids[6]}));
+    ret[4] = msh.lookup(face_type({ptids[0], ptids[4], ptids[5], ptids[1]}));
+    ret[5] = msh.lookup(face_type({ptids[2], ptids[6], ptids[7], ptids[3]}));
+
+    return ret;
+}
+
 template<typename T, size_t DIM>
 T
 measure(const cartesian_mesh<T, DIM>& msh,

@@ -523,11 +523,11 @@ class BoundaryConditions
     bool
     cell_has_dirichlet_faces(const cell_type& cl) const
     {
-        const auto fcs = faces(m_msh, cl);
+        const auto fcs_id = faces_id(m_msh, cl);
 
-        for (auto& fc : fcs)
+        for (auto& fc_id : fcs_id)
         {
-            if (is_dirichlet_face(fc))
+            if (is_dirichlet_face(fc_id))
             {
                 return true;
             }
@@ -539,11 +539,11 @@ class BoundaryConditions
     bool
     cell_has_robin_faces(const cell_type& cl) const
     {
-        const auto fcs = faces(m_msh, cl);
+        const auto fcs_id = faces_id(m_msh, cl);
 
-        for (auto& fc : fcs)
+        for (auto& fc_id : fcs_id)
         {
-            if (is_robin_face(fc))
+            if (is_robin_face(fc_id))
             {
                 return true;
             }
@@ -555,11 +555,11 @@ class BoundaryConditions
     bool
     cell_has_contact_faces(const cell_type& cl) const
     {
-        const auto fcs = faces(m_msh, cl);
+        const auto fcs_id = faces_id(m_msh, cl);
 
-        for (auto& fc : fcs)
+        for (auto& fc_id : fcs_id)
         {
-            if (is_contact_face(fc))
+            if (is_contact_face(fc_id))
             {
                 return true;
             }
@@ -571,11 +571,11 @@ class BoundaryConditions
     bool
     cell_has_neumann_faces(const cell_type& cl) const
     {
-        const auto fcs = faces(m_msh, cl);
+        const auto fcs_id = faces_id(m_msh, cl);
 
-        for (auto& fc : fcs)
+        for (auto& fc_id : fcs_id)
         {
-            if (is_neumann_face(fc))
+            if (is_neumann_face(fc_id))
             {
                 return true;
             }
@@ -587,12 +587,12 @@ class BoundaryConditions
     size_t
     howmany_contact_faces(const cell_type& cl) const
     {
-        const auto fcs = faces(m_msh, cl);
+        const auto fcs_id = faces_id(m_msh, cl);
         size_t     nb  = 0;
 
-        for (auto& fc : fcs)
+        for (auto& fc_id : fcs_id)
         {
-            if (is_contact_face(fc))
+            if (is_contact_face(fc_id))
             {
                 nb++;
             }

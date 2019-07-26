@@ -26,3 +26,4 @@
 #pragma once
 
 #include "implementation_bits/methods_hho.hpp"
+#include "implementation_bits/assembler_hho.hpp"
