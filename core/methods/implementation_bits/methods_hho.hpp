@@ -1128,6 +1128,88 @@ make_scalar_dg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
 make_scalar_hho_stabilization(const Mesh&                                                     msh,
+        const typename Mesh::cell_type&                                 cl,
+        const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& reconstruction,
+        const hho_degree_info&                                          di)
+{
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+
+    const auto recdeg = di.reconstruction_degree();
+    const auto celdeg = di.cell_degree();
+    const auto facdeg = di.face_degree();
+
+    const auto rbs = scalar_basis_size(recdeg, Mesh::dimension);
+    const auto cbs = scalar_basis_size(celdeg, Mesh::dimension);
+    const auto fbs = scalar_basis_size(facdeg, Mesh::dimension - 1);
+
+    const auto cb = make_scalar_monomial_basis(msh, cl, recdeg);
+
+    const matrix_type mass_mat = make_mass_matrix(msh, cl, cb);
+
+    const matrix_type projT = mass_mat.block(0, 0, cbs, cbs);
+    const matrix_type Reval = mass_mat.block(0, 1, cbs, rbs - 1);
+    const matrix_type Re = Reval * reconstruction;
+    matrix_type       pR = projT.ldlt().solve(Re);
+
+    matrix_type rdiff = matrix_type::Zero(rbs, reconstruction.cols());
+    rdiff.block(1,0,rbs-1,reconstruction.cols()) = -reconstruction;
+    assert(rdiff.cols() == pR.cols());
+    rdiff.block(0,0,cbs,pR.cols()) += pR.block(0,0,cbs,pR.cols());
+
+    const auto fcs       = faces(msh, cl);
+    const auto num_faces = fcs.size();
+
+    matrix_type data = matrix_type::Zero(cbs + num_faces * fbs, cbs + num_faces * fbs);
+
+    // Step 3: project on faces (eqn. 21)
+    for (size_t face_i = 0; face_i < num_faces; face_i++)
+    {
+        const auto fc = fcs[face_i];
+        const auto hf = diameter(msh, fc);
+        auto       fb = make_scalar_monomial_basis(msh, fc, facdeg);
+
+        matrix_type face_mass_matrix  = make_mass_matrix(msh, fc, fb);
+        matrix_type face_trace_matrix = matrix_type::Zero(fbs, rbs);
+
+        const auto face_quadpoints = integrate(msh, fc, recdeg + facdeg);
+        for (auto& qp : face_quadpoints)
+        {
+            const auto        f_phi   = fb.eval_functions(qp.point());
+            const auto        c_phi   = cb.eval_functions(qp.point());
+            face_trace_matrix += priv::outer_product(priv::inner_product(qp.weight(), f_phi), c_phi);
+        }
+
+        /* Build v_F - v_T term */
+
+        LLT<matrix_type> piKF;
+        piKF.compute(face_mass_matrix);
+
+        matrix_type T = face_trace_matrix.block(0, 0, fbs, cbs);
+
+        // Step 3a: \pi_F^k( v_F - p_T^k v )
+        const matrix_type MR1 = face_trace_matrix.block(0, 0, fbs, rbs);
+        matrix_type     RRR = MR1*rdiff;
+        matrix_type       BRF = piKF.solve(RRR);
+
+
+
+        //data += BRF.transpose() * face_mass_matrix * BRF / hf;
+
+        matrix_type MT = piKF.solve(T);
+        data.block(0,0,cbs,cbs) += T.transpose() * MT / hf;
+        data.block(cbs + face_i * fbs, cbs + face_i * fbs, fbs, fbs) += face_mass_matrix/hf;
+        data.block(0, cbs + face_i * fbs, cbs, fbs) += -T.transpose()/hf;
+        data.block(cbs + face_i * fbs, 0, fbs, cbs) += -T/hf;
+        data -= RRR.transpose() * BRF / hf;
+    }
+
+    return data;
+}
+
+template<typename Mesh>
+Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+make_scalar_hho_stabilization_old(const Mesh&                                                     msh,
                               const typename Mesh::cell_type&                                 cl,
                               const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& reconstruction,
                               const hho_degree_info&                                          di)

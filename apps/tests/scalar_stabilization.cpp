@@ -70,7 +70,7 @@ struct test_functor_hho_equal_order
             error += proj.dot(stab*proj);
         }
 
-        return std::sqrt( error );
+        return /*std::sqrt*/( error );
     }
 
     size_t

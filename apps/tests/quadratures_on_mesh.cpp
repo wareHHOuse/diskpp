@@ -80,6 +80,8 @@ test_integration_on_mesh(const Mesh<T, 2, Storage>& msh)
                 std::cout << std::setprecision(16) << int_ana << std::endl;
                 std::cout << "   Numerical value  = ";
                 std::cout << std::setprecision(16) << int_num << std::endl;
+                std::cout << "   Error  = ";
+                std::cout << std::abs(int_num - int_ana) << std::endl;
             }
         }
     }
@@ -143,6 +145,8 @@ test_integration_on_mesh(const Mesh<T, 3, Storage>& msh)
                 std::cout << std::setprecision(16) << int_ana << std::endl;
                 std::cout << "   Numerical value  = ";
                 std::cout << std::setprecision(16) << int_num << std::endl;
+                std::cout << "   Error  = ";
+                std::cout << std::abs(int_num - int_ana) << std::endl;
                 }
             }
         }
