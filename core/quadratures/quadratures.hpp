@@ -33,6 +33,18 @@
 
 namespace disk {
 
+/**
+ * @brief Compute a quadrature of order "degree" in the physical space of the specified element
+ * Thic function is the genric function which leads to a static assertion. For each type of mesh and elements, a specialization has to exist
+ * which is chosen at the compilatation time
+ *
+ * @tparam MeshType type of the mesh
+ * @tparam Element  type of the element
+ * @param msh mesh
+ * @param elem  element (face or cell)
+ * @param degree order of the quadrature
+ * @return std::vector<disk::quadrature_point<typename MeshType::coordinate_type, MeshType::dimension>> quadrature
+ */
 template<typename MeshType, typename Element>
 std::vector<disk::quadrature_point<typename MeshType::coordinate_type, MeshType::dimension>>
 integrate(const MeshType& msh, const Element& elem, const size_t degree)

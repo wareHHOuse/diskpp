@@ -6,6 +6,10 @@
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
  *  /_\/_\/_\/_\   methods.
  *
+ * This file is copyright of the following authors:
+ * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
+ * Nicolas Pignet  (C) 2019                     nicolas.pignet@enpc.fr
+ * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -20,9 +24,9 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
- #ifndef _GEOMETRY_HPP_WAS_INCLUDED_
-     #error "You must NOT include this file directly. Include geometry.hpp."
- #endif
+#ifndef _GEOMETRY_HPP_WAS_INCLUDED_
+#error "You must NOT include this file directly. Include geometry.hpp."
+#endif
 
 #ifndef _GEOMETRY_CARTESIAN_HPP_
 #define _GEOMETRY_CARTESIAN_HPP_
@@ -53,13 +57,39 @@ struct cartesian_storage_class<2> {
     typedef cartesian_element<2,2>  node_type;
 };
 
+/**
+ * @brief speciliaziton for the storage class of a cartesian mesh
+ * This class is more efficiant than generic_mesh for cartesain meshes since the internal data structures
+ * are optimized
+ *
+ * @tparam T scalar type
+ * @tparam DIM dimension of the mesh, i.e, 1D, 2D or 3D
+ */
+
 template<typename T, size_t DIM>
 using cartesian_mesh_storage = mesh_storage<T, DIM, cartesian_storage_class<DIM>>;
 
+/**
+ * @brief speciliaziton for  cartesian mesh
+ * This class is more efficiant than generic_mesh for cartesain meshes since the internal data structures
+ * are optimized
+ *
+ * @tparam T scalar type
+ * @tparam DIM dimension of the mesh, i.e, 1D, 2D or 3D
+ */
 template<typename T, size_t DIM>
 using cartesian_mesh = mesh<T, DIM, cartesian_mesh_storage<T, DIM>>;
 
-
+/**
+ * @brief Return the list of point of the specified element (face or cell)
+ * 
+ * @tparam T scalar type
+ * @tparam DIM dimension of the mesh
+ * @tparam CODIM co-dimension of the element (CODIM=DIM if elem=cell and CODIM=DIM-1 if elem=face)
+ * @param msh mesh
+ * @param elem specified element (cell or face)
+ * @return std::array<typename cartesian_mesh<T,DIM>::point_type, cartesian_priv::howmany<DIM, CODIM>::nodes> list of points of the specified element
+ */
 template<typename T, size_t DIM, size_t CODIM>
 std::array<typename cartesian_mesh<T,DIM>::point_type, cartesian_priv::howmany<DIM, CODIM>::nodes>
 points(const cartesian_mesh<T, DIM>& msh, const cartesian_element<DIM, CODIM>& elem)
@@ -78,7 +108,13 @@ points(const cartesian_mesh<T, DIM>& msh, const cartesian_element<DIM, CODIM>& e
     return pts;
 }
 
-/* Return the number of elements of the specified cell */
+/**
+ * @brief Return the number of faces of the specified cell
+ *
+ * @param msh mesh
+ * @param cl pecified cell
+ * @return template<typename T, size_t DIM> constexpr howmany_faces number of faces
+ */
 template<typename T, size_t DIM>
 constexpr size_t
 howmany_faces(const cartesian_mesh<T,DIM>& msh, const typename cartesian_mesh<T,DIM>::cell& cl)
@@ -91,11 +127,20 @@ howmany_faces(const cartesian_mesh<T,DIM>& msh, const typename cartesian_mesh<T,
         case 3: return 6;
     }
     /* NOTREACHED */
+    assert(false);
 }
 
+/**
+ * @brief Return the faces of the specified 2D-cell (quadrangle)
+ *
+ * @tparam T scalar_type
+ * @param msh mesh
+ * @param cl specified 2D-cell
+ * @return std::array<typename cartesian_mesh<T, 2>::face, 4> faces of the cell
+ */
 template<typename T>
 std::array<typename cartesian_mesh<T, 2>::face, 4>
-faces(const cartesian_mesh<T, 2>&,
+faces(const cartesian_mesh<T, 2>& msh,
       const typename cartesian_mesh<T, 2>::cell& cl)
 {
     typedef typename cartesian_mesh<T, 2>::face    face_type;
@@ -112,9 +157,17 @@ faces(const cartesian_mesh<T, 2>&,
     return ret;
 }
 
+/**
+ * @brief Return the faces of the specified 3D-cell (hexahedron)
+ *
+ * @tparam T scalar_type
+ * @param msh mesh
+ * @param cl specified 3D-cell
+ * @return std::array<typename cartesian_mesh<T, 3>::face, 6> faces of the cell
+ */
 template<typename T>
 std::array<typename cartesian_mesh<T, 3>::face, 6>
-faces(const cartesian_mesh<T, 3>&,
+faces(const cartesian_mesh<T, 3>& msh,
       const typename cartesian_mesh<T, 3>::cell& cl)
 {
     typedef typename cartesian_mesh<T, 3>::face    face_type;
@@ -133,6 +186,40 @@ faces(const cartesian_mesh<T, 3>&,
     return ret;
 }
 
+/**
+ * @brief Return the faces id of the specified 2D-cell (quadrangle)
+ *
+ * @tparam T scalar_type
+ * @param msh mesh
+ * @param cl specified 2D-cell
+ * @return std::array<typename cartesian_mesh<T, 2>::face::id_type, 4> faces of the cell
+ */
+template<typename T>
+std::array<typename cartesian_mesh<T, 2>::face::id_type, 4>
+faces_id(const cartesian_mesh<T, 2>& msh, const typename cartesian_mesh<T, 2>::cell& cl)
+{
+    typedef typename cartesian_mesh<T, 2>::face face_type;
+    std::array<typename face_type::id_type, 4>  ret;
+
+    auto ptids = cl.point_ids();
+    assert(ptids.size() == 4);
+
+    ret[0] = msh.lookup(face_type({ptids[0], ptids[1]}));
+    ret[1] = msh.lookup(face_type({ptids[0], ptids[2]}));
+    ret[2] = msh.lookup(face_type({ptids[1], ptids[3]}));
+    ret[3] = msh.lookup(face_type({ptids[2], ptids[3]}));
+
+    return ret;
+}
+
+/**
+ * @brief Return the faces id of the specified 3D-cell (hexahedron)
+ *
+ * @tparam T scalar_type
+ * @param msh mesh
+ * @param cl specified 3D-cell
+ * @return std::array<typename cartesian_mesh<T, 3>::face::id_type, 6> faces of the cell
+ */
 template<typename T>
 std::array<typename cartesian_mesh<T, 3>::face::id_type, 6>
 faces_id(const cartesian_mesh<T, 3>& msh, const typename cartesian_mesh<T, 3>::cell& cl)
@@ -153,6 +240,15 @@ faces_id(const cartesian_mesh<T, 3>& msh, const typename cartesian_mesh<T, 3>::c
     return ret;
 }
 
+/**
+ * @brief Compute the measure (volume in 3D or area 2D) of the specified cell
+ * 
+ * @tparam T scalar type
+ * @tparam DIM dimension of the mesh
+ * @param msh mesh
+ * @param cl specified cell
+ * @return T measure of the cell
+ */
 template<typename T, size_t DIM>
 T
 measure(const cartesian_mesh<T, DIM>& msh,
@@ -182,7 +278,15 @@ measure(const cartesian_mesh<T, DIM>& msh,
     /* NOTREACHED */
 }
 
-
+/**
+ * @brief Compute the measure (area in 3D or length 2D) of the specified face
+ *
+ * @tparam T scalar type
+ * @tparam DIM dimension of the mesh
+ * @param msh mesh
+ * @param fc specified face
+ * @return T measure of the face
+ */
 template<typename T, size_t DIM>
 T
 measure(const cartesian_mesh<T, DIM>& msh,

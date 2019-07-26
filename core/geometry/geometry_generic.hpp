@@ -6,6 +6,10 @@
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
  *  /_\/_\/_\/_\   methods.
  *
+ * This file is copyright of the following authors:
+ * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
+ * Nicolas Pignet  (C) 2019                     nicolas.pignet@enpc.fr
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -61,9 +65,21 @@ struct generic_storage_class<3> {
         typedef generic_element<3,3>    node_type;
 };
 
+/**
+ * @brief speciliaziton for the storage class of a generic mesh (including polytopal meshes)
+ *
+ * @tparam T scalar type
+ * @tparam DIM dimension of the mesh, i.e, 1D, 2D or 3D
+ */
 template<typename T, size_t DIM>
 using generic_mesh_storage = mesh_storage<T, DIM, generic_storage_class<DIM>>;
 
+/**
+ * @brief speciliaziton for  generic mesh (including polytopal meshes)
+ *
+ * @tparam T scalar type
+ * @tparam DIM dimension of the mesh, i.e, 1D, 2D or 3D
+ */
 template<typename T, size_t DIM>
 using generic_mesh = mesh<T, DIM, generic_mesh_storage<T, DIM>>;
 

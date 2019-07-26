@@ -2371,6 +2371,11 @@ make_mechanics_assembler(const Mesh& msh, const hho_degree_info hdi, const Bound
     return assembler_mechanics<Mesh>(msh, hdi, bnd);
 }
 
+/**
+ * @brief Assembler for HHO methods where the discrete problem is scalar and formulated only in terms of primal unknowns \f$(u_T, u_{\partial T}) \f$
+ *
+ * @tparam Mesh
+ */
 template<typename Mesh>
 class scalar_primal_hho_assembler
 {
@@ -2425,8 +2430,10 @@ class scalar_primal_hho_assembler
     typedef dynamic_matrix<scalar_type> matrix_type;
     typedef dynamic_vector<scalar_type> vector_type;
 
+
     SparseMatrix<scalar_type> LHS;
     vector_type               RHS;
+
 
     scalar_primal_hho_assembler(const Mesh& msh, const hho_degree_info& hdi, const boundary_type& bnd) : di(hdi)
     {

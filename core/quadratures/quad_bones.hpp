@@ -8,7 +8,7 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
+ * Nicolas Pignet  (C) 2018, 2019               nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -42,10 +42,18 @@
 
 namespace disk {
 
-/* Golub-Welsch algorithm to get quadrature points on a line. Pay attention
+/*  */
+
+/**
+ * @brief Golub-Welsch algorithm to get quadrature points on a line. Pay attention
  * that this functions solves an eigenvalue problem each time you call it,
  * so it is quite expensive. You should use the Gauss-Legendre quadrature
- * defined below, which calls Golub-Welsch only when really needed. */
+ * defined below, which calls Golub-Welsch only when really needed.
+ *
+ * @tparam T scalar type
+ * @param degree order of the quadrature
+ * @return std::vector<std::pair<point<T, 1>, T>> list of quadrature points
+ */
 template<typename T>
 std::vector<std::pair<point<T, 1>, T>>
 golub_welsch(const size_t degree)
@@ -92,8 +100,13 @@ golub_welsch(const size_t degree)
     return ret;
 }
 
-/* Gauss-Legendre 1D quadrature. Fall-back to Golub-Welsch if the required
- * degree is too high. */
+/**
+ * @brief Gauss-Legendre 1D quadrature. Fall-back to Golub-Welsch if the required
+ * degree is too high (>9)
+ *
+ * @param degree order of the quadrature
+ * @return template<typename T> gauss_legendre quadrature of gauss legendre
+ */
 template<typename T>
 std::vector<std::pair<point<T, 1>, T>>
 gauss_legendre(size_t degree)
@@ -329,25 +342,52 @@ quadrangle_quadrature(const size_t degree)
     return ret;
 }
 
-/* This class represents a quadrature point, which is composed by the
- * coordinates (method .point()) and the weight (method .weight()) */
+/**
+ * @brief This class represents a quadrature point, which is composed by the
+ * coordinates and the weight
+ *
+ * @tparam T scalar type
+ * @tparam DIM dimension of the point
+ */
 template<typename T, size_t DIM>
 class quadrature_point : private std::pair<point<T,DIM>, T>
 {
     typedef std::pair<point<T,DIM>, T> base_type;
 
 public:
+    /**
+     * @brief Construct a new quadrature point object
+     *
+     * Default constructor
+     *
+     */
     quadrature_point()
     {}
 
+    /**
+     * @brief Construct a new quadrature point object
+     *
+     * @param p a point which represents the coordinates of the quadrature point
+     * @param w weight assoicated to the point
+     */
     quadrature_point(const point<T, DIM>& p, const T& w)
         : base_type(p, w)
     {}
 
+    /**
+     * @brief Return the coordinate of the quadrature point
+     *
+     * @return point<T, DIM> coordinate
+     */
     point<T, DIM>
     point() const
     { return this->first; }
 
+    /**
+     * @brief Return the weight of the quadrature point
+     *
+     * @return T
+     */
     T
     weight() const
     { return this->second; }
@@ -360,6 +400,7 @@ make_qp(const point<T, DIM>& point, const T& weight)
     return quadrature_point<T, DIM>(point, weight);
 }
 
+//
 template<typename T, size_t DIM>
 std::ostream&
 operator<<(std::ostream& os, const quadrature_point<T,DIM>& qp)
@@ -470,8 +511,14 @@ integrate_triangle(size_t degree, const PtA& pts)
     return ret;
 }
 
-/* Integrate using tensorized Gauss points on any quadrangle (not only
- * cartesian quadrangles) */
+/**
+ * @brief Integrate using tensorized Gauss points on any quadrangle (not only
+ * cartesian quadrangles)
+ *
+ * @param degree order of the quadrature
+ * @param pts vertices of the quadrangle
+ * @return template<typename T> integrate_quadrangle_tens quadrature
+ */
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
 integrate_quadrangle_tens(size_t degree, const std::vector<point<T, 2>>& pts)
@@ -526,6 +573,17 @@ integrate_quadrangle_tens(size_t degree, const std::vector<point<T, 2>>& pts)
     return ret;
 }
 
+/**
+ * @brief Generate a quadratue if the physical space of the 2D-face
+ *
+ * @tparam Mesh type of the mesh
+ * @tparam T scalar type
+ * @tparam Storage storage type
+ * @param msh mesh
+ * @param fc face
+ * @param degree order of the quadrature
+ * @return std::vector<disk::quadrature_point<T, 2>> quadrature
+ */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 std::vector<disk::quadrature_point<T, 2>>
 integrate_2D_face(const Mesh<T, 2, Storage>& msh, const typename Mesh<T, 2, Storage>::face& fc, size_t degree)

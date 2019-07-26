@@ -6,6 +6,10 @@
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
  *  /_\/_\/_\/_\   methods.
  *
+ * This file is copyright of the following authors:
+ * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
+ * Nicolas Pignet  (C) 2019                     nicolas.pignet@enpc.fr
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -20,12 +24,12 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
- #ifndef _GEOMETRY_HPP_WAS_INCLUDED_
-     #error "You must NOT include this file directly. Include geometry.hpp."
- #endif
+#ifndef _GEOMETRY_HPP_WAS_INCLUDED_
+#error "You must NOT include this file directly. Include geometry.hpp."
+#endif
 
- #ifndef _GEOMETRY_ALL_HPP_
- #define _GEOMETRY_ALL_HPP_
+#ifndef _GEOMETRY_ALL_HPP_
+#define _GEOMETRY_ALL_HPP_
 
 /*
  * Here we have all the queries that don't depend on the particular mesh
@@ -316,7 +320,17 @@ has_faces_on_boundary(const Mesh& msh, const typename Mesh::cell& cl)
     return has_bnd;
 }
 
-
+/**
+ * @brief Compute the outward unit normal to a 2D face
+ *
+ * @tparam Mesh type of mesh
+ * @tparam T scalar type
+ * @tparam Storage type of storage for the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param fc face
+ * @return static_vector<T, 2> Compute the outward unit normal to a 2D face
+ */
 template<template<typename, size_t, typename> class Mesh,
          typename T, typename Storage>
 static_vector<T, 2>
@@ -340,6 +354,17 @@ normal(const Mesh<T,2,Storage>& msh,
     return n/n.norm();
 }
 
+/**
+ * @brief Compute the outward unit normal to a 3D face
+ *
+ * @tparam Mesh type of mesh
+ * @tparam T scalar type
+ * @tparam Storage type of storage for the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param fc face
+ * @return static_vector<T, 3> Compute the outward unit normal to a 3D face
+ */
 template<template<typename, size_t, typename> class Mesh,
          typename T, typename Storage>
 static_vector<T, 3>
@@ -364,7 +389,17 @@ normal(const Mesh<T, 3, Storage>& msh,
     return n/n.norm();
 }
 
-
+/**
+ * @brief Compute the outward unit normal to a 1D face (i.e a point)
+ *
+ * @tparam Mesh type of mesh
+ * @tparam T scalar type
+ * @tparam Storage type of storage for the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param fc face
+ * @return T Compute the outward unit normal to a 1D face
+ */
 template<template<typename, size_t, typename> class Mesh,
          typename T, typename Storage>
 T

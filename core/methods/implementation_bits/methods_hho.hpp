@@ -39,19 +39,50 @@ using namespace Eigen;
 namespace disk
 {
 
+/**
+ * @brief this class contains the different polynomial degrees which can used with HHO methods
+ *
+ */
 class hho_degree_info
 {
-    size_t  cell_deg, face_deg, reconstruction_deg, grad_deg;
+    /**
+     * @brief
+     *  cell_deg : polynomial degree used for the cells
+     *  face_deg : polynomial degree used for the faces
+     *  grad_deg : polynomial degree used for the gradient
+     *
+     */
+    size_t  cell_deg, face_deg, grad_deg;
 
 public:
+    /**
+     * @brief Construct a new hho degree info object
+     * The default polynomial degree is 1 for the face and cell degrees
+     *
+     */
     hho_degree_info()
-        : cell_deg(1), face_deg(1), reconstruction_deg(2), grad_deg(1)
+        : cell_deg(1), face_deg(1),  grad_deg(1)
     {}
 
+    /**
+     * @brief Construct a new hho degree info object
+     *
+     * @param degree polynomial degree used for the cells, faces and gradient
+     */
     explicit hho_degree_info(size_t degree)
-        : cell_deg(degree), face_deg(degree), reconstruction_deg(degree+1), grad_deg(degree)
+        : cell_deg(degree), face_deg(degree),  grad_deg(degree)
     {}
 
+    /**
+     * @brief Construct a new hho degree info object
+     *
+     * @param cd polynomial degree used for the cells
+     * @param fd polynomial degree used for the faces
+     *
+     * @brief Note that
+     * fd >= 0 and cd >=0
+     * fd - 1 <= cd <= fd +1
+     */
     hho_degree_info(size_t cd, size_t fd)
     {
         bool c1 = fd > 0  && (cd == fd-1 || cd == fd || cd == fd+1);
@@ -60,7 +91,6 @@ public:
         {
             cell_deg            = cd;
             face_deg            = fd;
-            reconstruction_deg  = fd+1;
             grad_deg            = fd;
         }
         else
@@ -68,11 +98,22 @@ public:
             std::cout << "Invalid cell degree. Reverting to equal-order" << std::endl;
             cell_deg            = fd;
             face_deg            = fd;
-            reconstruction_deg  = fd+1;
             grad_deg            = fd;
         }
     }
 
+    /**
+     * @brief Construct a new hho degree info object
+     *
+     * @param cd polynomial degree used for the cells
+     * @param fd polynomial degree used for the faces
+     * @param gd polynomial degree used for the gradient
+     *
+     * @brief Note that
+     * fd >= 0, cd >=0 and gd >=0
+     * fd - 1 <= cd <= fd +1
+     * gd >= fd
+     */
     hho_degree_info(size_t cd, size_t fd, size_t gd)
     {
        bool c1 = fd > 0 && (cd == fd - 1 || cd == fd || cd == fd + 1);
@@ -81,105 +122,167 @@ public:
        if (c1 || c2 || c3) {
           cell_deg           = cd;
           face_deg           = fd;
-          reconstruction_deg = fd + 1;
           grad_deg           = gd;
        } else {
           std::cout << "Invalid cell degree. Reverting to equal-order" << std::endl;
           cell_deg           = fd;
           face_deg           = fd;
-          reconstruction_deg = fd + 1;
           grad_deg           = fd;
        }
     }
 
+    /**
+     * @brief Return the polynomial degree used for the cells
+     *
+     * @return size_t polynomial degree used for the cells
+     */
     size_t cell_degree() const
     {
         return cell_deg;
     }
 
+    /**
+     * @brief Return the polynomial degree used for the faces
+     *
+     * @return size_t polynomial degree used for the faces
+     */
     size_t face_degree() const
     {
         return face_deg;
     }
 
+    /**
+     * @brief Return the polynomial degree used for the reconstruction operator
+     *
+     * @return size_t polynomial degree used for the reconstruction operator
+     */
     size_t reconstruction_degree() const
     {
-        return reconstruction_deg;
+        return face_deg+1;
     }
 
+    /**
+     * @brief Return the polynomial degree used for the gradient reconstruction
+     *
+     * @return size_t polynomial degree used for the gradient reconstruction
+     */
     size_t
     grad_degree() const
     {
        return grad_deg;
     }
 
+    /**
+     * @brief Print the different degree
+     *
+     */
     void
     info_degree() const
     {
-       std::cout << cell_deg << " " << face_deg << " " << reconstruction_deg << " " << grad_deg
-                 << std::endl;
+       std::cout << "cell degree: " << cell_deg << std::endl;
+       std::cout << "face degree: " << face_deg << std::endl;
+       std::cout << "gradient degree: " << grad_deg << std::endl;
+       std::cout << "reconstruction degree: " << face_deg+1 << std::endl;
     }
 };
 
+/**
+ * @brief Compute the interpolation operator \f$ \hat{I}(u) := (\Pi^{cd}_T(u), \Pi^{fd}_{\partial T}(u)) \f$
+ * of a function \f$ u \in H^1(T;\mathbb{R}) \f$ where \f$ \Pi^{cd}_T \f$, respc. \f$ \Pi^{fd}_{\partial T} \f$ are the L2-orthogonal projector on the cell and faces
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh  mesh
+ * @param cl  cell
+ * @param hdi  hho degree informations
+ * @param u  function  \f$ u \in H^1(T;\mathbb{R}) \f$ to project
+ * @param di additonal quadratue degree
+ * @return dynamic_vector<typename Mesh::coordinate_type> coefficient of the the interpolation operator \f$ \hat{I}(u) \f$
+ */
 template<typename Mesh>
-Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+dynamic_vector<typename Mesh::coordinate_type>
 project_function(const Mesh&                      msh,
                  const typename Mesh::cell_type&  cl,
                  const hho_degree_info&           hdi,
-                 const scalar_rhs_function<Mesh>& f,
+                 const scalar_rhs_function<Mesh>& u,
                  size_t                           di = 0)
 {
-    using T = typename Mesh::coordinate_type;
-    typedef Matrix<T, Dynamic, 1> vector_type;
+    typedef dynamic_vector<typename Mesh::coordinate_type> vector_type;
 
-    auto cbs       = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
-    auto fbs       = scalar_basis_size(hdi.face_degree(), Mesh::dimension - 1);
-    auto num_faces = howmany_faces(msh, cl);
+    const auto cbs       = scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+    const auto fbs       = scalar_basis_size(hdi.face_degree(), Mesh::dimension - 1);
+    const auto num_faces = howmany_faces(msh, cl);
 
     vector_type ret = vector_type::Zero(cbs + num_faces * fbs);
 
-    ret.block(0, 0, cbs, 1) = project_function(msh, cl, hdi.cell_degree(), f, di);
+    ret.block(0, 0, cbs, 1) = project_function(msh, cl, hdi.cell_degree(), u, di);
 
-    auto fcs = faces(msh, cl);
+    const auto fcs = faces(msh, cl);
     for (size_t i = 0; i < num_faces; i++)
     {
-        ret.segment(cbs + i * fbs, fbs) = project_function(msh, fcs[i], hdi.face_degree(), f, di);
+        ret.segment(cbs + i * fbs, fbs) = project_function(msh, fcs[i], hdi.face_degree(), u, di);
     }
 
     return ret;
 }
 
+/**
+ * @brief Compute the interpolation operator \f$ \hat{I}(u) := (\Pi^{cd}_T(u), \Pi^{fd}_{\partial T}(u)) \f$
+ * of a function \f$ u \in H^1(T;\mathbb{R}^d) \f$ where \f$ \Pi^{cd}_T \f$, respc. \f$ \Pi^{fd}_{\partial T} \f$ are the L2-orthogonal projector on the cell and faces
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh  mesh
+ * @param cl  cell
+ * @param hdi  hho degree informations
+ * @param u  function  \f$ u \in H^1(T;\mathbb{R}^d) \f$ to project
+ * @param di additonal quadratue degree
+ * @return dynamic_vector<typename Mesh::coordinate_type> coefficient of the the interpolation operator \f$ \hat{I}(u) \f$
+ */
 template<typename Mesh>
-Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+dynamic_vector<typename Mesh::coordinate_type>
 project_function(const Mesh&                      msh,
                  const typename Mesh::cell_type&  cl,
                  const hho_degree_info&           hdi,
-                 const vector_rhs_function<Mesh>& f,
+                 const vector_rhs_function<Mesh>& u,
                  size_t                           di = 0)
 {
-    using T = typename Mesh::coordinate_type;
-    typedef Matrix<T, Dynamic, 1> vector_type;
+    typedef dynamic_vector<typename Mesh::coordinate_type> vector_type;
 
-    auto cbs       = vector_basis_size(hdi.cell_degree(), Mesh::dimension, Mesh::dimension);
-    auto fbs       = vector_basis_size(hdi.face_degree(), Mesh::dimension - 1, Mesh::dimension);
-    auto num_faces = howmany_faces(msh, cl);
+    const auto cbs       = vector_basis_size(hdi.cell_degree(), Mesh::dimension, Mesh::dimension);
+    const auto fbs       = vector_basis_size(hdi.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+    const auto num_faces = howmany_faces(msh, cl);
 
     vector_type ret = vector_type::Zero(cbs + num_faces * fbs);
 
-    ret.block(0, 0, cbs, 1) = project_function(msh, cl, hdi.cell_degree(), f, di);
+    ret.block(0, 0, cbs, 1) = project_function(msh, cl, hdi.cell_degree(), u, di);
 
-    auto fcs = faces(msh, cl);
+    const auto fcs = faces(msh, cl);
     for (size_t i = 0; i < num_faces; i++)
     {
-        ret.segment(cbs + i * fbs, fbs) = project_function(msh, fcs[i], hdi.face_degree(), f, di);
+        ret.segment(cbs + i * fbs, fbs) = project_function(msh, fcs[i], hdi.face_degree(), u, di);
     }
 
     return ret;
 }
 
+
+/**
+ * @brief Compute the term \f$ (\nabla R^{k+1}_T(\hat{u}), \nabla R^{k+1}_T(\hat{v}) )_T   \f$  where \f$ R^{k+1}_T \f$ is the high-order
+ * reconstruction operator which if solution of
+ *
+ * \f$ (\nabla R^{k+1}_T(\hat{u}), \nabla w )_T = (\nabla u_T, \nabla w )_T + (u_{\partial T} - u_T, \nabla w n_T)_{\partial T}, \quad \forall w \f$
+ *
+ *  The term \f$ (\nabla R^{k+1}_T(\hat{u}), \nabla R^{k+1}_T(\hat{v}) )_T   \f$ is the HHO conterpart of \f$ (\nabla u, \nabla v )_T   \f$
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl  cell
+ * @param di  hho degree information
+ * @return std::pair<   dynamic_matrix<typename Mesh::coordinate_type>,
+dynamic_matrix<typename Mesh::coordinate_type>  > the first term is \f$ \nabla R^{k+1}_T \f$ and the second term is \f$ (\nabla R^{k+1}_T(\hat{u}), \nabla R^{k+1}_T(\hat{v}) )_T   \f$
+ */
 template<typename Mesh>
-std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-             Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
+std::pair<   dynamic_matrix<typename Mesh::coordinate_type>,
+             dynamic_matrix<typename Mesh::coordinate_type>  >
 make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
                           const hho_degree_info& di)
 {
@@ -236,8 +339,8 @@ make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl,
 
 namespace priv {
 template<typename Mesh, typename GradBasis>
-std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-          Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>,
+          dynamic_matrix<typename Mesh::coordinate_type>>
 make_vector_hho_gradrec_impl(const Mesh&                     msh,
                              const typename Mesh::cell_type& cl,
                              const hho_degree_info&          di,
@@ -302,9 +405,24 @@ make_vector_hho_gradrec_impl(const Mesh&                     msh,
 }
 }
 
+
+/**
+ * @brief Compute the term \f$ (G^{k}_T(\hat{u}), G^{k}_T(\hat{v}) )_T   \f$  where \f$ G^{k}_T \f$ is the hho gradient reconstruction which if solution of
+ *
+ * \f$ (G^{k}_T(\hat{u})(\hat{u}), \tau )_T = (\nabla u_T, \tau )_T + (u_{\partial T} - u_T, \tau n_T)_{\partial T}, \quad \forall w \f$
+ *
+ *  The term \f$ (G^{k}_T(\hat{u}), G^{k}_T(\hat{v}) )_T   \f$ is the HHO conterpart of \f$ (\nabla u, \nabla v )_T   \f$
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl  cell
+ * @param di  hho degree information
+ * @return std::pair<   dynamic_matrix<typename Mesh::coordinate_type>,
+dynamic_matrix<typename Mesh::coordinate_type>  > the first term is \f$ G^{k}_T \f$ and the second term is \f$ (G^{k}_T(\hat{u}), G^{k}_T(\hat{v}) )_T   \f$
+ */
 template<typename Mesh>
-std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-          Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>,
+          dynamic_matrix<typename Mesh::coordinate_type>>
 make_vector_hho_gradrec(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
     const auto graddeg = di.grad_degree();
@@ -313,9 +431,24 @@ make_vector_hho_gradrec(const Mesh& msh, const typename Mesh::cell_type& cl, con
     return priv::make_vector_hho_gradrec_impl(msh, cl, di, gb);
 }
 
+/**
+ * @brief Compute the term \f$ (K G^{k}_T(\hat{u}), G^{k}_T(\hat{v}) )_T   \f$  where \f$ G^{k}_T \f$ is the hho gradient reconstruction which if solution of
+ *
+ * \f$ (G^{k}_T(\hat{u})(\hat{u}), \tau )_T = (\nabla u_T, \tau )_T + (u_{\partial T} - u_T, \tau n_T)_{\partial T}, \quad \forall w \f$
+ *
+ *  The term \f$ (K G^{k}_T(\hat{u}), G^{k}_T(\hat{v}) )_T   \f$ is the HHO conterpart of \f$ (K \nabla u, \nabla v )_T   \f$
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl  cell
+ * @param di  hho degree information
+ * @param mfield is a material fiel which can depend on the coordiantes (mfield is symmetric positive definite matrix)
+ * @return std::pair<   dynamic_matrix<typename Mesh::coordinate_type>,
+dynamic_matrix<typename Mesh::coordinate_type>  > the first term is \f$ G^{k}_T \f$ and the second term is \f$ (K G^{k}_T(\hat{u}), G^{k}_T(\hat{v}) )_T   \f$
+ */
 template<typename Mesh, typename TensorField>
-std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-          Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>,
+          dynamic_matrix<typename Mesh::coordinate_type>>
 make_vector_hho_gradrec(const Mesh&                     msh,
                         const typename Mesh::cell_type& cl,
                         const hho_degree_info&          di,
@@ -332,9 +465,26 @@ make_vector_hho_gradrec(const Mesh&                     msh,
     return std::make_pair(gradrec.first, LHS);
 }
 
+/**
+ * @brief Compute the term \f$ (G^{k}_T(\hat{u}), G^{k}_T(\hat{v}) )_T   \f$  where \f$ G^{k}_T \f$ is the hho gradient reconstruction which if solution of
+ *
+ * \f$ (G^{k}_T(\hat{u})(\hat{u}), \tau )_T = (\nabla u_T, \tau )_T + (u_{\partial T} - u_T, \tau n_T)_{\partial T}, \quad \forall w \f$
+ *
+ *  The term \f$ (G^{k}_T(\hat{u}), G^{k}_T(\hat{v}) )_T   \f$ is the HHO conterpart of \f$ (K \nabla u, \nabla v )_T   \f$
+ *
+ *  Here the reconstructed gradient \f$ G^{k}_T \f$ is reconstructed in the Raviart-Thomas space (works only for simplical cell)
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl  simplicial cell (triangle or tetrahedron)
+ * @param di  hho degree information
+ * @return std::pair<   dynamic_matrix<typename Mesh::coordinate_type>,
+dynamic_matrix<typename Mesh::coordinate_type>  > the first term is \f$ G^{k}_T \f$ and the second term is \f$ ( G^{k}_T(\hat{u}), G^{k}_T(\hat{v}) )_T   \f$
+ */
+
 template<typename Mesh>
-std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-          Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>,
+          dynamic_matrix<typename Mesh::coordinate_type>>
 make_vector_hho_gradrec_RT(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
     const auto graddeg = di.grad_degree();
@@ -343,9 +493,26 @@ make_vector_hho_gradrec_RT(const Mesh& msh, const typename Mesh::cell_type& cl, 
     return make_vector_hho_gradrec_impl(msh, cl, di, gb);
 }
 
+/**
+ * @brief Compute the term \f$ (K G^{k}_T(\hat{u}), G^{k}_T(\hat{v}) )_T   \f$  where \f$ G^{k}_T \f$ is the hho gradient reconstruction which if solution of
+ *
+ * \f$ (G^{k}_T(\hat{u})(\hat{u}), \tau )_T = (\nabla u_T, \tau )_T + (u_{\partial T} - u_T, \tau n_T)_{\partial T}, \quad \forall w \f$
+ *
+ *  The term \f$ (K G^{k}_T(\hat{u}), G^{k}_T(\hat{v}) )_T   \f$ is the HHO conterpart of \f$ (K \nabla u, \nabla v )_T   \f$
+ *
+ *  Here the reconstructed gradient \f$ G^{k}_T \f$ is reconstructed in the Raviart-Thomas space (works only for simplical cell)
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl  simplicial cell (triangle or tetrahedron)
+ * @param di  hho degree information
+ * @param mfield is a material fiel which can depend on the coordiantes (mfield is symmetric positive definite matrix)
+ * @return std::pair<   dynamic_matrix<typename Mesh::coordinate_type>,
+dynamic_matrix<typename Mesh::coordinate_type>  > the first term is \f$ G^{k}_T \f$ and the second term is \f$ (K G^{k}_T(\hat{u}), G^{k}_T(\hat{v}) )_T   \f$
+ */
 template<typename Mesh, typename TensorField>
-std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-          Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>,
+          dynamic_matrix<typename Mesh::coordinate_type>>
 make_vector_hho_gradrec_RT(const Mesh&                     msh,
                            const typename Mesh::cell_type& cl,
                            const hho_degree_info&          di,
@@ -374,8 +541,8 @@ nb_lag(const size_t dim)
 }
 
 template<typename Mesh, typename BasisCell>
-std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-          Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>,
+          dynamic_matrix<typename Mesh::coordinate_type>>
 make_vector_hho_symmetric_laplacian_impl_facezero(const Mesh&                     msh,
                                                         const typename Mesh::cell_type& cl,
                                                         const BasisCell&                cb)
@@ -460,8 +627,8 @@ make_vector_hho_symmetric_laplacian_impl_facezero(const Mesh&                   
 }
 
 template<typename Mesh, typename BasisCell>
-std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-          Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>,
+          dynamic_matrix<typename Mesh::coordinate_type>>
 make_vector_hho_symmetric_laplacian_impl(const Mesh& msh, const typename Mesh::cell_type& cl, const BasisCell& cb, const hho_degree_info& di)
 {
     using T        = typename Mesh::coordinate_type;
@@ -554,8 +721,8 @@ make_vector_hho_symmetric_laplacian_impl(const Mesh& msh, const typename Mesh::c
 
 
 template<typename Mesh>
-std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-             Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
+std::pair<   dynamic_matrix<typename Mesh::coordinate_type>,
+             dynamic_matrix<typename Mesh::coordinate_type>  >
 make_vector_hho_symmetric_laplacian(const Mesh& msh,
                           const typename Mesh::cell_type& cl,
                           const hho_degree_info& di)
@@ -566,8 +733,8 @@ make_vector_hho_symmetric_laplacian(const Mesh& msh,
 }
 
 template<typename Mesh>
-std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-          Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>,
+          dynamic_matrix<typename Mesh::coordinate_type>>
 make_matrix_symmetric_gradrec(const Mesh&                     msh,
                               const typename Mesh::cell_type& cl,
                               const hho_degree_info&          di)
@@ -663,8 +830,8 @@ make_matrix_symmetric_gradrec(const Mesh&                     msh,
 }
 
 template<typename Mesh>
-std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-          Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>,
+          dynamic_matrix<typename Mesh::coordinate_type>>
 make_matrix_symmetric_gradrec_RT(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
@@ -730,8 +897,8 @@ make_matrix_symmetric_gradrec_RT(const Mesh& msh, const typename Mesh::cell_type
 }
 
 template<typename Mesh>
-std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-             Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
+std::pair<   dynamic_matrix<typename Mesh::coordinate_type>,
+             dynamic_matrix<typename Mesh::coordinate_type>  >
 make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_type& cl,
                                    const hho_degree_info& di)
 {
@@ -750,7 +917,7 @@ make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_ty
 }
 
 template<typename Mesh>
-Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+dynamic_matrix<typename Mesh::coordinate_type>
 make_hho_divergence_reconstruction_rhs(const Mesh& msh, const typename Mesh::cell_type& cl,
                                    const hho_degree_info& di)
 {
@@ -805,9 +972,18 @@ make_hho_divergence_reconstruction_rhs(const Mesh& msh, const typename Mesh::cel
     return dr_rhs;
 }
 
-// we compute the stabilisation 1/h_F(uF-pi^k_F(uT), vF-pi^k_F(vT))_F
+/**
+ * @brief compute the stabilization term \f$ \sum_{F \in F_T} 1/h_F(u_F-\Pi^k_F(u_T), v_F-\Pi^k_F(v_T))_F \f$
+ * for scalar HHO unknowns
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param di hho degree information
+ * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
+ */
 template<typename Mesh>
-Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hdg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
@@ -864,217 +1040,18 @@ make_scalar_hdg_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
     return data;
 }
 
-
-#define REMOVE_CODE_NICOLAS_PR
-/******* STUFF REMOVED BY NICOLAS BEGIN *******/
-#ifndef REMOVE_CODE_NICOLAS_PR
-template<typename T, int M, int N>
-T estimate_conditioning(const Matrix<T,M,N>& m)
-{
-    Eigen::JacobiSVD< Matrix<T,M,N> > svd(m);
-    T sigma_max = svd.singularValues()(0);
-    T sigma_min = svd.singularValues()(svd.singularValues().size()-1);
-    T cond =  sigma_max / sigma_min;
-    return cond;
-}
-
-
-template<typename Mesh, typename T>
-auto
-diffusion_static_condensation_compute(const Mesh& msh,
-        const typename Mesh::cell_type& cl, const hho_degree_info hdi,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& local_mat,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& cell_rhs)
-{
-    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-
-    auto cell_degree = hdi.cell_degree();
-    auto face_degree = hdi.face_degree();
-    auto num_cell_dofs = scalar_basis_size(cell_degree, Mesh::dimension);
-    auto num_face_dofs = scalar_basis_size(face_degree, Mesh::dimension-1);
-
-    auto fcs = faces(msh, cl);
-    auto num_faces = fcs.size();
-
-    assert(local_mat.rows() == local_mat.cols());
-    assert(local_mat.cols() == num_cell_dofs + num_faces*num_face_dofs);
-    assert(cell_rhs.rows() == num_cell_dofs);
-
-    size_t cell_size = num_cell_dofs;
-    size_t face_size = num_face_dofs * num_faces;
-
-    matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
-    matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
-    matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
-    matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
-
-    assert(K_TT.cols() == cell_size);
-    assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
-    assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
-    assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
-    assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
-
-    auto K_TT_ldlt = K_TT.ldlt();
-    matrix_type AL = K_TT_ldlt.solve(K_TF);
-    vector_type bL = K_TT_ldlt.solve(cell_rhs);
-
-    matrix_type AC = K_FF - K_FT * AL;
-    vector_type bC = /* no projection on faces, eqn. 26*/ - K_FT * bL;
-
-    return std::make_pair(AC, bC);
-}
-
-template<typename Mesh, typename T>
-std::pair< typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>,
-            typename Eigen::Matrix<T, Eigen::Dynamic, 1>>
-diffusion_static_condensation_compute_full(const Mesh& msh,
-        const typename Mesh::cell_type& cl, const hho_degree_info hdi,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& local_mat,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& rhs)
-{
-    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-
-    auto cell_degree = hdi.cell_degree();
-    auto face_degree = hdi.face_degree();
-    auto num_cell_dofs = scalar_basis_size(cell_degree, Mesh::dimension);
-    auto num_face_dofs = scalar_basis_size(face_degree, Mesh::dimension-1);
-
-    auto fcs = faces(msh, cl);
-    auto num_faces = fcs.size();
-
-    assert(local_mat.rows() == local_mat.cols());
-    assert(local_mat.cols() == num_cell_dofs + num_faces*num_face_dofs);
-    assert(rhs.rows() == num_cell_dofs + num_faces*num_face_dofs);
-
-    size_t cell_size = num_cell_dofs;
-    size_t face_size = num_face_dofs * num_faces;
-
-    matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
-    matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
-    matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
-    matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
-
-    assert(K_TT.cols() == cell_size);
-    assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
-    assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
-    assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
-    assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
-
-    vector_type cell_rhs = rhs.block(0, 0, num_cell_dofs, 1);
-    vector_type face_rhs = rhs.block(num_cell_dofs, 0, num_faces*num_face_dofs, 1);
-
-    auto K_TT_ldlt = K_TT.ldlt();
-    matrix_type AL = K_TT_ldlt.solve(K_TF);
-    vector_type bL = K_TT_ldlt.solve(cell_rhs);
-
-    matrix_type AC = K_FF - K_FT * AL;
-    vector_type bC = /* no projection on faces, eqn. 26*/face_rhs - K_FT * bL;
-
-    return std::make_pair(AC, bC);
-}
-
-template<typename Mesh, typename T>
-auto
-diffusion_static_condensation_compute_vector(const Mesh& msh,
-        const typename Mesh::cell_type& cl, const hho_degree_info hdi,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& local_mat,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& cell_rhs)
-{
-    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-
-    auto cell_degree = hdi.cell_degree();
-    auto face_degree = hdi.face_degree();
-    auto num_cell_dofs = vector_basis_size(cell_degree, Mesh::dimension, Mesh::dimension);
-    auto num_face_dofs = vector_basis_size(face_degree, Mesh::dimension-1, Mesh::dimension);
-
-    auto fcs = faces(msh, cl);
-    auto num_faces = fcs.size();
-
-    assert(local_mat.rows() == local_mat.cols());
-    assert(local_mat.cols() == num_cell_dofs + num_faces*num_face_dofs);
-    assert(cell_rhs.rows() == num_cell_dofs);
-
-    size_t cell_size = num_cell_dofs;
-    size_t face_size = num_face_dofs * num_faces;
-
-    matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
-    matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
-    matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
-    matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
-
-    assert(K_TT.cols() == cell_size);
-    assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
-    assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
-    assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
-    assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
-
-    auto K_TT_ldlt = K_TT.ldlt();
-    matrix_type AL = K_TT_ldlt.solve(K_TF);
-    vector_type bL = K_TT_ldlt.solve(cell_rhs);
-
-    matrix_type AC = K_FF - K_FT * AL;
-    vector_type bC = /* no projection on faces, eqn. 26*/ - K_FT * bL;
-
-    return std::make_pair(AC, bC);
-}
-
-template<typename Mesh, typename T>
-auto
-diffusion_static_condensation_compute_vector_full(const Mesh& msh,
-        const typename Mesh::cell_type& cl, const hho_degree_info hdi,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& local_mat,
-        const typename Eigen::Matrix<T, Eigen::Dynamic, 1>& rhs)
-{
-    using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-    using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-
-    auto cell_degree = hdi.cell_degree();
-    auto face_degree = hdi.face_degree();
-    auto num_cell_dofs = vector_basis_size(cell_degree, Mesh::dimension, Mesh::dimension);
-    auto num_face_dofs = vector_basis_size(face_degree, Mesh::dimension-1, Mesh::dimension);
-
-    auto fcs = faces(msh, cl);
-    auto num_faces = fcs.size();
-
-    assert(local_mat.rows() == local_mat.cols());
-    assert(local_mat.cols() == num_cell_dofs + num_faces*num_face_dofs);
-
-    size_t cell_size = num_cell_dofs;
-    size_t face_size = num_face_dofs * num_faces;
-
-    matrix_type K_TT = local_mat.topLeftCorner(cell_size, cell_size);
-    matrix_type K_TF = local_mat.topRightCorner(cell_size, face_size);
-    matrix_type K_FT = local_mat.bottomLeftCorner(face_size, cell_size);
-    matrix_type K_FF = local_mat.bottomRightCorner(face_size, face_size);
-
-    assert(K_TT.cols() == cell_size);
-    assert(K_TT.cols() + K_TF.cols() == local_mat.cols());
-    assert(K_TT.rows() + K_FT.rows() == local_mat.rows());
-    assert(K_TF.rows() + K_FF.rows() == local_mat.rows());
-    assert(K_FT.cols() + K_FF.cols() == local_mat.cols());
-    assert((rhs.rows() == cell_size) || (rhs.rows() == cell_size + num_faces*num_face_dofs));
-
-    vector_type cell_rhs = rhs.block(0, 0, num_cell_dofs, 1);
-    vector_type face_rhs = vector_type::Zero(face_size);
-    if(rhs.cols() ==  num_cell_dofs + num_faces*num_face_dofs)
-        face_rhs = rhs.block(num_cell_dofs, 0, num_faces*num_face_dofs, 1);
-
-    auto K_TT_ldlt = K_TT.ldlt();
-    matrix_type AL = K_TT_ldlt.solve(K_TF);
-    vector_type bL = K_TT_ldlt.solve(cell_rhs);
-
-    matrix_type AC = K_FF - K_FT * AL;
-    vector_type bC = /* no projection on faces, eqn. 26*/face_rhs - K_FT * bL;
-
-    return std::make_pair(AC, bC);
-}
-#endif // REMOVE_CODE_NICOLAS_PR
-
+/**
+ * @brief compute the stabilization term \f$ \sum_{F \in F_T} 1/h_F(u_F-u_T, v_F-v_T)_F \f$
+ * for scalar HHO unknowns
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param di hho degree information
+ * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
+ */
 template<typename Mesh>
-Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_dg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
     using T = typename Mesh::coordinate_type;
@@ -1125,11 +1102,22 @@ make_scalar_dg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
     return data;
 }
 
+/**
+ * @brief compute the stabilization term \f$\sum_{F \in F_T} 1/h_F(u_F - u_T + \Pi^k_T R^{k+1}_T(\hat{u}_T) - R^{k+1}_T(\hat{u}_T), v_F - v_T + \Pi^k_T R^{k+1}_T(\hat{v}_T) - R^{k+1}_T(\hat{v}_T))_F \f$
+ * for scalar HHO unknowns
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param reconstruction reconstruction operator \f$ R^{k+1}_T \f$
+ * @param di hho degree information
+ * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
+ */
 template<typename Mesh>
-Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hho_stabilization(const Mesh&                                                     msh,
                               const typename Mesh::cell_type&                                 cl,
-                              const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& reconstruction,
+                              const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
                               const hho_degree_info&                                          di)
 {
     using T = typename Mesh::coordinate_type;
@@ -1202,11 +1190,22 @@ make_scalar_hho_stabilization(const Mesh&                                       
     return data;
 }
 
+/**
+ * @brief compute the stabilization term \f$\sum_{F \in F_T} 1/h_F(u_F - u_T + \Pi^k_T R^{k+1}_T(\hat{u}_T) - R^{k+1}_T(\hat{u}_T), v_F - v_T + \Pi^k_T R^{k+1}_T(\hat{v}_T) - R^{k+1}_T(\hat{v}_T))_F \f$
+ * for vectorial HHO unknowns
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param reconstruction reconstruction operator \f$ R^{k+1}_T \f$
+ * @param di hho degree information
+ * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
+ */
 template<typename Mesh>
-Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+dynamic_matrix<typename Mesh::coordinate_type>
 make_vector_hho_stabilization(const Mesh&                                                     msh,
                               const typename Mesh::cell_type&                                 cl,
-                              const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& reconstruction,
+                              const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
                               const hho_degree_info&                                          di)
 {
     using T = typename Mesh::coordinate_type;
@@ -1709,8 +1708,8 @@ compute_grad_matrix(const Mesh&                                           msh,
 } // end priv
 
 template<typename Mesh>
-std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-          Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>,
+          dynamic_matrix<typename Mesh::coordinate_type>>
 make_vector_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
 {
     const auto hho_scalar_laplacian = make_scalar_hho_laplacian(msh, cl, hdi);
@@ -1719,13 +1718,13 @@ make_vector_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, c
 }
 
 template<typename Mesh>
-std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-          Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>,
+          dynamic_matrix<typename Mesh::coordinate_type>>
 make_vector_hho_laplacian(const Mesh&                     msh,
                           const typename Mesh::cell_type& cl,
                           const hho_degree_info&          hdi,
-                          const std::pair < Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-                          Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic> >& hho_scalar_laplacian)
+                          const std::pair < dynamic_matrix<typename Mesh::coordinate_type>,
+                          dynamic_matrix<typename Mesh::coordinate_type> >& hho_scalar_laplacian)
 {
     const auto oper = priv::compute_grad_vector(msh, cl, hdi, hho_scalar_laplacian.first);
     const auto data = priv::compute_lhs_vector(msh, cl, hdi, hho_scalar_laplacian.second);
@@ -1733,8 +1732,18 @@ make_vector_hho_laplacian(const Mesh&                     msh,
     return std::make_pair(oper, data);
 }
 
+/**
+ * @brief compute the stabilization term \f$ \sum_{F \in F_T} 1/h_F(u_F-\Pi^k_F(u_T), v_F-\Pi^k_F(v_T))_F \f$
+ * for vectorial HHO unknowns
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param di hho degree information
+ * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
+ */
 template<typename Mesh>
-Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+dynamic_matrix<typename Mesh::coordinate_type>
 make_vector_hdg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
     const auto hdg_scalar_stab = make_scalar_hdg_stabilization(msh, cl, di);
@@ -1742,8 +1751,18 @@ make_vector_hdg_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
     return priv::compute_lhs_vector(msh, cl, di, hdg_scalar_stab);
 }
 
+/**
+ * @brief compute the stabilization term \f$ \sum_{F \in F_T} 1/h_F(u_F-u_T, v_F-v_T)_F \f$
+ * for vectorial HHO unknowns
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param di hho degree information
+ * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
+ */
 template<typename Mesh>
-Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+dynamic_matrix<typename Mesh::coordinate_type>
 make_vector_dg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
     const auto dg_scalar_stab = make_scalar_dg_stabilization(msh, cl, di);
@@ -1753,9 +1772,9 @@ make_vector_dg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
 
 // doesn't work for symmetric gradient
 template<typename Mesh>
-Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
+dynamic_matrix<typename Mesh::coordinate_type>
 make_vector_hho_stabilization_optim(const Mesh& msh, const typename Mesh::cell_type& cl,
-                              const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& reconstruction_scalar,
+                              const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction_scalar,
                               const hho_degree_info& hdi)
 {
     const auto hho_scalar_stab = make_scalar_hho_stabilization(msh, cl, reconstruction_scalar, hdi);
@@ -1764,8 +1783,8 @@ make_vector_hho_stabilization_optim(const Mesh& msh, const typename Mesh::cell_t
 }
 
 template<typename Mesh>
-std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-          Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>,
+          dynamic_matrix<typename Mesh::coordinate_type>>
 make_marix_hho_gradrec(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
 
 {
