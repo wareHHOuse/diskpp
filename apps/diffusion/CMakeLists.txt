@@ -4,9 +4,13 @@ if (BUILD_APP_DIFFUSION)
 	target_link_libraries(diffusion_hho ${LINK_LIBS})
 	install(TARGETS diffusion_hho RUNTIME DESTINATION bin)
 
-	#add_executable(diffusion_hho_test diffusion_hho_test.cpp)
-	#target_link_libraries(diffusion_hho_test ${LINK_LIBS})
-	#install(TARGETS diffusion_hho_test RUNTIME DESTINATION bin)
+    add_executable(diffusion_dg diffusion_dg.cpp)
+    target_link_libraries(diffusion_dg ${LINK_LIBS})
+    install(TARGETS diffusion_dg RUNTIME DESTINATION bin)
+
+    #add_executable(diffusion_hho_test diffusion_hho_test.cpp)
+    #target_link_libraries(diffusion_hho_test ${LINK_LIBS})
+    #install(TARGETS diffusion_hho_test RUNTIME DESTINATION bin)
 
 	add_executable(diffusion_dga diffusion_dga.cpp)
 	target_link_libraries(diffusion_dga ${LINK_LIBS})
