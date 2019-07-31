@@ -348,7 +348,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     typedef typename mesh_type::point_type  point_type;
 
     typedef dynamic_matrix<scalar_type>     matrix_type;
-    typedef disk::BoundaryConditions<mesh_type, false> boundary_type;
+    typedef disk::vector_boundary_conditions<mesh_type> boundary_type;
 
     auto rhs_fun = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
         return Matrix<scalar_type, 2, 1>::Zero();

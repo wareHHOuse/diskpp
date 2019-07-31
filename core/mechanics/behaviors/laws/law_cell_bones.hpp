@@ -132,7 +132,7 @@ class LawTypeCellBones
             rhs += priv::outer_product(gphi, qp_stress);
         }
 
-        return mass.llt().solve(rhs);
+        return mass.ldlt().solve(rhs);
     }
 
     vector_type
@@ -154,7 +154,7 @@ class LawTypeCellBones
                 rhs += qp.weight() * qp.getAccumulatedPlasticStrain() * pphi;
             }
 
-            return mass.llt().solve(rhs);
+            return mass.ldlt().solve(rhs);
         }
 
         return vector_type::Zero(pbs);
@@ -184,7 +184,7 @@ class LawTypeCellBones
                 }
             }
 
-            return mass.llt().solve(rhs);
+            return mass.ldlt().solve(rhs);
         }
 
         return vector_type::Zero(pbs);

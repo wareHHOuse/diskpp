@@ -98,7 +98,7 @@ class hierarchical_contact_solver
     typedef disk::simplicial_mesh<T, 2>     mesh_type;
     typedef Eigen::SparseMatrix<T>          sparse_matrix_type;
     typedef Eigen::Triplet<T>               triplet_type;
-    typedef disk::BoundaryConditions<mesh_type> boundary_type;
+    typedef disk::scalar_boundary_conditions<mesh_type> boundary_type;
 
     typedef static_vector<T, 3>             fem_vector;
     typedef static_matrix<T, 3, 3>          fem_matrix;
@@ -277,7 +277,7 @@ class hierarchical_contact_solver
             return 0;
         };
 
-        disk::BoundaryConditions<mesh_type> bnd(msh);
+        disk::scalar_boundary_conditions<mesh_type> bnd(msh);
 
         /*--------------------------------------------------------------------------
         *  Check boundary labels for the unitary square domain

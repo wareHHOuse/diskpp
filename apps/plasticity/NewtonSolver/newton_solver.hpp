@@ -56,7 +56,7 @@ class NewtonRaphson_solver_plasticity
     typedef dynamic_matrix<scalar_type> matrix_dynamic;
     typedef dynamic_vector<scalar_type> vector_dynamic;
 
-    typedef disk::BoundaryConditions<mesh_type, false> bnd_type;
+    typedef disk::vector_boundary_conditions<mesh_type> bnd_type;
 
     const hdi_type& m_hdi;
     const bnd_type& m_bnd;

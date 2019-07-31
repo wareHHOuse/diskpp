@@ -51,7 +51,7 @@ class ADMM
     typedef typename mesh_type::face        face_type;
     typedef typename mesh_type::point_type  point_type;
 
-    typedef disk::mechanics::BoundaryConditions<mesh_type> boundary_type;
+    typedef disk::vector_boundary_conditions<mesh_type> boundary_type;
     typedef Matrix<T, Mesh::dimension, Mesh::dimension>         tensor_type;
     typedef Matrix<T, Mesh::dimension, 1>               vector2d_type;
     typedef Matrix<T, Dynamic, Dynamic>                 matrix_type;
