@@ -77,6 +77,7 @@ endif()
 add_subdirectory(contrib)
 add_subdirectory(core)
 add_subdirectory(utils)
+add_subdirectory(doc)
 
 add_library(diskpp SHARED ${diskpp_source})
 set(LINK_LIBS "${LINK_LIBS}" diskpp)
