@@ -2391,6 +2391,7 @@ class scalar_primal_hho_assembler
 
     hho_degree_info                   di;
     std::vector<Triplet<scalar_type>> triplets;
+    std::vector<std::pair<size_t, scalar_type>> duos;
 
     size_t num_all_faces, num_dirichlet_faces, num_other_faces;
     size_t fbs;
@@ -2461,7 +2462,8 @@ class scalar_primal_hho_assembler
         this->initialize();
 
         // preallocate memory
-        triplets.reserve(2 * (di.face_degree() + 1) * system_size);
+        triplets.reserve(2 * (di.face_degree() + 2) * system_size);
+        duos.reserve(2 * system_size);
     }
 
     void
@@ -2531,10 +2533,10 @@ class scalar_primal_hho_assembler
                 if (asm_map[j].assemble())
                     triplets.push_back(Triplet<scalar_type>(asm_map[i], asm_map[j], lhs(i, j)));
                 else
-                    RHS(asm_map[i]) -= lhs(i, j) * dirichlet_data(j);
+                    duos.push_back(std::make_pair(asm_map[i], -lhs(i, j) * dirichlet_data(j)));
             }
 
-            RHS(asm_map[i]) += rhs(i);
+            duos.push_back(std::make_pair(asm_map[i], rhs(i)));
         }
     }
 
@@ -2543,12 +2545,51 @@ class scalar_primal_hho_assembler
     {
         LHS.setFromTriplets(triplets.begin(), triplets.end());
         triplets.clear();
+
+        for (auto& [id, val] : duos)
+            RHS(id) += val;
+
+        duos.clear();
     }
 
     size_t
     global_system_size() const
     {
         return system_size;
+    }
+
+    vector_type
+    expand_solution(const mesh_type& msh, const boundary_type& bnd, const vector_type& solution)
+    {
+        assert(solution.size() == m_num_unknowns);
+
+        vector_type ret = vector_type::Zero(fbs * msh.faces_size());
+
+        for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++)
+        {
+            const auto bfc             = *itor;
+            const auto face_id         = msh.lookup(bfc);
+            const auto face_offset     = face_id * fbs;
+            const auto compress_offset = compress_table.at(face_id) * fbs;
+
+            if (bnd.is_dirichlet_face(face_id))
+            {
+                size_t sol_ind = 0;
+
+                const vector_type proj_bcf =
+                  project_function(msh, bfc, di.face_degree(), bnd.dirichlet_boundary_func(face_id), di.face_degree());
+
+                assert(proj_bcf.size() == fbs);
+
+                ret.segment(face_offset, fbs) = proj_bcf;
+            }
+            else
+            {
+                ret.segment(face_offset, fbs) = solution.segment(compress_offset, fbs);
+            }
+        }
+
+        return ret;
     }
 
     vector_type
@@ -2621,7 +2662,7 @@ class scalar_primal_hho_assembler
                         assert(neumann.size() == fbs);
                         for (size_t i = 0; i < neumann.size(); i++)
                         {
-                            RHS(asm_map[i]) += neumann(i);
+                            duos.push_back(std::make_pair(asm_map[i], neumann(i)));
                         }
                     }
                 }
@@ -2682,7 +2723,7 @@ class scalar_primal_hho_assembler
 
                         for (size_t i = 0; i < fbs; i++)
                         {
-                            RHS(asm_map[i]) += robin(i);
+                            duos.push_back(std::make_pair(asm_map[i], robin(i)));
 
                             for (size_t j = 0; j < fbs; j++)
                             {
