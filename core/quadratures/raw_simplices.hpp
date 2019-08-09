@@ -80,31 +80,15 @@ public:
 };
 
 /**
- * @brief Return the list of points of the specified simplex
- *
- * @tparam T scalar_type
- * @tparam N diemnsion of the simplex
- * @param rs specified simplex
- * @return std::array<point_type, N+1> list of the vertex
- */
-template<typename T, size_t N>
-std::array<point_type, N+1>
-points(const raw_simplex<T, N>& rs)
-{
-    return rs.points();
-}
-
-
-/**
  * @brief Compute the measure, i.e. the area of the specified triangle
  *
- * @tparam T scalar type
+ * @tparam PtT type of point
  * @param rs specified triangle
  * @return T area of the triangle
  */
-template<typename T>
-T
-measure(const raw_simplex<T,2>& rs)
+template<typename PtT>
+auto
+measure(const raw_simplex<PtT,2>& rs)
 {
     const auto pts = rs.points();
     assert(pts.size() == 3);
@@ -118,14 +102,15 @@ measure(const raw_simplex<T,2>& rs)
 /**
  * @brief Compute the measure, i.e. the volume of the specified tetrahedra
  *
- * @tparam T scalar type
+ * @tparam PtT type of point
  * @param rs specified tetrahedra
  * @return T area of the tetrahedra
  */
-template<typename T>
-T
-measure(const raw_simplex<point<T,3>,3>& rs)
+template<typename PtT>
+auto
+measure(const raw_simplex<PtT,3>& rs)
 {
+    using T        = typename PtT::value_type;
     const auto pts = rs.points();
     assert(pts.size() == 4);
 
@@ -146,7 +131,7 @@ measure(const raw_simplex<point<T,3>,3>& rs)
  */
 template<typename T, size_t N>
 point<T,N>
-barycenter(const raw_simplex<T,N>& rs)
+barycenter(const raw_simplex<point<T,N>,N>& rs)
 {
     const auto pts = rs.points();
     const auto bar = std::accumulate(std::next(pts.begin()), pts.end(), pts.front());
@@ -280,7 +265,7 @@ split_in_raw_tetrahedra(const Mesh& msh, const typename Mesh::cell& cl)
 
             for (auto& tri : tris)
             {
-                const auto tpts = points(tri);
+                const auto tpts = tri.points();
                 const auto rs   = raw_simplex_type({bar, tpts[0], tpts[1], tpts[2]});
                 raw_simplices.push_back(rs);
             }
