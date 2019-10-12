@@ -1,4 +1,5 @@
 add_subdirectory(mesh_basic_tests)
+add_subdirectory(nonlinear_solid_mechanics)
 add_subdirectory(diffusion)
 #add_subdirectory(parallel_diffusion)
 add_subdirectory(app_template)
@@ -24,3 +25,4 @@ add_subdirectory(vector_laplacian)
 add_subdirectory(plasticity)
 add_subdirectory(finite_strains)
 add_subdirectory(bingham)
+
