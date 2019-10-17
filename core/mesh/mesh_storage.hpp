@@ -52,6 +52,8 @@ class mesh_storage
 
 struct bnd_info
 {
+    bnd_info() : boundary_id(0), is_boundary(false) {}
+    bnd_info(size_t bid, bool b) : boundary_id(bid), is_boundary(b) {}
     size_t  boundary_id;
     bool    is_boundary;
 };
