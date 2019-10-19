@@ -493,16 +493,16 @@ integrate_triangle(size_t degree, const PtA& pts)
 
     ret.resize(qps.size());
 
-    const auto col1 = pts[1] - pts[0];
-    const auto col2 = pts[2] - pts[0];
+    // Compute the integration basis
+    const auto [p0, v0, v1] = integration_basis(pts[0], pts[1], pts[2]);
 
-    /* Compute the area of the sub-triangle */
-    const auto tm = (col1.x() * col2.y() - col2.x() * col1.y()) / 2.;
+    /* Compute the area of the triangle */
+    const auto tm = area_triangle_kahan(pts[0], pts[1], pts[2]);
 
-    auto tr = [&](const std::pair<point<T, 2>, T>& qd) -> auto
+    auto tr = [ p0 = p0, v0 = v0, v1 = v1, tm ](const std::pair<point<T, 2>, T>& qd) -> auto
     {
-        const auto point  = col1 * qd.first.x() + col2 * qd.first.y() + pts[0];
-        const auto weight = qd.second * std::abs(tm);
+        const auto point  = p0 + v0 * qd.first.x() + v1 * qd.first.y();
+        const auto weight = qd.second * tm;
         return disk::make_qp(point, weight);
     };
 

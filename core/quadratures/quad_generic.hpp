@@ -89,16 +89,16 @@ integrate_polygon(const size_t degree, const std::vector<point<T, 2>>& pts)
     {
         const auto pt1  = pts[i];
         const auto pt2  = pts[i + 1];
-        const auto col1 = pt1 - pts[0];
-        const auto col2 = pt2 - pts[0];
+        // Compute the integration basis
+        const auto [p0, v0, v1] = integration_basis(pts[0], pt1, pt2);
 
         /* Compute the area of the sub-triangle */
-        const auto tm = (col1.x() * col2.y() - col2.x() * col1.y()) / 2.;
+        const auto tm = area_triangle_kahan(pts[0], pt1, pt2);
 
-        auto tr = [&](const std::pair<point<T, 2>, T>& qd) -> auto
+        auto tr = [ p0 = p0, v0 = v0, v1 = v1, tm ](const std::pair<point<T, 2>, T>& qd) -> auto
         {
-            const auto point  = col1 * qd.first.x() + col2 * qd.first.y() + pts[0];
-            const auto weight = qd.second * std::abs(tm);
+            const auto point  = p0 + v0 * qd.first.x() + v1 * qd.first.y();
+            const auto weight = qd.second * tm;
             return make_qp(point, weight);
         };
 
@@ -118,16 +118,16 @@ integrate_polygon(const size_t degree, const std::vector<point<T, 2>>& pts)
     {
         const auto pt1  = pts[i];
         const auto pt2  = pts[(i + 1) % pts.size()];
-        const auto col1 = pt1 - c_center;
-        const auto col2 = pt2 - c_center;
+        // Compute the integration basis
+        const auto [p0, v0, v1] = integration_basis(c_center, pt1, pt2);
 
         /* Compute the area of the sub-triangle */
-        const auto tm = (col1.x() * col2.y() - col2.x() * col1.y()) / 2.;
+        const auto tm = area_triangle_kahan(pts[0], pt1, pt2);
 
-        auto tr = [&](const std::pair<point<T, 2>, T>& qd) -> auto
+        auto tr = [ p0 = p0, v0 = v0, v1 = v1, tm ](const std::pair<point<T, 2>, T>& qd) -> auto
         {
-            const auto point  = col1 * qd.first.x() + col2 * qd.first.y() + c_center;
-            const auto weight = qd.second * std::abs(tm);
+            const auto point  = p0 + v0 * qd.first.x() + v1 * qd.first.y();
+            const auto weight = qd.second * tm;
             return make_qp(point, weight);
         };
 
@@ -186,7 +186,7 @@ template<typename T>
 std::vector<disk::quadrature_point<T, 3>>
 integrate_polyhedron(const disk::generic_mesh<T, 3>&                msh,
                      const typename disk::generic_mesh<T, 3>::cell& cl,
-                     const size_t                                         degree)
+                     const size_t                                   degree)
 {
     using quadpoint_type = disk::quadrature_point<T, 3>;
 
@@ -202,13 +202,12 @@ integrate_polyhedron(const disk::generic_mesh<T, 3>&                msh,
         assert(pts.size() == 4);
 
         const auto meas = measure(rs);
-        const auto col1 = pts[1] - pts[0];
-        const auto col2 = pts[2] - pts[0];
-        const auto col3 = pts[3] - pts[0];
+        // Compute the integration basis
+        const auto [p0, v0, v1, v2] = integration_basis(pts[0], pts[1], pts[2], pts[3]);
 
         for (auto& qd : m_quadrature_data)
         {
-            auto point  = col1 * qd.first.x() + col2 * qd.first.y() + col3 * qd.first.z() + pts[0];
+            auto point  = p0 + v0 * qd.first.x() + v1 * qd.first.y() + v2 * qd.first.z();
             auto weight = qd.second * meas;
             ret.push_back(make_qp(point, weight));
         }
@@ -237,12 +236,12 @@ integrate_polyhedron_face(const disk::generic_mesh<T, 3>&                msh,
         assert(pts.size() == 3);
         const auto meas = measure(rs);
 
-        const auto col1 = pts[1] - pts[0];
-        const auto col2 = pts[2] - pts[0];
+        // Compute the integration basis
+        const auto [p0, v0, v1] = integration_basis(pts[0], pts[1], pts[2]);
 
         for (auto& qd : m_quadrature_data)
         {
-            const auto point  = col1 * qd.first.x() + col2 * qd.first.y() + pts[0];
+            const auto point  = p0 + v0 * qd.first.x() + v1 * qd.first.y();
             const auto weight = qd.second * meas;
             ret.push_back(disk::make_qp(point, weight));
         }

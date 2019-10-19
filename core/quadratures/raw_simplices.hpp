@@ -28,6 +28,7 @@
 
 #include "geometry/geometry.hpp"
 #include "mesh/point.hpp"
+#include "common/simplicial_formula.hpp"
 
 namespace disk{
 
@@ -93,10 +94,7 @@ measure(const raw_simplex<PtT,2>& rs)
     const auto pts = rs.points();
     assert(pts.size() == 3);
 
-    const auto v0 = (pts[1] - pts[0]).to_vector();
-    const auto v1 = (pts[2] - pts[0]).to_vector();
-
-    return v0.cross(v1).norm()/2.0;
+    return area_triangle_kahan(pts[0], pts[1], pts[2]);
 }
 
 /**
@@ -114,11 +112,7 @@ measure(const raw_simplex<PtT,3>& rs)
     const auto pts = rs.points();
     assert(pts.size() == 4);
 
-    const auto v0 = (pts[1] - pts[0]).to_vector();
-    const auto v1 = (pts[2] - pts[0]).to_vector();
-    const auto v2 = (pts[3] - pts[0]).to_vector();
-
-    return std::abs( v0.dot(v1.cross(v2))/T(6) );
+    return volume_tetrahedron_kahan(pts[0], pts[1], pts[2], pts[3]);
 }
 
 /**
@@ -153,12 +147,10 @@ map_from_reference(const raw_simplex<point<T,3>, 3>& rs, const point<T,3>& p)
     const auto pts = rs.points();
     assert(pts.size() == 4);
 
-    auto pp = (pts[1] - pts[0]) * p.x() +
-              (pts[2] - pts[0]) * p.y() +
-              (pts[3] - pts[0]) * p.z() +
-              pts[0];
+    // Compute the integration basis
+    const auto [p0, v0, v1, v2] = integration_basis(pts[0], pts[1], pts[2], pts[3]);
 
-    return pp;
+    return p0 + v0 * p.x() + v1 * p.y() + v2 * p.z();
 }
 
 /**
@@ -176,11 +168,12 @@ map_from_reference(const point<T,2>& p, const raw_simplex<point<T,3>, 2>& rs)
     const auto pts = rs.points();
     assert(pts.size() == 3);
 
-    auto pp = (pts[1] - pts[0]) * p.x() +
-              (pts[2] - pts[0]) * p.y() +
-              pts[0];
+    // Compute the integration basis
+    const auto [p0, v0, v1] = integration_basis(pts[0], pts[1], pts[2]);
 
-    return pp;
+    return v0 * p.x() +
+              v1 * p.y() +
+              p0;
 }
 
 /**

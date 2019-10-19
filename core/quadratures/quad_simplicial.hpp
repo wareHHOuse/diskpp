@@ -31,8 +31,10 @@
 #ifndef _QUAD_SIMPLICIAL_HPP_
 #define _QUAD_SIMPLICIAL_HPP_
 
+#include "common/simplicial_formula.hpp"
 
-namespace disk {
+namespace disk
+{
 
 /**
  * @brief Compute a quadrature of order "degree" in the physical space of the specified 2D-cell (triangle)
@@ -45,9 +47,9 @@ namespace disk {
  */
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
-integrate(const disk::simplicial_mesh<T, 2>& msh,
+integrate(const disk::simplicial_mesh<T, 2>&                msh,
           const typename disk::simplicial_mesh<T, 2>::cell& cl,
-          const size_t degree)
+          const size_t                                      degree)
 {
     if (degree == 0)
     {
@@ -69,9 +71,9 @@ integrate(const disk::simplicial_mesh<T, 2>& msh,
  */
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
-integrate(const disk::simplicial_mesh<T, 2>& msh,
+integrate(const disk::simplicial_mesh<T, 2>&                msh,
           const typename disk::simplicial_mesh<T, 2>::face& fc,
-          const size_t degree)
+          const size_t                                      degree)
 {
     if (degree == 0)
     {
@@ -100,7 +102,9 @@ map_to_physical(const disk::simplicial_mesh<T, 3>&                msh,
                 const point<T, 2>&                                pm)
 {
     const auto pts = points(msh, face);
-    return pts[0] + (pts[1] - pts[0]) * pm.x() + (pts[2] - pts[0]) * pm.y();
+    // Compute the integration basis
+    const auto [p0, v0, v1] = integration_basis(pts[0], pts[1], pts[2]);
+    return p0 + v0 * pm.x() + v1 * pm.y();
 }
 
 /**
@@ -120,15 +124,13 @@ map_to_physical(const disk::simplicial_mesh<T, 3>&                msh,
 {
     const auto pts = points(msh, cl);
 
-    const auto pp = (pts[1] - pts[0]) * p.x() +
-                    (pts[2] - pts[0]) * p.y() +
-                    (pts[3] - pts[0]) * p.z() + pts[0];
+    // Compute the integration basis
+    const auto [p0, v0, v1, v2] = integration_basis(pts[0], pts[1], pts[2], pts[3]);
 
-    return pp;
+    return p0 + v0 * p.x() + v1 * p.y() + v2 * p.z();
 }
 
 } // namespace priv
-
 
 /**
  * @brief Compute a quadrature of order "degree" in the physical space of the specified 3D-face (triangle)
@@ -141,9 +143,7 @@ map_to_physical(const disk::simplicial_mesh<T, 3>&                msh,
  */
 template<typename T>
 std::vector<disk::quadrature_point<T, 3>>
-integrate(const disk::simplicial_mesh<T, 3>& msh,
-          const typename disk::simplicial_mesh<T, 3>::face& fc,
-          size_t degree)
+integrate(const disk::simplicial_mesh<T, 3>& msh, const typename disk::simplicial_mesh<T, 3>::face& fc, size_t degree)
 {
     if (degree == 0)
     {
@@ -156,12 +156,12 @@ integrate(const disk::simplicial_mesh<T, 3>& msh,
     assert(pts.size() == 3);
     const auto meas = measure(msh, fc);
 
-    const auto col1 = pts[1] - pts[0];
-    const auto col2 = pts[2] - pts[0];
+    // Compute the integration basis
+    const auto [p0, v0, v1] = integration_basis(pts[0], pts[1], pts[2]);
 
-    auto tr = [&](const std::pair<point<T, 2>, T>& qd) -> auto
+    auto tr = [p0=p0, v0=v0, v1=v1, meas](const std::pair<point<T, 2>, T>& qd) -> auto
     {
-        const auto point  = col1 * qd.first.x() + col2 * qd.first.y() + pts[0];
+        const auto point  = p0 + v0 * qd.first.x() + v1 * qd.first.y();
         const auto weight = qd.second * meas;
         return disk::make_qp(point, weight);
     };
@@ -183,9 +183,7 @@ integrate(const disk::simplicial_mesh<T, 3>& msh,
  */
 template<typename T>
 std::vector<disk::quadrature_point<T, 3>>
-integrate(const disk::simplicial_mesh<T, 3>& msh,
-          const typename disk::simplicial_mesh<T, 3>::cell& cl,
-          size_t degree)
+integrate(const disk::simplicial_mesh<T, 3>& msh, const typename disk::simplicial_mesh<T, 3>::cell& cl, size_t degree)
 {
     if (degree == 0)
     {
@@ -198,15 +196,12 @@ integrate(const disk::simplicial_mesh<T, 3>& msh,
     assert(pts.size() == 4);
     const auto meas = measure(msh, cl);
 
-    const auto col1 = pts[1] - pts[0];
-    const auto col2 = pts[2] - pts[0];
-    const auto col3 = pts[3] - pts[0];
+    // Compute the integration basis
+    const auto [p0, v0, v1, v2] = integration_basis(pts[0], pts[1], pts[2], pts[3]);
 
-    auto tr = [&](const std::pair<point<T, 3>, T>& qd) -> auto
+    auto tr = [ p0 = p0, v0 = v0, v1 = v1, v2 = v2, meas ](const std::pair<point<T, 3>, T>& qd) -> auto
     {
-        const auto point  = col1 * qd.first.x() +
-                            col2 * qd.first.y() +
-                            col3 * qd.first.z() + pts[0];
+        const auto point  = p0 + v0 * qd.first.x() + v1 * qd.first.y() + v2 * qd.first.z();
         const auto weight = qd.second * meas;
         return disk::make_qp(point, weight);
     };
