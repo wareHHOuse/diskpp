@@ -1,3 +1,6 @@
+option(BUILD_DOC "Build documentation" ON)
+
+if (BUILD_DOC)
 find_package(Doxygen)
 if(NOT DOXYGEN_FOUND)
     message("Doxygen not found, I will not generate/install the documentation")
@@ -19,3 +22,4 @@ else()
           DESTINATION share/doc/${CMAKE_PROJECT_NAME})
 
 endif()
+endif(BUILD_DOC)
