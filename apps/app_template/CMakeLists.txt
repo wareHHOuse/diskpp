@@ -1,2 +1,5 @@
+option(BUILD_APP_TEMPLATE "Build template application" ON)
+if (BUILD_APP_TEMPLATE)
 add_executable(app_template app_template.cpp)
 target_link_libraries(app_template ${LINK_LIBS})
+endif (BUILD_APP_TEMPLATE)
