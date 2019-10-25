@@ -129,7 +129,7 @@ public:
         {
         	auto bar = barycenter(msh, cl);
         	Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, di, sol_fun);
-        	auto cell_ofs = disk::priv::offset(msh, cl);
+        	auto cell_ofs = disk::offset(msh, cl);
         	Matrix<scalar_type, Dynamic, 1> s = sol.block(cell_ofs * cbs, 0, cbs, 1);
         	Matrix<scalar_type, Dynamic, 1> diff = s - p.head(cbs);
         	auto cb = disk::make_scalar_monomial_basis(msh, cl, di.cell_degree());
@@ -161,7 +161,7 @@ public:
                         const cell_type& cl)
     {
         auto gamma = compute_auxiliar(msh, cl);
-        auto cell_ofs  = disk::priv::offset(msh, cl);
+        auto cell_ofs  = disk::offset(msh, cl);
         auxiliar.block(cell_ofs * sbs, 0, sbs, 1) = gamma;
         return;
     }
@@ -172,7 +172,7 @@ public:
     {
         auto sb = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
 
-        auto cell_ofs  = disk::priv::offset(msh, cl);
+        auto cell_ofs  = disk::offset(msh, cl);
         auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
 
         Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> u_TF =
@@ -196,7 +196,7 @@ public:
 
         for(auto cl: msh)
         {
-            auto cell_ofs  = disk::priv::offset(msh, cl);
+            auto cell_ofs  = disk::offset(msh, cl);
             auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
 
             Eigen::Matrix<scalar_type, Eigen::Dynamic, 1> u_TF =
@@ -228,7 +228,7 @@ public:
         auto G         = make_vector_hho_gradrec(msh, cl, di);
         auto cb = disk::make_scalar_monomial_basis(msh, cl, di.cell_degree());
         auto sb = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
-        auto cell_ofs  = disk::priv::offset(msh, cl);
+        auto cell_ofs  = disk::offset(msh, cl);
         auto num_faces = howmany_faces(msh, cl);
 
         auto stress = multiplier.block( sbs * cell_ofs,  0, sbs, 1);
@@ -300,7 +300,7 @@ public:
             auto gr   = make_scalar_hho_laplacian(msh, cl, di);
             auto stab = make_scalar_hho_stabilization(msh, cl, gr.first, di);
 
-            auto cell_ofs  = disk::priv::offset(msh, cl);
+            auto cell_ofs  = disk::offset(msh, cl);
             auto num_total_dofs = cbs + fbs * howmany_faces(msh, cl);
 
             Matrix<scalar_type, Dynamic, 1> cell_rhs = rhs_all.block( cbs*cell_ofs, 0, cbs, 1);
@@ -332,7 +332,7 @@ public:
 
         for (auto& cl: msh)
         {
-            auto cell_ofs = disk::priv::offset(msh, cl);
+            auto cell_ofs = disk::offset(msh, cl);
             vector_type stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
             auto gamma  = compute_auxiliar( msh,  cl);
 

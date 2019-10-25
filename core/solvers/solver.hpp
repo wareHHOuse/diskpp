@@ -177,6 +177,10 @@ conjugated_gradient(sol::state& lua,
 
 #ifdef HAVE_INTEL_MKL
 
+#define PARDISO_IN_CORE                 0
+#define PARDISO_OUT_OF_CORE_IF_NEEDED   1
+#define PARDISO_OUT_OF_CORE_ALWAYS      2
+
 template<typename T>
 struct pardiso_params
 {
@@ -203,14 +207,22 @@ mkl_pardiso(const pardiso_params<T>& params,
         solver.pardisoParameterArray()[18] = -1; //report flops
 
     solver.analyzePattern(A);
+    if (solver.info() != Eigen::Success) {
+       std::cerr << "ERROR: analyzePattern failed" << std::endl;
+       return false;
+    }
+
     solver.factorize(A);
     if (solver.info() != Eigen::Success) {
        std::cerr << "ERROR: Could not factorize the matrix" << std::endl;
+       std::cerr << "Try to tweak MKL_PARDISO_OOC_MAX_CORE_SIZE" << std::endl;
+       return false;
     }
 
     x = solver.solve(b);
     if (solver.info() != Eigen::Success) {
        std::cerr << "ERROR: Could not solve the linear system" << std::endl;
+       return false;
     }
 
     if (params.report_factorization_Mflops)
