@@ -68,8 +68,15 @@ class mechanical_computation
 
     bool two_dim;
 
+/**
+ * @brief Compute A : gphi for finite deformation
+ *
+ * @param A fourth-order tangent modulus
+ * @param gphi set of basis function for gradient reconstruction
+ * @return eigen_compatible_stdvector<static_matrix_type> A : gphi
+ */
     eigen_compatible_stdvector<static_matrix_type>
-    compute_A_gphi(const static_tensor_type& tens, const eigen_compatible_stdvector<static_matrix_type>& gphi) const
+    compute_A_gphi(const static_tensor_type& A, const eigen_compatible_stdvector<static_matrix_type>& gphi) const
     {
         const auto grad_basis_size = gphi.size();
         const auto DIM2            = dimension * dimension;
@@ -85,7 +92,7 @@ class mechanical_computation
             { // depend de l'ordre des bases
                 for (size_t l = 0; l < dimension; l++)
                 { // depend de l'ordre des bases
-                    Aphi.push_back(disk::tm_prod(tens, gphi[row], l, k));
+                    Aphi.push_back(disk::tm_prod(A, gphi[row], l, k));
                     row++;
                 }
             }
@@ -94,6 +101,19 @@ class mechanical_computation
         return Aphi;
     }
 
+    /**
+     * @brief Compute the stress tensor and the tangent modulus at the given qudature point
+     *  - in small deformation Cauchy and Cep
+     *  - in finite deformation PK1 and A
+     * @tparam QPType Type of law at the quadrature point
+     * @tparam LawData Type for material data
+     * @param qp A behavior quadrature point where we compute the constitutive law
+     * @param material_data material data
+     * @param RkT_iqn Reconstruction operator evaluated at the quadrature point (symmetric gradient)
+     * in small deformation and gradient in finite deformation)
+     * @param small_def small deformation yes or no
+     * @return std::pair<static_matrix_type, static_tensor_type> stress tensor and the tangent modulus
+     */
     template<typename QPType, typename LawData>
     std::pair<static_matrix_type, static_tensor_type>
     compute_behavior(QPType&                   qp,
@@ -124,6 +144,7 @@ class mechanical_computation
         // std::cout << "module : " << Cep << std::endl;
         if (small_def)
         {
+            // upper part
             for (size_t j = 0; j < grad_basis_size; j++)
             {
                 const static_matrix_type Cgphi_j = weight * tm_prod(Cep, gphi[j]);
@@ -154,6 +175,7 @@ class mechanical_computation
         }
         else
         {
+            // lower part
             const auto qp_A_gphi = compute_A_gphi(weight * Cep, gphi);
 
             for (size_t j = 0; j < grad_basis_size; j += grad_dim_dofs)
@@ -175,12 +197,21 @@ class mechanical_computation
     }
 
     void
-    symmetrized_rigidity(const size_t grad_basis_size, matrix_type& AT) const
+    symmetrized_rigidity(const size_t grad_basis_size, matrix_type& AT, const bool small_def) const
     {
-        // lower part AT
-        for (size_t i = 0; i < grad_basis_size; i++)
-            for (size_t j = i; j < grad_basis_size; j++)
-                AT(i, j) = AT(j, i);
+        if(small_def)
+        {
+            // lower part AT
+            for (size_t j = 0; j < grad_basis_size; j++)
+                for (size_t i = j; i < grad_basis_size; i++)
+                    AT(i, j) = AT(j, i);}
+        else
+        {
+            // upper part AT
+            for (size_t i = 0; i < grad_basis_size; i++)
+                for (size_t j = i; j < grad_basis_size; j++)
+                   AT(i, j) = AT(j, i);
+        }
     }
 
     template<typename Function>
@@ -188,7 +219,7 @@ class mechanical_computation
     compute_external_forces(const cell_type& cl, const Function& load, vector_type& RTF)
     {
         // compute (f,v)_T
-        const auto cb             = make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
+        const auto cb       = make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
         RTF.head(cb.size()) = make_rhs(m_msh, cl, cb, load);
     }
 
@@ -201,7 +232,8 @@ class mechanical_computation
                             const size_t                                          grad_basis_size,
                             vector_type&                                          aT) const
     {
-        //  std::cout << "stress" << std::endl;
+        //   std::cout << "stress" << std::endl;
+        //   std::cout << stress << std::endl;
         const static_matrix_type stress_qp = weight * stress;
 
         if (small_def)
@@ -365,18 +397,22 @@ class mechanical_computation
             // Compute bahavior
             tc.tic();
             const auto [stress, Cep] = compute_behavior(qp, material_data, RkT_iqn, small_def);
+            // std::cout << "stress" << std::endl;
+            // std::cout << stress << std::endl;
+            // std::cout << "Cep" << std::endl;
+            // std::cout << Cep << std::endl;
             tc.toc();
             time_law += tc.to_double();
 
             // Compute rigidity
-            compute_rigidity(Cep, gphi, small_def, qp.weight(), grad_dim_dofs, grad_basis_size, AT);
+            this->compute_rigidity(Cep, gphi, small_def, qp.weight(), grad_dim_dofs, grad_basis_size, AT);
 
-            compute_internal_forces(stress, gphi, small_def, qp.weight(), grad_dim_dofs, grad_basis_size, aT);
+            this->compute_internal_forces(stress, gphi, small_def, qp.weight(), grad_dim_dofs, grad_basis_size, aT);
         }
 
-        compute_external_forces(cl, load, RTF);
+        this->compute_external_forces(cl, load, RTF);
 
-        symmetrized_rigidity(grad_basis_size, AT);
+        this->symmetrized_rigidity(grad_basis_size, AT, small_def);
 
         // std::cout << "AT: " << AT.norm() << std::endl;
         // std::cout << AT << std::endl;
@@ -386,9 +422,10 @@ class mechanical_computation
         F_int = RkT.transpose() * aT;
         RTF -= F_int;
 
-        //  std::cout << "K: " << K_int.norm() << std::endl;
-        // // std::cout << K_int << std::endl;
-        //  std::cout << "F: " << F_int.norm() << std::endl;
+        // std::cout << "K: " << K_int.norm() << std::endl;
+        // std::cout << K_int << std::endl;
+        // std::cout << "F: " << F_int.norm() << std::endl;
+        // std::cout << "RTF: " << RTF.norm() << std::endl;
 
         assert(K_int.rows() == num_total_dofs);
         assert(K_int.cols() == num_total_dofs);

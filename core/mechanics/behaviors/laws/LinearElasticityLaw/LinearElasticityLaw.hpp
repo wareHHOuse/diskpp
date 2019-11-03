@@ -98,6 +98,7 @@ class LinearElasticity_qp : public law_qp_bones<T, DIM>
     std::pair<static_matrix_type3D, static_tensor<scalar_type, 3>>
     compute_whole3D(const static_matrix_type3D& strain_curr, const data_type& data, bool tangentmodulus = true)
     {
+        this->m_estrain_curr                  = strain_curr;
         const static_tensor<scalar_type, 3> C = this->elastic_modulus3D(data);
 
         // compute Cauchy stress

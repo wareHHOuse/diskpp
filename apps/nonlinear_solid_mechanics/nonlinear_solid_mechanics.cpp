@@ -62,7 +62,7 @@ run_nl_solid_mechanics_solver(const Mesh<T, 2, Storage>&      msh,
     // Cook with quadrilaterals
     auto zero = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
 
-    auto trac = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0.0, 0.3125}; };
+    auto trac = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0.0, 0.1125}; };
 
     bnd.addDirichletBC(disk::CLAMPED, 3, zero);
     bnd.addNeumannBC(disk::NEUMANN, 8, trac);
@@ -70,6 +70,7 @@ run_nl_solid_mechanics_solver(const Mesh<T, 2, Storage>&      msh,
     disk::mechanics::NewtonSolver<mesh_type> nl(msh, bnd, rp);
 
     nl.addBehavior(disk::DeformationMeasure::SMALL_DEF, disk::LawType::ELASTIC);
+    nl.addMaterialData(material_data);
 
     nl.initial_guess(zero);
 
@@ -85,7 +86,7 @@ run_nl_solid_mechanics_solver(const Mesh<T, 2, Storage>&      msh,
         solve_info.printInfo();
     }
 
-    if (nl.test_convergence())
+    if (nl.convergence())
     {
         std::cout << "average diameter h: " << average_diameter(msh) << std::endl;
     }
@@ -107,11 +108,16 @@ main(int argc, char** argv)
     disk::MaterialData<RealType> material_data;
 
     // // Cook Parameters (mm, MPa, kN)
-    // RealType E  = 206.9;
-    // RealType nu = 0.29;
+    RealType E  = 70;
+    RealType nu = 0.4999;
 
-    // material_data.setMu(E, nu);
-    // material_data.setLambda(E, nu);
+    material_data.setMu(E, nu);
+    material_data.setLambda(E, nu);
+
+    material_data.setK(0.0);
+    material_data.setH(0.135);
+
+    material_data.setSigma_y0(0.243);
 
     // readCurve("VEM2_2d.dat", material_data);
 
@@ -131,15 +137,15 @@ main(int argc, char** argv)
     // material_data.setSigma_y0(0.243);
 
     // Sphere Parameters (mm, MPa, kN)
-    RealType E  = 28.95;
-    RealType nu = 0.3;
-    RealType ET = 0;
+    // RealType E  = 28.95;
+    // RealType nu = 0.3;
+    // RealType ET = 0;
 
-    material_data.setMu(E, nu);
-    material_data.setLambda(E, nu);
-    material_data.setK(0);
-    material_data.setH(0.0);
-    material_data.setSigma_y0(6);
+    // material_data.setMu(E, nu);
+    // material_data.setLambda(E, nu);
+    // material_data.setK(0);
+    // material_data.setH(0.0);
+    // material_data.setSigma_y0(6);
 
     int ch;
 

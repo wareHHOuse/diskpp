@@ -155,7 +155,7 @@ class NewtonIteration
         timecounter tc, ttot;
 
         ttot.tic();
-        int cell_i = 0;
+        size_t cell_i = 0;
 
         for (auto& cl : m_msh)
         {
@@ -292,6 +292,7 @@ class NewtonIteration
         }
 
         m_F_int = sqrt(m_F_int);
+        //std::cout << "F_int: " << m_F_int << std::endl;
 
         m_assembler.impose_neumann_boundary_conditions(m_msh, m_bnd);
         m_assembler.finalize();
@@ -331,7 +332,7 @@ class NewtonIteration
 
         // Update  unknowns
         // Update face Uf^{i+1} = Uf^i + delta Uf^i
-        for (int i = 0; i < m_solution_faces.size(); i++)
+        for (size_t i = 0; i < m_solution_faces.size(); i++)
         {
             assert(m_solution_faces.at(i).size() == fbs);
             m_solution_faces.at(i) += solF.segment(i * fbs, fbs);
@@ -378,11 +379,11 @@ class NewtonIteration
     }
 
     bool
-    test_convergence(const int iter)
+    convergence(const size_t iter)
     {
         // norm of the solution
         scalar_type error_un = 0;
-        for (int i = 0; i < m_solution_faces.size(); i++)
+        for (size_t i = 0; i < m_solution_faces.size(); i++)
         {
             scalar_type norm = m_solution_faces[i].norm();
             error_un += norm * norm;
@@ -398,7 +399,7 @@ class NewtonIteration
         // norm of the rhs
         const scalar_type residual  = m_assembler.RHS.norm();
         scalar_type       max_error = 0.0;
-        for (int i = 0; i < m_assembler.RHS.size(); i++)
+        for (size_t i = 0; i < m_assembler.RHS.size(); i++)
             max_error = std::max(max_error, std::abs(m_assembler.RHS(i)));
 
         // norm of the increment

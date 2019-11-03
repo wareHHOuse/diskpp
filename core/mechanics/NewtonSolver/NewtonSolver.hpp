@@ -354,7 +354,13 @@ class NewtonSolver
     void
     addMaterialData(const MaterialData<scalar_type>& material_data)
     {
-        m_behavior.addMatrialData(material_data);
+        m_behavior.addMaterialData(material_data);
+
+        if (m_verbose)
+        {
+            std::cout << "Add material ..." << std::endl;
+            m_behavior.getMaterialData().print();
+        }
     }
 
     template<typename LoadFunction>
@@ -408,11 +414,11 @@ class NewtonSolver
             }
 
             // Test convergence
-            m_convergence = newton_step.test_convergence();
+            m_convergence = newton_step.convergence();
 
             if (!m_convergence)
             {
-                if (current_step.level() > m_rp.m_sublevel)
+                if (current_step.level() + 1 > m_rp.m_sublevel)
                 {
                     std::cout << "***********************************************************" << std::endl;
                     std::cout << "***** PROBLEM OF CONVERGENCE: We stop the calcul here *****" << std::endl;
@@ -467,7 +473,7 @@ class NewtonSolver
     }
 
     bool
-    test_convergence() const
+    convergence() const
     {
         return m_convergence;
     }

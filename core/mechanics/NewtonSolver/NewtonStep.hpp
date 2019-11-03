@@ -157,7 +157,7 @@ class NewtonStep
 
         m_convergence = false;
 
-        for (int iter = 0; iter < m_rp.m_iter_max; iter++)
+        for (size_t iter = 0; iter < m_rp.m_iter_max; iter++)
         {
             // assemble lhs and rhs
             AssemblyInfo assembly_info;
@@ -176,7 +176,7 @@ class NewtonStep
 
             ni.updateAssemblyInfo(assembly_info);
             // test convergence
-            m_convergence = newton_iter.test_convergence(iter);
+            m_convergence = newton_iter.convergence(iter);
             if (m_convergence)
             {
                 newton_iter.save_solutions(m_solution, m_solution_faces);
@@ -206,7 +206,7 @@ class NewtonStep
      * @return false else
      */
     bool
-    test_convergence() const
+    convergence() const
     {
         return m_convergence;
     }
