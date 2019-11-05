@@ -197,7 +197,7 @@ class mechanical_computation
     }
 
     void
-    symmetrized_rigidity(const size_t grad_basis_size, matrix_type& AT, const bool small_def) const
+    symmetrized_rigidity_matrix(const size_t grad_basis_size, matrix_type& AT, const bool small_def) const
     {
         if(small_def)
         {
@@ -277,8 +277,14 @@ class mechanical_computation
         }
     }
 
+    void
+    compute_contact_terms(void) const
+    {
+        // to fill in the future
+    }
+
     size_t
-    num_grad_dim(const bool& small_def) const
+    num_grad_dim_dofs(const bool& small_def) const
     {
         if (small_def)
         {
@@ -301,6 +307,7 @@ class mechanical_computation
     vector_type RTF;
     vector_type F_int;
     double      time_law;
+    double      time_contact;
 
     mechanical_computation(const mesh_type& msh, const hdi_type& hdi) : m_msh(msh), m_hdi(hdi)
     {
@@ -322,6 +329,10 @@ class mechanical_computation
             const LawData&     material_data,
             const bool         small_def)
     {
+        time_law     = 0.0;
+        time_contact = 0.0;
+        timecounter tc;
+
         const auto cell_degree = m_hdi.cell_degree();
         const auto grad_degree = m_hdi.grad_degree();
         const auto face_degree = m_hdi.face_degree();
@@ -341,13 +352,9 @@ class mechanical_computation
 
         const auto grad_basis_size = gb_size;
 
-        time_law = 0.0;
-        timecounter tc;
-
-        const auto fcs            = faces(m_msh, cl);
-        const auto num_faces      = fcs.size();
+        const auto num_faces      = howmany_faces(m_msh, cl);
         const auto num_total_dofs = cell_basis_size + num_faces * face_basis_size;
-        const auto grad_dim_dofs  = num_grad_dim(small_def);
+        const auto grad_dim_dofs  = num_grad_dim_dofs(small_def);
 
         matrix_type AT = matrix_type::Zero(grad_basis_size, grad_basis_size);
         vector_type aT = vector_type::Zero(grad_basis_size);
@@ -376,6 +383,7 @@ class mechanical_computation
         for (auto& qp : law_quadpoints)
         {
             //  std::cout << "qp: " << qp.point() << std::endl;
+            // Compute gradient basis function
             if (small_def)
             {
                 gphi = gbs.eval_functions(qp.point());
@@ -388,13 +396,12 @@ class mechanical_computation
             assert(gphi.size() == grad_basis_size);
 
             // Compute local gradient and norm
-            //  std::cout << "RkT_utf: " << RkT_uTF.transpose() << std::endl;
             const auto RkT_iqn = eval(RkT_uTF, gphi);
 
-            // std::cout << "RkT" << std::endl;
+            // std::cout << "RkT_iqn" << std::endl;
             // std::cout << RkT_iqn << std::endl;
 
-            // Compute bahavior
+            // Compute behavior
             tc.tic();
             const auto [stress, Cep] = compute_behavior(qp, material_data, RkT_iqn, small_def);
             // std::cout << "stress" << std::endl;
@@ -406,13 +413,20 @@ class mechanical_computation
 
             // Compute rigidity
             this->compute_rigidity(Cep, gphi, small_def, qp.weight(), grad_dim_dofs, grad_basis_size, AT);
-
+            // Compute internal force
             this->compute_internal_forces(stress, gphi, small_def, qp.weight(), grad_dim_dofs, grad_basis_size, aT);
+            // Compute contact terms
+            tc.tic();
+            this->compute_contact_terms();
+            tc.toc();
+            time_contact += tc.to_double();
         }
 
+        // compute external forces
         this->compute_external_forces(cl, load, RTF);
 
-        this->symmetrized_rigidity(grad_basis_size, AT, small_def);
+        // Symmetrize rigidity matrix
+        this->symmetrized_rigidity_matrix(grad_basis_size, AT, small_def);
 
         // std::cout << "AT: " << AT.norm() << std::endl;
         // std::cout << AT << std::endl;
