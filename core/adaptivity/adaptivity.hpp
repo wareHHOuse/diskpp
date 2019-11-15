@@ -201,6 +201,18 @@ class MeshDegree
         const auto face_id             = msh.lookup(fc);
         return m_faces_degree[face_id] = di;
     }
+
+    std::vector<DegreeInfo>
+    faces_degree(void) const
+    {
+        return m_faces_degree;
+    }
+
+    std::vector<DegreeInfo>
+    cells_degree(void) const
+    {
+        return m_cells_degree;
+    }
 };
 
 } // end disk

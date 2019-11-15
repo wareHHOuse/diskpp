@@ -153,7 +153,7 @@ class NewtonStep
         tc.tic();
 
         // initialise the NewtonRaphson iteration
-        NewtonIteration<mesh_type> newton_iter(m_msh, m_hdi, m_bnd, m_rp);
+        NewtonIteration<mesh_type> newton_iter(m_msh, m_hdi, m_bnd, m_rp, degree_infos);
 
         newton_iter.initialize(m_solution, m_solution_faces);
 

@@ -98,8 +98,13 @@ class NewtonIteration
     bool m_verbose;
 
   public:
-    NewtonIteration(const mesh_type& msh, const hdi_type& hdi, const bnd_type& bnd, const param_type& rp) :
-      m_msh(msh), m_hdi(hdi), m_rp(rp), m_bnd(bnd), m_verbose(rp.m_verbose)
+    NewtonIteration(const mesh_type&             msh,
+                    const hdi_type&              hdi,
+                    const bnd_type&              bnd,
+                    const param_type&            rp,
+                    const MeshDegree<mesh_type>& degree_infos) :
+      m_msh(msh),
+      m_hdi(hdi), m_rp(rp), m_bnd(bnd), m_verbose(rp.m_verbose)
     {
         m_AL.clear();
         m_AL.resize(m_msh.cells_size());
@@ -107,7 +112,7 @@ class NewtonIteration
         m_bL.clear();
         m_bL.resize(m_msh.cells_size());
 
-        m_assembler = make_vector_primal_hho_assembler(m_msh, m_hdi, m_bnd);
+        m_assembler = make_vector_primal_hho_assembler(m_msh, degree_infos, m_bnd);
     }
 
     bool
@@ -115,6 +120,7 @@ class NewtonIteration
     {
         return m_verbose;
     }
+
     void
     verbose(bool v)
     {
@@ -191,7 +197,7 @@ class NewtonIteration
             // Mechanical Computation
 
             auto& law_cell = law.getCellQPs(cell_i);
-            //auto& law_qp   = behavior.getQPs(m_msh, cl);
+            // auto& law_qp   = behavior.getQPs(m_msh, cl);
             tc.tic();
             elem.compute(cl, lf, GT, m_solution.at(cell_i), law_cell, material_data, small_def);
 
@@ -234,7 +240,7 @@ class NewtonIteration
                             else
                             {
                                 const auto recons_scalar = make_scalar_hho_laplacian(m_msh, cl, m_hdi);
-                                stab_HHO  = make_vector_hho_stabilization_optim(m_msh, cl, recons_scalar.first, m_hdi);
+                                stab_HHO = make_vector_hho_stabilization_optim(m_msh, cl, recons_scalar.first, m_hdi);
                             }
 
                             assert(elem.K_int.rows() == stab_oper.rows());
@@ -296,7 +302,7 @@ class NewtonIteration
         }
 
         m_F_int = sqrt(m_F_int);
-        //std::cout << "F_int: " << m_F_int << std::endl;
+        // std::cout << "F_int: " << m_F_int << std::endl;
 
         m_assembler.impose_neumann_boundary_conditions(m_msh, m_bnd);
         m_assembler.finalize();
@@ -323,7 +329,7 @@ class NewtonIteration
     }
 
     scalar_type
-    postprocess(const MeshDegree<mesh_type>&  degree_infos)
+    postprocess(const MeshDegree<mesh_type>& degree_infos)
     {
         timecounter tc;
         tc.tic();
@@ -332,7 +338,8 @@ class NewtonIteration
         size_t cell_i = 0;
         for (auto& cl : m_msh)
         {
-            const vector_type xdT = m_assembler.take_local_solution_nonlinear(m_msh, cl, m_bnd, m_system_solution, m_solution_faces);
+            const vector_type xdT =
+              m_assembler.take_local_solution_nonlinear(m_msh, cl, m_bnd, m_system_solution, m_solution_faces);
 
             // static decondensation
             const vector_type xT = m_bL[cell_i] - m_AL[cell_i] * xdT;
@@ -358,11 +365,12 @@ class NewtonIteration
 
         // Update  unknowns
         // Update face Uf^{i+1} = Uf^i + delta Uf^i
-        const auto fbs = vector_basis_size(m_hdi.face_degree(), mesh_type::dimension - 1, mesh_type::dimension);
-        for (size_t i = 0; i < m_solution_faces.size(); i++)
+        size_t face_i = 0;
+        for (auto itor = m_msh.faces_begin(); itor != m_msh.faces_end(); itor++)
         {
-            assert(m_solution_faces.at(i).size() == fbs);
-            m_solution_faces.at(i) += solF.segment(i * fbs, fbs);
+            const auto fc = *itor;
+            m_solution_faces.at(face_i++) +=
+              m_assembler.take_local_solution_nonlinear(m_msh, fc, m_bnd, m_system_solution, m_solution_faces);
         }
 
         tc.toc();
