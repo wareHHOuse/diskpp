@@ -427,7 +427,7 @@ class diffusion_condensed_assembler
 
     template<typename Function>
     vector_type
-    take_local_data(const Mesh&                     msh,
+    take_local_solution(const Mesh&                     msh,
                     const typename Mesh::cell_type& cl,
                     const vector_type&              solution,
                     const Function&                 dirichlet_bf)
@@ -1319,7 +1319,6 @@ class assembler_mechanics
     {
         const size_t      face_degree   = m_hdi.face_degree();
         const auto        num_face_dofs = vector_basis_size(face_degree, dimension - 1, dimension);
-        const scalar_type zero          = 0;
 
         const auto          fcs = faces(msh, cl);
         std::vector<size_t> l2g(fcs.size() * num_face_dofs);
@@ -1392,11 +1391,11 @@ class assembler_mechanics
                             for (size_t i = 0; i < num_face_dofs; i += dimension)
                             {
                                 mat_Fj.col(i + 1).setZero();
-                                proj_bcf(i + 1) = zero;
+                                proj_bcf(i + 1) = scalar_type(0);
                                 if (dimension == 3)
                                 {
                                     mat_Fj.col(i + 2).setZero();
-                                    proj_bcf(i + 2) = zero;
+                                    proj_bcf(i + 2) = scalar_type(0);
                                 }
                                 if (!ind_ok)
                                 {
@@ -1417,11 +1416,11 @@ class assembler_mechanics
                             for (size_t i = 0; i < num_face_dofs; i += dimension)
                             {
                                 mat_Fj.col(i).setZero();
-                                proj_bcf(i) = zero;
+                                proj_bcf(i) = scalar_type(0);
                                 if (dimension == 3)
                                 {
                                     mat_Fj.col(i + 2).setZero();
-                                    proj_bcf(i + 2) = zero;
+                                    proj_bcf(i + 2) = scalar_type(0);
                                 }
                                 if (!ind_ok)
                                 {
@@ -1444,9 +1443,9 @@ class assembler_mechanics
                             for (size_t i = 0; i < num_face_dofs; i += dimension)
                             {
                                 mat_Fj.col(i).setZero();
-                                proj_bcf(i) = zero;
+                                proj_bcf(i) = scalar_type(0);
                                 mat_Fj.col(i + 1).setZero();
-                                proj_bcf(i + 1) = zero;
+                                proj_bcf(i + 1) = scalar_type(0);
                                 if (!ind_ok)
                                 {
                                     l2g.at(pos + i)     = face_offset + ind_sol++;
@@ -1465,7 +1464,7 @@ class assembler_mechanics
                                 if (dimension == 3)
                                 {
                                     mat_Fj.col(i + 2).setZero();
-                                    proj_bcf(i + 2) = zero;
+                                    proj_bcf(i + 2) = scalar_type(0);
                                 }
                                 if (!ind_ok)
                                 {
@@ -1489,7 +1488,7 @@ class assembler_mechanics
                             for (size_t i = 0; i < num_face_dofs; i += dimension)
                             {
                                 mat_Fj.col(i + 1).setZero();
-                                proj_bcf(i + 1) = zero;
+                                proj_bcf(i + 1) = scalar_type(0);
                                 if (!ind_ok)
                                 {
                                     l2g.at(pos + i)     = 0xDEADBEEF;
@@ -1509,7 +1508,7 @@ class assembler_mechanics
                             for (size_t i = 0; i < num_face_dofs; i += dimension)
                             {
                                 mat_Fj.col(i).setZero();
-                                proj_bcf(i) = zero;
+                                proj_bcf(i) = scalar_type(0);
                                 if (!ind_ok)
                                 {
                                     l2g.at(pos + i)     = face_offset + ind_sol++;
@@ -1847,7 +1846,6 @@ class assembler_mechanics
         assert(sol_F.size() == msh.faces_size());
         const size_t      face_degree   = m_hdi.face_degree();
         const auto        num_face_dofs = vector_basis_size(face_degree, dimension - 1, dimension);
-        const scalar_type zero          = 0;
 
         const auto          fcs = faces(msh, cl);
         std::vector<size_t> l2g(fcs.size() * num_face_dofs);
@@ -1922,11 +1920,11 @@ class assembler_mechanics
                             for (size_t i = 0; i < num_face_dofs; i += dimension)
                             {
                                 mat_Fj.col(i + 1).setZero();
-                                incr(i + 1) = zero;
+                                incr(i + 1) = scalar_type(0);
                                 if (dimension == 3)
                                 {
                                     mat_Fj.col(i + 2).setZero();
-                                    incr(i + 2) = zero;
+                                    incr(i + 2) = scalar_type(0);
                                 }
                                 if (!ind_ok)
                                 {
@@ -1947,11 +1945,11 @@ class assembler_mechanics
                             for (size_t i = 0; i < num_face_dofs; i += dimension)
                             {
                                 mat_Fj.col(i).setZero();
-                                incr(i) = zero;
+                                incr(i) = scalar_type(0);
                                 if (dimension == 3)
                                 {
                                     mat_Fj.col(i + 2).setZero();
-                                    incr(i + 2) = zero;
+                                    incr(i + 2) = scalar_type(0);
                                 }
                                 if (!ind_ok)
                                 {
@@ -1974,9 +1972,9 @@ class assembler_mechanics
                             for (size_t i = 0; i < num_face_dofs; i += dimension)
                             {
                                 mat_Fj.col(i).setZero();
-                                incr(i) = zero;
+                                incr(i) = scalar_type(0);
                                 mat_Fj.col(i + 1).setZero();
-                                incr(i + 1) = zero;
+                                incr(i + 1) = scalar_type(0);
                                 if (!ind_ok)
                                 {
                                     l2g.at(pos + i)     = face_offset + ind_sol++;
@@ -1995,7 +1993,7 @@ class assembler_mechanics
                                 if (dimension == 3)
                                 {
                                     mat_Fj.col(i + 2).setZero();
-                                    incr(i + 2) = zero;
+                                    incr(i + 2) = scalar_type(0);
                                 }
                                 if (!ind_ok)
                                 {
@@ -2019,7 +2017,7 @@ class assembler_mechanics
                             for (size_t i = 0; i < num_face_dofs; i += dimension)
                             {
                                 mat_Fj.col(i + 1).setZero();
-                                incr(i + 1) = zero;
+                                incr(i + 1) = scalar_type(0);
                                 if (!ind_ok)
                                 {
                                     l2g.at(pos + i)     = 0xDEADBEEF;
@@ -2039,7 +2037,7 @@ class assembler_mechanics
                             for (size_t i = 0; i < num_face_dofs; i += dimension)
                             {
                                 mat_Fj.col(i).setZero();
-                                incr(i) = zero;
+                                incr(i) = scalar_type(0);
                                 if (!ind_ok)
                                 {
                                     l2g.at(pos + i)     = face_offset + ind_sol++;
@@ -2371,8 +2369,39 @@ make_mechanics_assembler(const Mesh& msh, const hho_degree_info hdi, const Bound
     return assembler_mechanics<Mesh>(msh, hdi, bnd);
 }
 
+class assembly_index
+{
+    size_t idx;
+    bool   assem;
+
+  public:
+    assembly_index(const size_t i, const bool as) : idx(i), assem(as) {}
+
+    operator size_t() const
+    {
+        if (!assem)
+            throw std::logic_error("Invalid assembly_index");
+
+        return idx;
+    }
+
+    bool
+    assemble(void) const
+    {
+        return assem;
+    }
+
+    friend std::ostream&
+    operator<<(std::ostream& os, const assembly_index& as)
+    {
+        os << "(" << as.idx << "," << as.assem << ")";
+        return os;
+    }
+};
+
 /**
- * @brief Assembler for HHO methods where the discrete problem is scalar and formulated only in terms of primal unknowns \f$(u_T, u_{\partial T}) \f$
+ * @brief Assembler for HHO methods where the discrete problem is scalar and formulated only in terms of primal unknowns
+ * \f$(u_T, u_{\partial T}) \f$
  *
  * @tparam Mesh
  */
@@ -2389,52 +2418,20 @@ class scalar_primal_hho_assembler
 
     std::vector<ident_raw_t> compress_table;
 
-    hho_degree_info                   di;
-    std::vector<Triplet<scalar_type>> triplets;
+    hho_degree_info                             di;
+    std::vector<Triplet<scalar_type>>           triplets;
     std::vector<std::pair<size_t, scalar_type>> duos;
 
     size_t num_all_faces, num_dirichlet_faces, num_other_faces;
     size_t fbs;
     size_t system_size;
 
-    class assembly_index
-    {
-        size_t idx;
-        bool   assem;
-
-      public:
-        assembly_index(size_t i, bool as) : idx(i), assem(as) {}
-
-        operator size_t() const
-        {
-            if (!assem)
-                throw std::logic_error("Invalid assembly_index");
-
-            return idx;
-        }
-
-        bool
-        assemble() const
-        {
-            return assem;
-        }
-
-        friend std::ostream&
-        operator<<(std::ostream& os, const assembly_index& as)
-        {
-            os << "(" << as.idx << "," << as.assem << ")";
-            return os;
-        }
-    };
-
   public:
     typedef dynamic_matrix<scalar_type> matrix_type;
     typedef dynamic_vector<scalar_type> vector_type;
 
-
     SparseMatrix<scalar_type> LHS;
     vector_type               RHS;
-
 
     scalar_primal_hho_assembler(const Mesh& msh, const hho_degree_info& hdi, const boundary_type& bnd) : di(hdi)
     {
@@ -2744,6 +2741,1379 @@ make_scalar_primal_hho_assembler(const Mesh&                             msh,
                                  const scalar_boundary_conditions<Mesh>& bnd)
 {
     return scalar_primal_hho_assembler<Mesh>(msh, hdi, bnd);
+}
+
+/**
+ * @brief Assembler for HHO methods where the discrete problem is vectorial and formulated only in terms of primal
+ * unknowns \f$(u_T, u_{\partial T}) \f$
+ *
+ * @tparam Mesh
+ */
+template<typename Mesh>
+class vector_primal_hho_assembler
+{
+    typedef Mesh                                mesh_type;
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::face            face_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::face::id_type   face_id_type;
+
+    typedef vector_boundary_conditions<Mesh> boundary_type;
+
+    std::vector<ident_raw_t> compress_table;
+    std::vector<size_t>      faces_degree;
+
+    std::vector<Triplet<scalar_type>>           triplets;
+    std::vector<std::pair<size_t, scalar_type>> duos;
+
+    size_t num_all_faces, num_dirichlet_faces, num_other_faces;
+    size_t system_size, m_total_dofs;
+
+    void
+    select_faces_degree(const Mesh& msh, const hho_degree_info& hdi, const boundary_type& bnd)
+    {
+        faces_degree.clear();
+        faces_degree.assign(msh.faces_size(), hdi.face_degree());
+
+        for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++)
+        {
+            const auto bfc          = *itor;
+            const auto face_id      = msh.lookup(bfc);
+            const auto contact_type = bnd.contact_boundary_type(face_id);
+
+            if (contact_type == SIGNORINI_FACE)
+            {
+                faces_degree[face_id] = hdi.face_degree() + 1;
+            }
+            else if (contact_type == SIGNORINI_CELL)
+            {
+                throw std::invalid_argument("SIGNORINI_CELL not yet implemented");
+            }
+        }
+    }
+
+    size_t
+    num_face_dofs(const size_t face_id) const
+    {
+        return vector_basis_size(faces_degree[face_id], Mesh::dimension - 1, Mesh::dimension);
+    }
+
+    size_t
+    num_faces_dofs(const Mesh& msh, const cell_type& cl) const
+    {
+        const auto fcs_id   = faces_id(msh, cl);
+        size_t     num_dofs = 0;
+
+        for (auto face_id : fcs_id)
+        {
+            num_dofs += num_face_dofs(face_id);
+        }
+
+        return num_dofs;
+    }
+
+    std::vector<size_t>
+    faces_offset(const Mesh& msh, const cell_type& cl) const
+    {
+        const auto fcs_id   = faces_id(msh, cl);
+        size_t     num_dofs = 0;
+
+        std::vector<size_t> ret;
+        ret.reserve(fcs_id.size());
+
+        for (auto face_id : fcs_id)
+        {
+            ret.push_back(num_dofs);
+            num_dofs += num_face_dofs(face_id);
+        }
+
+        return ret;
+    }
+
+  public:
+    typedef dynamic_matrix<scalar_type> matrix_type;
+    typedef dynamic_vector<scalar_type> vector_type;
+
+    SparseMatrix<scalar_type> LHS;
+    vector_type               RHS;
+
+    vector_primal_hho_assembler(void)
+    {
+        compress_table.clear();
+        faces_degree.clear();
+
+        triplets.clear();
+        duos.clear();
+
+        system_size=0, m_total_dofs=0;
+    }
+
+    vector_primal_hho_assembler(const Mesh& msh, const hho_degree_info& hdi, const boundary_type& bnd)
+    {
+        select_faces_degree(msh, hdi, bnd);
+
+        const auto num_all_faces       = msh.faces_size();
+        const auto num_dirichlet_faces = bnd.nb_faces_dirichlet();
+        const auto num_other_faces     = num_all_faces - num_dirichlet_faces;
+
+        compress_table.resize(num_all_faces);
+
+        size_t compressed_offset = 0;
+        m_total_dofs             = 0;
+        for (size_t face_id = 0; face_id < msh.faces_size(); face_id++)
+        {
+            const auto face_degree = faces_degree[face_id];
+            const auto n_face_dofs = num_face_dofs(face_id);
+
+            compress_table[face_id] = compressed_offset;
+
+            if (!bnd.is_contact_face(face_id))
+            {
+                compressed_offset += n_face_dofs - bnd.dirichlet_imposed_dofs(face_id, face_degree);
+            }
+            else if (bnd.contact_boundary_type(face_id) == SIGNORINI_FACE)
+            {
+                compressed_offset += n_face_dofs;
+            }
+
+            m_total_dofs += n_face_dofs;
+        }
+
+        system_size = compressed_offset;
+
+        this->initialize();
+
+        // preallocate memory
+        triplets.reserve(2 * (hdi.face_degree() + 2) * system_size);
+        duos.reserve(3 * system_size);
+    }
+
+    void
+    initialize(void)
+    {
+        initialize_lhs();
+        initialize_rhs();
+    }
+
+    void
+    initialize_lhs(void)
+    {
+        LHS = SparseMatrix<scalar_type>(system_size, system_size);
+        return;
+    }
+
+    void
+    initialize_rhs(void)
+    {
+        RHS = vector_type::Zero(system_size);
+        return;
+    }
+
+    void
+    assemble(const mesh_type&     msh,
+             const cell_type&     cl,
+             const boundary_type& bnd,
+             const matrix_type&   lhs,
+             const vector_type&   rhs,
+             int                  di = 0)
+    {
+        const auto fcs_id       = faces_id(msh, cl);
+        const auto fcs          = faces(msh, cl);
+        const auto n_faces_dofs = num_faces_dofs(msh, cl);
+
+        std::vector<assembly_index> asm_map;
+        asm_map.reserve(n_faces_dofs);
+
+        vector_type rhs_bc = vector_type::Zero(n_faces_dofs);
+
+        const auto offset_faces = faces_offset(msh, cl);
+        for (size_t face_i = 0; face_i < fcs_id.size(); face_i++)
+        {
+            const auto face_id     = fcs_id[face_i];
+            const auto fc          = fcs[face_i];
+            const auto face_degree = faces_degree[face_id];
+            const auto n_face_dofs = num_face_dofs(face_id);
+
+            const bool fc_is_dirichlet_boundary = bnd.is_dirichlet_face(face_id);
+            const auto face_offset              = compress_table.at(face_id);
+
+            if (!fc_is_dirichlet_boundary)
+            {
+                for (size_t i = 0; i < n_face_dofs; i++)
+                {
+                    asm_map.push_back(assembly_index(face_offset + i, true));
+                }
+            }
+            else
+            {
+                size_t ind_sol = 0;
+
+                vector_type proj_bcf = project_function(msh, fc, face_degree, bnd.dirichlet_boundary_func(face_id), di);
+
+                bool ind_ok = false;
+                for (size_t face_j = 0; face_j < fcs.size(); face_j++)
+                {
+                    const auto  fcj    = fcs[face_j];
+                    const auto n_face_dofs_j = num_face_dofs(fcs_id[face_j]);
+                    matrix_type mat_Fj =
+                      lhs.block(offset_faces[face_j], offset_faces[face_i], n_face_dofs_j, n_face_dofs);
+
+                    switch (bnd.dirichlet_boundary_type(face_id))
+                    {
+                        case DIRICHLET:
+                        {
+                            if (!ind_ok)
+                            {
+                                for (size_t i = 0; i < n_face_dofs; i++)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+                                }
+                                ind_ok = true;
+                            }
+                            break;
+                        }
+                        case CLAMPED:
+                        {
+                            proj_bcf.setZero();
+                            mat_Fj.setZero();
+                            if (!ind_ok)
+                            {
+                                for (size_t i = 0; i < n_face_dofs; i++)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+                                }
+                                ind_ok = true;
+                            }
+                            break;
+                        }
+                        case DX:
+                        {
+                            for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                            {
+                                mat_Fj.col(i + 1).setZero();
+                                proj_bcf(i + 1) = scalar_type(0);
+
+                                if (Mesh::dimension == 3)
+                                {
+                                    mat_Fj.col(i + 2).setZero();
+                                    proj_bcf(i + 2) = scalar_type(0);
+                                }
+                                if (!ind_ok)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+                                    asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    if (Mesh::dimension == 3)
+                                    {
+                                        asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    }
+                                }
+                            }
+                            ind_ok = true;
+                            break;
+                        }
+                        case DY:
+                        {
+                            for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                            {
+                                mat_Fj.col(i).setZero();
+                                proj_bcf(i) = scalar_type(0);
+                                if (Mesh::dimension == 3)
+                                {
+                                    mat_Fj.col(i + 2).setZero();
+                                    proj_bcf(i + 2) = scalar_type(0);
+                                }
+                                if (!ind_ok)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    asm_map.push_back(assembly_index(face_offset + i+1, false));
+                                    if (Mesh::dimension == 3)
+                                    {
+                                        asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    }
+                                }
+                            }
+                            ind_ok = true;
+                            break;
+                        }
+                        case DZ:
+                        {
+                            if (Mesh::dimension != 3)
+                                throw std::invalid_argument("You are not in 3D");
+                            for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                            {
+                                mat_Fj.col(i).setZero();
+                                proj_bcf(i) = scalar_type(0);
+                                mat_Fj.col(i + 1).setZero();
+                                proj_bcf(i + 1) = scalar_type(0);
+                                if (!ind_ok)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    asm_map.push_back(assembly_index(face_offset + i + 2, false));
+                                }
+                            }
+                            ind_ok = true;
+                            break;
+                        }
+                        case DXDY:
+                        {
+                            for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                            {
+                                if (Mesh::dimension == 3)
+                                {
+                                    mat_Fj.col(i + 2).setZero();
+                                    proj_bcf(i + 2) = scalar_type(0);
+                                }
+                                if (!ind_ok)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+                                    asm_map.push_back(assembly_index(face_offset + i + 1, false));
+                                    if (Mesh::dimension == 3)
+                                    {
+                                        asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    }
+                                }
+                            }
+                            ind_ok = true;
+                            break;
+                        }
+                        case DXDZ:
+                        {
+                            if (Mesh::dimension != 3)
+                                throw std::invalid_argument("You are not in 3D");
+                            for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                            {
+                                mat_Fj.col(i + 1).setZero();
+                                proj_bcf(i + 1) = scalar_type(0);
+                                if (!ind_ok)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+                                    asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    asm_map.push_back(assembly_index(face_offset + i + 2, false));
+                                }
+                            }
+                            ind_ok = true;
+                            break;
+                        }
+                        case DYDZ:
+                        {
+                            if (Mesh::dimension != 3)
+                                throw std::invalid_argument("You are not in 3D");
+                            for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                            {
+                                mat_Fj.col(i).setZero();
+                                proj_bcf(i) = scalar_type(0);
+                                if (!ind_ok)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    asm_map.push_back(assembly_index(face_offset + i + 1, false));
+                                    asm_map.push_back(assembly_index(face_offset + i + 2, false));
+                                }
+                            }
+                            ind_ok = true;
+                            break;
+                        }
+                        default:
+                        {
+                            throw std::logic_error("Unknown Dirichlet Conditions (assembler)");
+                            break;
+                        }
+                    }
+
+                    rhs_bc.segment(offset_faces[face_j], n_face_dofs_j) += mat_Fj * proj_bcf;
+                }
+            }
+        }
+
+#ifdef FILL_COLMAJOR
+        for (size_t j = 0; j < lhs.rows(); j++)
+        {
+            if (!asm_map[j].assemble())
+                continue;
+
+            for (size_t i = 0; i < lhs.cols(); i++)
+            {
+                if (asm_map[i].assemble())
+                    triplets.push_back(Triplet<scalar_type>(asm_map[i], asm_map[j], lhs(i, j)));
+            }
+
+            duos.push_back(std::make_pair(asm_map[j], rhs(j) - rhs_bc(j)));
+        }
+#else
+        for (size_t i = 0; i < lhs.rows(); i++)
+        {
+            if (!asm_map[i].assemble())
+                continue;
+
+            for (size_t j = 0; j < lhs.cols(); j++)
+            {
+                if (asm_map[j].assemble())
+                    triplets.push_back(Triplet<scalar_type>(asm_map[i], asm_map[j], lhs(i, j)));
+            }
+
+            duos.push_back(std::make_pair(asm_map[i], rhs(i) - rhs_bc(i)));
+        }
+#endif
+    }
+
+    vector_type
+    take_local_solution(const Mesh&                     msh,
+                        const typename Mesh::cell_type& cl,
+                        const boundary_type&            bnd,
+                        const vector_type&              solution,
+                        size_t                          di = 0) const
+    {
+
+        const auto fcs    = faces(msh, cl);
+        const auto fcs_id = faces_id(msh, cl);
+
+        const auto n_faces_dofs = num_faces_dofs(msh, cl);
+
+        vector_type ret = vector_type::Zero(n_faces_dofs);
+
+        size_t face_offset = 0;
+        for (size_t face_i = 0; face_i < fcs.size(); face_i++)
+        {
+            const auto fc      = fcs[face_i];
+            const auto face_id = fcs_id[face_i];
+
+            const auto face_degree = faces_degree[face_id];
+            const auto n_face_dofs = num_face_dofs(face_id);
+
+            const auto compress_offset = compress_table[face_id];
+
+            if (bnd.is_dirichlet_face(face_id))
+            {
+                size_t sol_ind = 0;
+
+                const vector_type proj_bcf =
+                  project_function(msh, fc, face_degree, bnd.dirichlet_boundary_func(face_id), di);
+
+                assert(proj_bcf.size() == n_face_dofs);
+
+                switch (bnd.dirichlet_boundary_type(face_id))
+                {
+                    case DIRICHLET:
+                    {
+                        ret.segment(face_offset, n_face_dofs) = proj_bcf;
+                        break;
+                    }
+                    case CLAMPED:
+                    {
+                        ret.segment(face_offset, n_face_dofs).setZero();
+                        break;
+                    }
+                    case DX:
+                    {
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = proj_bcf(i);
+                            ret(face_offset + i + 1) = solution(compress_offset + sol_ind++);
+                            if (Mesh::dimension == 3)
+                            {
+                                ret(face_offset + i + 2) = solution(compress_offset + sol_ind++);
+                            }
+                        }
+                        break;
+                    }
+                    case DY:
+                    {
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 1) = proj_bcf(i + 1);
+                            if (Mesh::dimension == 3)
+                            {
+                                ret(face_offset + i + 2) = solution(compress_offset + sol_ind++);
+                            }
+                        }
+                        break;
+                    }
+                    case DZ:
+                    {
+                        if (Mesh::dimension != 3)
+                            throw std::invalid_argument("You are not in 3D");
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 1) = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 2) = proj_bcf(i + 2);
+                        }
+                        break;
+                    }
+                    case DXDY:
+                    {
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = proj_bcf(i);
+                            ret(face_offset + i + 1) = proj_bcf(i + 1);
+                            if (Mesh::dimension == 3)
+                            {
+                                ret(face_offset + i + 2) = solution(compress_offset + sol_ind++);
+                            }
+                        }
+                        break;
+                    }
+                    case DXDZ:
+                    {
+                        if (Mesh::dimension != 3)
+                            throw std::invalid_argument("You are not in 3D");
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = proj_bcf(i);
+                            ret(face_offset + i + 1) = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 2) = proj_bcf(i + 2);
+                        }
+                        break;
+                    }
+                    case DYDZ:
+                    {
+                        if (Mesh::dimension != 3)
+                            throw std::invalid_argument("You are not in 3D");
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 1) = proj_bcf(i + 1);
+                            ret(face_offset + i + 2) = proj_bcf(i + 2);
+                        }
+                        break;
+                    }
+                    default:
+                    {
+                        throw std::logic_error("Unknown Dirichlet Condition (assembler)");
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                ret.segment(face_offset, n_face_dofs) = solution.segment(compress_offset, n_face_dofs);
+            }
+
+            face_offset += n_face_dofs;
+        }
+
+        return ret;
+    }
+
+    vector_type
+    expand_solution(const mesh_type& msh, const boundary_type& bnd, const vector_type& solution, int di = 0) const
+    {
+        assert(solution.size() == system_size);
+
+        vector_type ret = vector_type::Zero(m_total_dofs);
+
+        size_t face_offset = 0;
+        for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++)
+        {
+            const auto bfc     = *itor;
+            const auto face_id = msh.lookup(bfc);
+
+            const auto face_degree = faces_degree[face_id];
+            const auto n_face_dofs = num_face_dofs(face_id);
+
+            const auto compress_offset = compress_table[face_id];
+
+            if (bnd.is_dirichlet_face(face_id))
+            {
+                size_t sol_ind = 0;
+
+                const vector_type proj_bcf =
+                  project_function(msh, bfc, face_degree, bnd.dirichlet_boundary_func(face_id), di);
+
+                assert(proj_bcf.size() == n_face_dofs);
+
+                switch (bnd.dirichlet_boundary_type(face_id))
+                {
+                    case DIRICHLET:
+                    {
+                        ret.segment(face_offset, n_face_dofs) = proj_bcf;
+                        break;
+                    }
+                    case CLAMPED:
+                    {
+                        ret.segment(face_offset, n_face_dofs).setZero();
+                        break;
+                    }
+                    case DX:
+                    {
+
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = proj_bcf(i);
+                            ret(face_offset + i + 1) = solution(compress_offset + sol_ind++);
+                            if (Mesh::dimension == 3)
+                            {
+                                ret(face_offset + i + 2) = solution(compress_offset + sol_ind++);
+                            }
+                        }
+                        break;
+                    }
+                    case DY:
+                    {
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 1) = proj_bcf(i + 1);
+                            if (Mesh::dimension == 3)
+                            {
+                                ret(face_offset + i + 2) = solution(compress_offset + sol_ind++);
+                            }
+                        }
+                        break;
+                    }
+                    case DZ:
+                    {
+                        if (Mesh::dimension != 3)
+                            throw std::invalid_argument("You are not in 3D");
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 1) = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 2) = proj_bcf(i + 2);
+                        }
+                        break;
+                    }
+                    case DXDY:
+                    {
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = proj_bcf(i);
+                            ret(face_offset + i + 1) = proj_bcf(i + 1);
+                            if (Mesh::dimension == 3)
+                            {
+                                ret(face_offset + i + 2) = solution(compress_offset + sol_ind++);
+                            }
+                        }
+                        break;
+                    }
+                    case DXDZ:
+                    {
+                        if (Mesh::dimension != 3)
+                            throw std::invalid_argument("You are not in 3D");
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = proj_bcf(i);
+                            ret(face_offset + i + 1) = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 2) = proj_bcf(i + 2);
+                        }
+                        break;
+                    }
+                    case DYDZ:
+                    {
+                        if (Mesh::dimension != 3)
+                            throw std::invalid_argument("You are not in 3D");
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 1) = proj_bcf(i + 1);
+                            ret(face_offset + i + 2) = proj_bcf(i + 2);
+                        }
+                        break;
+                    }
+                    default:
+                    {
+                        throw std::logic_error("Unknown Dirichlet Condition (assembler)");
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                ret.segment(face_offset, n_face_dofs) = solution.segment(compress_offset, n_face_dofs);
+            }
+
+            face_offset += n_face_dofs;
+        }
+
+        return ret;
+    }
+
+    void
+    assemble_nonlinear(const mesh_type&                msh,
+                       const cell_type&                cl,
+                       const boundary_type&            bnd,
+                       const matrix_type&              lhs,
+                       const vector_type&              rhs,
+                       const std::vector<vector_type>& sol_F,
+                       int                             di = 0)
+    {
+        assert(sol_F.size() == msh.faces_size());
+        const auto fcs_id       = faces_id(msh, cl);
+        const auto fcs          = faces(msh, cl);
+        const auto n_faces_dofs = num_faces_dofs(msh, cl);
+
+        std::vector<assembly_index> asm_map;
+        asm_map.reserve(n_faces_dofs);
+
+        vector_type rhs_bc = vector_type::Zero(n_faces_dofs);
+
+        const auto offset_faces = faces_offset(msh, cl);
+
+        for (size_t face_i = 0; face_i < fcs_id.size(); face_i++)
+        {
+            const auto face_id     = fcs_id[face_i];
+            const auto fc          = fcs[face_i];
+            const auto face_degree = faces_degree[face_id];
+            const auto n_face_dofs = num_face_dofs(face_id);
+
+            const bool fc_is_dirichlet_boundary = bnd.is_dirichlet_face(face_id);
+            const auto face_offset              = compress_table.at(face_id);
+
+            if (!fc_is_dirichlet_boundary)
+            {
+                for (size_t i = 0; i < n_face_dofs; i++)
+                {
+                    asm_map.push_back(assembly_index(face_offset + i, true));
+                }
+            }
+            else
+            {
+                size_t ind_sol = 0;
+
+                const vector_type proj_bcf =
+                  project_function(msh, fc, face_degree, bnd.dirichlet_boundary_func(face_id), di);
+                assert(proj_bcf.size() == sol_F[face_id].size());
+
+                vector_type incr   = proj_bcf - sol_F[face_id];
+                bool        ind_ok = false;
+                for (size_t face_j = 0; face_j < fcs.size(); face_j++)
+                {
+                    const auto fcj  = fcs[face_j];
+                    const auto n_face_dofs_j = num_face_dofs(fcs_id[face_j]);
+
+                    matrix_type mat_Fj =
+                      lhs.block(offset_faces[face_j], offset_faces[face_i], n_face_dofs_j, n_face_dofs);
+
+                    switch (bnd.dirichlet_boundary_type(face_id))
+                    {
+                        case DIRICHLET:
+                        {
+                            if (!ind_ok)
+                            {
+                                for (size_t i = 0; i < n_face_dofs; i++)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+                                }
+                                ind_ok = true;
+                            }
+                            break;
+                        }
+                        case CLAMPED:
+                        {
+                            incr = -sol_F[face_id];
+                            if (!ind_ok)
+                            {
+                                for (size_t i = 0; i < n_face_dofs; i++)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+                                }
+                                ind_ok = true;
+                            }
+                            break;
+                        }
+                        case DX:
+                        {
+                            for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                            {
+                                mat_Fj.col(i + 1).setZero();
+                                incr(i + 1) = scalar_type(0);
+                                if (Mesh::dimension == 3)
+                                {
+                                    mat_Fj.col(i + 2).setZero();
+                                    incr(i + 2) = scalar_type(0);
+                                }
+
+                                if (!ind_ok)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+                                    asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    if (Mesh::dimension == 3)
+                                    {
+                                        asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    }
+                                }
+                            }
+                            ind_ok = true;
+                            break;
+                        }
+                        case DY:
+                        {
+                            for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                            {
+                                mat_Fj.col(i).setZero();
+                                incr(i) = scalar_type(0);
+                                if (Mesh::dimension == 3)
+                                {
+                                    mat_Fj.col(i + 2).setZero();
+                                    incr(i + 2) = scalar_type(0);
+                                }
+                                if (!ind_ok)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+
+                                    if (Mesh::dimension == 3)
+                                    {
+                                        asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    }
+                                }
+                            }
+                            ind_ok = true;
+                            break;
+                        }
+                        case DZ:
+                        {
+                            if (Mesh::dimension != 3)
+                                throw std::invalid_argument("You are not in 3D");
+                            for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                            {
+                                mat_Fj.col(i).setZero();
+                                incr(i) = scalar_type(0);
+                                mat_Fj.col(i + 1).setZero();
+                                incr(i + 1) = scalar_type(0);
+                                if (!ind_ok)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+                                }
+                            }
+                            ind_ok = true;
+                            break;
+                        }
+                        case DXDY:
+                        {
+                            for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                            {
+                                if (Mesh::dimension == 3)
+                                {
+                                    mat_Fj.col(i + 2).setZero();
+                                    incr(i + 2) = scalar_type(0);
+                                }
+                                if (!ind_ok)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+                                    if (Mesh::dimension == 3)
+                                    {
+                                        asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    }
+                                }
+                            }
+                            ind_ok = true;
+                            break;
+                        }
+                        case DXDZ:
+                        {
+                            if (Mesh::dimension != 3)
+                                throw std::invalid_argument("You are not in 3D");
+                            for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                            {
+                                mat_Fj.col(i + 1).setZero();
+                                incr(i + 1) = scalar_type(0);
+                                if (!ind_ok)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+                                    asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+                                }
+                            }
+                            ind_ok = true;
+                            break;
+                        }
+                        case DYDZ:
+                        {
+                            if (Mesh::dimension != 3)
+                                throw std::invalid_argument("You are not in 3D");
+                            for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                            {
+                                mat_Fj.col(i).setZero();
+                                incr(i) = scalar_type(0);
+                                if (!ind_ok)
+                                {
+                                    asm_map.push_back(assembly_index(face_offset + ind_sol++, true));
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+                                    asm_map.push_back(assembly_index(face_offset + i, false));
+                                }
+                            }
+                            ind_ok = true;
+                            break;
+                        }
+                        default:
+                        {
+                            throw std::logic_error("Unknown Dirichlet Conditions");
+                            break;
+                        }
+                    }
+
+                    rhs_bc.segment(offset_faces[face_j], n_face_dofs_j) += mat_Fj * incr;
+                }
+            }
+        }
+        assert(lhs.rows() == lhs.cols());
+        assert(lhs.rows() == rhs.size());
+        assert(rhs.size() == l2g.size());
+        assert(rhs.size() == rhs_bc.size());
+
+#ifdef FILL_COLMAJOR
+        for (size_t j = 0; j < lhs.rows(); j++)
+        {
+            if (!asm_map[j].assemble())
+                continue;
+
+            for (size_t i = 0; i < lhs.cols(); i++)
+            {
+                if (asm_map[i].assemble())
+                    triplets.push_back(Triplet<scalar_type>(asm_map[i], asm_map[j], lhs(i, j)));
+            }
+
+            duos.push_back(std::make_pair(asm_map[i], rhs(i) - rhs_bc(i)));
+        }
+#else
+        for (size_t i = 0; i < lhs.rows(); i++)
+        {
+            if (!asm_map[i].assemble())
+                continue;
+
+            for (size_t j = 0; j < lhs.cols(); j++)
+            {
+                if (asm_map[j].assemble())
+                    triplets.push_back(Triplet<scalar_type>(asm_map[i], asm_map[j], lhs(i, j)));
+            }
+
+            duos.push_back(std::make_pair(asm_map[i], rhs(i) - rhs_bc(i)));
+        }
+#endif
+    }
+
+    vector_type
+    take_local_solution_nonlinear(const Mesh&                     msh,
+                                  const typename Mesh::cell_type& cl,
+                                  const boundary_type&            bnd,
+                                  const vector_type&              solution,
+                                  const std::vector<vector_type>& sol_F,
+                                  size_t                          di = 0) const
+    {
+        const auto fcs    = faces(msh, cl);
+        const auto fcs_id = faces_id(msh, cl);
+
+        const auto n_faces_dofs = num_faces_dofs(msh, cl);
+
+        vector_type ret = vector_type::Zero(n_faces_dofs);
+
+        size_t face_offset = 0;
+        for (size_t face_i = 0; face_i < fcs.size(); face_i++)
+        {
+            const auto fc      = fcs[face_i];
+            const auto face_id = fcs_id[face_i];
+
+            const auto face_degree = faces_degree[face_id];
+            const auto n_face_dofs = num_face_dofs(face_id);
+
+            const auto compress_offset = compress_table[face_id];
+
+            if (bnd.is_dirichlet_face(face_id))
+            {
+                size_t sol_ind = 0;
+
+                const vector_type proj_bcf =
+                  project_function(msh, fc, face_degree, bnd.dirichlet_boundary_func(face_id), di);
+                const vector_type incr = proj_bcf - sol_F[face_id];
+                assert(proj_bcf.size() == n_face_dofs);
+
+                switch (bnd.dirichlet_boundary_type(face_id))
+                {
+                    case DIRICHLET:
+                    {
+                        ret.segment(face_offset, n_face_dofs) = incr;
+                        break;
+                    }
+                    case CLAMPED:
+                    {
+                        ret.segment(face_offset, n_face_dofs) = -sol_F[face_id];
+                        break;
+                    }
+                    case DX:
+                    {
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = incr(i);
+                            ret(face_offset + i + 1) = solution(compress_offset + sol_ind++);
+                            if (Mesh::dimension == 3)
+                            {
+                                ret(face_offset + i + 2) = solution(compress_offset + sol_ind++);
+                            }
+                        }
+                        break;
+                    }
+                    case DY:
+                    {
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 1) = incr(i + 1);
+                            if (Mesh::dimension == 3)
+                            {
+                                ret(face_offset + i + 2) = solution(compress_offset + sol_ind++);
+                            }
+                        }
+                        break;
+                    }
+                    case DZ:
+                    {
+                        if (Mesh::dimension != 3)
+                            throw std::invalid_argument("You are not in 3D");
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 1) = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 2) = incr(i + 2);
+                        }
+                        break;
+                    }
+                    case DXDY:
+                    {
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = incr(i);
+                            ret(face_offset + i + 1) = incr(i + 1);
+                            if (Mesh::dimension == 3)
+                            {
+                                ret(face_offset + i + 2) = solution(compress_offset + sol_ind++);
+                            }
+                        }
+                        break;
+                    }
+                    case DXDZ:
+                    {
+                        if (Mesh::dimension != 3)
+                            throw std::invalid_argument("You are not in 3D");
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = incr(i);
+                            ret(face_offset + i + 1) = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 2) = incr(i + 2);
+                        }
+                        break;
+                    }
+                    case DYDZ:
+                    {
+                        if (Mesh::dimension != 3)
+                            throw std::invalid_argument("You are not in 3D");
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 1) = incr(i + 1);
+                            ret(face_offset + i + 2) = incr(i + 2);
+                        }
+                        break;
+                    }
+                    default:
+                    {
+                        throw std::logic_error("Unknown Dirichlet Conditions");
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                ret.segment(face_offset, n_face_dofs) = solution.segment(compress_offset, n_face_dofs);
+            }
+
+            face_offset += n_face_dofs;
+        }
+
+        return ret;
+    }
+
+    vector_type
+    expand_solution_nonlinear(const mesh_type&                msh,
+                              const boundary_type&            bnd,
+                              const vector_type&              solution,
+                              const std::vector<vector_type>& sol_F,
+                              int                             di = 0) const
+    {
+        assert(solution.size() == system_size);
+        assert(sol_F.size() == msh.faces_size());
+
+        vector_type ret        = vector_type::Zero(m_total_dofs);
+        size_t     face_offset = 0;
+
+        for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++)
+        {
+            const auto bfc     = *itor;
+            const auto face_id = msh.lookup(bfc);
+
+            const auto face_degree = faces_degree[face_id];
+            const auto n_face_dofs = num_face_dofs(face_id);
+
+            const auto compress_offset = compress_table[face_id];
+
+            if (bnd.is_dirichlet_face(face_id))
+            {
+                size_t sol_ind = 0;
+
+                const vector_type proj_bcf =
+                  project_function(msh, bfc, face_degree, bnd.dirichlet_boundary_func(face_id), di);
+                const vector_type incr = proj_bcf - sol_F[face_id];
+                assert(proj_bcf.size() == n_face_dofs);
+
+                switch (bnd.dirichlet_boundary_type(face_id))
+                {
+                    case DIRICHLET:
+                    {
+                        ret.segment(face_offset, n_face_dofs) = incr;
+                        break;
+                    }
+                    case CLAMPED:
+                    {
+                        ret.segment(face_offset, n_face_dofs) = -sol_F[face_id];
+                        break;
+                    }
+                    case DX:
+                    {
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = incr(i);
+                            ret(face_offset + i + 1) = solution(compress_offset + sol_ind++);
+                            if (Mesh::dimension == 3)
+                            {
+                                ret(face_offset + i + 2) = solution(compress_offset + sol_ind++);
+                            }
+                        }
+                        break;
+                    }
+                    case DY:
+                    {
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 1) = incr(i + 1);
+                            if (Mesh::dimension == 3)
+                            {
+                                ret(face_offset + i + 2) = solution(compress_offset + sol_ind++);
+                            }
+                        }
+                        break;
+                    }
+                    case DZ:
+                    {
+                        if (Mesh::dimension != 3)
+                            throw std::invalid_argument("You are not in 3D");
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 1) = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 2) = incr(i + 2);
+                        }
+                        break;
+                    }
+                    case DXDY:
+                    {
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = incr(i);
+                            ret(face_offset + i + 1) = incr(i + 1);
+                            if (Mesh::dimension == 3)
+                            {
+                                ret(face_offset + i + 2) = solution(compress_offset + sol_ind++);
+                            }
+                        }
+                        break;
+                    }
+                    case DXDZ:
+                    {
+                        if (Mesh::dimension != 3)
+                            throw std::invalid_argument("You are not in 3D");
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = incr(i);
+                            ret(face_offset + i + 1) = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 2) = incr(i + 2);
+                        }
+                        break;
+                    }
+                    case DYDZ:
+                    {
+                        if (Mesh::dimension != 3)
+                            throw std::invalid_argument("You are not in 3D");
+                        for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                        {
+                            ret(face_offset + i)     = solution(compress_offset + sol_ind++);
+                            ret(face_offset + i + 1) = incr(i + 1);
+                            ret(face_offset + i + 2) = incr(i + 2);
+                        }
+                        break;
+                    }
+                    default:
+                    {
+                        throw std::logic_error("Unknown Dirichlet Conditions");
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                ret.segment(face_offset, n_face_dofs) = solution.segment(compress_offset, n_face_dofs);
+            }
+
+            face_offset += n_face_dofs;
+        }
+
+        return ret;
+    }
+
+    void
+    impose_neumann_boundary_conditions(const mesh_type& msh, const boundary_type& bnd)
+    {
+        if (bnd.nb_faces_neumann() > 0)
+        {
+            for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++)
+            {
+                const auto bfc     = *itor;
+                const auto face_id = msh.lookup(bfc);
+
+                const auto face_degree = faces_degree[face_id];
+                const auto n_face_dofs = num_face_dofs(face_id);
+
+                const auto compress_offset = compress_table[face_id];
+
+                if (bnd.is_neumann_face(face_id))
+                {
+                    const auto    fb          = make_vector_monomial_basis(msh, bfc, face_degree);
+                    const vector_type neumann = make_rhs(msh, bfc, fb, bnd.neumann_boundary_func(face_id), 1);
+
+                    assert(neumann.size() == n_face_dofs);
+
+                    if (bnd.is_dirichlet_face(face_id))
+                    {
+                        switch (bnd.dirichlet_boundary_type(face_id))
+                        {
+                            case DIRICHLET:
+                            {
+                                throw std::invalid_argument("You tried to impose both Dirichlet and "
+                                                            "Neumann conditions on the same face");
+                                break;
+                            }
+                            case CLAMPED:
+                            {
+                                throw std::invalid_argument("You tried to impose both Dirichlet and "
+                                                            "Neumann conditions on the same face");
+                                break;
+                            }
+                            case DX:
+                            {
+                                for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                                {
+                                    duos.push_back(std::make_pair(compress_offset + i + 1, neumann(i + 1)));
+                                    if (Mesh::dimension == 3)
+                                    {
+                                        duos.push_back(std::make_pair(compress_offset + i + 2, neumann(i + 2)));
+                                    }
+                                }
+                                break;
+                            }
+                            case DY:
+                            {
+                                for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                                {
+                                    duos.push_back(std::make_pair(compress_offset + i, neumann(i)));
+                                    if (Mesh::dimension == 3)
+                                    {
+                                        duos.push_back(std::make_pair(compress_offset + i, neumann(i + 2)));
+                                    }
+                                }
+
+                                break;
+                            }
+                            case DZ:
+                            {
+                                if (Mesh::dimension != 3)
+                                    throw std::invalid_argument("You are not in 3D");
+                                for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                                {
+                                    duos.push_back(std::make_pair(compress_offset + i, neumann(i)));
+                                    duos.push_back(std::make_pair(compress_offset + i + 1, neumann(i + 1)));
+                                }
+                                break;
+                            }
+                            case DXDY:
+                            {
+                                for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                                {
+                                    if (Mesh::dimension == 3)
+                                    {
+                                        duos.push_back(std::make_pair(compress_offset + i + 2, neumann(i + 2)));
+                                    }
+                                }
+                                break;
+                            }
+                            case DXDZ:
+                            {
+                                if (Mesh::dimension != 3)
+                                    throw std::invalid_argument("You are not in 3D");
+                                for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                                {
+                                    duos.push_back(std::make_pair(compress_offset + i + 1, neumann(i + 1)));
+                                }
+                                break;
+                            }
+                            case DYDZ:
+                            {
+                                if (Mesh::dimension != 3)
+                                    throw std::invalid_argument("You are not in 3D");
+                                for (size_t i = 0; i < n_face_dofs; i += Mesh::dimension)
+                                {
+                                    duos.push_back(std::make_pair(compress_offset + i, neumann(i)));
+                                }
+                                break;
+                            }
+                            default:
+                            {
+                                throw std::logic_error("Unknown Neumann Conditions");
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        for (size_t i = 0; i < n_face_dofs; i++)
+                        {
+                            duos.push_back(std::make_pair(compress_offset + i, neumann(i)));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    void
+    finalize(void)
+    {
+        LHS.setFromTriplets(triplets.begin(), triplets.end());
+        triplets.clear();
+
+        for (auto& [id, val] : duos)
+            RHS(id) += val;
+
+        duos.clear();
+    }
+
+    size_t
+    global_system_size() const
+    {
+        return system_size;
+    }
+};
+
+template<typename Mesh>
+auto
+make_vector_primal_hho_assembler(const Mesh&                             msh,
+                                 const hho_degree_info&                  hdi,
+                                 const vector_boundary_conditions<Mesh>& bnd)
+{
+    return vector_primal_hho_assembler<Mesh>(msh, hdi, bnd);
 }
 
 } // end disk

@@ -36,6 +36,8 @@
 #include "NewtonSolverInformations.hpp"
 #include "NewtonSolverParameters.hpp"
 #include "bases/bases.hpp"
+
+#include "adaptivity/adaptivity.hpp"
 #include "boundary_conditions/boundary_conditions.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "methods/hho"
@@ -74,8 +76,8 @@ class NewtonIteration
     typedef hho_degree_info                       hdi_type;
     typedef Behavior<mesh_type>                   behavior_type;
 
-    typedef assembler_mechanics<mesh_type>    assembler_type;
-    typedef mechanical_computation<mesh_type> elem_type;
+    typedef vector_primal_hho_assembler<mesh_type> assembler_type;
+    typedef mechanical_computation<mesh_type>      elem_type;
 
     vector_type m_system_solution;
 
@@ -105,7 +107,7 @@ class NewtonIteration
         m_bL.clear();
         m_bL.resize(m_msh.cells_size());
 
-        m_assembler = make_mechanics_assembler(m_msh, m_hdi, m_bnd);
+        m_assembler = make_vector_primal_hho_assembler(m_msh, m_hdi, m_bnd);
     }
 
     bool
@@ -136,13 +138,14 @@ class NewtonIteration
     assemble(const LoadFunction&             lf,
              const std::vector<matrix_type>& gradient_precomputed,
              const std::vector<matrix_type>& stab_precomputed,
-             behavior_type& behavior)
+             const MeshDegree<mesh_type>&    degree_infos,
+             behavior_type&                  behavior)
     {
         elem_type    elem(m_msh, m_hdi);
         AssemblyInfo ai;
 
         // set RHS to zero
-        m_assembler.setZeroRhs();
+        m_assembler.initialize();
         m_F_int = 0.0;
 
         // Get materail data
@@ -286,7 +289,8 @@ class NewtonIteration
             tc.toc();
             ai.m_time_statcond += tc.to_double();
 
-            m_assembler.assemble_nl(m_msh, cl, m_bnd, std::get<0>(scnp), m_solution_faces);
+            const auto& lc = std::get<0>(scnp);
+            m_assembler.assemble_nonlinear(m_msh, cl, m_bnd, lc.first, lc.second, m_solution_faces);
 
             cell_i++;
         }
@@ -319,48 +323,24 @@ class NewtonIteration
     }
 
     scalar_type
-    postprocess()
+    postprocess(const MeshDegree<mesh_type>&  degree_infos)
     {
         timecounter tc;
         tc.tic();
 
-        const auto dimension = mesh_type::dimension;
-        const auto fbs       = vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
-        const auto cbs = vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
-
-        const auto solF = m_assembler.expand_solution_nl(m_msh, m_bnd, m_system_solution, m_solution_faces);
-
-        // Update  unknowns
-        // Update face Uf^{i+1} = Uf^i + delta Uf^i
-        for (size_t i = 0; i < m_solution_faces.size(); i++)
-        {
-            assert(m_solution_faces.at(i).size() == fbs);
-            m_solution_faces.at(i) += solF.segment(i * fbs, fbs);
-        }
         // Update cell
         size_t cell_i = 0;
         for (auto& cl : m_msh)
         {
-            // Extract the solution
-            const auto fcs_id          = faces_id(m_msh, cl);
-            const auto num_faces       = fcs_id.size();
-            const auto total_faces_dof = num_faces * fbs;
-
-            vector_type xdT = vector_type::Zero(total_faces_dof);
-
-            for (size_t face_i = 0; face_i < num_faces; face_i++)
-            {
-                xdT.segment(face_i * fbs, fbs) = solF.segment(fcs_id[face_i] * fbs, fbs);
-            }
+            const vector_type xdT = m_assembler.take_local_solution_nonlinear(m_msh, cl, m_bnd, m_system_solution, m_solution_faces);
 
             // static decondensation
             const vector_type xT = m_bL[cell_i] - m_AL[cell_i] * xdT;
 
-            assert(xT.size() == cbs);
             assert(m_solution.at(cell_i).size() == xT.size() + xdT.size());
             // Update element U^{i+1} = U^i + delta U^i ///
-            m_solution.at(cell_i).head(cbs) += xT;
-            m_solution.at(cell_i).segment(cbs, total_faces_dof) += xdT;
+            m_solution.at(cell_i).head(xT.size()) += xT;
+            m_solution.at(cell_i).segment(xT.size(), xdT.size()) += xdT;
 
             // std::cout << "KT_F " << m_AL[cell_i].norm() << std::endl;
             // std::cout << "sol_F" << std::endl;
@@ -372,6 +352,17 @@ class NewtonIteration
             // std::cout << (m_solution.at(cell_i)).segment(0, cbs).transpose() << std::endl;
 
             cell_i++;
+        }
+
+        const auto solF = m_assembler.expand_solution_nonlinear(m_msh, m_bnd, m_system_solution, m_solution_faces);
+
+        // Update  unknowns
+        // Update face Uf^{i+1} = Uf^i + delta Uf^i
+        const auto fbs = vector_basis_size(m_hdi.face_degree(), mesh_type::dimension - 1, mesh_type::dimension);
+        for (size_t i = 0; i < m_solution_faces.size(); i++)
+        {
+            assert(m_solution_faces.at(i).size() == fbs);
+            m_solution_faces.at(i) += solF.segment(i * fbs, fbs);
         }
 
         tc.toc();

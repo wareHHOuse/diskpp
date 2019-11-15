@@ -38,6 +38,7 @@
 #include "TimeManager.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
 
+#include "adaptivity/adaptivity.hpp"
 #include "boundary_conditions/boundary_conditions.hpp"
 #include "methods/hho"
 
@@ -73,25 +74,54 @@ class NewtonSolver
     typedef hho_degree_info                       hdi_type;
     typedef Behavior<mesh_type>                   behavior_type;
 
-    hdi_type         m_hdi;
-    bnd_type         m_bnd;
-    const mesh_type& m_msh;
-    param_type       m_rp;
-    behavior_type    m_behavior;
+    hdi_type              m_hdi;
+    bnd_type              m_bnd;
+    const mesh_type&      m_msh;
+    param_type            m_rp;
+    behavior_type         m_behavior;
+    MeshDegree<mesh_type> m_degree_infos;
 
     std::vector<vector_type> m_solution, m_solution_faces;
     std::vector<matrix_type> m_gradient_precomputed, m_stab_precomputed;
 
     bool m_verbose, m_convergence;
 
+    void
+    init_degree(void)
+    {
+        m_degree_infos = MeshDegree(m_msh, m_hdi.cell_degree(), m_hdi.face_degree());
+
+        if (m_bnd.nb_faces_contact() > 0)
+        {
+            for (auto itor = m_msh.boundary_faces_begin(); itor != m_msh.boundary_faces_end(); itor++)
+            {
+                const auto bfc     = *itor;
+                const auto face_id = m_msh.lookup(bfc);
+
+                if (m_bnd.is_contact_face(face_id))
+                {
+                    switch (m_bnd.contact_boundary_type(face_id))
+                    {
+                        case SIGNORINI_FACE:
+                        {
+                            m_degree_infos.degree(m_msh, bfc, m_hdi.face_degree() + 1);
+                            break;
+                        }
+                        default: { throw std::invalid_argument("Invalid contact type");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Initializa data structures
     void
     init(void)
     {
-        const auto dimension     = mesh_type::dimension;
-        const auto num_cell_dofs = vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
-        const auto num_face_dofs = vector_basis_size(m_hdi.face_degree(), dimension - 1, dimension);
-        const auto total_dof     = m_msh.cells_size() * num_cell_dofs + m_msh.faces_size() * num_face_dofs;
+        const auto dimension = mesh_type::dimension;
+
+        size_t total_dof = 0;
 
         m_solution.clear();
         m_solution_faces.clear();
@@ -101,12 +131,37 @@ class NewtonSolver
 
         for (auto& cl : m_msh)
         {
-            const auto num_faces = howmany_faces(m_msh, cl);
-            m_solution.push_back(vector_type::Zero(num_cell_dofs + num_faces * num_face_dofs));
+            const auto di            = m_degree_infos.degreeInfo(m_msh, cl);
+            const auto num_cell_dofs = vector_basis_size(di.degree(), dimension, dimension);
+            total_dof += num_cell_dofs;
+
+            const auto fcs    = faces(m_msh, cl);
+            const auto fcs_di = m_degree_infos.degreeInfo(m_msh, fcs);
+
+            size_t num_faces_dofs = 0;
+            for (auto& fc : fcs_di)
+            {
+                if (fc.hasUnknowns())
+                {
+                    num_faces_dofs += vector_basis_size(fc.degree(), dimension - 1, dimension);
+                }
+            }
+
+            m_solution.push_back(vector_type::Zero(num_cell_dofs + num_faces_dofs));
         }
 
-        for (size_t i = 0; i < m_msh.faces_size(); i++)
+        for (auto itor = m_msh.faces_begin(); itor != m_msh.faces_end(); itor++)
         {
+            const auto fc = *itor;
+            const auto di = m_degree_infos.degreeInfo(m_msh, fc);
+
+            size_t num_face_dofs = 0;
+            if (di.hasUnknowns())
+            {
+                num_face_dofs = vector_basis_size(di.degree(), dimension - 1, dimension);
+            }
+            total_dof += num_face_dofs;
+
             m_solution_faces.push_back(vector_type::Zero(num_face_dofs));
         }
 
@@ -236,7 +291,8 @@ class NewtonSolver
         // Initialization
         if (m_verbose)
             std::cout << "Initialization ..." << std::endl;
-        init();
+        this->init_degree();
+        this->init();
 
         // Precomputation
         if (m_rp.m_precomputation)
@@ -321,7 +377,7 @@ class NewtonSolver
     void
     addBehavior(const size_t deformation, const size_t law)
     {
-        m_behavior = behavior_type(m_msh, 2*m_hdi.grad_degree(), deformation, law);
+        m_behavior = behavior_type(m_msh, 2 * m_hdi.grad_degree(), deformation, law);
 
         if (m_verbose)
         {
@@ -405,7 +461,7 @@ class NewtonSolver
 
             //  Newton correction
             NewtonSolverInfo newton_info =
-              newton_step.compute(rlf, m_gradient_precomputed, m_stab_precomputed, m_behavior);
+              newton_step.compute(rlf, m_gradient_precomputed, m_stab_precomputed, m_degree_infos, m_behavior);
             si.updateInfo(newton_info);
 
             if (m_verbose)
@@ -481,19 +537,30 @@ class NewtonSolver
     size_t
     numberOfDofs()
     {
-        const auto num_face_dofs =
-          vector_basis_size(m_hdi.face_degree(), mesh_type::dimension - 1, mesh_type::dimension);
-        return m_msh.faces_size() * num_face_dofs;
+        const auto dimension      = mesh_type::dimension;
+        size_t     num_faces_dofs = 0;
+        for (auto itor = m_msh.faces_begin(); itor != m_msh.faces_end(); itor++)
+        {
+            const auto fc = *itor;
+            const auto di = m_degree_infos.degreeInfo(m_msh, fc);
+
+            if (di.hasUnknowns())
+            {
+                num_faces_dofs += vector_basis_size(di.degree(), dimension - 1, dimension);
+            }
+        }
+        return num_faces_dofs;
     }
 
     void
     printSolutionCell() const
     {
-        const auto num_cell_dofs = vector_basis_size(m_hdi.cell_degree(), mesh_type::dimension, mesh_type::dimension);
-        size_t     cell_i        = 0;
+        size_t cell_i = 0;
         std::cout << "Solution at the cells:" << std::endl;
         for (auto& cl : m_msh)
         {
+            const auto di            = m_degree_infos.degreeInfo(m_msh, cl);
+            const auto num_cell_dofs = vector_basis_size(di.cell_degree(), mesh_type::dimension, mesh_type::dimension);
             std::cout << "cell " << cell_i << ": " << std::endl;
             std::cout << m_solution.at(cell_i++).head(num_cell_dofs).transpose() << std::endl;
         }
@@ -506,18 +573,19 @@ class NewtonSolver
     {
         scalar_type err_dof = 0;
 
-        const auto cbs      = vector_basis_size(m_hdi.cell_degree(), mesh_type::dimension, mesh_type::dimension);
-        const int  diff_deg = m_hdi.face_degree() - m_hdi.cell_degree();
-        const int  di       = std::max(diff_deg, 0);
+        const int diff_deg = m_hdi.face_degree() - m_hdi.cell_degree();
+        const int di       = std::max(diff_deg, 0);
 
         size_t cell_i = 0;
 
         for (auto& cl : m_msh)
         {
-            const vector_type comp_dof = m_solution.at(cell_i++).head(cbs);
-            const vector_type true_dof = project_function(m_msh, cl, m_hdi.cell_degree(), as, di);
+            const auto di            = m_degree_infos.degreeInfo(m_msh, cl);
+            const auto num_cell_dofs = vector_basis_size(di.cell_degree(), mesh_type::dimension, mesh_type::dimension);
+            const vector_type comp_dof = m_solution.at(cell_i++).head(num_cell_dofs);
+            const vector_type true_dof = project_function(m_msh, cl, di.degree(), as, di);
 
-            const auto        cb   = make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
+            const auto        cb   = make_vector_monomial_basis(m_msh, cl, di.degree());
             const matrix_type mass = make_mass_matrix(m_msh, cl, cb);
 
             const vector_type diff_dof = (true_dof - comp_dof);

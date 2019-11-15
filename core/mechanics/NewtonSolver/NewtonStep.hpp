@@ -37,6 +37,7 @@
 #include "NewtonSolverParameters.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
 
+#include "adaptivity/adaptivity.hpp"
 #include "boundary_conditions/boundary_conditions.hpp"
 #include "methods/hho"
 
@@ -144,7 +145,8 @@ class NewtonStep
     compute(const LoadIncrement&            lf,
             const std::vector<matrix_type>& gradient_precomputed,
             const std::vector<matrix_type>& stab_precomputed,
-            behavior_type& behavior)
+            const MeshDegree<mesh_type>&    degree_infos,
+            behavior_type & behavior)
     {
         NewtonSolverInfo ni;
         timecounter      tc;
@@ -163,7 +165,7 @@ class NewtonStep
             AssemblyInfo assembly_info;
             try
             {
-                assembly_info = newton_iter.assemble(lf, gradient_precomputed, stab_precomputed, behavior);
+                assembly_info = newton_iter.assemble(lf, gradient_precomputed, stab_precomputed, degree_infos, behavior);
             }
             catch (const std::invalid_argument& ia)
             {
@@ -189,7 +191,7 @@ class NewtonStep
             SolveInfo solve_info = newton_iter.solve();
             ni.updateSolveInfo(solve_info);
             // update unknowns
-            ni.m_assembly_info.m_time_postpro += newton_iter.postprocess();
+            ni.m_assembly_info.m_time_postpro += newton_iter.postprocess(degree_infos);
 
             ni.m_iter++;
         }
