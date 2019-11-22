@@ -2894,7 +2894,7 @@ class vector_primal_hho_assembler
         duos.reserve(3 * system_size);
     }
 
-    vector_primal_hho_assembler(const Mesh& msh, const MeshDegree<Mesh>& degree_infos, const boundary_type& bnd)
+    vector_primal_hho_assembler(const Mesh& msh, const MeshDegreeInfo<Mesh>& degree_infos, const boundary_type& bnd)
     {
         faces_degree = degree_infos.faces_degree();
 
@@ -3996,7 +3996,7 @@ make_vector_primal_hho_assembler(const Mesh&                             msh,
 template<typename Mesh>
 auto
 make_vector_primal_hho_assembler(const Mesh&                             msh,
-                                 const MeshDegree<Mesh>&                 degree_infos,
+                                 const MeshDegreeInfo<Mesh>&                 degree_infos,
                                  const vector_boundary_conditions<Mesh>& bnd)
 {
     return vector_primal_hho_assembler<Mesh>(msh, degree_infos, bnd);

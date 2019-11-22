@@ -102,7 +102,7 @@ class NewtonIteration
                     const hdi_type&              hdi,
                     const bnd_type&              bnd,
                     const param_type&            rp,
-                    const MeshDegree<mesh_type>& degree_infos) :
+                    const MeshDegreeInfo<mesh_type>& degree_infos) :
       m_msh(msh),
       m_hdi(hdi), m_rp(rp), m_bnd(bnd), m_verbose(rp.m_verbose)
     {
@@ -144,7 +144,7 @@ class NewtonIteration
     assemble(const LoadFunction&             lf,
              const std::vector<matrix_type>& gradient_precomputed,
              const std::vector<matrix_type>& stab_precomputed,
-             const MeshDegree<mesh_type>&    degree_infos,
+             const MeshDegreeInfo<mesh_type>&    degree_infos,
              behavior_type&                  behavior)
     {
         elem_type    elem(m_msh, m_hdi);
@@ -329,7 +329,7 @@ class NewtonIteration
     }
 
     scalar_type
-    postprocess(const MeshDegree<mesh_type>& degree_infos)
+    postprocess(const MeshDegreeInfo<mesh_type>& degree_infos)
     {
         timecounter tc;
         tc.tic();

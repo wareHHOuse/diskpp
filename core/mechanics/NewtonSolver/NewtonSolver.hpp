@@ -79,7 +79,7 @@ class NewtonSolver
     const mesh_type&      m_msh;
     param_type            m_rp;
     behavior_type         m_behavior;
-    MeshDegree<mesh_type> m_degree_infos;
+    MeshDegreeInfo<mesh_type> m_degree_infos;
 
     std::vector<vector_type> m_solution, m_solution_faces;
     std::vector<matrix_type> m_gradient_precomputed, m_stab_precomputed;
@@ -89,7 +89,7 @@ class NewtonSolver
     void
     init_degree(void)
     {
-        m_degree_infos = MeshDegree(m_msh, m_hdi.cell_degree(), m_hdi.face_degree());
+        m_degree_infos = MeshDegreeInfo(m_msh, m_hdi.cell_degree(), m_hdi.face_degree());
 
         if (m_bnd.nb_faces_contact() > 0)
         {

@@ -145,7 +145,7 @@ class NewtonStep
     compute(const LoadIncrement&            lf,
             const std::vector<matrix_type>& gradient_precomputed,
             const std::vector<matrix_type>& stab_precomputed,
-            const MeshDegree<mesh_type>&    degree_infos,
+            const MeshDegreeInfo<mesh_type>&    degree_infos,
             behavior_type & behavior)
     {
         NewtonSolverInfo ni;

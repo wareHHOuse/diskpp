@@ -66,7 +66,136 @@ class DegreeInfo
 };
 
 template<typename MeshType>
-class MeshDegree
+class CellDegreeInfo
+{
+  private:
+    typedef typename MeshType::cell            cell_type;
+    typedef typename MeshType::face            face_type;
+    typedef typename MeshType::coordinate_type scalar_type;
+
+    DegreeInfo              m_cell, m_reconstruction, m_gradient;
+    std::vector<DegreeInfo> m_faces;
+
+  public:
+    CellDegreeInfo(const MeshType& msh, const cell_type& cl, const size_t degree)
+    {
+        const auto num_faces = howmany_faces(msh, cl);
+
+        m_faces.assign(num_faces, DegreeInfo(degree));
+        m_cell           = DegreeInfo(degree);
+        m_reconstruction = DegreeInfo(degree + 1);
+        m_gradient       = DegreeInfo(degree);
+    }
+
+    CellDegreeInfo(const MeshType& msh, const cell_type& cl, const size_t cell_degree, const size_t face_degree)
+    {
+        const auto num_faces = howmany_faces(msh, cl);
+
+        m_faces.assign(num_faces, DegreeInfo(face_degree));
+        m_cell           = DegreeInfo(cell_degree);
+        m_reconstruction = DegreeInfo(face_degree + 1);
+        m_gradient       = DegreeInfo(face_degree);
+    }
+
+    CellDegreeInfo(const MeshType&  msh,
+                   const cell_type& cl,
+                   const size_t     cell_degree,
+                   const size_t     face_degree,
+                   const size_t     grad_degree)
+    {
+        const auto num_faces = howmany_faces(msh, cl);
+
+        m_faces.assign(num_faces, DegreeInfo(face_degree));
+        m_cell           = DegreeInfo(cell_degree);
+        m_reconstruction = DegreeInfo(face_degree + 1);
+        m_gradient       = DegreeInfo(grad_degree);
+    }
+
+    CellDegreeInfo(const size_t                   cell_degree,
+                   const size_t                   reconstruction_degree,
+                   const size_t                   grad_degree,
+                   const std::vector<DegreeInfo>& faces_infos)
+    {
+        m_faces          = faces_infos;
+        m_cell           = DegreeInfo(cell_degree);
+        m_reconstruction = DegreeInfo(reconstruction_degree);
+        m_gradient       = DegreeInfo(grad_degree);
+    }
+
+    CellDegreeInfo(const DegreeInfo               cell_info,
+                   const DegreeInfo               reconstruction_info,
+                   const DegreeInfo               grad_info,
+                   const std::vector<DegreeInfo>& faces_infos)
+    {
+        m_faces          = faces_infos;
+        m_cell           = cell_info;
+        m_reconstruction = reconstruction_info;
+        m_gradient       = grad_info;
+    }
+
+    size_t
+    cell_degree(void) const
+    {
+        return m_cell.degree();
+    }
+
+    bool
+    cell_hasUnknowns(void) const
+    {
+        return m_cell.hasUnknowns();
+    }
+
+    size_t
+    grad_degree(void) const
+    {
+        return m_gradient.degree();
+    }
+
+    bool
+    grad_hasUnknowns(void) const
+    {
+        return m_gradient.hasUnknowns();
+    }
+
+    size_t
+    reconstruction_degree(void) const
+    {
+        return m_reconstruction.degree();
+    }
+
+    bool
+    reconstruction_hasUnknowns(void) const
+    {
+        return m_reconstruction.hasUnknowns();
+    }
+
+    DegreeInfo
+    cellDegreeInfo(void) const
+    {
+        return m_cell;
+    }
+
+    DegreeInfo
+    gradientDegreeInfo(void) const
+    {
+        return m_gradient;
+    }
+
+    DegreeInfo
+    reconstructionDegreeInfo(void) const
+    {
+        return m_reconstruction;
+    }
+
+    std::vector<DegreeInfo>
+    facesDegreeInfo(void) const
+    {
+        return m_faces;
+    }
+};
+
+template<typename MeshType>
+class MeshDegreeInfo
 {
   private:
     typedef typename MeshType::cell            cell_type;
@@ -74,27 +203,30 @@ class MeshDegree
     typedef typename MeshType::coordinate_type scalar_type;
 
     std::vector<DegreeInfo> m_cells_degree, m_faces_degree;
+    std::vector<DegreeInfo> m_gradient_degree, m_reconstruction_degree;
 
   public:
-    MeshDegree(void)
+    MeshDegreeInfo(void)
     {
         m_cells_degree.clear();
         m_faces_degree.clear();
+        m_gradient_degree.clear();
+        m_reconstruction_degree.clear();
     }
-    MeshDegree(const MeshType& msh)
+    MeshDegreeInfo(const MeshType& msh)
     {
         m_cells_degree.resize(msh.cells_size());
         m_faces_degree.resize(msh.faces_size());
     }
 
-    MeshDegree(const MeshType& msh, const size_t degree)
+    MeshDegreeInfo(const MeshType& msh, const size_t degree)
     {
         const DegreeInfo di(degree);
         m_cells_degree.assign(msh.cells_size(), di);
         m_faces_degree.assign(msh.faces_size(), di);
     }
 
-    MeshDegree(const MeshType& msh, const size_t cell_degree, const size_t face_degree)
+    MeshDegreeInfo(const MeshType& msh, const size_t cell_degree, const size_t face_degree)
     {
         const DegreeInfo dic(cell_degree);
         const DegreeInfo dif(face_degree);
@@ -212,6 +344,16 @@ class MeshDegree
     cells_degree(void) const
     {
         return m_cells_degree;
+    }
+
+    CellDegreeInfo<MeshType>
+    cellDegreeInfo(const MeshType& msh, const cell_type& cl) const
+    {
+        const auto cell_id = msh.lookup(cl);
+        const auto fcs     = faces(msh, cl);
+
+        return CellDegreeInfo<MeshType>(
+          m_cells_degree[cell_id], m_reconstruction_degree[cell_id], m_gradient_degree[cell_id], degreeInfo(msh, fcs));
     }
 };
 
