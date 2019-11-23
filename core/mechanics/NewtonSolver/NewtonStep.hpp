@@ -70,13 +70,7 @@ class NewtonStep
 
     typedef NewtonSolverParameter<scalar_type>    param_type;
     typedef vector_boundary_conditions<mesh_type> bnd_type;
-    typedef hho_degree_info                       hdi_type;
     typedef Behavior<mesh_type>                   behavior_type;
-
-    const mesh_type&  m_msh;
-    const hdi_type&   m_hdi;
-    const bnd_type&   m_bnd;
-    const param_type& m_rp;
 
     std::vector<vector_type> m_solution, m_solution_faces;
 
@@ -84,8 +78,7 @@ class NewtonStep
     bool m_convergence;
 
   public:
-    NewtonStep(const mesh_type& msh, const hdi_type& hdi, const bnd_type& bnd, const param_type& rp) :
-      m_msh(msh), m_hdi(hdi), m_bnd(bnd), m_rp(rp), m_verbose(rp.m_verbose), m_convergence(false)
+    NewtonStep(const param_type& rp) : m_verbose(rp.m_verbose), m_convergence(false)
     {
         m_solution.clear();
         m_solution_faces.clear();
@@ -124,11 +117,9 @@ class NewtonStep
     {
         m_solution_faces.clear();
         m_solution_faces = initial_solution_faces;
-        assert(m_msh.faces_size() == m_solution_faces.size());
 
         m_solution.clear();
         m_solution = initial_solution;
-        assert(m_msh.cells_size() == m_solution.size());
     }
 
     /**
@@ -142,30 +133,34 @@ class NewtonStep
      */
     template<typename LoadIncrement>
     NewtonSolverInfo
-    compute(const LoadIncrement&            lf,
-            const std::vector<matrix_type>& gradient_precomputed,
-            const std::vector<matrix_type>& stab_precomputed,
-            const MeshDegreeInfo<mesh_type>&    degree_infos,
-            behavior_type & behavior)
+    compute(const mesh_type&                 msh,
+            const bnd_type&                  bnd,
+            const param_type&                rp,
+            const MeshDegreeInfo<mesh_type>& degree_infos,
+            const LoadIncrement&             lf,
+            const std::vector<matrix_type>&  gradient_precomputed,
+            const std::vector<matrix_type>&  stab_precomputed,
+            behavior_type&                   behavior)
     {
         NewtonSolverInfo ni;
         timecounter      tc;
         tc.tic();
 
         // initialise the NewtonRaphson iteration
-        NewtonIteration<mesh_type> newton_iter(m_msh, m_hdi, m_bnd, m_rp, degree_infos);
+        NewtonIteration<mesh_type> newton_iter(msh, bnd, rp, degree_infos);
 
         newton_iter.initialize(m_solution, m_solution_faces);
 
         m_convergence = false;
 
-        for (size_t iter = 0; iter < m_rp.m_iter_max; iter++)
+        for (size_t iter = 0; iter < rp.m_iter_max; iter++)
         {
             // assemble lhs and rhs
             AssemblyInfo assembly_info;
             try
             {
-                assembly_info = newton_iter.assemble(lf, gradient_precomputed, stab_precomputed, degree_infos, behavior);
+                assembly_info = newton_iter.assemble(
+                  msh, bnd, rp, degree_infos, lf, gradient_precomputed, stab_precomputed, behavior);
             }
             catch (const std::invalid_argument& ia)
             {
@@ -178,7 +173,7 @@ class NewtonStep
 
             ni.updateAssemblyInfo(assembly_info);
             // test convergence
-            m_convergence = newton_iter.convergence(iter);
+            m_convergence = newton_iter.convergence(rp, iter);
             if (m_convergence)
             {
                 newton_iter.save_solutions(m_solution, m_solution_faces);
@@ -191,7 +186,7 @@ class NewtonStep
             SolveInfo solve_info = newton_iter.solve();
             ni.updateSolveInfo(solve_info);
             // update unknowns
-            ni.m_assembly_info.m_time_postpro += newton_iter.postprocess(degree_infos);
+            ni.m_assembly_info.m_time_postpro += newton_iter.postprocess(msh, bnd, degree_infos);
 
             ni.m_iter++;
         }

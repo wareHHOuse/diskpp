@@ -52,7 +52,6 @@ class mechanical_computation
 
     typedef NewtonSolverParameter<scalar_type>    param_type;
     typedef vector_boundary_conditions<mesh_type> bnd_type;
-    typedef hho_degree_info                       hdi_type;
     typedef Behavior<mesh_type>                   behavior_type;
 
     typedef static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> static_matrix_type;
@@ -62,9 +61,6 @@ class mechanical_computation
 
     typedef dynamic_matrix<scalar_type> matrix_type;
     typedef dynamic_vector<scalar_type> vector_type;
-
-    const mesh_type& m_msh;
-    const hdi_type&  m_hdi;
 
     bool two_dim;
 
@@ -216,11 +212,11 @@ class mechanical_computation
 
     template<typename Function>
     void
-    compute_external_forces(const cell_type& cl, const Function& load, vector_type& RTF)
+    compute_external_forces(const mesh_type& msh, const cell_type& cl, const Function& load, const size_t cell_degree, vector_type& RTF)
     {
         // compute (f,v)_T
-        const auto cb       = make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
-        RTF.head(cb.size()) = make_rhs(m_msh, cl, cb, load);
+        const auto cb       = make_vector_monomial_basis(msh, cl, cell_degree);
+        RTF.head(cb.size()) = make_rhs(msh, cl, cb, load);
     }
 
     void
@@ -309,7 +305,7 @@ class mechanical_computation
     double      time_law;
     double      time_contact;
 
-    mechanical_computation(const mesh_type& msh, const hdi_type& hdi) : m_msh(msh), m_hdi(hdi)
+    mechanical_computation(void)
     {
         if (dimension == 2)
             two_dim = true;
@@ -321,24 +317,29 @@ class mechanical_computation
 
     template<typename Function, typename LawCell, typename LawData>
     void
-    compute(const cell_type&   cl,
-            const Function&    load,
-            const matrix_type& RkT,
-            const vector_type& uTF,
-            LawCell&           law,
-            const LawData&     material_data,
-            const bool         small_def)
+    compute(const mesh_type&                 msh,
+            const cell_type&                 cl,
+            const bnd_type&                  bnd,
+            const param_type&                rp,
+            const MeshDegreeInfo<mesh_type>& degree_infos,
+            const Function&                  load,
+            const matrix_type&               RkT,
+            const vector_type&               uTF,
+            LawCell&                         law,
+            const LawData&                   material_data,
+            const bool                       small_def)
     {
         time_law     = 0.0;
         time_contact = 0.0;
         timecounter tc;
 
-        const auto cell_degree = m_hdi.cell_degree();
-        const auto grad_degree = m_hdi.grad_degree();
-        const auto face_degree = m_hdi.face_degree();
+        const auto cell_infos = degree_infos.cellDegreeInfo(msh, cl);
+        const auto faces_infos = cell_infos.facesDegreeInfo();
+
+        const auto cell_degree = cell_infos.cell_degree();
+        const auto grad_degree = cell_infos.grad_degree();
 
         const auto cell_basis_size = vector_basis_size(cell_degree, dimension, dimension);
-        const auto face_basis_size = vector_basis_size(face_degree, dimension - 1, dimension);
 
         size_t gb_size = 0;
         if (small_def)
@@ -352,8 +353,9 @@ class mechanical_computation
 
         const auto grad_basis_size = gb_size;
 
-        const auto num_faces      = howmany_faces(m_msh, cl);
-        const auto num_total_dofs = cell_basis_size + num_faces * face_basis_size;
+
+        const auto num_faces_dofs = vector_faces_dofs(msh, faces_infos);
+        const auto num_total_dofs = cell_basis_size + num_faces_dofs;
         const auto grad_dim_dofs  = num_grad_dim_dofs(small_def);
 
         matrix_type AT = matrix_type::Zero(grad_basis_size, grad_basis_size);
@@ -375,8 +377,8 @@ class mechanical_computation
 
         auto& law_quadpoints = law.getQPs();
 
-        const auto gb  = make_matrix_monomial_basis(m_msh, cl, grad_degree);
-        const auto gbs = make_sym_matrix_monomial_basis(m_msh, cl, grad_degree);
+        const auto gb  = make_matrix_monomial_basis(msh, cl, grad_degree);
+        const auto gbs = make_sym_matrix_monomial_basis(msh, cl, grad_degree);
 
         eigen_compatible_stdvector<static_matrix_type> gphi;
         // std::cout << "nb: " << law_quadpoints.size() << std::endl;
@@ -423,7 +425,7 @@ class mechanical_computation
         }
 
         // compute external forces
-        this->compute_external_forces(cl, load, RTF);
+        this->compute_external_forces(msh, cl, load, cell_degree, RTF);
 
         // Symmetrize rigidity matrix
         this->symmetrized_rigidity_matrix(grad_basis_size, AT, small_def);

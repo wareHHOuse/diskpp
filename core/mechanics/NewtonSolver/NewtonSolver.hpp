@@ -74,11 +74,10 @@ class NewtonSolver
     typedef hho_degree_info                       hdi_type;
     typedef Behavior<mesh_type>                   behavior_type;
 
-    hdi_type              m_hdi;
-    bnd_type              m_bnd;
-    const mesh_type&      m_msh;
-    param_type            m_rp;
-    behavior_type         m_behavior;
+    bnd_type                  m_bnd;
+    const mesh_type&          m_msh;
+    param_type                m_rp;
+    behavior_type             m_behavior;
     MeshDegreeInfo<mesh_type> m_degree_infos;
 
     std::vector<vector_type> m_solution, m_solution_faces;
@@ -87,9 +86,9 @@ class NewtonSolver
     bool m_verbose, m_convergence;
 
     void
-    init_degree(void)
+    init_degree(const size_t cell_degree, const size_t face_degree, const size_t grad_degree)
     {
-        m_degree_infos = MeshDegreeInfo(m_msh, m_hdi.cell_degree(), m_hdi.face_degree());
+        m_degree_infos = MeshDegreeInfo(m_msh, cell_degree, face_degree, grad_degree);
 
         if (m_bnd.nb_faces_contact() > 0)
         {
@@ -104,7 +103,7 @@ class NewtonSolver
                     {
                         case SIGNORINI_FACE:
                         {
-                            m_degree_infos.degree(m_msh, bfc, m_hdi.face_degree() + 1);
+                            m_degree_infos.degree(m_msh, bfc, face_degree + 1);
                             break;
                         }
                         default: { throw std::invalid_argument("Invalid contact type");
@@ -192,15 +191,16 @@ class NewtonSolver
 
         for (auto& cl : m_msh)
         {
+            //std::cout << m_degree_infos.cellDegreeInfo(m_msh, cl) << std::endl;
             /////// Gradient Reconstruction /////////
             if (m_behavior.getDeformation() == SMALL_DEF)
             {
-                const auto sgr = make_matrix_symmetric_gradrec(m_msh, cl, m_hdi);
+                const auto sgr = make_matrix_symmetric_gradrec(m_msh, cl, m_degree_infos);
                 m_gradient_precomputed.push_back(sgr.first);
             }
             else
             {
-                const auto gr = make_marix_hho_gradrec(m_msh, cl, m_hdi);
+                const auto gr = make_marix_hho_gradrec(m_msh, cl, m_degree_infos);
                 m_gradient_precomputed.push_back(gr.first);
             }
 
@@ -212,25 +212,26 @@ class NewtonSolver
                     {
                         if (m_behavior.getDeformation() == SMALL_DEF)
                         {
-                            const auto recons = make_vector_hho_symmetric_laplacian(m_msh, cl, m_hdi);
-                            m_stab_precomputed.push_back(make_vector_hho_stabilization(m_msh, cl, recons.first, m_hdi));
+                            const auto recons = make_vector_hho_symmetric_laplacian(m_msh, cl, m_degree_infos);
+                            m_stab_precomputed.push_back(
+                              make_vector_hho_stabilization(m_msh, cl, recons.first, m_degree_infos));
                         }
                         else
                         {
-                            const auto recons_scalar = make_scalar_hho_laplacian(m_msh, cl, m_hdi);
+                            const auto recons_scalar = make_scalar_hho_laplacian(m_msh, cl, m_degree_infos);
                             m_stab_precomputed.push_back(
-                              make_vector_hho_stabilization_optim(m_msh, cl, recons_scalar.first, m_hdi));
+                              make_vector_hho_stabilization_optim(m_msh, cl, recons_scalar.first, m_degree_infos));
                         }
                         break;
                     }
                     case HDG:
                     {
-                        m_stab_precomputed.push_back(make_vector_hdg_stabilization(m_msh, cl, m_hdi));
+                        m_stab_precomputed.push_back(make_vector_hdg_stabilization(m_msh, cl, m_degree_infos));
                         break;
                     }
                     case DG:
                     {
-                        m_stab_precomputed.push_back(make_vector_dg_stabilization(m_msh, cl, m_hdi));
+                        m_stab_precomputed.push_back(make_vector_dg_stabilization(m_msh, cl, m_degree_infos));
                         break;
                     }
                     case NO: { break;
@@ -291,7 +292,7 @@ class NewtonSolver
         // Initialization
         if (m_verbose)
             std::cout << "Initialization ..." << std::endl;
-        this->init_degree();
+        this->init_degree(cell_degree, face_degree, grad_degree);
         this->init();
 
         // Precomputation
@@ -339,17 +340,18 @@ class NewtonSolver
 
         for (auto& cl : m_msh)
         {
-            m_solution.at(cell_i++) = project_function(m_msh, cl, m_hdi, func, 2);
+            m_solution.at(cell_i++) = project_function(m_msh, cl, m_degree_infos, func, 2);
         }
 
         for (auto itor = m_msh.faces_begin(); itor != m_msh.faces_end(); itor++)
         {
             const auto bfc     = *itor;
             const auto face_id = m_msh.lookup(bfc);
+            const auto fdi     = m_degree_infos.degreeInfo(m_msh, bfc);
 
             if (m_bnd.contact_boundary_type(face_id) == SIGNORINI_FACE)
             {
-                const auto proj_bcf = project_function(m_msh, bfc, m_hdi.face_degree() + 1, func, 2);
+                const auto proj_bcf = project_function(m_msh, bfc, fdi.degree() + 1, func, 2);
                 assert(m_solution_faces[face_id].size() == proj_bcf.size());
 
                 m_solution_faces[face_id] = proj_bcf;
@@ -360,7 +362,7 @@ class NewtonSolver
             }
             else
             {
-                const auto proj_bcf = project_function(m_msh, bfc, m_hdi.face_degree(), func, 2);
+                const auto proj_bcf = project_function(m_msh, bfc, fdi.degree(), func, 2);
                 assert(m_solution_faces[face_id].size() == proj_bcf.size());
 
                 m_solution_faces[face_id] = proj_bcf;
@@ -377,7 +379,7 @@ class NewtonSolver
     void
     addBehavior(const size_t deformation, const size_t law)
     {
-        m_behavior = behavior_type(m_msh, 2 * m_hdi.grad_degree(), deformation, law);
+        m_behavior = behavior_type(m_msh, 2 * m_rp.m_grad_degree, deformation, law);
 
         if (m_verbose)
         {
@@ -438,7 +440,7 @@ class NewtonSolver
         }
 
         // Newton step
-        NewtonStep<mesh_type> newton_step(m_msh, m_hdi, m_bnd, m_rp);
+        NewtonStep<mesh_type> newton_step(m_rp);
         newton_step.initialize(m_solution, m_solution_faces);
 
         // Loop on time step
@@ -460,8 +462,8 @@ class NewtonSolver
             m_bnd.multiplyAllFunctionsByAFactor(current_time);
 
             //  Newton correction
-            NewtonSolverInfo newton_info =
-              newton_step.compute(rlf, m_gradient_precomputed, m_stab_precomputed, m_degree_infos, m_behavior);
+            NewtonSolverInfo newton_info = newton_step.compute(m_msh, m_bnd, m_rp, m_degree_infos,
+              rlf, m_gradient_precomputed, m_stab_precomputed, m_behavior);
             si.updateInfo(newton_info);
 
             if (m_verbose)
@@ -506,9 +508,7 @@ class NewtonSolver
 
                         std::cout << "** Save results" << std::endl;
                         std::string name =
-                          "result" + std::to_string(mesh_type::dimension) + "D_k" +
-                          std::to_string(m_hdi.face_degree()) + "_l" + std::to_string(m_hdi.cell_degree()) + "_g" +
-                          std::to_string(m_hdi.grad_degree()) + "_t" + std::to_string(current_time) + "_";
+                          "result" + std::to_string(mesh_type::dimension) + "D_t" + std::to_string(current_time) + "_";
 
                         m_rp.m_time_save.pop_front();
                         if (m_rp.m_time_save.empty())
@@ -573,7 +573,7 @@ class NewtonSolver
     {
         scalar_type err_dof = 0;
 
-        const int diff_deg = m_hdi.face_degree() - m_hdi.cell_degree();
+        const int diff_deg = 1;
         const int di       = std::max(diff_deg, 0);
 
         size_t cell_i = 0;

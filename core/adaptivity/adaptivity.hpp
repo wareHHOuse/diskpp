@@ -194,6 +194,26 @@ class CellDegreeInfo
     }
 };
 
+template<typename Mesh>
+std::ostream&
+operator<<(std::ostream& os, const CellDegreeInfo<Mesh>& cell_infos)
+{
+    os << "Cell Degree Info:" << std::endl;
+    os << "- cell degree " << cell_infos.cell_degree() << std::endl;
+    os << "- grad degree " << cell_infos.grad_degree() << std::endl;
+    os << "- reconstruction degree " << cell_infos.reconstruction_degree() << std::endl;
+
+    const auto faces_infos = cell_infos.facesDegreeInfo();
+    size_t incr = 0;
+
+    for(auto& fdi : faces_infos)
+    {
+        os << "- face " << incr++ << ": degree " << fdi.degree() << ", unknowns " << fdi.hasUnknowns() << std::endl;
+    }
+
+    return os;
+}
+
 template<typename MeshType>
 class MeshDegreeInfo
 {
@@ -217,6 +237,8 @@ class MeshDegreeInfo
     {
         m_cells_degree.resize(msh.cells_size());
         m_faces_degree.resize(msh.faces_size());
+        m_gradient_degree.resize(msh.cells_size());
+        m_reconstruction_degree.resize(msh.cells_size());
     }
 
     MeshDegreeInfo(const MeshType& msh, const size_t degree)
@@ -224,6 +246,8 @@ class MeshDegreeInfo
         const DegreeInfo di(degree);
         m_cells_degree.assign(msh.cells_size(), di);
         m_faces_degree.assign(msh.faces_size(), di);
+        m_gradient_degree.assign(msh.cells_size(), di);
+        m_reconstruction_degree.assign(msh.cells_size(), DegreeInfo(degree + 1));
     }
 
     MeshDegreeInfo(const MeshType& msh, const size_t cell_degree, const size_t face_degree)
@@ -233,6 +257,16 @@ class MeshDegreeInfo
 
         m_cells_degree.assign(msh.cells_size(), dic);
         m_faces_degree.assign(msh.faces_size(), dif);
+        m_gradient_degree.assign(msh.cells_size(), dif);
+        m_reconstruction_degree.assign(msh.cells_size(), DegreeInfo(face_degree + 1));
+    }
+
+    MeshDegreeInfo(const MeshType& msh, const size_t cell_degree, const size_t face_degree, const size_t grad_degree)
+    {
+        m_cells_degree.assign(msh.cells_size(), DegreeInfo(cell_degree));
+        m_faces_degree.assign(msh.faces_size(), DegreeInfo(face_degree));
+        m_gradient_degree.assign(msh.cells_size(), DegreeInfo(grad_degree));
+        m_reconstruction_degree.assign(msh.cells_size(), DegreeInfo(face_degree + 1));
     }
 
     void
@@ -316,7 +350,8 @@ class MeshDegreeInfo
     std::vector<DegreeInfo>
     degreeInfo(const MeshType& msh, const faces_type& fcs) const
     {
-        std::vector<DegreeInfo> ret(fcs.size());
+        std::vector<DegreeInfo> ret;
+        ret.reserve(fcs.size());
 
         for (auto& fc : fcs)
         {
