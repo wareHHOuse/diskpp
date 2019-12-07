@@ -60,7 +60,7 @@ class hierarchical_eigval_solver
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>    hho_eigvecs;
     Eigen::Matrix<T, Eigen::Dynamic, 1>                 hho_eigvals;
 
-    feast_eigensolver_params<T> fep;
+    disk::feast_eigensolver_params<T> fep;
 
     disk::silo_database silo_db;
 
@@ -165,7 +165,7 @@ class hierarchical_eigval_solver
             std::vector<T> solution_vals;
             solution_vals.resize(msh.points_size());
 
-            dynamic_vector<T> gx = fem_eigvecs.block(0,i,fem_eigvecs.rows(),1);
+            disk::dynamic_vector<T> gx = fem_eigvecs.block(0,i,fem_eigvecs.rows(),1);
             for (size_t i = 0; i < gx.size(); i++)
                 solution_vals.at( fem_expand_map.at(i) ) = gx(i);
 
@@ -183,7 +183,7 @@ class hierarchical_eigval_solver
         {
             ofs << std::setprecision(10) << fem_eigvals(i) << " ";
 
-            dynamic_vector<T> gx = fem_eigvecs.block(0,i,fem_eigvecs.rows(),1);
+            disk::dynamic_vector<T> gx = fem_eigvecs.block(0,i,fem_eigvecs.rows(),1);
             ofs << gx.dot(gM*gx) << std::endl;
         }
         ofs.close();
@@ -238,13 +238,13 @@ class hierarchical_eigval_solver
         for (auto& cl : msh)
         {
             auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
-            dynamic_matrix<T> stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
+            disk::dynamic_matrix<T> stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
 
             auto              cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-            dynamic_matrix<T> mass   = make_mass_matrix(msh, cl, cb);
+            disk::dynamic_matrix<T> mass   = make_mass_matrix(msh, cl, cb);
 
-            dynamic_matrix<T> K = gr.second + stab_weight * stab;
-            dynamic_matrix<T> M = mass;
+            disk::dynamic_matrix<T> K = gr.second + stab_weight * stab;
+            disk::dynamic_matrix<T> M = mass;
 
             auto fcs = faces(msh, cl);
             auto num_faces = fcs.size();
@@ -323,7 +323,7 @@ class hierarchical_eigval_solver
             std::vector<T> solution_vals;
             solution_vals.resize(msh.cells_size());
 
-            dynamic_vector<T> gx = hho_eigvecs.block(0,i,hho_eigvecs.rows(),1);
+            disk::dynamic_vector<T> gx = hho_eigvecs.block(0,i,hho_eigvecs.rows(),1);
             for (size_t i = 0; i < msh.cells_size(); i++)
                 solution_vals.at(i) = gx(i*num_cell_dofs);
 
@@ -340,7 +340,7 @@ class hierarchical_eigval_solver
         {
             ofs << std::setprecision(10) << hho_eigvals(i) << " ";
 
-            dynamic_vector<T> gx = hho_eigvecs.block(0,i,hho_eigvecs.rows(),1);
+            disk::dynamic_vector<T> gx = hho_eigvecs.block(0,i,hho_eigvecs.rows(),1);
             ofs << gx.dot(gM*gx) << std::endl;
         }
         ofs.close();
@@ -447,7 +447,7 @@ public:
         auto exp_sol_size = num_cell_dofs * sol_msh.cells_size() +
                             num_face_dofs * sol_msh.faces_size();
 
-        dynamic_vector<T> hho_exp_sol = dynamic_vector<T>::Zero(exp_sol_size);
+        disk::dynamic_vector<T> hho_exp_sol = disk::dynamic_vector<T>::Zero(exp_sol_size);
 
         hho_exp_sol.block(0, 0, num_cell_dofs * sol_msh.cells_size(), 1) =
             hho_eigvecs.block(0, which_eigvec, num_cell_dofs * sol_msh.cells_size(), 1);
@@ -465,7 +465,7 @@ public:
 
 
 
-        std::vector<dynamic_vector<T>> rec_sols;
+        std::vector<disk::dynamic_vector<T>> rec_sols;
 
         size_t sol_cell_i = 0;
         for (auto& sol_cl : sol_msh)
@@ -473,7 +473,7 @@ public:
             hho_degree_info hdi(degree);
             auto gr = make_scalar_hho_laplacian(sol_msh, sol_cl, hdi);
 
-            dynamic_vector<T> hho_evec = dynamic_vector<T>::Zero(num_cell_dofs + 3*num_face_dofs);
+            disk::dynamic_vector<T> hho_evec = disk::dynamic_vector<T>::Zero(num_cell_dofs + 3*num_face_dofs);
             hho_evec.head(num_cell_dofs) = hho_exp_sol.block(sol_cell_i*num_cell_dofs, 0, num_cell_dofs, 1);
             auto sol_fcs = faces(sol_msh, sol_cl);
             for (size_t i = 0; i < sol_fcs.size(); i++)
@@ -489,8 +489,8 @@ public:
             sol_cell_i++;
         }
 
-        dynamic_vector<T> fem_evec = fem_eigvecs.block(0,which_eigvec,fem_eigvecs.rows(),1);
-        dynamic_vector<T> e_fem_evec = dynamic_vector<T>::Zero(ref_msh.points_size());
+        disk::dynamic_vector<T> fem_evec = fem_eigvecs.block(0,which_eigvec,fem_eigvecs.rows(),1);
+        disk::dynamic_vector<T> e_fem_evec = disk::dynamic_vector<T>::Zero(ref_msh.points_size());
         for (size_t i = 0; i < fem_evec.size(); i++)
             e_fem_evec( fem_expand_map.at(i) ) = fem_evec(i);
 
@@ -514,7 +514,7 @@ public:
             size_t sol_cl_ofs = mesh_hier.locate_point(bar, level);
             auto sol_cl = *std::next(sol_msh.cells_begin(), sol_cl_ofs);
 
-            dynamic_vector<T> rec_sol = rec_sols.at(sol_cl_ofs);
+            disk::dynamic_vector<T> rec_sol = rec_sols.at(sol_cl_ofs);
 
             auto sol_cb = make_scalar_monomial_basis(sol_msh, sol_cl, degree+1);
             auto qps = integrate(ref_msh, ref_cl, degree+2);

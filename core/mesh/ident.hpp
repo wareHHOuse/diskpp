@@ -25,6 +25,8 @@
 #include <iostream>
 #include <cstddef>
 
+namespace disk{
+
 template<typename T, typename impl, impl default_value>
 struct identifier
 {
@@ -125,3 +127,5 @@ operator<<(std::ostream& os, const identifier<T, impl, default_value>& id)
 }
 
 typedef size_t      ident_raw_t;
+
+} // end disk

@@ -44,7 +44,7 @@ test_bases(const Mesh& msh)
     typedef typename mesh_type::face        face_type;
     typedef typename mesh_type::coordinate_type scalar_type;
 
-    typedef dynamic_matrix<scalar_type>     matrix_type;
+    typedef disk::dynamic_matrix<scalar_type>     matrix_type;
 
     using point_type = typename mesh_type::point_type;
 

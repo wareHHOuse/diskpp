@@ -8,7 +8,7 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
+ * Nicolas Pignet  (C) 2018, 2019               nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -34,6 +34,15 @@
 
 namespace disk {
 
+/**
+ * @brief Compute a quadrature of order "degree" in the physical space of the specified 2D-cell (triangle)
+ *
+ * @tparam T scalar type
+ * @param msh (simplicial) mesh
+ * @param cl specified 2D-cell (triangle)
+ * @param degree order of the quadrature
+ * @return std::vector<disk::quadrature_point<T, 2>> quadrature
+ */
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
 integrate(const disk::simplicial_mesh<T, 2>& msh,
@@ -49,6 +58,15 @@ integrate(const disk::simplicial_mesh<T, 2>& msh,
     return priv::integrate_triangle<T>(degree, pts);
 }
 
+/**
+ * @brief Compute a quadrature of order "degree" in the physical space of the specified 2D-face (edge)
+ *
+ * @tparam T scalar type
+ * @param msh (simplicial) mesh
+ * @param fc specified 2D-face (edge)
+ * @param degree order of the quadrature
+ * @return std::vector<disk::quadrature_point<T, 2>> quadrature
+ */
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
 integrate(const disk::simplicial_mesh<T, 2>& msh,
@@ -66,6 +84,15 @@ integrate(const disk::simplicial_mesh<T, 2>& msh,
 namespace priv
 {
 
+/**
+ * @brief Map a point from the reference triangle to the physical triangle
+ *
+ * @tparam T scalar type
+ * @param msh (simplicial) mesh
+ * @param face specified 3D-face (triangle)
+ * @param pm point in the reference triangle
+ * @return point<T, 3> point in the physical triangle
+ */
 template<typename T>
 point<T, 3>
 map_to_physical(const disk::simplicial_mesh<T, 3>&                msh,
@@ -76,13 +103,22 @@ map_to_physical(const disk::simplicial_mesh<T, 3>&                msh,
     return pts[0] + (pts[1] - pts[0]) * pm.x() + (pts[2] - pts[0]) * pm.y();
 }
 
+/**
+ * @brief Map a point from the reference tetrahedra to the physical tetrahedra
+ *
+ * @tparam T scalar type
+ * @param msh (simplicial) mesh
+ * @param cl specified 3D-cell (tetrahedra)
+ * @param p point in the reference tetrahedra
+ * @return point<T, 3> point in the physical tetrahedra
+ */
 template<typename T>
 point<T, 3>
 map_to_physical(const disk::simplicial_mesh<T, 3>&                msh,
-                const typename disk::simplicial_mesh<T, 3>::cell& cell,
+                const typename disk::simplicial_mesh<T, 3>::cell& cl,
                 const point<T, 3>&                                p)
 {
-    const auto pts = points(msh, cell);
+    const auto pts = points(msh, cl);
 
     const auto pp = (pts[1] - pts[0]) * p.x() +
                     (pts[2] - pts[0]) * p.y() +
@@ -94,6 +130,15 @@ map_to_physical(const disk::simplicial_mesh<T, 3>&                msh,
 } // namespace priv
 
 
+/**
+ * @brief Compute a quadrature of order "degree" in the physical space of the specified 3D-face (triangle)
+ *
+ * @tparam T scalar type
+ * @param msh (simplicial) mesh
+ * @param fc specified 3D-face (triangle)
+ * @param degree order of the quadrature
+ * @return std::vector<disk::quadrature_point<T, 2>> quadrature
+ */
 template<typename T>
 std::vector<disk::quadrature_point<T, 3>>
 integrate(const disk::simplicial_mesh<T, 3>& msh,
@@ -127,6 +172,15 @@ integrate(const disk::simplicial_mesh<T, 3>& msh,
     return ret;
 }
 
+/**
+ * @brief Compute a quadrature of order "degree" in the physical space of the specified 3D-cell (tetrahedra)
+ *
+ * @tparam T scalar type
+ * @param msh (simplicial) mesh
+ * @param cl specified 3D-cell (tetrahedra)
+ * @param degree order of the quadrature
+ * @return std::vector<disk::quadrature_point<T, 3>> quadrature
+ */
 template<typename T>
 std::vector<disk::quadrature_point<T, 3>>
 integrate(const disk::simplicial_mesh<T, 3>& msh,

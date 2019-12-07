@@ -6,6 +6,10 @@
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
  *  /_\/_\/_\/_\   methods.
  *
+ *
+ * This file is copyright of the following authors:
+ * Nicolas Pignet (C) 2019                      nicolas.pignet@enpc.fr
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -145,6 +149,13 @@ public:
     {
         assert( m_pts_ptrs.size() > 0 );
         return m_pts_ptrs;
+    }
+
+    std::vector<sub_id_type>
+    faces_ids(void) const
+    {
+        assert(m_sids_ptrs.size() > 0);
+        return m_sids_ptrs;
     }
 
     sid_iterator        subelement_id_begin() { return m_sids_ptrs.begin(); }

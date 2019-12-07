@@ -60,8 +60,8 @@ class NewtonRaphson_step_finite_strains
 
     const static int dimension = mesh_type::dimension;
 
-    typedef dynamic_matrix<scalar_type> matrix_type;
-    typedef dynamic_vector<scalar_type> vector_type;
+    typedef disk::dynamic_matrix<scalar_type> matrix_type;
+    typedef disk::dynamic_vector<scalar_type> vector_type;
 
     typedef disk::assembler_mechanics<mesh_type> assembler_type;
 

@@ -50,3 +50,8 @@ target_link_libraries(netgen_primitives ${LINK_LIBS})
 add_executable(behaviors_test behaviors_test.cpp)
 target_link_libraries(behaviors_test ${LINK_LIBS})
 
+add_executable(integration integration.cpp)
+target_link_libraries(integration ${LINK_LIBS})
+
+add_executable(timing_test timing_test.cpp)
+target_link_libraries(timing_test ${LINK_LIBS})

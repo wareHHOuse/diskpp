@@ -151,7 +151,7 @@ struct diffusion_tensor<Mesh<T, 2, Storage>>
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type      point_type;
 
-    typedef static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> tensor_type;
+    typedef disk::static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> tensor_type;
 
     tensor_type
     operator()(const point_type& pt) const
@@ -170,7 +170,7 @@ struct diffusion_tensor<Mesh<T, 3, Storage>>
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type      point_type;
 
-    typedef static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> tensor_type;
+    typedef disk::static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> tensor_type;
 
     tensor_type
     operator()(const point_type& pt) const
@@ -208,7 +208,10 @@ run_hho_variable_diffusion_solver(const Mesh& msh, const size_t degree)
     const auto sol_fun          = make_solution_function(msh);
     const auto diffusion_tensor = make_diffusion_tensor(msh);
 
-    auto assembler = make_diffusion_assembler(msh, hdi);
+    scalar_boundary_conditions<Mesh> bnd(msh);
+    bnd.addDirichletEverywhere(sol_fun);
+
+    auto assembler = make_scalar_primal_hho_assembler(msh, hdi, bnd);
 
     for (auto& cl : msh)
     {
@@ -217,40 +220,43 @@ run_hho_variable_diffusion_solver(const Mesh& msh, const size_t degree)
         const auto rhs = make_rhs(msh, cl, cb, rhs_fun, 2);
 
         const auto sc = make_scalar_static_condensation(msh, cl, hdi, gr.second, rhs);
-        assembler.assemble(msh, cl, sc.first, sc.second, sol_fun);
+
+        assembler.assemble(msh, cl, bnd, sc.first, sc.second);
     }
+
+    assembler.impose_neumann_boundary_conditions(msh, bnd);
 
     assembler.finalize();
 
     size_t systsz = assembler.LHS.rows();
     size_t nnz    = assembler.LHS.nonZeros();
 
-    // std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
-    // std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
-    // std::cout << "Dofs: " << systsz << std::endl;
+    //  std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
+    //  std::cout << "systsz: " << systsz << std::endl;
+    //  std::cout << "nnz: " << nnz << std::endl;
 
-    vector_type sol = vector_type::Zero(systsz);
+     vector_type sol = vector_type::Zero(systsz);
 
-    disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = false;
-    mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+     disk::solvers::pardiso_params<T> pparams;
+     pparams.report_factorization_Mflops = false;
+     mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
 
-    T error = 0.0;
+     T error = 0.0;
 
-    for (auto& cl : msh)
-    {
-        const auto cb  = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-        const auto gr  = make_vector_hho_gradrec_RT(msh, cl, hdi, diffusion_tensor);
-        const auto rhs = make_rhs(msh, cl, cb, rhs_fun);
+     for (auto& cl : msh)
+     {
+         const auto cb  = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+         const auto gr  = make_vector_hho_gradrec_RT(msh, cl, hdi, diffusion_tensor);
+         const auto rhs = make_rhs(msh, cl, cb, rhs_fun);
 
-        vector_type locsol = assembler.take_local_data(msh, cl, sol, sol_fun);
+         vector_type locsol = assembler.take_local_solution(msh, cl, bnd, sol);
 
-        vector_type sol = make_scalar_static_decondensation(msh, cl, hdi, gr.second, rhs, locsol);
+         vector_type sol = make_scalar_static_decondensation(msh, cl, hdi, gr.second, rhs, locsol);
 
-        vector_type realsol = project_function(msh, cl, hdi, sol_fun, 2);
+         vector_type realsol = project_function(msh, cl, hdi, sol_fun, 2);
 
-        const auto diff = realsol - sol;
-        error += diff.dot(gr.second * diff);
+         const auto diff = realsol - sol;
+         error += diff.dot(gr.second * diff);
     }
 
     return std::sqrt(error);

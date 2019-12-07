@@ -122,9 +122,9 @@ class hierarchical_contact_solver
 
     disk::silo_database silo_db;
 
-    dynamic_vector<T> full_sol;
-    dynamic_vector<T> e_gx;
-    std::vector<dynamic_vector<T>> rec_refs;
+    disk::dynamic_vector<T> full_sol;
+    disk::dynamic_vector<T> e_gx;
+    std::vector<disk::dynamic_vector<T>> rec_refs;
 
     std::vector<std::pair<T,std::pair<T,T>>> errdiams;
 
@@ -331,15 +331,15 @@ class hierarchical_contact_solver
         }
 
 
-        e_gx = dynamic_vector<T>(msh.points_size());
+        e_gx = disk::dynamic_vector<T>(msh.points_size());
 
         T maxiter   = 10000;
 
         for(size_t iter= 0; iter < maxiter ; iter++)
         {
             sparse_matrix_type              gA(system_size, system_size);
-            dynamic_vector<T>               gb(system_size), gx(system_size);
-            gb = dynamic_vector<T>::Zero(system_size);
+            disk::dynamic_vector<T>               gb(system_size), gx(system_size);
+            gb = disk::dynamic_vector<T>::Zero(system_size);
             std::vector<triplet_type>       triplets;
 
             auto is_contact_vector = make_is_contact_vector(msh, bnd);
@@ -407,7 +407,7 @@ class hierarchical_contact_solver
             solver.factorize(gA);
             gx = solver.solve(gb);
 
-            dynamic_vector<T> diff_gx = dynamic_vector<T>::Zero(msh.points_size());
+            disk::dynamic_vector<T> diff_gx = disk::dynamic_vector<T>::Zero(msh.points_size());
 
             for (size_t i = 0; i < gx.size(); i++)
                 diff_gx( fem_expand_map.at(i) ) = gx(i);
@@ -485,7 +485,7 @@ class hierarchical_contact_solver
         auto zero_fun = [](const typename mesh_type::point_type& p) -> T {
             return 0.;
         };
-        dynamic_vector<T> ref_sol;
+        disk::dynamic_vector<T> ref_sol;
 
         std::cout <<  green << "* RUN SIGNORINI" << std::endl;
         size_t num_cell_dofs = scalar_basis_size(ref_hdi.cell_degree(), 2);
@@ -528,7 +528,7 @@ class hierarchical_contact_solver
             auto ref_rec_deg = ref_hdi.reconstruction_degree();
             auto rec_deg = hdi.reconstruction_degree();
             auto ref_cbs = scalar_basis_size(ref_rec_deg, 2);
-            dynamic_vector<T> rec_ref_loc = dynamic_vector<T>::Zero(ref_cbs);
+            disk::dynamic_vector<T> rec_ref_loc = disk::dynamic_vector<T>::Zero(ref_cbs);
 
             if (is_contact_vector.at(cl_count) == 1 && ap.solver == EVAL_IN_CELLS_FULL)
             {
@@ -597,7 +597,7 @@ public:
         size_t num_cell_dofs = scalar_basis_size(hdi.cell_degree(), 2);
         size_t num_face_dofs = scalar_basis_size(hdi.face_degree(), 1);
 
-        std::vector<dynamic_vector<T>> rec_sols;
+        std::vector<disk::dynamic_vector<T>> rec_sols;
 
         auto offset_vector = full_offset(sol_msh, hdi);
 
@@ -655,7 +655,7 @@ public:
             auto num_total_dofs = num_cell_dofs + 3 * num_face_dofs;
             hho_vector  sol_ufull = full_sol.block(cell_ofs, 0, num_total_dofs, 1);
 
-            dynamic_vector<T> rec_sol_loc = rec_sols.at(sol_cl_ofs);
+            disk::dynamic_vector<T> rec_sol_loc = rec_sols.at(sol_cl_ofs);
 
             auto sol_cb = make_scalar_monomial_basis(sol_msh, sol_cl, hdi.reconstruction_degree());
             auto qps = integrate(ref_msh, ref_cl, 2 * (std::max(hdi.face_degree(), hdi.cell_degree())));
@@ -780,7 +780,7 @@ public:
         size_t num_cell_dofs = scalar_basis_size(hdi.cell_degree(), 2);
         size_t num_face_dofs = scalar_basis_size(hdi.face_degree(), 1);
 
-        std::vector<dynamic_vector<T>> rec_sols;
+        std::vector<disk::dynamic_vector<T>> rec_sols;
 
         auto offset_vector = full_offset(sol_msh, hdi);
 
@@ -797,7 +797,7 @@ public:
             auto rec_deg = hdi.reconstruction_degree();
             auto sol_cb  = make_scalar_monomial_basis(sol_msh, sol_cl, rec_deg);
             auto sol_cbs = scalar_basis_size(rec_deg, 2);
-            dynamic_vector<T> rec_sol_loc = dynamic_vector<T>::Zero(sol_cbs);
+            disk::dynamic_vector<T> rec_sol_loc = disk::dynamic_vector<T>::Zero(sol_cbs);
 
             if (is_contact_vector.at(sol_cl_count) == 1 && ap.solver == EVAL_IN_CELLS_FULL)
             {
@@ -840,8 +840,8 @@ public:
             size_t sol_cl_ofs = mesh_hier.locate_point(bar, level);
             auto sol_cl = *std::next(sol_msh.cells_begin(), sol_cl_ofs);
 
-            dynamic_vector<T> rec_ref_loc =rec_refs.at(ref_cl_ofs);
-            dynamic_vector<T> rec_sol_loc = rec_sols.at(sol_cl_ofs);
+            disk::dynamic_vector<T> rec_ref_loc =rec_refs.at(ref_cl_ofs);
+            disk::dynamic_vector<T> rec_sol_loc = rec_sols.at(sol_cl_ofs);
 
             auto sol_cb = make_scalar_monomial_basis(sol_msh, sol_cl, hdi.reconstruction_degree());
             auto ref_cb = make_scalar_monomial_basis(ref_msh, ref_cl, ref_hdi.reconstruction_degree());

@@ -64,9 +64,9 @@ cfem_solver(const disk::simplicial_mesh<T, 2>& msh)
     }
 
     sparse_matrix_type              gA(system_size, system_size);
-    dynamic_vector<T>               gb(system_size), gx(system_size);
+    disk::dynamic_vector<T>               gb(system_size), gx(system_size);
 
-    gb = dynamic_vector<T>::Zero(system_size);
+    gb = disk::dynamic_vector<T>::Zero(system_size);
 
 
     std::vector<triplet_type>       triplets;
@@ -75,7 +75,7 @@ cfem_solver(const disk::simplicial_mesh<T, 2>& msh)
 
     for (auto& cl : msh)
     {
-        static_matrix<T, 2, 2> kappa = static_matrix<T, 2, 2>::Zero();
+        disk::static_matrix<T, 2, 2> kappa = disk::static_matrix<T, 2, 2>::Zero();
         auto bar = barycenter(msh, cl);
 
         auto c = std::cos(M_PI * bar.x()/0.02);
@@ -128,16 +128,11 @@ cfem_solver(const disk::simplicial_mesh<T, 2>& msh)
         solver.factorize(gA);
         gx = solver.solve(gb);
 
-        dynamic_vector<T> e_gx(msh.points_size());
-        e_gx = dynamic_vector<T>::Zero(msh.points_size());
+        disk::dynamic_vector<T> e_gx(msh.points_size());
+        e_gx = disk::dynamic_vector<T>::Zero(msh.points_size());
 
         for (size_t i = 0; i < gx.size(); i++)
             e_gx( expand_map.at(i) ) = gx(i);
-
-
-
-
-
 
         std::ofstream ofs("solution.dat");
 

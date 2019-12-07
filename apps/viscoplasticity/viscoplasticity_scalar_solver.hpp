@@ -118,10 +118,10 @@ class augmented_lagrangian_viscoplasticity
     std::vector<size_t>                     sol_offset_map;
     viscoplasticity_data<T>                 vp;
 
-    dynamic_matrix<T>     multiplier, auxiliar, auxiliar_old;
+    disk::dynamic_matrix<T>     multiplier, auxiliar, auxiliar_old;
 
 public:
-    dynamic_vector<T>   full_sol, full_sol_old;
+    disk::dynamic_vector<T>   full_sol, full_sol_old;
     std::pair<T, T>     convergence;
     //boundary_type           bnd;
 
@@ -145,14 +145,14 @@ public:
         auto total_dofs = pair_offset_map.first;
         sol_offset_map = pair_offset_map.second;
 
-        full_sol = dynamic_vector<T>::Zero(total_dofs);
-        full_sol_old = dynamic_vector<T>::Zero(total_dofs);
+        full_sol = disk::dynamic_vector<T>::Zero(total_dofs);
+        full_sol_old = disk::dynamic_vector<T>::Zero(total_dofs);
     };
 
     matrix_type
     compute_auxiliar(   const mesh_type& msh,
                         const cell_type& cl,
-                        const dynamic_vector<T>& full_solution)
+                        const disk::dynamic_vector<T>& full_solution)
     {
         auto cl_id = msh.lookup( cl);
         auto num_total_dofs = cbs + fbs * howmany_faces(msh, cl);
@@ -358,7 +358,7 @@ public:
 
     template<typename Assembler>
     auto
-    recover_solution(const mesh_type& msh, const Assembler& assembler, const dynamic_vector<T>& sol)
+    recover_solution(const mesh_type& msh, const Assembler& assembler, const disk::dynamic_vector<T>& sol)
     {
         //std::cout << "START RECOVER SOLUTION" << std::endl;
 
@@ -394,8 +394,8 @@ public:
         auto dim = Mesh::dimension;
         auto rbs = scalar_basis_size(di.reconstruction_degree(), dim);
 
-        dynamic_vector<T> cell_sol(cbs * msh.cells_size());
-        dynamic_vector<T> cell_rec_sol(rbs * msh.cells_size());
+        disk::dynamic_vector<T> cell_sol(cbs * msh.cells_size());
+        disk::dynamic_vector<T> cell_rec_sol(rbs * msh.cells_size());
 
         std::ofstream ofs("data_" + info + ".data");
         if (!ofs.is_open())
@@ -443,13 +443,13 @@ public:
         auto assembler = make_diffusion_assembler_alg(msh, di, bnd);
 
         auto systsz = assembler.global_system_size();
-        dynamic_vector<T> sol =  dynamic_vector<T>::Zero(systsz);
+        disk::dynamic_vector<T> sol =  disk::dynamic_vector<T>::Zero(systsz);
 
         auto num_total_quads = tsr_utils.num_total_quad_points();
 
-        multiplier   = dynamic_matrix<T>::Zero(sbs, num_total_quads);
-        auxiliar     = dynamic_matrix<T>::Zero(sbs, num_total_quads);
-        auxiliar_old = dynamic_matrix<T>::Zero(sbs, num_total_quads);
+        multiplier   = disk::dynamic_matrix<T>::Zero(sbs, num_total_quads);
+        auxiliar     = disk::dynamic_matrix<T>::Zero(sbs, num_total_quads);
+        auxiliar_old = disk::dynamic_matrix<T>::Zero(sbs, num_total_quads);
 
         auto max_iters = 50000;
         auto Ninf = 1.e+4;
@@ -468,7 +468,7 @@ public:
             size_t systsz = assembler.LHS.rows();
             size_t nnz = assembler.LHS.nonZeros();
 
-            dynamic_vector<T> sol = dynamic_vector<T>::Zero(systsz);
+            disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
             disk::solvers::pardiso_params<T> pparams;
             pparams.report_factorization_Mflops = true;
 

@@ -72,7 +72,7 @@ estimate_element_cond(sol::state& lua, const Mesh& msh)
         auto cbs = cb.size();
         auto cloc = A.block(0,0,cbs,cbs);
 
-        Eigen::JacobiSVD<dynamic_matrix<scalar_type>> svd(cloc);
+        Eigen::JacobiSVD<disk::dynamic_matrix<scalar_type>> svd(cloc);
         auto sigma_max = svd.singularValues()(0);
         auto sigma_min = svd.singularValues()(svd.singularValues().size()-1);
         auto cond =  sigma_max / sigma_min;

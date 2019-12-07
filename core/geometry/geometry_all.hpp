@@ -6,6 +6,10 @@
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
  *  /_\/_\/_\/_\   methods.
  *
+ * This file is copyright of the following authors:
+ * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
+ * Nicolas Pignet  (C) 2019                     nicolas.pignet@enpc.fr
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -20,12 +24,12 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
- #ifndef _GEOMETRY_HPP_WAS_INCLUDED_
-     #error "You must NOT include this file directly. Include geometry.hpp."
- #endif
+#ifndef _GEOMETRY_HPP_WAS_INCLUDED_
+#error "You must NOT include this file directly. Include geometry.hpp."
+#endif
 
- #ifndef _GEOMETRY_ALL_HPP_
- #define _GEOMETRY_ALL_HPP_
+#ifndef _GEOMETRY_ALL_HPP_
+#define _GEOMETRY_ALL_HPP_
 
 /*
  * Here we have all the queries that don't depend on the particular mesh
@@ -43,7 +47,14 @@
 
 namespace disk {
 
-/* Compute an estimate of the mesh discretization step 'h' */
+/**
+  * \brief Compute an estimate of the mesh discretization step 'h'
+  *
+  * \param msh a reference to the mesh
+  * \return an estimate of the mesh discretization step 'h'
+  *
+  */
+
 template<typename Mesh>
 typename Mesh::coordinate_type
 average_diameter(const Mesh& msh)
@@ -56,6 +67,15 @@ average_diameter(const Mesh& msh)
 
     return h/msh.cells_size();
 }
+
+/**
+  * \brief return the list of points of an element
+  *
+  * \param msh a reference to the mesh
+  * \param elem a generic element (cell or face)
+  * \return return a vector with the points of elem
+  *
+  */
 
 template<typename Mesh, typename Element>
 std::vector<typename Mesh::point_type>
@@ -74,14 +94,20 @@ points(const Mesh& msh, const Element& elem)
     return pts;
 }
 
-/* Compute the barycenter of a cell
- * This is crappy because it works only for simplicials and cartesian meshes
- */
+/**
+  * \brief Compute the barycenter of a generic element
+  *
+  * \param msh a reference to the mesh
+  * \param elem a generic element (cell or face)
+  * \return return the barycenter of elem
+  *
+  */
+
 template<typename Mesh, typename Element>
 point<typename Mesh::coordinate_type, Mesh::dimension>
-barycenter(const Mesh& msh, const Element& elm)
+barycenter(const Mesh& msh, const Element& elem)
 {
-    auto pts = points(msh, elm);
+    auto pts = points(msh, elem);
     auto bar = std::accumulate(std::next(pts.begin()), pts.end(), pts.front());
     return bar / typename Mesh::coordinate_type( pts.size() );
 }
@@ -108,6 +134,16 @@ barycenter(const Mesh& msh, const Element& elm)
 //     return tot_bar/(tot_meas*T(3));
 // }
 
+/**
+  * \brief Compute the diameter of a generic element, i.e, the maximum distance
+  * between two different points of the element.
+  *
+  * \param msh a reference to the mesh
+  * \param elem a generic element (cell or face)
+  * \return return the diameter of elem
+  *
+  */
+
 template<typename Mesh, typename Element>
 typename Mesh::coordinate_type
 diameter(const Mesh& msh, const Element& elem)
@@ -123,6 +159,15 @@ diameter(const Mesh& msh, const Element& elem)
     return diam;
 }
 
+/**
+  * \brief Compute the diameter of the bounding box af a 3D cell, i.e, the maximum distance
+  * between two different points of the bounding box.
+  *
+  * \param msh a reference to the mesh
+  * \param cl a 3D cell
+  * \return compute the diameter of the bounding box af a 3D cell
+  *
+  */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 std::array<T, 3>
 diameter_boundingbox(const Mesh<T, 3, Storage>& msh, const typename Mesh<T, 3, Storage>::cell& cl)
@@ -169,6 +214,16 @@ diameter_boundingbox(const Mesh<T, 3, Storage>& msh, const typename Mesh<T, 3, S
     return {std::abs(xmax - xmin), std::abs(ymax - ymin), std::abs(zmax - zmin)};
 }
 
+/**
+  * \brief Compute the diameter of the bounding box af a 2D cell, i.e, the maximum distance
+  * between two different points of the bounding box.
+  *
+  * \param msh a reference to the mesh
+  * \param cl a 2D cell
+  * \return compute the diameter of the bounding box af a 2D cell
+  *
+  */
+
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 std::array<T,2>
 diameter_boundingbox(const Mesh<T, 2, Storage>&                      msh,
@@ -205,6 +260,15 @@ diameter_boundingbox(const Mesh<T, 2, Storage>&                      msh,
     return {std::abs(xmax - xmin), std::abs(ymax - ymin)};
 }
 
+/**
+  * \brief Allows to known if the given point is inside a 2D cell
+  *
+  * \param msh a reference to the mesh
+  * \param cl a 3D cell
+  * \param pt coordinate of a point
+  *
+  */
+
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 bool
 is_inside(const Mesh<T, 2, Storage>&                      msh,
@@ -233,6 +297,16 @@ is_inside(const Mesh<T, 2, Storage>&                      msh,
     return true;
 }
 
+
+/**
+  * \brief Allows to known if a cell has at least one face on the boundary
+  *
+  * \param msh a reference to the mesh
+  * \param cl a  cell
+  * \return return true if the cell has faces on the boundary
+  *
+  */
+
 template<typename Mesh>
 bool
 has_faces_on_boundary(const Mesh& msh, const typename Mesh::cell& cl)
@@ -246,7 +320,17 @@ has_faces_on_boundary(const Mesh& msh, const typename Mesh::cell& cl)
     return has_bnd;
 }
 
-
+/**
+ * @brief Compute the outward unit normal to a 2D face
+ *
+ * @tparam Mesh type of mesh
+ * @tparam T scalar type
+ * @tparam Storage type of storage for the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param fc face
+ * @return static_vector<T, 2> Compute the outward unit normal to a 2D face
+ */
 template<template<typename, size_t, typename> class Mesh,
          typename T, typename Storage>
 static_vector<T, 2>
@@ -270,6 +354,17 @@ normal(const Mesh<T,2,Storage>& msh,
     return n/n.norm();
 }
 
+/**
+ * @brief Compute the outward unit normal to a 3D face
+ *
+ * @tparam Mesh type of mesh
+ * @tparam T scalar type
+ * @tparam Storage type of storage for the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param fc face
+ * @return static_vector<T, 3> Compute the outward unit normal to a 3D face
+ */
 template<template<typename, size_t, typename> class Mesh,
          typename T, typename Storage>
 static_vector<T, 3>
@@ -292,6 +387,36 @@ normal(const Mesh<T, 3, Storage>& msh,
         return -n/n.norm();
 
     return n/n.norm();
+}
+
+/**
+ * @brief Compute the outward unit normal to a 1D face (i.e a point)
+ *
+ * @tparam Mesh type of mesh
+ * @tparam T scalar type
+ * @tparam Storage type of storage for the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param fc face
+ * @return T Compute the outward unit normal to a 1D face
+ */
+template<template<typename, size_t, typename> class Mesh,
+         typename T, typename Storage>
+T
+normal(const Mesh<T, 1, Storage>& msh,
+       const typename Mesh<T, 1, Storage>::cell& cl,
+       const typename Mesh<T, 1, Storage>::face& fc)
+{
+    auto fcs = faces(msh, cl);
+    assert(fcs.size() == 2);
+
+    if (fc == fcs[0])
+        return -1.;
+
+    if (fc == fcs[1])
+        return 1.;
+
+    throw std::logic_error("shouldn't have arrived here");
 }
 
 } // namespace disk

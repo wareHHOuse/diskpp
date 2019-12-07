@@ -34,15 +34,15 @@
 
 #include "output/silo.hpp"
 
-point<rational<int>,2>
-barycenter(const std::vector<point<rational<int>,2>>& mp,
+disk::point<disk::rational<int>,2>
+barycenter(const std::vector<disk::point<disk::rational<int>,2>>& mp,
            size_t a, size_t b, size_t c)
 {
     return (mp[a] + mp[b] + mp[c])/3;
 }
 
-rational<int>
-area(const std::vector<point<rational<int>,2>>& mp,
+disk::rational<int>
+area(const std::vector<disk::point<disk::rational<int>,2>>& mp,
      size_t a, size_t b, size_t c)
 {
     return abs(det(mp[b] - mp[a], mp[c] - mp[a])/2);
@@ -51,8 +51,8 @@ area(const std::vector<point<rational<int>,2>>& mp,
 template<typename Mesh>
 void x(const Mesh& msh)
 {
-    using R = rational<int>;
-    using P = point<R,2>;
+    using R = disk::rational<int>;
+    using P = disk::point<R,2>;
 
     std::vector<P> mp;
     mp.resize(14);
@@ -129,9 +129,9 @@ add_triangle(Mesh& msh, size_t p0, size_t p1, size_t p2)
 
     using triangle = typename Mesh::surface_type;
     using edge = typename Mesh::edge_type;
-    point_identifier<2> pi0(p0);
-    point_identifier<2> pi1(p1);
-    point_identifier<2> pi2(p2);
+    disk::point_identifier<2> pi0(p0);
+    disk::point_identifier<2> pi1(p1);
+    disk::point_identifier<2> pi2(p2);
     storage->surfaces.push_back( triangle({pi0, pi1, pi2}) );
     storage->edges.push_back( edge({pi0, pi1}) );
     storage->edges.push_back( edge({pi1, pi2}) );
@@ -162,8 +162,8 @@ create_geometry(Mesh& msh)
 
     auto add_bedge = [&](size_t p0, size_t p1) -> void {
         using edge = typename Mesh::edge_type;
-        point_identifier<2> pi0(p0);
-        point_identifier<2> pi1(p1);
+        disk::point_identifier<2> pi0(p0);
+        disk::point_identifier<2> pi1(p1);
         boundary_edges.push_back( edge({pi0, pi1}) );
     };
 
@@ -234,9 +234,9 @@ compute_errors(disk::silo_database& silo, const std::string& prefix,
 int main(void)
 {
     _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
-    
+
     using T             = double;
-    using R             = rational<int64_t>;
+    using R             = disk::rational<int64_t>;
     using fmesh_type    = disk::simplicial_mesh<T, 2>;
     using rmesh_type    = disk::simplicial_mesh<R, 2>;
     using fpoint_type   = typename fmesh_type::point_type;
@@ -285,7 +285,7 @@ int main(void)
 
     compute_errors(silo, "level_0", rmsh, fmsh);
 
-    size_t mesh_levels = 6; /* Don't push too far with rational<> */
+    size_t mesh_levels = 6; /* Don't push too far with disk::rational<> */
     disk::mesh_hierarchy<R> rhier;
     rhier.build_hierarchy(rmsh, mesh_levels);
 

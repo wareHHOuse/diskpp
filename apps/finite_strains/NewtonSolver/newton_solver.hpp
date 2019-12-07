@@ -53,8 +53,8 @@ class NewtonRaphson_solver_finite_strains
     typedef ParamRun<scalar_type>               param_type;
     typedef typename disk::hho_degree_info      hdi_type;
 
-    typedef dynamic_matrix<scalar_type> matrix_type;
-    typedef dynamic_vector<scalar_type> vector_type;
+    typedef disk::dynamic_matrix<scalar_type> matrix_type;
+    typedef disk::dynamic_vector<scalar_type> vector_type;
 
     typedef disk::vector_boundary_conditions<mesh_type> bnd_type;
 

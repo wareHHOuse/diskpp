@@ -67,7 +67,7 @@ public:
 
         auto offset_vector = full_offset(msh, hdi);
 
-        dynamic_vector<T>  full_sol = dynamic_vector<T>::Zero(num_full_dofs);
+        disk::dynamic_vector<T>  full_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
         auto max_iter = 1000;
         auto tol = 1.e-6;
 
@@ -119,7 +119,7 @@ public:
             //std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
             //std::cout << "Dofs: " << systsz << std::endl;
 
-            dynamic_vector<T> dsol = dynamic_vector<T>::Zero(systsz);
+            disk::dynamic_vector<T> dsol = disk::dynamic_vector<T>::Zero(systsz);
 
             disk::solvers::pardiso_params<T> pparams;
             pparams.report_factorization_Mflops = true;
@@ -127,7 +127,7 @@ public:
 
             T error = 0.0 ;
 
-            dynamic_vector<T> diff_sol = dynamic_vector<T>::Zero(num_full_dofs);
+            disk::dynamic_vector<T> diff_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
             cl_count = 0;
 
@@ -199,7 +199,7 @@ public:
     }
 
     template<typename Function>
-    dynamic_vector<T>
+    disk::dynamic_vector<T>
     diffusion(const Mesh&  msh,
             const Function& rhs_fun,
             const disk::scalar_boundary_conditions<Mesh>& bnd)
@@ -216,7 +216,7 @@ public:
 
         auto offset_vector = full_offset(msh, hdi);
 
-        dynamic_vector<T>  diff_sol = dynamic_vector<T>::Zero(num_full_dofs);
+        disk::dynamic_vector<T>  diff_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
         auto cl_count = 0;
         auto assembler = make_diffusion_assembler2(msh, hdi, bnd);
@@ -245,13 +245,13 @@ public:
         //std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
         //std::cout << "Dofs: " << systsz << std::endl;
 
-        dynamic_vector<T> sol = dynamic_vector<T>::Zero(systsz);
+        disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
 
         disk::solvers::pardiso_params<T> pparams;
         pparams.report_factorization_Mflops = true;
         mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
 
-        dynamic_vector<T> diffusion_sol = dynamic_vector<T>::Zero(num_full_dofs);
+        disk::dynamic_vector<T> diffusion_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
         cl_count = 0;
         for (auto& cl : msh)
@@ -297,7 +297,7 @@ public:
         auto max_iter = 1000;
         auto tol = 1.e-6;
 
-        dynamic_vector<T>  full_sol = dynamic_vector<T>::Zero(num_full_dofs);
+        disk::dynamic_vector<T>  full_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
         full_sol = diffusion(msh, rhs_fun, bnd);
 
@@ -349,7 +349,7 @@ public:
             //std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
             //std::cout << "Dofs: " << systsz << std::endl;
 
-            dynamic_vector<T> dsol = dynamic_vector<T>::Zero(systsz);
+            disk::dynamic_vector<T> dsol = disk::dynamic_vector<T>::Zero(systsz);
 
             disk::solvers::pardiso_params<T> pparams;
             pparams.report_factorization_Mflops = true;
@@ -357,7 +357,7 @@ public:
 
             T error = 0.0 ;
 
-            dynamic_vector<T> diff_sol = dynamic_vector<T>::Zero(num_full_dofs);
+            disk::dynamic_vector<T> diff_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
             cl_count = 0;
 
@@ -447,7 +447,7 @@ public:
 
         auto offset_vector = full_offset(msh, hdi);
 
-        dynamic_vector<T>  full_sol = dynamic_vector<T>::Zero(num_full_dofs);
+        disk::dynamic_vector<T>  full_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
         auto max_iter = 1000;
         auto tol = 1.e-6;
 
@@ -500,7 +500,7 @@ public:
             //std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
             //std::cout << "Dofs: " << systsz << std::endl;
 
-            dynamic_vector<T> dsol = dynamic_vector<T>::Zero(systsz);
+            disk::dynamic_vector<T> dsol = disk::dynamic_vector<T>::Zero(systsz);
 
             disk::solvers::pardiso_params<T> pparams;
             pparams.report_factorization_Mflops = true;
@@ -508,7 +508,7 @@ public:
 
             T error = 0.0 ;
 
-            dynamic_vector<T> diff_sol = dynamic_vector<T>::Zero(num_full_dofs);
+            disk::dynamic_vector<T> diff_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
             cl_count = 0;
 

@@ -26,67 +26,67 @@
 #include "common.hpp"
 
 template<typename T>
-bool test_barycenter(const point<T,1>& pt)
+bool test_barycenter(const disk::point<T,1>& pt)
 {
     T ULP_max = 2;
-    
+
     if ( almost_equal(pt.x(), 0.5, ULP_max) )
         return true;
-    
+
     std::cout << "  pt.x() not accurate: " << std::setprecision(16) << pt.x() << std::endl;
     return false;
 }
 
 template<typename T>
-bool test_barycenter(const point<T,2>& pt)
+bool test_barycenter(const disk::point<T,2>& pt)
 {
     T max_abs_error = 1e-14;
     bool success = true;
-    
+
     if ( std::abs(pt.x()-0.5) > max_abs_error )
     {
         std::cout << "  pt.x() not accurate: ";
         std::cout << std::setprecision(16) << pt.x() << std::endl;
         success = false;
     }
-    
+
     if ( std::abs(pt.y()-0.5) > max_abs_error )
     {
         std::cout << "  pt.y() not accurate: ";
         std::cout << std::setprecision(16) << pt.y() << std::endl;
         success = false;
     }
-    
+
     return success;
 }
 
 template<typename T>
-bool test_barycenter(const point<T,3>& pt)
+bool test_barycenter(const disk::point<T,3>& pt)
 {
     T max_abs_error = 1e-14;
     bool success = true;
-    
+
     if ( std::abs(pt.x()-0.5) > max_abs_error )
     {
         std::cout << "  pt.x() not accurate: ";
         std::cout << std::setprecision(16) << pt.x() << std::endl;
         success = false;
     }
-    
+
     if ( std::abs(pt.y()-0.5) > max_abs_error )
     {
         std::cout << "  pt.y() not accurate: ";
         std::cout << std::setprecision(16) << pt.y() << std::endl;
         success = false;
     }
-    
+
     if ( std::abs(pt.z()-0.5) > max_abs_error )
     {
         std::cout << "  pt.z() not accurate: ";
         std::cout << std::setprecision(16) << pt.z() << std::endl;
         success = false;
     }
-    
+
     return success;
 }
 
@@ -98,18 +98,18 @@ test_barycenter(const Mesh& msh)
     typedef typename Mesh::coordinate_type T;
     point_type  tot_bar;
     T           tot_meas;
-    
+
     for (auto& cl : msh)
     {
         auto meas = measure(msh, cl);
         auto bar = barycenter(msh,cl);
-        
+
         tot_bar = tot_bar + meas*bar;
         tot_meas += meas;
     }
-    
+
     test_barycenter(tot_bar);
-    
+
     return true;
 }
 

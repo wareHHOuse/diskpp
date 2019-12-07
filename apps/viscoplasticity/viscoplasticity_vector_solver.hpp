@@ -69,7 +69,7 @@ class ADMM
 
 
 public:
-    dynamic_vector<T>   sol_old;
+    disk::dynamic_vector<T>   sol_old;
     std::pair<T, T>     convergence;
 
     ADMM(const  Mesh& msh,
@@ -142,7 +142,7 @@ public:
     auto
     update_multiplier(const mesh_type& msh, const Assembler& assembler,
                       const size_t iter,
-                      const dynamic_vector<T>& velocity_dofs,
+                      const disk::dynamic_vector<T>& velocity_dofs,
                       const std::string& name)
     {
         T conv_stress = 0.;
@@ -302,9 +302,9 @@ public:
         auto dim = Mesh::dimension;
         auto rbs = vector_basis_size(di.reconstruction_degree(), dim, dim);
 
-        dynamic_vector<T> press_vec = dynamic_vector<T>::Zero(pbs * msh.cells_size());
-        dynamic_vector<T> cell_sol  = dynamic_vector<T>::Zero(cbs * msh.cells_size());
-        dynamic_vector<T> cell_rec_sol = dynamic_vector<T>::Zero(rbs * msh.cells_size());
+        disk::dynamic_vector<T> press_vec = disk::dynamic_vector<T>::Zero(pbs * msh.cells_size());
+        disk::dynamic_vector<T> cell_sol  = disk::dynamic_vector<T>::Zero(cbs * msh.cells_size());
+        disk::dynamic_vector<T> cell_rec_sol = disk::dynamic_vector<T>::Zero(rbs * msh.cells_size());
 
         std::string  ext =  vp.info + "_i"+ tostr(iter) + ".data";
         std::ofstream ofs("data_" + ext );

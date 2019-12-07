@@ -64,7 +64,7 @@ fix_point_solver_faces(const Mesh& msh,
 
     auto num_full_dofs = cbs * msh.cells_size() + 2 * fbs * msh.faces_size()
                                         - fbs * msh.boundary_faces_size() ;
-    dynamic_vector<T> full_sol_old = dynamic_vector<T>::Zero(num_full_dofs);
+    disk::dynamic_vector<T> full_sol_old = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
     auto offset_vector = full_offset(msh, hdi);
 
@@ -114,14 +114,14 @@ fix_point_solver_faces(const Mesh& msh,
         //std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
         //std::cout << "Dofs: " << systsz << std::endl;
 
-        dynamic_vector<T> sol = dynamic_vector<T>::Zero(systsz);
+        disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
 
         disk::solvers::pardiso_params<T> pparams;
         pparams.report_factorization_Mflops = true;
         mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
 
         T error = 0.0 ;
-        dynamic_vector<T> full_sol = dynamic_vector<T>::Zero(num_full_dofs);
+        disk::dynamic_vector<T> full_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
         cl_count = 0;
 
@@ -215,7 +215,7 @@ fix_point_solver_cells(const Mesh& msh,
 
     auto num_full_dofs = cbs*msh.cells_size() + 2 * fbs*msh.faces_size()
                                         - fbs*msh.boundary_faces_size() ;
-    dynamic_vector<T> full_sol_old = dynamic_vector<T>::Zero(num_full_dofs);
+    disk::dynamic_vector<T> full_sol_old = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
     auto offset_vector = full_offset(msh, hdi);
     auto max_iter = 10000;
@@ -279,7 +279,7 @@ fix_point_solver_cells(const Mesh& msh,
         //std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
         //std::cout << "Dofs: " << systsz << std::endl;
 
-        dynamic_vector<T> sol = dynamic_vector<T>::Zero(systsz);
+        disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
 
         disk::solvers::pardiso_params<T> pparams;
         pparams.report_factorization_Mflops = true;
@@ -287,7 +287,7 @@ fix_point_solver_cells(const Mesh& msh,
 
         T error = 0.0 ;
         cl_count = 0;
-        dynamic_vector<T> full_sol = dynamic_vector<T>::Zero(num_full_dofs);
+        disk::dynamic_vector<T> full_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
         for (auto& cl : msh)
         {

@@ -111,7 +111,7 @@ using namespace disk;
 #if 0
 template<typename Mesh, typename T>
 void
-quiver(  const Mesh& msh, const dynamic_vector<T>& sol)
+quiver(  const Mesh& msh, const disk::dynamic_vector<T>& sol)
 {
     std::ofstream ofs("quiver_vel.data");
 
@@ -180,7 +180,7 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
     std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
     std::cout << "Dofs: " << systsz << std::endl;
     #endif
-    dynamic_vector<T> sol = dynamic_vector<T>::Zero(systsz);
+    disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
 
     disk::solvers::pardiso_params<T> pparams;
     pparams.report_factorization_Mflops = false;

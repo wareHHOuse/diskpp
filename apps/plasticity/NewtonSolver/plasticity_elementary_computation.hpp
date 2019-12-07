@@ -43,16 +43,16 @@ template<typename MeshType>
 class plasticity
 {
     typedef MeshType                             mesh_type;
-    typedef typename mesh_type::coordinate_type      scalar_type;
+    typedef typename mesh_type::coordinate_type  scalar_type;
     typedef typename mesh_type::cell             cell_type;
     typedef typename disk::hho_degree_info hdi_type;
 
     const static int dimension = mesh_type::dimension;
 
-    typedef static_matrix<scalar_type, dimension, dimension> gvt;
+    typedef disk::static_matrix<scalar_type, dimension, dimension> gvt;
 
-    typedef dynamic_matrix<scalar_type> matrix_type;
-    typedef dynamic_vector<scalar_type> vector_type;
+    typedef disk::dynamic_matrix<scalar_type> matrix_type;
+    typedef disk::dynamic_vector<scalar_type> vector_type;
 
     const mesh_type& m_msh;
     const hdi_type&  m_hdi;

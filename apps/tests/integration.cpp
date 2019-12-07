@@ -39,8 +39,8 @@ process_mesh(const MeshType& msh)
     typedef MeshType                            mesh_type;
     typedef typename mesh_type::cell            cell_type;
     typedef typename mesh_type::face            face_type;
-    typedef typename mesh_type::coordinate_type     scalar_type;
-    typedef dynamic_matrix<scalar_type>         matrix_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef disk::dynamic_matrix<scalar_type>   matrix_type;
 
     const size_t degree = 1;
 

@@ -561,7 +561,7 @@ int sgn(T val) {
 
 template<typename Mesh, typename T, typename Assembler>
 void
-quiver( const Mesh& msh, const dynamic_vector<T>& sol, const Assembler& assembler,
+quiver( const Mesh& msh, const disk::dynamic_vector<T>& sol, const Assembler& assembler,
         const typename disk::hho_degree_info & di, const std::string& filename)
 {
     std::ofstream ofs(filename);
@@ -792,8 +792,8 @@ public:
     typedef typename mesh_type::point_type              point_type;
 
     typedef post_processing_base<T,2,Storage>         pp_base;
-    typedef dynamic_vector<T>                           vector_type;
-    typedef dynamic_matrix<T>                           matrix_type;
+    typedef disk::dynamic_vector<T>                           vector_type;
+    typedef disk::dynamic_matrix<T>                           matrix_type;
     typedef std::vector<point_type>                     point_vector_type;
 
     point_vector_type sub_nodes;
@@ -826,7 +826,7 @@ public:
     void vtk_vector(std::ofstream &ofs,
                     const mesh_type& msh,
                     const std::string& name,
-                    const dynamic_vector<T> & vec)
+                    const disk::dynamic_vector<T> & vec)
     {
         ofs << "VECTORS  Vector  double"<< std::endl;
 
@@ -878,7 +878,7 @@ public:
     vtk_scalar( std::ofstream &ofs,
                 const mesh_type& msh,
                 const std::string& name,
-                const dynamic_vector<T> & vec)
+                const disk::dynamic_vector<T> & vec)
     {}
         #if 0
 
@@ -924,7 +924,7 @@ public:
     vtk_vector_magnitud( std::ofstream &ofs,
                 const mesh_type& msh,
                 const std::string& name,
-                const dynamic_vector<T> & vec)
+                const disk::dynamic_vector<T> & vec)
     {
         size_t cl_cont = 0;
         size_t fc_cont = 0;
@@ -963,7 +963,7 @@ public:
 
     void make_file(const mesh_type   & msh,
                 const std::string & name,
-                const dynamic_vector<T> & vector_Th,
+                const disk::dynamic_vector<T> & vector_Th,
                 const std::string & type)
     {
         test_points  = pp_base::make_vtk_points(msh, m_degree);

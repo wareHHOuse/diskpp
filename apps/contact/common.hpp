@@ -106,7 +106,7 @@ renumber_boundaries(Mesh<T,2,Storage>& msh, T a = 1., T b = 1., T c = 0., T d = 
 
 template<typename T>
 void
-dump_matrix(const dynamic_matrix<T>& vec, const std::string& filename)
+dump_matrix(const disk::dynamic_matrix<T>& vec, const std::string& filename)
 {
     std::ofstream ofs(filename);
 
@@ -118,7 +118,7 @@ dump_matrix(const dynamic_matrix<T>& vec, const std::string& filename)
 
 template<typename T>
 void
-save_data(const dynamic_vector<T>& vec, const std::string& filename)
+save_data(const disk::dynamic_vector<T>& vec, const std::string& filename)
 {
     std::ofstream ofs(filename);
 
@@ -145,7 +145,7 @@ save_data(const std::vector<T>  & vec,
 };
 
 template <typename T>
-dynamic_vector<T>
+disk::dynamic_vector<T>
 read_data( const std::string& filename)
 {
 
@@ -159,7 +159,7 @@ read_data( const std::string& filename)
     ifs >> elements_to_read;
     std::cout << "Attempting to read " << elements_to_read << " values" << std::endl;
 
-    dynamic_vector<T> vec = dynamic_vector<T>::Zero(elements_to_read);
+    disk::dynamic_vector<T> vec = disk::dynamic_vector<T>::Zero(elements_to_read);
 
     for (size_t i = 0; i < elements_to_read; i++)
         ifs >> vec(i);

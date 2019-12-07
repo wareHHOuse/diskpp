@@ -6,6 +6,10 @@
  *   /__\  /__\    DISK++, a template library for DIscontinuous SKeletal
  *  /_\/_\/_\/_\   methods.
  *
+ * This file is copyright of the following authors:
+ * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
+ * Nicolas Pignet  (C) 2019                     nicolas.pignet@enpc.fr
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -20,9 +24,9 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
- #ifndef _GEOMETRY_HPP_WAS_INCLUDED_
-     #error "You must NOT include this file directly. Include geometry.hpp."
- #endif
+#ifndef _GEOMETRY_HPP_WAS_INCLUDED_
+#error "You must NOT include this file directly. Include geometry.hpp."
+#endif
 
 #ifndef _GEOMETRY_SIMPLICIAL_HPP_
 #define _GEOMETRY_SIMPLICIAL_HPP_
@@ -73,7 +77,17 @@ using tetrahedral_mesh = simplicial_mesh<T, 3>;
 template<typename T>
 using triangular_mesh = simplicial_mesh<T, 2>;
 
-
+/**
+ * @brief Return the list of point of the specified element (face or cell)
+ *
+ * @tparam T scalar type
+ * @tparam DIM dimension of the mesh
+ * @tparam CODIM co-dimension of the element (CODIM=DIM if elem=cell and CODIM=DIM-1 if elem=face)
+ * @param msh (simplicial) mesh
+ * @param elem specified element (cell or face)
+ * @return std::array<typename cartesian_mesh<T,DIM>::point_type, cartesian_priv::howmany<DIM, CODIM>::nodes> list of
+ * points of the specified element
+ */
 template<typename T, size_t DIM, size_t CODIM>
 std::array<typename simplicial_mesh<T,DIM>::point_type, priv::howmany<DIM, CODIM>::nodes>
 points(const simplicial_mesh<T,DIM>& msh, const simplicial_element<DIM, CODIM>& elem)
@@ -92,7 +106,13 @@ points(const simplicial_mesh<T,DIM>& msh, const simplicial_element<DIM, CODIM>& 
     return pts;
 }
 
-/* Return the number of elements of the specified cell */
+/**
+ * @brief Return the number of faces of the specified cell
+ *
+ * @param msh (simplicial) mesh
+ * @param cl specified cell
+ * @return template<typename T, size_t DIM> constexpr howmany_faces number of faces
+ */
 template<typename T, size_t DIM>
 constexpr size_t
 howmany_faces(const simplicial_mesh<T,DIM>& msh, const typename simplicial_mesh<T,DIM>::cell& cl)
@@ -107,9 +127,17 @@ howmany_faces(const simplicial_mesh<T,DIM>& msh, const typename simplicial_mesh<
     /* NOTREACHED */
 }
 
+/**
+ * @brief Return the faces (triangles) of the specified 3D-cell (tetrahedra)
+ *
+ * @tparam T scalar_type
+ * @param msh (simplicial) mesh
+ * @param cl specified 3D-cell (tetrahedra)
+ * @return std::array<typename simplicial_mesh<T, 3>::face, 4> faces of the cell
+ */
 template<typename T>
 std::array<typename simplicial_mesh<T, 3>::face, 4>
-faces(const simplicial_mesh<T, 3>&,
+faces(const simplicial_mesh<T, 3>& msh,
       const typename simplicial_mesh<T, 3>::cell& cl)
 {
     typedef typename simplicial_mesh<T, 3>::face    face_type;
@@ -126,9 +154,17 @@ faces(const simplicial_mesh<T, 3>&,
     return ret;
 }
 
+/**
+ * @brief Return the faces (edges) of the specified 2D-cell (triangle)
+ *
+ * @tparam T scalar_type
+ * @param msh (simplicial) mesh
+ * @param cl specified 2D-cell (triangle)
+ * @return std::array<typename simplicial_mesh<T, 2>::face, 3> faces of the cell
+ */
 template<typename T>
 std::array<typename simplicial_mesh<T, 2>::face, 3>
-faces(const simplicial_mesh<T, 2>&,
+faces(const simplicial_mesh<T, 2>& msh,
       const typename simplicial_mesh<T, 2>::cell& cl)
 {
     typedef typename simplicial_mesh<T, 2>::face    face_type;
@@ -146,6 +182,68 @@ faces(const simplicial_mesh<T, 2>&,
     return ret;
 }
 
+/**
+ * @brief Return the faces id (triangles) of the specified 3D-cell (tetrahedra)
+ *
+ * @tparam T scalar_type
+ * @param msh (simplicial) mesh
+ * @param cl specified 3D-cell (tetrahedra)
+ * @return std::array<typename simplicial_mesh<T, 3>::face::id_type, 4> faces id of the cell
+ */
+template<typename T>
+std::array<typename simplicial_mesh<T, 3>::face::id_type, 4>
+faces_id(const simplicial_mesh<T, 3>& msh, const typename simplicial_mesh<T, 3>::cell& cl)
+{
+    typedef typename simplicial_mesh<T, 3>::face face_type;
+    std::array<typename face_type::id_type, 4>   ret;
+
+    auto ptids = cl.point_ids();
+    assert(ptids.size() == 4);
+
+    ret[0] = msh.lookup(face_type({ptids[1], ptids[2], ptids[3]}));
+    ret[1] = msh.lookup(face_type({ptids[0], ptids[2], ptids[3]}));
+    ret[2] = msh.lookup(face_type({ptids[0], ptids[1], ptids[3]}));
+    ret[3] = msh.lookup(face_type({ptids[0], ptids[1], ptids[2]}));
+
+    return ret;
+}
+
+/**
+ * @brief Return the faces id (edges) of the specified 2D-cell (triangle)
+ *
+ * @tparam T scalar_type
+ * @param msh (simplicial) mesh
+ * @param cl specified 2D-cell (triangle)
+ * @return std::array<typename simplicial_mesh<T, 2>::face::id_type, 3> faces id of the cell
+ */
+template<typename T>
+std::array<typename simplicial_mesh<T, 2>::face::id_type, 3>
+faces_id(const simplicial_mesh<T, 2>& msh, const typename simplicial_mesh<T, 2>::cell& cl)
+{
+    typedef typename simplicial_mesh<T, 2>::face face_type;
+    std::array<typename face_type::id_type, 3>   ret;
+
+    auto ptids = cl.point_ids();
+    assert(ptids.size() == 3);
+
+    assert(ptids[0] < ptids[1] && ptids[1] < ptids[2]);
+
+    ret[0] = msh.lookup(face_type({ptids[0], ptids[1]}));
+    ret[1] = msh.lookup(face_type({ptids[1], ptids[2]}));
+    ret[2] = msh.lookup(face_type({ptids[0], ptids[2]}));
+
+    return ret;
+}
+
+/**
+ * @brief Compute the volume of the specified 3D-cell (tetrahedra)
+ *
+ * @tparam T scalar type
+ * @param msh (simplicial) mesh
+ * @param cl specified 3D-cell (tetrahedra)
+ * @param signed_volume return a signed volume
+ * @return T volume of the cell
+ */
 template<typename T>
 T
 measure(const simplicial_mesh<T, 3>& msh,
@@ -165,6 +263,14 @@ measure(const simplicial_mesh<T, 3>& msh,
     return std::abs( v0.dot(v1.cross(v2))/T(6) );
 }
 
+/**
+ * @brief Compute the area of the specified 3D-face (triangle)
+ *
+ * @tparam T scalar type
+ * @param msh (simplicial) mesh
+ * @param fc specified 3D-face (triangle)
+ * @return T area of the face
+ */
 template<typename T>
 T
 measure(const simplicial_mesh<T, 3>& msh,
@@ -179,10 +285,20 @@ measure(const simplicial_mesh<T, 3>& msh,
     return v0.cross(v1).norm()/T(2);
 }
 
+/**
+ * @brief Compute the area of the specified 2D-cell (triangle)
+ *
+ * @tparam T scalar type
+ * @param msh (simplicial) mesh
+ * @param cl specified 2D-cell (triangle)
+ * @param signed_volume return a signed volume
+ * @return T volume of the cell
+ */
 template<typename T>
 T
 measure(const simplicial_mesh<T, 2>& msh,
-        const typename simplicial_mesh<T, 2>::cell& cl)
+        const typename simplicial_mesh<T, 2>::cell& cl,
+        bool signed_volume = false)
 {
     using namespace std;
     auto pts = points(msh, cl);
@@ -191,9 +307,20 @@ measure(const simplicial_mesh<T, 2>& msh,
     auto d0 = (pts[1] - pts[0]);
     auto d1 = (pts[2] - pts[0]);
 
+    if (signed_volume)
+        return d0.x()*d1.y() - d1.x()*d0.y()/T(2);
+
     return abs(d0.x()*d1.y() - d1.x()*d0.y())/T(2);
 }
 
+/**
+ * @brief Compute the length of the specified 2D-face (edge)
+ *
+ * @tparam T scalar type
+ * @param msh (simplicial) mesh
+ * @param fc specified 2D-face (edge)
+ * @return T length of the face
+ */
 template<typename T>
 T
 measure(const simplicial_mesh<T, 2>& msh,

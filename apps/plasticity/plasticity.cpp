@@ -79,22 +79,22 @@ void
 run_plasticity_solver(const Mesh<T, 2, Storage>& msh, const ParamRun<T>& rp, const disk::MaterialData<T>& material_data)
 {
     typedef Mesh<T, 2, Storage>                            mesh_type;
-    typedef static_vector<T, 2>                            result_type;
-    typedef static_matrix<T, 2, 2>                         result_grad_type;
-    typedef disk::vector_boundary_conditions<mesh_type>     Bnd_type;
+    typedef disk::static_vector<T, 2>                      result_type;
+    typedef disk::static_matrix<T, 2, 2>                   result_grad_type;
+    typedef disk::vector_boundary_conditions<mesh_type>    Bnd_type;
 
-    auto load = [material_data](const point<T, 2>& p) -> result_type { return result_type{0, 0}; };
+    auto load = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0, 0}; };
 
-    auto solution = [material_data](const point<T, 2>& p) -> result_type { return result_type{0, 0}; };
+    auto solution = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0, 0}; };
 
-    auto gradient = [material_data](const point<T, 2>& p) -> result_grad_type { return result_grad_type::Zero(); };
+    auto gradient = [material_data](const disk::point<T, 2>& p) -> result_grad_type { return result_grad_type::Zero(); };
 
     Bnd_type bnd(msh);
 
     // Plaque with quadrilaterals
-    // auto zero = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
+    // auto zero = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
 
-    // auto trac = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 5}; };
+    // auto trac = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0.0, 5}; };
 
     // bnd.addDirichletBC(disk::DX, 4, zero);
     // bnd.addDirichletBC(disk::DX, 14, zero);
@@ -102,10 +102,10 @@ run_plasticity_solver(const Mesh<T, 2, Storage>& msh, const ParamRun<T>& rp, con
     // bnd.addDirichletBC(disk::DY, 16, trac);
 
     // Cook with quadrilaterals
-    auto zero = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
+    auto zero = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
 
-    auto trac     = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 0.1125}; };
-    auto depltest = [material_data](const point<T, 2>& p) -> result_type { return result_type{0.0, 10}; };
+    auto trac     = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0.0, 0.1125}; };
+    auto depltest = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0.0, 10}; };
 
     bnd.addDirichletBC(disk::CLAMPED, 3, zero);
     bnd.addNeumannBC(disk::NEUMANN, 8, trac);
@@ -172,25 +172,25 @@ void
 run_plasticity_solver(const Mesh<T, 3, Storage>& msh, const ParamRun<T>& rp, const disk::MaterialData<T>& material_data)
 {
     typedef Mesh<T, 3, Storage>                            mesh_type;
-    typedef static_vector<T, 3>                            result_type;
-    typedef static_matrix<T, 3, 3>                         result_grad_type;
-    typedef disk::vector_boundary_conditions<mesh_type>     Bnd_type;
+    typedef disk::static_vector<T, 3>                      result_type;
+    typedef disk::static_matrix<T, 3, 3>                   result_grad_type;
+    typedef disk::vector_boundary_conditions<mesh_type>    Bnd_type;
 
-    auto load = [material_data](const point<T, 3>& p) -> result_type { return result_type{0, 0, 0}; };
+    auto load = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0, 0, 0}; };
 
-    auto solution = [material_data](const point<T, 3>& p) -> result_type { return result_type{0, 0, 0}; };
+    auto solution = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0, 0, 0}; };
 
-    auto gradient = [material_data](const point<T, 3>& p) -> result_grad_type { return result_grad_type::Zero(); };
+    auto gradient = [material_data](const disk::point<T, 3>& p) -> result_grad_type { return result_grad_type::Zero(); };
 
     Bnd_type bnd(msh);
     // bnd.addDirichletEverywhere(solution);
 
     // // Sphere
 
-    auto zero = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 0.0}; };
-    auto un   = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 1.0}; };
+    auto zero = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 0.0}; };
+    auto un   = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 1.0}; };
 
-    auto pres = [material_data](const point<T, 3>& p) -> result_type {
+    auto pres = [material_data](const disk::point<T, 3>& p) -> result_type {
         result_type er = result_type::Zero();
 
         er(0) = p.x();
@@ -208,11 +208,11 @@ run_plasticity_solver(const Mesh<T, 3, Storage>& msh, const ParamRun<T>& rp, con
     bnd.addNeumannBC(disk::NEUMANN, 27, pres);
 
     // Cube + pres
-    //    auto zero = [material_data](const point<T, 3>& p) -> result_type {
+    //    auto zero = [material_data](const disk::point<T, 3>& p) -> result_type {
     //       return result_type{0.0, 0.0, 0.0};
     //    };
 
-    //    auto pres = [material_data](const point<T, 3>& p) -> result_type {
+    //    auto pres = [material_data](const disk::point<T, 3>& p) -> result_type {
     //       return result_type{0.0, 0.0, -356};
     //    };
 
@@ -228,18 +228,18 @@ run_plasticity_solver(const Mesh<T, 3, Storage>& msh, const ParamRun<T>& rp, con
 
     // Beam 3D
 
-    // auto zero = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 0.0}; };
+    // auto zero = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 0.0}; };
 
-    // auto pres = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, -3000.0}; };
+    // auto pres = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, -3000.0}; };
 
     // bnd.addDirichletBC(disk::CLAMPED, 3, zero);
     // bnd.addNeumannBC(disk::NEUMANN, 13, pres);
 
     // Thin Plate 3D
 
-    // auto zero = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 0.0}; };
+    // auto zero = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 0.0}; };
 
-    // auto pres = [material_data](const point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, -2.0E-1}; };
+    // auto pres = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, -2.0E-1}; };
 
     // bnd.addDirichletBC(disk::CLAMPED, 3, zero);
     // bnd.addDirichletBC(disk::CLAMPED, 13, zero);

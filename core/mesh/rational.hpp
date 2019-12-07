@@ -26,6 +26,8 @@
 #include <cassert>
 #include <cmath>
 
+namespace disk{
+
 enum class rational_sign {
 	POSITIVE = 0,
 	NEGATIVE = 1
@@ -282,4 +284,6 @@ operator<<(std::ostream& os, const rational<T>& r)
 {
 	os << r.num() << "/" << r.den();
 	return os;
+}
+
 }

@@ -63,8 +63,8 @@ class plasticity_solver
     typedef ParamRun<scalar_type>               param_type;
     typedef disk::MaterialData<scalar_type>     data_type;
 
-    typedef dynamic_matrix<scalar_type> matrix_dynamic;
-    typedef dynamic_vector<scalar_type> vector_dynamic;
+    typedef disk::dynamic_matrix<scalar_type> matrix_dynamic;
+    typedef disk::dynamic_vector<scalar_type> vector_dynamic;
 
     typedef disk::vector_boundary_conditions<mesh_type> bnd_type;
     typedef disk::LinearIsotropicAndKinematicHardening<mesh_type> law_type;
@@ -308,7 +308,7 @@ class plasticity_solver
                           << total_step << ", sublevel: " << step.level << " ) *************************|" << std::endl;
             }
 
-            auto rlf = [&lf, &current_time ](const point<scalar_type, dimension>& p) -> auto
+            auto rlf = [&lf, &current_time ](const disk::point<scalar_type, dimension>& p) -> auto
             {
                 return disk::priv::inner_product(current_time, lf(p));
             };
@@ -582,12 +582,12 @@ class plasticity_solver
         gmsh::Gmesh gmsh    = disk::convertMesh(post_mesh);
         auto        storage = post_mesh.mesh().backend_storage();
 
-        const static_vector<scalar_type, dimension> vzero = static_vector<scalar_type, dimension>::Zero();
+        const disk::static_vector<scalar_type, dimension> vzero = disk::static_vector<scalar_type, dimension>::Zero();
 
         const size_t nb_nodes(gmsh.getNumberofNodes());
 
         // first(number of data at this node), second(cumulated value)
-        std::vector<std::pair<size_t, static_vector<scalar_type, dimension>>> value(nb_nodes, std::make_pair(0, vzero));
+        std::vector<std::pair<size_t, disk::static_vector<scalar_type, dimension>>> value(nb_nodes, std::make_pair(0, vzero));
 
         int cell_i = 0;
         for (auto& cl : m_msh)
@@ -618,7 +618,7 @@ class plasticity_solver
         // Compute the average value and save it
         for (int i_node = 0; i_node < value.size(); i_node++)
         {
-            const static_vector<scalar_type, dimension> depl_avr = value[i_node].second / double(value[i_node].first);
+            const disk::static_vector<scalar_type, dimension> depl_avr = value[i_node].second / double(value[i_node].first);
 
             const gmsh::Data tmp_data(i_node + 1, disk::convertToVectorGmsh(depl_avr));
             data.push_back(tmp_data);
@@ -730,13 +730,13 @@ class plasticity_solver
         gmsh::Gmesh gmsh    = disk::convertMesh(post_mesh);
         auto        storage = post_mesh.mesh().backend_storage();
 
-        const static_matrix<scalar_type, dimension, dimension> vzero =
-          static_matrix<scalar_type, dimension, dimension>::Zero();
+        const disk::static_matrix<scalar_type, dimension, dimension> vzero =
+          disk::static_matrix<scalar_type, dimension, dimension>::Zero();
 
         const size_t nb_nodes(gmsh.getNumberofNodes());
 
         // first(number of data at this node), second(cumulated value)
-        std::vector<std::pair<size_t, static_matrix<scalar_type, dimension, dimension>>> value(
+        std::vector<std::pair<size_t, disk::static_matrix<scalar_type, dimension, dimension>>> value(
           nb_nodes, std::make_pair(0, vzero));
 
         const auto material_data = m_law.getMaterialData();
@@ -771,7 +771,7 @@ class plasticity_solver
         // Compute the average value and save it
         for (int i_node = 0; i_node < value.size(); i_node++)
         {
-            const static_matrix<scalar_type, dimension, dimension> stress_avr =
+            const disk::static_matrix<scalar_type, dimension, dimension> stress_avr =
               value[i_node].second / double(value[i_node].first);
 
             const gmsh::Data tmp_data(i_node + 1, disk::convertToVectorGmsh(stress_avr));
@@ -901,7 +901,7 @@ class plasticity_solver
             auto       pb       = disk::make_scalar_monomial_basis(m_msh, cl, grad_degree);
             const auto law_cell = m_law.getCellIVs(cell_i);
 
-            const dynamic_vector<scalar_type> p_coeff    = law_cell.projectPOnCell(m_msh, cl, m_hdi);
+            const disk::dynamic_vector<scalar_type> p_coeff    = law_cell.projectPOnCell(m_msh, cl, m_hdi);
             const auto                        cell_nodes = post_mesh.nodes_cell(cell_i);
 
             // Loop on the nodes of the cell
@@ -1058,11 +1058,11 @@ class plasticity_solver
         gmsh::Gmesh gmsh(dimension);
         auto        storage = m_msh.backend_storage();
 
-        const static_vector<scalar_type, dimension> vzero = static_vector<scalar_type, dimension>::Zero();
+        const disk::static_vector<scalar_type, dimension> vzero = disk::static_vector<scalar_type, dimension>::Zero();
         const size_t                                nb_nodes(m_msh.points_size());
 
         // first(number of data at this node), second(cumulated value)
-        std::vector<std::pair<size_t, static_vector<scalar_type, dimension>>> value(nb_nodes, std::make_pair(0, vzero));
+        std::vector<std::pair<size_t, disk::static_vector<scalar_type, dimension>>> value(nb_nodes, std::make_pair(0, vzero));
 
         int cell_i = 0;
         for (auto& cl : m_msh)
@@ -1093,7 +1093,7 @@ class plasticity_solver
             const auto            pt   = *itor;
             std::array<double, 3> coor = disk::init_coor(pt);
 
-            const static_vector<scalar_type, dimension> depl_avr = value[i_node].second / double(value[i_node].first);
+            const disk::static_vector<scalar_type, dimension> depl_avr = value[i_node].second / double(value[i_node].first);
 
             for (int j = 0; j < dimension; j++)
                 coor[j] += depl_avr(j);
@@ -1213,7 +1213,7 @@ class plasticity_solver
                 const auto cphi  = cb.eval_functions(qp_pt);
                 const auto depl  = disk::eval(x, cphi);
 
-                static_vector<scalar_type, dimension> er = static_vector<scalar_type, dimension>::Zero();
+                disk::static_vector<scalar_type, dimension> er = disk::static_vector<scalar_type, dimension>::Zero();
 
                 er(0) = qp_pt.x();
                 er(1) = qp_pt.y();

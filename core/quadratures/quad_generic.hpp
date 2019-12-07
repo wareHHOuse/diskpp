@@ -8,7 +8,7 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
+ * Nicolas Pignet  (C) 2018, 2019               nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -99,7 +99,7 @@ integrate_polygon(const size_t degree, const std::vector<point<T, 2>>& pts)
         {
             const auto point  = col1 * qd.first.x() + col2 * qd.first.y() + pts[0];
             const auto weight = qd.second * std::abs(tm);
-            return disk::make_qp(point, weight);
+            return make_qp(point, weight);
         };
 
         auto retbegin = ret.begin();
@@ -128,7 +128,7 @@ integrate_polygon(const size_t degree, const std::vector<point<T, 2>>& pts)
         {
             const auto point  = col1 * qd.first.x() + col2 * qd.first.y() + c_center;
             const auto weight = qd.second * std::abs(tm);
-            return disk::make_qp(point, weight);
+            return make_qp(point, weight);
         };
 
         auto retbegin = ret.begin();
@@ -210,7 +210,7 @@ integrate_polyhedron(const disk::generic_mesh<T, 3>&                msh,
         {
             auto point  = col1 * qd.first.x() + col2 * qd.first.y() + col3 * qd.first.z() + pts[0];
             auto weight = qd.second * meas;
-            ret.push_back(disk::make_qp(point, weight));
+            ret.push_back(make_qp(point, weight));
         }
     }
 
