@@ -34,6 +34,7 @@
 #include "boundary_conditions/boundary_conditions.hpp"
 #include "common/eigen.hpp"
 #include "quadratures/quadratures.hpp"
+#include "utils_hho.hpp"
 
 using namespace Eigen;
 
@@ -113,8 +114,8 @@ class diffusion_condensed_assembler
     };
 
   public:
-    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
-    typedef Matrix<T, Dynamic, 1>       vector_type;
+    typedef dynamic_matrix<T> matrix_type;
+    typedef dynamic_vector<T> vector_type;
 
     SparseMatrix<T> LHS;
     vector_type     RHS;
@@ -429,9 +430,9 @@ class diffusion_condensed_assembler
     template<typename Function>
     vector_type
     take_local_solution(const Mesh&                     msh,
-                    const typename Mesh::cell_type& cl,
-                    const vector_type&              solution,
-                    const Function&                 dirichlet_bf)
+                        const typename Mesh::cell_type& cl,
+                        const vector_type&              solution,
+                        const Function&                 dirichlet_bf)
     {
         const auto fbs = scalar_basis_size(di.face_degree(), Mesh::dimension - 1);
         const auto fcs = faces(msh, cl);
@@ -463,6 +464,16 @@ class diffusion_condensed_assembler
         }
 
         return ret;
+    }
+
+    template<typename Function>
+    vector_type
+    take_local_data(const Mesh&                     msh,
+                    const typename Mesh::cell_type& cl,
+                    const vector_type&              solution,
+                    const Function&                 dirichlet_bf)
+    {
+        return this->take_local_solution(msh, cl, solution, dirichlet_bf);
     }
 
     vector_type
@@ -585,8 +596,8 @@ class stokes_assembler
     };
 
   public:
-    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
-    typedef Matrix<T, Dynamic, 1>       vector_type;
+    typedef dynamic_matrix<T> matrix_type;
+    typedef dynamic_vector<T> vector_type;
 
     SparseMatrix<T> LHS;
     vector_type     RHS;
@@ -950,7 +961,7 @@ class stokes_assembler_alg
     boundary_type           m_bnd;
     hho_degree_info         di;
     std::vector<Triplet<T>> triplets;
-    Matrix<T, Dynamic, 1>   RHS_DIRICHLET;
+    dynamic_vector<T>       RHS_DIRICHLET;
 
     size_t num_all_faces, num_dirichlet_faces, num_other_faces;
     size_t cbs_A, cbs_B, fbs_A;
@@ -987,8 +998,8 @@ class stokes_assembler_alg
     };
 
   public:
-    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
-    typedef Matrix<T, Dynamic, 1>       vector_type;
+    typedef dynamic_matrix<T> matrix_type;
+    typedef dynamic_vector<T> vector_type;
 
     SparseMatrix<T> LHS;
     vector_type     RHS;
@@ -1318,8 +1329,8 @@ class assembler_mechanics
     void
     assemble(const mesh_type& msh, const cell_type& cl, const bnd_type& bnd, const LocalContrib& lc, int di = 0)
     {
-        const size_t      face_degree   = m_hdi.face_degree();
-        const auto        num_face_dofs = vector_basis_size(face_degree, dimension - 1, dimension);
+        const size_t face_degree   = m_hdi.face_degree();
+        const auto   num_face_dofs = vector_basis_size(face_degree, dimension - 1, dimension);
 
         const auto          fcs = faces(msh, cl);
         std::vector<size_t> l2g(fcs.size() * num_face_dofs);
@@ -1845,8 +1856,8 @@ class assembler_mechanics
                 int                             di = 0)
     {
         assert(sol_F.size() == msh.faces_size());
-        const size_t      face_degree   = m_hdi.face_degree();
-        const auto        num_face_dofs = vector_basis_size(face_degree, dimension - 1, dimension);
+        const size_t face_degree   = m_hdi.face_degree();
+        const auto   num_face_dofs = vector_basis_size(face_degree, dimension - 1, dimension);
 
         const auto          fcs = faces(msh, cl);
         std::vector<size_t> l2g(fcs.size() * num_face_dofs);
@@ -3996,7 +4007,7 @@ make_vector_primal_hho_assembler(const Mesh&                             msh,
 template<typename Mesh>
 auto
 make_vector_primal_hho_assembler(const Mesh&                             msh,
-                                 const MeshDegreeInfo<Mesh>&                 degree_infos,
+                                 const MeshDegreeInfo<Mesh>&             degree_infos,
                                  const vector_boundary_conditions<Mesh>& bnd)
 {
     return vector_primal_hho_assembler<Mesh>(msh, degree_infos, bnd);

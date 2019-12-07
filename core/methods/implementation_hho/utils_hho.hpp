@@ -8,7 +8,6 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Karol Cascavita (C) 2018                     karol.cascavita@enpc.fr
  * Nicolas Pignet  (C) 2018, 2019               nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
@@ -304,5 +303,213 @@ vector_faces_offset(const Mesh& msh, const typename Mesh::cell_type& cl, const M
 
     return ret;
 }
+
+// define some optimization
+namespace priv
+{
+
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+compute_lhs_vector(const Mesh&                                           msh,
+                   const typename Mesh::cell&                            cl,
+                   const CellDegreeInfo<Mesh>&                           cell_infos,
+                   const dynamic_matrix<typename Mesh::coordinate_type>& lhs_scalar)
+{
+    typedef typename Mesh::coordinate_type scalar_type;
+
+    const int  dimension      = Mesh::dimension;
+    const auto num_cell_dofs  = vector_basis_size(cell_infos.cell_degree(), dimension, dimension);
+    const auto num_faces_dofs = vector_faces_dofs(msh, cell_infos.facesDegreeInfo());
+
+    const auto total_dofs = num_cell_dofs + num_faces_dofs;
+
+    dynamic_matrix<scalar_type> lhs = dynamic_matrix<scalar_type>::Zero(total_dofs, total_dofs);
+
+    const auto scal_total_dofs = total_dofs / dimension;
+
+    assert(lhs_scalar.rows() == scal_total_dofs);
+    assert(lhs_scalar.cols() == scal_total_dofs);
+
+    int row, col;
+#ifdef FILL_COLMAJOR
+    for (int j = 0; j < scal_total_dofs; j++)
+    {
+        col = j * dimension;
+        for (int i = 0; i < scal_total_dofs; i++)
+        {
+            row = i * dimension;
+            for (int k = 0; k < dimension; k++)
+            {
+                lhs(row + k, col + k) = lhs_scalar(i, j);
+            }
+        }
+    }
+#else
+    for (int i = 0; i < scal_total_dofs; i++)
+    {
+        row = i * dimension;
+        for (int j = 0; j < scal_total_dofs; j++)
+        {
+            col = j * dimension;
+            for (int k = 0; k < dimension; k++)
+            {
+                lhs(row + k, col + k) = lhs_scalar(i, j);
+            }
+        }
+    }
+#endif
+
+    return lhs;
+}
+
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+compute_lhs_vector(const Mesh&                                           msh,
+                   const typename Mesh::cell&                            cl,
+                   const hho_degree_info&                                hdi,
+                   const dynamic_matrix<typename Mesh::coordinate_type>& lhs_scalar)
+{
+    const CellDegreeInfo<Mesh> cell_infos(msh, cl, hdi.cell_degree(), hdi.face_degree(), hdi.grad_degree());
+
+    return compute_lhs_vector(msh, cl, cell_infos, lhs_scalar);
+}
+
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+compute_grad_vector(const Mesh&                                           msh,
+                    const typename Mesh::cell&                            cl,
+                    const CellDegreeInfo<Mesh>&                           cell_infos,
+                    const dynamic_matrix<typename Mesh::coordinate_type>& grad_scalar)
+{
+    typedef typename Mesh::coordinate_type scalar_type;
+
+    const int  dimension     = Mesh::dimension;
+    const auto rbs           = vector_basis_size(cell_infos.reconstruction_degree(), dimension, dimension);
+    const auto num_cell_dofs = vector_basis_size(cell_infos.cell_degree(), dimension, dimension);
+
+    const auto num_faces_dofs = vector_faces_dofs(msh, cell_infos.facesDegreeInfo());
+
+    const auto total_dofs = num_cell_dofs + num_faces_dofs;
+
+    dynamic_matrix<scalar_type> grad = dynamic_matrix<scalar_type>::Zero(rbs - dimension, total_dofs);
+
+    const auto scal_rbs        = rbs / dimension;
+    const auto scal_total_dofs = total_dofs / dimension;
+
+    assert(grad_scalar.rows() == scal_rbs - 1);
+    assert(grad_scalar.cols() == scal_total_dofs);
+
+    int row, col;
+#ifdef FILL_COLMAJOR
+    for (int j = 0; j < scal_total_dofs; j++)
+    {
+        col = j * dimension;
+        for (int i = 0; i < scal_total_dofs; i++)
+        {
+            row = i * dimension;
+            for (int k = 0; k < dimension; k++)
+            {
+                grad(row + k, col + k) = grad_scalar(i, j);
+            }
+        }
+    }
+#else
+    for (int i = 0; i < scal_rbs - 1; i++)
+    {
+        row = i * dimension;
+        for (int j = 0; j < scal_total_dofs; j++)
+        {
+            col = j * dimension;
+            for (int k = 0; k < dimension; k++)
+            {
+                grad(row + k, col + k) = grad_scalar(i, j);
+            }
+        }
+    }
+#endif
+
+    return grad;
+}
+
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+compute_grad_vector(const Mesh&                                           msh,
+                    const typename Mesh::cell&                            cl,
+                    const hho_degree_info&                                hdi,
+                    const dynamic_matrix<typename Mesh::coordinate_type>& grad_scalar)
+{
+    const CellDegreeInfo<Mesh> cell_infos(msh, cl, hdi.cell_degree(), hdi.face_degree(), hdi.grad_degree());
+
+    return compute_grad_vector(msh, cl, cell_infos, grad_scalar);
+}
+
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+compute_grad_matrix(const Mesh&                                           msh,
+                    const typename Mesh::cell&                            cl,
+                    const CellDegreeInfo<Mesh>&                           cell_infos,
+                    const dynamic_matrix<typename Mesh::coordinate_type>& grad_vector)
+{
+    typedef typename Mesh::coordinate_type scalar_type;
+
+    const int  dimension      = Mesh::dimension;
+    const auto gbs            = matrix_basis_size(cell_infos.grad_degree(), dimension, dimension);
+    const auto num_cell_dofs  = vector_basis_size(cell_infos.cell_degree(), dimension, dimension);
+    const auto num_faces_dofs = vector_faces_dofs(msh, cell_infos.facesDegreeInfo());
+
+    const auto total_dofs = num_cell_dofs + num_faces_dofs;
+
+    dynamic_matrix<scalar_type> grad = dynamic_matrix<scalar_type>::Zero(gbs, total_dofs);
+
+    const auto vec_gbs         = gbs / dimension;
+    const auto scal_total_dofs = total_dofs / dimension;
+
+    assert(grad_vector.rows() == vec_gbs);
+    assert(grad_vector.cols() == scal_total_dofs);
+
+    int row, col;
+#ifdef FILL_COLMAJOR
+    for (int j = 0; j < scal_total_dofs; j++)
+    {
+        col = j * dimension;
+        for (int i = 0; i < vec_gbs; i++)
+        {
+            row = i * dimension;
+            for (int k = 0; k < dimension; k++)
+            {
+                grad(row + k, col + k) = grad_vector(i, j);
+            }
+        }
+    }
+#else
+    for (int i = 0; i < vec_gbs; i++)
+    {
+        row = i * dimension;
+        for (int j = 0; j < scal_total_dofs; j++)
+        {
+            col = j * dimension;
+            for (int k = 0; k < dimension; k++)
+            {
+                grad(row + k, col + k) = grad_vector(i, j);
+            }
+        }
+    }
+#endif
+
+    return grad;
+}
+
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+compute_grad_matrix(const Mesh&                                           msh,
+                    const typename Mesh::cell&                            cl,
+                    const hho_degree_info&                                hdi,
+                    const dynamic_matrix<typename Mesh::coordinate_type>& grad_vector)
+{
+    const CellDegreeInfo<Mesh> cell_infos(msh, cl, hdi.cell_degree(), hdi.face_degree(), hdi.grad_degree());
+
+    return compute_grad_matrix(msh, cl, cell_infos, grad_vector);
+}
+} // end priv
 
 } // end diskpp
