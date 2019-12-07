@@ -140,7 +140,7 @@ run_stokes(const Mesh& msh, size_t degree)
 
     	auto cbs = disk::vector_basis_size(degree, Mesh::dimension, Mesh::dimension);
 
-    	auto cell_ofs = disk::priv::offset(msh, cl);
+    	auto cell_ofs = disk::offset(msh, cl);
     	Matrix<scalar_type, Dynamic, 1> s = sol.block(cell_ofs * cbs, 0, cbs, 1);
 
     	Matrix<scalar_type, Dynamic, 1> diff = s - p.head(cbs);

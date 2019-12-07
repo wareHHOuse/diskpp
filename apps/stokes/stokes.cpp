@@ -64,7 +64,7 @@ compute_errors(const Mesh& msh,
     	auto bar = barycenter(msh, cl);
     	Matrix<scalar_type, Dynamic, 1> p = project_function(msh, cl, hdi, velocity);
     	auto cbs = disk::vector_basis_size(hdi.cell_degree(), dim, dim);
-    	auto cell_ofs = disk::priv::offset(msh, cl);
+    	auto cell_ofs = disk::offset(msh, cl);
     	Matrix<scalar_type, Dynamic, 1> s = sol.block(cell_ofs * cbs, 0, cbs, 1);
     	Matrix<scalar_type, Dynamic, 1> diff = s - p.head(cbs);
     	auto cb = disk::make_vector_monomial_basis(msh, cl, hdi.cell_degree());

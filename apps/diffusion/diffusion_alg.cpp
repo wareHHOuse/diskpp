@@ -128,10 +128,12 @@ public:
         for (auto& cl : msh)
         {
         	auto bar = barycenter(msh, cl);
+
         	vector_type p = project_function(msh, cl, di, sol_fun);
         	auto cell_ofs = disk::priv::offset(msh, cl);
         	vector_type s = sol.block(cell_ofs * cbs, 0, cbs, 1);
         	vector_type diff = s - p.head(cbs);
+
         	auto cb = disk::make_scalar_monomial_basis(msh, cl, di.cell_degree());
         	matrix_type mm = disk::make_mass_matrix(msh, cl, cb);
         	error += diff.dot(mm*diff);
@@ -160,7 +162,7 @@ public:
                         const cell_type& cl)
     {
         auto gamma = compute_auxiliar(msh, cl);
-        auto cell_ofs  = disk::priv::offset(msh, cl);
+        auto cell_ofs  = disk::offset(msh, cl);
         auxiliar.block(cell_ofs * sbs, 0, sbs, 1) = gamma;
         return;
     }
@@ -171,7 +173,7 @@ public:
     {
         auto sb = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
 
-        auto cell_ofs  = disk::priv::offset(msh, cl);
+        auto cell_ofs  = disk::offset(msh, cl);
         auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
 
         vector_type u_TF =
@@ -195,7 +197,7 @@ public:
 
         for(auto cl: msh)
         {
-            auto cell_ofs  = disk::priv::offset(msh, cl);
+            auto cell_ofs  = disk::offset(msh, cl);
             auto num_total_dofs = cbs + howmany_faces(msh, cl) * fbs;
 
             vector_type u_TF =
@@ -227,7 +229,7 @@ public:
         auto G         = make_vector_hho_gradrec(msh, cl, di);
         auto cb = disk::make_scalar_monomial_basis(msh, cl, di.cell_degree());
         auto sb = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
-        auto cell_ofs  = disk::priv::offset(msh, cl);
+        auto cell_ofs  = disk::offset(msh, cl);
         auto num_faces = howmany_faces(msh, cl);
 
         auto stress = multiplier.block( sbs * cell_ofs,  0, sbs, 1);
@@ -299,7 +301,7 @@ public:
             auto gr   = make_scalar_hho_laplacian(msh, cl, di);
             auto stab = make_scalar_hho_stabilization(msh, cl, gr.first, di);
 
-            auto cell_ofs  = disk::priv::offset(msh, cl);
+            auto cell_ofs  = disk::offset(msh, cl);
             auto num_total_dofs = cbs + fbs * howmany_faces(msh, cl);
 
             vector_type cell_rhs = rhs_all.block( cbs*cell_ofs, 0, cbs, 1);
@@ -331,7 +333,7 @@ public:
 
         for (auto& cl: msh)
         {
-            auto cell_ofs = disk::priv::offset(msh, cl);
+            auto cell_ofs = disk::offset(msh, cl);
             vector_type stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
             auto gamma  = compute_auxiliar( msh,  cl);
 

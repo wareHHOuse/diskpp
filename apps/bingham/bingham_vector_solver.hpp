@@ -91,7 +91,7 @@ public:
         auto value = 1./(2. * (vp.mu + vp.alpha));
         auto G = disk::make_hlow_stokes(msh, cl, di, true);
 
-        auto cell_ofs    = disk::priv::offset(msh, cl);
+        auto cell_ofs    = disk::offset(msh, cl);
         vector_type   Gu = G.first * u_TF;
         vector_type   stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
 
@@ -127,7 +127,7 @@ public:
         auto cb = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
         auto sb = disk::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
 
-        auto cell_ofs =  disk::priv::offset(msh, cl);
+        auto cell_ofs =  disk::offset(msh, cl);
         auto num_faces = howmany_faces(msh, cl);
 
         vector_type rhs = vector_type::Zero(cbs + fbs * num_faces);

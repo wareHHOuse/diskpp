@@ -1881,7 +1881,7 @@ class diffusion_condensed_assembler_nitsche_cells
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc = fcs[face_i];
-            auto face_offset = priv::offset(msh, fc);
+            auto face_offset = offset(msh, fc);
             auto face_LHS_offset = compress_table.at(face_offset)*fbs;
 
             auto face_id = msh.lookup(fc);
@@ -1942,7 +1942,7 @@ class diffusion_condensed_assembler_nitsche_cells
             }
             else
             {
-                auto face_offset = priv::offset(msh, fc);
+                auto face_offset = offset(msh, fc);
                 auto face_SOL_offset = compress_table.at(face_offset)*fbs;
                 ret.block(face_i*fbs, 0, fbs, 1) = solution.block(face_SOL_offset, 0, fbs, 1);
             }
@@ -2076,7 +2076,7 @@ class diffusion_condensed_assembler_nitsche_faces
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc = fcs[face_i];
-            auto face_offset = priv::offset(msh, fc);
+            auto face_offset = offset(msh, fc);
             auto face_LHS_offset = compress_table.at(face_offset)*fbs;
 
             auto face_id = msh.lookup(fc);
@@ -2125,7 +2125,7 @@ class diffusion_condensed_assembler_nitsche_faces
             if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
             const auto face_id=eid.second;
 
-            auto face_offset = priv::offset(msh, fc);
+            auto face_offset = offset(msh, fc);
             auto face_SOL_offset = compress_table.at(face_offset)*fbs;
             ret.block(face_i*fbs, 0, fbs, 1) = solution.block(face_SOL_offset, 0, fbs, 1);
         }
@@ -2263,7 +2263,7 @@ public:
         std::vector<assembly_index> asm_map;
         asm_map.reserve(cbs + fcs.size()*fbs);
 
-        auto cell_offset        = priv::offset(msh, cl);
+        auto cell_offset        = offset(msh, cl);
         auto cell_LHS_offset    = cell_offset * cbs;
 
         for (size_t i = 0; i < cbs; i++)
@@ -2272,7 +2272,7 @@ public:
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc = fcs[face_i];
-            auto face_offset = priv::offset(msh, fc);
+            auto face_offset = offset(msh, fc);
             auto face_LHS_offset = cbs * msh.cells_size() + compress_table.at(face_offset)*fbs;
 
             auto fc_id = msh.lookup(fc);
@@ -2328,7 +2328,7 @@ public:
     {
         auto num_faces = howmany_faces(msh, cl);
         auto dim = Mesh::dimension;
-        auto cell_ofs = disk::priv::offset(msh, cl);
+        auto cell_ofs = disk::offset(msh, cl);
 
         Matrix<T, Dynamic, 1> svel(cbs + num_faces * fbs );
         svel.block(0, 0, cbs, 1) = sol.block(cell_ofs * cbs, 0, cbs, 1);
@@ -2350,7 +2350,7 @@ public:
             }
             else
             {
-                auto face_ofs = priv::offset(msh, fc);
+                auto face_ofs = offset(msh, fc);
                 auto global_ofs = cbs * msh.cells_size() + compress_table.at(face_ofs)*fbs;
                 svel.block(cbs + i*fbs, 0, fbs, 1) = sol.block(global_ofs, 0, fbs, 1);
             }
@@ -2508,7 +2508,7 @@ public:
         std::vector<assembly_index> asm_map;
         asm_map.reserve(cbs + fcs.size()*fbs);
 
-        auto cell_offset        = priv::offset(msh, cl);
+        auto cell_offset        = offset(msh, cl);
         auto cell_LHS_offset    = cell_offset * cbs;
 
         element_type ecell = CELL;
@@ -2521,7 +2521,7 @@ public:
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc = fcs[face_i];
-            auto face_offset = priv::offset(msh, fc);
+            auto face_offset = offset(msh, fc);
             auto face_LHS_offset = cbs * msh.cells_size() + compress_table.at(face_offset)*fbs;
 
             auto fc_id = msh.lookup(fc);
@@ -2648,7 +2648,7 @@ public:
     {
         auto num_faces = howmany_faces(msh, cl);
         auto dim = Mesh::dimension;
-        auto cell_ofs = disk::priv::offset(msh, cl);
+        auto cell_ofs = disk::offset(msh, cl);
 
         Matrix<T, Dynamic, 1> svel(cbs + num_faces * fbs );
         svel.block(0, 0, cbs, 1) = sol.block(cell_ofs * cbs, 0, cbs, 1);
@@ -2672,7 +2672,7 @@ public:
                 svel.block(cbs + i * fbs, 0, fbs, 1) = Matrix<T, Dynamic, 1>::Zero(fbs);
             else
             {
-                auto face_ofs = priv::offset(msh, fc);
+                auto face_ofs = offset(msh, fc);
                 auto global_ofs = cbs * msh.cells_size() + compress_table.at(face_ofs)*fbs;
                 svel.block(cbs + i*fbs, 0, fbs, 1) = sol.block(global_ofs, 0, fbs, 1);
             }
@@ -2833,7 +2833,7 @@ public:
         std::vector<assembly_index> asm_map;
         asm_map.reserve(cbs + fcs.size()*fbs);
 
-        auto cell_offset        = priv::offset(msh, cl);
+        auto cell_offset        = offset(msh, cl);
         auto cell_LHS_offset    = cell_offset * cbs;
 
         element_type ecell = CELL;
@@ -2845,7 +2845,7 @@ public:
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc = fcs[face_i];
-            auto face_offset = priv::offset(msh, fc);
+            auto face_offset = offset(msh, fc);
             auto face_LHS_offset = cbs * msh.cells_size() + compress_table.at(face_offset)*fbs;
 
             auto fc_id = msh.lookup(fc);
@@ -2969,7 +2969,7 @@ public:
     {
         auto num_faces = howmany_faces(msh, cl);
         auto dim = Mesh::dimension;
-        auto cell_ofs = disk::priv::offset(msh, cl);
+        auto cell_ofs = disk::offset(msh, cl);
         auto num_total_dofs  = cbs + num_faces * fbs;
         Matrix<T, Dynamic, 1> svel = Matrix<T, Dynamic, 1>::Zero(num_total_dofs);
         svel.block(0, 0, cbs, 1) = sol.block(cell_ofs * cbs, 0, cbs, 1);
@@ -2996,7 +2996,7 @@ public:
                 svel.block(cbs + i * fbs, 0, fbs, 1) = vector_type::Zero(fbs);
             else
             {
-                auto face_ofs = priv::offset(msh, fc);
+                auto face_ofs = offset(msh, fc);
                 auto global_ofs = cbs * msh.cells_size() + compress_table.at(face_ofs)*fbs;
                 svel.block(cbs + i*fbs, 0, fbs, 1) = sol.block(global_ofs, 0, fbs, 1);
             }
@@ -3150,7 +3150,7 @@ public:
         std::vector<assembly_index> asm_map;
         asm_map.reserve(cbs + fcs.size()*fbs);
 
-        auto cell_offset        = priv::offset(msh, cl);
+        auto cell_offset        = offset(msh, cl);
         auto cell_LHS_offset    = cell_offset * cbs;
 
         element_type ecell = CELL;
@@ -3160,7 +3160,7 @@ public:
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc = fcs[face_i];
-            auto face_offset = priv::offset(msh, fc);
+            auto face_offset = offset(msh, fc);
             auto face_LHS_offset = cbs * msh.cells_size() + compress_table.at(face_offset)*fbs;
 
             auto fc_id = msh.lookup(fc);
@@ -3293,7 +3293,7 @@ public:
     {
         auto num_faces = howmany_faces(msh, cl);
         auto dim = Mesh::dimension;
-        auto cell_ofs = disk::priv::offset(msh, cl);
+        auto cell_ofs = disk::offset(msh, cl);
         auto num_total_dofs  = cbs + num_faces * fbs;
         Matrix<T, Dynamic, 1> svel = Matrix<T, Dynamic, 1>::Zero(num_total_dofs);
         svel.block(0, 0, cbs, 1) = sol.block(cell_ofs * cbs, 0, cbs, 1);
@@ -3311,7 +3311,7 @@ public:
                 svel.block(cbs + i * fbs, 0, fbs, 1) = Matrix<T, Dynamic, 1>::Zero(fbs);
             else
             {
-                auto face_ofs = priv::offset(msh, fc);
+                auto face_ofs = offset(msh, fc);
                 auto global_ofs = cbs * msh.cells_size() + compress_table.at(face_ofs)*fbs;
                 svel.block(cbs + i*fbs, 0, fbs, 1) = sol.block(global_ofs, 0, fbs, 1);
             }
@@ -3436,7 +3436,7 @@ public:
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc = fcs[face_i];
-            auto face_offset = priv::offset(msh, fc);
+            auto face_offset = offset(msh, fc);
             auto face_LHS_offset = compress_table.at(face_offset)*fbs;
 
             auto face_id = msh.lookup(fc);
@@ -3616,7 +3616,7 @@ public:
                 ret.block(face_i * fbs, 0, fbs, 1) = Matrix<T, Dynamic, 1>::Zero(fbs);
             else
             {
-                auto face_offset = priv::offset(msh, fc);
+                auto face_offset = offset(msh, fc);
                 auto face_SOL_offset = compress_table.at(face_offset)*fbs;
                 ret.block(face_i * fbs, 0, fbs, 1) = solution.block(face_SOL_offset, 0, fbs, 1);
             }

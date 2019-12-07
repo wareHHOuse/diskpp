@@ -2,12 +2,12 @@
  *       /\         DISK++, a template library for DIscontinuous SKeletal
  *      /__\        methods.
  *     /_\/_\
- *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018
+ *    /\    /\      Matteo Cicuttin (C) 2016, 2017, 2018, 2019
  *   /__\  /__\     matteo.cicuttin@enpc.fr
  *  /_\/_\/_\/_\    École Nationale des Ponts et Chaussées - CERMICS
  *
  * This file is copyright of the following authors:
- * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
+ * Matteo Cicuttin (C) 2016, 2017, 2018, 2019   matteo.cicuttin@enpc.fr
  * Karol Cascavita (C) 2018                     karol.cascavita@enpc.fr
  * Nicolas Pignet  (C) 2018, 2019               nicolas.pignet@enpc.fr
  *
@@ -16,7 +16,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
  * If you use this code or parts of it for scientific publications, you
- * are required to cite it as following:
+ * are required to cite it as following:    
  *
  * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
  * polytopal meshes using generic programming.
@@ -59,7 +59,7 @@ public:
      * @brief Construct a new hho degree info object
      * The default polynomial degree is 1 for the face and cell degrees
      *
-     */
+     */   
     hho_degree_info()
         : cell_deg(1), face_deg(1),  grad_deg(1)
     {}
@@ -1525,28 +1525,33 @@ make_hlow_stokes(const Mesh& msh, const typename Mesh::cell_type& cl,
 namespace priv
 {
 
+
+
+// define some optimization
+namespace priv {
+
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
-compute_lhs_vector(const Mesh&                                           msh,
-                   const typename Mesh::cell&                            cl,
-                   const hho_degree_info&                                hdi,
+compute_lhs_vector(const Mesh&                msh,
+                   const typename Mesh::cell& cl,
+                   const hho_degree_info& hdi,
                    const dynamic_matrix<typename Mesh::coordinate_type>& lhs_scalar)
 {
     typedef typename Mesh::coordinate_type scalar_type;
 
-    const int  dimension     = Mesh::dimension;
+    const int dimension     = Mesh::dimension;
     const auto num_cell_dofs = vector_basis_size(hdi.cell_degree(), dimension, dimension);
     const auto num_face_dofs = vector_basis_size(hdi.face_degree(), dimension - 1, dimension);
 
-    const auto fcs       = faces(msh, cl);
+    const auto   fcs     = faces(msh, cl);
     const auto num_faces = fcs.size();
 
     const auto total_dofs = num_cell_dofs + num_faces * num_face_dofs;
 
     dynamic_matrix<scalar_type> lhs = dynamic_matrix<scalar_type>::Zero(total_dofs, total_dofs);
 
-    const auto scal_cell_dofs  = scalar_basis_size(hdi.cell_degree(), dimension);
-    const auto scal_face_dofs  = scalar_basis_size(hdi.face_degree(), dimension - 1);
+    const auto scal_cell_dofs = scalar_basis_size(hdi.cell_degree(), dimension);
+    const auto scal_face_dofs = scalar_basis_size(hdi.face_degree(), dimension - 1);
     const auto scal_total_dofs = scal_cell_dofs + num_faces * scal_face_dofs;
 
     assert(lhs_scalar.rows() == scal_total_dofs);
