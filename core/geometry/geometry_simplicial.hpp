@@ -36,6 +36,8 @@
 
 #include "geometry/element_simplicial.hpp"
 #include "loaders/loader_utils.hpp"
+#include "common/simplicial_formula.hpp"
+#include "mesh/rational.hpp"
 
 namespace disk {
 
@@ -253,14 +255,40 @@ measure(const simplicial_mesh<T, 3>& msh,
     auto pts = points(msh, cl);
     assert(pts.size() == 4);
 
-    auto v0 = (pts[1] - pts[0]).to_vector();
-    auto v1 = (pts[2] - pts[0]).to_vector();
-    auto v2 = (pts[3] - pts[0]).to_vector();
+    const T vol = volume_tetrahedron_kahan(pts[0], pts[1], pts[2], pts[3]);
 
     if (signed_volume)
-        return v0.dot(v1.cross(v2))/T(6);
+    {
+        const auto v0   = (pts[1] - pts[0]).to_vector();
+        const auto v1   = (pts[2] - pts[0]).to_vector();
+        const auto v2   = (pts[3] - pts[0]).to_vector();
 
-    return std::abs( v0.dot(v1.cross(v2))/T(6) );
+        const T vol2 = v0.dot(v1.cross(v2)) / T(6);
+        return vol2/std::abs(vol2) * vol;
+    }
+
+    return vol;
+}
+
+template<typename T>
+rational<T>
+measure(const simplicial_mesh<rational<T>, 3>& msh, const typename simplicial_mesh<rational<T>, 3>::cell& cl, bool signed_volume = false)
+{
+    auto pts = points(msh, cl);
+    assert(pts.size() == 4);
+
+    const auto v0 = (pts[1] - pts[0]).to_vector();
+    const auto v1 = (pts[2] - pts[0]).to_vector();
+    const auto v2 = (pts[3] - pts[0]).to_vector();
+
+    const auto vol = v0.dot(v1.cross(v2)) / T(6);
+
+    if (signed_volume)
+    {
+        return vol;
+    }
+
+    return abs(vol);
 }
 
 /**
@@ -279,10 +307,7 @@ measure(const simplicial_mesh<T, 3>& msh,
     auto pts = points(msh, fc);
     assert(pts.size() == 3);
 
-    auto v0 = (pts[1] - pts[0]).to_vector();
-    auto v1 = (pts[2] - pts[0]).to_vector();
-
-    return v0.cross(v1).norm()/T(2);
+    return area_triangle_kahan(pts[0], pts[1], pts[2]);
 }
 
 /**
@@ -304,13 +329,42 @@ measure(const simplicial_mesh<T, 2>& msh,
     auto pts = points(msh, cl);
     assert(pts.size() == 3);
 
-    auto d0 = (pts[1] - pts[0]);
-    auto d1 = (pts[2] - pts[0]);
+    const T area = area_triangle_kahan(pts[0], pts[1], pts[2]);
 
     if (signed_volume)
-        return d0.x()*d1.y() - d1.x()*d0.y()/T(2);
+    {
+        const auto d0 = (pts[1] - pts[0]);
+        const auto d1 = (pts[2] - pts[0]);
 
-    return abs(d0.x()*d1.y() - d1.x()*d0.y())/T(2);
+        const T area2 = d0.x() * d1.y() - d1.x() * d0.y();
+
+        return area2/std::abs(area2) * area;
+    }
+
+    return area;
+}
+
+template<typename T>
+rational<T>
+measure(const simplicial_mesh<rational<T>, 2>&                msh,
+        const typename simplicial_mesh<rational<T>, 2>::cell& cl,
+        bool                                                  signed_volume = false)
+{
+    using namespace std;
+    auto pts = points(msh, cl);
+    assert(pts.size() == 3);
+
+    const auto d0 = (pts[1] - pts[0]);
+    const auto d1 = (pts[2] - pts[0]);
+
+    const auto area = d0.x() * d1.y() - d1.x() * d0.y();
+
+    if (signed_volume)
+    {
+        return area;
+    }
+
+    return abs(area);
 }
 
 /**

@@ -312,12 +312,11 @@ bool
 has_faces_on_boundary(const Mesh& msh, const typename Mesh::cell& cl)
 {
     auto fcs = faces(msh, cl);
-    bool has_bnd = false;
     for (auto& fc : fcs)
         if ( msh.is_boundary(fc) )
             return true;
 
-    return has_bnd;
+    return false;
 }
 
 /**
