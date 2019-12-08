@@ -147,7 +147,7 @@ template<typename Mesh>
 std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
 make_matrix_symmetric_gradrec(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
-    const CellDegreeInfo cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
+    const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 
     return make_matrix_symmetric_gradrec(msh, cl, cell_infos);
 }

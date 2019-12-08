@@ -182,7 +182,7 @@ make_vector_hho_stabilization(const Mesh&                                       
                               const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
                               const hho_degree_info&                                di)
 {
-    const CellDegreeInfo cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
+    const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 
     return make_vector_hho_stabilization(msh, cl, reconstruction, cell_infos);
 }

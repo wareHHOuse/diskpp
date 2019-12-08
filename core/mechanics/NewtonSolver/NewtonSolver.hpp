@@ -71,7 +71,6 @@ class NewtonSolver
 
     typedef NewtonSolverParameter<scalar_type>    param_type;
     typedef vector_boundary_conditions<mesh_type> bnd_type;
-    typedef hho_degree_info                       hdi_type;
     typedef Behavior<mesh_type>                   behavior_type;
 
     bnd_type                  m_bnd;
@@ -88,7 +87,7 @@ class NewtonSolver
     void
     init_degree(const size_t cell_degree, const size_t face_degree, const size_t grad_degree)
     {
-        m_degree_infos = MeshDegreeInfo(m_msh, cell_degree, face_degree, grad_degree);
+        m_degree_infos = MeshDegreeInfo<mesh_type>(m_msh, cell_degree, face_degree, grad_degree);
 
         if (m_bnd.nb_faces_contact() > 0)
         {

@@ -157,7 +157,7 @@ template<typename Mesh>
 std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
 make_hho_divergence_reconstruction(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
-    const CellDegreeInfo cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
+    const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 
     return make_hho_divergence_reconstruction(msh, cl, cell_infos);
 }
@@ -193,7 +193,7 @@ template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
 make_hho_divergence_reconstruction_rhs(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
-    const CellDegreeInfo cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
+    const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 
     return make_hho_divergence_reconstruction_rhs(msh, cl, cell_infos);
 }

@@ -201,7 +201,7 @@ template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hdg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
-    const CellDegreeInfo cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
+    const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 
     return make_scalar_hdg_stabilization(msh, cl, cell_infos);
 }
@@ -239,7 +239,7 @@ template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_dg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
 {
-    const CellDegreeInfo cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
+    const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 
     return make_scalar_dg_stabilization(msh, cl, cell_infos);
 }
@@ -401,7 +401,7 @@ make_scalar_hho_stabilization(const Mesh&                                       
                               const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
                               const hho_degree_info&                                di)
 {
-    const CellDegreeInfo cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
+    const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 
     return make_scalar_hho_stabilization(msh, cl, reconstruction, cell_infos);
 }
