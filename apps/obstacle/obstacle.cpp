@@ -991,7 +991,7 @@ obstacle_solver_strong(const Mesh& msh,
         timecounter tc;
 
         auto assembler  = make_obstacle_assembler_strong(msh, in_A, hdi);
-        
+
         tc.tic();
         for (auto& cl : msh)
         {
@@ -1130,7 +1130,7 @@ obstacle_solver_nitsche(const Mesh& msh,
         timecounter tc;
 
         auto assembler  = make_obstacle_assembler_nitsche(msh, in_A, hdi);
-        
+
         tc.tic();
         for (auto& cl : msh)
         {
@@ -1346,7 +1346,7 @@ hho_solver_xx(const Mesh& msh, size_t degree, size_t maxiter, typename Mesh::coo
             u_prev.block(cbs*cell_i, 0, cbs, 1) = cell_mass*u.block(cbs*cell_i, 0, cbs, 1);
             cell_i++;
         }
-   } 
+   }
 
 
     /*
@@ -1575,7 +1575,7 @@ do_autotest(const std::vector<std::string>& meshes, const char *outfile, size_t 
         else
             ofs << std::setw(10) << "   ---    ";
 
-       
+
         ofs << fmtfl << ri_nitsche[i].error << "  ";
 
         auto nitsche_rate = compute_rate(ri_nitsche[i-1], ri_nitsche[i]);
@@ -1717,7 +1717,7 @@ int main(int argc, char **argv)
     if (autotest_mode)
     {
         launch_autotests<T>();
-        return;
+        return 0;
     }
 
     if (argc != 1)

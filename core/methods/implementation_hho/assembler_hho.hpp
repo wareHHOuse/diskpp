@@ -35,38 +35,12 @@
 #include "common/eigen.hpp"
 #include "quadratures/quadratures.hpp"
 #include "utils_hho.hpp"
+#include "mesh/mesh.hpp"
 
 using namespace Eigen;
 
 namespace disk
 {
-
-namespace priv
-{
-
-template<typename Mesh>
-size_t
-offset(const Mesh& msh, const typename Mesh::cell_type& cl)
-{
-    auto itor = std::lower_bound(msh.cells_begin(), msh.cells_end(), cl);
-    if (itor == msh.cells_end())
-        throw std::logic_error("Cell not found: this is likely a bug.");
-
-    return std::distance(msh.cells_begin(), itor);
-}
-
-template<typename Mesh>
-size_t
-offset(const Mesh& msh, const typename Mesh::face_type& fc)
-{
-    auto itor = std::lower_bound(msh.faces_begin(), msh.faces_end(), fc);
-    if (itor == msh.faces_end())
-        throw std::logic_error("Face not found: this is likely a bug.");
-
-    return std::distance(msh.faces_begin(), itor);
-}
-
-} // priv
 
 // assembler for scalar primal problem with HHO like diffusion problem
 template<typename Mesh>
@@ -209,7 +183,7 @@ class diffusion_condensed_assembler
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             const auto fc              = fcs[face_i];
-            const auto face_offset     = fcs_id[face_i]; // priv::offset(msh, fc);
+            const auto face_offset     = fcs_id[face_i]; // offset(msh, fc);
             const auto face_LHS_offset = compress_table.at(face_offset) * fbs;
 
             const bool dirichlet = is_dirichlet(fc);
@@ -262,7 +236,7 @@ class diffusion_condensed_assembler
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             const auto fc              = fcs[face_i];
-            const auto face_offset     = priv::offset(msh, fc);
+            const auto face_offset     = offset(msh, fc);
             const auto face_LHS_offset = compress_table.at(face_offset) * fbs;
 
             const auto face_id   = msh.lookup(fc);
@@ -456,7 +430,7 @@ class diffusion_condensed_assembler
             }
             else
             {
-                const auto face_offset     = priv::offset(msh, fc);
+                const auto face_offset     = offset(msh, fc);
                 const auto face_SOL_offset = compress_table.at(face_offset) * fbs;
 
                 ret.block(face_i * fbs, 0, fbs, 1) = solution.block(face_SOL_offset, 0, fbs, 1);
@@ -509,7 +483,7 @@ class diffusion_condensed_assembler
             }
             else
             {
-                const auto face_offset             = priv::offset(msh, fc);
+                const auto face_offset             = offset(msh, fc);
                 const auto face_SOL_offset         = compress_table.at(face_offset) * fbs;
                 ret.block(face_i * fbs, 0, fbs, 1) = solution.block(face_SOL_offset, 0, fbs, 1);
             }
@@ -674,7 +648,7 @@ class stokes_assembler
         std::vector<assembly_index> asm_map;
         asm_map.reserve(cbs_A + fcs.size() * fbs_A);
 
-        auto cell_offset     = priv::offset(msh, cl);
+        auto cell_offset     = offset(msh, cl);
         auto cell_LHS_offset = cell_offset * cbs_A;
 
         auto B_offset = cbs_A * msh.cells_size() + fbs_A * num_other_faces + cbs_B * cell_offset;
@@ -687,7 +661,7 @@ class stokes_assembler
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc              = fcs[face_i];
-            auto face_offset     = priv::offset(msh, fc);
+            auto face_offset     = offset(msh, fc);
             auto face_LHS_offset = cbs_A * msh.cells_size() + compress_table.at(face_offset) * fbs_A;
 
             auto fc_id     = msh.lookup(fc);
@@ -771,7 +745,7 @@ class stokes_assembler
         std::vector<assembly_index> asm_map;
         asm_map.reserve(cbs_A + fcs.size() * fbs_A);
 
-        auto cell_offset     = priv::offset(msh, cl);
+        auto cell_offset     = offset(msh, cl);
         auto cell_LHS_offset = cell_offset * cbs_A;
 
         auto B_offset = cbs_A * msh.cells_size() + fbs_A * num_other_faces + cbs_B * cell_offset;
@@ -784,7 +758,7 @@ class stokes_assembler
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc              = fcs[face_i];
-            auto face_offset     = priv::offset(msh, fc);
+            auto face_offset     = offset(msh, fc);
             auto face_LHS_offset = cbs_A * msh.cells_size() + compress_table.at(face_offset) * fbs_A;
 
             auto fc_id     = msh.lookup(fc);
@@ -882,7 +856,7 @@ class stokes_assembler
     {
         auto num_faces = howmany_faces(msh, cl);
         auto dim       = Mesh::dimension;
-        auto cell_ofs  = priv::offset(msh, cl);
+        auto cell_ofs  = offset(msh, cl);
 
         vector_type svel(cbs_A + num_faces * fbs_A);
         svel.block(0, 0, cbs_A, 1) = sol.block(cell_ofs * cbs_A, 0, cbs_A, 1);
@@ -901,7 +875,7 @@ class stokes_assembler
             }
             else
             {
-                auto face_ofs   = priv::offset(msh, fc);
+                auto face_ofs   = offset(msh, fc);
                 auto global_ofs = cbs_A * msh.cells_size() + compress_table.at(face_ofs) * fbs_A;
                 svel.block(cbs_A + i * fbs_A, 0, fbs_A, 1) = sol.block(global_ofs, 0, fbs_A, 1);
             }
@@ -912,7 +886,7 @@ class stokes_assembler
     vector_type
     take_pressure(const Mesh& msh, const typename Mesh::cell_type& cl, const vector_type& sol) const
     {
-        auto cell_ofs = priv::offset(msh, cl);
+        auto cell_ofs = offset(msh, cl);
         auto pres_ofs = cbs_A * msh.cells_size() + fbs_A * num_other_faces + cbs_B * cell_ofs;
 
         vector_type spres = sol.block(pres_ofs, 0, cbs_B, 1);
@@ -926,7 +900,7 @@ class stokes_assembler
         auto fbs_A = vector_basis_size(di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
         auto cbs_B = scalar_basis_size(di.face_degree(), Mesh::dimension);
 
-        auto face_offset = priv::offset(msh, fc);
+        auto face_offset = offset(msh, fc);
         return cbs_A * msh.cells_size() + compress_table.at(face_offset) * fbs_A;
     }
 
@@ -937,7 +911,7 @@ class stokes_assembler
         auto fbs_A = vector_basis_size(di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
         auto cbs_B = scalar_basis_size(di.face_degree(), Mesh::dimension);
 
-        auto face_offset = priv::offset(msh, fc);
+        auto face_offset = offset(msh, fc);
         return cbs_A * msh.cells_size() + compress_table.at(face_offset) * fbs_A;
     }
 };
@@ -1074,7 +1048,7 @@ class stokes_assembler_alg
         std::vector<assembly_index> asm_map;
         asm_map.reserve(cbs_A + fcs.size() * fbs_A);
 
-        auto cell_offset     = priv::offset(msh, cl);
+        auto cell_offset     = offset(msh, cl);
         auto cell_LHS_offset = cell_offset * cbs_A;
 
         auto B_offset = cbs_A * msh.cells_size() + fbs_A * num_other_faces + cbs_B * cell_offset;
@@ -1087,7 +1061,7 @@ class stokes_assembler_alg
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc              = fcs[face_i];
-            auto face_offset     = priv::offset(msh, fc);
+            auto face_offset     = offset(msh, fc);
             auto face_LHS_offset = cbs_A * msh.cells_size() + compress_table.at(face_offset) * fbs_A;
 
             auto fc_id     = msh.lookup(fc);
@@ -1169,7 +1143,7 @@ class stokes_assembler_alg
         std::vector<assembly_index> asm_map;
         asm_map.reserve(cbs_A + fcs.size() * fbs_A);
 
-        auto cell_offset     = priv::offset(msh, cl);
+        auto cell_offset     = offset(msh, cl);
         auto cell_LHS_offset = cell_offset * cbs_A;
 
         auto B_offset = cbs_A * msh.cells_size() + fbs_A * num_other_faces + cbs_B * cell_offset;
@@ -1180,7 +1154,7 @@ class stokes_assembler_alg
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc              = fcs[face_i];
-            auto face_offset     = priv::offset(msh, fc);
+            auto face_offset     = offset(msh, fc);
             auto face_LHS_offset = cbs_A * msh.cells_size() + compress_table.at(face_offset) * fbs_A;
 
             auto fc_id     = msh.lookup(fc);
@@ -1225,7 +1199,7 @@ class stokes_assembler_alg
     {
         auto num_faces = howmany_faces(msh, cl);
         auto dim       = Mesh::dimension;
-        auto cell_ofs  = priv::offset(msh, cl);
+        auto cell_ofs  = offset(msh, cl);
 
         vector_type svel(cbs_A + num_faces * fbs_A);
         svel.block(0, 0, cbs_A, 1) = sol.block(cell_ofs * cbs_A, 0, cbs_A, 1);
@@ -1244,7 +1218,7 @@ class stokes_assembler_alg
             }
             else
             {
-                auto face_ofs   = priv::offset(msh, fc);
+                auto face_ofs   = offset(msh, fc);
                 auto global_ofs = cbs_A * msh.cells_size() + compress_table.at(face_ofs) * fbs_A;
                 svel.block(cbs_A + i * fbs_A, 0, fbs_A, 1) = sol.block(global_ofs, 0, fbs_A, 1);
             }
@@ -1255,7 +1229,7 @@ class stokes_assembler_alg
     vector_type
     take_pressure(const Mesh& msh, const typename Mesh::cell_type& cl, const vector_type& sol) const
     {
-        auto cell_ofs = priv::offset(msh, cl);
+        auto cell_ofs = offset(msh, cl);
         auto pres_ofs = cbs_A * msh.cells_size() + fbs_A * num_other_faces + cbs_B * cell_ofs;
 
         vector_type spres = sol.block(pres_ofs, 0, cbs_B, 1);

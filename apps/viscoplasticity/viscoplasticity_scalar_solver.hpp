@@ -265,7 +265,7 @@ public:
         auto cb = make_scalar_monomial_basis(msh, cl, di.cell_degree());
         auto sb = make_vector_monomial_basis(msh, cl, di.face_degree());
 
-        auto cell_ofs =  priv::offset(msh, cl);
+        auto cell_ofs =  offset(msh, cl);
         auto num_faces = howmany_faces(msh, cl);
 
         //(stress - alpha * gamma, Gv)
@@ -411,7 +411,7 @@ public:
             vector_type ufull  = full_sol.block(sol_offset, 0, num_total_dofs, 1);
             assert((gr.first * ufull).rows() == rbs - dim);
 
-            auto cell_ofs =  priv::offset(msh, cl);
+            auto cell_ofs =  offset(msh, cl);
             cell_rec_sol.block(cell_ofs * rbs + dim, 0, rbs - dim, 1) = gr.first * ufull;
             cell_rec_sol.block(cell_ofs * rbs, 0, dim, 1) = ufull.block(0,0, dim, 1);
             cell_sol.block(cell_ofs * cbs, 0, cbs, 1)     = ufull.block(0,0, cbs, 1);
