@@ -239,9 +239,9 @@ class NewtonIteration
                                   make_vector_hho_stabilization_optim(msh, cl, recons_scalar.first, degree_infos);
                             }
 
-                            assert(elem.K_int.rows() == stab_oper.rows());
-                            assert(elem.K_int.cols() == stab_oper.cols());
-                            assert(elem.RTF.rows() == stab_oper.rows());
+                            assert(elem.K_int.rows() == stab_HHO.rows());
+                            assert(elem.K_int.cols() == stab_HHO.cols());
+                            assert(elem.RTF.rows() == stab_HHO.rows());
                             assert(elem.RTF.cols() == m_solution.at(cell_i).cols());
 
                             lhs += rp.m_beta * stab_HHO;

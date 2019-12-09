@@ -2544,7 +2544,7 @@ class scalar_primal_hho_assembler
     vector_type
     expand_solution(const mesh_type& msh, const boundary_type& bnd, const vector_type& solution)
     {
-        assert(solution.size() == m_num_unknowns);
+        assert(solution.size() == system_size);
 
         vector_type ret = vector_type::Zero(fbs * msh.faces_size());
 
@@ -3601,7 +3601,6 @@ class vector_primal_hho_assembler
         }
         assert(lhs.rows() == lhs.cols());
         assert(lhs.rows() == rhs.size());
-        assert(rhs.size() == l2g.size());
         assert(rhs.size() == rhs_bc.size());
 
 #ifdef FILL_COLMAJOR
