@@ -717,6 +717,7 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
 
   private:
     size_t basis_degree, basis_size;
+    point_type cell_bar;
 
     typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
@@ -734,6 +735,8 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
 
         if (points(msh, cl).size() != 4)
             throw std::invalid_argument("Raviart-Thomas basis: available only on tetrahedron");
+
+        cell_bar = barycenter(msh, cl);
     }
 
     eigen_compatible_stdvector<function_type>
@@ -753,9 +756,13 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
 
         Matrix<scalar_type, 1, 3> row;
 
-        row(0) = pt.x();
-        row(1) = pt.y();
-        row(2) = pt.z();
+        const auto bx = (pt.x() - cell_bar.x());
+        const auto by = (pt.y() - cell_bar.y());
+        const auto bz = (pt.z() - cell_bar.z());
+
+        row(0) = bx;
+        row(1) = by;
+        row(2) = bz;
 
         // compute P^(k-1)_H otimes X (monomial of degree exactly k - 1)
         for (size_t i = beg; i < scalar_basis.size(); i++)
@@ -798,6 +805,7 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
 
   private:
     size_t basis_degree, basis_size;
+    point_type cell_bar;
 
     typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
@@ -815,6 +823,8 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
 
         if (points(msh, cl).size() != 3)
             throw std::invalid_argument("Raviart-Thomas basis: available only on triangle");
+
+        cell_bar = barycenter(msh, cl);
     }
 
     eigen_compatible_stdvector<function_type>
@@ -834,8 +844,10 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
 
         Matrix<scalar_type, 1, 2> row;
 
-        row(0) = pt.x();
-        row(1) = pt.y();
+        const auto bx = (pt.x() - cell_bar.x());
+        const auto by = (pt.y() - cell_bar.y());
+        row(0) = bx;
+        row(1) = by;
 
         // compute P^(k-1)_H otimes X (monomial of degree exactly k - 1)
         for (size_t i = beg; i < scalar_basis.size(); i++)
@@ -919,6 +931,7 @@ class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 
 
   private:
     size_t basis_degree, basis_size;
+    point_type cell_bar;
 
     typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
@@ -936,6 +949,8 @@ class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 
 
         if (points(msh, cl).size() != 4)
             throw std::invalid_argument("Raviart-Thomas basis: available only on tetrahedron");
+
+        cell_bar = barycenter(msh, cl);
     }
 
     eigen_compatible_stdvector<function_type>
@@ -953,29 +968,33 @@ class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 
         if (basis_degree >= 2)
             beg = scalar_basis_size(basis_degree - 2, 2);
 
+        const auto bx = (pt.x() - cell_bar.x());
+        const auto by = (pt.y() - cell_bar.y());
+        const auto bz = (pt.z() - cell_bar.z());
+
         function_type mat1 = function_type::Zero();
 
-        mat1(0, 0) = pt.x();
-        mat1(0, 1) = pt.y() / scalar_type(2);
+        mat1(0, 0) = bx;
+        mat1(0, 1) = by / scalar_type(2);
         mat1(1, 0) = mat1(0, 1);
-        mat1(0, 2) = pt.z() / scalar_type(2);
+        mat1(0, 2) = bz / scalar_type(2);
         mat1(2, 0) = mat1(0, 2);
 
         function_type mat2 = function_type::Zero();
 
-        mat2(0, 1) = pt.x() / scalar_type(2);
+        mat2(0, 1) = bx / scalar_type(2);
         mat2(1, 0) = mat2(0, 1);
-        mat2(1, 1) = pt.y();
-        mat2(1, 2) = pt.z() / scalar_type(2);
+        mat2(1, 1) = by;
+        mat2(1, 2) = bz / scalar_type(2);
         mat2(2, 1) = mat2(1, 2);
 
         function_type mat3 = function_type::Zero();
 
-        mat3(0, 2) = pt.x() / scalar_type(2);
+        mat3(0, 2) = bx / scalar_type(2);
         mat3(2, 0) = mat3(0, 2);
-        mat3(1, 2) = pt.y() / scalar_type(2);
+        mat3(1, 2) = by / scalar_type(2);
         mat3(2, 1) = mat3(1, 2);
-        mat3(2, 2) = pt.z();
+        mat3(2, 2) = bz;
 
         // compute sym(P^(k-1)_H otimes X) (monomial of degree exactly k - 1)
         for (size_t i = beg; i < scalar_basis.size(); i++)
@@ -1015,6 +1034,7 @@ class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 
 
   private:
     size_t basis_degree, basis_size;
+    point_type cell_bar;
 
     typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
@@ -1032,6 +1052,8 @@ class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 
 
         if (points(msh, cl).size() != 3)
             throw std::invalid_argument("Raviart-Thomas basis: available only on triangles");
+
+        cell_bar = barycenter(msh, cl);
     }
 
     eigen_compatible_stdvector<function_type>
@@ -1048,17 +1070,20 @@ class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 
         if (basis_degree >= 2)
             beg = scalar_basis_size(basis_degree - 2, 2);
 
+        const auto bx = (pt.x() - cell_bar.x());
+        const auto by = (pt.y() - cell_bar.y());
+
         function_type mat1 = function_type::Zero();
 
-        mat1(0, 0) = pt.x();
-        mat1(0, 1) = pt.y() / scalar_type(2);
+        mat1(0, 0) = bx;
+        mat1(0, 1) = by / scalar_type(2);
         mat1(1, 0) = mat1(0, 1);
 
         function_type mat2 = function_type::Zero();
 
-        mat2(0, 1) = pt.x() / scalar_type(2);
+        mat2(0, 1) = bx / scalar_type(2);
         mat2(1, 0) = mat2(0, 1);
-        mat2(1, 1) = pt.y();
+        mat2(1, 1) = by;
 
         // compute sym(P^(k-1)_H otimes X) (monomial of degree exactly k - 1)
         for (size_t i = beg; i < scalar_basis.size(); i++)
