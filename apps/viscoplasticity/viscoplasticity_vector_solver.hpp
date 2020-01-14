@@ -215,7 +215,7 @@ public:
         auto cb = make_vector_monomial_basis(msh, cl, di.cell_degree());
         auto sb = make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
 
-        auto cell_ofs =  priv::offset(msh, cl);
+        auto cell_ofs =  offset(msh, cl);
         auto num_faces = howmany_faces(msh, cl);
 
         //(stress - alpha * gamma, Gv)

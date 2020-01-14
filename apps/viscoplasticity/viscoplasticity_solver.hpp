@@ -320,7 +320,7 @@ public:
         auto value = 1./(factor * (viscosity + alpha));
         auto G = disk::make_hlow_stokes(msh, cl, di, use_sym_grad);
 
-        auto cell_ofs    = disk::priv::offset(msh, cl);
+        auto cell_ofs    = disk::offset(msh, cl);
         vector_type Gu = G.first * u_TF;
         vector_type stress = multiplier.block(cell_ofs * sbs, 0, sbs, 1);
 
@@ -367,7 +367,7 @@ public:
         {
             vector_type u_TF = assembler.take_velocity(msh, cl, sol);
             auto G = disk::make_hlow_stokes(msh, cl, di, use_sym_grad);
-            auto cell_ofs = disk::priv::offset(msh, cl);
+            auto cell_ofs = disk::offset(msh, cl);
 
             vector_type Gu = G.first * u_TF;
             vector_type gamma_old = auxiliar_old.block(cell_ofs *sbs, 0, sbs, 1);
@@ -401,7 +401,7 @@ public:
         auto cb = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());
         auto sb = disk::make_sym_matrix_monomial_basis(msh, cl, di.face_degree());
 
-        auto cell_ofs =  disk::priv::offset(msh, cl);
+        auto cell_ofs =  disk::offset(msh, cl);
         auto num_faces = howmany_faces(msh, cl);
 
         vector_type rhs = vector_type::Zero(cbs + fbs * num_faces);
@@ -502,7 +502,7 @@ public:
         for(auto cl : msh)
         {
             auto gr  = disk::make_hho_stokes(msh, cl, di, use_sym_grad);
-            auto cell_ofs = disk::priv::offset(msh, cl);
+            auto cell_ofs = disk::offset(msh, cl);
             vector_type svel =  assembler.take_velocity(msh, cl, sol);
             assert((gr.first * svel).rows() == rbs - dim);
             cell_rec_sol.block(cell_ofs * rbs + dim, 0, rbs - dim, 1) = gr.first * svel;

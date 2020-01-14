@@ -1,0 +1,3 @@
+add_executable(nonlinear_solid_mechanics nonlinear_solid_mechanics.cpp)
+target_link_libraries(nonlinear_solid_mechanics ${LINK_LIBS})
+install(TARGETS nonlinear_solid_mechanics RUNTIME DESTINATION bin)

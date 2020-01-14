@@ -8,6 +8,8 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
+ * Nicolas Pignet  (C) 2019                     nicolas.pignet@enpc.fr
+ *
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -25,5 +27,15 @@
 
 #pragma once
 
-#include "implementation_bits/methods_hho.hpp"
-#include "implementation_bits/assembler_hho.hpp"
+#include "implementation_hho/assembler_hho.hpp"
+#include "implementation_hho/methods_hho.hpp"
+#include "implementation_hho/scalar_hho_laplacian.hpp"
+#include "implementation_hho/scalar_hho_divrec.hpp"
+#include "implementation_hho/scalar_hho_condensation.hpp"
+#include "implementation_hho/scalar_stabilization.hpp"
+#include "implementation_hho/vector_hho_laplacian.hpp"
+#include "implementation_hho/vector_hho_gradrec.hpp"
+#include "implementation_hho/vector_hho_condensation.hpp"
+#include "implementation_hho/vector_stabilization.hpp"
+#include "implementation_hho/matrix_hho_gradrec.hpp"
+#include "implementation_hho/utils_hho.hpp"

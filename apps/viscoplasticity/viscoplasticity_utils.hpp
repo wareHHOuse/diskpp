@@ -405,7 +405,7 @@ plot_over_line(const Mesh&                                                      
             if(wn_PnPoly( msh, cl, p))
             {
                 auto cbs   = disk::vector_basis_size(cell_degree, dim, dim);
-                auto cell_ofs = disk::priv::offset(msh, cl);
+                auto cell_ofs = disk::offset(msh, cl);
 
                 vector_type s = vec.block(cell_ofs * cbs, 0, cbs, 1);
                 auto cb  = disk::make_vector_monomial_basis(msh, cl, cell_degree);
@@ -452,7 +452,7 @@ compute_discontinuous_velocity(const Mesh&                                      
 
     for (auto& cl : msh)
     {
-        auto cell_ofs = disk::priv::offset(msh, cl);
+        auto cell_ofs = disk::offset(msh, cl);
         Matrix<T, Dynamic, 1> x = sol.block(cell_ofs * cbs, 0, cbs, 1);
 
         const auto cell_nodes = post_mesh.nodes_cell(cell_i);
@@ -515,7 +515,7 @@ quiver( const Mesh& msh, const disk::dynamic_vector<T>& sol, const Assembler& as
                                         Mesh::dimension, Mesh::dimension);
     for (auto& cl: msh)
     {
-        auto cell_ofs = disk::priv::offset(msh, cl);
+        auto cell_ofs = disk::offset(msh, cl);
         Matrix<T, Dynamic, 1>  s = assembler.take_velocity(msh, cl, sol);
 
         auto cb  = disk::make_vector_monomial_basis(msh, cl, di.cell_degree());

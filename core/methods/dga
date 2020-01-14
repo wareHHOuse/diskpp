@@ -25,4 +25,4 @@
 
 #pragma once
 
-#include "implementation_bits/methods_dga.hpp"
+#include "implementation_dga/methods_dga.hpp"

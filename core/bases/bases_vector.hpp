@@ -547,6 +547,7 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
 
   private:
     size_t basis_degree, basis_size;
+    point_type cell_bar;
 
     typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
@@ -564,6 +565,8 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
 
         if (points(msh, cl).size() != 4)
             throw std::invalid_argument("Raviart-Thomas basis: available only on tetrahedron");
+
+        cell_bar = barycenter(msh, cl);
     }
 
     function_type
@@ -580,12 +583,16 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
         const auto beg    = scalar_basis_size(deg, 3);
         const auto offset = vector_basis.size();
 
+        const auto bx = (pt.x() - cell_bar.x());
+        const auto by = (pt.y() - cell_bar.y());
+        const auto bz = (pt.z() - cell_bar.z());
+
         // compute x P^(k-1)_H (monomial of degree exactly k - 1)
         for (size_t i = beg; i < scalar_basis.size(); i++)
         {
-            ret(offset + i - beg, 0) = pt.x() * sphi(i);
-            ret(offset + i - beg, 1) = pt.y() * sphi(i);
-            ret(offset + i - beg, 2) = pt.z() * sphi(i);
+            ret(offset + i - beg, 0) = bx * sphi(i);
+            ret(offset + i - beg, 1) = by * sphi(i);
+            ret(offset + i - beg, 2) = bz * sphi(i);
         }
 
         return ret;
@@ -606,10 +613,14 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
         const auto beg    = scalar_basis_size(deg, 3);
         const auto offset = vector_basis.size();
 
+        const auto bx = (pt.x() - cell_bar.x());
+        const auto by = (pt.y() - cell_bar.y());
+        const auto bz = (pt.z() - cell_bar.z());
+
         /// compute P^(k-1)_H + x.grad(P^(k-1)_H) (monomial of degree exactly k - 1)
         for (size_t i = beg; i < scalar_basis.size(); i++)
         {
-            ret(offset + i - beg) = 3 * sphi(i) + pt.x() * sdphi(i, 0) + pt.y() * sdphi(i, 1) + pt.z() * sdphi(i, 2);
+            ret(offset + i - beg) = 3 * sphi(i) + bx * sdphi(i, 0) + by * sdphi(i, 1) + bz * sdphi(i, 2);
         }
 
         return ret;
@@ -643,6 +654,7 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
 
   private:
     size_t basis_degree, basis_size;
+    point_type cell_bar;
 
     typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
@@ -660,6 +672,8 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
 
         if (points(msh, cl).size() != 3)
             throw std::invalid_argument("Raviart-Thomas basis: available only on triangles");
+
+        cell_bar = barycenter(msh, cl);
     }
 
     function_type
@@ -676,11 +690,14 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
         const auto beg    = scalar_basis_size(basis_degree - 2, 2);
         const auto offset = vector_basis.size();
 
+        const auto bx = (pt.x() - cell_bar.x());
+        const auto by = (pt.y() - cell_bar.y());
+
         // compute x P^(k-1)_H (monomial of degree exactly k - 1)
         for (size_t i = beg; i < scalar_basis.size(); i++)
         {
-            ret(offset + i - beg, 0) = pt.x() * sphi(i);
-            ret(offset + i - beg, 1) = pt.y() * sphi(i);
+            ret(offset + i - beg, 0) = bx * sphi(i);
+            ret(offset + i - beg, 1) = by * sphi(i);
         }
 
         return ret;
@@ -701,10 +718,13 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
         const auto beg    = scalar_basis_size(basis_degree - 2, 2);
         const auto offset = vector_basis.size();
 
+        const auto bx = (pt.x() - cell_bar.x());
+        const auto by = (pt.y() - cell_bar.y());
+
         /// compute P^(k-1)_H + x.grad(P^(k-1)_H) (monomial of degree exactly k - 1)
         for (size_t i = beg; i < scalar_basis.size(); i++)
         {
-            ret(offset + i - beg) = 2 * sphi(i) + pt.x() * sdphi(i, 0) + pt.y() * sdphi(i, 1);
+            ret(offset + i - beg) = 2 * sphi(i) + bx * sdphi(i, 0) + by * sdphi(i, 1);
         }
 
         return ret;

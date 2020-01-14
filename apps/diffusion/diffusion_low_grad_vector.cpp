@@ -121,7 +121,7 @@ quiver(  const Mesh& msh, const disk::dynamic_vector<T>& sol)
     auto cbs = vector_basis_size(cell_degree, Mesh::dimension, Mesh::dimension);
     for (auto& cl: msh)
     {
-        auto cell_ofs = priv::offset(msh, cl);
+        auto cell_ofs = offset(msh, cl);
         vector_type s = sol.block(cell_ofs * cbs, 0, cbs, 1);
 
         auto cb  =  make_vector_monomial_basis(msh, cl, di.cell_degree());

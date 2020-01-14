@@ -16,11 +16,12 @@
  * If you use this code or parts of it for scientific publications, you
  * are required to cite it as following:
  *
- * Implementation of Discontinuous Skeletal methods on arbitrary-dimensional,
- * polytopal meshes using generic programming.
- * M. Cicuttin, D. A. Di Pietro, A. Ern.
- * Journal of Computational and Applied Mathematics.
- * DOI: 10.1016/j.cam.2017.09.017
+ * Hybrid High-Order methods for finite elastoplastic deformations
+ * within a logarithmic strain framework.
+ * M. Abbas, A. Ern, N. Pignet.
+ * International Journal of Numerical Methods in Engineering (2019)
+ * 120(3), 303-327
+ * DOI: 10.1002/nme.6137
  */
 
 #pragma once

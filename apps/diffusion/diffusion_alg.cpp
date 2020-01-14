@@ -130,7 +130,7 @@ public:
         	auto bar = barycenter(msh, cl);
 
         	vector_type p = project_function(msh, cl, di, sol_fun);
-        	auto cell_ofs = disk::priv::offset(msh, cl);
+        	auto cell_ofs = disk::offset(msh, cl);
         	vector_type s = sol.block(cell_ofs * cbs, 0, cbs, 1);
         	vector_type diff = s - p.head(cbs);
 
