@@ -40,6 +40,8 @@
 #include "adaptivity/adaptivity.hpp"
 #include "boundary_conditions/boundary_conditions.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "mechanics/contact/ContactManager.hpp"
+
 #include "methods/hho"
 
 #include "solvers/solver.hpp"
@@ -86,7 +88,7 @@ class NewtonIteration
     std::vector<matrix_type> m_AL;
 
     std::vector<vector_type> m_postprocess_data;
-    std::vector<vector_type> m_solution, m_solution_faces;
+    std::vector<vector_type> m_solution, m_solution_faces, m_solution_mult;
 
     scalar_type m_F_int;
 
@@ -121,13 +123,18 @@ class NewtonIteration
     }
 
     void
-    initialize(const std::vector<vector_type>& initial_solution, const std::vector<vector_type>& initial_solution_faces)
+    initialize(const std::vector<vector_type>& initial_solution,
+               const std::vector<vector_type>& initial_solution_faces,
+               const std::vector<vector_type>& initial_solution_mult)
     {
         m_solution_faces.clear();
         m_solution_faces = initial_solution_faces;
 
         m_solution.clear();
         m_solution = initial_solution;
+
+        m_solution_mult.clear();
+        m_solution_mult = initial_solution_mult;
     }
 
     template<typename LoadFunction>
@@ -139,7 +146,8 @@ class NewtonIteration
              const LoadFunction&              lf,
              const std::vector<matrix_type>&  gradient_precomputed,
              const std::vector<matrix_type>&  stab_precomputed,
-             behavior_type&                   behavior)
+             behavior_type&                   behavior,
+             ContactManager<mesh_type>&       contact_manager)
     {
         elem_type    elem;
         AssemblyInfo ai;
@@ -281,6 +289,8 @@ class NewtonIteration
             tc.toc();
             ai.m_time_stab += tc.to_double();
 
+            // contact contribution
+
             // Static Condensation
             tc.tic();
             const auto scnp = make_vector_static_condensation_withMatrix(msh, cl, degree_infos, lhs, rhs);
@@ -384,6 +394,12 @@ class NewtonIteration
             error_un += norm * norm;
         }
 
+        for (size_t i = 0; i < m_solution_mult.size(); i++)
+        {
+            scalar_type norm = m_solution_mult[i].norm();
+            error_un += norm * norm;
+        }
+
         error_un = std::sqrt(error_un);
 
         if (error_un <= scalar_type(10E-15))
@@ -449,7 +465,9 @@ class NewtonIteration
     }
 
     void
-    save_solutions(std::vector<vector_type>& solution, std::vector<vector_type>& solution_faces)
+    save_solutions(std::vector<vector_type>& solution,
+                   std::vector<vector_type>& solution_faces,
+                   std::vector<vector_type>& solution_mult)
     {
         solution_faces.clear();
         solution_faces = m_solution_faces;
@@ -458,6 +476,10 @@ class NewtonIteration
         solution.clear();
         solution = m_solution;
         assert(m_solution.size() == solution.size());
+
+        solution_mult.clear();
+        solution_mult = m_solution_mult;
+        assert(m_solution_mult.size() == solution_mult.size());
     }
 };
 }

@@ -36,6 +36,7 @@
 #include "NewtonSolverInformations.hpp"
 #include "NewtonSolverParameters.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "mechanics/contact/ContactManager.hpp"
 
 #include "adaptivity/adaptivity.hpp"
 #include "boundary_conditions/boundary_conditions.hpp"
@@ -72,7 +73,7 @@ class NewtonStep
     typedef vector_boundary_conditions<mesh_type> bnd_type;
     typedef Behavior<mesh_type>                   behavior_type;
 
-    std::vector<vector_type> m_solution, m_solution_faces;
+    std::vector<vector_type> m_solution, m_solution_faces, m_solution_mult;
 
     bool m_verbose;
     bool m_convergence;
@@ -82,6 +83,7 @@ class NewtonStep
     {
         m_solution.clear();
         m_solution_faces.clear();
+        m_solution_mult.clear();
     }
 
     /**
@@ -113,13 +115,18 @@ class NewtonStep
      */
 
     void
-    initialize(const std::vector<vector_type>& initial_solution, const std::vector<vector_type>& initial_solution_faces)
+    initialize(const std::vector<vector_type>& initial_solution,
+               const std::vector<vector_type>& initial_solution_faces,
+               const std::vector<vector_type>& initial_solution_mult)
     {
         m_solution_faces.clear();
         m_solution_faces = initial_solution_faces;
 
         m_solution.clear();
         m_solution = initial_solution;
+
+        m_solution_mult.clear();
+        m_solution_mult = initial_solution_mult;
     }
 
     /**
@@ -140,7 +147,8 @@ class NewtonStep
             const LoadIncrement&             lf,
             const std::vector<matrix_type>&  gradient_precomputed,
             const std::vector<matrix_type>&  stab_precomputed,
-            behavior_type&                   behavior)
+            behavior_type&                   behavior,
+            ContactManager<mesh_type>&       contact_manager)
     {
         NewtonSolverInfo ni;
         timecounter      tc;
@@ -149,7 +157,7 @@ class NewtonStep
         // initialise the NewtonRaphson iteration
         NewtonIteration<mesh_type> newton_iter(msh, bnd, rp, degree_infos);
 
-        newton_iter.initialize(m_solution, m_solution_faces);
+        newton_iter.initialize(m_solution, m_solution_faces, m_solution_mult);
 
         m_convergence = false;
 
@@ -160,7 +168,7 @@ class NewtonStep
             try
             {
                 assembly_info = newton_iter.assemble(
-                  msh, bnd, rp, degree_infos, lf, gradient_precomputed, stab_precomputed, behavior);
+                  msh, bnd, rp, degree_infos, lf, gradient_precomputed, stab_precomputed, behavior, contact_manager);
             }
             catch (const std::invalid_argument& ia)
             {
@@ -176,7 +184,7 @@ class NewtonStep
             m_convergence = newton_iter.convergence(rp, iter);
             if (m_convergence)
             {
-                newton_iter.save_solutions(m_solution, m_solution_faces);
+                newton_iter.save_solutions(m_solution, m_solution_faces, m_solution_mult);
                 tc.toc();
                 ni.m_time_newton = tc.to_double();
                 return ni;
@@ -213,7 +221,9 @@ class NewtonStep
      *
      */
     void
-    save_solutions(std::vector<vector_type>& solution, std::vector<vector_type>& solution_faces)
+    save_solutions(std::vector<vector_type>& solution,
+                   std::vector<vector_type>& solution_faces,
+                   std::vector<vector_type>& solution_mult)
     {
         solution_faces.clear();
         solution_faces = m_solution_faces;
@@ -222,6 +232,10 @@ class NewtonStep
         solution.clear();
         solution = m_solution;
         assert(m_solution.size() == solution.size());
+
+        solution_mult.clear();
+        solution_mult = m_solution_mult;
+        assert(m_solution_mult.size() == solution_mult.size());
     }
 };
 }

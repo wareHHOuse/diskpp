@@ -37,6 +37,7 @@
 #include "NewtonStep.hpp"
 #include "TimeManager.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "mechanics/contact/ContactManager.hpp"
 
 #include "adaptivity/adaptivity.hpp"
 #include "boundary_conditions/boundary_conditions.hpp"
@@ -78,8 +79,9 @@ class NewtonSolver
     param_type                m_rp;
     behavior_type             m_behavior;
     MeshDegreeInfo<mesh_type> m_degree_infos;
+    ContactManager<mesh_type> m_contact_manager;
 
-    std::vector<vector_type> m_solution, m_solution_faces;
+    std::vector<vector_type> m_solution, m_solution_faces, m_solution_mult;
     std::vector<matrix_type> m_gradient_precomputed, m_stab_precomputed;
 
     bool m_verbose, m_convergence;
@@ -440,7 +442,7 @@ class NewtonSolver
 
         // Newton step
         NewtonStep<mesh_type> newton_step(m_rp);
-        newton_step.initialize(m_solution, m_solution_faces);
+        newton_step.initialize(m_solution, m_solution_faces, m_solution_mult);
 
         // Loop on time step
         while (!list_time_step.empty())
@@ -462,7 +464,7 @@ class NewtonSolver
 
             //  Newton correction
             NewtonSolverInfo newton_info = newton_step.compute(m_msh, m_bnd, m_rp, m_degree_infos,
-              rlf, m_gradient_precomputed, m_stab_precomputed, m_behavior);
+              rlf, m_gradient_precomputed, m_stab_precomputed, m_behavior, m_contact_manager);
             si.updateInfo(newton_info);
 
             if (m_verbose)
@@ -503,7 +505,7 @@ class NewtonSolver
                 {
                     if (m_rp.m_time_save.front() < current_time + 1E-5)
                     {
-                        newton_step.save_solutions(m_solution, m_solution_faces);
+                        newton_step.save_solutions(m_solution, m_solution_faces, m_solution_mult);
 
                         std::cout << "** Save results" << std::endl;
                         std::string name =
@@ -517,8 +519,8 @@ class NewtonSolver
             }
         }
 
-        // savec solutions
-        newton_step.save_solutions(m_solution, m_solution_faces);
+        // save solutions
+        newton_step.save_solutions(m_solution, m_solution_faces, m_solution_mult);
         si.m_time_step = list_time_step.numberOfTimeStep();
 
         ttot.toc();
