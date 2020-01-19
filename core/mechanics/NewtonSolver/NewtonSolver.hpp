@@ -574,24 +574,96 @@ class NewtonSolver
     {
         scalar_type err_dof = 0;
 
-        const int diff_deg = 1;
-        const int di       = std::max(diff_deg, 0);
-
         size_t cell_i = 0;
 
         for (auto& cl : m_msh)
         {
-            const auto di            = m_degree_infos.degreeInfo(m_msh, cl);
-            const auto num_cell_dofs = vector_basis_size(di.cell_degree(), mesh_type::dimension, mesh_type::dimension);
+            const auto cdi           = m_degree_infos.degreeInfo(m_msh, cl);
+            const auto num_cell_dofs = vector_basis_size(cdi.degree(), mesh_type::dimension, mesh_type::dimension);
             const vector_type comp_dof = m_solution.at(cell_i++).head(num_cell_dofs);
-            const vector_type true_dof = project_function(m_msh, cl, di.degree(), as, di);
+            const vector_type true_dof = project_function(m_msh, cl, cdi.degree(), as, 2);
 
-            const auto        cb   = make_vector_monomial_basis(m_msh, cl, di.degree());
+            const auto        cb   = make_vector_monomial_basis(m_msh, cl, cdi.degree());
             const matrix_type mass = make_mass_matrix(m_msh, cl, cb);
 
             const vector_type diff_dof = (true_dof - comp_dof);
             assert(comp_dof.size() == true_dof.size());
             err_dof += diff_dof.dot(mass * diff_dof);
+        }
+
+        return sqrt(err_dof);
+    }
+
+    // compute l2 error
+    template<typename AnalyticalSolution>
+    scalar_type
+    compute_H1_error(const AnalyticalSolution& as)
+    {
+        scalar_type err_dof = 0;
+
+        size_t cell_i = 0;
+
+        matrix_type grad;
+        matrix_type stab;
+
+        for (auto& cl : m_msh)
+        {
+            // std::cout << m_degree_infos.cellDegreeInfo(m_msh, cl) << std::endl;
+            /////// Gradient Reconstruction /////////
+            if (m_behavior.getDeformation() == SMALL_DEF)
+            {
+                grad = make_matrix_symmetric_gradrec(m_msh, cl, m_degree_infos).second;
+            }
+            else
+            {
+                grad = make_marix_hho_gradrec(m_msh, cl, m_degree_infos).second;
+            }
+
+            if (m_rp.m_stab)
+            {
+                switch (m_rp.m_stab_type)
+                {
+                    case HHO:
+                    {
+                        if (m_behavior.getDeformation() == SMALL_DEF)
+                        {
+                            const auto recons = make_vector_hho_symmetric_laplacian(m_msh, cl, m_degree_infos);
+                            stab = make_vector_hho_stabilization(m_msh, cl, recons.first, m_degree_infos);
+                        }
+                        else
+                        {
+                            const auto recons_scalar = make_scalar_hho_laplacian(m_msh, cl, m_degree_infos);
+                            stab = make_vector_hho_stabilization_optim(m_msh, cl, recons_scalar.first, m_degree_infos);
+                        }
+                        break;
+                    }
+                    case HDG:
+                    {
+                        stab = make_vector_hdg_stabilization(m_msh, cl, m_degree_infos);
+                        break;
+                    }
+                    case DG:
+                    {
+                        stab = make_vector_dg_stabilization(m_msh, cl, m_degree_infos);
+                        break;
+                    }
+                    case NO: { break;
+                        stab.setZero();
+                    }
+                    default: throw std::invalid_argument("Unknown stabilization");
+                }
+            }
+
+            const auto Ah = grad + stab;
+
+            const vector_type comp_dof = m_solution.at(cell_i);
+            const vector_type true_dof = project_function(m_msh, cl, m_degree_infos, as, 2);
+
+            const vector_type diff_dof = (true_dof - comp_dof);
+            assert(comp_dof.size() == true_dof.size());
+            err_dof += diff_dof.dot(Ah * diff_dof);
+
+            cell_i++;
         }
 
         return sqrt(err_dof);
