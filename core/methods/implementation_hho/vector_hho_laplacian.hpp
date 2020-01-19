@@ -63,7 +63,7 @@ make_vector_hho_symmetric_laplacian(const Mesh&                     msh,
     const auto celdeg = cell_infos.cell_degree();
 
     const auto rb = make_vector_monomial_basis(msh, cl, recdeg);
-    const auto cb = make_vector_monomial_basis(msh, cl, recdeg);
+    const auto cb = make_vector_monomial_basis(msh, cl, celdeg);
 
     const auto rbs = vector_basis_size(recdeg, N, N);
     const auto cbs = vector_basis_size(celdeg, N, N);
