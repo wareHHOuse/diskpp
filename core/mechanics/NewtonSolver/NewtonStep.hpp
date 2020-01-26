@@ -155,7 +155,7 @@ class NewtonStep
         tc.tic();
 
         // initialise the NewtonRaphson iteration
-        NewtonIteration<mesh_type> newton_iter(msh, bnd, rp, degree_infos);
+        NewtonIteration<mesh_type> newton_iter(msh, bnd, rp, degree_infos, contact_manager);
 
         newton_iter.initialize(m_solution, m_solution_faces, m_solution_mult);
 
@@ -194,7 +194,7 @@ class NewtonStep
             SolveInfo solve_info = newton_iter.solve();
             ni.updateSolveInfo(solve_info);
             // update unknowns
-            ni.m_assembly_info.m_time_postpro += newton_iter.postprocess(msh, bnd, degree_infos);
+            ni.m_assembly_info.m_time_postpro += newton_iter.postprocess(msh, bnd, degree_infos, contact_manager);
 
             ni.m_iter++;
         }

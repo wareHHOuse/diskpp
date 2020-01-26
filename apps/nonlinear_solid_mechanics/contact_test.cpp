@@ -219,8 +219,8 @@ error_type run_tresca_solver(Mesh<T, 2, Storage>&            msh,
     };
 
     Bnd_type bnd(msh);
-   // bnd.addContactBC(disk::SIGNORINI_FACE, 1, s);
-    bnd.addDirichletBC(disk::DIRICHLET, 1, solution);
+    bnd.addContactBC(disk::SIGNORINI_FACE, 1, s);
+    // bnd.addDirichletBC(disk::DIRICHLET, 1, solution);
     bnd.addDirichletBC(disk::DIRICHLET, 2, solution);
     bnd.addDirichletBC(disk::DIRICHLET, 3, solution);
     bnd.addDirichletBC(disk::DIRICHLET, 4, solution);

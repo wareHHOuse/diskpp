@@ -26,7 +26,14 @@
 
 #pragma once
 
+#include <map>
+
 #include "common/eigen.hpp"
+
+#include "adaptivity/adaptivity.hpp"
+#include "boundary_conditions/boundary_conditions.hpp"
+
+#include "bases/bases.hpp"
 
 namespace disk
 {
@@ -38,7 +45,85 @@ template<typename MeshType>
 class ContactManager
 {
   private:
+    typedef MeshType                            mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+
+    typedef typename mesh_type::cell cell_type;
+    typedef typename mesh_type::face face_type;
+
+    typedef vector_boundary_conditions<mesh_type> bnd_type;
+
+    std::map<size_t, size_t> mapOfFaces;
+    std::map<size_t, size_t> mapOfMult;
+    std::vector<size_t>      degree_mult;
+
   public:
+    ContactManager(void)
+    {
+        mapOfFaces.clear();
+        mapOfMult.clear();
+        degree_mult.clear();
+    }
+
+    ContactManager(const mesh_type& msh, const bnd_type& bnd)
+    {
+        const auto num_contact_faces = bnd.nb_faces_contact();
+        mapOfFaces.clear();
+        mapOfMult.clear();
+        degree_mult.clear();
+
+        degree_mult.resize(num_contact_faces);
+    }
+
+    void
+    addMapping(const size_t& face_id, const size_t& mult_id)
+    {
+        mapOfFaces.insert(std::make_pair(face_id, mult_id));
+        mapOfMult.insert(std::make_pair(mult_id, face_id));
+    }
+
+    size_t
+    getMappingFaceToMult(const size_t& face_id) const
+    {
+        return mapOfFaces.at(face_id);
+    }
+
+    size_t
+    getMappingMultToFace(const size_t& mult_id) const
+    {
+        return mapOfMult.at(mult_id);
+    }
+
+    size_t
+    numberOfMult(const mesh_type&                 msh,
+                 const cell_type&                 cl,
+                 const bnd_type&                  bnd,
+                 const CellDegreeInfo<mesh_type>& cell_infos) const
+    {
+
+        return bnd.howmany_contact_faces(cl) *
+               vector_basis_size(cell_infos.grad_degree(), mesh_type::dimension-1, mesh_type::dimension);
+    }
+
+    size_t
+    numberOfMultFace(const size_t& mult_id) const
+    {
+
+        const auto degree = getDegreeMultFace(mult_id);
+        return vector_basis_size(degree, mesh_type::dimension-1, mesh_type::dimension);
+    }
+
+    void
+    setDegreeMultFace(const size_t& mult_id, const size_t& mult_degree)
+    {
+        degree_mult.at(mult_id) = mult_degree;
+    }
+
+    size_t
+    getDegreeMultFace(const size_t& mult_id) const
+    {
+        return degree_mult.at(mult_id);
+    }
 };
 }
 }

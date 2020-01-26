@@ -122,28 +122,51 @@ class NewtonSolver
         const auto dimension = mesh_type::dimension;
 
         size_t total_dof = 0;
+        size_t mult_id = 0;
 
         m_solution.clear();
         m_solution_faces.clear();
+        m_solution_mult.clear();
 
         m_solution.reserve(m_msh.cells_size());
         m_solution_faces.reserve(m_msh.faces_size());
+        m_solution_mult.reserve(m_bnd.nb_faces_contact());
+
+        m_contact_manager = ContactManager<mesh_type>(m_msh, m_bnd);
 
         for (auto& cl : m_msh)
         {
-            const auto di            = m_degree_infos.degreeInfo(m_msh, cl);
-            const auto num_cell_dofs = vector_basis_size(di.degree(), dimension, dimension);
+            const auto di            = m_degree_infos.cellDegreeInfo(m_msh, cl);
+            const auto num_cell_dofs = vector_basis_size(di.cell_degree(), dimension, dimension);
             total_dof += num_cell_dofs;
 
             const auto fcs    = faces(m_msh, cl);
-            const auto fcs_di = m_degree_infos.degreeInfo(m_msh, fcs);
+            const auto fcs_di = di.facesDegreeInfo();
+
+            const auto grad_degree = di.grad_degree();
 
             size_t num_faces_dofs = 0;
-            for (auto& fc : fcs_di)
+            for (auto& fc_di : fcs_di)
             {
-                if (fc.hasUnknowns())
+                if (fc_di.hasUnknowns())
                 {
-                    num_faces_dofs += vector_basis_size(fc.degree(), dimension - 1, dimension);
+                    num_faces_dofs += vector_basis_size(fc_di.degree(), dimension - 1, dimension);
+                }
+            }
+
+            for(auto& fc : fcs)
+            {
+                if(m_bnd.is_contact_face(fc))
+                {
+                    const auto num_mult_dofs = vector_basis_size(di.grad_degree(), dimension-1, dimension);
+                    m_solution_mult.push_back(vector_type::Zero(num_mult_dofs));
+                    total_dof += num_mult_dofs;
+
+                    // add mapping
+                    const auto face_id = m_msh.lookup(fc);
+                    m_contact_manager.addMapping(face_id, mult_id);
+                    m_contact_manager.setDegreeMultFace(mult_id, grad_degree);
+                    mult_id++;
                 }
             }
 
@@ -352,7 +375,7 @@ class NewtonSolver
 
             if (m_bnd.contact_boundary_type(face_id) == SIGNORINI_FACE)
             {
-                const auto proj_bcf = project_function(m_msh, bfc, fdi.degree() + 1, func, 2);
+                const auto proj_bcf = project_function(m_msh, bfc, fdi.degree(), func, 2);
                 assert(m_solution_faces[face_id].size() == proj_bcf.size());
 
                 m_solution_faces[face_id] = proj_bcf;

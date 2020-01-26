@@ -52,7 +52,7 @@ make_vector_static_condensation_withMatrix(const Mesh&                          
     const auto num_faces     = howmany_faces(msh, cl);
     const auto num_face_dofs = vector_basis_size(hdi.face_degree(), Mesh::dimension - 1, Mesh::dimension);
 
-    return priv::static_condensation_impl(msh, cl, lhs, rhs, num_cell_dofs, num_faces * num_face_dofs);
+    return priv::static_condensation_impl(lhs, rhs, num_cell_dofs, num_faces * num_face_dofs);
 }
 
 template<typename Mesh, typename T>
@@ -61,13 +61,19 @@ make_vector_static_condensation_withMatrix(const Mesh&                          
                                            const typename Mesh::cell_type&                                  cl,
                                            const MeshDegreeInfo<Mesh>&                                      msh_infos,
                                            const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
-                                           const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              rhs)
+                                           const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              rhs,
+                                           bool check_size = true)
 {
     const auto cell_infos     = msh_infos.cellDegreeInfo(msh, cl);
     const auto num_cell_dofs  = vector_basis_size(cell_infos.cell_degree(), Mesh::dimension, Mesh::dimension);
-    const auto num_faces_dofs = vector_faces_dofs(msh, cell_infos.facesDegreeInfo());
 
-    return priv::static_condensation_impl(msh, cl, lhs, rhs, num_cell_dofs, num_faces_dofs);
+    if(check_size)
+    {
+        const auto num_faces_dofs = vector_faces_dofs(msh, cell_infos.facesDegreeInfo());
+        return priv::static_condensation_impl(lhs, rhs, num_cell_dofs, num_faces_dofs);
+    }
+
+    return priv::static_condensation_impl(lhs, rhs, num_cell_dofs, rhs.size()-num_cell_dofs);
 }
 
 template<typename Mesh, typename T>
@@ -95,7 +101,7 @@ make_vector_static_decondensation(const Mesh&                                   
     const auto num_faces     = howmany_faces(msh, cl);
     const auto num_face_dofs = vector_basis_size(hdi.face_degree(), Mesh::dimension - 1, Mesh::dimension);
 
-    return static_decondensation_impl(msh, cl, lhs, rhs, solF, num_cell_dofs, num_faces * num_face_dofs);
+    return static_decondensation_impl(lhs, rhs, solF, num_cell_dofs, num_faces * num_face_dofs);
 }
 
 // static decondensation for primal vector problem
