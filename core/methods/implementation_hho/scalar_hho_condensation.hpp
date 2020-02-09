@@ -154,7 +154,7 @@ make_scalar_static_condensation(const Mesh&                                     
                                 const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
                                 const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              rhs)
 {
-    return std::get<0>(make_scalar_static_condensation_withMatrix(hdi, lhs, rhs));
+    return std::get<0>(make_scalar_static_condensation_withMatrix(msh, cl, hdi, lhs, rhs));
 }
 
 // static decondensation for primal scalar problem
@@ -171,7 +171,7 @@ make_scalar_static_decondensation(const Mesh&                                   
     const auto num_faces     = howmany_faces(msh, cl);
     const auto num_face_dofs = scalar_basis_size(hdi.face_degree(), Mesh::dimension - 1);
 
-    return static_decondensation_impl(lhs, rhs, solF, num_cell_dofs, num_faces * num_face_dofs);
+    return priv::static_decondensation_impl(lhs, rhs, solF, num_cell_dofs, num_faces * num_face_dofs);
 }
 
 // static decondensation for primal scalar problem
