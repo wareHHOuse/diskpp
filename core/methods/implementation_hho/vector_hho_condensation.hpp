@@ -101,7 +101,7 @@ make_vector_static_decondensation(const Mesh&                                   
     const auto num_faces     = howmany_faces(msh, cl);
     const auto num_face_dofs = vector_basis_size(hdi.face_degree(), Mesh::dimension - 1, Mesh::dimension);
 
-    return static_decondensation_impl(lhs, rhs, solF, num_cell_dofs, num_faces * num_face_dofs);
+    return priv::static_decondensation_impl(lhs, rhs, solF, num_cell_dofs, num_faces * num_face_dofs);
 }
 
 // static decondensation for primal vector problem
