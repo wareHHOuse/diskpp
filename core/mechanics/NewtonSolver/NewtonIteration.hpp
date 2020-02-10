@@ -40,6 +40,8 @@
 #include "adaptivity/adaptivity.hpp"
 #include "boundary_conditions/boundary_conditions.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "mechanics/contact/ContactManager.hpp"
+
 #include "methods/hho"
 
 #include "solvers/solver.hpp"
@@ -75,8 +77,8 @@ class NewtonIteration
     typedef vector_boundary_conditions<mesh_type> bnd_type;
     typedef Behavior<mesh_type>                   behavior_type;
 
-    typedef vector_primal_hho_assembler<mesh_type> assembler_type;
-    typedef mechanical_computation<mesh_type>      elem_type;
+    typedef vector_mechanics_hho_assembler<mesh_type> assembler_type;
+    typedef mechanical_computation<mesh_type>         elem_type;
 
     vector_type m_system_solution;
 
@@ -86,7 +88,7 @@ class NewtonIteration
     std::vector<matrix_type> m_AL;
 
     std::vector<vector_type> m_postprocess_data;
-    std::vector<vector_type> m_solution, m_solution_faces;
+    std::vector<vector_type> m_solution, m_solution_faces, m_solution_mult;
 
     scalar_type m_F_int;
 
@@ -96,7 +98,8 @@ class NewtonIteration
     NewtonIteration(const mesh_type&                 msh,
                     const bnd_type&                  bnd,
                     const param_type&                rp,
-                    const MeshDegreeInfo<mesh_type>& degree_infos) :
+                    const MeshDegreeInfo<mesh_type>& degree_infos,
+                    const ContactManager<mesh_type>& contact_manager) :
       m_verbose(rp.m_verbose)
     {
         m_AL.clear();
@@ -105,7 +108,7 @@ class NewtonIteration
         m_bL.clear();
         m_bL.resize(msh.cells_size());
 
-        m_assembler = make_vector_primal_hho_assembler(msh, degree_infos, bnd);
+        m_assembler = assembler_type(msh, degree_infos, bnd, contact_manager);
     }
 
     bool
@@ -121,13 +124,18 @@ class NewtonIteration
     }
 
     void
-    initialize(const std::vector<vector_type>& initial_solution, const std::vector<vector_type>& initial_solution_faces)
+    initialize(const std::vector<vector_type>& initial_solution,
+               const std::vector<vector_type>& initial_solution_faces,
+               const std::vector<vector_type>& initial_solution_mult)
     {
         m_solution_faces.clear();
         m_solution_faces = initial_solution_faces;
 
         m_solution.clear();
         m_solution = initial_solution;
+
+        m_solution_mult.clear();
+        m_solution_mult = initial_solution_mult;
     }
 
     template<typename LoadFunction>
@@ -139,7 +147,8 @@ class NewtonIteration
              const LoadFunction&              lf,
              const std::vector<matrix_type>&  gradient_precomputed,
              const std::vector<matrix_type>&  stab_precomputed,
-             behavior_type&                   behavior)
+             behavior_type&                   behavior,
+             ContactManager<mesh_type>&       contact_manager)
     {
         elem_type    elem;
         AssemblyInfo ai;
@@ -230,7 +239,7 @@ class NewtonIteration
                             if (small_def)
                             {
                                 const auto recons = make_vector_hho_symmetric_laplacian(msh, cl, degree_infos);
-                                stab_HHO = make_vector_hho_stabilization(msh, cl, recons.first, degree_infos);
+                                stab_HHO          = make_vector_hho_stabilization(msh, cl, recons.first, degree_infos);
                             }
                             else
                             {
@@ -281,9 +290,74 @@ class NewtonIteration
             tc.toc();
             ai.m_time_stab += tc.to_double();
 
+            bool check_size = true;
+
+            // contact contribution
+            if (bnd.cell_has_contact_faces(cl))
+            {
+                const auto cell_infos  = degree_infos.cellDegreeInfo(msh, cl);
+                const auto faces_infos = cell_infos.facesDegreeInfo();
+
+                const auto cell_degree = cell_infos.cell_degree();
+                const auto grad_degree = cell_infos.grad_degree();
+
+                const auto num_cell_dofs = vector_basis_size(cell_degree, mesh_type::dimension, mesh_type::dimension);
+
+                const auto num_faces_dofs  = vector_faces_dofs(msh, faces_infos);
+                const auto num_primal_dofs = num_cell_dofs + num_faces_dofs;
+                const auto num_mult_dofs   = contact_manager.numberOfMult(msh, cl, bnd, cell_infos);
+                const auto num_total_dofs  = num_primal_dofs + num_mult_dofs;
+
+                assert(vector_basis_size(grad_degree, mesh_type::dimension - 1, mesh_type::dimension) == num_mult_dofs);
+
+                vector_type solution           = vector_type::Zero(num_total_dofs);
+                solution.head(num_primal_dofs) = m_solution.at(cell_i);
+
+                const auto fcs_cont = bnd.faces_with_contact(cl);
+
+                size_t offset = num_primal_dofs;
+
+                matrix_type Acont = matrix_type::Zero(num_total_dofs, num_total_dofs);
+                vector_type rcont = vector_type::Zero(num_total_dofs);
+
+                for (auto fc_cont : fcs_cont)
+                {
+                    const auto fc_id   = msh.lookup(fc_cont);
+                    const auto mult_id = contact_manager.getMappingFaceToMult(fc_id);
+                    const auto face_id = contact_manager.getMappingMultToFace(mult_id);
+
+                    const auto num_mult_face = m_solution_mult.at(mult_id).size();
+
+                    solution.segment(offset, num_mult_face) = m_solution_mult.at(mult_id);
+                    rcont.segment(offset, num_mult_face)    = -m_solution_mult.at(mult_id);
+
+                    offset += num_mult_face;
+
+                    // std::cout << "id: " << fc_id << "->" << mult_id << "->" << face_id << std::endl;
+                    // std::cout << "mult: " << m_solution_mult.at(mult_id).transpose() << std::endl;
+                }
+                assert(offset == num_total_dofs);
+
+                Acont.topLeftCorner(num_primal_dofs, num_primal_dofs) = lhs;
+                rcont.head(num_primal_dofs)                           = rhs;
+
+                Acont.bottomRightCorner(num_mult_dofs, num_mult_dofs) =
+                  matrix_type::Identity(num_mult_dofs, num_mult_dofs);
+
+                // std::cout << "sol: " << solution.transpose() << std::endl;
+
+                lhs = Acont;
+                rhs = rcont;
+
+                check_size = false;
+
+                assert(lhs.rows() == num_total_dofs && lhs.cols() == num_total_dofs);
+                assert(rhs.rows() == num_total_dofs);
+            }
+
             // Static Condensation
             tc.tic();
-            const auto scnp = make_vector_static_condensation_withMatrix(msh, cl, degree_infos, lhs, rhs);
+            const auto scnp = make_vector_static_condensation_withMatrix(msh, cl, degree_infos, lhs, rhs, check_size);
 
             m_AL[cell_i] = std::get<1>(scnp);
             m_bL[cell_i] = std::get<2>(scnp);
@@ -292,7 +366,7 @@ class NewtonIteration
             ai.m_time_statcond += tc.to_double();
 
             const auto& lc = std::get<0>(scnp);
-            m_assembler.assemble_nonlinear(msh, cl, bnd, lc.first, lc.second, m_solution_faces);
+            m_assembler.assemble_nonlinear(msh, cl, bnd, contact_manager, lc.first, lc.second, m_solution_faces);
 
             cell_i++;
         }
@@ -312,6 +386,7 @@ class NewtonIteration
     SolveInfo
     solve(void)
     {
+        // std::cout << "begin solve" << std::endl;
         timecounter tc;
 
         tc.tic();
@@ -321,14 +396,22 @@ class NewtonIteration
         mkl_pardiso(pparams, m_assembler.LHS, m_assembler.RHS, m_system_solution);
         tc.toc();
 
+        // std::cout << "end solve" << std::endl;
+
         return SolveInfo(m_assembler.LHS.rows(), m_assembler.LHS.nonZeros(), tc.to_double());
     }
 
     scalar_type
-    postprocess(const mesh_type& msh, const bnd_type& bnd, const MeshDegreeInfo<mesh_type>& degree_infos)
+    postprocess(const mesh_type&                 msh,
+                const bnd_type&                  bnd,
+                const MeshDegreeInfo<mesh_type>& degree_infos,
+                const ContactManager<mesh_type>& contact_manager)
     {
+        // std::cout << "begin post_process" << std::endl;
         timecounter tc;
         tc.tic();
+
+        // std::cout << m_system_solution << std::endl;
 
         // Update cell
         size_t cell_i = 0;
@@ -337,8 +420,23 @@ class NewtonIteration
             const vector_type xdT =
               m_assembler.take_local_solution_nonlinear(msh, cl, bnd, m_system_solution, m_solution_faces);
 
+            vector_type x_cond = xdT;
+
+            // contact contribution
+            if (bnd.cell_has_contact_faces(cl))
+            {
+                const vector_type mult =
+                  m_assembler.take_local_multiplier(msh, cl, bnd, contact_manager, m_system_solution);
+
+                vector_type x_cont = vector_type::Zero(xdT.size()+mult.size());
+                x_cont.head(xdT.size()) = xdT;
+                x_cont.tail(mult.size()) = mult;
+
+                x_cond = x_cont;
+            }
+
             // static decondensation
-            const vector_type xT = m_bL[cell_i] - m_AL[cell_i] * xdT;
+            const vector_type xT = m_bL[cell_i] - m_AL[cell_i] * x_cond;
 
             assert(m_solution.at(cell_i).size() == xT.size() + xdT.size());
             // Update element U^{i+1} = U^i + delta U^i ///
@@ -352,12 +450,10 @@ class NewtonIteration
             // std::cout << m_bL[cell_i].transpose() << std::endl;
             // std::cout << "sol_T" << std::endl;
             // std::cout << xT.transpose() << std::endl;
-            // std::cout << (m_solution.at(cell_i)).segment(0, cbs).transpose() << std::endl;
+            // std::cout << (m_solution.at(cell_i)).segment(0, xT.size()).transpose() << std::endl;
 
             cell_i++;
         }
-
-        const auto solF = m_assembler.expand_solution_nonlinear(msh, bnd, m_system_solution, m_solution_faces);
 
         // Update  unknowns
         // Update face Uf^{i+1} = Uf^i + delta Uf^i
@@ -369,6 +465,22 @@ class NewtonIteration
               m_assembler.take_local_solution_nonlinear(msh, fc, bnd, m_system_solution, m_solution_faces);
         }
 
+        // Update contact unknowns
+        for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++)
+        {
+            const auto bfc     = *itor;
+            const auto face_id = msh.lookup(bfc);
+
+            if (bnd.contact_boundary_type(face_id) == SIGNORINI_FACE)
+            {
+                const auto        mult_id = contact_manager.getMappingFaceToMult(face_id);
+                const vector_type mult =
+                  m_assembler.take_local_multiplier(msh, bfc, bnd, contact_manager, m_system_solution);
+                m_solution_mult.at(mult_id) += mult;
+            }
+        }
+
+        // std::cout << "end post_process" << std::endl;
         tc.toc();
         return tc.to_double();
     }
@@ -381,6 +493,12 @@ class NewtonIteration
         for (size_t i = 0; i < m_solution_faces.size(); i++)
         {
             scalar_type norm = m_solution_faces[i].norm();
+            error_un += norm * norm;
+        }
+
+        for (size_t i = 0; i < m_solution_mult.size(); i++)
+        {
+            scalar_type norm = m_solution_mult[i].norm();
             error_un += norm * norm;
         }
 
@@ -449,7 +567,9 @@ class NewtonIteration
     }
 
     void
-    save_solutions(std::vector<vector_type>& solution, std::vector<vector_type>& solution_faces)
+    save_solutions(std::vector<vector_type>& solution,
+                   std::vector<vector_type>& solution_faces,
+                   std::vector<vector_type>& solution_mult)
     {
         solution_faces.clear();
         solution_faces = m_solution_faces;
@@ -458,6 +578,10 @@ class NewtonIteration
         solution.clear();
         solution = m_solution;
         assert(m_solution.size() == solution.size());
+
+        solution_mult.clear();
+        solution_mult = m_solution_mult;
+        assert(m_solution_mult.size() == solution_mult.size());
     }
 };
 }

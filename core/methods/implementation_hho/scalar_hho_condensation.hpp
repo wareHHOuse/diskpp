@@ -41,11 +41,9 @@ namespace disk
 namespace priv
 {
 // static condensation
-template<typename Mesh, typename T>
+template<typename T>
 auto
-static_condensation_impl(const Mesh&                                                      msh,
-                         const typename Mesh::cell_type&                                  cl,
-                         const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
+static_condensation_impl(const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
                          const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              rhs,
                          const size_t                                                     num_cell_dofs,
                          const size_t                                                     num_faces_dofs)
@@ -53,7 +51,6 @@ static_condensation_impl(const Mesh&                                            
     using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
     using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
 
-    const auto fcs            = faces(msh, cl);
     const auto num_total_dofs = num_cell_dofs + num_faces_dofs;
 
     assert(lhs.rows() == lhs.cols());
@@ -99,11 +96,9 @@ static_condensation_impl(const Mesh&                                            
 }
 
 // static decondensation for primal scalar problem
-template<typename Mesh, typename T>
+template<typename T>
 Eigen::Matrix<T, Eigen::Dynamic, 1>
-static_decondensation_impl(const Mesh&                                                      msh,
-                           const typename Mesh::cell_type&                                  cl,
-                           const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
+static_decondensation_impl(const typename Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& lhs,
                            const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              rhs,
                            const typename Eigen::Matrix<T, Eigen::Dynamic, 1>&              solF,
                            const size_t                                                     num_cell_dofs,
@@ -112,7 +107,6 @@ static_decondensation_impl(const Mesh&                                          
     using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
     using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
 
-    const auto fcs            = faces(msh, cl);
     const auto num_total_dofs = num_cell_dofs + num_faces_dofs;
 
     assert(lhs.rows() == lhs.cols());
@@ -149,7 +143,7 @@ make_scalar_static_condensation_withMatrix(const Mesh&                          
     const auto num_faces     = howmany_faces(msh, cl);
     const auto num_face_dofs = scalar_basis_size(hdi.face_degree(), Mesh::dimension - 1);
 
-    return priv::static_condensation_impl(msh, cl, lhs, rhs, num_cell_dofs, num_faces * num_face_dofs);
+    return priv::static_condensation_impl(lhs, rhs, num_cell_dofs, num_faces * num_face_dofs);
 }
 
 template<typename Mesh, typename T>
@@ -177,7 +171,7 @@ make_scalar_static_decondensation(const Mesh&                                   
     const auto num_faces     = howmany_faces(msh, cl);
     const auto num_face_dofs = scalar_basis_size(hdi.face_degree(), Mesh::dimension - 1);
 
-    return static_decondensation_impl(msh, cl, lhs, rhs, solF, num_cell_dofs, num_faces * num_face_dofs);
+    return priv::static_decondensation_impl(lhs, rhs, solF, num_cell_dofs, num_faces * num_face_dofs);
 }
 
 // static decondensation for primal scalar problem
