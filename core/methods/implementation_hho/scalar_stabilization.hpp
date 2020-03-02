@@ -26,6 +26,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <vector>
 
 #include "adaptivity/adaptivity.hpp"
@@ -37,6 +38,98 @@
 
 namespace disk
 {
+
+/**
+ * @brief compute the difference operator \f$ \Delta := u_{\partial T}-u_T \f$
+ * for scalar HHO unknowns
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param cell_infos cell degree informations
+ * @return dynamic_matrix<typename Mesh::coordinate_type> return the differenc operator
+ */
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+make_scalar_hho_difference(const Mesh& msh, const typename Mesh::cell_type& cl, const CellDegreeInfo<Mesh>& cell_infos)
+{
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+
+    const auto celdeg = cell_infos.cell_degree();
+
+    const auto cbs = scalar_basis_size(celdeg, Mesh::dimension);
+
+    const auto faces_infos    = cell_infos.facesDegreeInfo();
+    const auto num_faces_dofs = scalar_faces_dofs(msh, faces_infos);
+    const auto total_dofs     = cbs + num_faces_dofs;
+    const auto num_diff_dofs  = scalar_diff_dofs(msh, cell_infos);
+
+    matrix_type data = matrix_type::Zero(num_diff_dofs, total_dofs);
+
+    const auto cb = make_scalar_monomial_basis(msh, cl, celdeg);
+
+    const auto fcs          = faces(msh, cl);
+    size_t     offset_faces = cbs;
+    size_t     offset_diff  = 0;
+
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto fdi = faces_infos[i];
+
+        if (fdi.hasUnknowns())
+        {
+            const auto fc     = fcs[i];
+            const auto facdeg = fdi.degree();
+            const auto ddeg   = std::max(facdeg, celdeg);
+            const auto db     = make_scalar_monomial_basis(msh, fc, ddeg);
+            const auto fbs    = scalar_basis_size(facdeg, Mesh::dimension - 1);
+            const auto dbs    = scalar_basis_size(ddeg, Mesh::dimension - 1);
+
+            matrix_type mass_F = matrix_type::Zero(dbs, dbs);
+            matrix_type trace  = matrix_type::Zero(dbs, cbs);
+
+            const auto qps = integrate(msh, fc, 2 * ddeg);
+            for (auto& qp : qps)
+            {
+                const auto c_phi = cb.eval_functions(qp.point());
+                const auto d_phi = db.eval_functions(qp.point());
+
+                mass_F += priv::outer_product(priv::inner_product(qp.weight(), d_phi), d_phi);
+                trace += priv::outer_product(priv::inner_product(qp.weight(), d_phi), c_phi);
+            }
+
+            const matrix_type proj = mass_F.ldlt().solve(trace);
+
+            data.block(offset_diff, 0, dbs, cbs)            = -proj;
+            data.block(offset_diff, offset_faces, fbs, fbs) = matrix_type::Identity(fbs, fbs);
+
+            offset_faces += fbs;
+            offset_diff += dbs;
+        }
+    }
+
+    return data;
+}
+
+/**
+ * @brief compute the difference operator \f$ \Delta := u_{\partial T}-u_T \f$
+ * for scalar HHO unknowns
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param di hho degree information
+ * @return dynamic_matrix<typename Mesh::coordinate_type> return the difference operator
+ */
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+make_scalar_hho_difference(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+{
+    const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
+
+    return make_scalar_hho_difference(msh, cl, cell_infos);
+}
 
 /**
  * @brief compute the stabilization term \f$ \sum_{F \in F_T} 1/h_F(u_F-\Pi^k_F(u_T), v_F-\Pi^k_F(v_T))_F \f$
@@ -115,6 +208,103 @@ make_scalar_hdg_stabilization(const Mesh&                     msh,
     }
 
     return data;
+}
+
+/**
+ * @brief compute the stabilization term \f$ \sum_{F \in F_T} 1/h_F(u_F-\Pi^k_F(u_T), v_F-\Pi^k_F(v_T))_F \f$
+ * for scalar HHO unknowns
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param cell_infos cell degree informations
+ * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
+ */
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+make_scalar_hdg_stabilization_diff(const Mesh&                     msh,
+                                   const typename Mesh::cell_type& cl,
+                                   const CellDegreeInfo<Mesh>&     cell_infos)
+{
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+
+    const auto celdeg = cell_infos.cell_degree();
+
+    const auto faces_infos = cell_infos.facesDegreeInfo();
+
+    const auto num_diff_dofs  = scalar_diff_dofs(msh, cell_infos);
+    const auto num_faces_dofs = scalar_faces_dofs(msh, faces_infos);
+
+    matrix_type data = matrix_type::Zero(num_diff_dofs, num_diff_dofs);
+
+    const auto fcs         = faces(msh, cl);
+    size_t     offset      = 0;
+    size_t     offset_diff = 0;
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto fdi = faces_infos[i];
+
+        if (fdi.hasUnknowns())
+        {
+            const auto fc     = fcs[i];
+            const auto facdeg = fdi.degree();
+            const auto hF     = diameter(msh, fc);
+
+            const auto diff_deg = std::max(celdeg, facdeg);
+            const auto fb       = make_scalar_monomial_basis(msh, fc, facdeg);
+            const auto db       = make_scalar_monomial_basis(msh, fc, diff_deg);
+
+            const auto fbs = scalar_basis_size(facdeg, Mesh::dimension - 1);
+            const auto dbs = scalar_basis_size(diff_deg, Mesh::dimension - 1);
+
+            matrix_type mass  = matrix_type::Zero(fbs, fbs);
+            matrix_type trace = matrix_type::Zero(fbs, dbs);
+
+            const auto qps = integrate(msh, fc, facdeg + diff_deg);
+            for (auto& qp : qps)
+            {
+                const auto d_phi = db.eval_functions(qp.point());
+                const auto f_phi = fb.eval_functions(qp.point());
+
+                mass += priv::outer_product(priv::inner_product(qp.weight(), f_phi), f_phi);
+                trace += priv::outer_product(priv::inner_product(qp.weight(), f_phi), d_phi);
+            }
+
+            matrix_type oper = matrix_type::Zero(fbs, num_diff_dofs);
+            matrix_type tr   = matrix_type::Zero(fbs, num_diff_dofs);
+
+            tr.block(0, offset_diff, fbs, dbs) = trace;
+
+            oper.block(0, offset_diff, fbs, dbs) = mass.ldlt().solve(trace);
+            data += oper.transpose() * tr * (1. / hF);
+
+            offset += fbs;
+            offset_diff += dbs;
+        }
+    }
+
+    return data;
+}
+
+/**
+ * @brief compute the stabilization term \f$\sum_{F \in F_T} 1/h_F(u_F - u_T + \Pi^k_T R^{k+1}_T(\hat{u}_T) -
+ * R^{k+1}_T(\hat{u}_T), v_F - v_T + \Pi^k_T R^{k+1}_T(\hat{v}_T) - R^{k+1}_T(\hat{v}_T))_F \f$ for scalar HHO
+ * unknowns
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param di hho degree information
+ * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
+ */
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+make_scalar_hdg_stabilization_diff(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+{
+    const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
+
+    return make_scalar_hdg_stabilization_diff(msh, cl, cell_infos);
 }
 
 /**
@@ -469,8 +659,8 @@ make_scalar_hho_stabilization_fluxes(const Mesh&                                
                 face_trace_matrix += priv::outer_product(priv::inner_product(qp.weight(), f_phi), c_phi);
             }
 
-            matA.block(row, offset, fbs, fbs) += face_mass_matrix/hf;
-            matA.block(row, 0, fbs, cbs) -= face_trace_matrix/hf;
+            matA.block(row, offset, fbs, fbs) += face_mass_matrix / hf;
+            matA.block(row, 0, fbs, cbs) -= face_trace_matrix / hf;
 
             offset += fbs;
             row += fbs;
@@ -502,6 +692,105 @@ make_scalar_hho_stabilization_fluxes(const Mesh&                                
     const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 
     return make_scalar_hho_stabilization_fluxes(msh, cl, reconstruction, cell_infos);
+}
+
+/**
+ * @brief compute the stabilization term \f$\sum_{F \in F_T} 1/h_F(u_F - u_T + \Pi^k_T R^{k+1}_T(\hat{u}_T) -
+ * R^{k+1}_T(\hat{u}_T), v_F - v_T + \Pi^k_T R^{k+1}_T(\hat{v}_T) - R^{k+1}_T(\hat{v}_T))_F \f$ for scalar HHO
+ * unknowns
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param cell_infos cell degree information
+ * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
+ */
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+make_scalar_dg_stabilization_fluxes(const Mesh&                     msh,
+                                    const typename Mesh::cell_type& cl,
+                                    const CellDegreeInfo<Mesh>&     cell_infos)
+{
+    const auto stab    = make_scalar_dg_stabilization_diff(msh, cl, cell_infos);
+    const auto adjoint = make_scalar_stabilization_fluxes(msh, cl, cell_infos, stab);
+    return adjoint * make_scalar_hho_difference(msh, cl, cell_infos);
+}
+
+/**
+ * @brief compute the stabilization term \f$\sum_{F \in F_T} 1/h_F(u_F - u_T + \Pi^k_T R^{k+1}_T(\hat{u}_T) -
+ * R^{k+1}_T(\hat{u}_T), v_F - v_T + \Pi^k_T R^{k+1}_T(\hat{v}_T) - R^{k+1}_T(\hat{v}_T))_F \f$ for scalar HHO
+ * unknowns
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param di hho degree information
+ * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
+ */
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+make_scalar_dg_stabilization_fluxes(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+{
+    const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
+
+    return make_scalar_dg_stabilization_fluxes(msh, cl, cell_infos);
+}
+
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+make_scalar_stabilization_fluxes(const Mesh&                                          msh,
+                                 const typename Mesh::cell_type&                      cl,
+                                 const CellDegreeInfo<Mesh>&                          cell_infos,
+                                 const dynamic_matrix<typename Mesh::coordinate_type> stab)
+{
+    const auto mass = make_scalar_dg_stabilization_diff(msh, cl, cell_infos);
+
+    return mass.ldlt().solve(stab);
+}
+
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+make_scalar_dg_stabilization_diff(const Mesh&                                          msh,
+                                 const typename Mesh::cell_type&                      cl,
+                                 const CellDegreeInfo<Mesh>&                          cell_infos)
+{
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+
+    const auto celdeg = cell_infos.cell_degree();
+
+    const auto faces_infos = cell_infos.facesDegreeInfo();
+
+    const auto num_diff_dofs  = scalar_diff_dofs(msh, cell_infos);
+    const auto num_faces_dofs = scalar_faces_dofs(msh, faces_infos);
+
+    matrix_type data = matrix_type::Zero(num_diff_dofs, num_diff_dofs);
+
+    const auto fcs         = faces(msh, cl);
+    size_t     offset_diff = 0;
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto fdi = faces_infos[i];
+
+        if (fdi.hasUnknowns())
+        {
+            const auto fc     = fcs[i];
+            const auto facdeg = fdi.degree();
+            const auto hF     = diameter(msh, fc);
+
+            const auto diff_deg = std::max(celdeg, facdeg);
+            const auto db       = make_scalar_monomial_basis(msh, fc, diff_deg);
+            const auto dbs      = scalar_basis_size(diff_deg, Mesh::dimension - 1);
+
+            matrix_type mass = make_mass_matrix(msh, fc, db);
+
+            data.block(offset_diff, offset_diff, dbs, dbs) = mass / hF;
+
+            offset_diff += dbs;
+        }
+    }
+
+    return data;
 }
 
 } // end diskpp
