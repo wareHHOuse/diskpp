@@ -26,6 +26,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <vector>
 
 #include "adaptivity/adaptivity.hpp"
@@ -302,6 +303,25 @@ vector_faces_offset(const Mesh& msh, const typename Mesh::cell_type& cl, const M
     }
 
     return ret;
+}
+
+template<typename Mesh>
+size_t
+scalar_diff_dofs(const Mesh& msh, const CellDegreeInfo<Mesh>& cell_infos)
+{
+    const auto faces_infos = cell_infos.facesDegreeInfo();
+
+    const auto dbs = scalar_basis_size(cell_infos.cell_degree(), Mesh::dimension-1);
+
+    size_t     num_dofs = 0;
+
+    for (auto fdi : faces_infos)
+    {
+        const auto fbs = scalar_face_dofs(msh, fdi);
+        num_dofs += std::max(dbs, fbs);
+    }
+
+    return num_dofs;
 }
 
 // define some optimization
