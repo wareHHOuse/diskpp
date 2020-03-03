@@ -2504,7 +2504,7 @@ class scalar_primal_hho_assembler
                 const auto fc = *std::next(msh.faces_begin(), face_id);
 
                 dirichlet_data.segment(face_i * fbs, fbs) =
-                  project_function(msh, fc, di.face_degree(), dirichlet_fun, di.face_degree());
+                  project_function(msh, fc, di.face_degree(), dirichlet_fun, 2);
             }
         }
 
@@ -2562,7 +2562,7 @@ class scalar_primal_hho_assembler
                 size_t sol_ind = 0;
 
                 const vector_type proj_bcf =
-                  project_function(msh, bfc, di.face_degree(), bnd.dirichlet_boundary_func(face_id), di.face_degree());
+                  project_function(msh, bfc, di.face_degree(), bnd.dirichlet_boundary_func(face_id), 2);
 
                 assert(proj_bcf.size() == fbs);
 
@@ -2594,7 +2594,7 @@ class scalar_primal_hho_assembler
                 const auto dirichlet_bf = bnd.dirichlet_boundary_func(face_id);
                 const auto fc           = *std::next(msh.faces_begin(), face_id);
                 ret.segment(face_i * fbs, fbs) =
-                  project_function(msh, fc, di.face_degree(), dirichlet_bf, di.face_degree());
+                  project_function(msh, fc, di.face_degree(), dirichlet_bf, 2);
             }
             else
             {
