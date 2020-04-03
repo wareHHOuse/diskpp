@@ -30,6 +30,7 @@
 #include "core/loaders/loader.hpp"
 #include "contrib/sol2/sol.hpp"
 #include "contrib/colormanip.h"
+#include "mesh/simple_meshers.hpp"
 
 const size_t MIN_TEST_DEGREE = 0;
 const size_t MAX_TEST_DEGREE = 3;
@@ -315,6 +316,25 @@ get_triangle_netgen_meshes(void)
         loader.populate_mesh(msh);
 
         ret.push_back(msh);
+    }
+
+    return ret;
+}
+
+template<typename T>
+std::vector< disk::simplicial_mesh<T, 2> >
+get_triangle_sm_meshes(void)
+{
+    typedef disk::simplicial_mesh<T, 2>  mesh_type;
+
+    mesh_type base_mesh;
+    auto mesher = make_simple_mesher(base_mesh);
+
+    std::vector< mesh_type > ret;
+    for (size_t i = 0; i < 5; i++)
+    {
+        mesher.refine();
+        ret.push_back( copy_mesh(base_mesh) );
     }
 
     return ret;
@@ -629,6 +649,19 @@ class tester
     }
 
     void
+    test_triangles_sm(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
+    {
+        std::cout << yellow << "Mesh under test: triangles on disk++-generated mesh";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_triangle_sm_meshes<T>();
+        auto tf     = get_test_functor(meshes);
+        auto er     = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
+    }
+
+    void
     test_quads(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
     {
         std::cout << yellow << "Mesh under test: quads on generic mesh";
@@ -703,6 +736,7 @@ public:
       bool do_triangles_generic   = true;
       bool do_polygonal_generic   = true;
       bool do_triangles_netgen    = true;
+      bool do_triangles_sm        = true;
       bool do_quads               = true;
       bool do_cartesian_2d_diskpp = true;
       bool do_tetrahedra_netgen   = true;
@@ -716,6 +750,7 @@ public:
           do_triangles_generic   = lua["do_triangles_generic"].get_or(false);
           do_polygonal_generic   = lua["do_polygonal_generic"].get_or(false);
           do_triangles_netgen    = lua["do_triangles_netgen"].get_or(false);
+          do_triangles_sm        = lua["do_triangles_sm"].get_or(false);
           do_quads               = lua["do_quads"].get_or(false);
           do_cartesian_2d_diskpp = lua["do_cartesian_2d_diskpp"].get_or(false);
           do_tetrahedra_netgen   = lua["do_tetrahedra_netgen"].get_or(false);
@@ -731,6 +766,9 @@ public:
 
       if (do_triangles_netgen)
           test_triangles_netgen(min_degree, max_degree);
+
+      if (do_triangles_sm)
+          test_triangles_sm(min_degree, max_degree);
 
       if (do_polygonal_generic)
           test_polygonal_generic(min_degree, max_degree);
@@ -791,6 +829,19 @@ class tester_simplicial
     }
 
     void
+    test_triangles_sm(void)
+    {
+        std::cout << yellow << "Mesh under test: triangles on disk++-generated mesh";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_triangle_sm_meshes<T>();
+        auto tf     = get_test_functor(meshes);
+        auto er     = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er);
+    }
+
+    void
     test_tetrahedra_netgen(void)
     {
         std::cout << yellow << "Mesh under test: tetrahedra on netgen mesh";
@@ -825,6 +876,7 @@ class tester_simplicial
         bool crash_on_nan         = false;
         bool do_triangles_generic = true;
         bool do_triangles_netgen  = true;
+        bool do_triangles_sm      = true;
         bool do_tetrahedra_netgen = true;
         bool do_tetrahedra_fvca6  = true;
 
@@ -834,6 +886,7 @@ class tester_simplicial
             crash_on_nan         = lua["crash_on_nan"].get_or(false);
             do_triangles_generic = lua["do_triangles_generic"].get_or(false);
             do_triangles_netgen  = lua["do_triangles_netgen"].get_or(false);
+            do_triangles_sm      = lua["do_triangles_sm"].get_or(false);
             do_tetrahedra_netgen = lua["do_tetrahedra_netgen"].get_or(false);
             do_tetrahedra_fvca6  = lua["do_tetrahedra_fvca6"].get_or(false);
         }
@@ -846,6 +899,9 @@ class tester_simplicial
 
         if (do_triangles_netgen)
             test_triangles_netgen();
+
+        if (do_triangles_sm)
+            test_triangles_sm();
 
         if (do_tetrahedra_netgen)
             test_tetrahedra_netgen();

@@ -208,6 +208,13 @@ public:
     {
         return m_storage;
     }
+
+protected:
+    void
+    backend_storage(std::shared_ptr<Storage> s)
+    {
+        m_storage = s;
+    } 
 };
 
 /* \brif Generic template for a mesh.
@@ -580,7 +587,21 @@ public:
     {
         this->backend_storage()->statistics();
     }
+
+    auto copy() const
+    {
+        auto ret = *this;
+        auto be = this->backend_storage();
+        ret.backend_storage( std::make_shared<Storage>(*be) );
+        return ret;
+    }
 };
+
+template<typename Mesh>
+Mesh copy_mesh(const Mesh& msh)
+{
+    return msh.copy();
+}
 
 template<typename Mesh>
 void cell_info(const Mesh& msh, const typename Mesh::cell& cl)

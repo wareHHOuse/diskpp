@@ -55,3 +55,7 @@ target_link_libraries(integration ${LINK_LIBS})
 
 add_executable(timing_test timing_test.cpp)
 target_link_libraries(timing_test ${LINK_LIBS})
+
+add_executable(sm_driver sm_driver.cpp)
+target_link_libraries(sm_driver ${LINK_LIBS})
+
