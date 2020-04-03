@@ -1,3 +1,4 @@
+add_subdirectory(diskpp_tutorials)
 add_subdirectory(mesh_basic_tests)
 add_subdirectory(nonlinear_solid_mechanics)
 add_subdirectory(diffusion)

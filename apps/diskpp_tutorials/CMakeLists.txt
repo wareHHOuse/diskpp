@@ -1,0 +1,5 @@
+option(BUILD_DISKPP_TUTORIALS "Build DiSk++ tutorials" ON)
+if (BUILD_DISKPP_TUTORIALS)
+    add_executable(diskpp_tutorial_1 diskpp_tutorial_1.cpp)
+    target_link_libraries(diskpp_tutorial_1 ${LINK_LIBS})
+endif()

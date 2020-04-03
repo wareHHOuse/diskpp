@@ -1,5 +1,5 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
+ *       /\        Matteo Cicuttin (C) 2016-2020
  *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
@@ -582,23 +582,6 @@ public:
     }
 };
 
-template<typename Mesh>
-void cell_info(const Mesh& msh, const typename Mesh::cell& cl)
-{
-    std::cout << "** CELL INFORMATION BEGIN **" << std::endl;
-    std::cout << cl << std::endl;
-    auto fcs = faces(msh, cl);
-    for (auto& fc : fcs)
-    {
-        std::cout << "  - " << fc;
-        if ( msh.is_boundary(fc) )
-            std::cout << " [B " << msh.boundary_id(fc) << "]";
-
-        std::cout << std::endl;
-    }
-    std::cout << "** CELL INFORMATION END **" << std::endl;
-}
-
 template<typename T, size_t DIM, typename Storage>
 typename mesh<T, DIM, Storage>::cell_iterator
 begin(mesh<T, DIM, Storage>& msh)
@@ -625,6 +608,97 @@ typename mesh<T, DIM, Storage>::const_cell_iterator
 end(const mesh<T, DIM, Storage>& msh)
 {
     return msh.cells_end();
+}
+
+namespace priv {
+
+template<typename Mesh>
+class cells_iterproxy
+{
+    Mesh& m_msh;
+
+public:
+    cells_iterproxy(Mesh& msh)
+        : m_msh(msh)
+    {}
+
+    auto begin()        { return m_msh.cells_begin(); }
+    auto begin() const  { return m_msh.cells_begin(); }
+    auto end()          { return m_msh.cells_end(); }
+    auto end() const    { return m_msh.cells_end(); }
+};
+
+template<typename Mesh>
+class faces_iterproxy
+{
+    Mesh& m_msh;
+
+public:
+    faces_iterproxy(Mesh& msh)
+        : m_msh(msh)
+    {}
+
+    auto begin()        { return m_msh.faces_begin(); }
+    auto begin() const  { return m_msh.faces_begin(); }
+    auto end()          { return m_msh.faces_end(); }
+    auto end() const    { return m_msh.faces_end(); }
+};
+
+} // namespace priv
+
+/**
+ * Get iterator proxy to iterate on cells with
+ *
+ *      for (auto& cl : cells(msh)) {}
+ */
+template<typename T, size_t DIM, typename Storage>
+auto cells(mesh<T, DIM, Storage>& msh)
+{
+    using Mesh = mesh<T, DIM, Storage>;
+    return priv::cells_iterproxy<Mesh>(msh);
+}
+
+/**
+ * Get iterator proxy to iterate on faces with
+ *
+ *      for (auto& fc : faces(msh)) {}
+ */
+
+template<typename T, size_t DIM, typename Storage>
+auto faces(mesh<T, DIM, Storage>& msh)
+{
+    using Mesh = mesh<T, DIM, Storage>;
+    return priv::faces_iterproxy<Mesh>(msh);
+}
+
+/*
+typename<T, size_t DIM, typename Storage>
+auto boundary_faces(mesh<T, DIM, Storage>& msh)
+{
+}
+
+typename<T, size_t DIM, typename Storage>
+auto boundary_faces(mesh<T, DIM, Storage>& msh, size_t boundary_id)
+{
+}
+*/
+
+
+template<typename Mesh>
+void cell_info(const Mesh& msh, const typename Mesh::cell& cl)
+{
+    std::cout << "** CELL INFORMATION BEGIN **" << std::endl;
+    std::cout << cl << std::endl;
+    auto fcs = faces(msh, cl);
+    for (auto& fc : fcs)
+    {
+        std::cout << "  - " << fc;
+        if ( msh.is_boundary(fc) )
+            std::cout << " [B " << msh.boundary_id(fc) << "]";
+
+        std::cout << std::endl;
+    }
+    std::cout << "** CELL INFORMATION END **" << std::endl;
 }
 
 template<typename Mesh>
