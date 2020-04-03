@@ -1,2 +1,5 @@
-add_executable(solution_plotter solution_plotter.cpp)
-target_link_libraries(solution_plotter ${LINK_LIBS})
+option(BUILD_APP_SOLUTION_PLOTTER "Build solution plotter application" ON)
+if (BUILD_APP_SOLUTION_PLOTTER)
+	add_executable(solution_plotter solution_plotter.cpp)
+	target_link_libraries(solution_plotter ${LINK_LIBS})
+endif()

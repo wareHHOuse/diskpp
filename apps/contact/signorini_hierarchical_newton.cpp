@@ -39,7 +39,7 @@
 
 //#include "output/silo.hpp"
 
-#include "contrib/sol2/sol.hpp"
+#include "sol/sol.hpp"
 #include "contrib/timecounter.h"
 #include "contrib/colormanip.h"
 

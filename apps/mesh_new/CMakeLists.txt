@@ -1,2 +1,5 @@
-add_executable(mesh_new mesh_new.cpp)
-target_link_libraries(mesh_new ${LINK_LIBS})
+option(BUILD_APP_MESHNEW "Build new mesh testing app" ON)
+if (BUILD_APP_MESHNEW)
+	add_executable(mesh_new mesh_new.cpp)
+	target_link_libraries(mesh_new ${LINK_LIBS})
+endif()

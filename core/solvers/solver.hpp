@@ -20,7 +20,7 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-#include "contrib/sol2/sol.hpp"
+#include "sol/sol.hpp"
 #include "common/eigen.hpp"
 
 #ifdef HAVE_AGMG
