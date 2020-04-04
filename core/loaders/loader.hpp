@@ -55,6 +55,7 @@
 #include <fstream>
 #include <cassert>
 #include <thread>
+#include <regex>
 #include <set>
 
 #include "geometry/geometry.hpp"
@@ -1026,6 +1027,7 @@ class netgen_mesh_loader<T,2> : public mesh_loader<simplicial_mesh<T,2>>
     }
 
 public:
+    static const char constexpr *expected_extension = "mesh2d";
     netgen_mesh_loader() = default;
 
     bool read_mesh(const std::string& s)
@@ -1262,6 +1264,7 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
     }
 
 public:
+    static const char constexpr *expected_extension = "mesh";
     netgen_mesh_loader() = default;
 
     bool read_mesh(const std::string& s)
@@ -1805,6 +1808,8 @@ class cartesian_mesh_loader<T,2> : public mesh_loader<cartesian_mesh<T,2>>
     }
 
 public:
+    static const char constexpr *expected_extension = "quad";
+    
     cartesian_mesh_loader() = default;
 
     bool read_mesh(const std::string& s)
@@ -2525,6 +2530,7 @@ load_fvca6_3d_mesh(const char* filename)
 
 /* Helper to load 2D meshes in Netgen format */
 template<typename T>
+[[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::simplicial_mesh<T, 2>
 load_netgen_2d_mesh(const char *filename)
 {
@@ -2540,7 +2546,7 @@ load_netgen_2d_mesh(const char *filename)
 
 /* Helper to load 2D meshes in DiSk++ format */
 template<typename T>
-[[deprecated("DiSk++ deprecation: The two-argument version of this function should be preferred")]]
+[[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::cartesian_mesh<T, 2>
 load_cartesian_2d_mesh(const char *filename)
 {
@@ -2554,22 +2560,9 @@ load_cartesian_2d_mesh(const char *filename)
     return msh;
 }
 
-template<typename T>
-bool
-load_cartesian_2d_mesh(const char *filename, disk::cartesian_mesh<T, 2>& msh)
-{
-    disk::cartesian_mesh_loader<T, 2> loader;
-    bool success = loader.read_mesh(filename);
-    if (!success)
-        return false;
-
-    loader.populate_mesh(msh);
-
-    return true;
-}
-
 /* Helper to load 3D meshes in Netgen format */
 template<typename T>
+[[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::simplicial_mesh<T, 3>
 load_netgen_3d_mesh(const char *filename)
 {
@@ -2627,5 +2620,67 @@ load_medit_3d_mesh(const char* filename)
 
    return msh;
 }
+    
+/**************************************************************************/
+// New mesh loader helpers
+namespace priv {
+
+bool
+check_filename_extension(const char *filename, const char *extension)
+{
+    std::stringstream ss;
+    ss << ".*\\." << extension << "$";
+    
+    return std::regex_match(filename, std::regex(ss.str()));
+}
+
+template<typename LT, typename MT>
+bool
+load_mesh(const char *filename, LT& loader, MT& msh)
+{
+    if ( !check_filename_extension(filename, LT::expected_extension) )
+    {
+        std::cout << "Warning: unexpected filename extension for ";
+        std::cout << "the required mesh type" << std::endl;
+    }
+
+    bool success = loader.read_mesh(filename);
+    if (!success)
+        return false;
+    
+    loader.populate_mesh(msh);
+    return true;
+}
+
+} //namespace priv
+
+template<typename T>
+bool
+load_mesh_netgen(const char *filename, disk::simplicial_mesh<T, 2>& msh)
+{
+    disk::netgen_mesh_loader<T, 2> loader;
+    return priv::load_mesh(filename, loader, msh);
+}
+
+template<typename T>
+bool
+load_mesh_netgen(const char *filename, disk::simplicial_mesh<T, 3>& msh)
+{
+    disk::netgen_mesh_loader<T, 3> loader;
+    return priv::load_mesh(filename, loader, msh);
+}
+    
+template<typename T>
+bool
+load_mesh_diskpp_cartesian(const char *filename, disk::cartesian_mesh<T, 2>& msh)
+{
+    disk::cartesian_mesh_loader<T, 2> loader;
+    return priv::load_mesh(filename, loader, msh);
+}
 
 } // namespace disk
+
+
+
+
+

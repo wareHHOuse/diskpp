@@ -20,34 +20,44 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
+/* This DiSk++ tutorial shows how to iterate on the elements of a mesh
+ * previously loaded.
+ */
+
+
+
 #include <iostream>
 
+// For the mesh data structure
 #include "core/mesh/mesh.hpp"
+
+// For the loaders and related helper functions
 #include "core/loaders/loader.hpp"
 
-/* DiSk++ tutorial: demonstrate how to iterate over mesh elements
- */
+using disk::cells;
+using disk::faces;
 
 int main(int argc, const char **argv)
 {
-    using disk::cells;
-    using disk::faces;
-
     if (argc < 2)
     {
-        std::cout << "Please specify a DiSk++ cartesian mesh filename" << std::endl;
+        std::cout << "Please specify a DiSk++ cartesian mesh" << std::endl;
         return 1;
     }
 
+    /* We will work on a 2D cartesian mesh; you can change this as you like*/
     using T = double;
     disk::cartesian_mesh<T, 2> msh;
 
     /* Load the mesh */
-    bool success = disk::load_cartesian_2d_mesh<T>(argv[1], msh);
+    bool success = disk::load_mesh_diskpp_cartesian<T>(argv[1], msh);
     if (!success)
-        return;
+        return 1;
 
-    /* Iterate on cells */
+    /* Here cells(), faces() and boundary_faces() return a lightweight
+     * proxy object providing the appropriate begin() and end() methods. */
+
+    /* Iterate on the mesh cells */
     for (auto& cl : cells(msh))
         std::cout << cl << std::endl;
 
