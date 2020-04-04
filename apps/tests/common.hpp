@@ -28,7 +28,7 @@
 #include <iomanip>
 
 #include "core/loaders/loader.hpp"
-#include "contrib/sol2/sol.hpp"
+#include "sol/sol.hpp"
 #include "contrib/colormanip.h"
 
 const size_t MIN_TEST_DEGREE = 0;

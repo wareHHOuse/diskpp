@@ -1,2 +1,5 @@
-add_executable(hexagon_splitter hexagon_splitter.cpp)
-target_link_libraries(hexagon_splitter ${LINK_LIBS})
+option(BUILD_APP_HEXSPLITTER "Build hexagon splitter application" ON)
+if (BUILD_APP_HEXSPLITTER)
+	add_executable(hexagon_splitter hexagon_splitter.cpp)
+	target_link_libraries(hexagon_splitter ${LINK_LIBS})
+endif()

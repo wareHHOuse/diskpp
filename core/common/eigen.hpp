@@ -22,8 +22,6 @@
 
 #pragma once
 
-#include "config.h"
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wall"
 #pragma clang diagnostic ignored "-Wshadow"
