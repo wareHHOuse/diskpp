@@ -25,4 +25,5 @@ add_subdirectory(vector_laplacian)
 add_subdirectory(plasticity)
 add_subdirectory(finite_strains)
 add_subdirectory(bingham)
+add_subdirectory(unsteady_laplacian)
 

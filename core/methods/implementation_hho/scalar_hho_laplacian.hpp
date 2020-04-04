@@ -175,4 +175,84 @@ make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, c
     return make_scalar_hho_laplacian(msh, cl, mesh_infos.cellDegreeInfo(msh, cl));
 }
 
+/**
+ * @briefApply Dirichlet boundary conditions via Nitsche trick, version for diffusion.
+ * @param rec_op the reconstruction operator
+ * @param lhs the element lhs contribution
+ * @param rhs the element rhs contribution
+ *
+ * lhs and rhs get updated in order to apply the boundary conditions.
+ */
+
+template<typename T>
+using DM = Matrix<T, Dynamic, Dynamic>;
+
+template<typename T>
+using DV = Matrix<T, Dynamic, 1>;
+
+template<typename Mesh, typename Function>
+void
+apply_dirichlet_via_nitsche(const Mesh& msh,
+                            const typename Mesh::cell_type& cl,
+                            DM<typename Mesh::coordinate_type>& rec_op,
+                            DM<typename Mesh::coordinate_type>& lhs,
+                            DV<typename Mesh::coordinate_type>& rhs,
+                            const hho_degree_info& hdi,
+                            const Function& bcs_fun,
+                            typename Mesh::coordinate_type penalization = 1.0)
+{
+    const size_t DIM = Mesh::dimension;
+    typedef typename Mesh::coordinate_type              T;
+    typedef Matrix<T, Dynamic, Dynamic>       matrix_type;
+    typedef Matrix<T, Dynamic, 1>             vector_type;
+    typedef Matrix<T, Dynamic, DIM>           grad_type;
+
+    auto rb = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+    auto cbs = scalar_basis_size(hdi.cell_degree(), DIM);
+    auto fcs = faces(msh, cl);
+    auto num_faces = fcs.size();
+
+    for (size_t face_i = 0; face_i < fcs.size(); face_i++)
+    {
+        auto fc = fcs[face_i];
+
+        if ( !msh.is_boundary(fc) )
+            continue;
+
+        auto fb = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
+
+        auto rbs = rb.size();
+        auto fbs = fb.size();
+
+        matrix_type mass = matrix_type::Zero(fbs, fbs);
+        matrix_type trace = matrix_type::Zero(fbs, rbs-1);
+        vector_type vec1 = vector_type::Zero(rbs-1);
+        auto hf = measure(msh, fc);
+        auto blkofs = cbs+fbs*face_i;
+        auto qps = integrate(msh, fc, 2*hdi.reconstruction_degree());
+        for (auto& qp : qps)
+        {
+            auto n = normal(msh, cl, fc);
+            grad_type   r_dphi = rb.eval_gradients( qp.point() );
+            vector_type r_dphi_n = r_dphi.block(1,0,rbs-1,DIM)*n;
+            vector_type f_phi = fb.eval_functions( qp.point() );
+
+            trace += qp.weight() * f_phi * r_dphi_n.transpose();
+            mass += qp.weight() * f_phi * f_phi.transpose();
+            vec1 += qp.weight() * r_dphi_n * bcs_fun(qp.point());
+
+            rhs.block(blkofs, 0, fbs, 1) += qp.weight() * f_phi * (penalization/hf) * bcs_fun(qp.point());
+        }
+
+        matrix_type l = trace * rec_op;
+
+        assert(l.cols() == lhs.cols());
+        lhs.block(blkofs, 0, l.rows(), l.cols()) -= l;
+        lhs.block(0, blkofs, l.cols(), l.rows()) -= l.transpose();
+        lhs.block(blkofs, blkofs, mass.rows(), mass.cols()) += (penalization/hf)*mass;
+
+        rhs -= rec_op.transpose() * vec1;
+    }
+}
+
 } // end diskpp
