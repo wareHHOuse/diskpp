@@ -34,6 +34,8 @@
 #include "mesh/mesh.hpp"
 #include "mesh/point.hpp"
 
+#include "quadratures/raw_simplices.hpp"
+
 namespace disk {
 
 // Class to create mesh for post-processing
@@ -130,31 +132,19 @@ class PostMesh<Mesh<T, 2, Storage>>
       assert(storage_in->surfaces.size() == msh.cells_size());
       // split all surfaces in triangles
       for (auto& cl : msh) {
-         auto pts_cell = cell_nodes(msh, cl);
+          const auto triangles = split_in_raw_triangles_index(msh, cl);
 
-         list_type pts;
+          for (auto& tri : triangles)
+          {
+              storage_out->surfaces.push_back(surface_type({tri[0], tri[1], tri[2]}));
+          }
 
-         for (auto pt : pts_cell)
-            pts.push_back(pt);
+          auto      pts_cell = cl.point_ids();
+          list_type pts;
+          for (auto pt : pts_cell)
+              pts.push_back(pt);
 
-         // If it is a triangle we save it
-         if (pts.size() == 3) {
-            storage_out->surfaces.push_back(surface_type({pts[0], pts[1], pts[2]}));
-         } else {
-            // we split element  in triangles with barycenter as node
-            const auto bar = barycenter(msh, cl);
-            storage_out->points.push_back(bar);
-            const auto bar_id = disk::point_identifier<2>(num_points++);
-            pts.push_back(bar_id);
-            storage_out->nodes.push_back(node_type({bar_id}));
-
-            auto fcs = faces(msh, cl);
-            for (auto& fc : fcs) {
-               const auto pts_fc = face_nodes(msh, fc);
-               storage_out->surfaces.push_back(surface_type({pts_fc[0], pts_fc[1], bar_id}));
-            }
-         }
-         list_cell_nodes.push_back(pts);
+          list_cell_nodes.push_back(pts);
       }
    }
 

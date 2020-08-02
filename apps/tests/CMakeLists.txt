@@ -57,4 +57,7 @@ if (BUILD_APP_DISKPP_TESTS)
 
     add_executable(timing_test timing_test.cpp)
     target_link_libraries(timing_test ${LINK_LIBS})
+
+    add_executable(divide_polygons divide_polygons.cpp)
+    target_link_libraries(divide_polygons ${LINK_LIBS})
 endif()

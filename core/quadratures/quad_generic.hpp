@@ -72,7 +72,7 @@ barycenter(Iterator begin, Iterator end)
  */
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
-integrate_polygon(const size_t degree, const std::vector<point<T, 2>>& pts)
+integrate_convex_polygon(const size_t degree, const std::vector<point<T, 2>>& pts)
 {
     using quadpoint_type = disk::quadrature_point<T, 2>;
 
@@ -122,7 +122,7 @@ integrate_polygon(const size_t degree, const std::vector<point<T, 2>>& pts)
         const auto [p0, v0, v1] = integration_basis(c_center, pt1, pt2);
 
         /* Compute the area of the sub-triangle */
-        const auto tm = area_triangle_kahan(pts[0], pt1, pt2);
+        const auto tm = area_triangle_kahan(c_center, pt1, pt2);
 
         auto tr = [ p0 = p0, v0 = v0, v1 = v1, tm ](const std::pair<point<T, 2>, T>& qd) -> auto
         {
@@ -139,6 +139,49 @@ integrate_polygon(const size_t degree, const std::vector<point<T, 2>>& pts)
 #endif
     return ret;
 }
+
+/* Integrate non-convex polygon. More costly than convex polygon
+ * due to spliting
+ */
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+std::vector<disk::quadrature_point<T, 2>>
+integrate_nonconvex_polygon(const Mesh<T, 2, Storage>&                msh,
+                            const typename Mesh<T, 2, Storage>::cell& cl,
+                            const size_t                              degree)
+{
+    using quadpoint_type = disk::quadrature_point<T, 2>;
+
+    const auto qps = disk::triangle_quadrature(degree);
+
+    /* Break the cell in triangles, compute the transformation matrix and
+     * map quadrature data in the physical space. Edges of the triangle as
+     * column vectors in the transformation matrix. */
+
+    const auto rss = split_in_raw_triangles(msh, cl);
+
+    std::vector<quadpoint_type> ret;
+    ret.reserve(qps.size() * rss.size());
+
+    for (auto& rs : rss)
+    {
+        const auto pts = rs.points();
+        assert(pts.size() == 3);
+        const auto meas = area_triangle_kahan(pts[0], pts[1], pts[2]);
+
+        // Compute the integration basis
+        const auto [p0, v0, v1] = integration_basis(pts[0], pts[1], pts[2]);
+
+        for (auto& qd : qps)
+        {
+            const auto point  = p0 + v0 * qd.first.x() + v1 * qd.first.y();
+            const auto weight = qd.second * meas;
+            ret.push_back(disk::make_qp(point, weight));
+        }
+    }
+
+    return ret;
+}
+
 }
 
 template<typename T>
@@ -161,9 +204,10 @@ integrate(const disk::generic_mesh<T, 2>& msh, const typename disk::generic_mesh
 
         case 3: return priv::integrate_triangle<T>(degree, pts);
 
-        case 4: return priv::integrate_quadrangle_tens(degree, pts);
+        // case 4: return priv::integrate_quadrangle_tens(degree, pts);
 
-        default: return priv::integrate_polygon(degree, pts);
+        default: return priv::integrate_nonconvex_polygon(msh, cl, degree);
+        // default: return priv::integrate_convex_polygon(degree, pts);
     }
 }
 
