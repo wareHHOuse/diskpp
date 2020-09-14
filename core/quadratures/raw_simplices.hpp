@@ -30,6 +30,8 @@
 #include "mesh/point.hpp"
 #include "common/simplicial_formula.hpp"
 
+#include "contrib/earcut.hpp"
+
 namespace disk{
 
 
@@ -194,6 +196,7 @@ template<typename Mesh>
 std::vector<raw_simplex<typename Mesh::point_type, 2>>
 split_in_raw_triangles(const Mesh& msh, const typename Mesh::face& fc)
 {
+    static_assert(Mesh::dimension == 3);
     typedef raw_simplex<typename Mesh::point_type, 2>   raw_simplex_type;
 
     auto pts    = points(msh, fc);
@@ -221,6 +224,74 @@ split_in_raw_triangles(const Mesh& msh, const typename Mesh::face& fc)
 }
 
 /**
+ * @brief Split a 2D-cell in triangles. There is several possibilities
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl specified 2D-cell
+ * @return std::vector<raw_simplex<typename Mesh::point_type, 2>> list of triangles
+ */
+template<typename Mesh>
+std::vector<raw_simplex<typename Mesh::point_type, 2>>
+split_in_raw_triangles(const Mesh& msh, const typename Mesh::cell& cl)
+{
+    static_assert(Mesh::dimension == 2);
+    typedef raw_simplex<typename Mesh::point_type, 2> raw_simplex_type;
+
+    auto pts = points(msh, cl);
+
+    std::vector<typename Mesh::point_type> vpts;
+    vpts.insert(vpts.begin(), std::begin(pts), std::end(pts));
+
+    const auto triangles = triangulation_earcut_algorithm(vpts);
+    std::vector<raw_simplex_type> raw_simplices;
+    raw_simplices.reserve(triangles.size());
+
+    for(auto& tri : triangles)
+    {
+        raw_simplices.push_back(raw_simplex_type({pts[tri[0]], pts[tri[1]], pts[tri[2]]}));
+    }
+
+    return raw_simplices;
+}
+
+/**
+ * @brief Split a 2D-cell in triangles.
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl specified 2D-cell
+ * @return std::vector<std::array<point_identifier<2>, 3>> list of triangles (index of points)
+ */
+template<typename Mesh>
+std::vector<std::array<point_identifier<2>, 3>>
+split_in_raw_triangles_index(const Mesh& msh, const typename Mesh::cell& cl)
+{
+    static_assert(Mesh::dimension == 2);
+    using Triangle = std::array<point_identifier<2>, 3>;
+
+    const auto pts = points(msh, cl);
+    const auto pts_id = cl.point_ids();
+
+    std::vector<typename Mesh::point_type> vpts;
+    vpts.insert(vpts.begin(), std::begin(pts), std::end(pts));
+
+    const auto triangles = triangulation_earcut_algorithm(vpts);
+
+    std::vector<Triangle> raw_simplices;
+    raw_simplices.reserve(triangles.size());
+
+    for (auto& tri : triangles)
+    {
+        raw_simplices.push_back(Triangle{
+            point_identifier<2>(pts_id[tri[0]]),
+            point_identifier<2>(pts_id[tri[1]]),
+            point_identifier<2>(pts_id[tri[2]])});
+    }
+    return raw_simplices;
+}
+
+/**
  * @brief Split a 3D-cell in tetrahedra. There is several possibilities
  *
  * If the 3D-cell has:
@@ -237,7 +308,8 @@ template<typename Mesh>
 std::vector<raw_simplex<typename Mesh::point_type, 3>>
 split_in_raw_tetrahedra(const Mesh& msh, const typename Mesh::cell& cl)
 {
-    typedef raw_simplex<typename Mesh::point_type, 3>   raw_simplex_type;
+    static_assert(Mesh::dimension == 3);
+    typedef raw_simplex<typename Mesh::point_type, 3> raw_simplex_type;
 
     const auto pts    = points(msh, cl);
     assert(pts.size() >= 4);
@@ -268,4 +340,66 @@ split_in_raw_tetrahedra(const Mesh& msh, const typename Mesh::cell& cl)
     return raw_simplices;
 }
 
-} // end disk
+/**
+ * @brief Split a 2D-cell in triangles using earcut algorithm
+ *
+ * Return the list of triangles (local index of nodes)
+ *
+ * There is (n-2) triangles for n points
+ *
+ * @tparam scalar type
+ * @param std::vector<point<T, 2>>& list of points of the cell
+ * @return std::vector<std::array<std::size_t, 3>> list of triangles
+ */
+template<typename T>
+std::vector<std::array<std::size_t, 3>>
+triangulation_earcut_algorithm(const std::vector<point<T, 2>>& pts)
+{
+    // Create array
+    using Point = std::array<T, 2>;
+    using Triangle = std::array<std::size_t, 3>;
+    std::vector<std::vector<Point>> polygon;
+
+    std::vector<Point> list_pts;
+    list_pts.reserve(pts.size());
+
+    for( auto& pt : pts)
+    {
+        list_pts.push_back(Point{{pt.x(), pt.y()}});
+    }
+
+    // Fill polygon structure with actual data. Any winding order works.
+    // The first polyline defines the main polygon.
+    polygon.push_back(list_pts);
+    // Following polylines define holes.
+    // polygon.push_back({{75, 25}, {75, 75}, {25, 75}, {25, 25}});
+
+    // Run tessellation
+    // Returns array of indices that refer to the vertices of the input polygon.
+    // e.g: the index 6 would refer to {25, 75} in this example.
+    // Three subsequent indices form a triangle. Output triangles are clockwise.
+    const auto indices = mapbox::earcut<std::size_t>(polygon);
+    const auto nb_ind  = indices.size();
+
+    std::vector<Triangle> triangles;
+    triangles.reserve(nb_ind / 3);
+
+    for (std::size_t i = 0; i < nb_ind; i+=3)
+    {
+        triangles.push_back(Triangle{{indices[i], indices[i + 1], indices[i + 2]}});
+    }
+
+    // std::cout << "pts: ";
+    // for (auto& pt : pts)
+    //     std ::cout << "(" << pt.x() << "," << pt.y() << ")";
+    // std::cout << std::endl;
+    // std::cout << "ind: ";
+
+    // for (auto& i : indices)
+    //     std ::cout << i << ", ";
+    // std::cout << std::endl;
+
+    return triangles;
+}
+
+    } // end disk

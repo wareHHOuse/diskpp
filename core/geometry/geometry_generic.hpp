@@ -202,15 +202,15 @@ template<typename T>
 T
 measure(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::cell& cl)
 {
-    auto pts = points(msh, cl);
+    auto rss = split_in_raw_triangles(msh, cl);
 
-    T acc = 0.0;
-    for (size_t i = 1; i < pts.size() - 1; i++)
+    T area = 0.0;
+    for (auto& rs : rss)
     {
-        acc += area_triangle_kahan(pts.at(0), pts.at(i), pts.at(i + 1));
+        area += measure(rs);
     }
 
-    return acc;
+    return area;
 }
 
 /**
