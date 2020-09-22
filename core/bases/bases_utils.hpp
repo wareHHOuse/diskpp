@@ -220,6 +220,7 @@ make_mass_matrix(const Mesh& msh, const Element& elem, const Basis& basis, size_
     return ret;
 }
 
+/*
 template<typename Mesh, typename Element, typename Basis, typename MaterialField>
 Matrix<typename Basis::scalar_type, Dynamic, Dynamic>
 make_mass_matrix(const Mesh& msh, const Element& elem, const Basis& basis, const MaterialField& material_tensor, size_t di = 0)
@@ -244,6 +245,7 @@ make_mass_matrix(const Mesh& msh, const Element& elem, const Basis& basis, const
     return ret;
 }
 
+*/
 template<typename Mesh, typename Element, typename Basis>
 Matrix<typename Basis::scalar_type, Dynamic, Dynamic>
 make_stiffness_matrix(const Mesh& msh, const Element& elem, const Basis& basis)

@@ -35,6 +35,16 @@
 namespace disk
 {
 
+namespace priv
+{
+    struct hdi_named_args
+    {
+        size_t rd;
+        size_t cd;
+        size_t fd;
+    };
+}
+
 /**
  * @brief this class contains the different polynomial degrees which can used with HHO methods
  *
@@ -48,7 +58,7 @@ class hho_degree_info
      *  grad_deg : polynomial degree used for the gradient
      *
      */
-    size_t cell_deg, face_deg, grad_deg;
+    size_t cell_deg, face_deg, grad_deg, rec_deg;
 
   public:
     /**
@@ -84,6 +94,7 @@ class hho_degree_info
             cell_deg = cd;
             face_deg = fd;
             grad_deg = fd;
+            rec_deg  = fd+1;
         }
         else
         {
@@ -91,6 +102,7 @@ class hho_degree_info
             cell_deg = fd;
             face_deg = fd;
             grad_deg = fd;
+            rec_deg  = fd+1;
         }
     }
 
@@ -116,6 +128,7 @@ class hho_degree_info
             cell_deg = cd;
             face_deg = fd;
             grad_deg = gd;
+            rec_deg = fd+1;
         }
         else
         {
@@ -123,7 +136,16 @@ class hho_degree_info
             cell_deg = fd;
             face_deg = fd;
             grad_deg = fd;
+            rec_deg = fd+1;
         }
+    }
+
+    hho_degree_info(const priv::hdi_named_args& hna)
+    {
+        rec_deg = hna.rd;
+        cell_deg = hna.cd;
+        face_deg = hna.fd;
+        grad_deg = hna.fd;
     }
 
     /**
@@ -156,7 +178,7 @@ class hho_degree_info
     size_t
     reconstruction_degree() const
     {
-        return face_deg + 1;
+        return rec_deg;
     }
 
     /**
@@ -180,7 +202,7 @@ class hho_degree_info
         std::cout << "cell degree: " << cell_deg << std::endl;
         std::cout << "face degree: " << face_deg << std::endl;
         std::cout << "gradient degree: " << grad_deg << std::endl;
-        std::cout << "reconstruction degree: " << face_deg + 1 << std::endl;
+        std::cout << "reconstruction degree: " << rec_deg << std::endl;
     }
 };
 

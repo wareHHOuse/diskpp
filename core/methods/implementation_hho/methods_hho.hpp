@@ -123,6 +123,55 @@ project_function(const Mesh&                      msh,
 
 /**
  * @brief Compute the interpolation operator \f$ \hat{I}(u) := (\Pi^{cd}_T(u), \Pi^{fd}_{\partial T}(u)) \f$
+ * of a function \f$ u \in H^1(T;\mathbb{R}^d) \f$ where \f$ \Pi^{cd}_T \f$, respc. \f$ \Pi^{fd}_{\partial T} \f$ are
+ * the L2-orthogonal projector on the cell and faces
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh  mesh
+ * @param cl  cell
+ * @param hdi  hho degree informations
+ * @param u  function  \f$ u \in H^1(T;\mathbb{R}^d) \f$ to project
+ * @param di additonal quadratue degree
+ * @return dynamic_vector<typename Mesh::coordinate_type> coefficient of the the interpolation operator \f$ \hat{I}(u)
+ * \f$
+ */
+template<typename Mesh>
+dynamic_vector<typename Mesh::coordinate_type>
+project_tangent(const Mesh&                      msh,
+                const typename Mesh::cell_type&  cl,
+                const hho_degree_info&           hdi,
+                const vector_rhs_function<Mesh>& u,
+                size_t                           di = 0)
+{
+    typedef dynamic_vector<typename Mesh::coordinate_type> vector_type;
+
+    const auto cbs       = vector_basis_size(hdi.cell_degree(), Mesh::dimension, Mesh::dimension);
+    const auto fbs       = vector_basis_size(hdi.face_degree(), Mesh::dimension - 1, Mesh::dimension-1);
+    const auto num_faces = howmany_faces(msh, cl);
+
+    vector_type ret = vector_type::Zero(cbs + num_faces * fbs);
+
+    ret.block(0, 0, cbs, 1) = project_function(msh, cl, hdi.cell_degree(), u, di);
+
+    const auto fcs = faces(msh, cl);
+    for (size_t i = 0; i < num_faces; i++)
+    {
+        auto n = normal(msh, cl, fcs[i]);
+        auto trace_u = [&](const typename Mesh::point_type& pt) -> auto {
+            auto uval = u(pt);
+            return n.cross(uval.cross(n));
+        };
+
+        auto fc = fcs[i];
+        const auto fb = make_vector_monomial_tangential_basis(msh, fc, hdi.face_degree());
+        ret.segment(cbs + i * fbs, fbs) = project_function(msh, fcs[i], fb, trace_u, di);
+    }
+
+    return ret;
+}
+
+/**
+ * @brief Compute the interpolation operator \f$ \hat{I}(u) := (\Pi^{cd}_T(u), \Pi^{fd}_{\partial T}(u)) \f$
  * of a function \f$ u \in H^1(T;\mathbb{R}) \f$ where \f$ \Pi^{cd}_T \f$, respc. \f$ \Pi^{fd}_{\partial T} \f$ are the
  * L2-orthogonal projector on the cell and faces
  *

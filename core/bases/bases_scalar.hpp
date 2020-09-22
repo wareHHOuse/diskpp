@@ -475,29 +475,27 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
     }
 };
 
-/* Specialization for 3D meshes, faces */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face>
-{
+template<typename Mesh, typename Element>
+class scaled_monomial_abstract_face_basis;
 
-  public:
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class scaled_monomial_abstract_face_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face>
+{
+public:
     typedef Mesh<T, 3, Storage>                 mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type      point_type;
     typedef typename mesh_type::face            face_type;
     typedef Matrix<scalar_type, Dynamic, 1>     function_type;
 
-  private:
+private:
     point_type  face_bar;
     scalar_type face_h;
-    size_t      basis_degree, basis_size;
 
-#ifdef POWER_CACHE
-    mutable std::vector<scalar_type> power_cache;
-#endif
+    /* Local reference frame */
+    typedef static_vector<T, 3>                 vector_type;
+    vector_type                                 e0, e1;
 
-    typedef static_vector<T, 3> vector_type;
-    vector_type                 e0, e1;
 
     /* It takes two edges of an element's face and uses them as the coordinate
      * axis of a 2D reference system. Those two edges are accepted only if they have an angle
@@ -534,16 +532,18 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
         if (!ok)
             throw std::invalid_argument("Degenerate polyhedron, cannot proceed");
 
+        /* Don't normalize, in order to keep axes of the same order of lenght
+         * of v in make_face_point_3d_to_2d() */
         e0 = v0 / v0.norm();
         e1 = v1 - (v1.dot(v0) * v0) / (v0.dot(v0));
         e1 = e1 / e1.norm();
     }
 
+protected:
     /* This function maps a 3D point on a face to a 2D reference system, to compute the
      * face basis. It takes two edges of an element's face and uses them as the coordinate
      * axis of a 2D reference system. Those two edges are accepted only if they have an angle
      * between them greater than 8 degrees, then they are orthonormalized via G-S. */
-
     point<T, 2>
     map_face_point_3d_to_2d(const point_type& pt) const
     {
@@ -555,38 +555,69 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
         return point<T, 2>({eta, xi});
     }
 
-  public:
-    scaled_monomial_scalar_basis(const mesh_type& msh, const face_type& fc, size_t degree)
+    auto face_barycenter() const
+    {
+        return face_bar;
+    }
+
+    auto face_diameter() const
+    {
+        return face_h;
+    }
+
+    auto reference_frame() const
+    {
+        return std::make_pair(e0, e1);
+    }
+
+public:
+    scaled_monomial_abstract_face_basis(const mesh_type& msh, const face_type& fc)
     {
         face_bar     = barycenter(msh, fc);
         face_h       = diameter(msh, fc);
+        compute_axis(msh, fc, e0, e1);
+    }
+};
+
+
+/* Specialization for 3D meshes, faces */
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face>
+    : public scaled_monomial_abstract_face_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face>
+{
+
+public:
+    typedef Mesh<T, 3, Storage>                 mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef typename mesh_type::face            face_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     function_type;
+
+    using base = scaled_monomial_abstract_face_basis<mesh_type, face_type>;
+
+private:
+    point_type  face_bar;
+    scalar_type face_h;
+    size_t      basis_degree, basis_size;
+
+  public:
+    scaled_monomial_scalar_basis(const mesh_type& msh, const face_type& fc, size_t degree)
+        : base(msh, fc)
+    {
+        face_bar     = this->face_barycenter();
+        face_h       = this->face_diameter();
         basis_degree = degree;
         basis_size   = scalar_basis_size(degree, 2);
-        compute_axis(msh, fc, e0, e1);
     }
 
     function_type
     eval_functions(const point_type& pt) const
     {
-        const auto ep = map_face_point_3d_to_2d(pt);
+        const auto ep = this->map_face_point_3d_to_2d(pt);
         const auto bx = ep.x();
         const auto by = ep.y();
 
         function_type ret = function_type::Zero(basis_size);
-
-#ifdef POWER_CACHE
-        if (power_cache.size() != (basis_degree + 1) * 2)
-            power_cache.resize((basis_degree + 1) * 2);
-
-        power_cache[0] = 1.0;
-        power_cache[1] = 1.0;
-        for (size_t i = 1; i <= basis_degree; i++)
-        {
-            power_cache[PC_OFS_2D_X(i)] = bx * power_cache[PC_OFS_2D_X(i - 1)];
-            power_cache[PC_OFS_2D_Y(i)] = by * power_cache[PC_OFS_2D_Y(i - 1)];
-        }
-#endif
-
         size_t pos = 0;
         for (size_t k = 0; k <= basis_degree; k++)
         {
@@ -594,13 +625,8 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
             {
                 const auto pow_x = k - i;
                 const auto pow_y = i;
-#ifdef POWER_CACHE
-                const auto px = power_cache[PC_OFS_2D_X(pow_x)];
-                const auto py = power_cache[PC_OFS_2D_Y(pow_y)];
-#else
                 const auto px = iexp_pow(bx, pow_x);
                 const auto py = iexp_pow(by, pow_y);
-#endif
                 ret(pos++) = px * py;
             }
         }

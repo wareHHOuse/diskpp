@@ -60,4 +60,10 @@ if (BUILD_APP_DISKPP_TESTS)
 
     add_executable(divide_polygons divide_polygons.cpp)
     target_link_libraries(divide_polygons ${LINK_LIBS})
+
+    add_executable(curl_reconstruction curl_reconstruction.cpp)
+    target_link_libraries(curl_reconstruction ${LINK_LIBS})
+
+    add_executable(curl_stabilization curl_stabilization.cpp)
+    target_link_libraries(curl_stabilization ${LINK_LIBS})
 endif()

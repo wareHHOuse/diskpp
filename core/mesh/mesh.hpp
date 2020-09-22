@@ -469,6 +469,20 @@ public:
                              count_lambda);
     }
 
+    /* Get the number of boundary faces in the boundary with specified id */
+    size_t  boundary_faces_size(size_t id) const
+    {
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+
+        auto count_lambda = [&](const bnd_info& bi) -> bool {
+            return bi.is_boundary and bi.boundary_id == id;
+        };
+
+        return std::count_if(this->backend_storage()->boundary_info.begin(),
+                             this->backend_storage()->boundary_info.end(),
+                             count_lambda);
+    }
+
     /* Get the total number of internal faces */
     size_t  internal_faces_size() const
     {

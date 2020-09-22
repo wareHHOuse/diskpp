@@ -174,6 +174,7 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
         return ret;
     }
 
+    [[deprecated("Is this implementation correct?")]]
     function_type
     eval_curls(const point_type& pt) const
     {
@@ -196,6 +197,34 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
             // row 2
             ret(j, 1) = -dphi_i(0);
             ret(j, 2) = -dphi_i(1);
+            j++;
+        }
+        assert(j == basis_size);
+        return ret;
+    }
+
+    function_type
+    eval_curls2(const point_type& pt) const
+    {
+        function_type ret = function_type::Zero(basis_size, 3);
+
+        const function_type dphi = scalar_basis.eval_gradients(pt);
+
+        size_t j = 0;
+        for (size_t i = 0; i < scalar_basis.size(); i++)
+        {
+            const Matrix<scalar_type, 1, 3> dphi_i = dphi.row(i);
+            // row 1
+            ret(j, 1) = dphi_i(2);
+            ret(j, 2) = -dphi_i(1);
+            j++;
+            // row 2
+            ret(j, 0) = -dphi_i(2);
+            ret(j, 2) = dphi_i(0);
+            j++;
+            // row 2
+            ret(j, 0) = dphi_i(1);
+            ret(j, 1) = -dphi_i(0);
             j++;
         }
         assert(j == basis_size);
@@ -288,6 +317,93 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
         return basis_degree;
     }
 };
+
+
+/* Specialization for 3D meshes, faces */
+template<typename Mesh>
+class scaled_monomial_vector_tangential_basis
+    : public scaled_monomial_abstract_face_basis<Mesh, typename Mesh::face>
+{
+    static_assert(Mesh::dimension == 3);
+
+public:
+    typedef Mesh                                mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef typename mesh_type::face            face_type;
+    typedef Matrix<scalar_type, Dynamic, 3>     function_type;
+
+    using base = scaled_monomial_abstract_face_basis<mesh_type, face_type>;
+
+private:
+    size_t basis_degree, basis_size;
+
+public:
+    scaled_monomial_vector_tangential_basis(const mesh_type& msh, const face_type& fc, size_t degree)
+        : base(msh, fc)
+    {
+        basis_degree = degree;
+        basis_size   = vector_basis_size(degree, 2, 2);
+    }
+
+    function_type
+    eval_functions(const point_type& pt) const
+    {
+        const auto ep = this->map_face_point_3d_to_2d(pt);
+        const auto bx = ep.x();
+        const auto by = ep.y();
+
+        auto [e0, e1] = this->reference_frame();
+
+        function_type ret = function_type::Zero(basis_size, 3);
+        size_t pos = 0;
+        for (size_t k = 0; k <= basis_degree; k++)
+        {
+            for (size_t i = 0; i <= k; i++)
+            {
+                const auto pow_x    = k - i;
+                const auto pow_y    = i;
+                const auto px       = iexp_pow(bx, pow_x);
+                const auto py       = iexp_pow(by, pow_y);
+                const auto val0     = e0 * px * py;
+                const auto val1     = e1 * px * py;
+
+                ret(pos, 0) = val0(0);
+                ret(pos, 1) = val0(1);
+                ret(pos, 2) = val0(2);
+                pos++;
+
+                ret(pos, 0) = val1(0);
+                ret(pos, 1) = val1(1);
+                ret(pos, 2) = val1(2);
+                pos++;
+            }
+        }
+
+        assert(pos == basis_size);
+        return ret;
+    }
+
+    size_t
+    size() const
+    {
+        return basis_size;
+    }
+
+    size_t
+    degree() const
+    {
+        return basis_degree;
+    }
+};
+
+template<typename MeshType, typename ElementType>
+auto
+make_vector_monomial_tangential_basis(const MeshType& msh, const ElementType& elem, size_t degree)
+{
+    return scaled_monomial_vector_tangential_basis<MeshType>(msh, elem, degree);
+}
+
 
 /* Specialization for 2D meshes, cells */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
