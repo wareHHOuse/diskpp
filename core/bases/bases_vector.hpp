@@ -53,7 +53,7 @@ vector_basis_size(size_t k, size_t sd, size_t vd)
 }
 
 /* Generic template for bases. */
-template<typename MeshType, typename Element>
+template<typename MeshType, typename Element, typename ScalarType>
 struct scaled_monomial_vector_basis
 {
     static_assert(sizeof(MeshType) == -1, "scaled_monomial_vector_basis: not suitable for the requested kind of mesh");
@@ -62,36 +62,45 @@ struct scaled_monomial_vector_basis
 };
 
 /* Basis 'factory'. */
-template<typename MeshType, typename ElementType>
+template<typename MeshType, typename ElementType, typename ScalarType = typename MeshType::coordinate_type>
 auto
 make_vector_monomial_basis(const MeshType& msh, const ElementType& elem, size_t degree)
 {
-    return scaled_monomial_vector_basis<MeshType, ElementType>(msh, elem, degree);
+    return scaled_monomial_vector_basis<MeshType, ElementType, ScalarType>(msh, elem, degree);
+}
+
+template<typename MeshType, typename ElementType>
+auto
+make_vector_monomial_basis_complex(const MeshType& msh, const ElementType& elem, size_t degree)
+{
+    using complex_type = std::complex<typename MeshType::coordinate_type>;
+    return scaled_monomial_vector_basis<MeshType, ElementType, complex_type>(msh, elem, degree);
 }
 
 /* Specialization for 3D meshes, cells */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell>
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell, ScalarType>
 {
 
-  public:
+public:
     typedef Mesh<T, 3, Storage>                 mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef ScalarType                          scalar_type;
+    typedef typename mesh_type::coordinate_type coordinate_type;
     typedef typename mesh_type::cell            cell_type;
     typedef typename mesh_type::point_type      point_type;
     typedef Matrix<scalar_type, 3, 3>           gradient_type;
     typedef Matrix<scalar_type, Dynamic, 3>     function_type;
     typedef Matrix<scalar_type, Dynamic, 1>     divergence_type;
 
-  private:
+private:
     size_t basis_degree, basis_size;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, cell_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
-  public:
-    scaled_monomial_vector_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
-      scalar_basis(msh, cl, degree)
+public:
+    scaled_monomial_vector_basis(const mesh_type& msh, const cell_type& cl, size_t degree)
+        : scalar_basis(msh, cl, degree)
     {
         basis_degree = degree;
         basis_size   = vector_basis_size(degree, 3, 3);
@@ -210,6 +219,10 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 
         const function_type dphi = scalar_basis.eval_gradients(pt);
 
+        /* This generates *a lot* of linearly dependent stuff, this is not
+         * the correct way to generate the curls. Must figure out a better
+         * thing. */
+
         size_t j = 0;
         for (size_t i = 0; i < scalar_basis.size(); i++)
         {
@@ -262,13 +275,14 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 };
 
 /* Specialization for 3D meshes, faces */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face>
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face, ScalarType>
 {
 
   public:
     typedef Mesh<T, 3, Storage>                 mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef ScalarType                          scalar_type;
+    typedef typename mesh_type::coordinate_type coordinate_type;
     typedef typename mesh_type::point_type      point_type;
     typedef typename mesh_type::face            face_type;
     typedef Matrix<scalar_type, Dynamic, 3>     function_type;
@@ -276,7 +290,7 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
   private:
     size_t basis_degree, basis_size;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, face_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, face_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
   public:
@@ -319,21 +333,26 @@ class scaled_monomial_vector_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 };
 
 
+template<typename MeshType, typename ElementType, typename ScalarType>
+class scaled_monomial_vector_tangential_basis;
+
+
 /* Specialization for 3D meshes, faces */
-template<typename Mesh>
-class scaled_monomial_vector_tangential_basis
-    : public scaled_monomial_abstract_face_basis<Mesh, typename Mesh::face>
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_monomial_vector_tangential_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face, ScalarType>
+    : public scaled_monomial_abstract_face_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face, ScalarType>
 {
-    static_assert(Mesh::dimension == 3);
+    static_assert(Mesh<T, 3, Storage>::dimension == 3);
 
 public:
-    typedef Mesh                                mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef Mesh<T, 3, Storage>                 mesh_type;
+    typedef ScalarType                          scalar_type;
+    typedef typename mesh_type::coordinate_type coordinate_type;
     typedef typename mesh_type::point_type      point_type;
     typedef typename mesh_type::face            face_type;
     typedef Matrix<scalar_type, Dynamic, 3>     function_type;
 
-    using base = scaled_monomial_abstract_face_basis<mesh_type, face_type>;
+    using base = scaled_monomial_abstract_face_basis<mesh_type, face_type, scalar_type>;
 
 private:
     size_t basis_degree, basis_size;
@@ -397,22 +416,23 @@ public:
     }
 };
 
-template<typename MeshType, typename ElementType>
+template<typename MeshType, typename ElementType, typename ScalarType = typename MeshType::coordinate_type>
 auto
 make_vector_monomial_tangential_basis(const MeshType& msh, const ElementType& elem, size_t degree)
 {
-    return scaled_monomial_vector_tangential_basis<MeshType>(msh, elem, degree);
+    return scaled_monomial_vector_tangential_basis<MeshType, ElementType, ScalarType>(msh, elem, degree);
 }
 
 
 /* Specialization for 2D meshes, cells */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell>
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell, ScalarType>
 {
 
   public:
     typedef Mesh<T, 2, Storage>                 mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef ScalarType                          scalar_type;
+    typedef typename mesh_type::coordinate_type coordinate_type;
     typedef typename mesh_type::cell            cell_type;
     typedef typename mesh_type::point_type      point_type;
     typedef Matrix<scalar_type, 2, 2>           gradient_type;
@@ -422,7 +442,7 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
   private:
     size_t basis_degree, basis_size;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, cell_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
   public:
@@ -549,13 +569,14 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 };
 
 /* Specialization for 2D meshes, faces */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::face>
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::face, ScalarType>
 {
 
   public:
     typedef Mesh<T, 2, Storage>                 mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef ScalarType                          scalar_type;
+    typedef typename mesh_type::coordinate_type coordinate_type;
     typedef typename mesh_type::point_type      point_type;
     typedef typename mesh_type::face            face_type;
     typedef Matrix<scalar_type, Dynamic, 2>     function_type;
@@ -563,7 +584,7 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
   private:
     size_t basis_degree, basis_size;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, face_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, face_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
   public:
@@ -665,10 +686,10 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
     size_t basis_degree, basis_size;
     point_type cell_bar;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, cell_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
-    typedef scaled_monomial_vector_basis<mesh_type, cell_type> vector_basis_type;
+    typedef scaled_monomial_vector_basis<mesh_type, cell_type, scalar_type> vector_basis_type;
     vector_basis_type                                          vector_basis;
 
   public:
@@ -772,10 +793,10 @@ class scaled_monomial_vector_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
     size_t basis_degree, basis_size;
     point_type cell_bar;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, cell_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
-    typedef scaled_monomial_vector_basis<mesh_type, cell_type> vector_basis_type;
+    typedef scaled_monomial_vector_basis<mesh_type, cell_type, scalar_type> vector_basis_type;
     vector_basis_type                                          vector_basis;
 
   public:

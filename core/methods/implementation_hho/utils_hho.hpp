@@ -66,14 +66,18 @@ class hho_degree_info
      * The default polynomial degree is 1 for the face and cell degrees
      *
      */
-    hho_degree_info() : cell_deg(1), face_deg(1), grad_deg(1) {}
+    hho_degree_info()
+        : cell_deg(1), face_deg(1), grad_deg(1), rec_deg(2)
+    {}
 
     /**
      * @brief Construct a new hho degree info object
      *
      * @param degree polynomial degree used for the cells, faces and gradient
      */
-    explicit hho_degree_info(size_t degree) : cell_deg(degree), face_deg(degree), grad_deg(degree) {}
+    explicit hho_degree_info(size_t degree)
+        : cell_deg(degree), face_deg(degree), grad_deg(degree), rec_deg(degree+1)
+    {}
 
     /**
      * @brief Construct a new hho degree info object
