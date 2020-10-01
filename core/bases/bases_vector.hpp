@@ -424,6 +424,148 @@ make_vector_monomial_tangential_basis(const MeshType& msh, const ElementType& el
 }
 
 
+
+
+template<typename MeshType, typename ElementType, typename ScalarType>
+class scaled_monomial_nedelec_tangential_basis;
+
+size_t
+nedelec_tangential_basis_size(size_t degree)
+{
+    size_t basis_size   = vector_basis_size(degree-1, 2, 2);
+           basis_size  += scalar_basis_size(degree+1, 2) - scalar_basis_size(degree, 2);
+
+    return basis_size;
+}
+
+/* Specialization for 3D meshes, faces */
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_monomial_nedelec_tangential_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face, ScalarType>
+    : public scaled_monomial_abstract_face_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face, ScalarType>
+{
+    static_assert(Mesh<T, 3, Storage>::dimension == 3);
+
+public:
+    typedef Mesh<T, 3, Storage>                 mesh_type;
+    typedef ScalarType                          scalar_type;
+    typedef typename mesh_type::coordinate_type coordinate_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef typename mesh_type::face            face_type;
+    typedef Matrix<scalar_type, Dynamic, 3>     function_type;
+
+    using base = scaled_monomial_abstract_face_basis<mesh_type, face_type, scalar_type>;
+
+private:
+    size_t basis_degree, basis_size;
+
+public:
+    scaled_monomial_nedelec_tangential_basis(const mesh_type& msh, const face_type& fc, size_t degree)
+        : base(msh, fc)
+    {
+        basis_degree = degree;
+        basis_size   = vector_basis_size(degree-1, 2, 2);
+        basis_size  += scalar_basis_size(degree+1, 2) - scalar_basis_size(degree, 2);
+    }
+
+    function_type
+    eval_functions(const point_type& pt) const
+    {
+        const auto ep = this->map_face_point_3d_to_2d(pt);
+        const auto bx = ep.x();
+        const auto by = ep.y();
+
+        auto [e0, e1] = this->reference_frame();
+
+        auto ih0 = 1./e0.norm();
+        auto ih1 = 1./e1.norm();
+
+        function_type ret = function_type::Zero(basis_size, 3);
+        size_t pos = 0;
+        for (size_t k = 0; k < basis_degree; k++)
+        {
+            for (size_t i = 0; i <= k; i++)
+            {
+                const auto pow_x    = k - i;
+                const auto pow_y    = i;
+                const auto px       = iexp_pow(bx, pow_x);
+                const auto py       = iexp_pow(by, pow_y);
+                const auto val0     = e0 * px * py;
+                const auto val1     = e1 * px * py;
+
+                ret(pos, 0) = val0(0);
+                ret(pos, 1) = val0(1);
+                ret(pos, 2) = val0(2);
+                pos++;
+
+                ret(pos, 0) = val1(0);
+                ret(pos, 1) = val1(1);
+                ret(pos, 2) = val1(2);
+                pos++;
+            }
+        }
+
+        /* Gradients of homogeneous poly of degree k+1 */
+        auto bd = basis_degree+1;
+        for (size_t i = 0; i <= bd; i++)
+        {
+            const auto pow_x    = bd - i;
+            const auto pow_y    = i;
+            const auto px       = iexp_pow(bx, pow_x);
+            const auto py       = iexp_pow(by, pow_y);
+            const auto dx       = (pow_x == 0) ? 0 : pow_x * ih0 * iexp_pow(bx, pow_x - 1);
+            const auto dy       = (pow_y == 0) ? 0 : pow_y * ih1 * iexp_pow(by, pow_y - 1);
+            const auto dpdx     = dx * py;
+            const auto dpdy     = px * dy;
+            const Matrix<T,3,1> grad = e0*dpdx + e1*dpdy;
+
+            ret(pos, 0) = grad(0);
+            ret(pos, 1) = grad(1);
+            ret(pos, 2) = grad(2);
+            pos++;
+        }
+
+        assert(pos == basis_size);
+        return ret;
+    }
+
+    size_t
+    size() const
+    {
+        return basis_size;
+    }
+
+    size_t
+    degree() const
+    {
+        return basis_degree;
+    }
+};
+
+template<typename MeshType, typename ElementType, typename ScalarType = typename MeshType::coordinate_type>
+auto
+make_vector_monomial_nedelec_tangential_basis(const MeshType& msh, const ElementType& elem, size_t degree)
+{
+    return scaled_monomial_nedelec_tangential_basis<MeshType, ElementType, ScalarType>(msh, elem, degree);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* Specialization for 2D meshes, cells */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
 class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell, ScalarType>

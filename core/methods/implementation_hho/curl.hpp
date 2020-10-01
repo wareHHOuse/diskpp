@@ -202,6 +202,71 @@ make_vector_hho_curl_impl(const Mesh&                       msh,
 
 template<typename Mesh>
 std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+make_vector_hho_curl_impl_nedelec(const Mesh&                       msh,
+                          const typename Mesh::cell_type&   cl,
+                          const hho_degree_info&       cell_infos)
+{
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
+
+    const auto facdeg = cell_infos.face_degree();
+    const auto celdeg = cell_infos.cell_degree();
+    const auto recdeg = cell_infos.reconstruction_degree();
+
+    const auto cb = make_vector_monomial_basis(msh, cl, celdeg);
+    const auto rb = make_vector_monomial_basis(msh, cl, recdeg);
+    const auto fbs = nedelec_tangential_basis_size(facdeg);
+    const auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
+    const auto rbs = vector_basis_size(recdeg, Mesh::dimension, Mesh::dimension);
+
+    const auto      fcs = faces(msh, cl);
+    const auto num_faces_dofs = fcs.size() * fbs;
+
+    matrix_type stiff = matrix_type::Zero(rbs, rbs);
+    matrix_type cr_lhs = matrix_type::Zero(rbs-3, rbs-3);
+    matrix_type cr_rhs = matrix_type::Zero(rbs-3, cbs + num_faces_dofs);
+
+    const auto qps = integrate(msh, cl, 2*recdeg);
+    for (auto& qp : qps)
+    {
+        const auto cphi = rb.eval_curls2(qp.point());
+        stiff += qp.weight() * cphi * cphi.transpose();
+    }
+
+    cr_lhs = stiff.block(3, 3, rbs-3, rbs-3);
+    cr_rhs.block(0, 0, rbs-3, cbs) = stiff.block(3, 0, rbs-3, cbs);
+
+    size_t offset = cbs;
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto fc = fcs[i];
+        const auto n      = normal(msh, cl, fc);
+        const auto fb     = make_vector_monomial_nedelec_tangential_basis(msh, fc, facdeg);
+
+        const auto qps_f = integrate(msh, fc, 2*recdeg);
+        for (auto& qp : qps_f)
+        {
+            Matrix<T, Dynamic, 3> cphi      = rb.eval_curls2(qp.point());
+            Matrix<T, Dynamic, 3> cphi_n    = vcross(cphi, n).block(3,0,rbs-3,3);
+            Matrix<T, Dynamic, 3> f_phi     = fb.eval_functions(qp.point());
+            Matrix<T, Dynamic, 3> c_phi     = cb.eval_functions(qp.point());
+
+            cr_rhs.block(0, 0, rbs-3, cbs) -= qp.weight() * cphi_n * c_phi.transpose();
+            cr_rhs.block(0, offset, rbs-3, fbs) += qp.weight() * cphi_n * f_phi.transpose();
+        }
+
+        offset += fbs;
+    }
+
+    matrix_type oper = cr_lhs.ldlt().solve(cr_rhs);
+    matrix_type data = cr_rhs.transpose() * oper;
+
+    return std::make_pair(oper, data);
+}
+
+template<typename Mesh>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
 make_vector_lapl_H0t_oper(const Mesh&                       msh,
                           const typename Mesh::cell_type&   cl,
                           const hho_degree_info&       cell_infos)

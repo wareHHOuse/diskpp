@@ -864,7 +864,7 @@ void vector_wave_solver(Mesh& msh, size_t order)
 
     auto sol_fun = [&](const typename Mesh::point_type& pt) -> Matrix<T, 3, 1> {
         Matrix<T, 3, 1> ret;
-        ret(0) = 0.0;
+        ret(0) = 0.0;//M_PI*std::sin(M_PI*pt.x());
         ret(1) = 0.0;
         ret(2) = std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
         return ret;
@@ -877,6 +877,11 @@ void vector_wave_solver(Mesh& msh, size_t order)
 #endif
 
     T omega = M_PI;
+
+    T norm_C  = 0.0;
+    T norm_Ct = 0.0;
+    T norm_S  = 0.0;
+    T norm_M  = 0.0;
 
     std::cout << "Assembling to triplets" << std::endl;
     for (auto& cl : msh)
@@ -895,13 +900,30 @@ void vector_wave_solver(Mesh& msh, size_t order)
         auto cb = make_vector_monomial_basis(msh, cl, chdi.cell_degree());
         rhs.segment(0, cb.size()) = make_rhs(msh, cl, cb, rhs_fun, 1);
 
+        //VectorXcd eivals = lhs.block(0,0,cb.size(), cb.size()).eigenvalues();
+        //std::cout << eivals.transpose() << std::endl;
+
 #ifdef USE_STATIC_CONDENSATION
         auto [LC, bC] = disk::static_condensation(lhs, rhs, cb.size());
         assm.assemble(msh, cl, LC, bC);
 #else
         assm.assemble(msh, cl, lhs, rhs);
 #endif
+
+        Matrix<T, Dynamic, 1> prj = project_tangent(msh, cl, chdi, sol_fun);
+
+        norm_C += prj.dot(CR.second*prj);
+        norm_S += prj.dot(ST*prj);
+        norm_M += prj.dot(MM*prj);
+
+
+        Matrix<T, Dynamic, Dynamic> CC = make_curl_curl_matrix(msh, cl, cb);
+        Matrix<T, Dynamic, 1> pc = project_function(msh, cl, chdi.cell_degree(), sol_fun);
+        norm_Ct += pc.dot(CC*pc);
     }
+
+    std::cout << std::sqrt(norm_C) << " " << std::sqrt(norm_S) << " " << std::sqrt(norm_M) << std::endl;
+    std::cout << std::sqrt(norm_Ct) << std::endl;
 
     std::cout << "Triplets to matrix" << std::endl;
     assm.finalize();
