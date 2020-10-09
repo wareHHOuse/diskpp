@@ -400,7 +400,7 @@ public:
     typedef priv::filter_iterator<typename mesh::face_iterator,
                                   priv::is_internal_pred<mesh>>
                                   internal_face_iterator;
-
+    
     /* Return a vector with the ids of all the boundaries */
     std::vector<size_t>
     boundary_id_list(void) const
@@ -581,6 +581,118 @@ public:
         this->backend_storage()->statistics();
     }
 };
+
+
+template<typename Mesh>
+class neighbour_connectivity
+{
+    typedef typename Mesh::cell_type                    cell_type;
+    typedef typename Mesh::face_type                    face_type;
+    typedef std::array<typename cell_type::id_type, 2>  face_owners_type;
+    std::vector<face_owners_type>                       face_owners;
+    
+#define NO_OWNER (~0)
+    
+    void compute_connectivity(const Mesh& msh)
+    {
+        face_owners.resize( msh.faces_size() );
+        
+        for (auto& fo : face_owners)
+        {
+            fo[0] = typename cell_type::id_type(NO_OWNER);
+            fo[1] = typename cell_type::id_type(NO_OWNER);
+        }
+        
+        size_t cell_i = 0;
+        for (auto& cl : msh)
+        {
+            auto fcs = faces(msh, cl);
+            
+            for (auto& fc : fcs)
+            {
+                auto fi = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
+                if (!fi.first)
+                {
+                    std::stringstream ss;
+                    ss << fc << ": Face not present in mesh";
+                    throw std::invalid_argument(ss.str());
+                }
+                auto fc_id = offset(msh, fc);
+                
+                auto&  fo = face_owners.at(fc_id);
+                if (fo[0] == NO_OWNER)
+                    fo[0] = typename cell_type::id_type(cell_i);
+                else if (fo[1] == NO_OWNER)
+                    fo[1] = typename cell_type::id_type(cell_i);
+                else
+                    throw std::logic_error("BUG: a face has max 2 owners");
+            }
+            
+            ++cell_i;
+        }
+    }
+    
+public:
+    neighbour_connectivity(const Mesh& msh)
+    {
+        compute_connectivity(msh);
+    }
+    
+    std::pair<cell_type, bool>
+    neighbour_via(const Mesh& msh, const cell_type& cl, const face_type& fc)
+    {
+        if ( face_owners.size() != msh.faces_size() )
+            throw std::logic_error("Inconsistent neighbour information.");
+        
+        auto cl_ofs = offset(msh, cl);
+        auto fc_ofs = offset(msh, fc);
+        
+        auto fo = face_owners.at( fc_ofs );
+        
+        if ( fo[0] != cl_ofs )
+            std::swap(fo[0], fo[1]);
+        
+        assert(fo[0] == cl_ofs);
+        
+        if (fo[1] == NO_OWNER)
+            return std::make_pair(*msh.cells_begin(), false);
+        
+        return std::make_pair( *std::next(msh.cells_begin(), fo[1]), true);
+    }
+};
+
+template<typename Mesh>
+auto connectivity_via_faces(const Mesh& msh)
+{
+    return neighbour_connectivity<Mesh>(msh);
+}
+    
+/*
+template<typename Mesh>
+std::pair<typename Mesh::cell_type, bool>
+neighbour_via(const Mesh& msh,
+              const typename Mesh::cell_type& cl,
+              const typename Mesh::face_type& fc)
+{
+    if ( msh.face_owners.size() != msh.faces.size() )
+        throw std::logic_error("No neighbour information.");
+    
+    auto cl_ofs = offset(msh, cl);
+    auto fc_ofs = offset(msh, fc);
+    
+    auto fo = msh.face_owners.at( fc_ofs );
+    
+    if ( fo[0] != cl_ofs )
+        std::swap(fo[0], fo[1]);
+    
+    assert(fo[0] == cl_ofs);
+    
+    if (fo[1] == NO_OWNER)
+        return std::make_pair(msh.cells[0], false);
+    
+    return std::make_pair(msh.cells.at(fo[1]), true);
+}
+ */
 
 template<typename T, size_t DIM, typename Storage>
 typename mesh<T, DIM, Storage>::cell_iterator
@@ -766,47 +878,6 @@ dump_to_matlab(const Mesh<T, 2, Storage>& msh, const std::string& filename)
     }
 
     ofs.close();
-}
-
-template<typename Mesh>
-class connectivity
-{
-    typedef Mesh                        mesh_type;
-    typedef typename mesh_type::cell    cell_type;
-    typedef typename mesh_type::face    face_type;
-
-    std::vector< std::set<cell_type> >      face_cell_connectivity;
-
-    Mesh m_msh;
-
-public:
-    connectivity(const Mesh& msh) : m_msh(msh)
-    {
-        face_cell_connectivity.resize( msh.faces_size() );
-
-        for (auto& cl : msh)
-        {
-            auto fcs = faces(msh, cl);
-            for (auto fc : fcs)
-            {
-                auto face_id = msh.lookup(fc);
-                face_cell_connectivity.at(face_id).insert(cl);
-            }
-        }
-    }
-
-    std::set<cell_type>
-    connected_cells(const face_type& fc)
-    {
-        auto face_id = m_msh.lookup(fc);
-        return face_cell_connectivity.at(face_id);
-    }
-};
-
-template<typename Mesh>
-auto make_connectivity(const Mesh& msh)
-{
-    return connectivity<Mesh>(msh);
 }
 
 template<typename Mesh>
