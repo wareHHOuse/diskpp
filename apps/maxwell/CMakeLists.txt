@@ -6,5 +6,8 @@ if (BUILD_APP_MAXWELL)
                             CXX_STANDARD 20
                             CXX_STANDARD_REQUIRED YES
                             CXX_EXTENSIONS NO)
+
+    add_executable(maxwell_sip_dg maxwell_sip_dg.cpp)
+    target_link_libraries(maxwell_sip_dg ${LINK_LIBS})
 endif()
 

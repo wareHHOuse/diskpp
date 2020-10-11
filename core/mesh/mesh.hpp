@@ -1,5 +1,15 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016-2020
+ * DISK++, a template library for DIscontinuous SKeletal methods.
+ *  
+ * Matteo Cicuttin (C) 2020
+ * matteo.cicuttin@uliege.be
+ *
+ * University of Liège - Montefiore Institute
+ * Applied and Computational Electromagnetics group  
+ */
+
+/*
+ *       /\        Matteo Cicuttin (C) 2016-2019
  *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
