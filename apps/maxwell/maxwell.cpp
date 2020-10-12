@@ -25,6 +25,9 @@
 #include "output/silo.hpp"
 #include "solvers/solver.hpp"
 
+#include <Eigen/IterativeLinearSolvers>
+#include <unsupported/Eigen/IterativeSolvers>
+
 template<typename Mesh>
 class maxwell_assembler
 {
@@ -493,12 +496,12 @@ public:
             if ( msh.is_boundary(fcs[fi]) )
                 continue;
 
+            auto cofsi = fbs * compress_table.at( offset(msh, fcs[fi]) );
             for (size_t fj = 0; fj < fcs.size(); fj++)
             {
                 if ( msh.is_boundary(fcs[fj]) )
                     continue;
 
-                auto cofsi = fbs * compress_table.at( offset(msh, fcs[fi]) );
                 auto cofsj = fbs * compress_table.at( offset(msh, fcs[fj]) );
 
                 for (size_t i = 0; i < fbs; i++)
@@ -511,6 +514,8 @@ public:
                     }
                 }
             }
+
+            RHS.segment(cofsi, fbs) += rhs.segment(fi*fbs, fbs);
         }
     }
 
@@ -555,6 +560,7 @@ public:
                 auto ofs = fbs*compress_table.at( offset(msh, fc) );
                 ret.segment(i*fbs, fbs) = sol.segment(ofs, fbs);
             }
+            i++;
         }
 
         return ret;
@@ -708,11 +714,6 @@ public:
     }
 };
 
-
-
-
-//#define USE_STATIC_CONDENSATION
-
 template<typename Mesh>
 void laplacian_H0t_solver(Mesh& msh, size_t order)
 {
@@ -829,8 +830,11 @@ void laplacian_H0t_solver(Mesh& msh, size_t order)
     silo_db.close();
 }
 
+#define USE_STATIC_CONDENSATION
+
 template<typename Mesh>
-void vector_wave_solver(Mesh& msh, size_t order)
+std::pair<typename Mesh::coordinate_type, typename Mesh::coordinate_type>
+vector_wave_solver(Mesh& msh, size_t order, const typename Mesh::coordinate_type& alpha)
 {
     using T = typename Mesh::coordinate_type;
 
@@ -878,8 +882,8 @@ void vector_wave_solver(Mesh& msh, size_t order)
         auto ST = make_vector_hho_curl_stab(msh, cl, chdi);
         auto MM = make_vector_mass_oper(msh, cl, chdi);
 
-        Matrix<T, Dynamic, Dynamic> lhs = CR.second + ST - (omega*omega)*MM;
-        Matrix<T, Dynamic, 1> rhs(lhs.rows());
+        Matrix<T, Dynamic, Dynamic> lhs = CR.second + alpha*ST - (omega*omega)*MM;
+        Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(lhs.rows());
 
         auto cb = make_vector_monomial_basis(msh, cl, chdi.cell_degree());
         rhs.segment(0, cb.size()) = make_rhs(msh, cl, cb, rhs_fun, 1);
@@ -907,6 +911,7 @@ void vector_wave_solver(Mesh& msh, size_t order)
     }
 
     std::cout << std::sqrt(norm_C) << " " << std::sqrt(norm_S) << " " << std::sqrt(norm_M) << std::endl;
+    std::cout << std::sqrt(norm_C) + alpha*std::sqrt(norm_S) - omega*omega*std::sqrt(norm_M) << std::endl;
     std::cout << std::sqrt(norm_Ct) << std::endl;
 
     std::cout << "Triplets to matrix" << std::endl;
@@ -914,12 +919,11 @@ void vector_wave_solver(Mesh& msh, size_t order)
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.syssz);
 
-    
     std::cout << "Running pardiso" << std::endl;
     disk::solvers::pardiso_params<T> pparams;
     pparams.report_factorization_Mflops = true;
     mkl_pardiso(pparams, assm.LHS, assm.RHS, sol);
-    
+
     /*
     disk::solvers::conjugated_gradient_params<T> cgp;
     cgp.max_iter = assm.LHS.rows();
@@ -927,9 +931,14 @@ void vector_wave_solver(Mesh& msh, size_t order)
     conjugated_gradient(cgp, assm.LHS, assm.RHS, sol);
     */
 
+    //Eigen::GMRES<Eigen::SparseMatrix<T>, Eigen::IdentityPreconditioner> gmres;
+    //gmres.compute(assm.LHS);
+    //sol = gmres.solve(assm.RHS);
+
     std::vector<T> data_ux, data_uy, data_uz;
 
-    T err = 0.0; size_t cell_i = 0;
+    T l2_err = 0.0; size_t cell_i = 0;
+    T energy_err = 0.0;
     for (auto& cl : msh)
     {
         auto cb = make_vector_monomial_basis(msh, cl, chdi.cell_degree());
@@ -938,12 +947,20 @@ void vector_wave_solver(Mesh& msh, size_t order)
         auto CR = disk::make_vector_hho_curl_impl(msh, cl, chdi);
         auto ST = make_vector_hho_curl_stab(msh, cl, chdi);
         auto MM = make_vector_mass_oper(msh, cl, chdi);
-        Matrix<T, Dynamic, Dynamic> lhs = CR.second + ST - (omega*omega)*MM;
-        Matrix<T, Dynamic, 1> rhs(lhs.rows());
+        Matrix<T, Dynamic, Dynamic> lhs = CR.second + alpha*ST - (omega*omega)*MM;
+        Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(lhs.rows());
         rhs.segment(0, cb.size()) = make_rhs(msh, cl, cb, rhs_fun, 1);
         auto edofs = assm.get_element_dofs(msh, cl, sol);
         auto esol = disk::static_decondensation(lhs, rhs, edofs);
         Matrix<T, Dynamic, 1> lsol = esol.segment(0, cb.size());
+
+        Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb, 1);
+        Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun, 1);
+        Matrix<T, Dynamic, 1> asol = MMe.llt().solve(arhs);
+
+        Matrix<T, Dynamic, 1> prj = project_tangent(msh, cl, chdi, sol_fun);
+
+        energy_err += (prj-esol).dot(lhs*(prj-esol));
 #else
         Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb, 1);
         Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun, 1);
@@ -965,14 +982,16 @@ void vector_wave_solver(Mesh& msh, size_t order)
 
         Matrix<T, Dynamic, 1> diff = lsol - asol;
 
-        err += diff.dot(MMe*diff);
+        l2_err += diff.dot(MMe*diff);
 
         cell_i++;
     }
 
     std::cout << "h = " << disk::average_diameter(msh) << " ";
-    std::cout << "err = " << std::sqrt(err) << std::endl;
+    std::cout << "err(L2) = " << std::sqrt(l2_err) << " err(energy) = ";
+    std::cout << std::sqrt(energy_err) << std::endl;
 
+    /*
     disk::silo_database silo_db;
     silo_db.create("maxwell.silo");
     silo_db.add_mesh(msh, "mesh");
@@ -990,10 +1009,13 @@ void vector_wave_solver(Mesh& msh, size_t order)
     silo_db.add_expression("mag_u", "magnitude(u)", DB_VARTYPE_SCALAR);
 
     silo_db.close();
+    */
+
+    return std::make_pair( std::sqrt(l2_err), std::sqrt(energy_err));
 }
 
 template<typename Mesh>
-void maxwell_eigenvalue_solver(Mesh& msh, size_t order)
+void maxwell_eigenvalue_solver(Mesh& msh, size_t order, const typename Mesh::coordinate_type& alpha)
 {
     using T = typename Mesh::coordinate_type;
 
@@ -1010,7 +1032,7 @@ void maxwell_eigenvalue_solver(Mesh& msh, size_t order)
         auto CR = disk::make_vector_hho_curl_impl(msh, cl, chdi);
         auto ST = make_vector_hho_curl_stab(msh, cl, chdi);
         auto MM = make_vector_mass_oper(msh, cl, chdi);
-        assm.assemble(msh, cl, CR.second+ST, MM);
+        assm.assemble(msh, cl, CR.second+alpha*ST, MM);
     }
 
     assm.finalize();
@@ -1078,7 +1100,7 @@ void maxwell_eigenvalue_solver(Mesh& msh, size_t order)
     }
 
     for (size_t i = 0; i < fep.eigvals_found; i++)
-        std::cout << hho_eigvals(i) << std::endl;
+        std::cout << std::setprecision(8) << hho_eigvals(i) << std::endl;
     
 }
 
@@ -1087,11 +1109,81 @@ int main(int argc, char **argv)
 {
     using T = double;
 
-    if (argc != 3)
+    T           stab_param = 1.0;
+    bool        solve_eigvals = false;
+    size_t      degree = 1;
+    char *      mesh_filename = nullptr;
+
+    int ch;
+    while ( (ch = getopt(argc, argv, "a:ek:m:")) != -1 )
+    {
+        switch(ch)
+        {
+            case 'a':
+                stab_param = std::stod(optarg);
+                break;
+
+            case 'e':
+                solve_eigvals = true;
+                break;
+
+            case 'k':
+                degree = std::stoi(optarg);
+                break;
+
+            case 'm':
+                mesh_filename = optarg;
+                break;
+
+            case '?':
+            default:
+                std::cout << "Invalid option" << std::endl;
+                return 1;
+        }
+    }
+
+    /* Netgen 3D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$") ))
+    {
+        std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
+        auto msh = disk::load_netgen_3d_mesh<T>(mesh_filename);
+
+        if (solve_eigvals)
+            maxwell_eigenvalue_solver(msh, degree, stab_param);
+        else
+            vector_wave_solver(msh, degree, stab_param);
+
+        return 0;
+    }
+
+    /* DiSk++ cartesian 3D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.hex$") ))
+    {
+        std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
+        auto msh = disk::load_cartesian_3d_mesh<T>(mesh_filename);
+        
+        if (solve_eigvals)
+            maxwell_eigenvalue_solver(msh, degree, stab_param);
+        else
+            vector_wave_solver(msh, degree, stab_param);
+        
+        return 0;
+    }
+}
+
+#if 0
+
+int main(int argc, char **argv)
+{
+    using T = double;
+
+    if (argc != 2)
     {
         std::cout << "params!" << std::endl;
         return 1;
     }
+
+    //T stabparam = std::stod(argv[1]);
 
     int order = std::stoi(argv[1]);
     if (order < 0)
@@ -1100,19 +1192,42 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    int mesh = std::stoi(argv[2]);
+    //int mesh = std::stoi(argv[3]);
 
     using Mesh = disk::simplicial_mesh<T,3>;
     //using Mesh = disk::cartesian_mesh<T, 3>;
     //using Mesh = disk::generic_mesh<T, 3>;
 
-    Mesh msh;
+    std::ofstream ofs_l2("l2log.txt");
+    std::ofstream ofs_nrg("nrglog.txt");
 
-    
+    for (T sp = 1.0; sp < 15.0; sp += 1.0)
+    {
+        ofs_l2  << sp << " ";
+        ofs_nrg << sp << " ";
+        
+        for (size_t i = 1; i < 5; i++)
+        {
+            Mesh msh;
+            std::stringstream ss;
+            ss << "../../../meshes/3D_tetras/netgen/cube" << i << ".mesh";
 
-    std::stringstream ss;
-    ss << "../../../meshes/3D_tetras/netgen/cube" << mesh << ".mesh";
-    disk::load_mesh_netgen(ss.str().c_str(), msh);
+            disk::load_mesh_netgen(ss.str().c_str(), msh);
+
+            auto diam = disk::average_diameter(msh);
+
+
+            auto [l2,nrg] = vector_wave_solver(msh, order, sp);  
+            ofs_l2  << l2 << " ";
+            ofs_nrg << nrg << " ";
+        }
+
+        ofs_l2 << std::endl;
+        ofs_nrg << std::endl;
+    }
+
+    //1 from 1 to 15
+    //2 from 15 to 30
 
     //disk::load_mesh_diskpp_cartesian("../../../meshes/3D_hexa/diskpp/testmesh-16-16-16.hex", msh);
 
@@ -1123,16 +1238,17 @@ int main(int argc, char **argv)
 
 
 
-    std::cout << "Cells: " << msh.cells_size() << std::endl;
+    //std::cout << "Cells: " << msh.cells_size() << std::endl;
 
     
 
     
 
     //laplacian_H0t_solver(msh, order);
-    vector_wave_solver(msh, order);
-    //maxwell_eigenvalue_solver(msh, order);
+    //vector_wave_solver(msh, order, stabparam);vector_wave_solver(msh, order, stabparam);
+    //maxwell_eigenvalue_solver(msh, order, stabparam);
 
 
 }
 
+#endif

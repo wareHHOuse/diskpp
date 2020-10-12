@@ -67,6 +67,9 @@ if (BUILD_APP_DISKPP_TESTS)
     add_executable(curl_reconstruction curl_reconstruction.cpp)
     target_link_libraries(curl_reconstruction ${LINK_LIBS})
 
+    add_executable(curl_reconstruction_pk curl_reconstruction_pk.cpp)
+    target_link_libraries(curl_reconstruction_pk ${LINK_LIBS})
+
     add_executable(curl_stabilization curl_stabilization.cpp)
     target_link_libraries(curl_stabilization ${LINK_LIBS})
 endif()

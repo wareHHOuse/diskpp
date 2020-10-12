@@ -211,6 +211,70 @@ make_vector_hho_curl_impl(const Mesh&                       msh,
 
 template<typename Mesh>
 std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+make_vector_hho_curl_impl_pk(const Mesh&                       msh,
+                          const typename Mesh::cell_type&   cl,
+                          const hho_degree_info&       cell_infos)
+{
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
+
+    const auto facdeg = cell_infos.face_degree();
+    const auto celdeg = cell_infos.cell_degree();
+    const auto recdeg = cell_infos.reconstruction_degree();
+
+    const auto cb = make_vector_monomial_basis(msh, cl, celdeg);
+    const auto rb = make_vector_monomial_basis(msh, cl, recdeg);
+    const auto fbs = vector_basis_size(facdeg, Mesh::dimension - 1, Mesh::dimension-1);
+    const auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
+    const auto rbs = vector_basis_size(recdeg, Mesh::dimension, Mesh::dimension);
+
+    const auto      fcs = faces(msh, cl);
+    const auto num_faces_dofs = fcs.size() * fbs;
+
+    matrix_type mass = matrix_type::Zero(rbs, rbs);
+    matrix_type cr_rhs = matrix_type::Zero(rbs, cbs + num_faces_dofs);
+
+    const auto qps = integrate(msh, cl, 2*recdeg);
+    for (auto& qp : qps)
+    {
+        const auto phi = rb.eval_functions(qp.point());
+        mass += qp.weight() * phi * phi.transpose();
+
+        const auto cphi = cb.eval_curls2(qp.point());
+        cr_rhs.block(0, 0, rbs, cbs) += qp.weight() * phi * cphi.transpose();
+    }
+
+    size_t offset = cbs;
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto fc = fcs[i];
+        const auto n      = normal(msh, cl, fc);
+        const auto fb     = make_vector_monomial_tangential_basis(msh, fc, facdeg);
+
+        const auto qps_f = integrate(msh, fc, 2*recdeg);
+        for (auto& qp : qps_f)
+        {
+            Matrix<T, Dynamic, 3> r_phi     = rb.eval_functions(qp.point());
+            Matrix<T, Dynamic, 3> r_phi_n   = vcross(r_phi, n);
+            Matrix<T, Dynamic, 3> f_phi     = fb.eval_functions(qp.point());
+            Matrix<T, Dynamic, 3> c_phi     = cb.eval_functions(qp.point());
+
+            cr_rhs.block(0, 0, rbs, cbs) -= qp.weight() * r_phi_n * c_phi.transpose();
+            cr_rhs.block(0, offset, rbs, fbs) += qp.weight() * r_phi_n * f_phi.transpose();
+        }
+
+        offset += fbs;
+    }
+
+    matrix_type oper = mass.ldlt().solve(cr_rhs);
+    matrix_type data = cr_rhs.transpose() * oper;
+
+    return std::make_pair(oper, data);
+}
+
+template<typename Mesh>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
 make_vector_hho_curl_impl_nedelec(const Mesh&                       msh,
                           const typename Mesh::cell_type&   cl,
                           const hho_degree_info&       cell_infos)
@@ -512,10 +576,12 @@ static_condensation(const dynamic_matrix<T>& lhs, const dynamic_vector<T>& rhs,
     dynamic_vector<T> bT = rhs.segment(     0, t_size);
     dynamic_vector<T> bF = rhs.segment(tf_bnd, f_size);
 
-    LLT<dynamic_matrix<T>> llt_LTT(LTT);
+    LDLT<dynamic_matrix<T>> ldlt_LTT(LTT);
+    if (ldlt_LTT.info() != Eigen::Success)
+        throw std::invalid_argument("Can't factorize matrix for static condensation");
 
-    dynamic_matrix<T> LC = LFF - LFT*llt_LTT.solve(LTF);
-    dynamic_vector<T> bC = bF - LFT*llt_LTT.solve(bT);
+    dynamic_matrix<T> LC = LFF - LFT*ldlt_LTT.solve(LTF);
+    dynamic_vector<T> bC = bF - LFT*ldlt_LTT.solve(bT);
 
     return std::make_pair(LC, bC);
 }
@@ -535,7 +601,11 @@ static_decondensation(const dynamic_matrix<T>& lhs, const dynamic_vector<T>& rhs
     dynamic_vector<T> bT = rhs.segment(0, t_size);
 
     dynamic_vector<T> ret = dynamic_vector<T>::Zero(lhs.rows());
-    ret.segment(     0, t_size) = LTT.llt().solve(bT - LTF*uF);
+    LDLT<dynamic_matrix<T>> ldlt_LTT(LTT);
+    if (ldlt_LTT.info() != Eigen::Success)
+        throw std::invalid_argument("Can't factorize matrix for static condensation");
+
+    ret.segment(     0, t_size) = ldlt_LTT.solve(bT - LTF*uF);
     ret.segment(tf_bnd, f_size) = uF;
 
     return ret;
@@ -578,7 +648,7 @@ make_vector_hho_curl_stab(const Mesh&                       msh,
 
         rhs.block(0, offset, fbs, fbs) = matrix_type::Identity(fbs, fbs);
 
-        const auto qps_f = integrate(msh, fc, celdeg+facdeg);
+        const auto qps_f = integrate(msh, fc, 2*std::max(celdeg,facdeg));
         for (auto& qp : qps_f)
         {
             Matrix<T, Dynamic, 3> f_phi = fb.eval_functions(qp.point());

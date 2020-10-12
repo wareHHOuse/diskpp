@@ -23,6 +23,9 @@
 #include "output/silo.hpp"
 #include "solvers/solver.hpp"
 
+#include <Eigen/IterativeLinearSolvers>
+#include <unsupported/Eigen/IterativeSolvers>
+
 namespace disk {
 
 /* Temporarly copied from curl.hpp */
@@ -340,7 +343,11 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
     pparams.report_factorization_Mflops = true;
     mkl_pardiso(pparams, assm.LHS, assm.RHS, sol);
 
-
+    /*
+    Eigen::GMRES<Eigen::SparseMatrix<T>, Eigen::IdentityPreconditioner> gmres;
+    gmres.compute(assm.LHS);
+    sol = gmres.solve(assm.RHS);
+    */
 
     std::vector<T> data_ux, data_uy, data_uz;
 
@@ -401,23 +408,40 @@ int main(int argc, char **argv)
 {
     using T = double;
 
-    if (argc != 4)
+    T           stab_param = 1.0;
+    size_t      degree = 1;
+    char *      mesh_filename = nullptr;
+
+    int ch;
+    while ( (ch = getopt(argc, argv, "a:k:m:")) != -1 )
     {
-        std::cout << "Please specify file name." << std::endl;
-        return 1;
+        switch(ch)
+        {
+            case 'a':
+                stab_param = std::stod(optarg);
+                break;
+
+            case 'k':
+                degree = std::stoi(optarg);
+                break;
+
+            case 'm':
+                mesh_filename = optarg;
+                break;
+
+            case '?':
+            default:
+                std::cout << "Invalid option" << std::endl;
+                return 1;
+        }
     }
-
-    size_t degree = std::stoi(argv[2]);
-    T eta = std::stod(argv[3]);
-
-    char *mesh_filename = argv[1];
 
     /* Netgen 3D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$") ))
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
         auto msh = disk::load_netgen_3d_mesh<T>(mesh_filename);
-        run_maxwell_solver(msh, degree, eta);
+        run_maxwell_solver(msh, degree, stab_param);
         return 0;
     }
 
@@ -426,7 +450,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
         auto msh = disk::load_cartesian_3d_mesh<T>(mesh_filename);
-        run_maxwell_solver(msh, degree, eta);
+        run_maxwell_solver(msh, degree, stab_param);
         return 0;
     }
 }

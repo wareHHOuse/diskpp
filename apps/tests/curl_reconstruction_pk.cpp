@@ -62,29 +62,35 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
             return ret;
         };
 
+        auto sol = [](const point_type& pt) -> Matrix<T,3,1> {
+            Matrix<T,3,1> ret;
+            ret(0) = -M_PI*std::cos(M_PI*pt.z());
+            ret(1) = -M_PI*std::cos(M_PI*pt.x());
+            ret(2) = -M_PI*std::cos(M_PI*pt.y());
+            return ret;
+        };
+
         size_t fd = degree;
         size_t cd = mixed ? degree+1 : degree;
-        size_t rd = degree+1;
+        size_t rd = degree;
 
         disk::hho_degree_info hdi( { .rd = rd, .cd = cd, .fd = fd } );
 
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            auto CR = disk::make_vector_hho_curl_impl(msh, cl, hdi);
-            auto proj = disk::project_tangent(msh, cl, hdi, f,3);
+            auto CR = disk::make_vector_hho_curl_impl_pk(msh, cl, hdi);
+            auto proj = disk::project_tangent(msh, cl, hdi, f, 2);
             Matrix<T, Dynamic, 1> rf = CR.first * proj;
             auto rb = disk::make_vector_monomial_basis(msh, cl, rd);
 
-            Matrix<T, Dynamic, Dynamic> mass         = disk::make_mass_matrix(msh, cl, rb,3);
-            Matrix<T, Dynamic, 1>       rhs          = disk::make_rhs(msh, cl, rb, f,3);
+            Matrix<T, Dynamic, Dynamic> mass         = disk::make_mass_matrix(msh, cl, rb, 2);
+            Matrix<T, Dynamic, 1>       rhs          = disk::make_rhs(msh, cl, rb, sol, 2);
             Matrix<T, Dynamic, 1>       exp_reconstr = mass.ldlt().solve(rhs);
-            Matrix<T, Dynamic, 1>       diff = exp_reconstr;
-            diff.head(3) = exp_reconstr.head(3);
-            diff.tail(rb.size()-3) -= rf;
+            Matrix<T, Dynamic, 1>       diff = exp_reconstr - rf;
         
-            Matrix<T, Dynamic, Dynamic> CC = make_curl_curl_matrix(msh, cl, rb,3);
-            error += diff.dot(CC * diff);
+            //Matrix<T, Dynamic, Dynamic> CC = make_curl_curl_matrix(msh, cl, rb);
+            error += diff.dot(mass * diff);
 
         }
 

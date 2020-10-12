@@ -54,8 +54,13 @@ struct test_functor_curl_stab<Mesh<T,3,Storage>, mixed>
 
         typedef Matrix<scalar_type, mesh_type::dimension, 1> ret_type;
 
-        auto f = make_vector_testing_data(msh);
-
+        auto f = [](const point_type& pt) -> Matrix<T,3,1> {
+            Matrix<T,3,1> ret;
+            ret(0) = std::sin(M_PI*pt.y());
+            ret(1) = std::sin(M_PI*pt.z());
+            ret(2) = std::sin(M_PI*pt.x());
+            return ret;
+        };
 
         typename disk::hho_degree_info hdi(mixed ? degree+1 : degree, degree);
 
