@@ -453,5 +453,18 @@ int main(int argc, char **argv)
         run_maxwell_solver(msh, degree, stab_param);
         return 0;
     }
+
+    /* FVCA6 3D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.msh$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
+        disk::generic_mesh<T,3> msh;
+        
+        disk::load_mesh_fvca6_3d<T>(mesh_filename, msh);
+        
+        run_maxwell_solver(msh, degree, stab_param);
+        
+        return 0;
+    }
 }
 

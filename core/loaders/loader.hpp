@@ -2490,6 +2490,7 @@ class medit_mesh_loader<T, 3> : public mesh_loader<generic_mesh<T, 3>>
 
 /* Helper to load uniform 1D meshes. */
 template<typename T>
+[[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::generic_mesh<T,1>
 load_uniform_1d_mesh(T min, T max, size_t cells)
 {
@@ -2504,6 +2505,7 @@ load_uniform_1d_mesh(T min, T max, size_t cells)
 
 /* Helper to load 2D meshes in FVCA5 format */
 template<typename T>
+[[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::generic_mesh<T,2>
 load_fvca5_2d_mesh(const char *filename)
 {
@@ -2519,6 +2521,7 @@ load_fvca5_2d_mesh(const char *filename)
 
 /* Helper to load 3D meshes in FVCA6 format */
 template<typename T>
+[[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::generic_mesh<T, 3>
 load_fvca6_3d_mesh(const char* filename)
 {
@@ -2582,6 +2585,7 @@ load_netgen_3d_mesh(const char *filename)
 
 /* Helper to load 3D meshes in DiSk++ format */
 template<typename T>
+[[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::cartesian_mesh<T, 3>
 load_cartesian_3d_mesh(const char *filename)
 {
@@ -2597,6 +2601,7 @@ load_cartesian_3d_mesh(const char *filename)
 
 /* Helper to load 2D meshes in Medit format */
 template<typename T>
+[[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::generic_mesh<T, 2>
 load_medit_2d_mesh(const char* filename)
 {
@@ -2612,6 +2617,7 @@ load_medit_2d_mesh(const char* filename)
 
 /* Helper to load 3D meshes in Medit format */
 template<typename T>
+[[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::generic_mesh<T, 3>
 load_medit_3d_mesh(const char* filename)
 {

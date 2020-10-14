@@ -40,6 +40,47 @@ struct test_functor_curl_stab
 };
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, bool mixed>
+struct test_functor_curl_stab<Mesh<T,2,Storage>, mixed>
+{
+    using mesh_type = Mesh<T,2,Storage>;
+    /* Expect k+1 convergence (hho stabilization) */
+    typename mesh_type::coordinate_type
+    operator()(const mesh_type& msh, size_t degree) const
+    {
+        typedef typename mesh_type::cell            cell_type;
+        typedef typename mesh_type::face            face_type;
+        typedef typename mesh_type::coordinate_type scalar_type;
+        typedef typename mesh_type::point_type      point_type;
+
+        typedef Matrix<scalar_type, mesh_type::dimension, 1> ret_type;
+
+        auto f = [](const point_type& pt) -> T {
+            return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+        };
+
+        typename disk::hho_degree_info hdi(mixed ? degree+1 : degree, degree);
+
+        scalar_type error = 0.0;
+        for (auto& cl : msh)
+        {
+            auto stab = disk::curl_hdg_stabilization(msh, cl, hdi);
+
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_tangent(msh, cl, hdi, f, 2);
+
+            error += proj.dot(stab * proj);
+        }
+
+        return std::sqrt(error);
+    }
+
+    size_t
+    expected_rate(size_t k)
+    {
+        return k + (mixed ? 1 : 0);
+    }
+};
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, bool mixed>
 struct test_functor_curl_stab<Mesh<T,3,Storage>, mixed>
 {
     using mesh_type = Mesh<T,3,Storage>;
@@ -67,7 +108,7 @@ struct test_functor_curl_stab<Mesh<T,3,Storage>, mixed>
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            auto stab = disk::make_vector_hho_curl_stab(msh, cl, hdi);
+            auto stab = disk::curl_hdg_stabilization(msh, cl, hdi);
 
             Matrix<scalar_type, Dynamic, 1> proj = disk::project_tangent(msh, cl, hdi, f, 2);
 

@@ -437,7 +437,6 @@ public:
             x_coords.push_back(pt.x());
             y_coords.push_back(pt.y());
             z_coords.push_back(pt.z());
-            std::cout << pt << std::endl;
         }
 
         T *coords[] = {x_coords.data(), y_coords.data(), z_coords.data()};
@@ -453,20 +452,15 @@ public:
             nodecnts.push_back( ptids.size() );
 
             for (auto& ptid : ptids)
-            {
                 nodelist.push_back(ptid);
-                std::cout << ptid << " ";
-            }
-            std::cout << std::endl;
         }
         int lnodelist = nodelist.size();
         int nzones = msh.cells_size();
 
         std::vector<int> facecnts, facelist;
-        int cell_i =0;
+
         for (auto& cl : msh)
         {
-            std::cout << cl << std::endl;
             auto fcs = faces(msh, cl);
             facecnts.push_back( fcs.size() );
 
@@ -476,14 +470,7 @@ public:
                 if (silo_face_orientation(msh, cl, fc) < 0)
                     ofs = ~ofs;
                 facelist.push_back( ofs );
-                std::cout << ofs << " ";
             }
-            std::cout << std::endl;
-            
-            cell_i++;
-        
-            if (cell_i == 4)
-                break;
         };
 
         int lfacelist = facelist.size();
@@ -492,11 +479,12 @@ public:
         zlname << "zonelist_" << name;
         std::string zonelist_name = zlname.str();
 
-nzones=4;
-
-        DBPutPHZonelist(m_siloDb, zonelist_name.c_str(), nfaces, nodecnts.data(),
+        int err = DBPutPHZonelist(m_siloDb, zonelist_name.c_str(), nfaces, nodecnts.data(),
             lnodelist, nodelist.data(), nullptr, nzones, facecnts.data(), lfacelist,
-            facelist.data(), 0, 0, 0, nullptr);
+            facelist.data(), 0, 0, nzones-1, nullptr);
+
+        if (err != 0)
+            std::cout << "DBPutPHZonelist() call failed" << std::endl;
 
         int ndims = 3;
         int nnodes = msh.points_size();

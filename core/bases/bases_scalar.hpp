@@ -192,6 +192,22 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         return ret;
     }
 
+    gradient_type
+    eval_curls2(const point_type& pt) const
+    {
+        gradient_type ret = gradient_type::Zero(basis_size, 2);
+
+        auto dphi = eval_gradients(pt);
+
+        for (size_t i = 0; i < basis_size; i++)
+        {
+            ret(i,0) =  dphi(i,1);
+            ret(i,1) = -dphi(i,0);
+        }
+
+        return ret;
+    }
+
     size_t
     size() const
     {
