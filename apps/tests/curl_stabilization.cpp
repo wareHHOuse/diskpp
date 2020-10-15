@@ -65,7 +65,7 @@ struct test_functor_curl_stab<Mesh<T,2,Storage>, mixed>
         {
             auto stab = disk::curl_hdg_stabilization(msh, cl, hdi);
 
-            Matrix<scalar_type, Dynamic, 1> proj = disk::project_tangent(msh, cl, hdi, f, 2);
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_tangent(msh, cl, hdi, f);
 
             error += proj.dot(stab * proj);
         }
@@ -110,7 +110,7 @@ struct test_functor_curl_stab<Mesh<T,3,Storage>, mixed>
         {
             auto stab = disk::curl_hdg_stabilization(msh, cl, hdi);
 
-            Matrix<scalar_type, Dynamic, 1> proj = disk::project_tangent(msh, cl, hdi, f, 2);
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_tangent(msh, cl, hdi, f);
 
             error += proj.dot(stab * proj);
         }

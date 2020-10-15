@@ -958,16 +958,16 @@ vector_wave_solver(Mesh<T,2,Storage>& msh, size_t order, const typename Mesh<T,2
         auto esol = disk::static_decondensation(lhs, rhs, edofs);
         Matrix<T, Dynamic, 1> lsol = esol.segment(0, cb.size());
 
-        Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb, 1);
-        Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun, 1);
+        Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb);
+        Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun);
         Matrix<T, Dynamic, 1> asol = MMe.llt().solve(arhs);
 
         Matrix<T, Dynamic, 1> prj = project_tangent(msh, cl, chdi, sol_fun);
 
         energy_err += (prj-esol).dot(lhs*(prj-esol));
 #else
-        Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb, 1);
-        Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun, 1);
+        Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb);
+        Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun);
         Matrix<T, Dynamic, 1> asol = MMe.llt().solve(arhs);
         Matrix<T, Dynamic, 1> lsol = sol.segment(cell_i*cb.size(), cb.size());
 #endif
@@ -1121,21 +1121,21 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order, const typename Mesh<T,3
         auto MM = make_vector_mass_oper(msh, cl, chdi);
         Matrix<T, Dynamic, Dynamic> lhs = CR.second + alpha*ST - (omega*omega)*MM;
         Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(lhs.rows());
-        rhs.segment(0, cb.size()) = make_rhs(msh, cl, cb, rhs_fun, 1);
+        rhs.segment(0, cb.size()) = make_rhs(msh, cl, cb, rhs_fun);
         auto edofs = assm.get_element_dofs(msh, cl, sol);
         auto esol = disk::static_decondensation(lhs, rhs, edofs);
         Matrix<T, Dynamic, 1> lsol = esol.segment(0, cb.size());
 
-        Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb, 1);
-        Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun, 1);
+        Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb);
+        Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun);
         Matrix<T, Dynamic, 1> asol = MMe.llt().solve(arhs);
 
         Matrix<T, Dynamic, 1> prj = project_tangent(msh, cl, chdi, sol_fun);
 
         energy_err += (prj-esol).dot(lhs*(prj-esol));
 #else
-        Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb, 1);
-        Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun, 1);
+        Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb);
+        Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun);
         Matrix<T, Dynamic, 1> asol = MMe.llt().solve(arhs);
         Matrix<T, Dynamic, 1> lsol = sol.segment(cell_i*cb.size(), cb.size());
 #endif

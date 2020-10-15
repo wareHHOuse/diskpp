@@ -80,12 +80,12 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
         for (auto& cl : msh)
         {
             auto CR = disk::make_vector_hho_curl_impl_pk(msh, cl, hdi);
-            auto proj = disk::project_tangent(msh, cl, hdi, f, 2);
+            auto proj = disk::project_tangent(msh, cl, hdi, f);
             Matrix<T, Dynamic, 1> rf = CR.first * proj;
             auto rb = disk::make_vector_monomial_basis(msh, cl, rd);
 
-            Matrix<T, Dynamic, Dynamic> mass         = disk::make_mass_matrix(msh, cl, rb, 2);
-            Matrix<T, Dynamic, 1>       rhs          = disk::make_rhs(msh, cl, rb, sol, 2);
+            Matrix<T, Dynamic, Dynamic> mass         = disk::make_mass_matrix(msh, cl, rb);
+            Matrix<T, Dynamic, 1>       rhs          = disk::make_rhs(msh, cl, rb, sol);
             Matrix<T, Dynamic, 1>       exp_reconstr = mass.ldlt().solve(rhs);
             Matrix<T, Dynamic, 1>       diff = exp_reconstr - rf;
         

@@ -358,8 +358,8 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
     {
         auto cb = make_vector_monomial_basis(msh, cl, degree);
 
-        Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb, 1);
-        Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun, 1);
+        Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb);
+        Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun);
         Matrix<T, Dynamic, 1> asol = MMe.llt().solve(arhs);
         Matrix<T, Dynamic, 1> lsol = sol.segment(cell_i*cb.size(), cb.size());
 

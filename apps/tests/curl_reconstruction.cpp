@@ -127,12 +127,12 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
         for (auto& cl : msh)
         {
             auto CR = disk::curl_reconstruction(msh, cl, hdi);
-            auto proj = disk::project_tangent(msh, cl, hdi, f,3);
+            auto proj = disk::project_tangent(msh, cl, hdi, f);
             Matrix<T, Dynamic, 1> rf = CR.first * proj;
             auto rb = disk::make_vector_monomial_basis(msh, cl, rd);
 
-            Matrix<T, Dynamic, Dynamic> mass         = disk::make_mass_matrix(msh, cl, rb,3);
-            Matrix<T, Dynamic, 1>       rhs          = disk::make_rhs(msh, cl, rb, f,3);
+            Matrix<T, Dynamic, Dynamic> mass         = disk::make_mass_matrix(msh, cl, rb);
+            Matrix<T, Dynamic, 1>       rhs          = disk::make_rhs(msh, cl, rb, f);
             Matrix<T, Dynamic, 1>       exp_reconstr = mass.ldlt().solve(rhs);
             Matrix<T, Dynamic, 1>       diff = exp_reconstr;
             diff.head(3) = exp_reconstr.head(3);
