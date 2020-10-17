@@ -186,14 +186,16 @@ struct pardiso_params
 {
     bool    report_factorization_Mflops;
     int     out_of_core; //0: IC, 1: IC, OOC if limits passed, 2: OOC
+    int     mflops;
 
-    pardiso_params() : report_factorization_Mflops(false),
-                       out_of_core(0) {}
+    pardiso_params() :
+        report_factorization_Mflops(false), out_of_core(0), mflops(0)
+    {}
 };
 
 template<typename T>
 bool
-mkl_pardiso(const pardiso_params<T>& params,
+mkl_pardiso(pardiso_params<T>& params,
             const Eigen::SparseMatrix<T>& A,
             const Eigen::Matrix<T, Eigen::Dynamic, 1>& b,
             Eigen::Matrix<T, Eigen::Dynamic, 1>& x)
@@ -228,6 +230,7 @@ mkl_pardiso(const pardiso_params<T>& params,
     if (params.report_factorization_Mflops)
     {
         int mflops = solver.pardisoParameterArray()[18];
+        params.mflops = mflops;
         std::cout << "[PARDISO] Factorization Mflops: " << mflops << std::endl;
     }
 

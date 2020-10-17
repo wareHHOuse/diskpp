@@ -25,6 +25,8 @@
 #include "output/silo.hpp"
 #include "solvers/solver.hpp"
 
+#include "compinfo.h"
+
 #include <Eigen/IterativeLinearSolvers>
 #include <unsupported/Eigen/IterativeSolvers>
 
@@ -1003,7 +1005,7 @@ vector_wave_solver(Mesh<T,2,Storage>& msh, size_t order, const typename Mesh<T,2
 }
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-std::pair<typename Mesh<T,3,Storage>::coordinate_type, typename Mesh<T,3,Storage>::coordinate_type>
+computation_info<typename Mesh<T,3,Storage>::coordinate_type>
 vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order, const typename Mesh<T,3,Storage>::coordinate_type& alpha)
 {
     typedef Mesh<T,3,Storage>                   mesh_type;
@@ -1107,10 +1109,11 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order, const typename Mesh<T,3
     //gmres.compute(assm.LHS);
     //sol = gmres.solve(assm.RHS);
 
-    std::vector<T> data_ux, data_uy, data_uz;
+    std::vector<T> data_ux, data_uy, data_uz, data_div;
 
     T l2_err = 0.0; size_t cell_i = 0;
     T energy_err = 0.0;
+    T err_divergence = 0.0;
     for (auto& cl : msh)
     {
         auto cb = make_vector_monomial_basis(msh, cl, chdi.cell_degree());
@@ -1140,6 +1143,16 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order, const typename Mesh<T,3
         Matrix<T, Dynamic, 1> lsol = sol.segment(cell_i*cb.size(), cb.size());
 #endif
 
+        T divt = 0.0;
+        auto qps = integrate(msh, cl, chdi.cell_degree());
+        for (auto& qp : qps)
+        {
+            auto divphi = cb.eval_divergences(qp.point());
+            divt += qp.weight() * (asol-lsol).dot(divphi);
+        }
+        data_div.push_back( divt );
+        err_divergence += divt;
+
         Matrix<T,1,3> acc = Matrix<T,1,3>::Zero();
         auto bar = barycenter(msh, cl);
         for (size_t i = 0; i < cb.size(); i++)
@@ -1162,6 +1175,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order, const typename Mesh<T,3
     std::cout << "h = " << disk::average_diameter(msh) << " ";
     std::cout << "err(L2) = " << std::sqrt(l2_err) << " err(energy) = ";
     std::cout << std::sqrt(energy_err) << std::endl;
+    std::cout << "Error divergence: " << err_divergence << std::endl;
 
     disk::silo_database silo_db;
     silo_db.create("maxwell.silo");
@@ -1179,9 +1193,18 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order, const typename Mesh<T,3
     silo_db.add_expression("u", "{ux, uy, uz}", DB_VARTYPE_VECTOR);
     silo_db.add_expression("mag_u", "magnitude(u)", DB_VARTYPE_SCALAR);
 
+    disk::silo_zonal_variable<T> div("div", data_div);
+    silo_db.add_variable("mesh", div);
+
     silo_db.close();
 
-    return std::make_pair( std::sqrt(l2_err), std::sqrt(energy_err));
+    return computation_info<T>({
+            .l2_error = l2_err,
+            .nrg_error = energy_err,
+            .mflops = pparams.mflops,
+            .dofs = assm.syssz,
+            .nonzeros = assm.LHS.nonZeros()
+        });
 }
 
 template<typename Mesh>
@@ -1270,10 +1293,93 @@ void maxwell_eigenvalue_solver(Mesh& msh, size_t order, const typename Mesh::coo
     }
 
     for (size_t i = 0; i < fep.eigvals_found; i++)
-        std::cout << std::setprecision(8) << hho_eigvals(i) << std::endl;
+    {
+        std::cout << std::setprecision(8) << hho_eigvals(i) << " -> ";
+        std::cout << std::sqrt( hho_eigvals(i) ) << std::endl;
+    }
     
 }
 
+
+void autotest_alpha(size_t order)
+{
+    using T = double;
+    
+    using Mesh = disk::simplicial_mesh<T,3>;
+
+    std::stringstream ssl2;
+    ssl2 << "l2log_k" << order << ".txt";
+
+    std::stringstream ssnrg;
+    ssnrg << "nrglog_k" << order << ".txt";
+
+    std::ofstream ofs_l2( ssl2.str() );
+    std::ofstream ofs_nrg( ssnrg.str() );
+
+    for (T sp = 1.0; sp < 16.0; sp += 1.0)
+    {
+        ofs_l2  << sp << " ";
+        ofs_nrg << sp << " ";
+        
+        for (size_t i = 1; i < 5; i++)
+        {
+            Mesh msh;
+            std::stringstream ss;
+            ss << "../../../meshes/3D_tetras/netgen/cube" << i << ".mesh";
+
+            disk::load_mesh_netgen(ss.str().c_str(), msh);
+
+            auto diam = disk::average_diameter(msh);
+
+            auto ci = vector_wave_solver(msh, order, sp);  
+            ofs_l2  << ci.l2_error << " ";
+            ofs_nrg << ci.nrg_error << " ";
+        }
+
+        ofs_l2 << std::endl;
+        ofs_nrg << std::endl;
+    }
+}
+
+void autotest_convergence(size_t order_min, size_t order_max)
+{
+    using T = double;
+    
+    using Mesh = disk::simplicial_mesh<T,3>;
+
+    std::ofstream ofs( "conv_hho.txt" );
+       
+    double sp[] = { 10, 5, 10, 7 };
+
+    for (size_t i = 1; i < 5; i++)
+    {
+        Mesh msh;
+        std::stringstream ss;
+        ss << "../../../meshes/3D_tetras/netgen/cube" << i << ".mesh";
+
+        disk::load_mesh_netgen(ss.str().c_str(), msh);
+        auto diam = disk::average_diameter(msh);
+
+        ofs << diam << " ";
+
+        for (size_t order = order_min; order <= order_max; order++)
+        {
+            auto ci = vector_wave_solver(msh, order, sp[order]);
+            ofs << ci.l2_error << " " << ci.nrg_error << " " << ci.mflops << " ";
+            ofs << ci.dofs << " " << ci.nonzeros << " ";
+        }
+
+        ofs << std::endl;
+    }
+}
+
+void autotest(size_t order)
+{
+    //for (size_t i = 0; i <= order; i++)
+    //    autotest_alpha(i);
+
+    autotest_convergence(0, order);
+}
 
 int main(int argc, char **argv)
 {
@@ -1285,7 +1391,7 @@ int main(int argc, char **argv)
     char *      mesh_filename = nullptr;
 
     int ch;
-    while ( (ch = getopt(argc, argv, "a:ek:m:")) != -1 )
+    while ( (ch = getopt(argc, argv, "Aa:ek:m:")) != -1 )
     {
         switch(ch)
         {
@@ -1304,6 +1410,10 @@ int main(int argc, char **argv)
             case 'm':
                 mesh_filename = optarg;
                 break;
+
+            case 'A':
+                autotest(degree);
+                return 0;
 
             case '?':
             default:
