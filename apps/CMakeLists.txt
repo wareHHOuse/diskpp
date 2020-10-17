@@ -28,4 +28,5 @@ add_subdirectory(finite_strains)
 add_subdirectory(bingham)
 add_subdirectory(unsteady_laplacian)
 add_subdirectory(maxwell)
+add_subdirectory(helmholtz)
 
