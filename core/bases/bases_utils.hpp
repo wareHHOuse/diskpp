@@ -222,6 +222,7 @@ make_mass_matrix(const Mesh& msh, const Element& elem, const Basis& basis, size_
 
 /* We have a problem here: this definition could be ambiguous with the previous
  * one. */
+#if 0
 template<typename Mesh, typename Element, typename Basis, typename MaterialField>
 [[deprecated("DiSk++ issue: this declaration is ambiguous, fix is needed")]]
 Matrix<typename Basis::scalar_type, Dynamic, Dynamic>
@@ -246,6 +247,7 @@ make_mass_matrix(const Mesh& msh, const Element& elem, const Basis& basis, const
 
     return ret;
 }
+#endif
 
 template<typename Mesh, typename Element, typename Basis>
 Matrix<typename Basis::scalar_type, Dynamic, Dynamic>

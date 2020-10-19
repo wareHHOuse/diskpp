@@ -127,7 +127,7 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
         for (auto& cl : msh)
         {
             auto CR = disk::curl_reconstruction(msh, cl, hdi);
-            auto proj = disk::project_tangent(msh, cl, hdi, f);
+            auto proj = disk::project_tangent(msh, cl, hdi, f, 2);
             Matrix<T, Dynamic, 1> rf = CR.first * proj;
             auto rb = disk::make_vector_monomial_basis(msh, cl, rd);
 
@@ -138,8 +138,30 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
             diff.head(3) = exp_reconstr.head(3);
             diff.tail(rb.size()-3) -= rf;
         
-            Matrix<T, Dynamic, Dynamic> CC = make_curl_curl_matrix(msh, cl, rb,3);
-            error += diff.dot(CC * diff);
+            //Matrix<T, Dynamic, Dynamic> CC = make_curl_curl_matrix(msh, cl, rb);
+            //error += diff.dot(CC * diff);
+
+            auto cb = disk::make_vector_monomial_basis(msh, cl, cd);
+            Matrix<T, Dynamic, Dynamic> cc = make_curl_curl_matrix(msh, cl, cb);
+
+            Matrix<T, Dynamic, Dynamic> tr = Matrix<T, Dynamic, Dynamic>::Zero(cb.size(), rb.size());
+            Matrix<T, Dynamic, Dynamic> mm = Matrix<T, Dynamic, Dynamic>::Zero(cb.size(), cb.size());
+
+            auto qps = integrate(msh, cl, 2*rd);
+            for (auto& qp : qps)
+            {
+                auto r_phi = rb.eval_functions(qp.point());
+                auto c_phi = cb.eval_functions(qp.point());
+                tr += qp.weight() * c_phi * r_phi.transpose();
+                mm += qp.weight() * c_phi * c_phi.transpose();
+            }
+
+            Matrix<T, Dynamic, Dynamic> H = mm.ldlt().solve(tr);
+
+            Matrix<T, Dynamic, 1> dh = H*diff;
+
+            error += dh.dot(cc*dh);
+
 
         }
 

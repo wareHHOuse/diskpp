@@ -794,6 +794,104 @@ curl_hdg_stabilization(const Mesh<T,3,Storage>&                     msh,
     return stab;
 }
 
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+dynamic_matrix<typename Mesh<T,3,Storage>::coordinate_type>
+curl_hho_stabilization(const Mesh<T,3,Storage>&                     msh,
+                       const typename Mesh<T,3,Storage>::cell_type& cl,
+                       const Matrix<T,Dynamic,Dynamic>              recop,
+                       const hho_degree_info&                       cell_infos)
+{
+    using mesh_type         = Mesh<T,3,Storage>;
+    using scalar_type       = typename mesh_type::coordinate_type;
+    using matrix_type       = Matrix<T, Dynamic, Dynamic>;
+    using vector_type       = Matrix<T, Dynamic, 1>;
+    using point_type        = typename mesh_type::point_type;
+
+    static const size_t DIM = 3;
+
+    const auto facdeg = cell_infos.face_degree();
+    const auto celdeg = cell_infos.cell_degree();
+    const auto recdeg = cell_infos.reconstruction_degree();
+
+    const auto cb  = make_vector_monomial_basis(msh, cl, celdeg);
+    const auto rb  = make_vector_monomial_basis(msh, cl, recdeg);
+    const auto fbs = vector_basis_size(facdeg, DIM - 1, DIM - 1);
+    const auto cbs = vector_basis_size(celdeg, DIM, DIM);
+    const auto rbs = vector_basis_size(recdeg, DIM, DIM);
+
+    const auto fcs = faces(msh, cl);
+    const auto num_faces_dofs = fcs.size() * fbs;
+
+    matrix_type stab = matrix_type::Zero(cbs + num_faces_dofs, cbs + num_faces_dofs);
+    
+    matrix_type Rtrace = matrix_type::Zero(cbs, rbs);
+
+    auto qps = integrate(msh, cl, 2*recdeg);
+    for (auto& qp : qps)
+    {
+        auto c_phi = cb.eval_functions(qp.point());
+        auto r_phi = rb.eval_functions(qp.point());
+
+        Rtrace += qp.weight() * c_phi * r_phi.transpose();
+    }
+
+    matrix_type Rtrace1 = Rtrace.block(0,3,cbs,rbs-3);
+    matrix_type Cmass = Rtrace.block(0,0,cbs,cbs);
+
+    /* project reconstruction on cell */
+    matrix_type RprojC = Cmass.ldlt().solve(Rtrace1 * recop);
+    /* subtract vT */
+    RprojC.block(0,0,cbs,cbs) -= matrix_type::Identity(cbs,cbs);
+    /* RprojC is now π_T(R(v)) - vT*/
+
+    size_t offset = cbs;
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto fc = fcs[i];
+        const auto n  = normal(msh, cl, fc);
+        const auto fb = make_vector_monomial_tangential_basis(msh, fc, facdeg);
+        const auto hf = diameter(msh, fc);
+
+        matrix_type Fmass = matrix_type::Zero(fbs, fbs);
+        matrix_type CtraceF = matrix_type::Zero(fbs, cbs);
+        matrix_type RtraceF = matrix_type::Zero(fbs, rbs-3);
+        matrix_type rhs = matrix_type::Zero(fbs, cbs + num_faces_dofs);
+
+        rhs.block(0, offset, fbs, fbs) = matrix_type::Identity(fbs, fbs);
+
+        const auto qps_f = integrate(msh, fc, 2*recdeg);
+        for (auto& qp : qps_f)
+        {
+            Matrix<T, Dynamic, 3> f_phi = fb.eval_functions(qp.point());
+            Matrix<T, Dynamic, 3> c_phi_tmp = cb.eval_functions(qp.point());
+            Matrix<T, Dynamic, 3> c_phi = vcross(n, vcross(c_phi_tmp, n));
+            Matrix<T, Dynamic, 3> r_phi = rb.eval_functions(qp.point()).block(3,0,rbs-3,3);
+
+            Fmass += qp.weight() * f_phi * f_phi.transpose();
+            CtraceF += qp.weight() * f_phi * c_phi.transpose();
+            RtraceF += qp.weight() * f_phi * r_phi.transpose();
+        }
+
+        LDLT<matrix_type> Fmass_ldlt(Fmass);
+
+        /* project reconstruction on face */
+        matrix_type RprojF = -Fmass_ldlt.solve(RtraceF * recop);
+        /* add vF */
+        RprojF.block(0,offset,fbs,fbs) += matrix_type::Identity(fbs, fbs);
+        /* RprojF is now vF - π_F(R(v)) */
+
+        matrix_type rf = Fmass_ldlt.solve(CtraceF * RprojC);
+        /* rf is now π_F(π_T(R(v)) - vT)*/
+
+        rhs = RprojF + rf;
+        stab += rhs.transpose() * Fmass * rhs / hf;
+
+        offset += fbs;
+    }
+
+    return stab;
+}
+
 template<typename Mesh, typename Element, typename Basis>
 Matrix<typename Basis::scalar_type, Dynamic, Dynamic>
 make_curl_curl_matrix(const Mesh& msh, const Element& elem, const Basis& basis, size_t di = 0)
