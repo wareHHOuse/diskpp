@@ -352,7 +352,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
     silo_db.close();
 
     return computation_info<T>({
-        .l2_error = err,
+        .l2_error_e = std::sqrt(err),
         .nrg_error = 0,
         .mflops = pparams.mflops,
         .dofs = assm.syssz,
@@ -524,8 +524,8 @@ void autotest_convergence(size_t order_min, size_t order_max)
     using Mesh = disk::simplicial_mesh<T,3>;
 
     std::ofstream ofs( "conv_dg.txt" );
-       
-    double sp[] = { 100, 100, 100, 100 };
+
+    double sp[] = { 30, 30, 30, 30 };
 
     for (size_t i = 1; i < 5; i++)
     {
@@ -541,7 +541,7 @@ void autotest_convergence(size_t order_min, size_t order_max)
         for (size_t order = order_min; order <= order_max; order++)
         {
             auto ci = run_maxwell_solver(msh, order, sp[order]);
-            ofs << ci.l2_error << " " << ci.nrg_error << " " << ci.mflops << " ";
+            ofs << ci.l2_error_e << " " << ci.nrg_error << " " << ci.mflops << " ";
             ofs << ci.dofs << " " << ci.nonzeros << " ";
         }
 

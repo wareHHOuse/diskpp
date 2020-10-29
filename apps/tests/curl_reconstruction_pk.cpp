@@ -77,20 +77,21 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
         disk::hho_degree_info hdi( { .rd = rd, .cd = cd, .fd = fd } );
 
         scalar_type error = 0.0;
-        for (auto& cl : msh)
+        for (const auto& cl : msh)
         {
-            auto CR = disk::make_vector_hho_curl_impl_pk(msh, cl, hdi);
-            auto proj = disk::project_tangent(msh, cl, hdi, f);
+            auto CR = disk::curl_reconstruction_pk(msh, cl, hdi);
+            auto proj = disk::project_tangent(msh, cl, hdi, f, 1);
             Matrix<T, Dynamic, 1> rf = CR.first * proj;
+
             auto rb = disk::make_vector_monomial_basis(msh, cl, rd);
 
-            Matrix<T, Dynamic, Dynamic> mass         = disk::make_mass_matrix(msh, cl, rb);
-            Matrix<T, Dynamic, 1>       rhs          = disk::make_rhs(msh, cl, rb, sol);
-            Matrix<T, Dynamic, 1>       exp_reconstr = mass.ldlt().solve(rhs);
-            Matrix<T, Dynamic, 1>       diff = exp_reconstr - rf;
-        
-            //Matrix<T, Dynamic, Dynamic> CC = make_curl_curl_matrix(msh, cl, rb);
-            error += diff.dot(mass * diff);
+            auto qps = integrate(msh, cl, 2*std::max(rd,cd)+1);
+            for (const auto& qp : qps)
+            {
+                auto cphi = rb.eval_functions(qp.point());
+                auto diff = disk::eval(rf, cphi) - sol(qp.point());
+                error += qp.weight() * diff.dot(diff);
+            }
 
         }
 

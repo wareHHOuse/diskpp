@@ -114,6 +114,15 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
             ret(0) = std::sin(M_PI*pt.y());
             ret(1) = std::sin(M_PI*pt.z());
             ret(2) = std::sin(M_PI*pt.x());
+            //ret(2) = std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+            return ret;
+        };
+
+        auto curl_f = [](const point_type& pt) -> Matrix<T,3,1> {
+            Matrix<T,3,1> ret;
+            ret(0) = -M_PI*std::cos(M_PI*pt.z());
+            ret(1) = -M_PI*std::cos(M_PI*pt.x());
+            ret(2) = -M_PI*std::cos(M_PI*pt.y());
             return ret;
         };
 
@@ -126,43 +135,45 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
+            /*
             auto CR = disk::curl_reconstruction(msh, cl, hdi);
-            auto proj = disk::project_tangent(msh, cl, hdi, f, 2);
-            Matrix<T, Dynamic, 1> rf = CR.first * proj;
+            auto proj = disk::project_tangent(msh, cl, hdi, f, 1);
             auto rb = disk::make_vector_monomial_basis(msh, cl, rd);
 
-            Matrix<T, Dynamic, Dynamic> mass         = disk::make_mass_matrix(msh, cl, rb);
-            Matrix<T, Dynamic, 1>       rhs          = disk::make_rhs(msh, cl, rb, f);
-            Matrix<T, Dynamic, 1>       exp_reconstr = mass.ldlt().solve(rhs);
-            Matrix<T, Dynamic, 1>       diff = exp_reconstr;
-            diff.head(3) = exp_reconstr.head(3);
-            diff.tail(rb.size()-3) -= rf;
-        
-            //Matrix<T, Dynamic, Dynamic> CC = make_curl_curl_matrix(msh, cl, rb);
-            //error += diff.dot(CC * diff);
-
-            auto cb = disk::make_vector_monomial_basis(msh, cl, cd);
-            Matrix<T, Dynamic, Dynamic> cc = make_curl_curl_matrix(msh, cl, cb);
-
-            Matrix<T, Dynamic, Dynamic> tr = Matrix<T, Dynamic, Dynamic>::Zero(cb.size(), rb.size());
-            Matrix<T, Dynamic, Dynamic> mm = Matrix<T, Dynamic, Dynamic>::Zero(cb.size(), cb.size());
+            Matrix<T, Dynamic, 1> reconstr_curl = Matrix<T, Dynamic, 1>::Zero(rb.size());
+            reconstr_curl.segment(3, rb.size()-3) = CR.first * proj;
 
             auto qps = integrate(msh, cl, 2*rd);
             for (auto& qp : qps)
             {
-                auto r_phi = rb.eval_functions(qp.point());
-                auto c_phi = cb.eval_functions(qp.point());
-                tr += qp.weight() * c_phi * r_phi.transpose();
-                mm += qp.weight() * c_phi * c_phi.transpose();
+                auto phi = rb.eval_curls2(qp.point());
+                Matrix<T,3,1> val = disk::eval(reconstr_curl, phi) - curl_f(qp.point());
+                error += qp.weight() * val.dot(val);
             }
+            */
 
-            Matrix<T, Dynamic, Dynamic> H = mm.ldlt().solve(tr);
+            ///*
+            auto CR = disk::curl_reconstruction_div(msh, cl, hdi);
+            auto proj = disk::project_tangent(msh, cl, hdi, f, 1);
+            auto rb = disk::make_vector_monomial_basis(msh, cl, rd);
+            auto cb = disk::make_vector_monomial_basis(msh, cl, cd);
 
-            Matrix<T, Dynamic, 1> dh = H*diff;
 
-            error += dh.dot(cc*dh);
+            Matrix<T, Dynamic, 1> reconstr_curl = Matrix<T, Dynamic, 1>::Zero(CR.first.rows());
+            reconstr_curl = CR.first * proj;
 
+            Matrix<T, Dynamic, 1> rr = reconstr_curl.segment(0, rb.size());
 
+            auto qps = integrate(msh, cl, 2*rd);
+
+            for (auto& qp : qps)
+            {
+                auto phi = rb.eval_functions(qp.point());
+                Matrix<T,3,1> val = disk::eval(rr, phi) - f(qp.point());
+                error += qp.weight() * val.dot(val);
+            }
+            //*/
+            
         }
 
         return std::sqrt(error);
