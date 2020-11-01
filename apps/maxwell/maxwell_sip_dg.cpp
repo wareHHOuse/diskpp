@@ -551,6 +551,8 @@ void autotest_convergence(size_t order_min, size_t order_max)
 
 int main(int argc, char **argv)
 {
+    rusage_monitor rm;
+
     using T = double;
 
     T           stab_param = 1.0;

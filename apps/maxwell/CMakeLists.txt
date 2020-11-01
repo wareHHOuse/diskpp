@@ -9,5 +9,8 @@ if (BUILD_APP_MAXWELL)
 
     add_executable(maxwell_sip_dg maxwell_sip_dg.cpp)
     target_link_libraries(maxwell_sip_dg ${LINK_LIBS})
+
+    add_executable(rectest rectest.cpp)
+    target_link_libraries(rectest ${LINK_LIBS})
 endif()
 

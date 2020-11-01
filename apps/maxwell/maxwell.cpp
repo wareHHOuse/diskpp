@@ -1009,51 +1009,52 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 computation_info<typename Mesh<T,3,Storage>::coordinate_type>
 vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order,
                    const typename Mesh<T,3,Storage>::coordinate_type& alpha,
-                   const typename Mesh<T,3,Storage>::coordinate_type& omega)
+                   const typename Mesh<T,3,Storage>::coordinate_type& omega,
+                   bool ho_stab)
 {
     typedef Mesh<T,3,Storage>                   mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type      point_type;
     
-    disk::hho_degree_info chdi( { .rd = (size_t) order,
+    disk::hho_degree_info chdi( { .rd = (size_t) order+1,
                                   .cd = (size_t) order,
                                   .fd = (size_t) order } );
 
     auto rhs_fun = [&](const point_type& pt) -> Matrix<T, 3, 1> {
         Matrix<T, 3, 1> ret;
-        ret(0) = 0.0;
-        ret(1) = 0.0;
-        ret(2) = omega*omega * std::sin(omega*pt.x())*std::sin(omega*pt.y());
+        //ret(0) = 0.0;
+        //ret(1) = 0.0;
+        //ret(2) = omega*omega * std::sin(omega*pt.x())*std::sin(omega*pt.y());
 
-        //ret(0) = M_PI * M_PI * std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::sin(M_PI*pt.z());
-        //ret(1) = M_PI * M_PI * std::cos(M_PI*pt.x())*std::cos(M_PI*pt.y())*std::sin(M_PI*pt.z());
-        //ret(2) = M_PI * M_PI * std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::cos(M_PI*pt.z());
+        ret(0) = M_PI * M_PI * std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::sin(M_PI*pt.z());
+        ret(1) = M_PI * M_PI * std::cos(M_PI*pt.x())*std::cos(M_PI*pt.y())*std::sin(M_PI*pt.z());
+        ret(2) = M_PI * M_PI * std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::cos(M_PI*pt.z());
 
         return ret;
     };
 
     auto sol_fun = [&](const point_type& pt) -> Matrix<T, 3, 1> {
         Matrix<T, 3, 1> ret;
-        ret(0) = 0.0;
-        ret(1) = 0.0;
-        ret(2) = std::sin(omega*pt.x())*std::sin(omega*pt.y());
-
-        //ret(0) = std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::sin(M_PI*pt.z());
+        //ret(0) = 0.0;
         //ret(1) = 0.0;
-        //ret(2) = 0.0;
+        //ret(2) = std::sin(omega*pt.x())*std::sin(omega*pt.y());
+
+        ret(0) = std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::sin(M_PI*pt.z());
+        ret(1) = 0.0;
+        ret(2) = 0.0;
 
         return ret;
     };
 
     auto curl_sol_fun = [&](const point_type& pt) -> Matrix<T, 3, 1> {
         Matrix<T, 3, 1> ret;
-        ret(0) =  omega*std::sin(omega*pt.x())*std::cos(omega*pt.y());
-        ret(1) = -omega*std::cos(omega*pt.x())*std::sin(omega*pt.y());
-        ret(2) = 0.0;
+        //ret(0) =  omega*std::sin(omega*pt.x())*std::cos(omega*pt.y());
+        //ret(1) = -omega*std::cos(omega*pt.x())*std::sin(omega*pt.y());
+        //ret(2) = 0.0;
 
-        //ret(0) =   0.0;
-        //ret(1) =   M_PI * std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::cos(M_PI*pt.z());
-        //ret(2) = - M_PI * std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y())*std::sin(M_PI*pt.z());
+        ret(0) =   0.0;
+        ret(1) =   M_PI * std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::cos(M_PI*pt.z());
+        ret(2) = - M_PI * std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y())*std::sin(M_PI*pt.z());
 
         return ret;
     };
@@ -1067,10 +1068,14 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order,
     std::cout << "Assembling to triplets" << std::endl;
     for (auto& cl : msh)
     {
-        auto CR = disk::curl_reconstruction_pk(msh, cl, chdi);
-        //auto ST = disk::curl_hho_stabilization(msh, cl, CR.first, chdi);
-        //auto CR = disk::curl_reconstruction(msh, cl, chdi);
-        auto ST = disk::curl_hdg_stabilization(msh, cl, chdi);
+        auto CR = disk::curl_reconstruction(msh, cl, chdi);
+
+        Matrix<T, Dynamic, Dynamic> ST;
+        if (ho_stab)
+            ST = disk::curl_hho_stabilization(msh, cl, CR.first, chdi);
+        else
+            ST = disk::curl_hdg_stabilization(msh, cl, chdi);
+
         auto MM = make_vector_mass_oper(msh, cl, chdi);
 
         Matrix<T, Dynamic, Dynamic> lhs = CR.second + alpha*ST - (omega*omega)*MM;
@@ -1110,13 +1115,17 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order,
     for (auto& cl : msh)
     {
         auto cb = make_vector_monomial_basis(msh, cl, chdi.cell_degree());
-        auto rb = make_vector_monomial_basis(msh, cl, chdi.cell_degree()+1);
+        auto rb = make_vector_monomial_basis(msh, cl, chdi.reconstruction_degree());
 
 #ifdef USE_STATIC_CONDENSATION
         auto CR = disk::curl_reconstruction(msh, cl, chdi);
-        //auto ST = disk::curl_hho_stabilization(msh, cl, CR.first, chdi);
-        //auto CR = disk::curl_reconstruction(msh, cl, chdi);
-        auto ST = disk::curl_hdg_stabilization(msh, cl, chdi);
+
+        Matrix<T, Dynamic, Dynamic> ST;
+        if (ho_stab)
+            ST = disk::curl_hho_stabilization(msh, cl, CR.first, chdi);
+        else
+            ST = disk::curl_hdg_stabilization(msh, cl, chdi);
+        
         auto MM = make_vector_mass_oper(msh, cl, chdi);
         Matrix<T, Dynamic, Dynamic> lhs = CR.second + alpha*ST - (omega*omega)*MM;
         Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(lhs.rows());
@@ -1127,14 +1136,12 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order,
         Matrix<T, Dynamic, 1> asol = project_tangent(msh, cl, chdi, sol_fun, 1);
         Matrix<T, Dynamic, 1> hsol = Matrix<T, Dynamic, 1>::Zero(rb.size());
 
-        auto CRd = disk::curl_reconstruction_div(msh, cl, chdi);        
-        hsol/*.segment(3, rb.size()-3)*/ = (CRd.first * esol).segment(0,rb.size());
-        //hsol = CR.first.block(0,0,rb.size(),esol.rows()) * esol;
+        hsol.segment(3, rb.size()-3) = CR.first * esol;
 
         auto qps = integrate(msh, cl, 2*chdi.reconstruction_degree());
         for (auto& qp : qps)
         {
-            Matrix<T, Dynamic, 3> hphi = rb.eval_functions(qp.point());
+            Matrix<T, Dynamic, 3> hphi = rb.eval_curls2(qp.point());
             Matrix<T, Dynamic, 3> hphi2 = cb.eval_curls2(qp.point());
             Matrix<T, Dynamic, 3> ephi = cb.eval_functions(qp.point());
             Matrix<T, Dynamic, 3> rphi = rb.eval_functions(qp.point());
@@ -1344,7 +1351,7 @@ void autotest_alpha(size_t order)
 
             auto diam = disk::average_diameter(msh);
 
-            auto ci = vector_wave_solver(msh, order, sp, M_PI);  
+            auto ci = vector_wave_solver(msh, order, sp, M_PI, false);  
             ofs_l2  << ci.l2_error_e << " " << ci.l2_error_h << " ";
             ofs_nrg << ci.nrg_error << " ";
         }
@@ -1380,7 +1387,7 @@ void autotest_convergence(size_t order_min, size_t order_max)
             if (order >= 2 and i > 4)
                 break;
 
-            auto ci = vector_wave_solver(msh, order, sp[order], M_PI);
+            auto ci = vector_wave_solver(msh, order, sp[order], M_PI, false);
             ofs << ci.l2_error_e << " " << ci.l2_error_h << " " << ci.nrg_error << " " << ci.mflops << " ";
             ofs << ci.dofs << " " << ci.nonzeros << " ";
         }
@@ -1399,6 +1406,8 @@ void autotest(size_t order)
 
 int main(int argc, char **argv)
 {
+    rusage_monitor rm;
+
     using T = double;
 
     T           stab_param = 1.0;
@@ -1406,9 +1415,10 @@ int main(int argc, char **argv)
     bool        solve_eigvals = false;
     size_t      degree = 1;
     char *      mesh_filename = nullptr;
+    bool        use_ho_stab = false;
 
     int ch;
-    while ( (ch = getopt(argc, argv, "Aa:ek:m:w:")) != -1 )
+    while ( (ch = getopt(argc, argv, "Aa:ek:m:w:H")) != -1 )
     {
         switch(ch)
         {
@@ -1434,6 +1444,10 @@ int main(int argc, char **argv)
 
             case 'w':
                 omega = M_PI*std::stod(optarg);
+                break;
+
+            case 'H':
+                use_ho_stab = true;
                 break;
 
             case '?':
@@ -1480,7 +1494,7 @@ int main(int argc, char **argv)
         if (solve_eigvals)
             maxwell_eigenvalue_solver(msh, degree, stab_param);
         else
-            vector_wave_solver(msh, degree, stab_param, omega);
+            vector_wave_solver(msh, degree, stab_param, omega, use_ho_stab);
 
         return 0;
     }
@@ -1494,7 +1508,7 @@ int main(int argc, char **argv)
         if (solve_eigvals)
             maxwell_eigenvalue_solver(msh, degree, stab_param);
         else
-            vector_wave_solver(msh, degree, stab_param, omega);
+            vector_wave_solver(msh, degree, stab_param, omega, use_ho_stab);
         
         return 0;
     }
@@ -1510,7 +1524,7 @@ int main(int argc, char **argv)
         if (solve_eigvals)
             maxwell_eigenvalue_solver(msh, degree, stab_param);
         else
-            vector_wave_solver(msh, degree, stab_param, omega);
+            vector_wave_solver(msh, degree, stab_param, omega, use_ho_stab);
         
         return 0;
     }

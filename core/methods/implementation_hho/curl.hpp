@@ -534,8 +534,8 @@ curl_reconstruction_div(const Mesh<T,2,Storage>&                     msh,
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 matrixpair<typename Mesh<T,3,Storage>::coordinate_type>
 curl_reconstruction_div(const Mesh<T,3,Storage>&                     msh,
-                    const typename Mesh<T,3,Storage>::cell_type& cl,
-                    const hho_degree_info&                       cell_infos)
+        const typename Mesh<T,3,Storage>::cell_type& cl,
+        const hho_degree_info&                       cell_infos)
 {
     using mesh_type         = Mesh<T,3,Storage>;
     using scalar_type       = typename mesh_type::coordinate_type;
@@ -546,7 +546,7 @@ curl_reconstruction_div(const Mesh<T,3,Storage>&                     msh,
     static const size_t DIM = 3;
     const auto facdeg = cell_infos.face_degree();
     const auto celdeg = cell_infos.cell_degree();
-    const auto recdeg = cell_infos.cell_degree()+1;
+    const auto recdeg = cell_infos.reconstruction_degree();
 
     const auto cb = make_vector_monomial_basis(msh, cl, celdeg);
     const auto rb = make_vector_monomial_basis(msh, cl, recdeg);
@@ -554,13 +554,13 @@ curl_reconstruction_div(const Mesh<T,3,Storage>&                     msh,
     const auto cbs = vector_basis_size(celdeg, DIM, DIM);
     const auto rbs = vector_basis_size(recdeg, DIM, DIM);
 
-    const auto db = make_scalar_monomial_basis(msh, cl, celdeg);
-    const auto dbs = scalar_basis_size(celdeg, DIM);
+    const auto db = make_scalar_monomial_basis(msh, cl, recdeg);
+    const auto dbs = scalar_basis_size(recdeg, DIM);
 
     const auto fcs = faces(msh, cl);
     const auto num_faces_dofs = fcs.size() * fbs;
 
-    const auto nunk = rbs+dbs;
+    const auto nunk = rbs+dbs+3;
 
     matrix_type lhs = matrix_type::Zero(nunk, nunk);
     matrix_type rhs = matrix_type::Zero(nunk, cbs + num_faces_dofs);
@@ -579,20 +579,19 @@ curl_reconstruction_div(const Mesh<T,3,Storage>&                     msh,
         const Matrix<T, Dynamic, 3> curl_Cphi = curl_Rphi.block(0, 0, cbs, 3);
         const Matrix<T, Dynamic, 1>  div_Cphi = div_Rphi.segment(0, cb.size());
 
-
-        lhs.block(0,   0, rbs, rbs) += qp.weight() * Rphi * Rphi.transpose();
-        rhs.block(0,   0, rbs, cbs) += qp.weight() * curl_Rphi * Cphi.transpose();
+        lhs.block(0,   0, rbs, rbs) += qp.weight() * curl_Rphi * curl_Rphi.transpose();
+        rhs.block(0,   0, rbs, cbs) += qp.weight() * curl_Rphi * curl_Cphi.transpose();
 
         lhs.block(0, rbs, rbs, dbs) += qp.weight() * Rphi * grad_Dphi.transpose();
-
-        lhs.block(rbs, 0, dbs, rbs) += qp.weight() * Dphi * div_Rphi.transpose();
+        lhs.block(rbs, 0, dbs, rbs) += qp.weight() * grad_Dphi * Rphi.transpose();
         rhs.block(rbs, 0, dbs, cbs) -= qp.weight() * Dphi * div_Cphi.transpose();
-    }
-    //lhs.block(0, rbs, rbs, dbs) = lhs.block(rbs, 0, dbs, rbs).transpose();
-    //lhs.block(0, 0, 3, 3) = matrix_type::Identity(3,3);
-    //rhs.block(0, 0, 3, 3) = matrix_type::Identity(3,3);
 
-    //lhs.block(rbs, rbs, dbs, dbs) = matrix_type::Identity(dbs,dbs);
+        lhs.block(rbs+dbs, 0, 3, rbs) += qp.weight() * Rphi.transpose();
+        rhs.block(rbs+dbs, 0, 3, cbs) += qp.weight() * Cphi.transpose();
+    }
+
+    lhs.block(0, rbs+dbs, rbs, 3) = lhs.block(rbs+dbs, 0, 3, rbs).transpose();
+
 
     size_t offset = cbs;
     for (size_t i = 0; i < fcs.size(); i++)
@@ -607,11 +606,14 @@ curl_reconstruction_div(const Mesh<T,3,Storage>&                     msh,
             Matrix<T, Dynamic, 3> phi           = rb.eval_functions(qp.point());
             Matrix<T, Dynamic, 3> phi_n         = vcross(phi, n);
             Matrix<T, Dynamic, 3> curl_phi      = rb.eval_curls2(qp.point());
+            Matrix<T, Dynamic, 3> curl_phi_n    = vcross(curl_phi, n);
             Matrix<T, Dynamic, 3> f_phi         = fb.eval_functions(qp.point());
             Matrix<T, Dynamic, 3> c_phi         = cb.eval_functions(qp.point());
-            Matrix<T, Dynamic, 1> div_phi_funcs = db.eval_functions(qp.point());
+            Matrix<T, Dynamic, 1> d_phi         = db.eval_functions(qp.point());
 
-            rhs.block(0,   offset, rbs, fbs) += qp.weight() * phi_n * f_phi.transpose();
+            rhs.block(0,        0, rbs, cbs) -= qp.weight() * curl_phi_n * c_phi.transpose();
+            rhs.block(0,   offset, rbs, fbs) += qp.weight() * curl_phi_n * f_phi.transpose();
+            rhs.block(rbs,      0, dbs, cbs) += qp.weight() * d_phi * (c_phi * n).transpose();
         }
 
         offset += fbs;
@@ -623,10 +625,9 @@ curl_reconstruction_div(const Mesh<T,3,Storage>&                     msh,
 
     matrix_type oper = ldlt_lhs.solve(rhs);
     matrix_type roper = oper.block(0,0,rbs,oper.cols());
-    matrix_type cc = make_curl_curl_matrix(msh, cl, rb);
-    matrix_type data = roper.transpose() * cc * roper;
+    matrix_type data = rhs.block(0,0,rbs,rhs.cols()).transpose() * roper;
 
-    return std::make_pair(oper, data);
+    return std::make_pair(roper, data);
 }
 
 
@@ -674,11 +675,11 @@ curl_hho_stabilization(const Mesh<T,3,Storage>&                     msh,
     matrix_type Rtrace1 = Rtrace.block(0,3,cbs,rbs-3);
     matrix_type Cmass = Rtrace.block(0,0,cbs,cbs);
 
-    matrix_type real_recop = recop;//.block(3, 0, rbs-3, recop.cols());
+    matrix_type real_recop = recop/*.block(3, 0, rbs-3, recop.cols())*/;
 
     /* project reconstruction on cell */
     matrix_type RprojC = Cmass.ldlt().solve(Rtrace1 * real_recop);
-
+//RprojC -= RprojC; /*DEBUG,leave commented*/
     /* subtract vT */
     RprojC.block(0,0,cbs,cbs) -= matrix_type::Identity(cbs,cbs);
     /* RprojC is now π_T(R(v)) - vT*/
@@ -716,7 +717,7 @@ curl_hho_stabilization(const Mesh<T,3,Storage>&                     msh,
 
         /* project reconstruction on face */
         matrix_type RprojF = -Fmass_ldlt.solve(RtraceF * real_recop);
-
+//RprojF -= RprojF; /*DEBUG,leave commented*/
         /* add vF */
         RprojF.block(0,offset,fbs,fbs) += matrix_type::Identity(fbs, fbs);
         /* RprojF is now vF - π_F(R(v)) */

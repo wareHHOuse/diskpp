@@ -135,7 +135,6 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            /*
             auto CR = disk::curl_reconstruction(msh, cl, hdi);
             auto proj = disk::project_tangent(msh, cl, hdi, f, 1);
             auto rb = disk::make_vector_monomial_basis(msh, cl, rd);
@@ -150,29 +149,6 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
                 Matrix<T,3,1> val = disk::eval(reconstr_curl, phi) - curl_f(qp.point());
                 error += qp.weight() * val.dot(val);
             }
-            */
-
-            ///*
-            auto CR = disk::curl_reconstruction_div(msh, cl, hdi);
-            auto proj = disk::project_tangent(msh, cl, hdi, f, 1);
-            auto rb = disk::make_vector_monomial_basis(msh, cl, rd);
-            auto cb = disk::make_vector_monomial_basis(msh, cl, cd);
-
-
-            Matrix<T, Dynamic, 1> reconstr_curl = Matrix<T, Dynamic, 1>::Zero(CR.first.rows());
-            reconstr_curl = CR.first * proj;
-
-            Matrix<T, Dynamic, 1> rr = reconstr_curl.segment(0, rb.size());
-
-            auto qps = integrate(msh, cl, 2*rd);
-
-            for (auto& qp : qps)
-            {
-                auto phi = rb.eval_functions(qp.point());
-                Matrix<T,3,1> val = disk::eval(rr, phi) - f(qp.point());
-                error += qp.weight() * val.dot(val);
-            }
-            //*/
             
         }
 
