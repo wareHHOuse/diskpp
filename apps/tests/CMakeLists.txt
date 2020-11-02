@@ -3,12 +3,14 @@ if (BUILD_APP_DISKPP_TESTS)
     add_executable(scalar_reconstruction scalar_reconstruction.cpp)
     target_link_libraries(scalar_reconstruction ${LINK_LIBS})
 
+    #add_executable(scalar_reconstruction_fullspace_test scalar_reconstruction_fullspace_test.cpp)
+    #target_link_libraries(scalar_reconstruction_fullspace_test ${LINK_LIBS})
+
     add_executable(scalar_stabilization scalar_stabilization.cpp)
     target_link_libraries(scalar_stabilization ${LINK_LIBS})
 
     add_executable(vector_reconstruction vector_reconstruction.cpp)
     target_link_libraries(vector_reconstruction ${LINK_LIBS})
-
 
     add_executable(divergence_reconstruction divergence_reconstruction.cpp)
     target_link_libraries(divergence_reconstruction ${LINK_LIBS})
@@ -60,4 +62,13 @@ if (BUILD_APP_DISKPP_TESTS)
 
     add_executable(divide_polygons divide_polygons.cpp)
     target_link_libraries(divide_polygons ${LINK_LIBS})
+
+    add_executable(curl_reconstruction curl_reconstruction.cpp)
+    target_link_libraries(curl_reconstruction ${LINK_LIBS})
+
+    add_executable(curl_reconstruction_pk curl_reconstruction_pk.cpp)
+    target_link_libraries(curl_reconstruction_pk ${LINK_LIBS})
+
+    add_executable(curl_stabilization curl_stabilization.cpp)
+    target_link_libraries(curl_stabilization ${LINK_LIBS})
 endif()

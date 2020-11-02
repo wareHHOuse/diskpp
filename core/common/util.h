@@ -24,6 +24,9 @@
 
 #include <cstddef>
 
+#include <sys/time.h>
+#include <sys/resource.h>
+
 unsigned int        fact(unsigned int);
 unsigned int        binomial(unsigned int, unsigned int);
 
@@ -51,3 +54,11 @@ T iexp_pow(T x, size_t n)
 
     return x*y;
 }
+
+
+class rusage_monitor
+{
+public:
+    rusage_monitor();
+    ~rusage_monitor();
+};

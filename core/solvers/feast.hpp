@@ -233,8 +233,8 @@ setup_feast(sol::state& lua, feast_eigensolver_params<T>& fep)
 }
 
 
-/*
 
+/*
 bool test_eigenvalue_solver(void)
 {
     int N = 256;
@@ -273,8 +273,16 @@ bool test_eigenvalue_solver(void)
 
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> eigvecs;
     Eigen::Matrix<double, Eigen::Dynamic, 1> eigvals;
+    
+    disk::feast_eigensolver_params<double> fep;
+    
+    fep.verbose = true;
+    fep.tolerance = 9;
+    fep.min_eigval = 1;
+    fep.max_eigval = 30;
+    fep.subspace_size = 10;
 
-    generalized_eigenvalue_solver(K, M, eigvecs, eigvals);
+    generalized_eigenvalue_solver(fep, K, M, eigvecs, eigvals);
 
     std::cout << eigvals << std::endl;
 

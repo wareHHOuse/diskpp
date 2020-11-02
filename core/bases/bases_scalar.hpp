@@ -27,16 +27,6 @@
 
 #pragma once
 
-//#define POWER_CACHE
-
-#ifdef POWER_CACHE
-#define PC_OFS_2D_X(d) (2 * d)
-#define PC_OFS_2D_Y(d) (2 * d + 1)
-#define PC_OFS_3D_X(d) (3 * d)
-#define PC_OFS_3D_Y(d) (3 * d + 1)
-#define PC_OFS_3D_Z(d) (3 * d + 2)
-#endif
-
 #include <vector>
 
 #include "common/eigen.hpp"
@@ -91,7 +81,7 @@ scalar_basis_size(size_t k, size_t d)
 }
 
 /* Generic template for bases. */
-template<typename MeshType, typename Element>
+template<typename MeshType, typename Element, typename ScalarType>
 struct scaled_monomial_scalar_basis
 {
     static_assert(sizeof(MeshType) == -1, "scaled_monomial_scalar_basis: not suitable for the requested kind of mesh");
@@ -100,37 +90,35 @@ struct scaled_monomial_scalar_basis
 };
 
 /* Basis 'factory'. */
-template<typename MeshType, typename ElementType>
+template<typename MeshType, typename ElementType, typename ScalarType = typename MeshType::coordinate_type>
 auto
 make_scalar_monomial_basis(const MeshType& msh, const ElementType& elem, size_t degree)
 {
-    return scaled_monomial_scalar_basis<MeshType, ElementType>(msh, elem, degree);
+    return scaled_monomial_scalar_basis<MeshType, ElementType, ScalarType>(msh, elem, degree);
 }
 
 /***************************************************************************************************/
 /***************************************************************************************************/
 
 /* Specialization for 2D meshes, cells */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell>
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell, ScalarType>
 {
 
   public:
     typedef Mesh<T, 2, Storage>                 mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef ScalarType                          scalar_type;
+    typedef typename mesh_type::coordinate_type coordinate_type;;
     typedef typename mesh_type::cell            cell_type;
     typedef typename mesh_type::point_type      point_type;
     typedef Matrix<scalar_type, Dynamic, 2>     gradient_type;
     typedef Matrix<scalar_type, Dynamic, 1>     function_type;
 
   private:
-    point_type                 cell_bar;
-    std::array<scalar_type, 2> box_h;
-    size_t                     basis_degree, basis_size;
+    point_type                      cell_bar;
+    std::array<coordinate_type, 2>  box_h;
+    size_t                          basis_degree, basis_size;
 
-#ifdef POWER_CACHE
-    mutable std::vector<scalar_type> power_cache;
-#endif
 
   public:
     scaled_monomial_scalar_basis(const mesh_type& msh, const cell_type& cl, size_t degree)
@@ -149,19 +137,6 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         const auto bx = (pt.x() - cell_bar.x()) / (0.5 * box_h[0]);
         const auto by = (pt.y() - cell_bar.y()) / (0.5 * box_h[1]);
 
-#ifdef POWER_CACHE
-        if (power_cache.size() != (basis_degree + 1) * 2)
-            power_cache.resize((basis_degree + 1) * 2);
-
-        power_cache[0] = 1.0;
-        power_cache[1] = 1.0;
-        for (size_t i = 1; i <= basis_degree; i++)
-        {
-            power_cache[PC_OFS_2D_X(i)] = bx * power_cache[PC_OFS_2D_X(i - 1)];
-            power_cache[PC_OFS_2D_Y(i)] = by * power_cache[PC_OFS_2D_Y(i - 1)];
-        }
-#endif
-
         size_t pos = 0;
         for (size_t k = 0; k <= basis_degree; k++)
         {
@@ -169,13 +144,10 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
             {
                 const auto pow_x = k - i;
                 const auto pow_y = i;
-#ifdef POWER_CACHE
-                const auto px = power_cache[PC_OFS_2D_X(pow_x)];
-                const auto py = power_cache[PC_OFS_2D_Y(pow_y)];
-#else
+
                 const auto px = iexp_pow(bx, pow_x);
                 const auto py = iexp_pow(by, pow_y);
-#endif
+
                 ret(pos++) = px * py;
             }
         }
@@ -196,19 +168,6 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         const auto bx = (pt.x() - cell_bar.x()) / (0.5 * box_h[0]);
         const auto by = (pt.y() - cell_bar.y()) / (0.5 * box_h[1]);
 
-#ifdef POWER_CACHE
-        if (power_cache.size() != (basis_degree + 1) * 2)
-            power_cache.resize((basis_degree + 1) * 2);
-
-        power_cache[0] = 1.0;
-        power_cache[1] = 1.0;
-        for (size_t i = 1; i <= basis_degree; i++)
-        {
-            power_cache[PC_OFS_2D_X(i)] = bx * power_cache[PC_OFS_2D_X(i - 1)];
-            power_cache[PC_OFS_2D_Y(i)] = by * power_cache[PC_OFS_2D_Y(i - 1)];
-        }
-#endif
-
         size_t pos = 0;
         for (size_t k = 0; k <= basis_degree; k++)
         {
@@ -216,17 +175,12 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
             {
                 const auto pow_x = k - i;
                 const auto pow_y = i;
-#ifdef POWER_CACHE
-                const auto px = power_cache[PC_OFS_2D_X(pow_x)];
-                const auto py = power_cache[PC_OFS_2D_Y(pow_y)];
-                const auto dx = (pow_x == 0) ? 0 : pow_x * ihx * power_cache[PC_OFS_2D_X(pow_x - 1)];
-                const auto dy = (pow_y == 0) ? 0 : pow_y * ihy * power_cache[PC_OFS_2D_Y(pow_y - 1)];
-#else
+
                 const auto px = iexp_pow(bx, pow_x);
                 const auto py = iexp_pow(by, pow_y);
                 const auto dx = (pow_x == 0) ? 0 : pow_x * ihx * iexp_pow(bx, pow_x - 1);
                 const auto dy = (pow_y == 0) ? 0 : pow_y * ihy * iexp_pow(by, pow_y - 1);
-#endif
+
                 ret(pos, 0) = dx * py;
                 ret(pos, 1) = px * dy;
                 pos++;
@@ -234,6 +188,22 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         }
 
         assert(pos == basis_size);
+
+        return ret;
+    }
+
+    gradient_type
+    eval_curls2(const point_type& pt) const
+    {
+        gradient_type ret = gradient_type::Zero(basis_size, 2);
+
+        auto dphi = eval_gradients(pt);
+
+        for (size_t i = 0; i < basis_size; i++)
+        {
+            ret(i,0) =  dphi(i,1);
+            ret(i,1) = -dphi(i,0);
+        }
 
         return ret;
     }
@@ -252,26 +222,23 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 };
 
 /* Specialization for 2D meshes, faces */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::face>
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::face, ScalarType>
 {
 
   public:
     typedef Mesh<T, 2, Storage>                 mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef ScalarType                          scalar_type;
+    typedef typename mesh_type::coordinate_type coordinate_type;
     typedef typename mesh_type::point_type      point_type;
     typedef typename mesh_type::face            face_type;
     typedef Matrix<scalar_type, Dynamic, 1>     function_type;
 
   private:
-    point_type  face_bar;
-    point_type  base;
-    scalar_type face_h;
-    size_t      basis_degree, basis_size;
-
-#ifdef POWER_CACHE
-    mutable std::vector<scalar_type> power_cache;
-#endif
+    point_type          face_bar;
+    point_type          base;
+    coordinate_type     face_h;
+    size_t              basis_degree, basis_size;
 
   public:
     scaled_monomial_scalar_basis(const mesh_type& msh, const face_type& fc, size_t degree)
@@ -321,26 +288,23 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 /***************************************************************************************************/
 
 /* Specialization for 3D meshes, cells */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell>
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell, ScalarType>
 {
 
   public:
     typedef Mesh<T, 3, Storage>                 mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef ScalarType                          scalar_type;
+    typedef typename mesh_type::coordinate_type coordinate_type;
     typedef typename mesh_type::cell            cell_type;
     typedef typename mesh_type::point_type      point_type;
     typedef Matrix<scalar_type, Dynamic, 3>     gradient_type;
     typedef Matrix<scalar_type, Dynamic, 1>     function_type;
 
   private:
-    point_type                 cell_bar;
-    std::array<scalar_type, 3> box_h;
-    size_t                     basis_degree, basis_size;
-
-#ifdef POWER_CACHE
-    mutable std::vector<scalar_type> power_cache;
-#endif
+    point_type                      cell_bar;
+    std::array<coordinate_type, 3>  box_h;
+    size_t                          basis_degree, basis_size;
 
   public:
     scaled_monomial_scalar_basis(const mesh_type& msh, const cell_type& cl, size_t degree)
@@ -360,20 +324,6 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
         const auto by = (pt.y() - cell_bar.y()) / (0.5 * box_h[1]);
         const auto bz = (pt.z() - cell_bar.z()) / (0.5 * box_h[2]);
 
-#ifdef POWER_CACHE
-        if (power_cache.size() != (basis_degree + 1) * 3)
-            power_cache.resize((basis_degree + 1) * 3);
-
-        power_cache[0] = 1.0;
-        power_cache[1] = 1.0;
-        power_cache[2] = 1.0;
-        for (size_t i = 1; i <= basis_degree; i++)
-        {
-            power_cache[PC_OFS_3D_X(i)] = bx * power_cache[PC_OFS_3D_X(i - 1)];
-            power_cache[PC_OFS_3D_Y(i)] = by * power_cache[PC_OFS_3D_Y(i - 1)];
-            power_cache[PC_OFS_3D_Z(i)] = bz * power_cache[PC_OFS_3D_Z(i - 1)];
-        }
-#endif
         size_t pos = 0;
         for (size_t k = 0; k <= basis_degree; k++)
         {
@@ -381,15 +331,10 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
             {
                 for (size_t pow_y = 0, pow_z = k - pow_x; pow_y <= k - pow_x; pow_y++, pow_z--)
                 {
-#ifdef POWER_CACHE
-                    const auto px = power_cache[PC_OFS_3D_X(pow_x)];
-                    const auto py = power_cache[PC_OFS_3D_Y(pow_y)];
-                    const auto pz = power_cache[PC_OFS_3D_Z(pow_z)];
-#else
                     const auto px = iexp_pow(bx, pow_x);
                     const auto py = iexp_pow(by, pow_y);
                     const auto pz = iexp_pow(bz, pow_z);
-#endif
+
                     ret(pos++) = px * py * pz;
                 }
             }
@@ -412,21 +357,6 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
         const auto ihy = 2.0 / box_h[1];
         const auto ihz = 2.0 / box_h[2];
 
-#ifdef POWER_CACHE
-        if (power_cache.size() != (basis_degree + 1) * 3)
-            power_cache.resize((basis_degree + 1) * 3);
-
-        power_cache[0] = 1.0;
-        power_cache[1] = 1.0;
-        power_cache[2] = 1.0;
-        for (size_t i = 1; i <= basis_degree; i++)
-        {
-            power_cache[PC_OFS_3D_X(i)] = bx * power_cache[PC_OFS_3D_X(i - 1)];
-            power_cache[PC_OFS_3D_Y(i)] = by * power_cache[PC_OFS_3D_Y(i - 1)];
-            power_cache[PC_OFS_3D_Z(i)] = bz * power_cache[PC_OFS_3D_Z(i - 1)];
-        }
-#endif
-
         size_t pos = 0;
         for (size_t k = 0; k <= basis_degree; k++)
         {
@@ -434,21 +364,13 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
             {
                 for (size_t pow_y = 0, pow_z = k - pow_x; pow_y <= k - pow_x; pow_y++, pow_z--)
                 {
-#ifdef POWER_CACHE
-                    const auto px = power_cache[PC_OFS_3D_X(pow_x)];
-                    const auto py = power_cache[PC_OFS_3D_Y(pow_y)];
-                    const auto pz = power_cache[PC_OFS_3D_Z(pow_z)];
-                    const auto dx = (pow_x == 0) ? 0 : pow_x * ihx * power_cache[PC_OFS_3D_X(pow_x - 1)];
-                    const auto dy = (pow_y == 0) ? 0 : pow_y * ihy * power_cache[PC_OFS_3D_Y(pow_y - 1)];
-                    const auto dz = (pow_z == 0) ? 0 : pow_z * ihz * power_cache[PC_OFS_3D_Z(pow_z - 1)];
-#else
                     const auto px = iexp_pow(bx, pow_x);
                     const auto py = iexp_pow(by, pow_y);
                     const auto pz = iexp_pow(bz, pow_z);
                     const auto dx = (pow_x == 0) ? 0 : pow_x * ihx * iexp_pow(bx, pow_x - 1);
                     const auto dy = (pow_y == 0) ? 0 : pow_y * ihy * iexp_pow(by, pow_y - 1);
                     const auto dz = (pow_z == 0) ? 0 : pow_z * ihz * iexp_pow(bz, pow_z - 1);
-#endif
+
                     ret(pos, 0) = dx * py * pz;
                     ret(pos, 1) = px * dy * pz;
                     ret(pos, 2) = px * py * dz;
@@ -475,29 +397,28 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
     }
 };
 
-/* Specialization for 3D meshes, faces */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face>
-{
+template<typename Mesh, typename Element, typename ScalarType>
+class scaled_monomial_abstract_face_basis;
 
-  public:
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_monomial_abstract_face_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face, ScalarType>
+{
+public:
     typedef Mesh<T, 3, Storage>                 mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef ScalarType                          scalar_type;
+    typedef typename mesh_type::coordinate_type coordinate_type;
     typedef typename mesh_type::point_type      point_type;
     typedef typename mesh_type::face            face_type;
     typedef Matrix<scalar_type, Dynamic, 1>     function_type;
 
-  private:
-    point_type  face_bar;
-    scalar_type face_h;
-    size_t      basis_degree, basis_size;
+private:
+    point_type          face_bar;
+    coordinate_type     face_h;
 
-#ifdef POWER_CACHE
-    mutable std::vector<scalar_type> power_cache;
-#endif
+    /* Local reference frame */
+    typedef static_vector<coordinate_type, 3>   vector_type;
+    vector_type                                 e0, e1;
 
-    typedef static_vector<T, 3> vector_type;
-    vector_type                 e0, e1;
 
     /* It takes two edges of an element's face and uses them as the coordinate
      * axis of a 2D reference system. Those two edges are accepted only if they have an angle
@@ -534,16 +455,18 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
         if (!ok)
             throw std::invalid_argument("Degenerate polyhedron, cannot proceed");
 
-        e0 = v0 / v0.norm();
+        /* Don't normalize, in order to keep axes of the same order of lenght
+         * of v in make_face_point_3d_to_2d() */
+        e0 = v0;// / v0.norm();
         e1 = v1 - (v1.dot(v0) * v0) / (v0.dot(v0));
-        e1 = e1 / e1.norm();
+        e1 = e1;// / e1.norm();
     }
 
+protected:
     /* This function maps a 3D point on a face to a 2D reference system, to compute the
      * face basis. It takes two edges of an element's face and uses them as the coordinate
      * axis of a 2D reference system. Those two edges are accepted only if they have an angle
      * between them greater than 8 degrees, then they are orthonormalized via G-S. */
-
     point<T, 2>
     map_face_point_3d_to_2d(const point_type& pt) const
     {
@@ -555,38 +478,70 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
         return point<T, 2>({eta, xi});
     }
 
-  public:
-    scaled_monomial_scalar_basis(const mesh_type& msh, const face_type& fc, size_t degree)
+    auto face_barycenter() const
+    {
+        return face_bar;
+    }
+
+    auto face_diameter() const
+    {
+        return face_h;
+    }
+
+    auto reference_frame() const
+    {
+        return std::make_pair(e0, e1);
+    }
+
+public:
+    scaled_monomial_abstract_face_basis(const mesh_type& msh, const face_type& fc)
     {
         face_bar     = barycenter(msh, fc);
         face_h       = diameter(msh, fc);
+        compute_axis(msh, fc, e0, e1);
+    }
+};
+
+
+/* Specialization for 3D meshes, faces */
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face, ScalarType>
+    : public scaled_monomial_abstract_face_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face, ScalarType>
+{
+
+public:
+    typedef Mesh<T, 3, Storage>                 mesh_type;
+    typedef ScalarType                          scalar_type;
+    typedef typename mesh_type::coordinate_type coordinate_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef typename mesh_type::face            face_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     function_type;
+
+    using base = scaled_monomial_abstract_face_basis<mesh_type, face_type, scalar_type>;
+
+private:
+    point_type          face_bar;
+    coordinate_type     face_h;
+    size_t              basis_degree, basis_size;
+
+  public:
+    scaled_monomial_scalar_basis(const mesh_type& msh, const face_type& fc, size_t degree)
+        : base(msh, fc)
+    {
+        face_bar     = this->face_barycenter();
+        face_h       = this->face_diameter();
         basis_degree = degree;
         basis_size   = scalar_basis_size(degree, 2);
-        compute_axis(msh, fc, e0, e1);
     }
 
     function_type
     eval_functions(const point_type& pt) const
     {
-        const auto ep = map_face_point_3d_to_2d(pt);
+        const auto ep = this->map_face_point_3d_to_2d(pt);
         const auto bx = ep.x();
         const auto by = ep.y();
 
         function_type ret = function_type::Zero(basis_size);
-
-#ifdef POWER_CACHE
-        if (power_cache.size() != (basis_degree + 1) * 2)
-            power_cache.resize((basis_degree + 1) * 2);
-
-        power_cache[0] = 1.0;
-        power_cache[1] = 1.0;
-        for (size_t i = 1; i <= basis_degree; i++)
-        {
-            power_cache[PC_OFS_2D_X(i)] = bx * power_cache[PC_OFS_2D_X(i - 1)];
-            power_cache[PC_OFS_2D_Y(i)] = by * power_cache[PC_OFS_2D_Y(i - 1)];
-        }
-#endif
-
         size_t pos = 0;
         for (size_t k = 0; k <= basis_degree; k++)
         {
@@ -594,13 +549,8 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
             {
                 const auto pow_x = k - i;
                 const auto pow_y = i;
-#ifdef POWER_CACHE
-                const auto px = power_cache[PC_OFS_2D_X(pow_x)];
-                const auto py = power_cache[PC_OFS_2D_Y(pow_y)];
-#else
                 const auto px = iexp_pow(bx, pow_x);
                 const auto py = iexp_pow(by, pow_y);
-#endif
                 ret(pos++) = px * py;
             }
         }
@@ -623,6 +573,7 @@ class scaled_monomial_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
     }
 };
 
+#if 0
 template<typename MeshType, typename Element>
 struct scaled_legendre_scalar_basis
 {
@@ -724,7 +675,7 @@ class scaled_legendre_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         return basis_degree;
     }
 };
-
+#endif
 /*
 template<typename Mesh, typename Element, typename Basis>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>

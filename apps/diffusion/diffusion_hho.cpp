@@ -107,8 +107,6 @@ run_hho_diffusion_solver(const Mesh& msh, size_t degree)
 {
     using T = typename Mesh::coordinate_type;
 
-    //size_t degree = 0;
-
     hho_degree_info hdi(degree);
 
     auto rhs_fun = make_rhs_function(msh);
@@ -132,14 +130,15 @@ run_hho_diffusion_solver(const Mesh& msh, size_t degree)
     size_t systsz = assembler.LHS.rows();
     size_t nnz = assembler.LHS.nonZeros();
 
-    //std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
-    //std::cout << "Mesh faces: " << msh.faces_size() << std::endl;
-    //std::cout << "Dofs: " << systsz << std::endl;
+    std::cout << "Mesh has " << msh.cells_size() << " elements." << std::endl;
+    std::cout << "System has " << assembler.LHS.rows() << " unknowns and ";
+    std::cout << assembler.LHS.nonZeros() << " nonzeros." << std::endl;
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
 
+    std::cout << "Running pardiso" << std::endl;
     disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = false;
+    pparams.report_factorization_Mflops = true;
     mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
 
     T error = 0.0;
@@ -163,7 +162,11 @@ run_hho_diffusion_solver(const Mesh& msh, size_t degree)
 
 
         auto diff = realsol - fullsol;
-        error += diff.dot(A*diff);
+        //error += diff.dot(A*diff);
+
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> MM = make_mass_matrix(msh, cl, cb);
+
+        error += diff.segment(0,cb.size()).dot(MM*diff.segment(0,cb.size()));
 
         //auto bar = barycenter(msh, cl);
 
@@ -173,9 +176,8 @@ run_hho_diffusion_solver(const Mesh& msh, size_t degree)
 
     }
 
-    //std::cout << std::sqrt(error) << std::endl;
-
-    //ofs.close();
+    std::cout << "h = " << disk::average_diameter(msh) << " ";
+    std::cout << "err = " << std::sqrt(error) << std::endl;
 
     return std::sqrt(error);
 }
@@ -206,25 +208,42 @@ run_diffusion_solver(const Mesh& msh)
     run_hho_diffusion_solver(msh, 0);
 }
 
-#if 0
+
 int main(int argc, char **argv)
 {
+    rusage_monitor rm;
+
     using T = double;
 
-    if (argc != 2)
-    {
-        std::cout << "Please specify file name." << std::endl;
-        return 1;
-    }
+    size_t      degree = 1;
+    char *      mesh_filename = nullptr;
 
-    char *mesh_filename = argv[1];
+    int ch;
+    while ( (ch = getopt(argc, argv, "k:m:")) != -1 )
+    {
+        switch(ch)
+        {
+            case 'k':
+                degree = std::stoi(optarg);
+                break;
+
+            case 'm':
+                mesh_filename = optarg;
+                break;
+
+            case '?':
+            default:
+                std::cout << "Invalid option" << std::endl;
+                return 1;
+        }
+    }
 
     /* FVCA5 2D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
         auto msh = disk::load_fvca5_2d_mesh<T>(mesh_filename);
-        run_diffusion_solver(msh);
+        run_hho_diffusion_solver(msh, degree);
         return 0;
     }
 
@@ -236,7 +255,7 @@ int main(int argc, char **argv)
 
         std::cout << msh.faces_size() << std::endl;
 
-        run_diffusion_solver(msh);
+        run_hho_diffusion_solver(msh, degree);
         return 0;
     }
 
@@ -245,7 +264,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
         auto msh = disk::load_cartesian_2d_mesh<T>(mesh_filename);
-        run_diffusion_solver(msh);
+        run_hho_diffusion_solver(msh, degree);
         return 0;
     }
 
@@ -255,26 +274,38 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
         auto msh = disk::load_netgen_3d_mesh<T>(mesh_filename);
-        run_diffusion_solver(msh);
+        run_hho_diffusion_solver(msh, degree);
         return 0;
     }
 
     /* DiSk++ cartesian 3D */
-    /*
     if (std::regex_match(mesh_filename, std::regex(".*\\.hex$") ))
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
         auto msh = disk::load_cartesian_3d_mesh<T>(mesh_filename);
-        run_diffusion_solver(msh);
+        run_hho_diffusion_solver(msh, degree);
         return 0;
     }
-    */
-}
-#endif
 
+    /* FVCA6 3D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.msh$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
+        disk::generic_mesh<T,3> msh;
+        
+        disk::load_mesh_fvca6_3d<T>(mesh_filename, msh);
+        
+        run_hho_diffusion_solver(msh, degree);
+        
+        return 0;
+    }
+}
+
+#if 0
 int main(void)
 {
     tester<test_functor> tstr;
     tstr.run();
     return 0;
 }
+#endif

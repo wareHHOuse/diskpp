@@ -59,6 +59,33 @@
 
 namespace disk {
 
+namespace priv {
+template<template<typename, size_t, typename> class Mesh,
+    typename T, typename Storage>
+int
+silo_face_orientation(const Mesh<T, 3, Storage>& msh,
+                      const typename Mesh<T, 3, Storage>::cell& cl,
+                      const typename Mesh<T, 3, Storage>::face& fc)
+{
+    auto pts = points(msh, fc);
+    assert(pts.size() >= 3);
+
+    auto v0 = (pts[1] - pts[0]).to_vector();
+    auto v1 = (pts[2] - pts[1]).to_vector();
+    auto n = v0.cross(v1);
+
+    auto cell_bar = barycenter(msh, cl);
+    auto face_bar = barycenter(msh, fc);
+    auto outward_vector = (face_bar - cell_bar).to_vector();
+
+    if ( n.dot(outward_vector) < T(0) )
+        return -1;
+
+    return 1;
+}
+}
+
+
 enum variable_centering_t
 {
     nodal_variable_t,
@@ -172,6 +199,61 @@ public:
     }
 
     template<typename T>
+    bool add_mesh(const simplicial_mesh<T,3>& msh, const std::string& name)
+    {
+        std::vector<double> x_coords, y_coords, z_coords;
+        x_coords.reserve(msh.points_size());
+        y_coords.reserve(msh.points_size());
+        z_coords.reserve(msh.points_size());
+
+        for (auto itor = msh.points_begin(); itor != msh.points_end(); itor++)
+        {
+            auto pt = *itor;
+            /* explicit cast to support rational<>. silo works in double anyways */
+            x_coords.push_back( double(pt.x()) );
+            y_coords.push_back( double(pt.y()) );
+            z_coords.push_back( double(pt.z()) );
+        }
+
+        double *coords[] = {x_coords.data(), y_coords.data(), z_coords.data()};
+
+        std::vector<int> nodelist;
+        nodelist.reserve( 4*msh.cells_size() );
+
+        for (auto& cl : msh)
+        {
+            auto ptids = cl.point_ids();
+            assert(ptids.size() == 4);
+
+            for (auto& ptid : ptids)
+                nodelist.push_back( ptid + 1 );
+        }
+
+        int lnodelist = nodelist.size();
+
+        int shapetype[] = { DB_ZONETYPE_TET };
+        int shapesize[] = {4};
+        int shapecounts[] = { static_cast<int>(msh.cells_size()) };
+        int nshapetypes = 1;
+        int nnodes = msh.points_size();
+        int nzones = msh.cells_size();
+        int ndims = 3;
+
+        std::stringstream zlname;
+        zlname << "zonelist_" << name;
+        std::string zonelist_name = zlname.str();
+
+        DBPutZonelist2(m_siloDb, zonelist_name.c_str(), nzones, ndims,
+            nodelist.data(), lnodelist, 1, 0, 0, shapetype, shapesize,
+            shapecounts, nshapetypes, NULL);
+
+        DBPutUcdmesh(m_siloDb, name.c_str(), ndims, NULL, coords, nnodes, nzones,
+            zonelist_name.c_str(), NULL, DB_DOUBLE, NULL);
+
+        return true;
+    }
+
+    template<typename T>
     bool add_mesh(const simplicial_mesh<T,2>& msh, const std::string& name)
     {
         std::vector<double> x_coords, y_coords;
@@ -202,6 +284,7 @@ public:
 
         int lnodelist = nodelist.size();
 
+        int shapetype[] = { DB_ZONETYPE_TRIANGLE };
         int shapesize[] = {3};
         int shapecounts[] = { static_cast<int>(msh.cells_size()) };
         int nshapetypes = 1;
@@ -213,8 +296,70 @@ public:
         zlname << "zonelist_" << name;
         std::string zonelist_name = zlname.str();
 
-        DBPutZonelist(m_siloDb, zonelist_name.c_str(), nzones, ndims,
-            nodelist.data(), lnodelist, 1, shapesize, shapecounts, nshapetypes);
+        DBPutZonelist2(m_siloDb, zonelist_name.c_str(), nzones, ndims,
+            nodelist.data(), lnodelist, 1, 0, 0, shapetype, shapesize,
+            shapecounts, nshapetypes, NULL);
+
+        DBPutUcdmesh(m_siloDb, name.c_str(), ndims, NULL, coords, nnodes, nzones,
+            zonelist_name.c_str(), NULL, DB_DOUBLE, NULL);
+
+        return true;
+    }
+
+    template<typename T>
+    bool add_mesh(const cartesian_mesh<T,3>& msh, const std::string& name)
+    {
+        std::vector<double> x_coords, y_coords, z_coords;
+        x_coords.reserve(msh.points_size());
+        y_coords.reserve(msh.points_size());
+        z_coords.reserve(msh.points_size());
+
+        for (auto itor = msh.points_begin(); itor != msh.points_end(); itor++)
+        {
+            auto pt = *itor;
+            /* explicit cast to support rational<>. silo works in double anyways */
+            x_coords.push_back( double(pt.x()) );
+            y_coords.push_back( double(pt.y()) );
+            z_coords.push_back( double(pt.z()) );
+        }
+
+        double *coords[] = {x_coords.data(), y_coords.data(), z_coords.data()};
+
+        std::vector<int> nodelist;
+        nodelist.reserve( 8*msh.cells_size() );
+
+        for (auto& cl : msh)
+        {
+            auto ptids = cl.point_ids();
+            assert(ptids.size() == 8);
+
+            nodelist.push_back( ptids[0] + 1 );
+            nodelist.push_back( ptids[1] + 1 );
+            nodelist.push_back( ptids[3] + 1 );
+            nodelist.push_back( ptids[2] + 1 );
+            nodelist.push_back( ptids[4] + 1 );
+            nodelist.push_back( ptids[5] + 1 );
+            nodelist.push_back( ptids[7] + 1 );
+            nodelist.push_back( ptids[6] + 1 );
+        }
+
+        int lnodelist = nodelist.size();
+
+        int shapetype[] = { DB_ZONETYPE_HEX };
+        int shapesize[] = {8};
+        int shapecounts[] = { static_cast<int>(msh.cells_size()) };
+        int nshapetypes = 1;
+        int nnodes = msh.points_size();
+        int nzones = msh.cells_size();
+        int ndims = 3;
+
+        std::stringstream zlname;
+        zlname << "zonelist_" << name;
+        std::string zonelist_name = zlname.str();
+
+        DBPutZonelist2(m_siloDb, zonelist_name.c_str(), nzones, ndims,
+            nodelist.data(), lnodelist, 1, 0, 0, shapetype, shapesize,
+            shapecounts, nshapetypes, NULL);
 
         DBPutUcdmesh(m_siloDb, name.c_str(), ndims, NULL, coords, nnodes, nzones,
             zonelist_name.c_str(), NULL, DB_DOUBLE, NULL);
@@ -270,6 +415,87 @@ public:
 
         DBPutUcdmesh(m_siloDb, name.c_str(), ndims, NULL, coords, nnodes, nzones,
             zonelist_name.c_str(), NULL, DB_DOUBLE, NULL);
+
+        return true;
+    }
+
+    template<typename T>
+    bool add_mesh(generic_mesh<T,3>& msh, const std::string& name)
+    {
+        using mesh_type = generic_mesh<T,3>;
+
+        static_assert(std::is_same<T,double>::value, "Only double for now");
+
+        std::vector<T> x_coords, y_coords, z_coords;
+        x_coords.reserve(msh.points_size());
+        y_coords.reserve(msh.points_size());
+        z_coords.reserve(msh.points_size());
+
+        for (auto itor = msh.points_begin(); itor != msh.points_end(); itor++)
+        {
+            auto pt = *itor;
+            x_coords.push_back(pt.x());
+            y_coords.push_back(pt.y());
+            z_coords.push_back(pt.z());
+        }
+
+        T *coords[] = {x_coords.data(), y_coords.data(), z_coords.data()};
+
+        int nfaces = msh.faces_size();
+
+        std::vector<int> nodecnts;
+        std::vector<int> nodelist;
+
+        for (auto& fc : faces(msh))
+        {
+            auto ptids = fc.point_ids();
+            nodecnts.push_back( ptids.size() );
+
+            for (auto& ptid : ptids)
+                nodelist.push_back(ptid);
+        }
+        int lnodelist = nodelist.size();
+        int nzones = msh.cells_size();
+
+        std::vector<int> facecnts, facelist;
+
+        for (auto& cl : msh)
+        {
+            auto fcs = faces(msh, cl);
+            facecnts.push_back( fcs.size() );
+
+            for (auto& fc : fcs)
+            {
+                int ofs = offset(msh,fc);
+                if (silo_face_orientation(msh, cl, fc) < 0)
+                    ofs = ~ofs;
+                facelist.push_back( ofs );
+            }
+        };
+
+        int lfacelist = facelist.size();
+
+        std::stringstream zlname;
+        zlname << "zonelist_" << name;
+        std::string zonelist_name = zlname.str();
+
+        int err = DBPutPHZonelist(m_siloDb, zonelist_name.c_str(), nfaces, nodecnts.data(),
+            lnodelist, nodelist.data(), nullptr, nzones, facecnts.data(), lfacelist,
+            facelist.data(), 0, 0, nzones-1, nullptr);
+
+        if (err != 0)
+            std::cout << "DBPutPHZonelist() call failed" << std::endl;
+
+        int ndims = 3;
+        int nnodes = msh.points_size();
+
+        DBoptlist *optlist = DBMakeOptlist(1);
+        DBAddOption(optlist, DBOPT_PHZONELIST, (void*)zonelist_name.c_str());
+
+        DBPutUcdmesh(m_siloDb, name.c_str(), ndims, NULL, coords, nnodes, nzones,
+            NULL, NULL, DB_DOUBLE, optlist);
+
+        DBFreeOptlist(optlist);
 
         return true;
     }
@@ -397,6 +623,18 @@ public:
         else
             return false;
 
+        return true;
+    }
+
+    bool add_expression(const std::string& expr_name,
+                        const std::string& expr_definition,
+                        int expr_type)
+    {
+        std::stringstream ss;
+        ss << "def_" << expr_name;
+        const char *name[] = { expr_name.c_str() };
+        const char *def[] = { expr_definition.c_str() };
+        DBPutDefvars(m_siloDb, ss.str().c_str(), 1, name, &expr_type, def, NULL);
         return true;
     }
 };

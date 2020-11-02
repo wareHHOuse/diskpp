@@ -690,6 +690,8 @@ class fvca6_mesh_loader<T,3> : public mesh_loader<generic_mesh<T, 3>>
     }
 
 public:
+    static const char constexpr *expected_extension = "msh";
+
     fvca6_mesh_loader() = default;
 
     bool read_mesh(const std::string& s)
@@ -1110,7 +1112,8 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
     std::vector<point_type>                         points;
     std::vector<node_type>                          nodes;
     std::vector<edge_type>                          edges;
-    std::vector<surface_type>                       surfaces, boundary_surfaces;
+    std::vector<surface_type>                       surfaces;
+    std::vector<std::pair<surface_type, size_t>>    boundary_surfaces;
     std::vector<volume_type>                        volumes;
 
 
@@ -1249,7 +1252,7 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
 
             surface_type   tri( { p0, p1, p2 } );
 
-            boundary_surfaces.push_back( tri );
+            boundary_surfaces.push_back( std::make_pair(tri, std::get<0>(t)) );
 
             linecount++;
         }
@@ -1314,7 +1317,7 @@ public:
         for (auto& bs : boundary_surfaces)
         {
             auto position = find_element_id(storage->surfaces.begin(),
-                                            storage->surfaces.end(), bs);
+                                            storage->surfaces.end(), bs.first);
             if (position.first == false)
             {
                 std::cout << "Bad bug at " << __FILE__ << "("
@@ -1322,7 +1325,7 @@ public:
                 return false;
             }
 
-            bnd_info bi{0, true};
+            bnd_info bi{bs.second, true};
             storage->boundary_info.at(position.second) = bi;
         }
 
@@ -1582,6 +1585,7 @@ class cartesian_mesh_loader<T,3> : public mesh_loader<cartesian_mesh<T,3>>
     }
 
 public:
+    static const char constexpr *expected_extension = "hex";
     cartesian_mesh_loader() = default;
 
     bool read_mesh(const std::string& s)
@@ -2486,6 +2490,7 @@ class medit_mesh_loader<T, 3> : public mesh_loader<generic_mesh<T, 3>>
 
 /* Helper to load uniform 1D meshes. */
 template<typename T>
+[[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::generic_mesh<T,1>
 load_uniform_1d_mesh(T min, T max, size_t cells)
 {
@@ -2500,6 +2505,7 @@ load_uniform_1d_mesh(T min, T max, size_t cells)
 
 /* Helper to load 2D meshes in FVCA5 format */
 template<typename T>
+[[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::generic_mesh<T,2>
 load_fvca5_2d_mesh(const char *filename)
 {
@@ -2515,6 +2521,7 @@ load_fvca5_2d_mesh(const char *filename)
 
 /* Helper to load 3D meshes in FVCA6 format */
 template<typename T>
+[[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::generic_mesh<T, 3>
 load_fvca6_3d_mesh(const char* filename)
 {
@@ -2578,6 +2585,7 @@ load_netgen_3d_mesh(const char *filename)
 
 /* Helper to load 3D meshes in DiSk++ format */
 template<typename T>
+[[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::cartesian_mesh<T, 3>
 load_cartesian_3d_mesh(const char *filename)
 {
@@ -2593,6 +2601,7 @@ load_cartesian_3d_mesh(const char *filename)
 
 /* Helper to load 2D meshes in Medit format */
 template<typename T>
+[[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::generic_mesh<T, 2>
 load_medit_2d_mesh(const char* filename)
 {
@@ -2608,6 +2617,7 @@ load_medit_2d_mesh(const char* filename)
 
 /* Helper to load 3D meshes in Medit format */
 template<typename T>
+[[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::generic_mesh<T, 3>
 load_medit_3d_mesh(const char* filename)
 {
@@ -2675,6 +2685,22 @@ bool
 load_mesh_diskpp_cartesian(const char *filename, disk::cartesian_mesh<T, 2>& msh)
 {
     disk::cartesian_mesh_loader<T, 2> loader;
+    return priv::load_mesh(filename, loader, msh);
+}
+
+template<typename T>
+bool
+load_mesh_diskpp_cartesian(const char *filename, disk::cartesian_mesh<T, 3>& msh)
+{
+    disk::cartesian_mesh_loader<T, 3> loader;
+    return priv::load_mesh(filename, loader, msh);
+}
+
+template<typename T>
+bool
+load_mesh_fvca6_3d(const char *filename, disk::generic_mesh<T, 3>& msh)
+{
+    disk::fvca6_mesh_loader<T, 3> loader;
     return priv::load_mesh(filename, loader, msh);
 }
 

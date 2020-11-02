@@ -84,7 +84,7 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
   private:
     size_t basis_degree, basis_size;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, cell_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
   public:
@@ -151,7 +151,7 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
   private:
     size_t basis_degree, basis_size;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, face_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, face_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
   public:
@@ -217,7 +217,7 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
   private:
     size_t basis_degree, basis_size;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, cell_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
   public:
@@ -284,7 +284,7 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
   private:
     size_t basis_degree, basis_size;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, face_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, face_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
   public:
@@ -400,7 +400,7 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
   private:
     size_t basis_degree, basis_size;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, cell_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
   public:
@@ -472,7 +472,7 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
   private:
     size_t basis_degree, basis_size;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, face_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, face_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
   public:
@@ -542,7 +542,7 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
   private:
     size_t basis_degree, basis_size;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, cell_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
   public:
@@ -613,7 +613,7 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
   private:
     size_t basis_degree, basis_size;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, face_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, face_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
   public:
@@ -719,7 +719,7 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
     size_t basis_degree, basis_size;
     point_type cell_bar;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, cell_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
     typedef scaled_monomial_matrix_basis<mesh_type, cell_type> matrix_basis_type;
@@ -807,7 +807,7 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
     size_t basis_degree, basis_size;
     point_type cell_bar;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, cell_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
     typedef scaled_monomial_matrix_basis<mesh_type, cell_type> matrix_basis_type;
@@ -933,7 +933,7 @@ class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 
     size_t basis_degree, basis_size;
     point_type cell_bar;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, cell_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
     typedef scaled_monomial_sym_matrix_basis<mesh_type, cell_type> sym_matrix_basis_type;
@@ -1036,7 +1036,7 @@ class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 
     size_t basis_degree, basis_size;
     point_type cell_bar;
 
-    typedef scaled_monomial_scalar_basis<mesh_type, cell_type> scalar_basis_type;
+    typedef scaled_monomial_scalar_basis<mesh_type, cell_type, scalar_type> scalar_basis_type;
     scalar_basis_type                                          scalar_basis;
 
     typedef scaled_monomial_sym_matrix_basis<mesh_type, cell_type> sym_matrix_basis_type;

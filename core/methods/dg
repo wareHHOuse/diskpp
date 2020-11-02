@@ -1,0 +1,13 @@
+/*
+ * DISK++, a template library for DIscontinuous SKeletal methods.
+ *  
+ * Matteo Cicuttin (C) 2020
+ * matteo.cicuttin@uliege.be
+ *
+ * University of Liège - Montefiore Institute
+ * Applied and Computational Electromagnetics group  
+ */
+
+#pragma once
+
+#include "implementation_dg/assembler.hpp"
