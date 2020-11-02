@@ -43,7 +43,9 @@
 #include "geometry/geometry.hpp"
 #include "loaders/loader.hpp"
 #include "methods/hho"
+#include "methods/dg"
 #include "solvers/solver.hpp"
+#include "output/silo.hpp"
 
 #include "../tests/common.hpp"
 
@@ -133,14 +135,17 @@ auto make_solution_function(const Mesh& msh)
 
 template<typename Mesh>
 void
-run_diffusion_solver(Mesh& msh)
-{
-    size_t degree = 1;
-    
+run_diffusion_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_type eta)
+{   
     auto cvf = connectivity_via_faces(msh);
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
     typedef Matrix<T, Dynamic, 1>       vector_type;
+
+    auto f = make_rhs_function(msh);
+
+    auto cbs = disk::scalar_basis_size(degree, Mesh::dimension);
+    auto assm = make_discontinuous_galerkin_assembler(msh, cbs);
     
     for (auto& tcl : msh)
     {
@@ -156,7 +161,7 @@ run_diffusion_solver(Mesh& msh)
             auto dphi = tbasis.eval_gradients(ep);
             
             K += qp.weight() * dphi * dphi.transpose();
-            loc_rhs += qp.weight() * phi;
+            loc_rhs += qp.weight() * phi * f(qp.point());
         }
         
         auto fcs = faces(msh, tcl);
@@ -171,7 +176,7 @@ run_diffusion_solver(Mesh& msh)
             assert(tbasis.size() == nbasis.size());
             
             auto n     = normal(msh, tcl, fc);
-            auto eta_l = 1.0;//eta / diameter(msh, fc);
+            auto eta_l = eta / diameter(msh, fc);
             auto f_qps = disk::integrate(msh, fc, 2*degree);
             
             for (auto& fqp : f_qps)
@@ -192,8 +197,8 @@ run_diffusion_solver(Mesh& msh)
                     Att += - fqp.weight() * tphi * (tdphi*n).transpose();
                     Att += - fqp.weight() * (tdphi*n) * tphi.transpose();
                     
-                    loc_rhs -= fqp.weight() * (tdphi*n);
-                    loc_rhs += fqp.weight() * eta_l * tphi;
+                    //loc_rhs -= fqp.weight() * (tdphi*n);
+                    //loc_rhs += fqp.weight() * eta_l * tphi;
                     continue;
                 }
                 
@@ -205,33 +210,105 @@ run_diffusion_solver(Mesh& msh)
                 Atn += + fqp.weight() * 0.5 * (tdphi*n) * nphi.transpose();
             }
             
-            //assm.assemble(msh, tcl, tcl, Att);
-            //if (nv.second)
-            //    assm.assemble(msh, tcl, ncl, Atn);
+            assm.assemble(msh, tcl, tcl, Att);
+            if (nv.second)
+                assm.assemble(msh, tcl, ncl, Atn);
         }
         
-        //assm.assemble(msh, tcl, K, loc_rhs);
+        assm.assemble(msh, tcl, K, loc_rhs);
     }
+
+    assm.finalize();
+
+    std::cout << "Mesh has " << msh.cells_size() << " elements." << std::endl;
+    std::cout << "System has " << assm.LHS.rows() << " unknowns and ";
+    std::cout << assm.LHS.nonZeros() << " nonzeros." << std::endl;
+
+    disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.syssz);
+
+    std::cout << "Running pardiso" << std::endl;
+    disk::solvers::pardiso_params<T> pparams;
+    pparams.report_factorization_Mflops = true;
+    mkl_pardiso(pparams, assm.LHS, assm.RHS, sol);
+
+
+    auto sol_fun = make_solution_function(msh);
+
+    std::vector<double> data;
+
+    T err = 0.0; size_t cell_i = 0;
+    for (auto& cl : msh)
+    {
+        auto cb = make_scalar_monomial_basis(msh, cl, degree);
+
+        Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb);
+        Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun);
+        Matrix<T, Dynamic, 1> asol = MMe.llt().solve(arhs);
+        Matrix<T, Dynamic, 1> lsol = sol.segment(cell_i*cb.size(), cb.size());
+
+
+        Matrix<T, Dynamic, 1> diff = lsol - asol;
+
+        err += diff.dot(MMe*diff);
+
+        data.push_back( lsol(0) );
+
+        cell_i++;
+    }
+
+    disk::silo_database silo_db;
+    silo_db.create("diffusion.silo");
+    silo_db.add_mesh(msh, "mesh");
+
+    disk::silo_zonal_variable<T> u("u", data);
+    silo_db.add_variable("mesh", u);
+
+    silo_db.close();
+
+    std::cout << "h = " << disk::average_diameter(msh) << " ";
+    std::cout << "err = " << std::sqrt(err) << std::endl;
 }
 
 int main(int argc, char **argv)
 {
+    rusage_monitor rm;
+
     using T = double;
 
-    if (argc != 2)
-    {
-        std::cout << "Please specify file name." << std::endl;
-        return 1;
-    }
+    T           stab_param = 1.0;
+    size_t      degree = 1;
+    char *      mesh_filename = nullptr;
 
-    char *mesh_filename = argv[1];
+    int ch;
+    while ( (ch = getopt(argc, argv, "a:k:m:")) != -1 )
+    {
+        switch(ch)
+        {
+            case 'a':
+                stab_param = std::stod(optarg);
+                break;
+
+            case 'k':
+                degree = std::stoi(optarg);
+                break;
+
+            case 'm':
+                mesh_filename = optarg;
+                break;
+
+            case '?':
+            default:
+                std::cout << "Invalid option" << std::endl;
+                return 1;
+        }
+    }
 
     /* FVCA5 2D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
         auto msh = disk::load_fvca5_2d_mesh<T>(mesh_filename);
-        run_diffusion_solver(msh);
+        run_diffusion_solver(msh, degree, stab_param);
         return 0;
     }
 
@@ -243,7 +320,7 @@ int main(int argc, char **argv)
 
         std::cout << msh.faces_size() << std::endl;
 
-        run_diffusion_solver(msh);
+        run_diffusion_solver(msh, degree, stab_param);
         return 0;
     }
 
@@ -252,7 +329,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
         auto msh = disk::load_cartesian_2d_mesh<T>(mesh_filename);
-        run_diffusion_solver(msh);
+        run_diffusion_solver(msh, degree, stab_param);
         return 0;
     }
 
@@ -262,7 +339,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
         auto msh = disk::load_netgen_3d_mesh<T>(mesh_filename);
-        run_diffusion_solver(msh);
+        run_diffusion_solver(msh, degree, stab_param);
         return 0;
     }
 
@@ -271,7 +348,20 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
         auto msh = disk::load_cartesian_3d_mesh<T>(mesh_filename);
-        run_diffusion_solver(msh);
+        run_diffusion_solver(msh, degree, stab_param);
+        return 0;
+    }
+
+    /* FVCA6 3D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.msh$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
+        disk::generic_mesh<T,3> msh;
+        
+        disk::load_mesh_fvca6_3d<T>(mesh_filename, msh);
+        
+        run_diffusion_solver(msh, degree, stab_param);
+        
         return 0;
     }
 }
