@@ -24,6 +24,7 @@
 #include "core/loaders/loader.hpp"
 #include "output/silo.hpp"
 #include "solvers/solver.hpp"
+#include "solvers/mumps.hpp"
 
 #include "compinfo.h"
 
@@ -1097,12 +1098,19 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order,
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.syssz);
 
+    /*
     std::cout << "Running pardiso" << std::endl;
     disk::solvers::pardiso_params<T> pparams;
     pparams.report_factorization_Mflops = true;
     pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
     mkl_pardiso(pparams, assm.LHS, assm.RHS, sol);
+    */
 
+    ///*
+    std::cout << "Running MUMPS" << std::endl;
+    mumps_solver<T> mumps;
+    sol = mumps.solve(assm.LHS, assm.RHS);
+    //*/
 
     std::vector<T> data_ex, data_ey, data_ez;
     std::vector<T> data_hx, data_hy, data_hz;
@@ -1221,7 +1229,8 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order,
             .l2_error_e = std::sqrt(l2_err_e),
             .l2_error_h = std::sqrt(l2_err_h),
             .nrg_error = std::sqrt(energy_err),
-            .mflops = pparams.mflops,
+            //.mflops = pparams.mflops,
+            .mflops = (int)mumps.get_Mflops(),
             .dofs = assm.syssz,
             .nonzeros = assm.LHS.nonZeros()
         });
