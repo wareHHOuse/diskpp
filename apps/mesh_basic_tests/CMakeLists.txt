@@ -12,6 +12,9 @@ if (BUILD_APP_MESH_BASIC_TESTS)
 	add_executable(submesher_test submesher_test.cpp)
 	target_link_libraries(submesher_test ${LINK_LIBS})
 
+	add_executable(mesh_aspect mesh_aspect.cpp)
+	target_link_libraries(mesh_aspect ${LINK_LIBS})
+
 	set(CMAKE_AUTOMOC ON)
 	set(CMAKE_INCLUDE_CURRENT_DIR ON)
 

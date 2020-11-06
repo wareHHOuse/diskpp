@@ -1,11 +1,11 @@
 /*
  * DISK++, a template library for DIscontinuous SKeletal methods.
- *  
+ *
  * Matteo Cicuttin (C) 2020
  * matteo.cicuttin@uliege.be
  *
  * University of Liège - Montefiore Institute
- * Applied and Computational Electromagnetics group  
+ * Applied and Computational Electromagnetics group
  */
 
 /*
@@ -410,7 +410,7 @@ public:
     typedef priv::filter_iterator<typename mesh::face_iterator,
                                   priv::is_internal_pred<mesh>>
                                   internal_face_iterator;
-    
+
     /* Return a vector with the ids of all the boundaries */
     std::vector<size_t>
     boundary_id_list(void) const
@@ -614,24 +614,24 @@ class neighbour_connectivity
     typedef typename Mesh::face_type                    face_type;
     typedef std::array<typename cell_type::id_type, 2>  face_owners_type;
     std::vector<face_owners_type>                       face_owners;
-    
+
 #define NO_OWNER (~0)
-    
+
     void compute_connectivity(const Mesh& msh)
     {
         face_owners.resize( msh.faces_size() );
-        
+
         for (auto& fo : face_owners)
         {
             fo[0] = typename cell_type::id_type(NO_OWNER);
             fo[1] = typename cell_type::id_type(NO_OWNER);
         }
-        
+
         size_t cell_i = 0;
         for (auto& cl : msh)
         {
             auto fcs = faces(msh, cl);
-            
+
             for (auto& fc : fcs)
             {
                 auto fi = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
@@ -642,7 +642,7 @@ class neighbour_connectivity
                     throw std::invalid_argument(ss.str());
                 }
                 auto fc_id = offset(msh, fc);
-                
+
                 auto&  fo = face_owners.at(fc_id);
                 if (fo[0] == NO_OWNER)
                     fo[0] = typename cell_type::id_type(cell_i);
@@ -651,36 +651,36 @@ class neighbour_connectivity
                 else
                     throw std::logic_error("BUG: a face has max 2 owners");
             }
-            
+
             ++cell_i;
         }
     }
-    
+
 public:
     neighbour_connectivity(const Mesh& msh)
     {
         compute_connectivity(msh);
     }
-    
+
     std::pair<cell_type, bool>
     neighbour_via(const Mesh& msh, const cell_type& cl, const face_type& fc)
     {
         if ( face_owners.size() != msh.faces_size() )
             throw std::logic_error("Inconsistent neighbour information.");
-        
+
         auto cl_ofs = offset(msh, cl);
         auto fc_ofs = offset(msh, fc);
-        
+
         auto fo = face_owners.at( fc_ofs );
-        
+
         if ( fo[0] != cl_ofs )
             std::swap(fo[0], fo[1]);
-        
+
         assert(fo[0] == cl_ofs);
-        
+
         if (fo[1] == NO_OWNER)
             return std::make_pair(*msh.cells_begin(), false);
-        
+
         return std::make_pair( *std::next(msh.cells_begin(), fo[1]), true);
     }
 };
@@ -690,7 +690,7 @@ auto connectivity_via_faces(const Mesh& msh)
 {
     return neighbour_connectivity<Mesh>(msh);
 }
-    
+
 /*
 template<typename Mesh>
 std::pair<typename Mesh::cell_type, bool>
@@ -700,20 +700,20 @@ neighbour_via(const Mesh& msh,
 {
     if ( msh.face_owners.size() != msh.faces.size() )
         throw std::logic_error("No neighbour information.");
-    
+
     auto cl_ofs = offset(msh, cl);
     auto fc_ofs = offset(msh, fc);
-    
+
     auto fo = msh.face_owners.at( fc_ofs );
-    
+
     if ( fo[0] != cl_ofs )
         std::swap(fo[0], fo[1]);
-    
+
     assert(fo[0] == cl_ofs);
-    
+
     if (fo[1] == NO_OWNER)
         return std::make_pair(msh.cells[0], false);
-    
+
     return std::make_pair(msh.cells.at(fo[1]), true);
 }
  */
@@ -962,7 +962,39 @@ std::ostream& operator<<(std::ostream& os, const bounding_box<Mesh>& bb)
     return os;
 }
 
+template<typename MeshType>
+void
+mesh_aspect(const MeshType& msh, const std::string& filename)
+{
+    using T = typename MeshType::coordinate_type;
 
+    std::ofstream myfile;
+    myfile.open(filename);
+    if (myfile.is_open())
+    {
+        myfile << "# cell_id  meas_T  hT  hF_min  hF_max  hT / hF_min  hT / hF_max  hF_max / hF_min \n";
+        for (auto& cl : msh)
+        {
+            const auto cell_id = msh.lookup(cl);
+            const auto hT      = diameter(msh, cl);
+            const auto mT      = measure(msh, cl);
+            T          hF_min  = hT;
+            T          hF_max  = 0;
 
+            const auto fcs = faces(msh, cl);
+            for (auto& fc : fcs)
+            {
+                const auto hF = diameter(msh, fc);
+                hF_min        = std::min(hF_min, hF);
+                hF_max        = std::max(hF_max, hF);
+            }
+
+            myfile << cell_id << " " << mT << " " << hT << " " << hF_min << " " << hF_max << " " << hT / hF_min << " "
+                   << hT / hF_max << " " << hF_max / hF_min << "\n";
+        }
+    }
+
+    myfile.close();
+}
 
 } // namespace disk
