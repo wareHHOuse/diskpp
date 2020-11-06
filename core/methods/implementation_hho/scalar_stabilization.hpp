@@ -139,13 +139,15 @@ make_scalar_hho_difference(const Mesh& msh, const typename Mesh::cell_type& cl, 
  * @param msh mesh
  * @param cl cell
  * @param cell_infos cell degree informations
+ * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hdg_stabilization(const Mesh&                     msh,
                               const typename Mesh::cell_type& cl,
-                              const CellDegreeInfo<Mesh>&     cell_infos)
+                              const CellDegreeInfo<Mesh>&     cell_infos,
+                              bool hF = true)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -160,6 +162,11 @@ make_scalar_hdg_stabilization(const Mesh&                     msh,
 
     matrix_type data = matrix_type::Zero(total_dofs, total_dofs);
 
+    T h = 0;
+    if(!hF){
+        h = diameter(msh, cl);
+    }
+
     const auto cb     = make_scalar_monomial_basis(msh, cl, celdeg);
     const auto fcs    = faces(msh, cl);
     size_t     offset = cbs;
@@ -172,7 +179,10 @@ make_scalar_hdg_stabilization(const Mesh&                     msh,
             const auto fc     = fcs[i];
             const auto facdeg = fdi.degree();
 
-            const auto h   = diameter(msh, fc);
+            if(hF){
+                h = diameter(msh, fc);
+            }
+
             const auto fb  = make_scalar_monomial_basis(msh, fc, facdeg);
             const auto fbs = scalar_basis_size(facdeg, Mesh::dimension - 1);
 
@@ -218,13 +228,15 @@ make_scalar_hdg_stabilization(const Mesh&                     msh,
  * @param msh mesh
  * @param cl cell
  * @param cell_infos cell degree informations
+ * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hdg_stabilization_diff(const Mesh&                     msh,
                                    const typename Mesh::cell_type& cl,
-                                   const CellDegreeInfo<Mesh>&     cell_infos)
+                                   const CellDegreeInfo<Mesh>&     cell_infos,
+                                   bool hF = true)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -241,6 +253,12 @@ make_scalar_hdg_stabilization_diff(const Mesh&                     msh,
     const auto fcs         = faces(msh, cl);
     size_t     offset      = 0;
     size_t     offset_diff = 0;
+
+    T h = 0;
+    if (!hF)
+    {
+        h = diameter(msh, cl);
+    }
     for (size_t i = 0; i < fcs.size(); i++)
     {
         const auto fdi = faces_infos[i];
@@ -249,7 +267,10 @@ make_scalar_hdg_stabilization_diff(const Mesh&                     msh,
         {
             const auto fc     = fcs[i];
             const auto facdeg = fdi.degree();
-            const auto hF     = diameter(msh, fc);
+            if (hF)
+            {
+                h = diameter(msh, fc);
+            }
 
             const auto diff_deg = std::max(celdeg, facdeg);
             const auto fb       = make_scalar_monomial_basis(msh, fc, facdeg);
@@ -277,7 +298,7 @@ make_scalar_hdg_stabilization_diff(const Mesh&                     msh,
             tr.block(0, offset_diff, fbs, dbs) = trace;
 
             oper.block(0, offset_diff, fbs, dbs) = mass.ldlt().solve(trace);
-            data += oper.transpose() * tr * (1. / hF);
+            data += oper.transpose() * tr * (1. / h);
 
             offset += fbs;
             offset_diff += dbs;
@@ -296,15 +317,19 @@ make_scalar_hdg_stabilization_diff(const Mesh&                     msh,
  * @param msh mesh
  * @param cl cell
  * @param di hho degree information
+ * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
-make_scalar_hdg_stabilization_diff(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+make_scalar_hdg_stabilization_diff(const Mesh&                     msh,
+                                   const typename Mesh::cell_type& cl,
+                                   const hho_degree_info&          di,
+                                   bool                            hF = true)
 {
     const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 
-    return make_scalar_hdg_stabilization_diff(msh, cl, cell_infos);
+    return make_scalar_hdg_stabilization_diff(msh, cl, cell_infos, hF);
 }
 
 /**
@@ -315,13 +340,15 @@ make_scalar_hdg_stabilization_diff(const Mesh& msh, const typename Mesh::cell_ty
  * @param msh mesh
  * @param cl cell
  * @param cell_infos cell degree informations
+ * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_dg_stabilization(const Mesh&                     msh,
                              const typename Mesh::cell_type& cl,
-                             const CellDegreeInfo<Mesh>&     cell_infos)
+                             const CellDegreeInfo<Mesh>&     cell_infos,
+                             bool                            hF = true)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -340,6 +367,11 @@ make_scalar_dg_stabilization(const Mesh&                     msh,
 
     const auto fcs    = faces(msh, cl);
     size_t     offset = cbs;
+    T          h      = 0;
+    if (!hF)
+    {
+        h = diameter(msh, cl);
+    }
     for (size_t i = 0; i < fcs.size(); i++)
     {
         const auto fdi = faces_infos[i];
@@ -348,7 +380,10 @@ make_scalar_dg_stabilization(const Mesh&                     msh,
         {
             const auto fc     = fcs[i];
             const auto facdeg = fdi.degree();
-            const auto hf     = diameter(msh, fc);
+            if (hF)
+            {
+                h = diameter(msh, fc);
+            }
             const auto fb     = make_scalar_monomial_basis(msh, fc, facdeg);
             const auto fbs    = scalar_basis_size(facdeg, Mesh::dimension - 1);
 
@@ -365,10 +400,10 @@ make_scalar_dg_stabilization(const Mesh&                     msh,
                 trace += priv::outer_product(priv::inner_product(qp.weight(), f_phi), c_phi);
             }
 
-            data.block(0, 0, cbs, cbs) += mass_T / hf;
-            data.block(offset, offset, fbs, fbs) += mass_F / hf;
-            data.block(0, offset, cbs, fbs) -= trace.transpose() / hf;
-            data.block(offset, 0, fbs, cbs) -= trace / hf;
+            data.block(0, 0, cbs, cbs) += mass_T / h;
+            data.block(offset, offset, fbs, fbs) += mass_F / h;
+            data.block(0, offset, cbs, fbs) -= trace.transpose() / h;
+            data.block(offset, 0, fbs, cbs) -= trace / h;
 
             offset += fbs;
         }
@@ -385,15 +420,19 @@ make_scalar_dg_stabilization(const Mesh&                     msh,
  * @param msh mesh
  * @param cl cell
  * @param di hho degree information
+ * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
-make_scalar_hdg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+make_scalar_hdg_stabilization(const Mesh&                     msh,
+                              const typename Mesh::cell_type& cl,
+                              const hho_degree_info&          di,
+                              bool                            hF = true)
 {
     const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 
-    return make_scalar_hdg_stabilization(msh, cl, cell_infos);
+    return make_scalar_hdg_stabilization(msh, cl, cell_infos, hF);
 }
 
 /**
@@ -404,15 +443,17 @@ make_scalar_hdg_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
  * @param msh mesh
  * @param cl cell
  * @param msh_infos mesh degree informations
+ * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hdg_stabilization(const Mesh&                     msh,
                               const typename Mesh::cell_type& cl,
-                              const MeshDegreeInfo<Mesh>&     msh_infos)
+                              const MeshDegreeInfo<Mesh>&     msh_infos,
+                              bool                            hF = true)
 {
-    return make_scalar_hdg_stabilization(msh, cl, msh_infos.cellDegreeInfo(msh, cl));
+    return make_scalar_hdg_stabilization(msh, cl, msh_infos.cellDegreeInfo(msh, cl), hF);
 }
 
 /**
@@ -423,15 +464,19 @@ make_scalar_hdg_stabilization(const Mesh&                     msh,
  * @param msh mesh
  * @param cl cell
  * @param di hho degree information
+ * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
-make_scalar_dg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+make_scalar_dg_stabilization(const Mesh&                     msh,
+                             const typename Mesh::cell_type& cl,
+                             const hho_degree_info&          di,
+                             bool                            hF = true)
 {
     const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 
-    return make_scalar_dg_stabilization(msh, cl, cell_infos);
+    return make_scalar_dg_stabilization(msh, cl, cell_infos, hF);
 }
 
 /**
@@ -442,13 +487,17 @@ make_scalar_dg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
  * @param msh mesh
  * @param cl cell
  * @param di hho degree information
+ * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
-make_scalar_dg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const MeshDegreeInfo<Mesh>& msh_infos)
+make_scalar_dg_stabilization(const Mesh&                     msh,
+                             const typename Mesh::cell_type& cl,
+                             const MeshDegreeInfo<Mesh>&     msh_infos,
+                             bool                            hF = true)
 {
-    return make_scalar_dg_stabilization(msh, cl, msh_infos.cellDegreeInfo(msh, cl));
+    return make_scalar_dg_stabilization(msh, cl, msh_infos.cellDegreeInfo(msh, cl), hF);
 }
 
 /**
@@ -461,6 +510,7 @@ make_scalar_dg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl
  * @param cl cell
  * @param reconstruction reconstruction operator \f$ R^{k+1}_T \f$
  * @param cell_infos cell degree information
+ * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
 template<typename Mesh>
@@ -468,7 +518,8 @@ dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hho_stabilization(const Mesh&                                           msh,
                               const typename Mesh::cell_type&                       cl,
                               const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
-                              const CellDegreeInfo<Mesh>&                           cell_infos)
+                              const CellDegreeInfo<Mesh>&                           cell_infos,
+                              bool                                                  hF = true)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -501,6 +552,12 @@ make_scalar_hho_stabilization(const Mesh&                                       
 
     matrix_type data = matrix_type::Zero(cbs + num_faces_dofs, cbs + num_faces_dofs);
 
+    T h = 0;
+    if (!hF)
+    {
+        h = diameter(msh, cl);
+    }
+
     // Step 3: project on faces (eqn. 21)
     size_t offset = cbs;
     for (size_t face_i = 0; face_i < fcs.size(); face_i++)
@@ -510,7 +567,10 @@ make_scalar_hho_stabilization(const Mesh&                                       
         if (fdi.hasUnknowns())
         {
             const auto fc = fcs[face_i];
-            const auto hf = diameter(msh, fc);
+            if (hF)
+            {
+                h = diameter(msh, fc);
+            }
 
             const auto facdeg = fdi.degree();
             const auto fb     = make_scalar_monomial_basis(msh, fc, facdeg);
@@ -541,7 +601,7 @@ make_scalar_hho_stabilization(const Mesh&                                       
             const matrix_type proj3 = piKF.solve(MR2 * proj1);
             const matrix_type BRF   = proj2 + proj3;
 
-            data += BRF.transpose() * face_mass_matrix * BRF / hf;
+            data += BRF.transpose() * face_mass_matrix * BRF / h;
 
             offset += fbs;
         }
@@ -560,6 +620,7 @@ make_scalar_hho_stabilization(const Mesh&                                       
  * @param cl cell
  * @param reconstruction reconstruction operator \f$ R^{k+1}_T \f$
  * @param msh_infos mesh degree information
+ * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
 template<typename Mesh>
@@ -567,9 +628,10 @@ dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hho_stabilization(const Mesh&                                           msh,
                               const typename Mesh::cell_type&                       cl,
                               const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
-                              const MeshDegreeInfo<Mesh>&                           msh_infos)
+                              const MeshDegreeInfo<Mesh>&                           msh_infos,
+                              bool                                                  hF = true)
 {
-    return make_scalar_hho_stabilization(msh, cl, reconstruction, msh_infos.cellDegreeInfo(msh, cl));
+    return make_scalar_hho_stabilization(msh, cl, reconstruction, msh_infos.cellDegreeInfo(msh, cl), hF);
 }
 
 /**
@@ -582,6 +644,7 @@ make_scalar_hho_stabilization(const Mesh&                                       
  * @param cl cell
  * @param reconstruction reconstruction operator \f$ R^{k+1}_T \f$
  * @param di hho degree information
+ * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
 template<typename Mesh>
@@ -589,11 +652,12 @@ dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hho_stabilization(const Mesh&                                           msh,
                               const typename Mesh::cell_type&                       cl,
                               const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
-                              const hho_degree_info&                                di)
+                              const hho_degree_info&                                di,
+                              bool                                                  hF = true)
 {
     const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 
-    return make_scalar_hho_stabilization(msh, cl, reconstruction, cell_infos);
+    return make_scalar_hho_stabilization(msh, cl, reconstruction, cell_infos, hF);
 }
 
 /**
@@ -606,6 +670,7 @@ make_scalar_hho_stabilization(const Mesh&                                       
  * @param cl cell
  * @param reconstruction reconstruction operator \f$ R^{k+1}_T \f$
  * @param cell_infos cell degree information
+ * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
 template<typename Mesh>
@@ -613,7 +678,8 @@ dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hho_stabilization_fluxes(const Mesh&                                           msh,
                                      const typename Mesh::cell_type&                       cl,
                                      const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
-                                     const CellDegreeInfo<Mesh>&                           cell_infos)
+                                     const CellDegreeInfo<Mesh>&                           cell_infos,
+                                     bool                                                  hF = true)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -632,6 +698,12 @@ make_scalar_hho_stabilization_fluxes(const Mesh&                                
 
     matrix_type matA = matrix_type::Zero(num_faces_dofs, cbs + num_faces_dofs);
 
+    T h = 0;
+    if (!hF)
+    {
+        h = diameter(msh, cl);
+    }
+
     // Step 3: project on faces (eqn. 21)
     size_t offset = cbs;
     size_t row    = 0;
@@ -642,7 +714,10 @@ make_scalar_hho_stabilization_fluxes(const Mesh&                                
         if (fdi.hasUnknowns())
         {
             const auto fc = fcs[face_i];
-            const auto hf = diameter(msh, fc);
+            if (hF)
+            {
+                h = diameter(msh, fc);
+            }
 
             const auto facdeg = fdi.degree();
             const auto fb     = make_scalar_monomial_basis(msh, fc, facdeg);
@@ -659,8 +734,8 @@ make_scalar_hho_stabilization_fluxes(const Mesh&                                
                 face_trace_matrix += priv::outer_product(priv::inner_product(qp.weight(), f_phi), c_phi);
             }
 
-            matA.block(row, offset, fbs, fbs) += face_mass_matrix / hf;
-            matA.block(row, 0, fbs, cbs) -= face_trace_matrix / hf;
+            matA.block(row, offset, fbs, fbs) += face_mass_matrix / h;
+            matA.block(row, 0, fbs, cbs) -= face_trace_matrix / h;
 
             offset += fbs;
             row += fbs;
@@ -680,6 +755,7 @@ make_scalar_hho_stabilization_fluxes(const Mesh&                                
  * @param cl cell
  * @param reconstruction reconstruction operator \f$ R^{k+1}_T \f$
  * @param di hho degree information
+ * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
 template<typename Mesh>
@@ -687,11 +763,12 @@ dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hho_stabilization_fluxes(const Mesh&                                           msh,
                                      const typename Mesh::cell_type&                       cl,
                                      const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
-                                     const hho_degree_info&                                di)
+                                     const hho_degree_info&                                di,
+                                     bool                                                  hF = true)
 {
     const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 
-    return make_scalar_hho_stabilization_fluxes(msh, cl, reconstruction, cell_infos);
+    return make_scalar_hho_stabilization_fluxes(msh, cl, reconstruction, cell_infos, hF);
 }
 
 /**
@@ -703,17 +780,19 @@ make_scalar_hho_stabilization_fluxes(const Mesh&                                
  * @param msh mesh
  * @param cl cell
  * @param cell_infos cell degree information
+ * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_dg_stabilization_fluxes(const Mesh&                     msh,
                                     const typename Mesh::cell_type& cl,
-                                    const CellDegreeInfo<Mesh>&     cell_infos)
+                                    const CellDegreeInfo<Mesh>&     cell_infos,
+                                    bool                            hF = true)
 {
-    const auto stab    = make_scalar_dg_stabilization_diff(msh, cl, cell_infos);
-    const auto adjoint = make_scalar_stabilization_fluxes(msh, cl, cell_infos, stab);
-    return adjoint * make_scalar_hho_difference(msh, cl, cell_infos);
+    const auto stab    = make_scalar_dg_stabilization_diff(msh, cl, cell_infos, hF);
+    const auto adjoint = make_scalar_stabilization_fluxes(msh, cl, cell_infos, stab, hF);
+    return adjoint * make_scalar_hho_difference(msh, cl, cell_infos, hF);
 }
 
 /**
@@ -725,15 +804,19 @@ make_scalar_dg_stabilization_fluxes(const Mesh&                     msh,
  * @param msh mesh
  * @param cl cell
  * @param di hho degree information
+ * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
-make_scalar_dg_stabilization_fluxes(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+make_scalar_dg_stabilization_fluxes(const Mesh&                     msh,
+                                    const typename Mesh::cell_type& cl,
+                                    const hho_degree_info&          di,
+                                    bool                            hF = true)
 {
     const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 
-    return make_scalar_dg_stabilization_fluxes(msh, cl, cell_infos);
+    return make_scalar_dg_stabilization_fluxes(msh, cl, cell_infos, hF);
 }
 
 template<typename Mesh>
@@ -741,18 +824,20 @@ dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_stabilization_fluxes(const Mesh&                                          msh,
                                  const typename Mesh::cell_type&                      cl,
                                  const CellDegreeInfo<Mesh>&                          cell_infos,
-                                 const dynamic_matrix<typename Mesh::coordinate_type> stab)
+                                 const dynamic_matrix<typename Mesh::coordinate_type> stab,
+                                 bool                                                 hF = true)
 {
-    const auto mass = make_scalar_dg_stabilization_diff(msh, cl, cell_infos);
+    const auto mass = make_scalar_dg_stabilization_diff(msh, cl, cell_infos, hF);
 
     return mass.ldlt().solve(stab);
 }
 
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
-make_scalar_dg_stabilization_diff(const Mesh&                                          msh,
-                                 const typename Mesh::cell_type&                      cl,
-                                 const CellDegreeInfo<Mesh>&                          cell_infos)
+make_scalar_dg_stabilization_diff(const Mesh&                     msh,
+                                  const typename Mesh::cell_type& cl,
+                                  const CellDegreeInfo<Mesh>&     cell_infos,
+                                  bool                            hF = true)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -766,6 +851,12 @@ make_scalar_dg_stabilization_diff(const Mesh&                                   
 
     matrix_type data = matrix_type::Zero(num_diff_dofs, num_diff_dofs);
 
+    T h = 0;
+    if (!hF)
+    {
+        h = diameter(msh, cl);
+    }
+
     const auto fcs         = faces(msh, cl);
     size_t     offset_diff = 0;
     for (size_t i = 0; i < fcs.size(); i++)
@@ -776,7 +867,10 @@ make_scalar_dg_stabilization_diff(const Mesh&                                   
         {
             const auto fc     = fcs[i];
             const auto facdeg = fdi.degree();
-            const auto hF     = diameter(msh, fc);
+            if (hF)
+            {
+                h = diameter(msh, fc);
+            }
 
             const auto diff_deg = std::max(celdeg, facdeg);
             const auto db       = make_scalar_monomial_basis(msh, fc, diff_deg);
@@ -784,7 +878,7 @@ make_scalar_dg_stabilization_diff(const Mesh&                                   
 
             matrix_type mass = make_mass_matrix(msh, fc, db);
 
-            data.block(offset_diff, offset_diff, dbs, dbs) = mass / hF;
+            data.block(offset_diff, offset_diff, dbs, dbs) = mass / h;
 
             offset_diff += dbs;
         }

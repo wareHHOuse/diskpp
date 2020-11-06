@@ -103,7 +103,7 @@ using namespace disk;
 
 template<typename Mesh>
 typename Mesh::coordinate_type
-run_hho_diffusion_solver(const Mesh& msh, size_t degree)
+run_hho_diffusion_solver(const Mesh& msh, size_t degree, const bool statcond, const bool stab_diam_F)
 {
     using T = typename Mesh::coordinate_type;
 
@@ -118,7 +118,7 @@ run_hho_diffusion_solver(const Mesh& msh, size_t degree)
     {
         auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
         auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
-        auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
+        auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi, stab_diam_F);
         auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
         auto sc     = make_scalar_static_condensation(msh, cl, hdi, A, rhs);
@@ -149,7 +149,7 @@ run_hho_diffusion_solver(const Mesh& msh, size_t degree)
     {
         auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
         auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
-        auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
+        auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi, stab_diam_F);
         auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A = gr.second + stab;
 
@@ -217,12 +217,17 @@ int main(int argc, char **argv)
 
     size_t      degree = 1;
     char *      mesh_filename = nullptr;
+    bool        stat_cond = true, stab_diam_F = true;
 
     int ch;
-    while ( (ch = getopt(argc, argv, "k:m:")) != -1 )
+    while ( (ch = getopt(argc, argv, "k:m:tw")) != -1 )
     {
         switch(ch)
         {
+            case 't': stab_diam_F = false; break;
+
+            case 'w': stat_cond = false; break;
+
             case 'k':
                 degree = std::stoi(optarg);
                 break;
@@ -243,7 +248,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
         auto msh = disk::load_fvca5_2d_mesh<T>(mesh_filename);
-        run_hho_diffusion_solver(msh, degree);
+        run_hho_diffusion_solver(msh, degree, stat_cond, stab_diam_F);
         return 0;
     }
 
@@ -255,7 +260,7 @@ int main(int argc, char **argv)
 
         std::cout << msh.faces_size() << std::endl;
 
-        run_hho_diffusion_solver(msh, degree);
+        run_hho_diffusion_solver(msh, degree, stat_cond, stab_diam_F);
         return 0;
     }
 
@@ -264,7 +269,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
         auto msh = disk::load_cartesian_2d_mesh<T>(mesh_filename);
-        run_hho_diffusion_solver(msh, degree);
+        run_hho_diffusion_solver(msh, degree, stat_cond, stab_diam_F);
         return 0;
     }
 
@@ -274,7 +279,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
         auto msh = disk::load_netgen_3d_mesh<T>(mesh_filename);
-        run_hho_diffusion_solver(msh, degree);
+        run_hho_diffusion_solver(msh, degree, stat_cond, stab_diam_F);
         return 0;
     }
 
@@ -283,7 +288,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
         auto msh = disk::load_cartesian_3d_mesh<T>(mesh_filename);
-        run_hho_diffusion_solver(msh, degree);
+        run_hho_diffusion_solver(msh, degree, stat_cond, stab_diam_F);
         return 0;
     }
 
@@ -292,11 +297,11 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
         disk::generic_mesh<T,3> msh;
-        
+
         disk::load_mesh_fvca6_3d<T>(mesh_filename, msh);
-        
-        run_hho_diffusion_solver(msh, degree);
-        
+
+        run_hho_diffusion_solver(msh, degree, stat_cond, stab_diam_F);
+
         return 0;
     }
 }
