@@ -90,12 +90,53 @@ struct scaled_monomial_scalar_basis
 };
 
 /* Basis 'factory'. */
+#define USE_LEGENDRE
+#ifdef USE_LEGENDRE
+template<template<typename, size_t, typename> class Mesh,
+         typename T,
+         size_t DIM,
+         typename Storage,
+         typename ScalarType = typename Mesh<T, DIM, Storage>::coordinate_type>
+auto
+make_scalar_monomial_basis(const Mesh<T, DIM, Storage>&                msh,
+                           const typename Mesh<T, DIM, Storage>::face& face,
+                           size_t                                      degree)
+{
+    return scaled_monomial_scalar_basis<Mesh<T, DIM, Storage>, typename Mesh<T, DIM, Storage>::face, ScalarType>(msh, face, degree);
+}
+
+template<template<typename, size_t, typename> class Mesh,
+         typename T,
+         size_t DIM,
+         typename Storage,
+         typename ScalarType = typename Mesh<T, DIM, Storage>::coordinate_type>
+auto
+make_scalar_monomial_basis(const Mesh<T, DIM, Storage>&                msh,
+                           const typename Mesh<T, DIM, Storage>::cell& cell,
+                           size_t                                      degree)
+{
+    return scaled_monomial_scalar_basis<Mesh<T, DIM, Storage>, typename Mesh<T, DIM, Storage>::cell, ScalarType>(msh, cell, degree);
+}
+
+template<template<typename, size_t, typename> class Mesh,
+         typename T,
+         typename Storage,
+         typename ScalarType = double>
+auto
+make_scalar_monomial_basis(const Mesh<T, 2, Storage>&                msh,
+                           const typename Mesh<T, 2, Storage>::face& face,
+                           size_t                                    degree)
+{
+    return make_scalar_legendre_basis(msh, face, degree);
+}
+#else
 template<typename MeshType, typename ElementType, typename ScalarType = typename MeshType::coordinate_type>
 auto
 make_scalar_monomial_basis(const MeshType& msh, const ElementType& elem, size_t degree)
 {
     return scaled_monomial_scalar_basis<MeshType, ElementType, ScalarType>(msh, elem, degree);
 }
+#endif
 
 /***************************************************************************************************/
 /***************************************************************************************************/
@@ -589,6 +630,55 @@ make_scalar_legendre_basis(const MeshType& msh, const ElementType& elem, size_t 
     return scaled_legendre_scalar_basis<MeshType, ElementType>(msh, elem, degree);
 }
 
+/* Specialization for 3D meshes, faces */
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+class scaled_legendre_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face>
+{
+
+  public:
+    typedef Mesh<T, 3, Storage>                 mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef typename mesh_type::face            face_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     function_type;
+
+  private:
+    point_type  face_bar;
+    point_type  base;
+    scalar_type face_h;
+    size_t      basis_degree, basis_size;
+
+  public:
+    scaled_legendre_scalar_basis(const mesh_type& msh, const face_type& fc, size_t degree)
+    {
+        face_bar     = barycenter(msh, fc);
+        face_h       = diameter(msh, fc);
+        basis_degree = degree;
+        basis_size   = scalar_basis_size(degree, 2);
+    }
+
+    function_type
+    eval_functions(const point_type& pt) const
+    {
+        function_type ret = function_type::Zero(basis_size);
+
+        throw std::runtime_error("LEGENDRE: Not implemented");
+        return ret;
+    }
+
+    size_t
+    size() const
+    {
+        return basis_size;
+    }
+
+    size_t
+    degree() const
+    {
+        return basis_degree;
+    }
+};
+
 /* Specialization for 2D meshes, faces */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class scaled_legendre_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::face>
@@ -640,6 +730,8 @@ class scaled_legendre_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         face_h       = diameter(msh, fc);
         basis_degree = degree;
         basis_size   = degree + 1;
+
+        std::cout << "LEGENDRE";
 
         if (degree > 10)
             throw std::invalid_argument("Sorry, I don't have a Legendre basis of order > 10.");
