@@ -573,7 +573,6 @@ private:
     }
 };
 
-#if 0
 template<typename MeshType, typename Element>
 struct scaled_legendre_scalar_basis
 {
@@ -609,25 +608,29 @@ class scaled_legendre_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
     size_t      basis_degree, basis_size;
 
     scalar_type
-    eval_poly(const point_type& pt, size_t num)
+    eval_poly(const std::array<scalar_type, 11>& pows, const size_t degree) const
     {
-        const auto x = pt.x();
-
-        std::array<scalar_type, 11> pows;
-        pows[0] = 1;
-        for (size_t i = 1; i <= 10; i++)
-            pows[i] = x * pows[i - 1];
-
-        switch (num)
+        scalar_type val;
+        switch (degree)
         {
-            case 0: return 1;
-            case 1: return x;
-            case 2: return (3 * pows[2] - 1) / 2;
-            case 3: return (5 * pows[3] - 3 * pows[1]) / 2;
-            case 4: return (35 * pows[4] - 30 * pows[2]) / 8;
-            case 5: return (63 * pows[5] - 70 * pows[3] + 15 * pows[1]) / 8;
-            case 6: return (231 * pows[6] - 315 * pows[4] + 105 * pows[2] - 5) / 16;
+            case 0: val = 1; break;
+            case 1: val = pows[1]; break;
+            case 2: val = (3 * pows[2] - 1) / 2; break;
+            case 3: val = (5 * pows[3] - 3 * pows[1]) / 2; break;
+            case 4: val = (35 * pows[4] - 30 * pows[2] + 3) / 8; break;
+            case 5: val = (63 * pows[5] - 70 * pows[3] + 15 * pows[1]) / 8; break;
+            case 6: val = (231 * pows[6] - 315 * pows[4] + 105 * pows[2] - 5) / 16; break;
+            case 7: val = (429 * pows[7] - 693 * pows[5] + 315 * pows[3] - 35 * pows[1]) / 16; break;
+            case 8: val = (6435 * pows[8] - 12012 * pows[6] + 6930 * pows[4] - 1260 * pows[2] + 35) / 128; break;
+            case 9:
+                val = (12155 * pows[9] - 25740 * pows[7] + 18018 * pows[5] - 4620 * pows[3] + 315 * pows[1]) / 128;
+                break;
+            case 10:
+                val =
+                  (46189 * pows[10] - 109395 * pows[8] + 90090 * pows[6] - 30030 * pows[4] + 3465 * pows[2] - 63) / 256;
+                break;
         }
+        return val / sqrt(2. / scalar_type(2 * degree + 1));
     }
 
   public:
@@ -655,10 +658,16 @@ class scaled_legendre_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         const auto dot = v.dot(t);
         const auto ep  = 4.0 * dot / (face_h * face_h);
 
+        std::array<scalar_type, 11> pows;
+        pows[0] = 1;
+        for (size_t i = 1; i <= basis_degree; i++)
+            pows[i] = ep * pows[i - 1];
+
+        const scalar_type scaling = sqrt(2.0 / face_h);
+
         for (size_t i = 0; i <= basis_degree; i++)
         {
-            auto bv = iexp_pow(ep, i);
-            ret(i)  = bv;
+            ret(i) = eval_poly(pows, i) * scaling;
         }
         return ret;
     }
@@ -675,7 +684,7 @@ class scaled_legendre_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         return basis_degree;
     }
 };
-#endif
+
 /*
 template<typename Mesh, typename Element, typename Basis>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>
