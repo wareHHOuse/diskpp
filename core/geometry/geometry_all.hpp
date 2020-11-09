@@ -44,6 +44,7 @@
 #include <vector>
 
 #include "common/util.h"
+#include "common/eigen.hpp"
 
 namespace disk {
 
@@ -160,105 +161,64 @@ diameter(const Mesh& msh, const Element& elem)
 }
 
 /**
-  * \brief Compute the diameter of the bounding box af a 3D cell, i.e, the maximum distance
+  * \brief Compute the diameter of the bounding box af an element, i.e, the maximum distance
   * between two different points of the bounding box.
   *
   * \param msh a reference to the mesh
-  * \param cl a 3D cell
-  * \return compute the diameter of the bounding box af a 3D cell
+  * \param elem an element
+  * \return compute the diameter of the bounding box af an element
   *
   */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-std::array<T, 3>
-diameter_boundingbox(const Mesh<T, 3, Storage>& msh, const typename Mesh<T, 3, Storage>::cell& cl)
+template<typename Mesh, typename Elem>
+std::array<typename Mesh::coordinate_type, Mesh::dimension>
+diameter_boundingbox(const Mesh&                                                                      msh,
+                     const Elem&                                                                      elem,
+                     static_matrix<typename Mesh::coordinate_type, Mesh::dimension, Mesh::dimension> axes =
+                       static_matrix<typename Mesh::coordinate_type, Mesh::dimension, Mesh::dimension>::Identity())
 {
-    const auto pts = points(msh, cl);
+    using T        = typename Mesh::coordinate_type;
+    const auto pts = points(msh, elem);
 
-    T xmin = pts[0].x();
-    T xmax = pts[0].x();
-    T ymin = pts[0].y();
-    T ymax = pts[0].y();
-    T zmin = pts[0].z();
-    T zmax = pts[0].z();
+    std::array<T, Mesh::dimension> box_min;
+    std::array<T, Mesh::dimension> box_max;
+    for (size_t i = 0; i < Mesh::dimension; i++)
+    {
+        box_min[i] = std::numeric_limits<T>::max();
+        box_max[i] = -std::numeric_limits<T>::max();
+    }
 
     for (auto& pt : pts)
     {
-        if (pt.x() < xmin)
-        {
-            xmin = pt.x();
-        }
-        else if (pt.x() > xmax)
-        {
-            xmax = pt.x();
-        }
+        const static_vector<T, Mesh::dimension> bp = (axes.transpose()) * (pt.to_vector());
 
-        if (pt.y() < ymin)
-        {
-            ymin = pt.y();
-        }
-        else if (pt.y() > ymax)
-        {
-            ymax = pt.y();
-        }
+        // std::cout << bp << std::endl;
 
-        if (pt.z() < zmin)
+        for (size_t i = 0; i < Mesh::dimension; i++)
         {
-            zmin = pt.z();
-        }
-        else if (pt.z() > zmax)
-        {
-            zmax = pt.z();
+            if (bp(i) < box_min[i])
+            {
+                box_min[i] = bp(i);
+            }
+
+            if (bp(i) > box_max[i])
+            {
+                box_max[i] = bp(i);
+            }
+
+            // std::cout << box_min[i] << " , " << box_max[i] << std::endl;
         }
     }
 
-    return {std::abs(xmax - xmin), std::abs(ymax - ymin), std::abs(zmax - zmin)};
-}
-
-/**
-  * \brief Compute the diameter of the bounding box af a 2D cell, i.e, the maximum distance
-  * between two different points of the bounding box.
-  *
-  * \param msh a reference to the mesh
-  * \param cl a 2D cell
-  * \return compute the diameter of the bounding box af a 2D cell
-  *
-  */
-
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-std::array<T,2>
-diameter_boundingbox(const Mesh<T, 2, Storage>&                      msh,
-                     const typename Mesh<T, 2, Storage>::cell&       cl)
-{
-    const auto pts = points(msh, cl);
-
-    T xmin = pts[0].x();
-    T xmax = pts[0].x();
-    T ymin = pts[0].y();
-    T ymax = pts[0].y();
-
-    for (auto& pt : pts)
+    std::array<T, Mesh::dimension> box_h;
+    for (size_t i = 0; i < Mesh::dimension; i++)
     {
-        if(pt.x() < xmin)
-        {
-            xmin = pt.x();
-        }
-        else if (pt.x() > xmax)
-        {
-            xmax = pt.x();
-        }
-
-        if (pt.y() < ymin)
-        {
-            ymin = pt.y();
-        }
-        else if (pt.y() > ymax)
-        {
-            ymax = pt.y();
-        }
+        box_h[i] = abs(box_max[i] - box_min[i]);
     }
 
-    return {std::abs(xmax - xmin), std::abs(ymax - ymin)};
+    return box_h;
 }
+
+
 
 /**
   * \brief Allows to known if the given point is inside a 2D cell
@@ -416,6 +376,48 @@ normal(const Mesh<T, 1, Storage>& msh,
         return 1.;
 
     throw std::logic_error("shouldn't have arrived here");
+}
+
+/**
+ * \brief Compute the diameter of the bounding box af a 3D cell, i.e, the maximum distance
+ * between two different points of the bounding box.
+ *
+ * \param msh a reference to the mesh
+ * \param cl a 3D cell
+ * \return compute the diameter of the bounding box af a 3D cell
+ *
+ */
+template<typename Mesh, typename Elem>
+static_matrix<typename Mesh::coordinate_type, Mesh::dimension, Mesh::dimension>
+inertia_axes(const Mesh& msh, const Elem& elem)
+{
+    typedef static_matrix<typename Mesh::coordinate_type, Mesh::dimension, Mesh::dimension> matrix_type;
+
+    const auto bar = barycenter(msh, elem);
+    const auto qps = integrate(msh, elem, 2);
+
+    matrix_type mass_inertia = matrix_type::Zero();
+    for (auto& qp : qps)
+    {
+        const auto coor = (bar - qp.point()).to_vector();
+
+        mass_inertia += qp.weight() * coor * coor.transpose();
+    }
+
+    // std::cout << "inertia matrix:" << std::endl;
+    // std::cout << mass_inertia << std::endl;
+
+    if(mass_inertia.isDiagonal())
+        return matrix_type::Identity();
+
+    Eigen::SelfAdjointEigenSolver<matrix_type> es(mass_inertia);
+
+    // std::cout << "eigenvalues:" << std::endl;
+    // std::cout << es.eigenvalues().transpose() << std::endl;
+    // std::cout << "eigenvectors:" << std::endl;
+    // std::cout << es.eigenvectors() << std::endl;
+
+    return es.eigenvectors();
 }
 
 } // namespace disk

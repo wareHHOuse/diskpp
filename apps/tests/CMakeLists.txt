@@ -74,4 +74,7 @@ if (BUILD_APP_DISKPP_TESTS)
 
     add_executable(conditionning_basis conditionning_basis.cpp)
     target_link_libraries(conditionning_basis ${LINK_LIBS})
+
+    add_executable(test_conditionning test_conditionning.cpp)
+    target_link_libraries(test_conditionning ${LINK_LIBS})
 endif()
