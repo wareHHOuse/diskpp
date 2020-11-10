@@ -64,14 +64,17 @@ struct scaled_monomial_matrix_basis
 /* Basis 'factory'. */
 template<typename MeshType, typename ElementType>
 auto
-make_matrix_monomial_basis(const MeshType& msh, const ElementType& elem, size_t degree)
+make_matrix_monomial_basis(const MeshType& msh, const ElementType& elem, size_t degree, bool use_inertia_axes = false)
 {
-    return scaled_monomial_matrix_basis<MeshType, ElementType>(msh, elem, degree);
+    return scaled_monomial_matrix_basis<MeshType, ElementType>(msh, elem, degree, use_inertia_axes);
 }
 
 /* Specialization for 3D meshes, cells */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell>
+  : public scaled_monomial_abstract_basis<Mesh<T, 3, Storage>,
+                                          typename Mesh<T, 3, Storage>::cell,
+                                          typename Mesh<T, 3, Storage>::coordinate_type>
 {
 
   public:
@@ -81,6 +84,8 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
     typedef typename mesh_type::point_type      point_type;
     typedef static_matrix<scalar_type, 3, 3>    function_type;
 
+    using base = scaled_monomial_abstract_basis<mesh_type, cell_type, scalar_type>;
+
   private:
     size_t basis_degree, basis_size;
 
@@ -88,8 +93,12 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
     scalar_basis_type                                          scalar_basis;
 
   public:
-    scaled_monomial_matrix_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
-      scalar_basis(msh, cl, degree)
+    scaled_monomial_matrix_basis(const mesh_type& msh,
+                                 const cell_type& cl,
+                                 size_t           degree,
+                                 bool             use_inertia_axes = false) :
+      scalar_basis(msh, cl, degree, use_inertia_axes),
+      base(msh, cl, use_inertia_axes)
     {
         basis_degree = degree;
         basis_size   = matrix_basis_size(degree, 3, 3);
@@ -136,75 +145,13 @@ class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
     }
 };
 
-/* Specialization for 3D meshes, faces */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-class scaled_monomial_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face>
-{
-
-  public:
-    typedef Mesh<T, 3, Storage>                 mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::point_type      point_type;
-    typedef typename mesh_type::face            face_type;
-    typedef static_matrix<scalar_type, 3, 3>    function_type;
-
-  private:
-    size_t basis_degree, basis_size;
-
-    typedef scaled_monomial_scalar_basis<mesh_type, face_type, scalar_type> scalar_basis_type;
-    scalar_basis_type                                          scalar_basis;
-
-  public:
-    scaled_monomial_matrix_basis(const mesh_type& msh, const face_type& fc, size_t degree) :
-      scalar_basis(msh, fc, degree)
-    {
-        basis_degree = degree;
-        basis_size   = matrix_basis_size(degree, 2, 3);
-    }
-
-    eigen_compatible_stdvector<function_type>
-    eval_functions(const point_type& pt) const
-    {
-        eigen_compatible_stdvector<function_type> ret;
-        ret.reserve(basis_size);
-
-        const auto phi = scalar_basis.eval_functions(pt);
-
-        for (int k = 0; k < scalar_basis.size(); k++)
-        {
-            function_type fc;
-
-            for (int j = 0; j < 3; j++)
-            {
-                for (int i = 0; i < 3; i++)
-                {
-                    fc       = function_type::Zero();
-                    fc(i, j) = phi(k);
-                    ret.push_back(fc);
-                }
-            }
-        }
-
-        assert(ret.size() == basis_size);
-        return ret;
-    }
-
-    size_t
-    size() const
-    {
-        return basis_size;
-    }
-
-    size_t
-    degree() const
-    {
-        return basis_degree;
-    }
-};
 
 /* Specialization for 2D meshes, cells */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell>
+  : public scaled_monomial_abstract_basis<Mesh<T, 2, Storage>,
+                                          typename Mesh<T, 2, Storage>::cell,
+                                          typename Mesh<T, 2, Storage>::coordinate_type>
 {
 
   public:
@@ -214,6 +161,8 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
     typedef typename mesh_type::point_type      point_type;
     typedef static_matrix<scalar_type, 2, 2>    function_type;
 
+    using base = scaled_monomial_abstract_basis<mesh_type, cell_type, scalar_type>;
+
   private:
     size_t basis_degree, basis_size;
 
@@ -221,8 +170,12 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
     scalar_basis_type                                          scalar_basis;
 
   public:
-    scaled_monomial_matrix_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
-      scalar_basis(msh, cl, degree)
+    scaled_monomial_matrix_basis(const mesh_type& msh,
+                                 const cell_type& cl,
+                                 size_t           degree,
+                                 bool             use_inertia_axes = false) :
+      scalar_basis(msh, cl, degree, use_inertia_axes),
+      base(msh, cl, use_inertia_axes)
     {
         basis_degree = degree;
         basis_size   = matrix_basis_size(degree, 2, 2);
@@ -269,71 +222,6 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
     }
 };
 
-/* Specialization for 2D meshes, faces */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::face>
-{
-
-  public:
-    typedef Mesh<T, 2, Storage>                 mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::point_type      point_type;
-    typedef typename mesh_type::face            face_type;
-    typedef static_matrix<scalar_type, 2, 2>    function_type;
-
-  private:
-    size_t basis_degree, basis_size;
-
-    typedef scaled_monomial_scalar_basis<mesh_type, face_type, scalar_type> scalar_basis_type;
-    scalar_basis_type                                          scalar_basis;
-
-  public:
-    scaled_monomial_matrix_basis(const mesh_type& msh, const face_type& fc, size_t degree) :
-      scalar_basis(msh, fc, degree)
-    {
-        basis_degree = degree;
-        basis_size   = matrix_basis_size(degree, 1, 2);
-    }
-
-    eigen_compatible_stdvector<function_type>
-    eval_functions(const point_type& pt) const
-    {
-        eigen_compatible_stdvector<function_type> ret;
-        ret.reserve(basis_size);
-
-        const auto phi = scalar_basis.eval_functions(pt);
-
-        for (int k = 0; k < scalar_basis.size(); k++)
-        {
-            function_type fc;
-
-            for (int j = 0; j < 2; j++)
-            {
-                for (int i = 0; i < 2; i++)
-                {
-                    fc       = function_type::Zero();
-                    fc(i, j) = phi(k);
-                    ret.push_back(fc);
-                }
-            }
-        }
-
-        assert(ret.size() == basis_size);
-        return ret;
-    }
-
-    size_t
-    size() const
-    {
-        return basis_size;
-    }
-
-    size_t
-    degree() const
-    {
-        return basis_degree;
-    }
-};
 
 /* Compute the size of a matrix basis of degree k in dimension d. */
 size_t
@@ -380,14 +268,20 @@ struct scaled_monomial_sym_matrix_basis
 /* Basis 'factory'. */
 template<typename MeshType, typename ElementType>
 auto
-make_sym_matrix_monomial_basis(const MeshType& msh, const ElementType& elem, size_t degree)
+make_sym_matrix_monomial_basis(const MeshType&    msh,
+                               const ElementType& elem,
+                               size_t             degree,
+                               bool               use_inertia_axes = false)
 {
-    return scaled_monomial_sym_matrix_basis<MeshType, ElementType>(msh, elem, degree);
+    return scaled_monomial_sym_matrix_basis<MeshType, ElementType>(msh, elem, degree, use_inertia_axes);
 }
 
 /* Specialization for 3D meshes, cells */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell>
+  : public scaled_monomial_abstract_basis<Mesh<T, 3, Storage>,
+                                          typename Mesh<T, 3, Storage>::cell,
+                                          typename Mesh<T, 3, Storage>::coordinate_type>
 {
 
   public:
@@ -397,6 +291,8 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
     typedef typename mesh_type::point_type      point_type;
     typedef static_matrix<scalar_type, 3, 3>    function_type;
 
+    using base = scaled_monomial_abstract_basis<mesh_type, cell_type, scalar_type>;
+
   private:
     size_t basis_degree, basis_size;
 
@@ -404,8 +300,12 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
     scalar_basis_type                                          scalar_basis;
 
   public:
-    scaled_monomial_sym_matrix_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
-      scalar_basis(msh, cl, degree)
+    scaled_monomial_sym_matrix_basis(const mesh_type& msh,
+                                     const cell_type& cl,
+                                     size_t           degree,
+                                     bool             use_inertia_axes = false) :
+      scalar_basis(msh, cl, degree, use_inertia_axes),
+      base(msh, cl, use_inertia_axes)
     {
         basis_degree = degree;
         basis_size   = sym_matrix_basis_size(degree, 3, 3);
@@ -457,80 +357,12 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, 
     }
 };
 
-/* Specialization for 3D meshes, faces */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-class scaled_monomial_sym_matrix_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::face>
-{
-
-  public:
-    typedef Mesh<T, 3, Storage>                 mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::point_type      point_type;
-    typedef typename mesh_type::face            face_type;
-    typedef static_matrix<scalar_type, 3, 3>    function_type;
-
-  private:
-    size_t basis_degree, basis_size;
-
-    typedef scaled_monomial_scalar_basis<mesh_type, face_type, scalar_type> scalar_basis_type;
-    scalar_basis_type                                          scalar_basis;
-
-  public:
-    scaled_monomial_sym_matrix_basis(const mesh_type& msh, const face_type& fc, size_t degree) :
-      scalar_basis(msh, fc, degree)
-    {
-        basis_degree = degree;
-        basis_size   = sym_matrix_basis_size(degree, 2, 3);
-    }
-
-    eigen_compatible_stdvector<function_type>
-    eval_functions(const point_type& pt) const
-    {
-        eigen_compatible_stdvector<function_type> ret;
-        ret.reserve(basis_size);
-
-        auto              phi     = scalar_basis.eval_functions(pt);
-        const scalar_type invrac2 = 1.0 / std::sqrt(2.0);
-
-        for (int k = 0; k < scalar_basis.size(); k++)
-        {
-            function_type fc;
-
-            for (int j = 0; j < 3; j++)
-            {
-                for (int i = 0; i < j; i++)
-                {
-                    fc       = function_type::Zero();
-                    fc(i, j) = phi(k) * invrac2;
-                    fc(j, i) = phi(k) * invrac2;
-                    ret.push_back(fc);
-                }
-                fc       = function_type::Zero();
-                fc(j, j) = phi(k);
-                ret.push_back(fc);
-            }
-        }
-
-        assert(ret.size() == basis_size);
-        return ret;
-    }
-
-    size_t
-    size() const
-    {
-        return basis_size;
-    }
-
-    size_t
-    degree() const
-    {
-        return basis_degree;
-    }
-};
 
 /* Specialization for 2D meshes, cells */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell>
+  : public scaled_monomial_abstract_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell,
+                                          typename Mesh<T, 2, Storage>::coordinate_type>
 {
   public:
     typedef Mesh<T, 2, Storage>                 mesh_type;
@@ -539,6 +371,8 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
     typedef typename mesh_type::point_type      point_type;
     typedef static_matrix<scalar_type, 2, 2>    function_type;
 
+    using base = scaled_monomial_abstract_basis<mesh_type, cell_type, scalar_type>;
+
   private:
     size_t basis_degree, basis_size;
 
@@ -546,8 +380,12 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
     scalar_basis_type                                          scalar_basis;
 
   public:
-    scaled_monomial_sym_matrix_basis(const mesh_type& msh, const cell_type& cl, size_t degree) :
-      scalar_basis(msh, cl, degree)
+    scaled_monomial_sym_matrix_basis(const mesh_type& msh,
+                                     const cell_type& cl,
+                                     size_t           degree,
+                                     bool             use_inertia_axes = false) :
+      scalar_basis(msh, cl, degree, use_inertia_axes),
+      base(msh, cl, use_inertia_axes)
     {
         basis_degree = degree;
         basis_size   = sym_matrix_basis_size(degree, 2, 2);
@@ -599,75 +437,6 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
     }
 };
 
-/* Specialization for 2D meshes, faces */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::face>
-{
-  public:
-    typedef Mesh<T, 2, Storage>                 mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::point_type      point_type;
-    typedef typename mesh_type::face            face_type;
-    typedef static_matrix<scalar_type, 2, 2>    function_type;
-
-  private:
-    size_t basis_degree, basis_size;
-
-    typedef scaled_monomial_scalar_basis<mesh_type, face_type, scalar_type> scalar_basis_type;
-    scalar_basis_type                                          scalar_basis;
-
-  public:
-    scaled_monomial_sym_matrix_basis(const mesh_type& msh, const face_type& fc, size_t degree) :
-      scalar_basis(msh, fc, degree)
-    {
-        basis_degree = degree;
-        basis_size   = sym_matrix_basis_size(degree, 1, 2);
-    }
-
-    eigen_compatible_stdvector<function_type>
-    eval_functions(const point_type& pt) const
-    {
-        eigen_compatible_stdvector<function_type> ret;
-        ret.reserve(basis_size);
-
-        auto              phi     = scalar_basis.eval_functions(pt);
-        const scalar_type invrac2 = 1.0 / std::sqrt(2.0);
-
-        for (int k = 0; k < scalar_basis.size(); k++)
-        {
-            function_type fc;
-
-            for (int j = 0; j < 2; j++)
-            {
-                for (int i = 0; i < j; i++)
-                {
-                    fc       = function_type::Zero();
-                    fc(i, j) = phi(k) * invrac2;
-                    fc(j, i) = phi(k) * invrac2;
-                    ret.push_back(fc);
-                }
-                fc       = function_type::Zero();
-                fc(j, j) = phi(k);
-                ret.push_back(fc);
-            }
-        }
-
-        assert(ret.size() == basis_size);
-        return ret;
-    }
-
-    size_t
-    size() const
-    {
-        return basis_size;
-    }
-
-    size_t
-    degree() const
-    {
-        return basis_degree;
-    }
-};
 
 ///////////////////////////////////////////////////
 //// Raviart-Thomas elements on simplicial ////////
@@ -706,6 +475,8 @@ make_matrix_monomial_basis_RT(const MeshType& msh, const ElementType& elem, cons
 /* Specialization for 3D meshes, cells */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class scaled_monomial_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell>
+  : public scaled_monomial_abstract_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell,
+                                          typename Mesh<T, 3, Storage>::coordinate_type>
 {
 
   public:
@@ -714,6 +485,8 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
     typedef typename mesh_type::cell            cell_type;
     typedef typename mesh_type::point_type      point_type;
     typedef Matrix<scalar_type, 3, 3>           function_type;
+
+    using base = scaled_monomial_abstract_basis<mesh_type, cell_type, scalar_type>;
 
   private:
     size_t basis_degree, basis_size;
@@ -727,8 +500,8 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
 
   public:
     scaled_monomial_matrix_basis_RT(const mesh_type& msh, const cell_type& cl, const size_t degree) :
-      basis_degree(degree), basis_size(matrix_basis_size_RT(degree, 3, 3)), scalar_basis(msh, cl, degree - 1),
-      matrix_basis(msh, cl, degree - 1)
+      basis_degree(degree), basis_size(matrix_basis_size_RT(degree, 3, 3)), scalar_basis(msh, cl, degree - 1, false),
+      matrix_basis(msh, cl, degree - 1, false), base(msh, cl, false)
     {
         if (basis_degree <= 0)
             throw std::invalid_argument("Raviart-Thomas basis: degree has to be > 0");
@@ -794,6 +567,9 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, S
 /* Specialization for 2D meshes, cells */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class scaled_monomial_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell>
+  : public scaled_monomial_abstract_basis<Mesh<T, 2, Storage>,
+                                          typename Mesh<T, 2, Storage>::cell,
+                                          typename Mesh<T, 2, Storage>::coordinate_type>
 {
 
   public:
@@ -802,6 +578,8 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
     typedef typename mesh_type::cell            cell_type;
     typedef typename mesh_type::point_type      point_type;
     typedef Matrix<scalar_type, 2, 2>           function_type;
+
+    using base = scaled_monomial_abstract_basis<mesh_type, cell_type, scalar_type>;
 
   private:
     size_t basis_degree, basis_size;
@@ -815,8 +593,8 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
 
   public:
     scaled_monomial_matrix_basis_RT(const mesh_type& msh, const cell_type& cl, const size_t degree) :
-      basis_degree(degree), basis_size(matrix_basis_size_RT(degree, 2, 2)), scalar_basis(msh, cl, degree - 1),
-      matrix_basis(msh, cl, degree - 1)
+      basis_degree(degree), basis_size(matrix_basis_size_RT(degree, 2, 2)), scalar_basis(msh, cl, degree - 1, false),
+      matrix_basis(msh, cl, degree - 1, false), base(msh, cl, false)
     {
         if (basis_degree <= 0)
             throw std::invalid_argument("Raviart-Thomas basis: degree has to be > 0");
@@ -920,6 +698,8 @@ make_sym_matrix_monomial_basis_RT(const MeshType& msh, const ElementType& elem, 
 /* Specialization for 3D meshes, cells */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell>
+  : public scaled_monomial_abstract_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell,
+                                          typename Mesh<T, 3, Storage>::coordinate_type>
 {
 
   public:
@@ -928,6 +708,8 @@ class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 
     typedef typename mesh_type::cell            cell_type;
     typedef typename mesh_type::point_type      point_type;
     typedef Matrix<scalar_type, 3, 3>           function_type;
+
+    using base = scaled_monomial_abstract_basis<mesh_type, cell_type, scalar_type>;
 
   private:
     size_t basis_degree, basis_size;
@@ -941,8 +723,9 @@ class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 
 
   public:
     scaled_monomial_sym_matrix_basis_RT(const mesh_type& msh, const cell_type& cl, const size_t degree) :
-      basis_degree(degree), basis_size(sym_matrix_basis_size_RT(degree, 3, 3)), scalar_basis(msh, cl, degree - 1),
-      sym_matrix_basis(msh, cl, degree - 1)
+      basis_degree(degree), basis_size(sym_matrix_basis_size_RT(degree, 3, 3)),
+      scalar_basis(msh, cl, degree - 1, false), sym_matrix_basis(msh, cl, degree - 1, false),
+      base(msh, cl, false)
     {
         if (degree <= 0)
             throw std::invalid_argument("Raviart-Thomas basis: degree has to be > 0");
@@ -1023,6 +806,8 @@ class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 3, Storage>, typename Mesh<T, 
 /* Specialization for 2D meshes, cells */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell>
+  : public scaled_monomial_abstract_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell,
+                                          typename Mesh<T, 2, Storage>::coordinate_type>
 {
 
   public:
@@ -1031,6 +816,8 @@ class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 
     typedef typename mesh_type::cell            cell_type;
     typedef typename mesh_type::point_type      point_type;
     typedef Matrix<scalar_type, 2, 2>           function_type;
+
+    using base = scaled_monomial_abstract_basis<mesh_type, cell_type, scalar_type>;
 
   private:
     size_t basis_degree, basis_size;
@@ -1044,8 +831,9 @@ class scaled_monomial_sym_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 
 
   public:
     scaled_monomial_sym_matrix_basis_RT(const mesh_type& msh, const cell_type& cl, const size_t degree) :
-      basis_degree(degree), basis_size(sym_matrix_basis_size_RT(degree, 2, 2)), scalar_basis(msh, cl, degree - 1),
-      sym_matrix_basis(msh, cl, degree - 1)
+      basis_degree(degree), basis_size(sym_matrix_basis_size_RT(degree, 2, 2)),
+      scalar_basis(msh, cl, degree - 1, false), sym_matrix_basis(msh, cl, degree - 1, false),
+      base(msh, cl, false)
     {
         if (degree <= 0)
             throw std::invalid_argument("Raviart-Thomas basis: degree has to be > 0");

@@ -148,12 +148,6 @@ class scaled_monomial_abstract_basis<Mesh, typename Mesh::cell, ScalarType>
         return _scaling_factor;
     }
 
-    bool
-    is_orthonormal() const
-    {
-        return false;
-    }
-
   public:
     scaled_monomial_abstract_basis(const mesh_type& msh, const cell_type& cl, bool use_inertia_axes = true)
     {
@@ -170,6 +164,12 @@ class scaled_monomial_abstract_basis<Mesh, typename Mesh::cell, ScalarType>
         _length_box = diameter_boundingbox(msh, cl, _axes);
         this->compute_scaling_factor();
         this->compute_passage_matrix();
+    }
+
+    bool
+    is_orthonormal() const
+    {
+        return false;
     }
 };
 
@@ -247,12 +247,6 @@ class scaled_monomial_abstract_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, St
         return 2.0 / _length;
     }
 
-    bool
-    is_orthonormal() const
-    {
-        return false;
-    }
-
   public:
     scaled_monomial_abstract_basis(const mesh_type& msh, const face_type& fc, bool use_inertia_axes = true)
     {
@@ -263,6 +257,12 @@ class scaled_monomial_abstract_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, St
         _axes.normalize();
         _length  = diameter(msh, fc);
         _passage = _axes.transpose() * this->scaling_factor();
+    }
+
+    bool
+    is_orthonormal() const
+    {
+        return false;
     }
 };
 
@@ -405,12 +405,6 @@ class scaled_monomial_abstract_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, St
         return _scaling_factor;
     }
 
-    bool
-    is_orthonormal() const
-    {
-        return false;
-    }
-
   public:
     scaled_monomial_abstract_basis(const mesh_type& msh, const face_type& fc, bool use_inertia_axes = true)
     {
@@ -419,6 +413,12 @@ class scaled_monomial_abstract_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, St
         this->compute_axes_box(msh, fc);
         this->compute_scaling_factor();
         this->compute_passage_matrix();
+    }
+
+    bool
+    is_orthonormal() const
+    {
+        return false;
     }
 };
 
@@ -481,9 +481,9 @@ class scaled_monomial_abstract_face_basis<Mesh<T, 3, Storage>, typename Mesh<T, 
 
         /* Don't normalize, in order to keep axes of the same order of lenght
          * of v in make_face_point_3d_to_2d() */
-        e0 = v0 / v0.norm();
+        e0 = v0; // / v0.norm();
         e1 = v1 - (v1.dot(v0) * v0) / (v0.dot(v0));
-        e1 = e1 / e1.norm();
+        e1 = e1; // / e1.norm();
     }
 
   protected:
@@ -520,48 +520,18 @@ class scaled_monomial_abstract_face_basis<Mesh<T, 3, Storage>, typename Mesh<T, 
         return std::make_pair(e0, e1);
     }
 
-    std::array<coordinate_type, 2>
-    face_box(const mesh_type& msh, const face_type& fc) const
-    {
-        const auto pts = points(msh, fc);
-
-        coordinate_type xmin = std::numeric_limits<coordinate_type>::max();
-        coordinate_type xmax = -std::numeric_limits<coordinate_type>::max();
-        coordinate_type ymin = std::numeric_limits<coordinate_type>::max();
-        coordinate_type ymax = -std::numeric_limits<coordinate_type>::max();
-
-        for (auto& pt : pts)
-        {
-            const auto bp = this->map_face_point_3d_to_2d(pt);
-
-            if (bp.x() < xmin)
-            {
-                xmin = bp.x();
-            }
-            else if (bp.x() > xmax)
-            {
-                xmax = bp.x();
-            }
-
-            if (bp.y() < ymin)
-            {
-                ymin = bp.y();
-            }
-            else if (bp.y() > ymax)
-            {
-                ymax = bp.y();
-            }
-        }
-
-        return {std::abs(xmax - xmin), std::abs(ymax - ymin)};
-    }
-
   public:
     scaled_monomial_abstract_face_basis(const mesh_type& msh, const face_type& fc)
     {
         face_bar = barycenter(msh, fc);
         face_h   = diameter(msh, fc);
         compute_axis(msh, fc, e0, e1);
+    }
+
+    bool
+    is_orthonormal() const
+    {
+        return false;
     }
 };
 
