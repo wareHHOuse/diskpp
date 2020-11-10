@@ -64,14 +64,20 @@ struct scaled_monomial_vector_basis
 /* Basis 'factory'. */
 template<typename MeshType, typename ElementType, typename ScalarType = typename MeshType::coordinate_type>
 auto
-make_vector_monomial_basis(const MeshType& msh, const ElementType& elem, size_t degree, bool use_inertia_axes = false)
+make_vector_monomial_basis(const MeshType&    msh,
+                           const ElementType& elem,
+                           size_t             degree,
+                           bool               use_inertia_axes = USE_INERTIA_AXES)
 {
     return scaled_monomial_vector_basis<MeshType, ElementType, ScalarType>(msh, elem, degree, use_inertia_axes);
 }
 
 template<typename MeshType, typename ElementType>
 auto
-make_vector_monomial_basis_complex(const MeshType& msh, const ElementType& elem, size_t degree, bool use_inertia_axes = false)
+make_vector_monomial_basis_complex(const MeshType&    msh,
+                                   const ElementType& elem,
+                                   size_t             degree,
+                                   bool               use_inertia_axes = USE_INERTIA_AXES)
 {
     using complex_type = std::complex<typename MeshType::coordinate_type>;
     return scaled_monomial_vector_basis<MeshType, ElementType, complex_type>(msh, elem, degree, use_inertia_axes);

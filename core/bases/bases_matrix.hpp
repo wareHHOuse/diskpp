@@ -64,7 +64,10 @@ struct scaled_monomial_matrix_basis
 /* Basis 'factory'. */
 template<typename MeshType, typename ElementType>
 auto
-make_matrix_monomial_basis(const MeshType& msh, const ElementType& elem, size_t degree, bool use_inertia_axes = false)
+make_matrix_monomial_basis(const MeshType&    msh,
+                           const ElementType& elem,
+                           size_t             degree,
+                           bool               use_inertia_axes = USE_INERTIA_AXES)
 {
     return scaled_monomial_matrix_basis<MeshType, ElementType>(msh, elem, degree, use_inertia_axes);
 }
@@ -271,7 +274,7 @@ auto
 make_sym_matrix_monomial_basis(const MeshType&    msh,
                                const ElementType& elem,
                                size_t             degree,
-                               bool               use_inertia_axes = false)
+                               bool               use_inertia_axes = USE_INERTIA_AXES)
 {
     return scaled_monomial_sym_matrix_basis<MeshType, ElementType>(msh, elem, degree, use_inertia_axes);
 }

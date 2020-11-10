@@ -64,11 +64,13 @@ struct scaled_monomial_scalar_basis
 };
 
 /* Basis 'factory'. */
-// #define USE_LEGENDRE
 #ifndef USE_LEGENDRE
 template<typename MeshType, typename ElementType, typename ScalarType = typename MeshType::coordinate_type>
 auto
-make_scalar_monomial_basis(const MeshType& msh, const ElementType& elem, size_t degree, bool use_inertia_axes = false)
+make_scalar_monomial_basis(const MeshType&    msh,
+                           const ElementType& elem,
+                           size_t             degree,
+                           bool               use_inertia_axes = USE_INERTIA_AXES)
 {
     return scaled_monomial_scalar_basis<MeshType, ElementType, ScalarType>(msh, elem, degree, use_inertia_axes);
 }
@@ -599,7 +601,10 @@ struct scaled_legendre_scalar_basis
 /* Basis 'factory'. */
 template<typename MeshType, typename ElementType, typename ScalarType = typename MeshType::coordinate_type>
 auto
-make_scalar_legendre_basis(const MeshType& msh, const ElementType& elem, size_t degree, bool use_inertia_axes = true)
+make_scalar_legendre_basis(const MeshType&    msh,
+                           const ElementType& elem,
+                           size_t             degree,
+                           bool               use_inertia_axes = USE_INERTIA_AXES)
 {
     return scaled_legendre_scalar_basis<MeshType, ElementType, ScalarType>(msh, elem, degree, use_inertia_axes);
 }
@@ -1007,7 +1012,10 @@ class scaled_legendre_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Stor
 #ifdef USE_LEGENDRE
 template<typename MeshType, typename ElementType, typename ScalarType = typename MeshType::coordinate_type>
 auto
-make_scalar_monomial_basis(const MeshType& msh, const ElementType& elem, size_t degree, bool use_inertia_axes = true)
+make_scalar_monomial_basis(const MeshType&    msh,
+                           const ElementType& elem,
+                           size_t             degree,
+                           bool               use_inertia_axes = USE_INERTIA_AXES)
 {
     return make_scalar_legendre_basis<MeshType, ElementType, ScalarType>(msh, elem, degree, use_inertia_axes);
 }
