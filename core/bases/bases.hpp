@@ -26,6 +26,12 @@
 
 #pragma once
 
+// Uncomment this option to Legendre basis (replace scaled momonial)
+// #define USE_LEGENDRE
+// Use or not inertia axes for the local axis (it improves conditioning but it not completely tested)
+// #define USE_INERTIA_AXES true
+#define USE_INERTIA_AXES false
+
 #include "bases_scalar.hpp"
 #include "bases_matrix.hpp"
 #include "bases_vector.hpp"

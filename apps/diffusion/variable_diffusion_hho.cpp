@@ -197,7 +197,7 @@ using namespace disk;
 
 template<typename Mesh>
 typename Mesh::coordinate_type
-run_hho_variable_diffusion_solver(const Mesh& msh, const size_t degree)
+run_hho_variable_diffusion_solver_RT(const Mesh& msh, const size_t degree)
 {
     using T = typename Mesh::coordinate_type;
     typedef Eigen::Matrix<T, Eigen::Dynamic, 1> vector_type;
@@ -263,13 +263,108 @@ run_hho_variable_diffusion_solver(const Mesh& msh, const size_t degree)
 }
 
 template<typename Mesh>
-struct test_functor
+typename Mesh::coordinate_type
+run_hho_variable_diffusion_solver(const Mesh& msh, const size_t degree)
 {
+    using T = typename Mesh::coordinate_type;
+    typedef Eigen::Matrix<T, Eigen::Dynamic, 1> vector_type;
+    typedef Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> matrix_type;
+
+    hho_degree_info hdi(degree+1, degree, degree);
+
+    const auto rhs_fun          = make_rhs_function(msh);
+    const auto sol_fun          = make_solution_function(msh);
+    const auto diffusion_tensor = make_diffusion_tensor(msh);
+
+    scalar_boundary_conditions<Mesh> bnd(msh);
+    bnd.addDirichletEverywhere(sol_fun);
+
+    auto assembler = make_scalar_primal_hho_assembler(msh, hdi, bnd);
+
+    for (auto& cl : msh)
+    {
+        const auto gr  = make_vector_hho_gradrec(msh, cl, hdi, diffusion_tensor);
+        const auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
+
+        matrix_type A = gr.second + stab;
+
+        const auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        const auto rhs = make_rhs(msh, cl, cb, rhs_fun, 2);
+
+        const auto sc = make_scalar_static_condensation(msh, cl, hdi, A, rhs);
+
+        assembler.assemble(msh, cl, bnd, sc.first, sc.second);
+    }
+
+    assembler.impose_neumann_boundary_conditions(msh, bnd);
+
+    assembler.finalize();
+
+    size_t systsz = assembler.LHS.rows();
+    size_t nnz    = assembler.LHS.nonZeros();
+
+    //  std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
+    //  std::cout << "systsz: " << systsz << std::endl;
+    //  std::cout << "nnz: " << nnz << std::endl;
+
+    vector_type sol = vector_type::Zero(systsz);
+
+    disk::solvers::pardiso_params<T> pparams;
+    pparams.report_factorization_Mflops = false;
+    mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+
+    T error = 0.0;
+
+    for (auto& cl : msh)
+    {
+        const auto gr  = make_vector_hho_gradrec(msh, cl, hdi, diffusion_tensor);
+        const auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
+
+        matrix_type A = gr.second + stab;
+
+        const auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        const auto rhs = make_rhs(msh, cl, cb, rhs_fun);
+
+        vector_type locsol = assembler.take_local_solution(msh, cl, bnd, sol);
+
+        vector_type sol = make_scalar_static_decondensation(msh, cl, hdi, A, rhs, locsol);
+
+        vector_type realsol = project_function(msh, cl, hdi, sol_fun, 2);
+
+        const auto diff = realsol - sol;
+        error += diff.dot(gr.second * diff);
+    }
+
+    return std::sqrt(error);
+}
+
+template<typename Mesh>
+class test_functor
+{
+public:
     /* Expect k+1 convergence (hho stabilization, energy norm) */
     typename Mesh::coordinate_type
     operator()(const Mesh& msh, size_t degree) const
     {
         return run_hho_variable_diffusion_solver(msh, degree);
+    }
+
+    size_t
+    expected_rate(size_t k)
+    {
+        return k + 1;
+    }
+};
+
+template<typename Mesh>
+class test_functor_RT
+{
+  public:
+    /* Expect k+1 convergence (energy norm) */
+    typename Mesh::coordinate_type
+    operator()(const Mesh& msh, size_t degree) const
+    {
+        return run_hho_variable_diffusion_solver_RT(msh, degree);
     }
 
     size_t
@@ -348,10 +443,37 @@ main(int argc, char** argv)
 #else
 
 int
-main(void)
+main(int argc, char** argv)
 {
-    tester_simplicial<test_functor> tstr;
-    tstr.run();
+
+    bool use_RT = false;
+    int  ch;
+
+    while ((ch = getopt(argc, argv, "r")) != -1)
+    {
+        switch (ch)
+        {
+            case 'r': use_RT = true; break;
+
+            default: std::cout << "wrong arguments" << std::endl; exit(1);
+        }
+    }
+
+    argc -= optind;
+    argv += optind;
+
+
+    if(use_RT)
+    {
+        tester_simplicial<test_functor_RT> tstr;
+        tstr.run();
+    }
+    else
+    {
+        tester<test_functor> tstr;
+        tstr.run();
+    }
+
     return 0;
 }
 #endif
