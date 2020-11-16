@@ -1,11 +1,11 @@
 /*
  * DISK++, a template library for DIscontinuous SKeletal methods.
- *  
+ *
  * Matteo Cicuttin (C) 2020
  * matteo.cicuttin@uliege.be
  *
  * University of Liège - Montefiore Institute
- * Applied and Computational Electromagnetics group  
+ * Applied and Computational Electromagnetics group
  */
 
 #include <iomanip>
@@ -36,7 +36,7 @@ struct test_functor_curl_reconstruction
     expected_rate(size_t k)
     {
         return k + 50;
-    } 
+    }
 };
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, bool mixed>
@@ -62,7 +62,7 @@ struct test_functor_curl_reconstruction<Mesh<T,2,Storage>, mixed>
         size_t cd = mixed ? degree+1 : degree;
         size_t rd = degree+1;
 
-        disk::hho_degree_info hdi( { .rd = rd, .cd = cd, .fd = fd } );
+        disk::hho_degree_info hdi(disk::priv::hdi_named_args{.rd = rd, .cd = cd, .fd = fd});
 
         scalar_type error = 0.0;
         for (auto& cl : msh)
@@ -78,7 +78,7 @@ struct test_functor_curl_reconstruction<Mesh<T,2,Storage>, mixed>
             Matrix<T, Dynamic, 1>       diff = exp_reconstr;
             diff.head(1) = exp_reconstr.head(1);
             diff.tail(rb.size()-1) -= rf;
-        
+
             Matrix<T, Dynamic, Dynamic> CC = make_curl_curl_matrix(msh, cl, rb);
             error += diff.dot(CC * diff);
 
@@ -130,7 +130,7 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
         size_t cd = mixed ? degree+1 : degree;
         size_t rd = degree+1;
 
-        disk::hho_degree_info hdi( { .rd = rd, .cd = cd, .fd = fd } );
+        disk::hho_degree_info hdi(disk::priv::hdi_named_args{.rd = rd, .cd = cd, .fd = fd});
 
         scalar_type error = 0.0;
         for (auto& cl : msh)
@@ -149,7 +149,7 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
                 Matrix<T,3,1> val = disk::eval(reconstr_curl, phi) - curl_f(qp.point());
                 error += qp.weight() * val.dot(val);
             }
-            
+
         }
 
         return std::sqrt(error);
