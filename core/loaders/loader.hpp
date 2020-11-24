@@ -383,13 +383,16 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
     }
 
 public:
-    fvca5_mesh_loader() = default;
+  static const char constexpr* expected_extension = "typ1";
 
-    bool read_mesh(const std::string& filename)
-    {
-        if (this->verbose())
-            std::cout << " *** READING FVCA5 MESH ***" << std::endl;
-        return fvca5_read(filename);
+  fvca5_mesh_loader() = default;
+
+  bool
+  read_mesh(const std::string& filename)
+  {
+      if (this->verbose())
+          std::cout << " *** READING FVCA5 MESH ***" << std::endl;
+      return fvca5_read(filename);
     }
 
     bool populate_mesh(mesh_type& msh)
@@ -1813,7 +1816,7 @@ class cartesian_mesh_loader<T,2> : public mesh_loader<cartesian_mesh<T,2>>
 
 public:
     static const char constexpr *expected_extension = "quad";
-    
+
     cartesian_mesh_loader() = default;
 
     bool read_mesh(const std::string& s)
@@ -2630,7 +2633,7 @@ load_medit_3d_mesh(const char* filename)
 
    return msh;
 }
-    
+
 /**************************************************************************/
 // New mesh loader helpers
 namespace priv {
@@ -2640,7 +2643,7 @@ check_filename_extension(const char *filename, const char *extension)
 {
     std::stringstream ss;
     ss << ".*\\." << extension << "$";
-    
+
     return std::regex_match(filename, std::regex(ss.str()));
 }
 
@@ -2657,7 +2660,7 @@ load_mesh(const char *filename, LT& loader, MT& msh)
     bool success = loader.read_mesh(filename);
     if (!success)
         return false;
-    
+
     loader.populate_mesh(msh);
     return true;
 }
@@ -2679,7 +2682,7 @@ load_mesh_netgen(const char *filename, disk::simplicial_mesh<T, 3>& msh)
     disk::netgen_mesh_loader<T, 3> loader;
     return priv::load_mesh(filename, loader, msh);
 }
-    
+
 template<typename T>
 bool
 load_mesh_diskpp_cartesian(const char *filename, disk::cartesian_mesh<T, 2>& msh)
@@ -2693,6 +2696,14 @@ bool
 load_mesh_diskpp_cartesian(const char *filename, disk::cartesian_mesh<T, 3>& msh)
 {
     disk::cartesian_mesh_loader<T, 3> loader;
+    return priv::load_mesh(filename, loader, msh);
+}
+
+template<typename T>
+bool
+load_mesh_fvca5_2d(const char* filename, disk::generic_mesh<T, 2>& msh)
+{
+    disk::fvca5_mesh_loader<T, 2> loader;
     return priv::load_mesh(filename, loader, msh);
 }
 
