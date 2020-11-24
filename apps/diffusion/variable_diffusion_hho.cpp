@@ -193,11 +193,18 @@ make_diffusion_tensor(const Mesh& msh)
 
 using namespace disk;
 
+void print_error(const size_t& degree, const double diam, const double H1_error)
+{
+    std::cout << "Degree: " << degree << std::endl;
+    std::cout << "h-diameter: " << diam << std::endl;
+    std::cout << "H1-error: " << H1_error << std::endl;
+}
+
 /* Solve anisotropic diffusion with HHO method on simplicial meshes using Raviart-Thomas */
 
 template<typename Mesh>
 typename Mesh::coordinate_type
-run_hho_variable_diffusion_solver_RT(const Mesh& msh, const size_t degree)
+run_hho_variable_diffusion_solver_RT(const Mesh& msh, const size_t degree, bool print = false)
 {
     using T = typename Mesh::coordinate_type;
     typedef Eigen::Matrix<T, Eigen::Dynamic, 1> vector_type;
@@ -235,28 +242,33 @@ run_hho_variable_diffusion_solver_RT(const Mesh& msh, const size_t degree)
     //  std::cout << "systsz: " << systsz << std::endl;
     //  std::cout << "nnz: " << nnz << std::endl;
 
-     vector_type sol = vector_type::Zero(systsz);
+    vector_type sol = vector_type::Zero(systsz);
 
-     disk::solvers::pardiso_params<T> pparams;
-     pparams.report_factorization_Mflops = false;
-     mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+    disk::solvers::pardiso_params<T> pparams;
+    pparams.report_factorization_Mflops = false;
+    mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
 
-     T error = 0.0;
+    T error = 0.0;
 
-     for (auto& cl : msh)
-     {
-         const auto cb  = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-         const auto gr  = make_vector_hho_gradrec_RT(msh, cl, hdi, diffusion_tensor);
-         const auto rhs = make_rhs(msh, cl, cb, rhs_fun);
+    for (auto& cl : msh)
+    {
+        const auto cb  = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        const auto gr  = make_vector_hho_gradrec_RT(msh, cl, hdi, diffusion_tensor);
+        const auto rhs = make_rhs(msh, cl, cb, rhs_fun);
 
-         vector_type locsol = assembler.take_local_solution(msh, cl, bnd, sol);
+        vector_type locsol = assembler.take_local_solution(msh, cl, bnd, sol);
 
-         vector_type sol = make_scalar_static_decondensation(msh, cl, hdi, gr.second, rhs, locsol);
+        vector_type sol = make_scalar_static_decondensation(msh, cl, hdi, gr.second, rhs, locsol);
 
-         vector_type realsol = project_function(msh, cl, hdi, sol_fun, 2);
+        vector_type realsol = project_function(msh, cl, hdi, sol_fun, 2);
 
-         const auto diff = realsol - sol;
-         error += diff.dot(gr.second * diff);
+        const auto diff = realsol - sol;
+        error += diff.dot(gr.second * diff);
+    }
+
+    if(print)
+    {
+        print_error(degree, average_diameter(msh), error);
     }
 
     return std::sqrt(error);
@@ -264,13 +276,13 @@ run_hho_variable_diffusion_solver_RT(const Mesh& msh, const size_t degree)
 
 template<typename Mesh>
 typename Mesh::coordinate_type
-run_hho_variable_diffusion_solver(const Mesh& msh, const size_t degree)
+run_hho_variable_diffusion_solver(const Mesh& msh, const size_t degree, bool print = false)
 {
     using T = typename Mesh::coordinate_type;
-    typedef Eigen::Matrix<T, Eigen::Dynamic, 1> vector_type;
+    typedef Eigen::Matrix<T, Eigen::Dynamic, 1>              vector_type;
     typedef Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> matrix_type;
 
-    hho_degree_info hdi(degree+1, degree, degree);
+    hho_degree_info hdi(degree + 1, degree, degree);
 
     const auto rhs_fun          = make_rhs_function(msh);
     const auto sol_fun          = make_solution_function(msh);
@@ -283,12 +295,12 @@ run_hho_variable_diffusion_solver(const Mesh& msh, const size_t degree)
 
     for (auto& cl : msh)
     {
-        const auto gr  = make_vector_hho_gradrec(msh, cl, hdi, diffusion_tensor);
+        const auto gr   = make_vector_hho_gradrec(msh, cl, hdi, diffusion_tensor);
         const auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
 
         matrix_type A = gr.second + stab;
 
-        const auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        const auto cb  = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
         const auto rhs = make_rhs(msh, cl, cb, rhs_fun, 2);
 
         const auto sc = make_scalar_static_condensation(msh, cl, hdi, A, rhs);
@@ -317,12 +329,12 @@ run_hho_variable_diffusion_solver(const Mesh& msh, const size_t degree)
 
     for (auto& cl : msh)
     {
-        const auto gr  = make_vector_hho_gradrec(msh, cl, hdi, diffusion_tensor);
+        const auto gr   = make_vector_hho_gradrec(msh, cl, hdi, diffusion_tensor);
         const auto stab = make_scalar_hdg_stabilization(msh, cl, hdi);
 
         matrix_type A = gr.second + stab;
 
-        const auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        const auto cb  = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
         const auto rhs = make_rhs(msh, cl, cb, rhs_fun);
 
         vector_type locsol = assembler.take_local_solution(msh, cl, bnd, sol);
@@ -335,18 +347,23 @@ run_hho_variable_diffusion_solver(const Mesh& msh, const size_t degree)
         error += diff.dot(gr.second * diff);
     }
 
+    if (print)
+    {
+        print_error(degree, average_diameter(msh), error);
+    }
+
     return std::sqrt(error);
 }
 
 template<typename Mesh>
 class test_functor
 {
-public:
+  public:
     /* Expect k+1 convergence (hho stabilization, energy norm) */
     typename Mesh::coordinate_type
     operator()(const Mesh& msh, size_t degree) const
     {
-        return run_hho_variable_diffusion_solver(msh, degree);
+        return run_hho_variable_diffusion_solver(msh, degree, false);
     }
 
     size_t
@@ -364,7 +381,7 @@ class test_functor_RT
     typename Mesh::coordinate_type
     operator()(const Mesh& msh, size_t degree) const
     {
-        return run_hho_variable_diffusion_solver_RT(msh, degree);
+        return run_hho_variable_diffusion_solver_RT(msh, degree, false);
     }
 
     size_t
@@ -374,106 +391,175 @@ class test_functor_RT
     }
 };
 
-#if 0
-int
-main(int argc, char** argv)
+void
+print_info()
 {
-    using T = double;
-
-    size_t degree        = 1;
-    char*  mesh_filename = nullptr;
-    int    ch;
-
-    while ((ch = getopt(argc, argv, "k:")) != -1)
-    {
-        switch (ch)
-        {
-            case 'k':
-                degree = atoi(optarg);
-                if (degree < 0)
-                {
-                    std::cout << "Degree must be positive. Falling back to 1." << std::endl;
-                    degree = 1;
-                }
-                break;
-
-            default: std::cout << "wrong arguments" << std::endl; exit(1);
-        }
-    }
-
-    argc -= optind;
-    argv += optind;
-
-    if (argc != 1)
-    {
-        std::cout << "Please specify file name." << std::endl;
-        return 1;
-    }
-
-    mesh_filename = argv[0];
-
-    /* FVCA5 2D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$")))
-    {
-        std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
-        auto msh = disk::load_fvca5_2d_mesh<T>(mesh_filename);
-        run_hho_variable_diffusion_solver(msh, degree);
-        return 0;
-    }
-
-    /* Netgen 2D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$")))
-    {
-        std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
-        auto msh = disk::load_netgen_2d_mesh<T>(mesh_filename);
-        run_hho_variable_diffusion_solver(msh, degree);
-        return 0;
-    }
-
-    /* Netgen 3D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$")))
-    {
-        std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-        auto msh = disk::load_netgen_3d_mesh<T>(mesh_filename);
-        run_hho_variable_diffusion_solver(msh, degree);
-        return 0;
-    }
+    std::cout << "Arguments" << std::endl;
+    std::cout << "-m : use the specified mesh file" << std::endl;
+    std::cout << "-k : degree of the HHO method" << std::endl;
+    std::cout << "-r : use Raiart-Thomas gradient" << std::endl;
+    std::cout << "default: convergence test" << std::endl;
 }
 
-#else
-
 int
 main(int argc, char** argv)
 {
+    using RealType = double;
 
-    bool use_RT = false;
-    int  ch;
+    char* mesh_filename = nullptr;
 
-    while ((ch = getopt(argc, argv, "r")) != -1)
+    bool   use_mesh = false;
+    bool   use_RT   = false;
+    size_t degree   = 1;
+    int    ch;
+
+    while ((ch = getopt(argc, argv, "k:m:r")) != -1)
     {
         switch (ch)
         {
+            case 'k': degree = std::stoi(optarg); break;
+
+            case 'm':
+                mesh_filename = optarg;
+                use_mesh      = true;
+                break;
+
             case 'r': use_RT = true; break;
 
-            default: std::cout << "wrong arguments" << std::endl; exit(1);
+            default:
+                std::cout << "wrong arguments" << std::endl;
+                print_info();
+                exit(1);
         }
     }
 
-    argc -= optind;
-    argv += optind;
-
-
-    if(use_RT)
+    if (use_mesh)
     {
-        tester_simplicial<test_functor_RT> tstr;
-        tstr.run();
+        /* FVCA5 2D */
+        if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$")))
+        {
+            std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
+            disk::generic_mesh<RealType, 2> msh;
+            disk::load_mesh_fvca5_2d(mesh_filename, msh);
+
+            if (use_RT)
+            {
+                run_hho_variable_diffusion_solver_RT(msh, degree, true);
+            }
+            else
+            {
+                run_hho_variable_diffusion_solver(msh, degree, true);
+            }
+
+            return 0;
+        }
+
+        /* Netgen 2D */
+        if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$")))
+        {
+            std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
+            disk::simplicial_mesh<RealType, 2> msh;
+            disk::load_mesh_netgen(mesh_filename, msh);
+
+            if (use_RT)
+            {
+                run_hho_variable_diffusion_solver_RT(msh, degree, true);
+            }
+            else
+            {
+                run_hho_variable_diffusion_solver(msh, degree, true);
+            }
+
+            return 0;
+        }
+
+        /* DiSk++ cartesian 2D */
+        if (std::regex_match(mesh_filename, std::regex(".*\\.quad$")))
+        {
+            std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
+            disk::cartesian_mesh<RealType, 2> msh;
+            disk::load_mesh_diskpp_cartesian(mesh_filename, msh);
+
+            if (use_RT)
+            {
+                run_hho_variable_diffusion_solver_RT(msh, degree, true);
+            }
+            else
+            {
+                run_hho_variable_diffusion_solver(msh, degree, true);
+            }
+            return 0;
+        }
+
+        /* Netgen 3D */
+        if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$")))
+        {
+            std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
+            disk::simplicial_mesh<RealType, 3> msh;
+            disk::load_mesh_netgen(mesh_filename, msh);
+
+            if (use_RT)
+            {
+                run_hho_variable_diffusion_solver_RT(msh, degree, true);
+            }
+            else
+            {
+                run_hho_variable_diffusion_solver(msh, degree, true);
+            }
+
+            return 0;
+        }
+
+        /* DiSk++ cartesian 3D */
+        if (std::regex_match(mesh_filename, std::regex(".*\\.hex$")))
+        {
+            std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
+            disk::cartesian_mesh<RealType, 3> msh;
+            disk::load_mesh_diskpp_cartesian(mesh_filename, msh);
+
+            if (use_RT)
+            {
+                run_hho_variable_diffusion_solver_RT(msh, degree, true);
+            }
+            else
+            {
+                run_hho_variable_diffusion_solver(msh, degree, true);
+            }
+            return 0;
+        }
+
+        /* FVCA6 3D */
+        if (std::regex_match(mesh_filename, std::regex(".*\\.msh$")))
+        {
+            std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
+            disk::generic_mesh<RealType, 3> msh;
+            disk::load_mesh_fvca6_3d(mesh_filename, msh);
+
+            if (use_RT)
+            {
+                run_hho_variable_diffusion_solver_RT(msh, degree, true);
+            }
+            else
+            {
+                run_hho_variable_diffusion_solver(msh, degree, true);
+            }
+
+            return 0;
+        }
     }
     else
     {
-        tester<test_functor> tstr;
-        tstr.run();
+        if (use_RT)
+        {
+            tester_simplicial<test_functor_RT> tstr;
+            tstr.run();
+        }
+        else
+        {
+            tester<test_functor> tstr;
+            tstr.run();
+        }
     }
 
     return 0;
 }
-#endif
