@@ -70,7 +70,7 @@ class MaterialData
 
   public:
     MaterialData() :
-      m_lambda(1.0), m_mu(1.0), m_H(0), m_K(0), m_sigma_y0(std::numeric_limits<scalar_type>::max()), m_type(0)
+      m_lambda(1.0), m_mu(1.0), m_H(0), m_K(0), m_sigma_y0(std::numeric_limits<scalar_type>::max()), m_type(1)
     {
     }
 
