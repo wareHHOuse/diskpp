@@ -1,13 +1,12 @@
 /*
  * DISK++, a template library for DIscontinuous SKeletal methods.
  *
- * Matteo Cicuttin (C) 2020
+ * Matteo Cicuttin (C) 2020, 2021
  * matteo.cicuttin@uliege.be
  *
  * University of Liège - Montefiore Institute
  * Applied and Computational Electromagnetics group
  */
-
 /*
  *       /\        Matteo Cicuttin (C) 2016-2019
  *      /__\       matteo.cicuttin@enpc.fr
@@ -418,8 +417,8 @@ public:
         assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
         std::set<size_t> boundary_ids;
         for (auto& bi : this->backend_storage()->boundary_info)
-            if (bi.is_boundary)
-                boundary_ids.insert(bi.boundary_id);
+            if (bi.is_boundary())
+                boundary_ids.insert(bi.id());
 
         return std::vector<size_t>(boundary_ids.begin(), boundary_ids.end());
     }
@@ -428,7 +427,7 @@ public:
     bool is_boundary(typename face::id_type id) const
     {
         assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
-        return this->backend_storage()->boundary_info.at(id).is_boundary;
+        return this->backend_storage()->boundary_info.at(id).is_boundary();
     }
 
     /* Determine if the specified face is a boundary (via actual face) */
@@ -436,7 +435,7 @@ public:
     {
         assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
         auto fid = lookup(f);
-        return this->backend_storage()->boundary_info.at(fid).is_boundary;
+        return this->backend_storage()->boundary_info.at(fid).is_boundary();
     }
 
     /* Determine if the specified face is a boundary (via iterator) */
@@ -444,7 +443,7 @@ public:
     {
         assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
         auto ofs = std::distance(this->faces_begin(), itor);
-        return this->backend_storage()->boundary_info.at(ofs).is_boundary;
+        return this->backend_storage()->boundary_info.at(ofs).is_boundary();
     }
 
     size_t boundary_id(const typename face::id_type& fid) const
@@ -453,7 +452,7 @@ public:
         if ( !is_boundary(fid) )
             throw std::invalid_argument("Face is not a boundary.");
 
-        return this->backend_storage()->boundary_info.at(fid).boundary_id;
+        return this->backend_storage()->boundary_info.at(fid).id();
     }
 
     size_t boundary_id(const face& f) const
@@ -464,7 +463,7 @@ public:
         if ( !is_boundary(fid) )
             throw std::invalid_argument("Face is not a boundary.");
 
-        return this->backend_storage()->boundary_info.at(fid).boundary_id;
+        return this->backend_storage()->boundary_info.at(fid).id();
     }
 
     /* Get the total number of boundary faces */
@@ -472,7 +471,9 @@ public:
     {
         assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
 
-        auto count_lambda = [](const bnd_info& bi) -> bool { return bi.is_boundary; };
+        auto count_lambda = [](const boundary_descriptor& bi) -> bool {
+            return bi.is_boundary();
+        };
 
         return std::count_if(this->backend_storage()->boundary_info.begin(),
                              this->backend_storage()->boundary_info.end(),
@@ -484,8 +485,8 @@ public:
     {
         assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
 
-        auto count_lambda = [&](const bnd_info& bi) -> bool {
-            return bi.is_boundary and bi.boundary_id == id;
+        auto count_lambda = [&](const boundary_descriptor& bi) -> bool {
+            return bi.is_boundary() and bi.id() == id;
         };
 
         return std::count_if(this->backend_storage()->boundary_info.begin(),
@@ -498,7 +499,9 @@ public:
     {
         assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
 
-        auto count_lambda = [](const bnd_info& bi) -> bool { return !bi.is_boundary; };
+        auto count_lambda = [](const boundary_descriptor& bi) -> bool {
+            return not bi.is_boundary();
+        };
 
         return std::count_if(this->backend_storage()->boundary_info.begin(),
                              this->backend_storage()->boundary_info.end(),
@@ -565,6 +568,20 @@ public:
         assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
         typedef priv::is_internal_pred<mesh> iip;
         return internal_face_iterator(iip(*this), this->faces_end(), this->faces_end());
+    }
+
+    subdomain_descriptor domain_info(const cell& c) const
+    {
+        assert( this->backend_storage()->subdomain_info.size() == this->cells_size() );
+        auto cid = lookup(c);
+        return this->backend_storage()->subdomain_info.at(cid);
+    }
+
+    boundary_descriptor boundary_info(const face& f) const
+    {
+        assert( this->backend_storage()->boundary_info.size() == this->faces_size() );
+        auto fid = lookup(f);
+        return this->backend_storage()->boundary_info.at(fid);
     }
 
     /* Apply a transformation to the mesh. Transform should be a functor or

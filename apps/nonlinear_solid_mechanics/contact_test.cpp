@@ -94,24 +94,24 @@ renumber_boundaries_2d(Mesh& msh)
     for (size_t face_i = 0; face_i < msh.faces_size(); face_i++)
     {
         auto fc = *std::next(msh.faces_begin(), face_i);
-        if (storage->boundary_info.at(face_i).is_boundary)
+        if ( storage->boundary_info.at(face_i).is_boundary() )
         {
             const auto bar = barycenter(msh, fc);
             if (is_close_to(bar.y(), T(0)))
             {
-                storage->boundary_info.at(face_i).boundary_id = 1;
+                storage->boundary_info.at(face_i).id(1);
             }
             else if (is_close_to(bar.x(), T(1)))
             {
-                storage->boundary_info.at(face_i).boundary_id = 2;
+                storage->boundary_info.at(face_i).id(2);
             }
             else if (is_close_to(bar.y(), T(1)))
             {
-                storage->boundary_info.at(face_i).boundary_id = 3;
+                storage->boundary_info.at(face_i).id(3);
             }
             else if (is_close_to(bar.x(), T(0)))
             {
-                storage->boundary_info.at(face_i).boundary_id = 4;
+                storage->boundary_info.at(face_i).id(4);
             }
             else
             {
@@ -136,32 +136,32 @@ renumber_boundaries_3d(Mesh& msh)
     for (size_t face_i = 0; face_i < msh.faces_size(); face_i++)
     {
         auto fc = *std::next(msh.faces_begin(), face_i);
-        if (storage->boundary_info.at(face_i).is_boundary)
+        if (storage->boundary_info.at(face_i).is_boundary())
         {
             const auto bar = barycenter(msh, fc);
             if (is_close_to(bar.z(), T(0)))
             {
-                storage->boundary_info.at(face_i).boundary_id = 1;
+                storage->boundary_info.at(face_i).id(1);
             }
             else if (is_close_to(bar.z(), T(1)))
             {
-                storage->boundary_info.at(face_i).boundary_id = 2;
+                storage->boundary_info.at(face_i).id(2);
             }
             else if (is_close_to(bar.x(), T(0)))
             {
-                storage->boundary_info.at(face_i).boundary_id = 2;
+                storage->boundary_info.at(face_i).id(2);
             }
             else if (is_close_to(bar.x(), T(1)))
             {
-                storage->boundary_info.at(face_i).boundary_id = 2;
+                storage->boundary_info.at(face_i).id(2);
             }
             else if (is_close_to(bar.y(), T(0)))
             {
-                storage->boundary_info.at(face_i).boundary_id = 2;
+                storage->boundary_info.at(face_i).id(2);
             }
             else if (is_close_to(bar.y(), T(1)))
             {
-                storage->boundary_info.at(face_i).boundary_id = 2;
+                storage->boundary_info.at(face_i).id(2);
             }
             else
             {

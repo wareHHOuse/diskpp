@@ -50,10 +50,54 @@ class mesh_storage
     static_assert(DIM > 0 && DIM <= 3, "mesh: Allowed dimensions are 1, 2 and 3");
 };
 
-struct bnd_info
+class boundary_descriptor
 {
-    size_t  boundary_id;
-    bool    is_boundary;
+    size_t  b_id;
+    size_t  b_tag;
+    bool    is_b;
+
+public:
+    boundary_descriptor()
+        : b_id(0), b_tag(0), is_b(false)
+    {}
+
+    boundary_descriptor(size_t id, bool b)
+        : b_id(id), b_tag(id), is_b(b)
+    {}
+
+    boundary_descriptor(size_t id, size_t tag, bool b)
+        : b_id(id), b_tag(tag), is_b(b)
+    {}
+
+    size_t id() const { return b_id; }
+    void   id(size_t id) { b_id = id; b_tag = id; }
+
+    size_t tag() const { return b_tag; }
+    void   tag(size_t tag) { b_tag = tag; }
+
+    size_t is_boundary() const { return is_b; }
+};
+
+class subdomain_descriptor
+{
+    size_t  s_id;
+    size_t  s_tag;
+
+public:
+    subdomain_descriptor()
+        : s_id(0), s_tag(0)
+    {}
+
+    subdomain_descriptor(size_t id)
+        : s_id(id), s_tag(0)
+    {}
+
+    subdomain_descriptor(size_t id, size_t tag)
+        : s_id(id), s_tag(tag)
+    {}
+
+    size_t id() const { return s_id; }
+    size_t tag() const { return s_tag; }
 };
 
 /* Template specialization of mesh_storage for 3D meshes.
@@ -86,7 +130,8 @@ struct mesh_storage<T, 3, StorageClass>
     std::vector<node_type>                          nodes;
     std::vector<point_type>                         points;
 
-    std::vector<bnd_info>                           boundary_info;
+    std::vector<subdomain_descriptor>               subdomain_info;
+    std::vector<boundary_descriptor>                boundary_info;
 
     void statistics(void) const
     {
@@ -97,7 +142,7 @@ struct mesh_storage<T, 3, StorageClass>
         std::cout << "Surfaces: " << surfaces.size() << std::endl;
         std::cout << "Volumes: " << volumes.size() << std::endl;
         auto bs = std::count_if(boundary_info.begin(), boundary_info.end(),
-                    [&](const bnd_info& bi){ return bi.is_boundary; }  );
+                    [&](const boundary_descriptor& bi){ return bi.is_boundary(); }  );
         std::cout << "Boundary surfaces: " << bs << std::endl;
     }
 };
@@ -129,7 +174,8 @@ struct mesh_storage<T, 2, StorageClass>
     std::vector<node_type>                          nodes;
     std::vector<point_type>                         points;
 
-    std::vector<bnd_info>                           boundary_info;
+    std::vector<subdomain_descriptor>               subdomain_info;
+    std::vector<boundary_descriptor>                boundary_info;
 
     void statistics(void) const
     {
@@ -167,7 +213,8 @@ struct mesh_storage<T, 1, StorageClass>
     std::vector<node_type>                          nodes;
     std::vector<point_type>                         points;
 
-    std::vector<bnd_info>                           boundary_info;
+    std::vector<subdomain_descriptor>               subdomain_info;
+    std::vector<boundary_descriptor>                boundary_info;
 
     void statistics(void) const
     {

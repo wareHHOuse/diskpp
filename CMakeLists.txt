@@ -80,7 +80,6 @@ find_package(SILO REQUIRED)
     add_definitions(-DHAVE_SILO)
 #endif()
 
-
 ######################################################################
 ## Package: HDF5 Support - To be made optional
 find_package(HDF5 REQUIRED)
@@ -93,6 +92,28 @@ find_package(HDF5 REQUIRED)
 find_package(Lua REQUIRED)
 include_directories("${LUA_INCLUDE_DIR}")
 set(LINK_LIBS ${LINK_LIBS} ${LUA_LIBRARIES})
+
+######################################################################
+## Package: GMSH
+
+set(GMSH_DIR "/opt/uliege/gmsh" CACHE PATH "GMSH install path")
+if (DEFINED ENV{GMSH_DIR})
+    set (GMSH_DIR $ENV{GMSH_DIR})
+endif()
+
+if (GMSH_DIR STREQUAL "" OR NOT EXISTS ${GMSH_DIR})
+    message(STATUS "GMSH not found")
+else()
+    message(STATUS "GMSH found")
+    set(GMSH_INCLUDE ${GMSH_DIR}/include)
+    set(GMSH_LIB ${GMSH_DIR}/lib)
+    set(LINK_LIBS ${LINK_LIBS} gmsh)
+    include_directories(${GMSH_INCLUDE})
+    link_directories(${GMSH_LIB})
+    add_definitions(-DHAVE_GMSH)
+endif()
+
+
 
 ######################################################################
 ## Optimization: Prefer 512 bit vectors on certain architectures.

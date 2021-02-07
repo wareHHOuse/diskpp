@@ -1,5 +1,14 @@
 /*
- *       /\        Matteo Cicuttin (C) 2016, 2017
+ * DISK++, a template library for DIscontinuous SKeletal methods.
+ *
+ * Matteo Cicuttin (C) 2020, 2021
+ * matteo.cicuttin@uliege.be
+ *
+ * University of Liège - Montefiore Institute
+ * Applied and Computational Electromagnetics group
+ */
+/*
+ *       /\        Matteo Cicuttin (C) 2016-2019
  *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
@@ -150,7 +159,7 @@ public:
             storage->nodes.at(i) = node_type(point_identifier<1>(i));
 
         storage->boundary_info.resize(num_nodes);
-        bnd_info bi{0, true};
+        boundary_descriptor bi(0, true);
         storage->boundary_info.at(0) = bi;
         storage->boundary_info.at(num_nodes - 1) = bi;
 
@@ -449,7 +458,7 @@ public:
                 return false;
             }
 
-            bnd_info bi{0, true};
+            boundary_descriptor bi(0, true);
             storage->boundary_info.at(position.second) = bi;
         }
 
@@ -791,7 +800,7 @@ public:
                 bf.at(*itor)++;
         }
 
-        bnd_info bi{0, true};
+        boundary_descriptor bi(0, true);
         storage->boundary_info.resize(storage->surfaces.size());
         for (size_t i = 0; i < storage->surfaces.size(); i++)
             if (bf[i] == 1)
@@ -1083,7 +1092,7 @@ public:
                           << __LINE__ << ")" << std::endl;
                 return false;
             }
-            bnd_info bi{be.second, true};
+            boundary_descriptor bi(be.second, true);
             storage->boundary_info.at(position.second) = bi;
         }
 
@@ -1328,7 +1337,7 @@ public:
                 return false;
             }
 
-            bnd_info bi{bs.second, true};
+            boundary_descriptor bi(bs.second, true);
             storage->boundary_info.at(position.second) = bi;
         }
 
@@ -1647,7 +1656,7 @@ public:
                 return false;
             }
 
-            bnd_info bi{0, true};
+            boundary_descriptor bi(0, true);
             storage->boundary_info.at(position.second) = bi;
         }
 
@@ -1868,7 +1877,7 @@ public:
                 return false;
             }
 
-            bnd_info bi{0, true};
+            boundary_descriptor bi(0, true);
             storage->boundary_info.at(position.second) = bi;
         }
 
@@ -2164,7 +2173,7 @@ class medit_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
             std::cout << "Bad bug at " << __FILE__ << "(" << __LINE__ << ")" << std::endl;
             return false;
          } else {
-            bnd_info bi{m_boundary_edges[i].second, true};
+            boundary_descriptor bi(m_boundary_edges[i].second, true);
             storage->boundary_info.at(position.second) = bi;
          }
       }
@@ -2483,7 +2492,7 @@ class medit_mesh_loader<T, 3> : public mesh_loader<generic_mesh<T, 3>>
 
       storage->boundary_info.resize(storage->surfaces.size());
       for (size_t i = 0; i < m_boundary_edges.size(); i++) {
-         bnd_info bi{m_boundary_edges[i][1], true};
+         boundary_descriptor bi(m_boundary_edges[i][1], true);
          storage->boundary_info[conv_table[m_boundary_edges[i][0]]] = bi;
       }
 
@@ -2718,6 +2727,6 @@ load_mesh_fvca6_3d(const char *filename, disk::generic_mesh<T, 3>& msh)
 } // namespace disk
 
 
-
-
-
+#ifdef HAVE_GMSH
+#include "gmsh_loader.hpp"
+#endif
