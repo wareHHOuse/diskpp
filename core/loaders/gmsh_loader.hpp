@@ -256,6 +256,8 @@ public:
         storage->volumes = std::move(vols);
         storage->subdomain_info = std::move(subdoms);
 
+        mark_internal_faces(msh);
+
         return true;
     }
 };

@@ -623,6 +623,32 @@ public:
     }
 };
 
+template<typename Mesh>
+void mark_internal_faces(Mesh& msh)
+{
+    std::vector<size_t> neigh_count(msh.faces_size(), 0);
+
+    for (auto& cl : cells(msh))
+    {
+        auto fcs = faces(msh, cl);
+        for (auto& fc : fcs)
+        {
+            auto ofs = offset(msh, fc);
+            neigh_count[ofs]++;
+        }
+    }
+
+    auto storage = msh.backend_storage();
+    for (size_t i = 0; i < msh.faces_size(); i++)
+    {
+        auto nc = neigh_count[i];
+        assert( (nc == 0) or (nc == 1) or (nc == 2) );
+        auto bi = storage->boundary_info.at(i);
+        if ( bi.is_boundary() and (nc == 2) )
+            bi.is_internal(true);
+        storage->boundary_info.at(i) = bi;
+    }
+}
 
 template<typename Mesh>
 class neighbour_connectivity

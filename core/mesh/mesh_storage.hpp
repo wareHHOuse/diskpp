@@ -55,18 +55,19 @@ class boundary_descriptor
     size_t  b_id;
     size_t  b_tag;
     bool    is_b;
+    bool    is_int;
 
 public:
     boundary_descriptor()
-        : b_id(0), b_tag(0), is_b(false)
+        : b_id(0), b_tag(0), is_b(false), is_int(false)
     {}
 
     boundary_descriptor(size_t id, bool b)
-        : b_id(id), b_tag(id), is_b(b)
+        : b_id(id), b_tag(id), is_b(b), is_int(false)
     {}
 
     boundary_descriptor(size_t id, size_t tag, bool b)
-        : b_id(id), b_tag(tag), is_b(b)
+        : b_id(id), b_tag(tag), is_b(b), is_int(false)
     {}
 
     size_t id() const { return b_id; }
@@ -75,7 +76,10 @@ public:
     size_t tag() const { return b_tag; }
     void   tag(size_t tag) { b_tag = tag; }
 
-    size_t is_boundary() const { return is_b; }
+    bool is_boundary() const { return is_b; }
+
+    bool is_internal() const { return is_int; }
+    void is_internal(bool i) { is_int = i; }
 };
 
 class subdomain_descriptor
