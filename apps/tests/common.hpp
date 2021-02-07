@@ -721,6 +721,8 @@ public:
           do_tetrahedra_netgen   = lua["do_tetrahedra_netgen"].get_or(false);
           do_cartesian_3d_diskpp = lua["do_cartesian_3d_diskpp"].get_or(false);
           do_generic_fvca6       = lua["do_generic_fvca6"].get_or(false);
+          min_degree             = lua["min_degree"].get_or(min_degree);
+          max_degree             = lua["max_degree"].get_or(max_degree);
       }
 
       if (crash_on_nan)

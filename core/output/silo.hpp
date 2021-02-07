@@ -55,7 +55,9 @@
 
 
 #include <silo.h>
-
+#include <complex>
+#include <algorithm>
+#include <vector>
 
 namespace disk {
 
@@ -583,6 +585,67 @@ public:
             DBPutUcdvar1(m_siloDb, var.name().c_str(), mesh_name.c_str(),
                          var.data(),
                          var.size(), NULL, 0, DB_DOUBLE,
+                         DB_NODECENT, NULL);
+        }
+        else
+            return false;
+
+        return true;
+    }
+
+    /* Scalar variable, COMPLEX case */
+    template<typename T, variable_centering_t centering>
+    bool add_variable(const std::string& mesh_name,
+                      silo_variable<std::complex<T>, centering>& var)
+    {
+        static_assert(std::is_same<T, double>::value, "Sorry, only double for now");
+
+        std::vector<T> var_rep(var.size());
+        std::vector<T> var_imp(var.size());
+
+        auto r = [](const std::complex<T>& z) -> T { return real(z); };
+        auto i = [](const std::complex<T>& z) -> T { return imag(z); };
+
+        std::transform(var.begin(), var.end(), var_rep.begin(), r);
+        std::transform(var.begin(), var.end(), var_imp.begin(), i);
+
+        if (!m_siloDb)
+        {
+            std::cout << "Silo database not opened" << std::endl;
+            return false;
+        }
+
+        if (centering == zonal_variable_t)
+        {
+            std::stringstream ss;
+            ss << var.name() << "_real";
+            DBPutUcdvar1(m_siloDb, ss.str().c_str(), mesh_name.c_str(),
+                         var_rep.data(),
+                         var_rep.size(), NULL, 0, DB_DOUBLE,
+                         DB_ZONECENT, NULL);
+            ss.str(std::string());
+
+            ss << var.name() << "_imag";
+            DBPutUcdvar1(m_siloDb, ss.str().c_str(), mesh_name.c_str(),
+                         var_imp.data(),
+                         var_imp.size(), NULL, 0, DB_DOUBLE,
+                         DB_ZONECENT, NULL);
+
+        }
+        else if (centering == nodal_variable_t)
+        {
+            std::stringstream ss;
+            ss << var.name() << "_real";
+            DBPutUcdvar1(m_siloDb, ss.str().c_str(), mesh_name.c_str(),
+                         var_rep.data(),
+                         var_rep.size(), NULL, 0, DB_DOUBLE,
+                         DB_NODECENT, NULL);
+            ss.str(std::string());
+
+            ss << var.name() << "_imag";
+            DBPutUcdvar1(m_siloDb, ss.str().c_str(), mesh_name.c_str(),
+                         var_imp.data(),
+                         var_imp.size(), NULL, 0, DB_DOUBLE,
                          DB_NODECENT, NULL);
         }
         else

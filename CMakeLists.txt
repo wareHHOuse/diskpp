@@ -158,7 +158,7 @@ endif()
 
 ######################################################################
 ## Compiler settings: Settings for different build types
-set(CMAKE_CXX_FLAGS_DEBUG "-g -fpermissive")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -fsanitize=address -fpermissive")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -g -fpermissive -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASEASSERT "-O3 -march=native -g -fpermissive")
 

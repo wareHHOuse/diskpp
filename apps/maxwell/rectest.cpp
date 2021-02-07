@@ -1,7 +1,7 @@
 #include <iostream>
 #include <iomanip>
 #include <regex>
-
+#include <fstream>
 #include <sstream>
 #include <string>
 
@@ -38,10 +38,78 @@ void rectest(Mesh& msh, size_t order)
         return ret;
     };
 
+    auto fs = [&](const point_type& pt) -> T {
+        return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+    };
+
     std::vector<T> data_ex, data_ey, data_ez;
+
+    T min = 9999999;
+    T max = 0;
+    T err = 0;
+
+    std::ofstream errfile("error.dat");
 
     for (auto& cl : msh)
     {
+        //std::cout << "**********" << std::endl;
+        Matrix<T, Dynamic, 1> pfun = disk::project_function(msh, cl, chdi, fs, 1);
+        auto GR = make_scalar_hho_laplacian(msh, cl, chdi);
+        auto ST = make_scalar_hdg_stabilization(msh, cl, chdi);
+
+        auto cb = make_scalar_monomial_basis(msh, cl, chdi.cell_degree());
+        auto cbs = cb.size();
+
+        auto ofs = cbs;
+        auto fcs = faces(msh, cl);
+        for (auto& fc : fcs)
+        {
+            //std::cout << "   +++++" << std::endl;
+            auto fb = make_scalar_monomial_basis(msh, fc, chdi.face_degree());
+            auto fbs = fb.size();
+
+            Matrix<T, Dynamic, Dynamic> mass = Matrix<T, Dynamic, Dynamic>::Zero(fbs, fbs);
+            Matrix<T, Dynamic, Dynamic> trace  = Matrix<T, Dynamic, Dynamic>::Zero(fbs, cbs);
+
+            const auto qps = integrate(msh, fc, 2 * chdi.face_degree());
+            for (auto& qp : qps)
+            {
+                const auto c_phi = cb.eval_functions(qp.point());
+                const auto f_phi = fb.eval_functions(qp.point());
+
+                mass += qp.weight() * (f_phi * f_phi.transpose());
+                trace += qp.weight() * (f_phi * c_phi.transpose());
+            }
+
+            Matrix<T, Dynamic, 1> vT_F = mass.ldlt().solve(trace*pfun.segment(0,cbs));
+
+            Matrix<T, Dynamic, 1> vF = pfun.segment(ofs, fb.size());
+            Matrix<T, Dynamic, 1> diff = (vT_F - vF);
+            /*
+            std::cout << "   vT|F   = " << vT_F.transpose() << std::endl;
+            std::cout << "   vF     = " << vF.transpose() << std::endl;
+            std::cout << "   diff   = " << diff.transpose() << std::endl;
+            std::cout << "   1/hF   = " << 1./diameter(msh, fc) << std::endl;
+            std::cout << "   dot    = " << diff.dot(diff) << std::endl;
+            std::cout << "   dotM   = " << diff.dot(mass*diff) << std::endl;
+            */
+            ofs += fb.size();
+        }
+
+        auto vSv = pfun.transpose().dot(ST*pfun);
+        err += vSv;
+        min = std::min(vSv, min);
+        max = std::max(vSv, max);
+
+        //std::cout << " v'Sv = " << vSv << " " << std::sqrt(vSv) << std::endl;
+
+        JacobiSVD<MatrixXd> svd(GR.second + ST);
+        double cond = svd.singularValues()(0) 
+            / svd.singularValues()(svd.singularValues().size()-1);
+
+        //std::cout << cond << std::endl;
+
+        /*
         auto cb = make_vector_monomial_basis(msh, cl, chdi.cell_degree());
         auto rb = make_vector_monomial_basis(msh, cl, chdi.reconstruction_degree());
 
@@ -61,8 +129,15 @@ void rectest(Mesh& msh, size_t order)
         data_ex.push_back( Rval(0) );
         data_ey.push_back( Rval(1) );
         data_ez.push_back( Rval(2) );
+        */
+
+        auto bar = barycenter(msh, cl);
+        errfile << bar.x() << " " << bar.y() << " " << vSv << std::endl;
     }
 
+    std::cout << min << " " << max << " " << std::sqrt(err) << std::endl;
+
+    /*
     disk::silo_database silo_db;
     silo_db.create("maxwell.silo");
     silo_db.add_mesh(msh, "mesh");
@@ -79,6 +154,7 @@ void rectest(Mesh& msh, size_t order)
     silo_db.add_expression("Ru", "{Ru_x, Ru_y, Ru_z}", DB_VARTYPE_VECTOR);
 
     silo_db.close();
+    */
 }
 
 int main(int argc, char **argv)
@@ -114,6 +190,19 @@ int main(int argc, char **argv)
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
         auto msh = disk::load_netgen_2d_mesh<T>(mesh_filename);
 
+        rectest(msh, degree);
+
+        return 0;
+    }
+
+    /* DiSk++ cartesian 2D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.quad$") ))
+    {
+        std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
+        auto msh = disk::load_cartesian_2d_mesh<T>(mesh_filename);
+        
+        rectest(msh, degree);
+        
         return 0;
     }
 
@@ -122,6 +211,8 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
         auto msh = disk::load_fvca5_2d_mesh<T>(mesh_filename);
+
+        rectest(msh, degree);
 
         return 0;
     }
@@ -152,8 +243,7 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.msh$") ))
     {
         std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
-        disk::generic_mesh<T,3> msh;
-        
+        auto msh = disk::load_fvca6_3d_mesh<T>(mesh_filename);
         rectest(msh, degree);
         
         return 0;

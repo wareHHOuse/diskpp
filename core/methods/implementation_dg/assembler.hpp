@@ -15,24 +15,24 @@
 
 namespace disk {
 
-template<typename Mesh>
+template<typename Mesh, typename ScalT>
 class discontinuous_galerkin_assembler
 {
     size_t cbs;
 
     using mesh_type = Mesh;
     using cell_type = typename mesh_type::cell_type;
-    using scal_type = typename mesh_type::coordinate_type;
+    using coord_type = typename mesh_type::coordinate_type;
+    using scal_type = ScalT;
     using matrix_type = Eigen::Matrix<scal_type, Eigen::Dynamic, Eigen::Dynamic>;
     using vector_type = Eigen::Matrix<scal_type, Eigen::Dynamic, 1>;
     using triplet_type = Triplet<scal_type>;
-    using T = scal_type;
 
     std::vector<triplet_type> triplets;
 
 public:
-    SparseMatrix<T>         LHS;
-    Matrix<T, Dynamic, 1>   RHS;
+    SparseMatrix<scal_type>         LHS;
+    Matrix<scal_type, Dynamic, 1>   RHS;
 
     size_t                  syssz;
 
@@ -41,8 +41,8 @@ public:
         cbs = pcbs;
         syssz = cbs * msh.cells_size();
 
-        LHS = SparseMatrix<T>(syssz, syssz);
-        RHS = Matrix<T, Dynamic, 1>::Zero(syssz);
+        LHS = SparseMatrix<scal_type>(syssz, syssz);
+        RHS = Matrix<scal_type, Dynamic, 1>::Zero(syssz);
     }
 
     void
@@ -78,11 +78,11 @@ public:
     }
 };
 
-template<typename Mesh>
+template<typename ScalT = double, typename Mesh>
 auto
 make_discontinuous_galerkin_assembler(const Mesh& msh, size_t cbs)
 {
-    return discontinuous_galerkin_assembler<Mesh>(msh, cbs);
+    return discontinuous_galerkin_assembler<Mesh, ScalT>(msh, cbs);
 }
 
 template<typename Mesh>

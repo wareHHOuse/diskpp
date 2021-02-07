@@ -115,9 +115,9 @@ inner_product(const T& a, const Matrix<T, Dynamic, N>& b)
 }
 
 // multiplication by a scalar
-template<typename T, int N, int M>
-Matrix<T, N, M>
-inner_product(const T& a, const Matrix<T, N, M>& b)
+template<typename T, typename U, int N, int M>
+auto
+inner_product(const T& a, const Matrix<U, N, M>& b) -> Matrix<decltype(a*b(0,0)), N, M>
 {
     return a * b;
 }
@@ -158,9 +158,9 @@ outer_product(const eigen_compatible_stdvector<Matrix<T, N, M>>& a,
     return ret;
 }
 
-template<typename T>
-T
-outer_product(const T& a, const T& b)
+template<typename T, typename U>
+auto
+outer_product(const T& a, const U& b) -> decltype(a*b)
 {
     return a * b;
 }
@@ -174,9 +174,9 @@ outer_product(const Matrix<T, Dynamic, 1>& a, const T& b)
 }
 
 // outer_product (b is a constant in this case) return a vector
-template<typename T, int N>
-Matrix<T, Dynamic, 1>
-outer_product(const Matrix<T, Dynamic, N>& a, const Matrix<T, N, 1>& b)
+template<typename T, typename U, int N>
+auto
+outer_product(const Matrix<T, Dynamic, N>& a, const Matrix<U, N, 1>& b) -> Matrix<decltype(a(0,0)*b(0)), Dynamic, 1>
 {
     return a * b;
 }
@@ -277,7 +277,7 @@ make_stiffness_matrix(const Mesh& msh, const Element& elem, const Basis& basis)
 }
 
 template<typename Mesh, typename Element, typename Basis, typename Function>
-Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+Matrix<typename Basis::scalar_type, Dynamic, 1>
 make_rhs(const Mesh& msh, const Element& elem, const Basis& basis, const Function& rhs_fun, size_t di = 0)
 {
     const auto degree     = basis.degree();
@@ -319,6 +319,13 @@ using vector_rhs_function = std::function<VRT<Mesh>(PT<Mesh>)>;
 
 template<typename Mesh>
 using matrix_rhs_function = std::function<MRT<Mesh>(PT<Mesh>)>;
+
+
+template<typename Mesh, typename ScalT>
+using VRTnew = Matrix<ScalT, Mesh::dimension, 1>;
+
+template<typename Mesh, typename ScalT>
+using scalar_rhs_function_new = std::function<ScalT(PT<Mesh>)>;
 
 template<typename Mesh, typename Element>
 Matrix<typename Mesh::coordinate_type, Dynamic, 1>

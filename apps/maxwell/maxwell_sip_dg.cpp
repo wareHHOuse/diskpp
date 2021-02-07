@@ -113,9 +113,12 @@ struct rhs_functor< Mesh<T, 3, Storage> >
     Matrix<T,3,1> operator()(const point_type& pt) const
     {
         Matrix<T, 3, 1> ret;
+        //ret(0) = M_PI * M_PI * std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::sin(M_PI*pt.z());
+        //ret(1) = M_PI * M_PI * std::cos(M_PI*pt.x())*std::cos(M_PI*pt.y())*std::sin(M_PI*pt.z());
+        //ret(2) = M_PI * M_PI * std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::cos(M_PI*pt.z());
         ret(0) = 0.0;
         ret(1) = 0.0;
-        ret(2) = M_PI * M_PI * std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+        ret(2) = M_PI*M_PI * std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
         return ret;
     }
 };
@@ -158,9 +161,9 @@ struct solution_functor< Mesh<T, 3, Storage> >
     Matrix<T,3,1> operator()(const point_type& pt) const
     {
         Matrix<T, 3, 1> ret;
-        ret(0) = 0.0;//M_PI*std::sin(M_PI*pt.x());
+        ret(0) = std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::sin(M_PI*pt.z());
         ret(1) = 0.0;
-        ret(2) = std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+        ret(2) = 0.0;
         return ret;
     }
 };
@@ -177,14 +180,18 @@ computation_info<typename Mesh::coordinate_type>
 run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_type eta)
 {   
     auto cvf = connectivity_via_faces(msh);
-    using T = typename Mesh::coordinate_type;
-    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
-    typedef Matrix<T, Dynamic, 1>       vector_type;
+    using coordinate_type = typename Mesh::coordinate_type;
+    using scalar_type = std::complex<double>;
+
+    typedef Matrix<scalar_type, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<scalar_type, Dynamic, 1>       vector_type;
     
     auto f = make_rhs_function(msh);
 
     auto cbs = disk::vector_basis_size(degree, Mesh::dimension, Mesh::dimension);
-    auto assm = make_discontinuous_galerkin_assembler(msh, cbs);
+    auto assm = disk::make_discontinuous_galerkin_assembler<scalar_type>(msh, cbs);
+
+    size_t impedance_boundary_id = 3;
 
     for (auto& tcl : msh)
     {
@@ -201,7 +208,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
             
             M += qp.weight() * phi * phi.transpose();
             K += qp.weight() * cphi * cphi.transpose();
-            loc_rhs += qp.weight() * phi * f(qp.point());
+            //loc_rhs += qp.weight() * phi * f(qp.point());
         }
 
         auto fcs = faces(msh, tcl);
@@ -224,6 +231,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
                 auto tphi       = tbasis.eval_functions(fqp.point());
                 auto tcphi      = tbasis.eval_curls2(fqp.point());
                 auto n_x_tphi   = disk::vcross(n, tphi);
+                auto n_x_tphi_x_n = disk::vcross(n_x_tphi, n);
                 
                 if (nv.second)
                 {   /* NOT on a boundary */
@@ -233,12 +241,26 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
                 }
                 else
                 {   /* On a boundary*/
-                    Att += + fqp.weight() * eta_l * n_x_tphi * n_x_tphi.transpose();
-                    Att += - fqp.weight() * n_x_tphi * tcphi.transpose();
-                    Att += - fqp.weight() * tcphi * n_x_tphi.transpose();
+                    if ( msh.boundary_id(fc) != 2 and msh.boundary_id(fc) != 4 and
+                         msh.boundary_id(fc) != 3 )
+                    {
+                        Att += + fqp.weight() * eta_l * n_x_tphi * n_x_tphi.transpose();
+                        Att += - fqp.weight() * tcphi * n_x_tphi.transpose();
+                        Att += - fqp.weight() * n_x_tphi * tcphi.transpose();
+                    }
+
                     
                     //loc_rhs -= fqp.weight() * tcphi_x_n;
                     //loc_rhs += fqp.weight() * eta_l * tphi;
+
+                    std::complex<double> jomega(0, M_PI);
+
+                    if ( msh.boundary_id(fc) == impedance_boundary_id)
+                    {
+                        Att -= fqp.weight() * jomega * n_x_tphi_x_n * n_x_tphi_x_n.transpose();
+                        loc_rhs += 2*fqp.weight()*jomega*n_x_tphi_x_n.col(2);
+                    }
+
                     continue;
                 }
                 
@@ -269,10 +291,10 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
     std::cout << "System has " << assm.LHS.rows() << " unknowns and ";
     std::cout << assm.LHS.nonZeros() << " nonzeros." << std::endl;
 
-    disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.syssz);
+    disk::dynamic_vector<scalar_type> sol = disk::dynamic_vector<scalar_type>::Zero(assm.syssz);
 
     std::cout << "Running pardiso" << std::endl;
-    disk::solvers::pardiso_params<T> pparams;
+    disk::solvers::pardiso_params<scalar_type> pparams;
     pparams.report_factorization_Mflops = true;
     mkl_pardiso(pparams, assm.LHS, assm.RHS, sol);
 
@@ -282,32 +304,33 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
     sol = gmres.solve(assm.RHS);
     */
 
-    std::vector<T> data_ux, data_uy, data_uz, data_div;
+    std::vector<scalar_type> data_ux, data_uy, data_uz, data_div;
 
     auto sol_fun = make_solution_function(msh);
 
-    T err = 0.0; size_t cell_i = 0;
-    T err_divergence = 0.0;
+    //T err = 0.0;
+    size_t cell_i = 0;
+    //T err_divergence = 0.0;
     for (auto& cl : msh)
     {
         auto cb = make_vector_monomial_basis(msh, cl, degree);
 
-        Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb);
-        Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun);
-        Matrix<T, Dynamic, 1> asol = MMe.llt().solve(arhs);
-        Matrix<T, Dynamic, 1> lsol = sol.segment(cell_i*cb.size(), cb.size());
+        Matrix<scalar_type, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb);
+        Matrix<scalar_type, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun);
+        Matrix<scalar_type, Dynamic, 1> asol = MMe.llt().solve(arhs);
+        Matrix<scalar_type, Dynamic, 1> lsol = sol.segment(cell_i*cb.size(), cb.size());
 
-        T divt = 0.0;
-        auto qps = integrate(msh, cl, degree);
-        for (auto& qp : qps)
-        {
-            auto divphi = cb.eval_divergences(qp.point());
-            divt += qp.weight() * (asol-lsol).dot(divphi);
-        }
-        data_div.push_back( divt );
-        err_divergence += divt;
+        //scalar_type divt = 0.0;
+        //auto qps = integrate(msh, cl, degree);
+        //for (auto& qp : qps)
+        //{
+        //    auto divphi = cb.eval_divergences(qp.point());
+        //    divt += qp.weight() * (asol-lsol).dot(divphi);
+        //}
+        //data_div.push_back( divt );
+        //err_divergence += divt;
 
-        Matrix<T,1,3> acc = Matrix<T,1,3>::Zero();
+        Matrix<scalar_type,1,3> acc = Matrix<scalar_type,1,3>::Zero();
         auto bar = barycenter(msh, cl);
         for (size_t i = 0; i < cb.size(); i++)
         {
@@ -319,40 +342,40 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
         data_uy.push_back( acc(1) );
         data_uz.push_back( acc(2) );
 
-        Matrix<T, Dynamic, 1> diff = lsol - asol;
+        Matrix<scalar_type, Dynamic, 1> diff = lsol - asol;
 
-        err += diff.dot(MMe*diff);
+        //err += diff.dot(MMe*diff);
 
         cell_i++;
     }
 
-    std::cout << "h = " << disk::average_diameter(msh) << " ";
-    std::cout << "err = " << std::sqrt(err) << std::endl;
-    std::cout << "Error divergence: " << err_divergence << std::endl;
+    //std::cout << "h = " << disk::average_diameter(msh) << " ";
+    //std::cout << "err = " << std::sqrt(err) << std::endl;
+    //std::cout << "Error divergence: " << err_divergence << std::endl;
 
     disk::silo_database silo_db;
     silo_db.create("maxwell_sip_dg.silo");
     silo_db.add_mesh(msh, "mesh");
 
-    disk::silo_zonal_variable<T> ux("ux", data_ux);
+    disk::silo_zonal_variable<scalar_type> ux("ux", data_ux);
     silo_db.add_variable("mesh", ux);
 
-    disk::silo_zonal_variable<T> uy("uy", data_uy);
+    disk::silo_zonal_variable<scalar_type> uy("uy", data_uy);
     silo_db.add_variable("mesh", uy);
 
-    disk::silo_zonal_variable<T> uz("uz", data_uz);
+    disk::silo_zonal_variable<scalar_type> uz("uz", data_uz);
     silo_db.add_variable("mesh", uz);
 
     silo_db.add_expression("u", "{ux, uy, uz}", DB_VARTYPE_VECTOR);
     silo_db.add_expression("mag_u", "magnitude(u)", DB_VARTYPE_SCALAR);
 
-    disk::silo_zonal_variable<T> div("div", data_div);
-    silo_db.add_variable("mesh", div);
+    //disk::silo_zonal_variable<scalar_type> div("div", data_div);
+    //silo_db.add_variable("mesh", div);
 
     silo_db.close();
 
-    return computation_info<T>({
-        .l2_error_e = std::sqrt(err),
+    return computation_info<coordinate_type>({
+        .l2_error_e = 0,//std::sqrt(err),
         .nrg_error = 0,
         .mflops = pparams.mflops,
         .dofs = assm.syssz,
@@ -523,15 +546,15 @@ void autotest_convergence(size_t order_min, size_t order_max)
     
     using Mesh = disk::simplicial_mesh<T,3>;
 
-    std::ofstream ofs( "conv_dg.txt" );
+    std::ofstream ofs( "dg_convergence_convt.txt" );
 
-    double sp[] = { 30, 30, 30, 30 };
+    double sp[] = { 50, 50, 50, 50 };
 
     for (size_t i = 1; i < 5; i++)
     {
         Mesh msh;
         std::stringstream ss;
-        ss << "../../../meshes/3D_tetras/netgen/cube" << i << ".mesh";
+        ss << "../../../meshes/3D_tetras/netgen/convt0" << i << ".mesh";
 
         disk::load_mesh_netgen(ss.str().c_str(), msh);
         auto diam = disk::average_diameter(msh);
