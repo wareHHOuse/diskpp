@@ -11,8 +11,10 @@ The repository has some dependencies that must be fetched. When you clone, make 
 
 ```git clone --recursive https://github.com/datafl4sh/diskpp```
 
+After cloning, be sure to checkout the branch `devel` if you want all the latest stuff. The branch master usually lags much behind `devel`.
+
 ## Installation
-The library runs on Unix systems. The main development is made on Mac OS X, but it compiles and runs fine also on Linux. It is written in C++14 and requires a recent compiler to be compiled (GCC >= 5.0 or Clang >= 3.8). Older compilers may work but they are neither supported nor tested.
+The library runs on Unix systems and the development is focused on Linux and Mac OS X in particular. DiSk++ is written mainly in C++14, however we are using C++17 and c++20 more and more. Be sure to use a recent compiler.
 
 ### Linux
 The project requires several packages to be installed on the system:
