@@ -1,0 +1,16 @@
+// Mode converter GMSH model
+
+Point(xb + 01) = {      rx,      ry, rz, cl_rod };
+Point(xb + 02) = { rx + rr,      ry, rz, cl_rod };
+Point(xb + 03) = {      rx, ry + rr, rz, cl_rod };
+Point(xb + 04) = { rx - rr,      ry, rz, cl_rod };
+Point(xb + 05) = {      rx, ry - rr, rz, cl_rod };
+
+Circle(xb + 01) = {xb + 02, xb + 01, xb + 03};
+Circle(xb + 02) = {xb + 03, xb + 01, xb + 04};
+Circle(xb + 03) = {xb + 04, xb + 01, xb + 05};
+Circle(xb + 04) = {xb + 05, xb + 01, xb + 02};
+
+Curve Loop(xb + 01) = {xb + 01, xb + 02, xb + 03, xb + 04};
+Plane Surface(xb + 21) = {xb + 01};
+

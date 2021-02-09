@@ -12,9 +12,9 @@
 
 namespace disk {
 
-template<typename T>
+template<typename T, typename U>
 Matrix<T, Dynamic, 3>
-vcross(const static_vector<T, 3>& normal, const Matrix<T, Dynamic, 3>& field)
+vcross(const static_vector<U, 3>& normal, const Matrix<T, Dynamic, 3>& field)
 {
     Matrix<T, Dynamic, 3>   ret;
     ret = Matrix<T, Dynamic, 3>::Zero(field.rows(), field.cols());
@@ -35,9 +35,9 @@ vcross(const static_vector<T, 3>& normal, const Matrix<T, Dynamic, 3>& field)
     return ret;
 }
 
-template<typename T>
+template<typename T, typename U>
 Matrix<T, Dynamic, 3>
-vcross(const Matrix<T, Dynamic, 3>& field, const static_vector<T, 3>& normal)
+vcross(const Matrix<T, Dynamic, 3>& field, const static_vector<U, 3>& normal)
 {
     Matrix<T, Dynamic, 3>   ret;
     ret = Matrix<T, Dynamic, 3>::Zero(field.rows(), field.cols());
@@ -77,19 +77,23 @@ vcross(const Matrix<T, Dynamic, 2>& field, const static_vector<T, 2>& normal)
     return -vcross(normal, field);
 }
 
-template<typename Mesh>
-dynamic_matrix<typename Mesh::coordinate_type>
+template<typename ScalT = double, typename Mesh>
+dynamic_matrix<ScalT>
 make_vector_mass_oper(const Mesh&                       msh,
                       const typename Mesh::cell_type&   cl,
                       const hho_degree_info&       cell_infos)
 {
-    using T = typename Mesh::coordinate_type;
-    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    using mesh_type = Mesh;
+    using coord_type = typename Mesh::coordinate_type;
+    using scalar_type = ScalT;
+    using cell_type = typename Mesh::cell_type;
+
+    typedef Matrix<scalar_type, Dynamic, Dynamic> matrix_type;
 
     const auto facdeg = cell_infos.face_degree();
     const auto celdeg = cell_infos.cell_degree();
 
-    const auto cb = make_vector_monomial_basis(msh, cl, celdeg);
+    const auto cb = make_vector_monomial_basis<mesh_type, cell_type, scalar_type>(msh, cl, celdeg);
     const auto fbs = vector_basis_size(facdeg, Mesh::dimension - 1, Mesh::dimension-1);
     const auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
 
@@ -106,6 +110,60 @@ make_vector_mass_oper(const Mesh&                       msh,
     }
 
     return mass;
+}
+
+template<typename ScalT = double, typename Mesh>
+std::pair<dynamic_matrix<ScalT>, dynamic_vector<ScalT>>
+make_impedance_term(const Mesh& msh, const typename Mesh::cell_type& cl,
+    const hho_degree_info& hdi, size_t bndid, ScalT z)
+{
+    using mesh_type = Mesh;
+    using coord_type = typename Mesh::coordinate_type;
+    using scalar_type = ScalT;
+    using cell_type = typename Mesh::cell_type;
+    using face_type = typename Mesh::face_type;
+
+    typedef Matrix<scalar_type, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<scalar_type, Dynamic, 1> vector_type;
+
+    const auto facdeg = hdi.face_degree();
+    const auto celdeg = hdi.cell_degree();
+    const auto recdeg = hdi.reconstruction_degree();
+
+    const auto fbs = vector_basis_size(facdeg, Mesh::dimension - 1, Mesh::dimension-1);
+    const auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
+    const auto rbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
+
+    const auto fcs = faces(msh, cl);
+    const auto num_faces_dofs = fcs.size() * fbs;
+
+    const auto rb = make_vector_monomial_basis<mesh_type, cell_type, scalar_type>(msh, cl, recdeg);
+
+    matrix_type Y = matrix_type::Zero(cbs + num_faces_dofs, cbs + num_faces_dofs);
+    vector_type yr = vector_type::Zero(cbs + num_faces_dofs);
+
+    auto offset = cbs;
+
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        auto fc = fcs[i];
+
+        if ( msh.is_boundary(fc) and msh.boundary_id(fc) == bndid )
+        {
+            const auto fb = make_vector_monomial_tangential_basis<mesh_type, face_type, scalar_type>(msh, fc, facdeg);
+            const auto qps_f = integrate(msh, fc, 2*facdeg);
+            for (auto& qp : qps_f)
+            {
+                Matrix<scalar_type, Dynamic, 3> fphi = fb.eval_functions(qp.point());
+                Y.block(offset, offset, fbs, fbs) += qp.weight() * z * fphi * fphi.transpose();
+                yr.segment(offset, fbs) += qp.weight() * z * fphi.col(2);
+            }
+        }
+
+        offset += fbs;
+    }
+
+    return std::make_pair(Y, yr);
 }
 
 template<typename T>
@@ -180,26 +238,27 @@ curl_reconstruction(const Mesh<T,2,Storage>&                     msh,
     return std::make_pair(oper, data);
 }
 
-
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-matrixpair<typename Mesh<T,3,Storage>::coordinate_type>
-curl_reconstruction(const Mesh<T,3,Storage>&                     msh,
-                    const typename Mesh<T,3,Storage>::cell_type& cl,
+template<typename ScalT = double, template<typename, size_t, typename> class Mesh, typename CoordT, typename Storage>
+matrixpair<ScalT>
+curl_reconstruction(const Mesh<CoordT,3,Storage>&                     msh,
+                    const typename Mesh<CoordT,3,Storage>::cell_type& cl,
                     const hho_degree_info&                       cell_infos)
 {
-    using mesh_type         = Mesh<T,3,Storage>;
-    using scalar_type       = typename mesh_type::coordinate_type;
-    using matrix_type       = Matrix<T, Dynamic, Dynamic>;
-    using vector_type       = Matrix<T, Dynamic, 1>;
+    using mesh_type         = Mesh<CoordT,3,Storage>;
+    using scalar_type       = ScalT;
+    using matrix_type       = Matrix<scalar_type, Dynamic, Dynamic>;
+    using vector_type       = Matrix<scalar_type, Dynamic, 1>;
     using point_type        = typename mesh_type::point_type;
+    using cell_type         = typename mesh_type::cell_type;
+    using face_type         = typename mesh_type::face_type;
 
     static const size_t DIM = 3;
     const auto facdeg = cell_infos.face_degree();
     const auto celdeg = cell_infos.cell_degree();
     const auto recdeg = cell_infos.reconstruction_degree();
 
-    const auto cb = make_vector_monomial_basis(msh, cl, celdeg);
-    const auto rb = make_vector_monomial_basis(msh, cl, recdeg);
+    const auto cb = make_vector_monomial_basis<mesh_type, cell_type, scalar_type>(msh, cl, celdeg);
+    const auto rb = make_vector_monomial_basis<mesh_type, cell_type, scalar_type>(msh, cl, recdeg);
     const auto fbs = vector_basis_size(facdeg, DIM - 1, DIM - 1);
     const auto cbs = vector_basis_size(celdeg, DIM, DIM);
     const auto rbs = vector_basis_size(recdeg, DIM, DIM);
@@ -226,15 +285,15 @@ curl_reconstruction(const Mesh<T,3,Storage>&                     msh,
     {
         const auto fc = fcs[i];
         const auto n      = normal(msh, cl, fc);
-        const auto fb     = make_vector_monomial_tangential_basis(msh, fc, facdeg);
+        const auto fb     = make_vector_monomial_tangential_basis<mesh_type, face_type, scalar_type>(msh, fc, facdeg);
 
         const auto qps_f = integrate(msh, fc, 2*recdeg);
         for (auto& qp : qps_f)
         {
-            Matrix<T, Dynamic, 3> cphi      = rb.eval_curls2(qp.point());
-            Matrix<T, Dynamic, 3> cphi_n    = vcross(cphi, n).block(3,0,rbs-3,3);
-            Matrix<T, Dynamic, 3> f_phi     = fb.eval_functions(qp.point());
-            Matrix<T, Dynamic, 3> c_phi     = cb.eval_functions(qp.point());
+            Matrix<scalar_type, Dynamic, 3> cphi      = rb.eval_curls2(qp.point());
+            Matrix<scalar_type, Dynamic, 3> cphi_n    = vcross(cphi, n).block(3,0,rbs-3,3);
+            Matrix<scalar_type, Dynamic, 3> f_phi     = fb.eval_functions(qp.point());
+            Matrix<scalar_type, Dynamic, 3> c_phi     = cb.eval_functions(qp.point());
 
             cr_rhs.block(0, 0, rbs-3, cbs) -= qp.weight() * cphi_n * c_phi.transpose();
             cr_rhs.block(0, offset, rbs-3, fbs) += qp.weight() * cphi_n * f_phi.transpose();
@@ -284,11 +343,12 @@ curl_reconstruction_pk(const Mesh&                       msh,
     const auto qps = integrate(msh, cl, 2*recdeg);
     for (auto& qp : qps)
     {
-        const auto phi = rb.eval_functions(qp.point());
-        mass += qp.weight() * phi * phi.transpose();
+        const auto r_phi = rb.eval_functions(qp.point());
+        mass += qp.weight() * r_phi * r_phi.transpose();
 
-        const auto cphi = cb.eval_curls2(qp.point());
-        cr_rhs.block(0, 0, rbs, cbs) += qp.weight() * cphi * phi.transpose();
+        const auto r_cphi = rb.eval_curls2(qp.point());
+        const auto c_phi = cb.eval_functions(qp.point());
+        cr_rhs.block(0, 0, rbs, cbs) += qp.weight() * r_cphi * c_phi.transpose();
     }
 
     size_t offset = cbs;
@@ -304,16 +364,18 @@ curl_reconstruction_pk(const Mesh&                       msh,
             Matrix<T, Dynamic, 3> r_phi     = rb.eval_functions(qp.point());
             Matrix<T, Dynamic, 3> r_phi_n   = vcross(r_phi, n);
             Matrix<T, Dynamic, 3> f_phi     = fb.eval_functions(qp.point());
-            Matrix<T, Dynamic, 3> c_phi     = cb.eval_functions(qp.point());
 
-            //cr_rhs.block(0, 0, rbs, cbs) -= qp.weight() * r_phi_n * c_phi.transpose();
             cr_rhs.block(0, offset, rbs, fbs) += qp.weight() * r_phi_n * f_phi.transpose();
         }
 
         offset += fbs;
     }
 
-    matrix_type oper = mass.ldlt().solve(cr_rhs);
+    LDLT<matrix_type> ldlt_lhs(mass);
+    if (ldlt_lhs.info() != Eigen::Success)
+        throw std::invalid_argument("Can't factorize matrix for curl reconstruction");
+
+    matrix_type oper = ldlt_lhs.solve(cr_rhs);
     matrix_type data = cr_rhs.transpose() * oper;
 
     return std::make_pair(oper, data);
@@ -433,24 +495,26 @@ curl_hdg_stabilization(const Mesh<T,2,Storage>&                     msh,
     return stab;
 }
 
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-dynamic_matrix<typename Mesh<T,3,Storage>::coordinate_type>
-curl_hdg_stabilization(const Mesh<T,3,Storage>&                     msh,
-                       const typename Mesh<T,3,Storage>::cell_type& cl,
+template<typename ScalT=double, template<typename, size_t, typename> class Mesh, typename CoordT, typename Storage>
+dynamic_matrix<ScalT>
+curl_hdg_stabilization(const Mesh<CoordT,3,Storage>&                     msh,
+                       const typename Mesh<CoordT,3,Storage>::cell_type& cl,
                        const hho_degree_info&                       cell_infos)
 {
-    using mesh_type         = Mesh<T,3,Storage>;
-    using scalar_type       = typename mesh_type::coordinate_type;
-    using matrix_type       = Matrix<T, Dynamic, Dynamic>;
-    using vector_type       = Matrix<T, Dynamic, 1>;
+    using mesh_type         = Mesh<CoordT,3,Storage>;
+    using scalar_type       = ScalT;
+    using matrix_type       = Matrix<scalar_type, Dynamic, Dynamic>;
+    using vector_type       = Matrix<scalar_type, Dynamic, 1>;
     using point_type        = typename mesh_type::point_type;
+    using cell_type         = typename mesh_type::cell_type;
+    using face_type         = typename mesh_type::face_type;
 
     static const size_t DIM = 3;
 
     const auto facdeg = cell_infos.face_degree();
     const auto celdeg = cell_infos.cell_degree();
 
-    const auto cb  = make_vector_monomial_basis(msh, cl, celdeg);
+    const auto cb  = make_vector_monomial_basis<mesh_type, cell_type, scalar_type>(msh, cl, celdeg);
     const auto fbs = vector_basis_size(facdeg, DIM - 1, DIM - 1);
     const auto cbs = vector_basis_size(celdeg, DIM, DIM);
 
@@ -459,12 +523,14 @@ curl_hdg_stabilization(const Mesh<T,3,Storage>&                     msh,
 
     matrix_type stab = matrix_type::Zero(cbs + num_faces_dofs, cbs + num_faces_dofs);
 
+    auto ht = diameter(msh, cl);
+
     size_t offset = cbs;
     for (size_t i = 0; i < fcs.size(); i++)
     {
         const auto fc = fcs[i];
         const auto n  = normal(msh, cl, fc);
-        const auto fb = make_vector_monomial_tangential_basis(msh, fc, facdeg);
+        const auto fb = make_vector_monomial_tangential_basis<mesh_type, face_type, scalar_type>(msh, fc, facdeg);
         const auto hf = diameter(msh, fc);
 
         matrix_type mass = matrix_type::Zero(fbs, fbs);
@@ -476,16 +542,16 @@ curl_hdg_stabilization(const Mesh<T,3,Storage>&                     msh,
         const auto qps_f = integrate(msh, fc, 2*std::max(celdeg,facdeg));
         for (auto& qp : qps_f)
         {
-            Matrix<T, Dynamic, 3> f_phi = fb.eval_functions(qp.point());
-            Matrix<T, Dynamic, 3> c_phi_tmp = cb.eval_functions(qp.point());
-            Matrix<T, Dynamic, 3> c_phi = vcross(n, vcross(c_phi_tmp, n));
+            Matrix<scalar_type, Dynamic, 3> f_phi = fb.eval_functions(qp.point());
+            Matrix<scalar_type, Dynamic, 3> c_phi_tmp = cb.eval_functions(qp.point());
+            Matrix<scalar_type, Dynamic, 3> c_phi = vcross(n, vcross(c_phi_tmp, n));
 
             mass += qp.weight() * f_phi * f_phi.transpose();
             trace += qp.weight() * f_phi * c_phi.transpose();
         }
 
         rhs.block(0,0,fbs,cbs) = -mass.ldlt().solve(trace);
-        stab += rhs.transpose() * mass * rhs / hf;
+        stab += rhs.transpose() * mass * rhs / ht;
 
         offset += fbs;
     }

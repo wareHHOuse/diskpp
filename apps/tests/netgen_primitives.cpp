@@ -178,7 +178,7 @@ create_geometry(Mesh& msh)
             << __LINE__ << ")" << std::endl;
             return;
         }
-        disk::bnd_info bi{1, true};
+        disk::boundary_descriptor bi(1, true);
         storage->boundary_info.at(position.second) = bi;
     }
 }

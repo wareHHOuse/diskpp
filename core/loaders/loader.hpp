@@ -1121,12 +1121,12 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
     typedef typename mesh_type::surface_type        surface_type;
     typedef typename mesh_type::volume_type         volume_type;
 
-    std::vector<point_type>                         points;
-    std::vector<node_type>                          nodes;
-    std::vector<edge_type>                          edges;
-    std::vector<surface_type>                       surfaces;
-    std::vector<std::pair<surface_type, size_t>>    boundary_surfaces;
-    std::vector<volume_type>                        volumes;
+    std::vector<point_type>                                     points;
+    std::vector<node_type>                                      nodes;
+    std::vector<edge_type>                                      edges;
+    std::vector<surface_type>                                   surfaces;
+    std::vector<boundary_descriptor>                            boundary_info;
+    std::vector<std::pair<volume_type, subdomain_descriptor>>   tmp_volumes;
 
 
     bool netgen_read(const std::string& filename)
@@ -1141,9 +1141,6 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
         size_t lines, linecount;
 
         mapped_file mf(filename);
-
-        //std::cout << green << " * * * Reading NETGEN format mesh * * * ";
-        //std::cout << nocolor << std::endl;
 
         /************************ Read points ************************/
         linecount = 0;
@@ -1167,10 +1164,6 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
 
             auto point = priv::read_3d_point_line<T>(endptr, &endptr, 1.0);
 
-            /*auto point = point_type( { std::get<0>(t),
-                                       std::get<1>(t),
-                                       std::get<2>(t) } );
-*/
             points.push_back( point );
 
             auto point_id = disk::point_identifier<3>( linecount );
@@ -1195,7 +1188,7 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
 
         edges.reserve(lines*6);
         surfaces.reserve(lines*4);
-        volumes.reserve(lines);
+        tmp_volumes.reserve(lines);
 
         while (linecount < lines)
         {
@@ -1208,11 +1201,11 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
 
             auto t = priv::read_tetrahedron_line<size_t>(endptr, &endptr);
 
+            auto subdomain_num = std::get<0>(t);
             disk::point_identifier<3>     p0(std::get<1>(t));
             disk::point_identifier<3>     p1(std::get<2>(t));
             disk::point_identifier<3>     p2(std::get<3>(t));
             disk::point_identifier<3>     p3(std::get<4>(t));
-            //domain_id_type      d(std::get<0>(t));
 
             edges.push_back( edge_type( { p0, p1 } ) );
             edges.push_back( edge_type( { p0, p2 } ) );
@@ -1226,10 +1219,9 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
             surfaces.push_back( surface_type( { p0, p2, p3 } ) );
             surfaces.push_back( surface_type( { p1, p2, p3 } ) );
 
-            //auto tuple = std::make_tuple(volume_type(p0, p1, p2, p3), d);
-            //temp_tet.push_back( tuple );
-
-            volumes.push_back( volume_type( { p0, p1, p2, p3 } ) );
+            subdomain_descriptor si(subdomain_num);
+            auto vs = std::make_pair(volume_type( {p0, p1, p2, p3} ), si);
+            tmp_volumes.push_back( vs );
 
             linecount++;
         }
@@ -1240,13 +1232,21 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
             std::cout << "/" << lines << std::endl;
         }
 
+        priv::sort_uniq(edges);
+        priv::sort_uniq(surfaces);
+        boundary_info.resize(surfaces.size());
+
+        using pvs = std::pair<volume_type, subdomain_descriptor>;
+        auto tmpvol_comp = [](const pvs& a, const pvs& b) {
+            return a.first < b.first;
+        };
+
+        std::sort(tmp_volumes.begin(), tmp_volumes.end(), tmpvol_comp);
+
         /************************ Read boundary surfaces ************************/
         linecount = 0;
 
         lines = strtot<size_t>(endptr, &endptr);
-
-        boundary_surfaces.reserve(lines);
-
         while (linecount < lines)
         {
             if ( this->verbose() && ((linecount%50000) == 0) )
@@ -1258,13 +1258,20 @@ class netgen_mesh_loader<T,3> : public mesh_loader<simplicial_mesh<T,3>>
 
             auto t = priv::read_triangle_line<size_t>(endptr, &endptr);
 
+            auto bnd_id = std::get<0>(t);
             disk::point_identifier<3>     p0(std::get<1>(t));
             disk::point_identifier<3>     p1(std::get<2>(t));
             disk::point_identifier<3>     p2(std::get<3>(t));
 
-            surface_type   tri( { p0, p1, p2 } );
+            boundary_descriptor bi(bnd_id, true);
+            surface_type surf( { p0, p1, p2 } );
 
-            boundary_surfaces.push_back( std::make_pair(tri, std::get<0>(t)) );
+            auto itor = std::lower_bound(surfaces.begin(), surfaces.end(), surf);
+            if ( (itor == surfaces.end()) or not (*itor == surf) )
+                throw std::logic_error("Face not found");
+
+            auto ofs = std::distance(surfaces.begin(), itor);
+            boundary_info.at(ofs) = bi;
 
             linecount++;
         }
@@ -1301,45 +1308,28 @@ public:
 
         storage->points = std::move(points);
         storage->nodes = std::move(nodes);
+        storage->edges = std::move(edges);
+        storage->surfaces = std::move(surfaces);
+        storage->boundary_info = std::move(boundary_info);
 
-        /* sort edges, make unique and move them in geometry */
-        THREAD(edge_thread,
-            priv::sort_uniq(edges);
-            storage->edges = std::move(edges);
-        );
+        std::vector<volume_type> vols;
+        vols.reserve( tmp_volumes.size() );
 
-        /* sort triangles, make unique and move them in geometry */
-        THREAD(tri_thread,
-            priv::sort_uniq(surfaces);
-            storage->surfaces = std::move(surfaces);
-        );
+        std::vector<subdomain_descriptor> subdoms;
+        subdoms.reserve( tmp_volumes.size() );
 
-        /* sort tetrahedra, make unique and move them in geometry */
-        THREAD(tet_thread,
-            std::sort(volumes.begin(), volumes.end());
-            storage->volumes = std::move(volumes);
-        );
-
-        /* wait for the threads */
-        WAIT_THREAD(edge_thread);
-        WAIT_THREAD(tri_thread);
-        WAIT_THREAD(tet_thread);
-
-        storage->boundary_info.resize(storage->surfaces.size());
-        for (auto& bs : boundary_surfaces)
+        for (auto& [vol, sd] : tmp_volumes)
         {
-            auto position = find_element_id(storage->surfaces.begin(),
-                                            storage->surfaces.end(), bs.first);
-            if (position.first == false)
-            {
-                std::cout << "Bad bug at " << __FILE__ << "("
-                          << __LINE__ << ")" << std::endl;
-                return false;
-            }
-
-            boundary_descriptor bi(bs.second, true);
-            storage->boundary_info.at(position.second) = bi;
+            vols.push_back(vol);
+            subdoms.push_back(sd);
         }
+
+        tmp_volumes.clear();
+
+        storage->volumes = std::move(vols);
+        storage->subdomain_info = std::move(subdoms);
+
+        mark_internal_faces(msh);
 
         if (this->verbose())
         {
@@ -1350,8 +1340,6 @@ public:
             std::cout << "Faces: " << storage->surfaces.size() << std::endl;
             std::cout << "Volumes: " << storage->volumes.size() << std::endl;
         }
-
-        boundary_surfaces.clear();
 
         return true;
     }
