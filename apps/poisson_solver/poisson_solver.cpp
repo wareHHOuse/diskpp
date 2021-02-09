@@ -38,7 +38,7 @@
 #include "output/silo.hpp"
 #include "solvers/solver.hpp"
 
-#include "contrib/sol2/sol.hpp"
+#include "contrib/sol2/include/sol/sol.hpp"
 #include "contrib/timecounter.h"
 
 #include "core/output/hdf5_io.hpp"

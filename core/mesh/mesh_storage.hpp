@@ -93,7 +93,7 @@ public:
     {}
 
     subdomain_descriptor(size_t id)
-        : s_id(id), s_tag(0)
+        : s_id(id), s_tag(id)
     {}
 
     subdomain_descriptor(size_t id, size_t tag)
@@ -145,9 +145,23 @@ struct mesh_storage<T, 3, StorageClass>
         std::cout << "Edges: " << edges.size() << std::endl;
         std::cout << "Surfaces: " << surfaces.size() << std::endl;
         std::cout << "Volumes: " << volumes.size() << std::endl;
-        auto bs = std::count_if(boundary_info.begin(), boundary_info.end(),
-                    [&](const boundary_descriptor& bi){ return bi.is_boundary(); }  );
-        std::cout << "Boundary surfaces: " << bs << std::endl;
+
+        std::map<size_t, size_t> count;
+        
+        for (auto& bi : boundary_info)
+            if (bi.is_boundary())
+                count[bi.id()]++;
+
+        for (auto& [bnd, elems] : count)
+            std::cout << bnd << ": " << elems << std::endl;
+
+        count.clear();
+
+        for (auto& di : subdomain_info)
+            count[di.id()]++;
+
+        for (auto& [dom, elems] : count)
+            std::cout << dom << ": " << elems << std::endl;
     }
 };
 

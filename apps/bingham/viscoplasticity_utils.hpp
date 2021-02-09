@@ -118,7 +118,7 @@ renumber_boundaries(Mesh<T,2,Storage>& msh, T a = 1., T b = 1., T c = 0., T d = 
             return std::abs(val - ref) < eps;
         };
 
-        if (!storage->boundary_info.at(i).is_boundary)
+        if (!storage->boundary_info.at(i).is_boundary())
             continue;
 
         size_t bid = 42;
@@ -131,7 +131,7 @@ renumber_boundaries(Mesh<T,2,Storage>& msh, T a = 1., T b = 1., T c = 0., T d = 
         if (bid == 42)
             throw std::logic_error("Can not locate the edge");
 
-        storage->boundary_info.at(i).boundary_id = bid;
+        storage->boundary_info.at(i).id(bid);
     }
 }
 
