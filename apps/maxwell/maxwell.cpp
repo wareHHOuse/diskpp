@@ -967,12 +967,12 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order)
         return ret;
     };
 
-    size_t air_tag = 12;
+    size_t air_tag = 13;
 
-    size_t port_tag = 68;
+    size_t port_tag = 1188;
     size_t port_id;
 
-    size_t imp_tag = 69;
+    size_t imp_tag = 1193;
     size_t imp_id;
 
     std::vector<bool> is_dirichlet(msh.faces_size(), false);
@@ -1453,8 +1453,8 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.geo$") ))
     {
         std::cout << "Guessed mesh format: GMSH" << std::endl;
-        disk::simplicial_mesh<T,3> msh;
-        disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
+        disk::generic_mesh<T,3> msh;
+        disk::gmsh_geometry_loader< disk::generic_mesh<T,3> > loader;
         
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);

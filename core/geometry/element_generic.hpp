@@ -199,7 +199,79 @@ public:
     }
 };
 
-/* element class, CODIM == DIM case */
+/* EDGE */
+template<size_t DIM>
+class generic_element<DIM, DIM-1>
+{
+    using sub_id_type = typename generic_element_traits<generic_element>::subelement_type::id_type;
+    using ptid_type = point_identifier<DIM>;
+
+    std::array<sub_id_type, 2>  sub_elem_ids;
+    std::array<ptid_type, 2>    assoc_points;
+
+public:
+    typedef typename generic_element_traits<generic_element>::id_type          id_type;
+
+    generic_element()
+    {}
+
+    generic_element(const sub_id_type& n0, const sub_id_type& n1)
+    {
+        /* Assume node ids == point ids. Use set_point_ids() below if that
+         * is not the case. */
+        if (n0 < n1)
+        {
+            sub_elem_ids[0] = n0;
+            sub_elem_ids[1] = n1;
+        }
+        else
+        {
+            sub_elem_ids[0] = n1;
+            sub_elem_ids[1] = n0;
+        }
+
+        assoc_points[0] = ptid_type(n0);
+        assoc_points[1] = ptid_type(n1);
+    }
+
+    
+    template<typename Itor>
+    void set_point_ids(const ptid_type& p0, const ptid_type& p1)
+    {
+        assoc_points[0] = p0;
+        assoc_points[1] = p1;
+    }
+
+    auto point_ids(void) const
+    {
+        return assoc_points;
+    }
+
+    auto faces_ids(void) const
+    {
+        return sub_elem_ids;
+    }
+
+    bool operator<(const generic_element& other) const
+    {
+        return (sub_elem_ids < other.sub_elem_ids);
+    }
+
+    bool operator==(const generic_element& other) const
+    {
+        return std::equal(sub_elem_ids.begin(), sub_elem_ids.end(),
+                          other.sub_elem_ids.begin());
+    }
+
+    auto subelement_id_begin() { return sub_elem_ids.begin(); }
+    auto subelement_id_end()   { return sub_elem_ids.end(); }
+    auto subelement_id_begin() const { return sub_elem_ids.begin(); }
+    auto subelement_id_end()   const { return sub_elem_ids.end(); }
+
+    size_t subelement_size() const { return sub_elem_ids.size(); }
+};
+
+/* NODE */
 template<size_t DIM>
 class generic_element<DIM, DIM>
 {

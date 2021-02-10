@@ -23,8 +23,8 @@ int main(int argc, char **argv)
     }
 
     using T = double;
-    disk::simplicial_mesh<T,3>  msh;
-    disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
+    disk::generic_mesh<T,3>  msh;
+    disk::gmsh_geometry_loader< disk::generic_mesh<T,3> > loader;
 
     //loader.verbose(true);
     loader.read_mesh(argv[1]);

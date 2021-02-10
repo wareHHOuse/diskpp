@@ -145,13 +145,14 @@ public:
 
             auto n0 = typename node_type::id_type(i);
             auto n1 = typename node_type::id_type(i+1);
-            auto e = edge_type{{n0, n1}};
+            auto e = edge_type(n0, n1);
 
+            /*
             std::vector<point_identifier<1>> pts(2);
             pts[0] = point_identifier<1>(i);
             pts[1] = point_identifier<1>(i+1);
             e.set_point_ids(pts.begin(), pts.end());
-
+            */
             storage->edges.at(i) = e;
         }
 
@@ -431,9 +432,10 @@ public:
             auto node1 = typename node_type::id_type(m_edges[i][0]);
             auto node2 = typename node_type::id_type(m_edges[i][1]);
 
-            auto e = edge_type{{node1, node2}};
+            auto e = edge_type(node1, node2);
 
-            e.set_point_ids(m_edges[i].begin(), m_edges[i].begin()+2); /* XXX: crap */
+            /* Next line not necessary anymore, see generic_element<DIM, DIM-1> */
+            //e.set_point_ids(m_edges[i].begin(), m_edges[i].begin()+2); /* XXX: crap */
             edges.push_back(e);
         }
         /* Sort them */
@@ -447,7 +449,7 @@ public:
             auto node1 = typename node_type::id_type(m_boundary_edges[i][0]);
             auto node2 = typename node_type::id_type(m_boundary_edges[i][1]);
 
-            auto e = edge_type{{node1, node2}};
+            auto e = edge_type(node1, node2);
 
             auto position = find_element_id(edges.begin(), edges.end(), e);
 
@@ -477,7 +479,7 @@ public:
                 auto n1 = typename node_type::id_type(e[0]);
                 auto n2 = typename node_type::id_type(e[1]);
 
-                edge_type edge{{n1, n2}};
+                edge_type edge(n1, n2);
                 auto edge_id = find_element_id(storage->edges.begin(),
                                                storage->edges.end(), edge);
                 if (!edge_id.first)
@@ -2135,9 +2137,10 @@ class medit_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
             auto node1 = typename node_type::id_type(m_edges[i][0]);
             auto node2 = typename node_type::id_type(m_edges[i][1]);
 
-            auto e = edge_type{{node1, node2}};
+            auto e = edge_type(node1, node2);
 
-            e.set_point_ids(m_edges[i].begin(), m_edges[i].begin() + 2); /* XXX: crap */
+            /* Next line not necessary anymore, see generic_element<DIM, DIM-1> */
+            //e.set_point_ids(m_edges[i].begin(), m_edges[i].begin() + 2); /* XXX: crap */
             edges.push_back(e);
             nb_edge++;
          }
@@ -2153,7 +2156,7 @@ class medit_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
          auto node1 = typename node_type::id_type(m_boundary_edges[i].first[0]);
          auto node2 = typename node_type::id_type(m_boundary_edges[i].first[1]);
 
-         auto e = edge_type{{node1, node2}};
+         auto e = edge_type(node1, node2);
 
          auto position = find_element_id(edges.begin(), edges.end(), e);
 
@@ -2179,7 +2182,7 @@ class medit_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
             auto n1 = typename node_type::id_type(e[0]);
             auto n2 = typename node_type::id_type(e[1]);
 
-            edge_type edge{{n1, n2}};
+            edge_type edge(n1, n2);
             auto      edge_id = find_element_id(storage->edges.begin(), storage->edges.end(), edge);
             if (!edge_id.first) {
                std::cout << "Bad bug at " << __FILE__ << "(" << __LINE__ << ")" << std::endl;
