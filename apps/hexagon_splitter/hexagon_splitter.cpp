@@ -79,7 +79,11 @@ int main(int argc, char **argv)
 
         auto ptids = fc.point_ids();
 
-        mfaces.push_back( disk::convert_to<size_t>(ptids) );
+        std::vector<size_t> ptids_v;
+        for (auto& ptid : ptids)
+            ptids_v.push_back(ptid);
+
+        mfaces.push_back( std::move(ptids_v) );
     }
 
     std::vector<std::vector<size_t>> cells;
