@@ -1,7 +1,7 @@
 /*
  * DISK++, a template library for DIscontinuous SKeletal methods.
  *  
- * Matteo Cicuttin (C) 2020
+ * Matteo Cicuttin (C) 2020,2021
  * matteo.cicuttin@uliege.be
  *
  * University of Liège - Montefiore Institute
@@ -30,6 +30,8 @@
 
 #include <Eigen/IterativeLinearSolvers>
 #include <unsupported/Eigen/IterativeSolvers>
+
+#include "paramloader.hpp"
 
 template<typename Mesh>
 class maxwell_assembler
@@ -943,7 +945,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order,
 
 template<template<typename, size_t, typename> class Mesh, typename CoordT, typename Storage>
 void
-vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order)
+vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std::string& cfg_fn)
 {
     typedef Mesh<CoordT,3,Storage>              mesh_type;
     typedef std::complex<double>                scalar_type;
@@ -952,33 +954,28 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order)
     typedef typename mesh_type::cell_type       cell_type;
     typedef typename mesh_type::face_type       face_type;
 
-    double omega = 2*M_PI*1.55e10;
+    parameter_loader<double> pl;
+    bool ok = pl.load(cfg_fn);
+    if (!ok)
+        return;
+
+    double omega = 2*M_PI*pl.frequency();
     double alpha = 5;
     
     disk::hho_degree_info chdi( { .rd = (size_t) order,
                                   .cd = (size_t) order,
                                   .fd = (size_t) order } );
 
-    auto rhs_fun = [&](const point_type& pt) -> Matrix<scalar_type, 3, 1> {
-        Matrix<scalar_type, 3, 1> ret;
-        ret(0) = 0.0;
-        ret(1) = 0.0;
-        ret(2) = 0.0;//omega*omega * std::sin(omega*pt.x())*std::sin(omega*pt.y());
-        return ret;
-    };
+    const auto fbs = disk::vector_basis_size(chdi.face_degree(),2, 2);
+    const auto cbs = disk::vector_basis_size(chdi.cell_degree(), 3, 3);
 
-    size_t air_tag = 13;
-
-    size_t port_tag = 1188;
-    size_t port_id;
-
-    size_t imp_tag = 1193;
-    size_t imp_id;
 
     std::vector<bool> is_dirichlet(msh.faces_size(), false);
 
-    for (auto& fc : faces(msh))
+    for (size_t i = 0; i < msh.faces_size(); i++)
     {
+        auto fc = *(msh.faces_begin() + i);
+
         auto bi = msh.boundary_info(fc);
         if (not bi.is_boundary())
             continue;
@@ -986,47 +983,67 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order)
         if (bi.is_internal())
             continue;
 
-        if (bi.tag() != port_tag and bi.tag() != imp_tag)
-            is_dirichlet.at( offset(msh, fc) ) = true;
-        else
-        {
-            if (bi.tag() == port_tag)
-                port_id = bi.id();
-            else
-                imp_id = bi.id();
-        }
+        auto face_tag = bi.tag();
+        if ( pl.is_impedance_like(face_tag) )
+            continue;
+
+        if ( pl.is_magnetic_like(face_tag) )
+            continue;
+
+        is_dirichlet[i] = true;
     }
 
     maxwell_assembler_condensed<mesh_type, scalar_type> assm(msh, chdi, is_dirichlet);
 
-    auto eps0 = 8.8541878128e-12;
-    auto mu0 = 4*M_PI*1e-7;
-
     auto compute_local_contribution = [&](const cell_type& cl) -> auto {
         auto di = msh.domain_info(cl);
-        double eps_r;
-        if (di.tag() == air_tag)
-            eps_r = 1;
-        else
-            eps_r = 24;
 
-        auto eps = eps_r * eps0;
-        auto mu = mu0;
+        auto eps = pl.epsilon( di.tag() );
+        auto mu = pl.mu( di.tag() );
         auto Z = std::sqrt(mu/eps);
+
         auto CR = disk::curl_reconstruction_pk(msh, cl, chdi);
         auto ST = disk::curl_hdg_stabilization(msh, cl, chdi);
         auto MM = disk::make_vector_mass_oper(msh, cl, chdi);
-        auto [ZZ, zr] = disk::make_impedance_term<scalar_type>(msh, cl, chdi, port_id, 1./Z);
-        auto [ZB, zb] = disk::make_impedance_term<scalar_type>(msh, cl, chdi, imp_id, 1./Z);
-
         Matrix<scalar_type, Dynamic, Dynamic> lhs =
-            (1./mu) * CR.second +
-            alpha * ST -
-            (eps*omega)*omega*MM -
-            std::complex<double>(0,omega)*(ZZ+ZB);
+            (1./mu) * CR.second + alpha * ST - (eps*omega)*omega*MM;
 
-        Matrix<scalar_type, Dynamic, 1> rhs = Matrix<scalar_type, Dynamic, 1>::Zero(lhs.rows());
-        rhs += std::complex<double>(0,2*omega)*zr;
+        Matrix<scalar_type, Dynamic, 1> rhs =
+            Matrix<scalar_type, Dynamic, 1>::Zero(lhs.rows());
+
+        auto fcs = faces(msh, cl);
+        for (size_t i = 0; i < fcs.size(); i++)
+        {
+            auto& fc = fcs[i];
+            auto bi = msh.boundary_info(fc);
+            if (not bi.is_boundary())
+                continue;
+
+            auto tag = bi.tag();
+            if ( pl.is_impedance(tag) )
+            {
+                auto jw = scalar_type(0,omega);
+                auto Y = disk::make_impedance_term(msh, fc, chdi.face_degree(), 1./Z);
+                lhs.block(cbs+i*fbs, cbs+i*fbs, fbs, fbs) -= jw*Y;
+            }
+
+            if ( pl.is_plane_wave(tag) )
+            {
+                auto f = [&](const point_type& pt) -> Matrix<std::complex<double>,3,1> {
+                    Matrix<std::complex<double>,3,1> ret;
+                    auto src = pl.plane_wave_source(tag, pt);
+                    ret(0) = std::complex<double>(src.Ex_re, src.Ex_im);
+                    ret(1) = std::complex<double>(src.Ey_re, src.Ey_im);
+                    ret(2) = std::complex<double>(src.Ez_re, src.Ez_im);
+                    return ret;
+                };
+                auto jw = scalar_type(0,omega);
+                auto [Y, y] = disk::make_plane_wave_term(msh, fc, chdi.face_degree(), 1./Z, f);
+                lhs.block(cbs+i*fbs, cbs+i*fbs, fbs, fbs) -= jw*Y;
+                rhs.segment(cbs+i*fbs, fbs) += 2.0*jw*y;
+            }
+        }
+
         return std::make_pair(lhs, rhs);
     };
 
@@ -1440,11 +1457,18 @@ int main(int argc, char **argv)
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
         auto msh = disk::load_netgen_3d_mesh<coord_T>(mesh_filename);
 
+        for (auto itor = msh.points_begin(); itor != msh.points_end(); itor++)
+        {
+            auto pt = *itor;
+            auto newpt = disk::point<T,3>(pt.x()/1000, pt.y()/1000, pt.z()/1000);
+            *itor = newpt;
+        }
+
         //if (solve_eigvals)
         //    maxwell_eigenvalue_solver(msh, degree, stab_param);
         //else
             //vector_wave_solver(msh, degree, stab_param, omega, false);
-            vector_wave_solver_complex(msh, degree);
+            vector_wave_solver_complex(msh, degree, "params.lua");
 
         return 0;
     }
@@ -1453,13 +1477,22 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.geo$") ))
     {
         std::cout << "Guessed mesh format: GMSH" << std::endl;
-        disk::generic_mesh<T,3> msh;
-        disk::gmsh_geometry_loader< disk::generic_mesh<T,3> > loader;
+        disk::simplicial_mesh<T,3> msh;
+        disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
         
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        vector_wave_solver_complex(msh, degree);
+        /*
+        for (auto itor = msh.points_begin(); itor != msh.points_end(); itor++)
+        {
+            auto pt = *itor;
+            auto newpt = disk::point<T,3>(pt.x()/1000, pt.y()/1000, pt.z()/1000);
+            *itor = newpt;
+        }
+        */
+
+        vector_wave_solver_complex(msh, degree, "params.lua");
 
         return 0;
     }

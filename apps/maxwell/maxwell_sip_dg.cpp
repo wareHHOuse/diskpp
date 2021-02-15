@@ -29,6 +29,8 @@
 #include <Eigen/IterativeLinearSolvers>
 #include <unsupported/Eigen/IterativeSolvers>
 
+#include "paramloader.hpp"
+
 namespace disk {
 
 /* Temporarly copied from curl.hpp */
@@ -176,25 +178,36 @@ auto make_solution_function(const Mesh& msh)
 
 
 template<typename Mesh>
-computation_info<typename Mesh::coordinate_type>
-run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_type eta)
-{   
+void
+run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_type eta,
+    const std::string& cfg_fn)
+{
+    parameter_loader<double> pl;
+    bool ok = pl.load(cfg_fn);
+    if (!ok)
+        return;
+
+    double omega = 2*M_PI*pl.frequency();
+
     auto cvf = connectivity_via_faces(msh);
     using coordinate_type = typename Mesh::coordinate_type;
     using scalar_type = std::complex<double>;
 
     typedef Matrix<scalar_type, Dynamic, Dynamic> matrix_type;
     typedef Matrix<scalar_type, Dynamic, 1>       vector_type;
-    
-    auto f = make_rhs_function(msh);
 
     auto cbs = disk::vector_basis_size(degree, Mesh::dimension, Mesh::dimension);
     auto assm = disk::make_discontinuous_galerkin_assembler<scalar_type>(msh, cbs);
 
-    size_t impedance_boundary_id = 3;
 
     for (auto& tcl : msh)
     {
+        auto di = msh.domain_info(tcl);
+
+        auto eps = pl.epsilon( di.tag() );
+        auto mu = pl.mu( di.tag() );
+        auto Z = std::sqrt(mu/eps);
+
         auto tbasis = disk::make_vector_monomial_basis(msh, tcl, degree);
         auto qps = disk::integrate(msh, tcl, 2*degree);
         
@@ -214,6 +227,17 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
         auto fcs = faces(msh, tcl);
         for (auto& fc : fcs)
         {
+            auto bi = msh.boundary_info(fc);
+
+            auto f = [&](const disk::point<double,3>& pt) -> Matrix<std::complex<double>,3,1> {
+                Matrix<std::complex<double>,3,1> ret;
+                auto src = pl.plane_wave_source(bi.tag(), pt);
+                ret(0) = std::complex<double>(src.Ex_re, src.Ex_im);
+                ret(1) = std::complex<double>(src.Ey_re, src.Ey_im);
+                ret(2) = std::complex<double>(src.Ez_re, src.Ez_im);
+                return ret;
+            };
+
             matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
             matrix_type Atn = matrix_type::Zero(tbasis.size(), tbasis.size());
             
@@ -225,7 +249,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
             auto n     = normal(msh, tcl, fc);
             auto eta_l = eta / diameter(msh, fc);
             auto f_qps = disk::integrate(msh, fc, 2*degree);
-            
+
             for (auto& fqp : f_qps)
             {
                 auto tphi       = tbasis.eval_functions(fqp.point());
@@ -240,9 +264,9 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
                     Att += - fqp.weight() * 0.5 * tcphi * n_x_tphi.transpose();
                 }
                 else
-                {   /* On a boundary*/
-                    if ( msh.boundary_id(fc) != 2 and msh.boundary_id(fc) != 4 and
-                         msh.boundary_id(fc) != 3 )
+                {
+                   /* On a boundary*/
+                    if ( not pl.is_magnetic_like(bi.tag()) and not pl.is_impedance_like(bi.tag()) )
                     {
                         Att += + fqp.weight() * eta_l * n_x_tphi * n_x_tphi.transpose();
                         Att += - fqp.weight() * tcphi * n_x_tphi.transpose();
@@ -253,13 +277,13 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
                     //loc_rhs -= fqp.weight() * tcphi_x_n;
                     //loc_rhs += fqp.weight() * eta_l * tphi;
 
-                    std::complex<double> jomega(0, M_PI);
+                    std::complex<double> jomega(0, omega);
 
-                    if ( msh.boundary_id(fc) == impedance_boundary_id)
-                    {
-                        Att -= fqp.weight() * jomega * n_x_tphi_x_n * n_x_tphi_x_n.transpose();
-                        loc_rhs += 2*fqp.weight()*jomega*n_x_tphi_x_n.col(2);
-                    }
+                    if ( pl.is_impedance_like(bi.tag()) )
+                        Att -= fqp.weight() * (mu*jomega/Z) * n_x_tphi_x_n * n_x_tphi_x_n.transpose();
+
+                    if ( pl.is_plane_wave(bi.tag()) )
+                        loc_rhs += 2*fqp.weight()*(mu*jomega/Z)*n_x_tphi_x_n*f(fqp.point());
 
                     continue;
                 }
@@ -277,9 +301,9 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
             if (nv.second)
                 assm.assemble(msh, tcl, ncl, Atn);
         }
-        
-        auto omega = M_PI;
-        matrix_type LC = K - omega*omega*M;
+
+        matrix_type LC = K - (eps*omega)*(omega*mu)*M;
+
         assm.assemble(msh, tcl, LC, loc_rhs);
     }
 
@@ -306,18 +330,12 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
 
     std::vector<scalar_type> data_ux, data_uy, data_uz, data_div;
 
-    auto sol_fun = make_solution_function(msh);
-
     //T err = 0.0;
     size_t cell_i = 0;
     //T err_divergence = 0.0;
     for (auto& cl : msh)
     {
         auto cb = make_vector_monomial_basis(msh, cl, degree);
-
-        Matrix<scalar_type, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb);
-        Matrix<scalar_type, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun);
-        Matrix<scalar_type, Dynamic, 1> asol = MMe.llt().solve(arhs);
         Matrix<scalar_type, Dynamic, 1> lsol = sol.segment(cell_i*cb.size(), cb.size());
 
         //scalar_type divt = 0.0;
@@ -341,10 +359,6 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
         data_ux.push_back( acc(0) );
         data_uy.push_back( acc(1) );
         data_uz.push_back( acc(2) );
-
-        Matrix<scalar_type, Dynamic, 1> diff = lsol - asol;
-
-        //err += diff.dot(MMe*diff);
 
         cell_i++;
     }
@@ -374,13 +388,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
 
     silo_db.close();
 
-    return computation_info<coordinate_type>({
-        .l2_error_e = 0,//std::sqrt(err),
-        .nrg_error = 0,
-        .mflops = pparams.mflops,
-        .dofs = assm.syssz,
-        .nonzeros = assm.LHS.nonZeros()
-    });
+    return;
 }
 
 template<typename Mesh>
@@ -540,6 +548,7 @@ run_maxwell_eigenvalue_solver(Mesh& msh, size_t degree, const typename Mesh::coo
     }
 }
 
+#if 0
 void autotest_convergence(size_t order_min, size_t order_max)
 {
     using T = double;
@@ -571,6 +580,7 @@ void autotest_convergence(size_t order_min, size_t order_max)
         ofs << std::endl;
     }
 }
+#endif
 
 int main(int argc, char **argv)
 {
@@ -584,7 +594,7 @@ int main(int argc, char **argv)
     char *      mesh_filename = nullptr;
 
     int ch;
-    while ( (ch = getopt(argc, argv, "Aa:k:m:e")) != -1 )
+    while ( (ch = getopt(argc, argv, "a:k:m:e")) != -1 )
     {
         switch(ch)
         {
@@ -604,10 +614,6 @@ int main(int argc, char **argv)
                 mesh_filename = optarg;
                 break;
 
-            case 'A':
-                autotest_convergence(1, degree);
-                return 0;
-
             case '?':
             default:
                 std::cout << "Invalid option" << std::endl;
@@ -620,38 +626,31 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
         auto msh = disk::load_netgen_3d_mesh<T>(mesh_filename);
-        if (solve_eigvals)
-            run_maxwell_eigenvalue_solver(msh, degree, stab_param);
-        else
-            run_maxwell_solver(msh, degree, stab_param);
+        run_maxwell_solver(msh, degree, stab_param, "params.lua");
         return 0;
     }
 
-    /* DiSk++ cartesian 3D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.hex$") ))
+    /* GMSH */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.geo$") ))
     {
-        std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
-        auto msh = disk::load_cartesian_3d_mesh<T>(mesh_filename);
-        if (solve_eigvals)
-            run_maxwell_eigenvalue_solver(msh, degree, stab_param);
-        else
-            run_maxwell_solver(msh, degree, stab_param);
-        return 0;
-    }
+        std::cout << "Guessed mesh format: GMSH" << std::endl;
+        disk::simplicial_mesh<T,3> msh;
+        disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
+        
+        loader.read_mesh(mesh_filename);
+        loader.populate_mesh(msh);
 
-    /* FVCA6 3D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.msh$") ))
-    {
-        std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
-        disk::generic_mesh<T,3> msh;
-        
-        disk::load_mesh_fvca6_3d<T>(mesh_filename, msh);
-        
-        if (solve_eigvals)
-            run_maxwell_eigenvalue_solver(msh, degree, stab_param);
-        else
-            run_maxwell_solver(msh, degree, stab_param);
-        
+        /*
+        for (auto itor = msh.points_begin(); itor != msh.points_end(); itor++)
+        {
+            auto pt = *itor;
+            auto newpt = disk::point<T,3>(pt.x()/1000, pt.y()/1000, pt.z()/1000);
+            *itor = newpt;
+        }
+        */
+
+        run_maxwell_solver(msh, degree, stab_param, "params.lua");
+
         return 0;
     }
 }

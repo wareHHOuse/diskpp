@@ -113,6 +113,63 @@ make_vector_mass_oper(const Mesh&                       msh,
 }
 
 template<typename ScalT = double, typename Mesh>
+dynamic_matrix<ScalT>
+make_impedance_term(const Mesh& msh, const typename Mesh::face_type& fc,
+    size_t facdeg, ScalT admittance)
+{
+    using mesh_type = Mesh;
+    using coord_type = typename Mesh::coordinate_type;
+    using scalar_type = ScalT;
+    using cell_type = typename Mesh::cell_type;
+    using face_type = typename Mesh::face_type;
+
+    using matrix_type = Matrix<scalar_type, Dynamic, Dynamic>;
+    const auto fbs = vector_basis_size(facdeg, Mesh::dimension - 1, Mesh::dimension-1);
+
+    matrix_type Y = matrix_type::Zero(fbs, fbs);
+
+    const auto fb = make_vector_monomial_tangential_basis<mesh_type, face_type, scalar_type>(msh, fc, facdeg);
+    const auto qps = integrate(msh, fc, 2*facdeg);
+    for (auto& qp : qps)
+    {
+        Matrix<scalar_type, Dynamic, 3> fphi = fb.eval_functions(qp.point());
+        Y += qp.weight() * admittance * fphi * fphi.transpose();
+    }
+
+    return Y;
+}
+
+template<typename ScalT = double, typename Mesh, typename Function>
+std::pair<dynamic_matrix<ScalT>, dynamic_vector<ScalT>>
+make_plane_wave_term(const Mesh& msh, const typename Mesh::face_type& fc,
+    size_t facdeg, ScalT admittance, Function f)
+{
+    using mesh_type = Mesh;
+    using coord_type = typename Mesh::coordinate_type;
+    using scalar_type = ScalT;
+    using cell_type = typename Mesh::cell_type;
+    using face_type = typename Mesh::face_type;
+
+    using matrix_type = Matrix<scalar_type, Dynamic, Dynamic>;
+    using vector_type = Matrix<scalar_type, Dynamic, 1>;
+    const auto fbs = vector_basis_size(facdeg, Mesh::dimension - 1, Mesh::dimension-1);
+
+    matrix_type Y = matrix_type::Zero(fbs, fbs);
+    vector_type y = vector_type::Zero(fbs);
+
+    const auto fb = make_vector_monomial_tangential_basis<mesh_type, face_type, scalar_type>(msh, fc, facdeg);
+    const auto qps = integrate(msh, fc, 2*facdeg);
+    for (auto& qp : qps)
+    {
+        Matrix<scalar_type, Dynamic, 3> fphi = fb.eval_functions(qp.point());
+        Y += qp.weight() * admittance * fphi * fphi.transpose();
+        y += qp.weight() * admittance * fphi * f(qp.point());
+    }
+
+    return std::make_pair(Y, y);
+}
+
+template<typename ScalT = double, typename Mesh>
 std::pair<dynamic_matrix<ScalT>, dynamic_vector<ScalT>>
 make_impedance_term(const Mesh& msh, const typename Mesh::cell_type& cl,
     const hho_degree_info& hdi, size_t bndid, ScalT z)
