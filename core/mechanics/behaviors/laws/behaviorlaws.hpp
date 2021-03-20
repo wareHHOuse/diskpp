@@ -276,9 +276,9 @@ class Behavior
             case 100: return m_elastic.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
             case 101: return m_linearHard.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
             case 102: return m_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
-            // case 103: return m_henckymises.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
-            // case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
-            // case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
+            case 103: return m_henckymises.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
+            case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
+            case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");
         }
@@ -294,10 +294,10 @@ class Behavior
             case 101: return m_linearHard.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
             case 102: return m_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
             case 103:
-            //     return m_henckymises.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent);
-            //     break;
-            // case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
-            // case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
+                return m_henckymises.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent);
+                break;
+            case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
+            case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");
         }
