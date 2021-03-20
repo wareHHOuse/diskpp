@@ -93,6 +93,12 @@ class law_qp_bones
     {
     }
 
+    quadrature_point<scalar_type, DIM>
+    quadrature_point() const
+    {
+        return make_qp(m_point, m_weight);
+    }
+
     point<scalar_type, DIM>
     point() const
     {

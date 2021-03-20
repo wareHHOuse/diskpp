@@ -157,10 +157,6 @@ class NewtonIteration
         m_assembler.initialize();
         m_F_int = 0.0;
 
-        // Get materail data
-        const auto material_data = behavior.getMaterialData();
-        // Get Law
-        auto& law = behavior.law();
 
         const bool small_def = (behavior.getDeformation() == SMALL_DEF);
 
@@ -199,11 +195,9 @@ class NewtonIteration
 
             // Mechanical Computation
 
-            auto& law_cell = law.getCellQPs(cell_i);
-            // auto& law_qp   = behavior.getQPs(msh, cl);
             tc.tic();
             elem.compute(
-              msh, cl, bnd, rp, degree_infos, lf, GT, m_solution.at(cell_i), law_cell, material_data, small_def);
+              msh, cl, bnd, rp, degree_infos, lf, GT, m_solution.at(cell_i), behavior, small_def);
 
             matrix_type lhs = elem.K_int;
             vector_type rhs = elem.RTF;

@@ -68,7 +68,7 @@ class NewtonSolverParameter
       m_face_degree(1), m_cell_degree(1), m_grad_degree(1), m_sublevel(1), m_iter_max(20), m_epsilon(T(1E-6)),
       m_verbose(false), m_precomputation(false), m_stab(true), m_beta(1), m_stab_type(HHO), m_n_time_save(0)
     {
-        m_time_step.push_back(std::make_pair(1.0, 10));
+        m_time_step.push_back(std::make_pair(1.0, 1));
     }
 
     void
@@ -238,5 +238,76 @@ class NewtonSolverParameter
 
         ifs.close();
         return true;
+    }
+
+    void setFaceDegree(const int face_degree)
+    {
+        m_face_degree = face_degree;
+    }
+
+    int
+    getFaceDegree( ) const
+    {
+        return m_face_degree;
+    }
+
+    void
+    setCellDegree(const int cell_degree)
+    {
+        m_cell_degree = cell_degree;
+    }
+
+    int
+    getCellDegree() const
+    {
+        return m_cell_degree;
+    }
+
+    void
+    setGradDegree(const int grad_degree)
+    {
+        m_grad_degree = grad_degree;
+    }
+
+    int
+    getGradDegree() const
+    {
+        return m_face_degree;
+    }
+
+    void
+    setStabilizationParameter(const T stab_para)
+    {
+        m_beta = stab_para;
+    }
+
+    T
+    getStabilizationParameter() const
+    {
+        return m_beta;
+    }
+
+    void
+    setVerbose(const bool verbose)
+    {
+        m_verbose = verbose;
+    }
+
+    bool
+    getVerbose() const
+    {
+        return m_verbose;
+    }
+
+    void
+    setPrecomputation(const bool precomp)
+    {
+        m_precomputation = precomp;
+    }
+
+    bool
+    getPrecomputation() const
+    {
+        return m_precomputation;
     }
 };

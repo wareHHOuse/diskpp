@@ -7,4 +7,8 @@ if (BUILD_APP_NSM)
 	add_executable(contact_test contact_test.cpp)
 	target_link_libraries(contact_test ${LINK_LIBS})
 	install(TARGETS contact_test RUNTIME DESTINATION bin)
+
+	add_executable(elasticity_test elasticity_test.cpp)
+	target_link_libraries(elasticity_test ${LINK_LIBS})
+	install(TARGETS elasticity_test RUNTIME DESTINATION bin)
 endif ()

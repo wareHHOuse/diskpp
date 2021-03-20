@@ -456,6 +456,9 @@ class NewtonSolver
         // list of time step
         ListOfTimeStep<scalar_type> list_time_step(m_rp.m_time_step);
 
+        if( m_verbose )
+            std::cout << "** Number of time step: " << list_time_step.numberOfTimeStep() << std::endl;
+
         // time of saving
         bool time_saving = false;
         if (m_rp.m_n_time_save > 0)

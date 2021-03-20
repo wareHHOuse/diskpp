@@ -64,13 +64,13 @@ class mechanical_computation
 
     bool two_dim;
 
-/**
- * @brief Compute A : gphi for finite deformation
- *
- * @param A fourth-order tangent modulus
- * @param gphi set of basis function for gradient reconstruction
- * @return eigen_compatible_stdvector<static_matrix_type> A : gphi
- */
+    /**
+     * @brief Compute A : gphi for finite deformation
+     *
+     * @param A fourth-order tangent modulus
+     * @param gphi set of basis function for gradient reconstruction
+     * @return eigen_compatible_stdvector<static_matrix_type> A : gphi
+     */
     eigen_compatible_stdvector<static_matrix_type>
     compute_A_gphi(const static_tensor_type& A, const eigen_compatible_stdvector<static_matrix_type>& gphi) const
     {
@@ -104,27 +104,27 @@ class mechanical_computation
      * @tparam QPType Type of law at the quadrature point
      * @tparam LawData Type for material data
      * @param qp A behavior quadrature point where we compute the constitutive law
-     * @param material_data material data
      * @param RkT_iqn Reconstruction operator evaluated at the quadrature point (symmetric gradient)
      * in small deformation and gradient in finite deformation)
      * @param small_def small deformation yes or no
      * @return std::pair<static_matrix_type, static_tensor_type> stress tensor and the tangent modulus
      */
-    template<typename QPType, typename LawData>
+
     std::pair<static_matrix_type, static_tensor_type>
-    compute_behavior(QPType&                   qp,
-                     const LawData&            material_data,
+    compute_behavior(behavior_type&            behavior,
+                     const size_t&             cell_id,
+                     const size_t&             qp_id,
                      const static_matrix_type& RkT_iqn,
                      const bool                small_def) const
     {
         if (small_def)
         {
-            return qp.compute_whole(RkT_iqn, material_data, false);
+            return behavior.compute_whole(cell_id, qp_id, RkT_iqn, false);
         }
         else
         {
             const auto FT_iqn = convertGtoF(RkT_iqn);
-            return qp.compute_whole(FT_iqn, material_data, false);
+            return behavior.compute_whole(cell_id, qp_id, FT_iqn, false);
         }
     }
 
@@ -195,24 +195,29 @@ class mechanical_computation
     void
     symmetrized_rigidity_matrix(const size_t grad_basis_size, matrix_type& AT, const bool small_def) const
     {
-        if(small_def)
+        if (small_def)
         {
             // lower part AT
             for (size_t j = 0; j < grad_basis_size; j++)
                 for (size_t i = j; i < grad_basis_size; i++)
-                    AT(i, j) = AT(j, i);}
+                    AT(i, j) = AT(j, i);
+        }
         else
         {
             // upper part AT
             for (size_t i = 0; i < grad_basis_size; i++)
                 for (size_t j = i; j < grad_basis_size; j++)
-                   AT(i, j) = AT(j, i);
+                    AT(i, j) = AT(j, i);
         }
     }
 
     template<typename Function>
     void
-    compute_external_forces(const mesh_type& msh, const cell_type& cl, const Function& load, const size_t cell_degree, vector_type& RTF)
+    compute_external_forces(const mesh_type& msh,
+                            const cell_type& cl,
+                            const Function&  load,
+                            const size_t     cell_degree,
+                            vector_type&     RTF)
     {
         // compute (f,v)_T
         const auto cb       = make_vector_monomial_basis(msh, cl, cell_degree);
@@ -315,7 +320,7 @@ class mechanical_computation
             assert(false);
     }
 
-    template<typename Function, typename LawCell, typename LawData>
+    template<typename Function>
     void
     compute(const mesh_type&                 msh,
             const cell_type&                 cl,
@@ -325,15 +330,14 @@ class mechanical_computation
             const Function&                  load,
             const matrix_type&               RkT,
             const vector_type&               uTF,
-            LawCell&                         law,
-            const LawData&                   material_data,
+            behavior_type&                   behavior,
             const bool                       small_def)
     {
         time_law     = 0.0;
         time_contact = 0.0;
         timecounter tc;
 
-        const auto cell_infos = degree_infos.cellDegreeInfo(msh, cl);
+        const auto cell_infos  = degree_infos.cellDegreeInfo(msh, cl);
         const auto faces_infos = cell_infos.facesDegreeInfo();
 
         const auto cell_degree = cell_infos.cell_degree();
@@ -352,7 +356,6 @@ class mechanical_computation
         }
 
         const auto grad_basis_size = gb_size;
-
 
         const auto num_faces_dofs = vector_faces_dofs(msh, faces_infos);
         const auto num_total_dofs = cell_basis_size + num_faces_dofs;
@@ -375,17 +378,18 @@ class mechanical_computation
         //  std::cout << "RkT: " << RkT.norm() << std::endl;
         //  std::cout << "RkT_Utf: " << RkT_uTF.transpose() << std::endl;
 
-        auto& law_quadpoints = law.getQPs();
-
         const auto gb  = make_matrix_monomial_basis(msh, cl, grad_degree);
         const auto gbs = make_sym_matrix_monomial_basis(msh, cl, grad_degree);
 
         eigen_compatible_stdvector<static_matrix_type> gphi;
-        // std::cout << "nb: " << law_quadpoints.size() << std::endl;
-        for (auto& qp : law_quadpoints)
+
+        const auto cell_id = msh.lookup(cl);
+        const auto nb_qp   = behavior.numberOfQP(cell_id);
+        for (int i_qp = 0; i_qp < nb_qp; i_qp++)
         {
             //  std::cout << "qp: " << qp.point() << std::endl;
             // Compute gradient basis function
+            const auto qp = behavior.quadrature_point(cell_id, i_qp);
             if (small_def)
             {
                 gphi = gbs.eval_functions(qp.point());
@@ -405,7 +409,7 @@ class mechanical_computation
 
             // Compute behavior
             tc.tic();
-            const auto [stress, Cep] = compute_behavior(qp, material_data, RkT_iqn, small_def);
+            const auto [stress, Cep] = compute_behavior(behavior, cell_id, i_qp, RkT_iqn, small_def);
             // std::cout << "stress" << std::endl;
             // std::cout << stress << std::endl;
             // std::cout << "Cep" << std::endl;

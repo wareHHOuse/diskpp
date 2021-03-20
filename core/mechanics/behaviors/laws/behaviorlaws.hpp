@@ -94,6 +94,9 @@ class Behavior
     typedef MaterialData<scalar_type>          material_type;
     typedef dynamic_vector<scalar_type>        vector_type;
 
+    typedef static_matrix<scalar_type, MeshType::dimension, MeshType::dimension>  static_matrix_type;
+    typedef static_tensor<scalar_type, MeshType::dimension>                       static_tensor_type;
+
     size_t m_deformation;
     size_t m_law;
     size_t m_id;
@@ -188,6 +191,22 @@ class Behavior
     }
 
     material_type
+    getMaterialData(void)
+    {
+        switch (m_id)
+        {
+            case 100: return m_elastic.getMaterialData(); break;
+            case 101: return m_linearHard.getMaterialData(); break;
+            case 102: return m_nonlinearHard.getMaterialData(); break;
+            case 103: return m_henckymises.getMaterialData(); break;
+            case 200: return m_neohokean.getMaterialData(); break;
+            case 201: return m_cavitation.getMaterialData(); break;
+
+            default: throw std::invalid_argument("Behavior error: Unknown id law");
+        }
+    }
+
+    const material_type&
     getMaterialData(void) const
     {
         switch (m_id)
@@ -203,35 +222,6 @@ class Behavior
         }
     }
 
-    // const material_type&
-    // getMaterialData(void) const
-    // {
-    //     switch (m_id)
-    //     {
-    //         case 100: return m_linear.getMaterialData(); break;
-    //         case 101: return m_linearHard.getMaterialData(); break;
-    //         case 102: return m_nonlinearHard.getMaterialData(); break;
-    //         case 103: return m_henckymises.getMaterialData(); break;
-    //         case 200: return m_neohokean.getMaterialData(); break;
-    //         case 201: return m_cavitation.getMaterialData(); break;
-
-    //         default: throw std::invalid_argument("Behavior error: Unknown id law");
-    //     }
-    // }
-
-    auto&
-    law()
-    {
-        return m_elastic;
-    }
-
-    std::vector<law_qp_bones<scalar_type, MeshType::dimension>>&
-    getQPs(const MeshType& msh, const cell_type& cl)
-    {
-        const auto cell_id = msh.lookup(cl);
-
-        return m_elastic.getCellQPs(cell_id).getQPs();
-    }
 
     /**
      * @brief Get number of quadrature points for the used law
@@ -255,10 +245,8 @@ class Behavior
     }
 
     size_t
-    numberOfQP(const MeshType& msh, const cell_type& cl) const
+    numberOfQP(const size_t& cell_id) const
     {
-        const auto cell_id = msh.lookup(cl);
-
         switch (m_id)
         {
             case 100: return m_elastic.getCellQPs(cell_id).getNumberOfQP(); break;
@@ -272,8 +260,50 @@ class Behavior
         }
     }
 
-    void
-    update(void)
+    size_t
+    numberOfQP(const MeshType& msh, const cell_type& cl) const
+    {
+        const auto cell_id = msh.lookup(cl);
+
+        return numberOfQP(cell_id);
+    }
+
+    auto
+    quadrature_point(const size_t& cell_id, const size_t& qp_id)
+    {
+        switch (m_id)
+        {
+            case 100: return m_elastic.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
+            case 101: return m_linearHard.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
+            case 102: return m_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
+            // case 103: return m_henckymises.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
+            // case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
+            // case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
+
+            default: throw std::invalid_argument("Behavior error: Unknown id law");
+        }
+    }
+
+    std::pair<static_matrix_type, static_tensor_type>
+    compute_whole(const size_t& cell_id, const size_t& qp_id, const static_matrix_type& RkT_iqn, bool tangent = true)
+    {
+        const material_type& mdata = getMaterialData();
+        switch (m_id)
+        {
+            case 100: return m_elastic.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
+            case 101: return m_linearHard.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
+            case 102: return m_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
+            case 103:
+            //     return m_henckymises.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent);
+            //     break;
+            // case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
+            // case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
+
+            default: throw std::invalid_argument("Behavior error: Unknown id law");
+        }
+    }
+
+    void update(void)
     {
         switch (m_id)
         {
