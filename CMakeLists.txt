@@ -113,6 +113,19 @@ else()
     add_definitions(-DHAVE_GMSH)
 endif()
 
+######################################################################
+## Package: MGIS support
+find_package(MGIS)
+if (MGIS_FOUND)
+    message(STATUS "MGIS found")
+    include_directories(${MGIS_INCLUDE_DIRS})
+    set(LINK_LIBS ${LINK_LIBS} ${MGIS_LIBRARIES})
+    set(HAVE_MGIS TRUE)
+    add_definitions(-DHAVE_MGIS)
+else()
+    message(STATUS "MGIS not found")
+endif()
+
 
 
 ######################################################################
