@@ -43,6 +43,10 @@
 #include "boundary_conditions/boundary_conditions.hpp"
 #include "methods/hho"
 
+#ifdef HAVE_MGIS
+#include "MGIS/Behaviour/Behaviour.hxx"
+#endif
+
 #include "timecounter.h"
 
 namespace disk
@@ -408,9 +412,33 @@ class NewtonSolver
         if (m_verbose)
         {
             std::cout << "Add behavior ..." << std::endl;
+            std::cout << "** Deformations: " << m_behavior.getDeformationName() << std::endl;
+            std::cout << "** Law: " << m_behavior.getLawName() << std::endl;
             std::cout << "** Number of integration points: " << m_behavior.numberOfQP() << std::endl;
         }
     }
+
+#ifdef HAVE_MGIS
+    /**
+     * @brief Add a behavior for materials
+     *
+     * @param deformation Type of deformation
+     * @param law Type of Law
+     */
+    void
+    addBehavior(const std::string& filename, const std::string& law, const mgis::behaviour::Hypothesis h)
+    {
+        m_behavior = behavior_type(m_msh, 2 * m_rp.m_grad_degree, filename, law, h);
+
+        if (m_verbose)
+        {
+            std::cout << "Add behavior ..." << std::endl;
+            std::cout << "** Deformations: " << m_behavior.getDeformationName() << std::endl;
+            std::cout << "** Law: " << m_behavior.getLawName() << std::endl;
+            std::cout << "** Number of integration points: " << m_behavior.numberOfQP() << std::endl;
+        }
+    }
+#endif
 
     /**
      * @brief Add a behavior for materials (by copy)

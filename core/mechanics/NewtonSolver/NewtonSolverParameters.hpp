@@ -65,7 +65,7 @@ class NewtonSolverParameter
     std::list<T> m_time_save;   // list of time where we save result;
 
     NewtonSolverParameter() :
-      m_face_degree(1), m_cell_degree(1), m_grad_degree(1), m_sublevel(1), m_iter_max(20), m_epsilon(T(1E-6)),
+      m_face_degree(1), m_cell_degree(1), m_grad_degree(1), m_sublevel(5), m_iter_max(20), m_epsilon(T(1E-6)),
       m_verbose(false), m_precomputation(false), m_stab(true), m_beta(1), m_stab_type(HHO), m_n_time_save(0)
     {
         m_time_step.push_back(std::make_pair(1.0, 1));

@@ -36,9 +36,6 @@
 #include "mechanics/NewtonSolver/NewtonSolver.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
 
-#ifdef HAVE_MGIS
-    #include "MGIS/Behaviour/Behaviour.hxx"
-#endif
 
 #include "timecounter.h"
 
@@ -77,12 +74,12 @@ run_nl_solid_mechanics_solver(const Mesh<T, 2, Storage>&      msh,
     // To use a law developped with Mfront
     const auto hypo = mgis::behaviour::Hypothesis::PLANESTRAIN;
     const std::string filename = "/Users/npignet/Documents/Outils/mgis1_2/tests/libBehaviourTest.dylib";
-    const auto        b        = mgis::behaviour::load(filename, "Elasticity", hypo);
+    nl.addBehavior(filename, "Elasticity", hypo);
 #else
     // To use a native law from DiSk++
+    nl.addBehavior(disk::DeformationMeasure::SMALL_DEF, disk::LawType::ELASTIC);
 #endif
 
-    nl.addBehavior(disk::DeformationMeasure::SMALL_DEF, disk::LawType::ELASTIC);
     nl.addMaterialData(material_data);
 
     nl.initial_guess(zero);
