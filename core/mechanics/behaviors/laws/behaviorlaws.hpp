@@ -33,7 +33,7 @@
 #include "LinearIsotropicAndKinematicHardening/LinearIsotropicAndKinematicHardening_qp.hpp"
 #include "LinearLaw/LinearLaw_qp.hpp"
 #include "Neohookean/Neohookean_qp.hpp"
-#include "Mfront/Mfront_qp.hpp"
+#include "Mfront/Mfront_law.hpp"
 #include "core/methods/hho"
 #include "law_bones.hpp"
 #include "behaviorlaws_names.hpp"
@@ -74,9 +74,10 @@ template<typename MeshType>
 using IsotropicHardeningVMis =
   LawTypeBones<MeshType, IsotropicHardeningVMis_qp<typename MeshType::coordinate_type, MeshType::dimension>, true>;
 
+#ifdef HAVE_MGIS
 template<typename MeshType>
-using Mfront =
-  LawTypeBones<MeshType, Mfront_qp<typename MeshType::coordinate_type, MeshType::dimension>, true>;
+using Mfront = Mfront_law<MeshType>;
+#endif
 
 template<typename MeshType>
 class Behavior
@@ -93,6 +94,11 @@ class Behavior
     size_t m_deformation;
     size_t m_law;
     size_t m_id;
+
+#ifdef HAVE_MGIS
+    typedef std::shared_ptr<mgis::behaviour::Behaviour> BehaviourPtr;
+    BehaviourPtr                                        m_behav;
+#endif
 
     Cavitation<MeshType>                           m_cavitation;
     Neohookean<MeshType>                           m_neohokean;
@@ -117,7 +123,9 @@ class Behavior
                     case LawType::LINEAR_HARDENING: m_id = 101; break;
                     case LawType::NONLINEAR_HARDENING: m_id = 102; break;
                     case LawType::HENCKY_MISES: m_id = 103; break;
+#ifdef HAVE_MGIS
                     case LawType::MFRONT: m_id = 500; break;
+#endif
                     default: throw std::invalid_argument("Incompatible law with SMALL_DEF");
                 }
                 break;
@@ -126,7 +134,9 @@ class Behavior
                 {
                     case LawType::NEOHOKEAN: m_id = 200; break;
                     case LawType::CAVITATION: m_id = 201; break;
+#ifdef HAVE_MGIS
                     case LawType::MFRONT: m_id = 500; break;
+#endif
                     default: throw std::invalid_argument("Incompatible law with F_DEF");
                 }
                 break;
@@ -137,7 +147,9 @@ class Behavior
                     // case LawType::LINEAR_HARDENING: m_id = 301; break;
                     // case LawType::NONLINEAR_HARDENING: m_id = 302; break;
                     // case LawType::HENCKY_MISES: m_id = 303; break;
+#ifdef HAVE_MGIS
                     case LawType::MFRONT: m_id = 500; break;
+#endif
                     default: throw std::invalid_argument("Incompatible law with LOGARITHMIC_DEF");
                 }
                 break;
@@ -178,25 +190,25 @@ class Behavior
       m_law(LawType::MFRONT)
     {
         using namespace mgis::behaviour;
+
         if (isStandardFiniteStrainBehaviour(filename, law))
         {
             m_deformation         = DeformationMeasure::F_DEF;
             auto opts             = FiniteStrainBehaviourOptions{};
             opts.stress_measure   = FiniteStrainBehaviourOptions::PK1;
             opts.tangent_operator = FiniteStrainBehaviourOptions::DPK1_DF;
-            auto b                = mgis::behaviour::load(opts, filename, law, h);
-            //return std::make_unique<Behaviour>(mgis::behaviour::load(opts, filename, law, h));
+            m_behav               = std::make_shared<Behaviour>(load(opts, filename, law, h));
         }
         else
+        {
             m_deformation = DeformationMeasure::SMALL_DEF;
-
-        auto b = mgis::behaviour::load(filename, law, h);
-        // return std::make_unique<Behaviour>(mgis::behaviour::load(filename, law, h));
+            m_behav       = std::make_shared<Behaviour>(load(filename, law, h));
+        }
 
         select_law();
         switch (m_id)
         {
-            case 500: m_mfront = Mfront<MeshType>(msh, degree); break;
+            case 500: m_mfront = Mfront<MeshType>(msh, degree, m_behav); break;
             default: throw std::invalid_argument("Behavior error: Unknown id law");
         }
     }
@@ -230,7 +242,10 @@ class Behavior
             case 103: m_henckymises.addMaterialData(materialData); break;
             case 200: m_neohokean.addMaterialData(materialData); break;
             case 201: m_cavitation.addMaterialData(materialData); break;
+#ifdef HAVE_MGIS
+
             case 500: m_mfront.addMaterialData(materialData); break;
+#endif
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");
         }
@@ -247,7 +262,9 @@ class Behavior
             case 103: return m_henckymises.getMaterialData(); break;
             case 200: return m_neohokean.getMaterialData(); break;
             case 201: return m_cavitation.getMaterialData(); break;
+#ifdef HAVE_MGIS
             case 500: return m_mfront.getMaterialData(); break;
+#endif
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");
         }
@@ -264,7 +281,9 @@ class Behavior
             case 103: return m_henckymises.getMaterialData(); break;
             case 200: return m_neohokean.getMaterialData(); break;
             case 201: return m_cavitation.getMaterialData(); break;
+#ifdef HAVE_MGIS
             case 500: return m_mfront.getMaterialData(); break;
+#endif
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");
         }
@@ -287,7 +306,9 @@ class Behavior
             case 103: return m_henckymises.getNumberOfQP(); break;
             case 200: return m_neohokean.getNumberOfQP(); break;
             case 201: return m_cavitation.getNumberOfQP(); break;
+#ifdef HAVE_MGIS
             case 500: return m_mfront.getNumberOfQP(); break;
+#endif
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");
         }
@@ -304,7 +325,9 @@ class Behavior
             case 103: return m_henckymises.getCellQPs(cell_id).getNumberOfQP(); break;
             case 200: return m_neohokean.getCellQPs(cell_id).getNumberOfQP(); break;
             case 201: return m_cavitation.getCellQPs(cell_id).getNumberOfQP(); break;
+#ifdef HAVE_MGIS
             case 500: return m_mfront.getCellQPs(cell_id).getNumberOfQP(); break;
+#endif
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");
         }
@@ -329,7 +352,9 @@ class Behavior
             case 103: return m_henckymises.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
             case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
             case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
+#ifdef HAVE_MGIS
             case 500: return m_mfront.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
+#endif
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");
         }
@@ -350,9 +375,11 @@ class Behavior
             case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
             case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent);
                 break;
+#ifdef HAVE_MGIS
             case 500:
                 return m_mfront.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent);
                 break;
+#endif
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");
         }
@@ -368,7 +395,9 @@ class Behavior
             case 103: return m_henckymises.update(); break;
             case 200: return m_neohokean.update(); break;
             case 201: return m_cavitation.update(); break;
+#ifdef HAVE_MGIS
             case 500: return m_mfront.update(); break;
+#endif
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");
         }
@@ -386,7 +415,9 @@ class Behavior
             case 103: return m_henckymises.projectStressOnCell(msh, cl, hdi, mate); break;
             case 200: return m_neohokean.projectStressOnCell(msh, cl, hdi, mate); break;
             case 201: return m_cavitation.projectStressOnCell(msh, cl, hdi, mate); break;
+#ifdef HAVE_MGIS
             case 500: return m_mfront.projectStressOnCell(msh, cl, hdi, mate); break;
+#endif
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");
         }

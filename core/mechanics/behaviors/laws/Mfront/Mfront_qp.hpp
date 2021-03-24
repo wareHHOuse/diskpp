@@ -53,6 +53,7 @@ class Mfront_qp : public law_qp_bones<T, DIM>
     typedef static_matrix<scalar_type, DIM, DIM> static_matrix_type;
     typedef static_matrix<scalar_type, 3, 3>     static_matrix_type3D;
     typedef MaterialData<scalar_type>            data_type;
+    typedef std::shared_ptr<mgis::behaviour::Behaviour> BehaviourPtr;
 
   private:
     // internal variables at previous step
@@ -62,16 +63,18 @@ class Mfront_qp : public law_qp_bones<T, DIM>
     static_matrix_type3D m_pstrain_curr;    // plastic strain
     bool                 m_is_plastic_curr; // the gauss point is plastic ?
 
+    BehaviourPtr m_behav; // shared pointer to mgis behaviour
+
   public:
     Mfront_qp() :
       law_qp_bones<T, DIM>(), m_pstrain_prev(static_matrix_type3D::Zero()),
-      m_pstrain_curr(static_matrix_type3D::Zero()), m_is_plastic_curr(false)
+      m_pstrain_curr(static_matrix_type3D::Zero()), m_is_plastic_curr(false), m_behav(nullptr)
     {
     }
 
-    Mfront_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) :
+    Mfront_qp(const point<scalar_type, DIM>& point, const scalar_type& weight, const BehaviourPtr& behav) :
       law_qp_bones<T, DIM>(point, weight), m_pstrain_prev(static_matrix_type3D::Zero()),
-      m_pstrain_curr(static_matrix_type3D::Zero()), m_is_plastic_curr(false)
+      m_pstrain_curr(static_matrix_type3D::Zero()), m_is_plastic_curr(false), m_behav(behav)
     {
     }
 
