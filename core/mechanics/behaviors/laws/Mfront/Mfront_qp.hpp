@@ -111,6 +111,8 @@ class Mfront_qp : public law_qp_bones<T, DIM>
     compute_stress3D(const data_type& data) const
     {
         const auto stressPtr = mgis::behaviour::getThermodynamicForce(m_behavData.s1, "Stress");
+        if (stressPtr != &(m_behavData.s1.thermodynamic_forces[0]))
+            throw std::runtime_error("We assume that the stress is the first variable");
 
         static_matrix_type3D stress;
         convertMatrixFromMgis(m_behavData.s1.thermodynamic_forces, stress);
@@ -141,14 +143,22 @@ class Mfront_qp : public law_qp_bones<T, DIM>
         auto v = mgis::behaviour::make_view(m_behavData);
         mgis::behaviour::integrate(v, *m_behav);
 
-        // compute Cauchy stress
-
+        // compute stress tensor depending on the choice
         const static_matrix_type3D stress = compute_stress3D(data);
+        // compute tangent module (consistent with the stress tensor)
 
-        //printing
+        // std::cout << C << std::endl;
+        // std::cout << convertTensorNotationMangel<scalar_type, 3>(C) << std::endl;
+
+        static_tensor<scalar_type, 3> Aep;
+        convertTensorFromMgis(m_behavData.K, Aep);
+
+        // std::cout << Aep << std::endl;
+
+        // printing
         print_markdown();
 
-        return std::make_pair(stress, C);
+        return std::make_pair(stress, Aep);
     }
 
     std::pair<static_matrix_type, static_tensor<scalar_type, DIM>>
@@ -159,6 +169,8 @@ class Mfront_qp : public law_qp_bones<T, DIM>
 
         const static_matrix_type              stress = convertMatrix<scalar_type, DIM>(behaviors3D.first);
         const static_tensor<scalar_type, DIM> Cep    = convertTensor<scalar_type, DIM>(behaviors3D.second);
+
+        std::cout << Cep << std::endl;
 
         return std::make_pair(stress, Cep);
     }

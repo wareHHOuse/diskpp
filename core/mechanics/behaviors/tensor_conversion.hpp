@@ -37,60 +37,6 @@ namespace disk
 // | A2111  A2112  A2211  A2212 |
 // | A2121  A2122  A2221  A2222 |
 
-// Convert Matrix in Coulum vector
-
-template<typename T>
-static_vector<T, 4>
-converttovector(const static_matrix<T, 2, 2>& mat)
-{
-    return static_vector<T, 4>{mat(0, 0), mat(1, 0), mat(0, 1), mat(1, 1)};
-}
-
-template<typename T>
-static_vector<T, 9>
-converttovector(const static_matrix<T, 3, 3>& mat)
-{
-    return static_vector<T, 9>{
-      mat(0, 0), mat(1, 0), mat(2, 0), mat(0, 1), mat(1, 1), mat(2, 1), mat(0, 2), mat(1, 2), mat(2, 2)};
-}
-
-// Convert vector in matrix
-
-template<typename T>
-static_matrix<T, 2, 2>
-converttomatrix(const static_vector<T, 4>& vec)
-{
-    static_matrix<T, 2, 2> mat;
-
-    mat(0, 0) = vec(0);
-    mat(1, 0) = vec(1);
-
-    mat(0, 1) = vec(2);
-    mat(1, 1) = vec(3);
-
-    return mat;
-}
-
-template<typename T>
-static_matrix<T, 3, 3>
-converttomatrix(const static_vector<T, 9>& vec)
-{
-    static_matrix<T, 3, 3> mat;
-
-    mat(1, 0) = vec(0);
-    mat(2, 0) = vec(1);
-    mat(3, 0) = vec(2);
-
-    mat(1, 1) = vec(3);
-    mat(2, 1) = vec(4);
-    mat(3, 1) = vec(5);
-
-    mat(1, 2) = vec(6);
-    mat(2, 2) = vec(7);
-    mat(3, 2) = vec(8);
-
-    return mat;
-}
 
 template<typename T>
 static_matrix<T, 3, 3>
@@ -267,6 +213,15 @@ convertMatrixToMgis(const static_matrix<T, 3, 3>& mat, std::vector<T2>& mat_vec)
             mat_vec[3] = sqrt(2.) * mat(0, 1);
             break;
         }
+        case 5:
+        {
+            mat_vec[0] = mat(0, 0);
+            mat_vec[1] = mat(1, 1);
+            mat_vec[2] = mat(2, 2);
+            mat_vec[3] = mat(0, 1);
+            mat_vec[4] = mat(1, 0);
+            break;
+        }
         case 6:
         {
             const T rac2 = sqrt(2.);
@@ -276,6 +231,19 @@ convertMatrixToMgis(const static_matrix<T, 3, 3>& mat, std::vector<T2>& mat_vec)
             mat_vec[3]   = rac2 * mat(0, 1);
             mat_vec[4]   = rac2 * mat(0, 2);
             mat_vec[5]   = rac2 * mat(1, 2);
+            break;
+        }
+        case 9:
+        {
+            mat_vec[0]   = mat(0, 0);
+            mat_vec[1]   = mat(1, 1);
+            mat_vec[2]   = mat(2, 2);
+            mat_vec[3]   = mat(0, 1);
+            mat_vec[4]   = mat(1, 0);
+            mat_vec[5]   = mat(0, 2);
+            mat_vec[6]   = mat(2, 0);
+            mat_vec[7]   = mat(1, 2);
+            mat_vec[8]   = mat(2, 1);
             break;
         }
 
@@ -299,6 +267,15 @@ convertMatrixFromMgis(const std::vector<T2>& mat_vec, static_matrix<T, 3, 3>& ma
             mat(1, 0) = mat(0, 1);
             break;
         }
+        case 5:
+        {
+            mat(0, 0) = mat_vec[0];
+            mat(1, 1) = mat_vec[1];
+            mat(2, 2) = mat_vec[2];
+            mat(0, 1) = mat_vec[3];
+            mat(1, 0) = mat_vec[4];
+            break;
+        }
         case 6:
         {
             const T rac2 = sqrt(2.);
@@ -311,6 +288,63 @@ convertMatrixFromMgis(const std::vector<T2>& mat_vec, static_matrix<T, 3, 3>& ma
             mat(2, 0)    = mat(0, 2);
             mat(0, 1)    = mat_vec[5] / sqrt(2.);
             mat(2, 1)    = mat(1, 2);
+            break;
+        }
+        case 9:
+        {
+            mat(0, 0)    = mat_vec[0];
+            mat(1, 1)    = mat_vec[1];
+            mat(2, 2)    = mat_vec[2];
+            mat(0, 1)    = mat_vec[3];
+            mat(1, 0)    = mat_vec[4];
+            mat(0, 2)    = mat_vec[5];
+            mat(2, 0)    = mat_vec[6];
+            mat(1, 2)    = mat_vec[7];
+            mat(2, 1)    = mat_vec[8];
+            break;
+        }
+
+        default: throw std::runtime_error("wrong size"); break;
+    }
+}
+
+template<typename T, typename T2>
+void
+convertTensorFromMgis(const std::vector<T2>& tens_vec, static_tensor<T, 3>& tens )
+{
+    tens.setZero();
+    std::cout << "SIZE: " << tens_vec.size() << std::endl;
+    for (int i = 0; i < tens_vec.size(); i++)
+        std::cout << i << ": " << tens_vec[i] << std::endl;
+    switch (tens_vec.size())
+    {
+        case 16:
+        {
+            const T rac2 = sqrt(2.);
+            coeff<T, 3>(tens, 0, 0, 0, 0, tens_vec[0]);
+            coeff<T, 3>(tens, 0, 0, 1, 1, tens_vec[1]);
+            coeff<T, 3>(tens, 0, 0, 2, 2, tens_vec[2]);
+            coeff<T, 3>(tens, 0, 0, 0, 1, tens_vec[3] / rac2);
+            coeff<T, 3>(tens, 0, 0, 1, 0, coeff<T, 3>(tens, 0, 0, 0, 1));
+            coeff<T, 3>(tens, 1, 1, 0, 0, tens_vec[4]);
+            coeff<T, 3>(tens, 1, 1, 1, 1, tens_vec[5]);
+            coeff<T, 3>(tens, 1, 1, 2, 2, tens_vec[6]);
+            coeff<T, 3>(tens, 1, 1, 0, 1, tens_vec[7] / rac2);
+            coeff<T, 3>(tens, 1, 1, 1, 0, coeff<T, 3>(tens, 1, 1, 0, 1));
+            coeff<T, 3>(tens, 2, 2, 0, 0, tens_vec[8]);
+            coeff<T, 3>(tens, 2, 2, 1, 1, tens_vec[9]);
+            coeff<T, 3>(tens, 2, 2, 2, 2, tens_vec[10]);
+            coeff<T, 3>(tens, 2, 2, 0, 1, tens_vec[11] / rac2);
+            coeff<T, 3>(tens, 2, 2, 1, 0, coeff<T, 3>(tens, 2, 2, 0, 1));
+            coeff<T, 3>(tens, 0, 1, 0, 0, tens_vec[12] / rac2);
+            coeff<T, 3>(tens, 0, 1, 1, 1, tens_vec[13] / rac2);
+            coeff<T, 3>(tens, 0, 1, 2, 2, tens_vec[14] / rac2);
+            coeff<T, 3>(tens, 0, 1, 0, 1, tens_vec[15] / 2.0);
+            coeff<T, 3>(tens, 0, 1, 1, 0, coeff<T, 3>(tens, 0, 1, 0, 1));
+            coeff<T, 3>(tens, 1, 0, 1, 1, coeff<T, 3>(tens, 0, 1, 1, 1));
+            coeff<T, 3>(tens, 1, 0, 2, 2, coeff<T, 3>(tens, 0, 1, 2, 2));
+            coeff<T, 3>(tens, 1, 0, 1, 0, coeff<T, 3>(tens, 0, 1, 1, 0));
+            coeff<T, 3>(tens, 1, 0, 0, 1, coeff<T, 3>(tens, 1, 0, 1, 0));
             break;
         }
 
