@@ -131,7 +131,6 @@ class Mfront_qp : public law_qp_bones<T, DIM>
     compute_whole3D(const static_matrix_type3D& strain_curr, const data_type& data, bool tangentmodulus = true)
     {
         this->m_estrain_curr                  = strain_curr;
-        const static_tensor<scalar_type, 3> C = this->elastic_modulus3D(data);
 
         if( tangentmodulus )
             m_behavData.K[0] = 4.;
@@ -147,16 +146,11 @@ class Mfront_qp : public law_qp_bones<T, DIM>
         const static_matrix_type3D stress = compute_stress3D(data);
         // compute tangent module (consistent with the stress tensor)
 
-        // std::cout << C << std::endl;
-        // std::cout << convertTensorNotationMangel<scalar_type, 3>(C) << std::endl;
-
         static_tensor<scalar_type, 3> Aep;
         convertTensorFromMgis(m_behavData.K, Aep);
 
-        // std::cout << Aep << std::endl;
-
         // printing
-        print_markdown();
+        // print_markdown();
 
         return std::make_pair(stress, Aep);
     }
@@ -169,8 +163,6 @@ class Mfront_qp : public law_qp_bones<T, DIM>
 
         const static_matrix_type              stress = convertMatrix<scalar_type, DIM>(behaviors3D.first);
         const static_tensor<scalar_type, DIM> Cep    = convertTensor<scalar_type, DIM>(behaviors3D.second);
-
-        std::cout << Cep << std::endl;
 
         return std::make_pair(stress, Cep);
     }
