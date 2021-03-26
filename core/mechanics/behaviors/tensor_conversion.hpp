@@ -252,4 +252,69 @@ convertCtoA(const static_tensor<T, 3>& C, const static_matrix<T, 3, 3>& PK2, con
 
     return A;
 }
+
+template<typename T, typename T2>
+void
+convertMatrixToMgis(const static_matrix<T, 3, 3>& mat, std::vector<T2>& mat_vec)
+{
+    switch (mat_vec.size())
+    {
+        case 4:
+        {
+            mat_vec[0] = mat(0, 0);
+            mat_vec[1] = mat(1, 1);
+            mat_vec[2] = mat(2, 2);
+            mat_vec[3] = sqrt(2.) * mat(0, 1);
+            break;
+        }
+        case 6:
+        {
+            const T rac2 = sqrt(2.);
+            mat_vec[0]   = mat(0, 0);
+            mat_vec[1]   = mat(1, 1);
+            mat_vec[2]   = mat(2, 2);
+            mat_vec[3]   = rac2 * mat(0, 1);
+            mat_vec[4]   = rac2 * mat(0, 2);
+            mat_vec[5]   = rac2 * mat(1, 2);
+            break;
+        }
+
+        default: throw std::runtime_error("wrong size"); break;
+    }
+}
+
+template<typename T, typename T2>
+void
+convertMatrixFromMgis(const std::vector<T2>& mat_vec, static_matrix<T, 3, 3>& mat)
+{
+    mat.setZero();
+    switch (mat_vec.size())
+    {
+        case 4:
+        {
+            mat(0, 0) = mat_vec[0];
+            mat(1, 1) = mat_vec[1];
+            mat(2, 2) = mat_vec[2];
+            mat(0, 1) = mat_vec[3] / sqrt(2.);
+            mat(1, 0) = mat(0, 1);
+            break;
+        }
+        case 6:
+        {
+            const T rac2 = sqrt(2.);
+            mat(0, 0)    = mat_vec[0];
+            mat(1, 1)    = mat_vec[1];
+            mat(2, 2)    = mat_vec[2];
+            mat(0, 1)    = mat_vec[3] / sqrt(2.);
+            mat(1, 0)    = mat(0, 1);
+            mat(0, 2)    = mat_vec[4] / sqrt(2.);
+            mat(2, 0)    = mat(0, 2);
+            mat(0, 1)    = mat_vec[5] / sqrt(2.);
+            mat(2, 1)    = mat(1, 2);
+            break;
+        }
+
+        default: throw std::runtime_error("wrong size"); break;
+    }
+}
 }

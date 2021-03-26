@@ -67,7 +67,7 @@ class Mfront_law
 
         for (auto& cl : msh)
         {
-            law_cell_type cell_qp(msh, cl, degree, m_behav);
+            law_cell_type cell_qp(msh, cl, degree, m_behav, m_data);
 
             m_list_cell_qp.push_back(cell_qp);
             m_nb_qp += cell_qp.getNumberOfQP();
@@ -78,6 +78,10 @@ class Mfront_law
     addMaterialData(const data_type materialData)
     {
         m_data = materialData;
+        for (auto& qp_cell : m_list_cell_qp)
+        {
+            qp_cell.addInitialMaterialParameters(m_data);
+        }
     }
 
     data_type
@@ -97,7 +101,7 @@ class Mfront_law
     {
         for (auto& qp_cell : m_list_cell_qp)
         {
-            qp_cell.update();
+            qp_cell.update(m_data);
         }
     }
 

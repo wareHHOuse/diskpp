@@ -129,6 +129,9 @@ main(int argc, char** argv)
 
     material_data.setSigma_y0(0.243);
 
+    material_data.addMfrontParameter("YoungModulus", E);
+    material_data.addMfrontParameter("PoissonRatio", nu);
+
     // readCurve("VEM2_2d.dat", material_data);
 
     // material_data.setK(0.0);

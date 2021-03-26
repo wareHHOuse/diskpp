@@ -52,6 +52,7 @@ class Mfront_law_cell
     const static size_t dimension = mesh_type::dimension;
 
     typedef Mfront_qp<typename MeshType::coordinate_type, MeshType::dimension> law_qp_type;
+    typedef typename law_qp_type::data_type                                    data_type;
 
   private:
     typedef std::shared_ptr<mgis::behaviour::Behaviour> BehaviourPtr;
@@ -63,7 +64,7 @@ class Mfront_law_cell
   public:
     Mfront_law_cell() : m_behav(nullptr) {}
 
-    Mfront_law_cell(const mesh_type& msh, const cell_type& cl, const size_t degree, const BehaviourPtr& b):
+    Mfront_law_cell(const mesh_type& msh, const cell_type& cl, const size_t degree, const BehaviourPtr& b, const data_type& data):
     m_behav(b)
     {
         const auto qps = integrate(msh, cl, degree);
@@ -73,7 +74,9 @@ class Mfront_law_cell
 
         for (auto& qp : qps)
         {
-            m_list_qp.push_back(law_qp_type(qp.point(), qp.weight(), b));
+            auto mqp = law_qp_type(qp.point(), qp.weight(), b);
+            mqp.addMaterialParameters(data);
+            m_list_qp.push_back(mqp);
         }
     }
 
@@ -84,11 +87,22 @@ class Mfront_law_cell
     }
 
     void
-    update()
+    update(const data_type& data)
     {
         for (auto& qp : m_list_qp)
         {
             qp.update();
+            qp.addMaterialParameters(data);
+        }
+    }
+
+    void
+    addInitialMaterialParameters(const data_type& data)
+    {
+        for (auto& qp : m_list_qp)
+        {
+            qp.addMaterialParameters(data);
+            qp.addInitialMaterialParameters(data);
         }
     }
 
