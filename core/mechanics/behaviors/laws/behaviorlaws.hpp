@@ -95,6 +95,8 @@ class Behavior
     size_t m_law;
     size_t m_id;
 
+    material_type m_data;
+
 #ifdef HAVE_MGIS
     typedef std::shared_ptr<mgis::behaviour::Behaviour> BehaviourPtr;
     BehaviourPtr                                        m_behav;
@@ -234,6 +236,7 @@ class Behavior
     void
     addMaterialData(const material_type& materialData)
     {
+        m_data = materialData;
         switch (m_id)
         {
             case 100: m_elastic.addMaterialData(materialData); break;
@@ -254,41 +257,14 @@ class Behavior
     material_type
     getMaterialData(void)
     {
-        switch (m_id)
-        {
-            case 100: return m_elastic.getMaterialData(); break;
-            case 101: return m_linearHard.getMaterialData(); break;
-            case 102: return m_nonlinearHard.getMaterialData(); break;
-            case 103: return m_henckymises.getMaterialData(); break;
-            case 200: return m_neohokean.getMaterialData(); break;
-            case 201: return m_cavitation.getMaterialData(); break;
-#ifdef HAVE_MGIS
-            case 500: return m_mfront.getMaterialData(); break;
-#endif
-
-            default: throw std::invalid_argument("Behavior error: Unknown id law");
-        }
+        return m_data;
     }
 
     const material_type&
     getMaterialData(void) const
     {
-        switch (m_id)
-        {
-            case 100: return m_elastic.getMaterialData(); break;
-            case 101: return m_linearHard.getMaterialData(); break;
-            case 102: return m_nonlinearHard.getMaterialData(); break;
-            case 103: return m_henckymises.getMaterialData(); break;
-            case 200: return m_neohokean.getMaterialData(); break;
-            case 201: return m_cavitation.getMaterialData(); break;
-#ifdef HAVE_MGIS
-            case 500: return m_mfront.getMaterialData(); break;
-#endif
-
-            default: throw std::invalid_argument("Behavior error: Unknown id law");
-        }
+        return m_data;
     }
-
 
     /**
      * @brief Get number of quadrature points for the used law
@@ -342,7 +318,7 @@ class Behavior
     }
 
     auto
-    quadrature_point(const size_t& cell_id, const size_t& qp_id)
+    quadrature_point(const size_t& cell_id, const size_t& qp_id) const
     {
         switch (m_id)
         {
@@ -363,22 +339,69 @@ class Behavior
     std::pair<static_matrix_type, static_tensor_type>
     compute_whole(const size_t& cell_id, const size_t& qp_id, const static_matrix_type& RkT_iqn, bool tangent = true)
     {
-        const material_type& mdata = getMaterialData();
         switch (m_id)
         {
-            case 100: return m_elastic.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
-            case 101: return m_linearHard.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
-            case 102: return m_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
+            case 100: return m_elastic.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent); break;
+            case 101: return m_linearHard.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent); break;
+            case 102: return m_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent); break;
             case 103:
-                return m_henckymises.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent);
+                return m_henckymises.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
                 break;
-            case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent); break;
-            case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent);
+            case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent); break;
+            case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
                 break;
 #ifdef HAVE_MGIS
             case 500:
-                return m_mfront.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, mdata, tangent);
+                return m_mfront.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
                 break;
+#endif
+
+            default: throw std::invalid_argument("Behavior error: Unknown id law");
+        }
+    }
+
+    static_matrix<scalar_type, 3, 3>
+    compute_stress3D(const size_t& cell_id, const size_t& qp_id) const
+    {
+        switch (m_id)
+        {
+            case 100:
+                return m_elastic.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data);
+                break;
+            case 101:
+                return m_linearHard.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data);
+                break;
+            case 102:
+                return m_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data);
+                break;
+            case 103:
+                return m_henckymises.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data);
+                break;
+            case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data); break;
+            case 201:
+                return m_cavitation.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data);
+                break;
+#ifdef HAVE_MGIS
+            case 500: return m_mfront.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data); break;
+#endif
+
+            default: throw std::invalid_argument("Behavior error: Unknown id law");
+        }
+    }
+
+    bool
+    is_plastic(const size_t& cell_id, const size_t& qp_id) const
+    {
+        switch (m_id)
+        {
+            case 100: return m_elastic.getCellQPs(cell_id).getQP(qp_id).is_plastic(); break;
+            case 101: return m_linearHard.getCellQPs(cell_id).getQP(qp_id).is_plastic(); break;
+            case 102: return m_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).is_plastic(); break;
+            case 103: return m_henckymises.getCellQPs(cell_id).getQP(qp_id).is_plastic(); break;
+            case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).is_plastic(); break;
+            case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).is_plastic(); break;
+#ifdef HAVE_MGIS
+            case 500: return m_mfront.getCellQPs(cell_id).getQP(qp_id).is_plastic(); break;
 #endif
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");
@@ -406,17 +429,16 @@ class Behavior
     vector_type
     projectStressOnCell(const MeshType& msh, const cell_type& cl, const hho_degree_info& hdi) const
     {
-        const material_type& mate = this->getMaterialData();
         switch (m_id)
         {
-            case 100: return m_elastic.projectStressOnCell(msh, cl, hdi, mate); break;
-            case 101: return m_linearHard.projectStressOnCell(msh, cl, hdi, mate); break;
-            case 102: return m_nonlinearHard.projectStressOnCell(msh, cl, hdi, mate); break;
-            case 103: return m_henckymises.projectStressOnCell(msh, cl, hdi, mate); break;
-            case 200: return m_neohokean.projectStressOnCell(msh, cl, hdi, mate); break;
-            case 201: return m_cavitation.projectStressOnCell(msh, cl, hdi, mate); break;
+            case 100: return m_elastic.projectStressOnCell(msh, cl, hdi, m_data); break;
+            case 101: return m_linearHard.projectStressOnCell(msh, cl, hdi, m_data); break;
+            case 102: return m_nonlinearHard.projectStressOnCell(msh, cl, hdi, m_data); break;
+            case 103: return m_henckymises.projectStressOnCell(msh, cl, hdi, m_data); break;
+            case 200: return m_neohokean.projectStressOnCell(msh, cl, hdi, m_data); break;
+            case 201: return m_cavitation.projectStressOnCell(msh, cl, hdi, m_data); break;
 #ifdef HAVE_MGIS
-            case 500: return m_mfront.projectStressOnCell(msh, cl, hdi, mate); break;
+            case 500: return m_mfront.projectStressOnCell(msh, cl, hdi, m_data); break;
 #endif
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");

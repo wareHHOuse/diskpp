@@ -37,11 +37,17 @@
 #include "NewtonStep.hpp"
 #include "TimeManager.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "mechanics/behaviors/tensor_conversion.hpp"
 #include "mechanics/contact/ContactManager.hpp"
+#include "mechanics/stress_tensors.hpp"
 
 #include "adaptivity/adaptivity.hpp"
 #include "boundary_conditions/boundary_conditions.hpp"
 #include "methods/hho"
+
+#include "output/gmshConvertMesh.hpp"
+#include "output/gmshDisk.hpp"
+#include "output/postMesh.hpp"
 
 #ifdef HAVE_MGIS
 #include "MGIS/Behaviour/Behaviour.hxx"
@@ -88,6 +94,8 @@ class NewtonSolver
     std::vector<vector_type> m_solution, m_solution_faces, m_solution_mult;
     std::vector<matrix_type> m_gradient_precomputed, m_stab_precomputed;
 
+    PostMesh<mesh_type> m_post_mesh;
+
     bool m_verbose, m_convergence;
 
     void
@@ -111,7 +119,9 @@ class NewtonSolver
                             m_degree_infos.degree(m_msh, bfc, face_degree + 1);
                             break;
                         }
-                        default: { throw std::invalid_argument("Invalid contact type");
+                        default:
+                        {
+                            throw std::invalid_argument("Invalid contact type");
                         }
                     }
                 }
@@ -126,7 +136,7 @@ class NewtonSolver
         const auto dimension = mesh_type::dimension;
 
         size_t total_dof = 0;
-        size_t mult_id = 0;
+        size_t mult_id   = 0;
 
         m_solution.clear();
         m_solution_faces.clear();
@@ -158,11 +168,11 @@ class NewtonSolver
                 }
             }
 
-            for(auto& fc : fcs)
+            for (auto& fc : fcs)
             {
-                if(m_bnd.is_contact_face(fc))
+                if (m_bnd.is_contact_face(fc))
                 {
-                    const auto num_mult_dofs = vector_basis_size(di.grad_degree(), dimension-1, dimension);
+                    const auto num_mult_dofs = vector_basis_size(di.grad_degree(), dimension - 1, dimension);
                     m_solution_mult.push_back(vector_type::Zero(num_mult_dofs));
                     total_dof += num_mult_dofs;
 
@@ -192,6 +202,9 @@ class NewtonSolver
             m_solution_faces.push_back(vector_type::Zero(num_face_dofs));
         }
 
+        // compute mesh for post-processing
+        m_post_mesh = PostMesh<mesh_type>(m_msh);
+
         if (m_verbose)
         {
             std::cout << "** Numbers of cells: " << m_msh.cells_size() << std::endl;
@@ -219,7 +232,7 @@ class NewtonSolver
 
         for (auto& cl : m_msh)
         {
-            //std::cout << m_degree_infos.cellDegreeInfo(m_msh, cl) << std::endl;
+            // std::cout << m_degree_infos.cellDegreeInfo(m_msh, cl) << std::endl;
             /////// Gradient Reconstruction /////////
             if (m_behavior.getDeformation() == SMALL_DEF)
             {
@@ -262,7 +275,9 @@ class NewtonSolver
                         m_stab_precomputed.push_back(make_vector_dg_stabilization(m_msh, cl, m_degree_infos));
                         break;
                     }
-                    case NO: { break;
+                    case NO:
+                    {
+                        break;
                     }
                     default: throw std::invalid_argument("Unknown stabilization");
                 }
@@ -484,7 +499,7 @@ class NewtonSolver
         // list of time step
         ListOfTimeStep<scalar_type> list_time_step(m_rp.m_time_step);
 
-        if( m_verbose )
+        if (m_verbose)
             std::cout << "** Number of time step: " << list_time_step.numberOfTimeStep() << std::endl;
 
         // time of saving
@@ -517,8 +532,15 @@ class NewtonSolver
             m_bnd.multiplyAllFunctionsByAFactor(current_time);
 
             //  Newton correction
-            NewtonSolverInfo newton_info = newton_step.compute(m_msh, m_bnd, m_rp, m_degree_infos,
-              rlf, m_gradient_precomputed, m_stab_precomputed, m_behavior, m_contact_manager);
+            NewtonSolverInfo newton_info = newton_step.compute(m_msh,
+                                                               m_bnd,
+                                                               m_rp,
+                                                               m_degree_infos,
+                                                               rlf,
+                                                               m_gradient_precomputed,
+                                                               m_stab_precomputed,
+                                                               m_behavior,
+                                                               m_contact_manager);
             si.updateInfo(newton_info);
 
             if (m_verbose)
@@ -564,6 +586,12 @@ class NewtonSolver
                         std::cout << "** Save results" << std::endl;
                         std::string name =
                           "result" + std::to_string(mesh_type::dimension) + "D_t" + std::to_string(current_time) + "_";
+
+                        this->output_discontinuous_displacement(name + "depl_disc.msh");
+                        this->output_continuous_displacement(name + "depl_cont.msh");
+                        this->output_stress_GP(name + "stress_GP.msh");
+                        this->output_discontinuous_deformed(name + "deformed_disc.msh");
+                        this->output_is_plastic_GP(name + "plastic_GP.msh");
 
                         m_rp.m_time_save.pop_front();
                         if (m_rp.m_time_save.empty())
@@ -632,8 +660,8 @@ class NewtonSolver
 
         for (auto& cl : m_msh)
         {
-            const auto cdi           = m_degree_infos.degreeInfo(m_msh, cl);
-            const auto num_cell_dofs = vector_basis_size(cdi.degree(), mesh_type::dimension, mesh_type::dimension);
+            const auto cdi             = m_degree_infos.degreeInfo(m_msh, cl);
+            const auto num_cell_dofs   = vector_basis_size(cdi.degree(), mesh_type::dimension, mesh_type::dimension);
             const vector_type comp_dof = m_solution.at(cell_i++).head(num_cell_dofs);
             const vector_type true_dof = project_function(m_msh, cl, cdi.degree(), as, 2);
 
@@ -682,7 +710,7 @@ class NewtonSolver
                         if (m_behavior.getDeformation() == SMALL_DEF)
                         {
                             const auto recons = make_vector_hho_symmetric_laplacian(m_msh, cl, m_degree_infos);
-                            stab = make_vector_hho_stabilization(m_msh, cl, recons.first, m_degree_infos);
+                            stab              = make_vector_hho_stabilization(m_msh, cl, recons.first, m_degree_infos);
                         }
                         else
                         {
@@ -701,7 +729,9 @@ class NewtonSolver
                         stab = make_vector_dg_stabilization(m_msh, cl, m_degree_infos);
                         break;
                     }
-                    case NO: { break;
+                    case NO:
+                    {
+                        break;
                         stab.setZero();
                     }
                     default: throw std::invalid_argument("Unknown stabilization");
@@ -721,6 +751,272 @@ class NewtonSolver
         }
 
         return sqrt(err_dof);
+    }
+
+    void
+    output_discontinuous_displacement(const std::string& filename) const
+    {
+        gmsh::Gmesh gmsh(mesh_type::dimension);
+
+        std::vector<gmsh::Data>          data;    // create data (not used)
+        const std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
+
+        int cell_i   = 0;
+        int nb_nodes = 0;
+        for (auto& cl : m_msh)
+        {
+            const auto              di         = m_degree_infos.cellDegreeInfo(m_msh, cl);
+            const auto              cb         = make_vector_monomial_basis(m_msh, cl, di.cell_degree());
+            const vector_type       x          = m_solution.at(cell_i++).head(cb.size());
+            auto                    cell_nodes = points(m_msh, cl);
+            std::vector<gmsh::Node> new_nodes;
+
+            // loop on the nodes of the cell
+            for (auto& pt : cell_nodes)
+            {
+                nb_nodes++;
+
+                const auto phi  = cb.eval_functions(pt);
+                const auto depl = eval(x, phi);
+
+                const std::vector<double>   deplv = convertToVectorGmsh(depl);
+                const std::array<double, 3> coor  = init_coor(pt);
+
+                // Add a node
+                const gmsh::Node tmp_node(coor, nb_nodes, 0);
+                new_nodes.push_back(tmp_node);
+                gmsh.addNode(tmp_node);
+
+                const gmsh::Data datatmp(nb_nodes, deplv);
+                data.push_back(datatmp);
+            }
+            // Add new element
+            add_element(gmsh, new_nodes);
+        }
+
+        // Create and init a nodedata view
+        gmsh::NodeData nodedata(3, 0.0, "depl_node_disc", data, subdata);
+
+        // Save the view
+        nodedata.saveNodeData(filename, gmsh);
+    }
+
+    void
+    output_continuous_displacement(const std::string& filename) const
+    {
+        const auto dimension = mesh_type::dimension;
+
+        gmsh::Gmesh gmsh    = convertMesh(m_post_mesh);
+        auto        storage = m_post_mesh.mesh().backend_storage();
+
+        const static_vector<scalar_type, dimension> vzero = static_vector<scalar_type, dimension>::Zero();
+
+        const size_t nb_nodes(gmsh.getNumberofNodes());
+
+        // first(number of data at this node), second(cumulated value)
+        std::vector<std::pair<size_t, static_vector<scalar_type, dimension>>> value(nb_nodes, std::make_pair(0, vzero));
+
+        int cell_i = 0;
+        for (auto& cl : m_msh)
+        {
+            const auto        di         = m_degree_infos.cellDegreeInfo(m_msh, cl);
+            const auto        cb         = make_vector_monomial_basis(m_msh, cl, di.cell_degree());
+            const vector_type x          = m_solution.at(cell_i).head(cb.size());
+            auto              cell_nodes = m_post_mesh.nodes_cell(cell_i);
+
+            // Loop on the nodes of the cell
+            for (auto& point_id : cell_nodes)
+            {
+                const auto pt = storage->points[point_id];
+
+                const auto phi  = cb.eval_functions(pt);
+                const auto depl = eval(x, phi);
+
+                // Add displacement at node
+                value[point_id].first++;
+                value[point_id].second += depl;
+            }
+            cell_i++;
+        }
+
+        std::vector<gmsh::Data>    data;    // create data
+        std::vector<gmsh::SubData> subdata; // create subdata
+        data.reserve(nb_nodes);             // data has a size of nb_node
+
+        // Compute the average value and save it
+        for (int i_node = 0; i_node < value.size(); i_node++)
+        {
+            const static_vector<scalar_type, dimension> depl_avr = value[i_node].second / double(value[i_node].first);
+
+            const gmsh::Data tmp_data(i_node + 1, convertToVectorGmsh(depl_avr));
+            data.push_back(tmp_data);
+        }
+
+        // Create and init a nodedata view
+        gmsh::NodeData nodedata(3, 0.0, "depl_node_cont", data, subdata);
+        // Save the view
+        nodedata.saveNodeData(filename, gmsh);
+    }
+
+    void
+    output_stress_GP(const std::string& filename) const
+    {
+        gmsh::Gmesh gmsh = convertMesh(m_post_mesh);
+
+        std::vector<gmsh::Data>    data;    // create data (not used)
+        std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
+        size_t                     nb_nodes(gmsh.getNumberofNodes());
+
+        int cell_i = 0;
+        for (auto& cl : m_msh)
+        {
+            const auto di = m_degree_infos.cellDegreeInfo(m_msh, cl);
+
+            const auto  uTF = m_solution.at(cell_i);
+            matrix_type gr;
+            if (m_rp.m_precomputation)
+            {
+                gr = m_gradient_precomputed.at(cell_i);
+            }
+            else
+            {
+                if (m_behavior.getDeformation() == SMALL_DEF)
+                {
+                    gr = make_matrix_symmetric_gradrec(m_msh, cl, m_degree_infos).first;
+                }
+                else
+                {
+                    gr = make_marix_hho_gradrec(m_msh, cl, m_degree_infos).first;
+                }
+            }
+
+            const vector_type GTuTF = gr * uTF;
+
+            const auto gb  = make_matrix_monomial_basis(m_msh, cl, di.grad_degree());
+            const auto gbs = make_sym_matrix_monomial_basis(m_msh, cl, di.grad_degree());
+
+            // Loop on nodes
+            const auto nb_qp = m_behavior.numberOfQP(cell_i);
+
+            for (int i_qp = 0; i_qp < nb_qp; i_qp++)
+            {
+                const auto          qp = m_behavior.quadrature_point(cell_i, i_qp);
+                std::vector<double> tens;
+
+                if (m_behavior.getDeformation() == SMALL_DEF)
+                {
+                    auto stress = m_behavior.compute_stress3D(cell_i, i_qp);
+                    tens        = convertToVectorGmsh(stress);
+                }
+                else
+                {
+                    const auto gphi      = gb.eval_functions(qp.point());
+                    const auto GT_iqn    = eval(GTuTF, gphi);
+                    const auto FT_iqn    = convertGtoF(GT_iqn);
+                    const auto FT_iqn_3D = convertMatrix3DwithOne(FT_iqn);
+
+                    auto P      = m_behavior.compute_stress3D(cell_i, i_qp);
+                    auto stress = convertPK1toCauchy(P, FT_iqn_3D);
+                    tens        = convertToVectorGmsh(stress);
+                }
+
+                // Add GP
+                // Create a node at gauss point
+                nb_nodes++;
+                const gmsh::Node    new_node = convertPoint(qp.point(), nb_nodes);
+                const gmsh::SubData sdata(tens, new_node);
+                subdata.push_back(sdata); // add subdata
+            }
+            cell_i++;
+        }
+
+        // Save
+        gmsh::NodeData nodedata(9, 0.0, "Stress_GP", data, subdata); // create and init a nodedata view
+
+        nodedata.saveNodeData(filename, gmsh); // save the view
+    }
+
+    void
+    output_is_plastic_GP(const std::string& filename) const
+    {
+        gmsh::Gmesh gmsh = convertMesh(m_post_mesh);
+
+        std::vector<gmsh::Data>    data;    // create data (not used)
+        std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
+        size_t                     nb_nodes(gmsh.getNumberofNodes());
+
+        int cell_i = 0;
+        for (auto& cl : m_msh)
+        {
+            // Loop on nodes
+            const auto nb_qp = m_behavior.numberOfQP(cell_i);
+
+            for (int i_qp = 0; i_qp < nb_qp; i_qp++)
+            {
+                const auto qp = m_behavior.quadrature_point(cell_i, i_qp);
+
+                scalar_type p = 0;
+                if (m_behavior.is_plastic(cell_i, i_qp))
+                    p = 1;
+
+                const std::vector<double> p_s = convertToVectorGmsh(p);
+
+                // Add GP
+                // Create a node at gauss point
+                nb_nodes++;
+                const gmsh::Node    new_node = convertPoint(qp.point(), nb_nodes);
+                const gmsh::SubData sdata(p_s, new_node);
+                subdata.push_back(sdata); // add subdata
+            }
+            cell_i++;
+        }
+
+        // Save
+        gmsh::NodeData nodedata(1, 0.0, "state_GP", data, subdata); // create and init a nodedata view
+
+        nodedata.saveNodeData(filename, gmsh); // save the view
+    }
+
+    void
+    output_discontinuous_deformed(const std::string& filename) const
+    {
+        gmsh::Gmesh gmsh(mesh_type::dimension);
+        auto        storage = m_msh.backend_storage();
+
+        int    cell_i   = 0;
+        size_t nb_nodes = 0;
+        for (auto& cl : m_msh)
+        {
+            const auto di = m_degree_infos.cellDegreeInfo(m_msh, cl);
+
+            auto                    cb         = make_vector_monomial_basis(m_msh, cl, di.cell_degree());
+            const vector_type       x          = m_solution.at(cell_i++).head(cb.size());
+            const auto              cell_nodes = points(m_msh, cl);
+            std::vector<gmsh::Node> new_nodes;
+
+            // Loop on nodes of the cell
+            for (auto& pt : cell_nodes)
+            {
+                nb_nodes++;
+
+                const auto phi  = cb.eval_functions(pt);
+                const auto depl = eval(x, phi);
+
+                std::array<double, 3> coor = init_coor(pt);
+                // Compute new coordinates
+                for (int j = 0; j < mesh_type::dimension; j++)
+                    coor[j] += depl(j);
+
+                // Save node
+                const gmsh::Node tmp_node(coor, nb_nodes, 0);
+                new_nodes.push_back(tmp_node);
+                gmsh.addNode(tmp_node);
+            }
+            // Add new element
+            add_element(gmsh, new_nodes);
+        }
+        // Save mesh
+        gmsh.writeGmesh(filename, 2);
     }
 };
 }
