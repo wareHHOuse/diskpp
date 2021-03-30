@@ -115,16 +115,17 @@ class mechanical_computation
                      const size_t&             cell_id,
                      const size_t&             qp_id,
                      const static_matrix_type& RkT_iqn,
-                     const bool                small_def) const
+                     const bool                small_def,
+                     const bool                use_tangent_modulus) const
     {
         if (small_def)
         {
-            return behavior.compute_whole(cell_id, qp_id, RkT_iqn, false);
+            return behavior.compute_whole(cell_id, qp_id, RkT_iqn, use_tangent_modulus);
         }
         else
         {
             const auto FT_iqn = convertGtoF(RkT_iqn);
-            return behavior.compute_whole(cell_id, qp_id, FT_iqn, false);
+            return behavior.compute_whole(cell_id, qp_id, FT_iqn, use_tangent_modulus);
         }
     }
 
@@ -370,26 +371,28 @@ class mechanical_computation
         assert(RkT.cols() == uTF.rows());
         assert(RkT.rows() == grad_basis_size);
 
-        //   std::cout << "sol" << std::endl;
-        //   std::cout << uTF.transpose() << std::endl;
+        // std::cout << "sol" << std::endl;
+        // std::cout << uTF.transpose() << std::endl;
 
         const vector_type RkT_uTF = RkT * uTF;
 
-        //  std::cout << "RkT: " << RkT.norm() << std::endl;
-        //  std::cout << "RkT_Utf: " << RkT_uTF.transpose() << std::endl;
+        // std::cout << "RkT: " << RkT.norm() << std::endl;
+        // std::cout << "RkT_Utf: " << RkT_uTF.transpose() << std::endl;
 
         const auto gb  = make_matrix_monomial_basis(msh, cl, grad_degree);
         const auto gbs = make_sym_matrix_monomial_basis(msh, cl, grad_degree);
 
         eigen_compatible_stdvector<static_matrix_type> gphi;
 
-        const auto cell_id = msh.lookup(cl);
-        const auto nb_qp   = behavior.numberOfQP(cell_id);
+        const auto cell_id             = msh.lookup(cl);
+        const auto nb_qp               = behavior.numberOfQP(cell_id);
+        const bool use_tangent_modulus = true;
         for (int i_qp = 0; i_qp < nb_qp; i_qp++)
         {
-            //  std::cout << "qp: " << qp.point() << std::endl;
             // Compute gradient basis function
             const auto qp = behavior.quadrature_point(cell_id, i_qp);
+            // std::cout << "qp: " << qp.point() << std::endl;
+
             if (small_def)
             {
                 gphi = gbs.eval_functions(qp.point());
@@ -409,10 +412,11 @@ class mechanical_computation
 
             // Compute behavior
             tc.tic();
-            const auto [stress, Cep] = compute_behavior(behavior, cell_id, i_qp, RkT_iqn, small_def);
-            // std::cout << "stress" << std::endl;
+            const auto [stress, Cep] =
+              compute_behavior(behavior, cell_id, i_qp, RkT_iqn, small_def, use_tangent_modulus);
+            // std::cout << "stress: " << stress.norm() << std::endl;
             // std::cout << stress << std::endl;
-            // std::cout << "Cep" << std::endl;
+            // std::cout << "Cep: " << Cep.norm() << std::endl;
             // std::cout << Cep << std::endl;
             tc.toc();
             time_law += tc.to_double();
