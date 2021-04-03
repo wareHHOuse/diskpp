@@ -192,7 +192,7 @@ class Behavior
       m_law(LawType::MFRONT)
     {
         using namespace mgis::behaviour;
-
+        std::cout << "Loading MFRONT law: " << law << std::endl;
         if (isStandardFiniteStrainBehaviour(filename, law))
         {
             m_deformation         = DeformationMeasure::F_DEF;
@@ -206,6 +206,14 @@ class Behavior
             m_deformation = DeformationMeasure::SMALL_DEF;
             m_behav       = std::make_shared<Behaviour>(load(filename, law, h));
         }
+
+        std::cout << "Material properties: (name, type)" << std::endl;
+        for (const auto& mp : (*m_behav).mps)
+            std::cout << mp.name << ", " << mp.type << std::endl;
+
+        std::cout << "Internal State Variables: (name, type)" << std::endl;
+        for (const auto& is : (*m_behav).isvs)
+            std::cout << is.name << ", " << is.type << std::endl;
 
         select_law();
         switch (m_id)

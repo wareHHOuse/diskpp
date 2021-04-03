@@ -69,11 +69,11 @@ run_nl_solid_mechanics_solver(const Mesh<T, 2, Storage>&      msh,
 #ifdef HAVE_MGIS
     // To use a law developped with Mfront
     const auto hypo = mgis::behaviour::Hypothesis::PLANESTRAIN;
-    const std::string filename = "/Users/npignet/Documents/Outils/mgis1_2/tests/libBehaviourTest.dylib";
-    nl.addBehavior(filename, "Elasticity", hypo);
+    const std::string filename = "src/libBehaviour.dylib";
+    nl.addBehavior(filename, "IsotropicLinearHardeningPlasticity", hypo);
 #else
     // To use a native law from DiSk++
-    nl.addBehavior(disk::DeformationMeasure::SMALL_DEF, disk::LawType::ELASTIC);
+    nl.addBehavior(disk::DeformationMeasure::SMALL_DEF, disk::LawType::LINEAR_HARDENING);
 #endif
 
     nl.addMaterialData(material_data);
@@ -128,11 +128,11 @@ run_nl_solid_mechanics_solver(const Mesh<T, 3, Storage>&      msh,
 #ifdef HAVE_MGIS
     // To use a law developped with Mfront
     const auto        hypo     = mgis::behaviour::Hypothesis::TRIDIMENSIONAL;
-    const std::string filename = "/Users/npignet/Documents/Outils/mgis1_2/tests/libBehaviourTest.dylib";
+    const std::string filename = "src/libBehaviour.dylib";
     nl.addBehavior(filename, "Elasticity", hypo);
 #else
     // To use a native law from DiSk++
-    nl.addBehavior(disk::DeformationMeasure::SMALL_DEF, disk::LawType::ELASTIC);
+    nl.addBehavior(disk::DeformationMeasure::SMALL_DEF, disk::LawType::LINEAR_HARDENING);
 #endif
 
     nl.addMaterialData(material_data);
@@ -184,8 +184,10 @@ main(int argc, char** argv)
 
     material_data.setSigma_y0(0.243);
 
-    material_data.addMfrontParameter("YoungModulus", E);
-    material_data.addMfrontParameter("PoissonRatio", nu);
+    material_data.addMfrontParameter("YoungModulus", material_data.getE());
+    material_data.addMfrontParameter("PoissonRatio", material_data.getNu());
+    material_data.addMfrontParameter("HardeningSlope", material_data.getH());
+    material_data.addMfrontParameter("YieldStrength", material_data.getSigma_y0());
 
     // readCurve("VEM2_2d.dat", material_data);
 
@@ -249,12 +251,12 @@ main(int argc, char** argv)
         return 0;
     }
 
-    /* Medit 3d*/
-    if (std::regex_match(mesh_filename, std::regex(".*\\.medit3d$")))
-    {
-        std::cout << "Guessed mesh format: Medit format" << std::endl;
-        auto msh = disk::load_medit_3d_mesh<RealType>(mesh_filename);
-        run_nl_solid_mechanics_solver(msh, rp, material_data);
-        return 0;
-    }
+    // /* Medit 3d*/
+    // if (std::regex_match(mesh_filename, std::regex(".*\\.medit3d$")))
+    // {
+    //     std::cout << "Guessed mesh format: Medit format" << std::endl;
+    //     auto msh = disk::load_medit_3d_mesh<RealType>(mesh_filename);
+    //     run_nl_solid_mechanics_solver(msh, rp, material_data);
+    //     return 0;
+    // }
 }
