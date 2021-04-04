@@ -233,7 +233,7 @@ class ListOfTimeStep
         const T start_time = CurrentStep.start_time();
         const T end_time   = CurrentStep.end_time();
 
-        const T new_time = (end_time - start_time) / T(2);
+        const T new_time = start_time + (end_time - start_time) / T(2);
 
         const TimeStep<T> newStep1(start_time, new_time, CurrentStep.level() + 1);
         const TimeStep<T> newStep2(new_time, end_time, CurrentStep.level() + 1);
