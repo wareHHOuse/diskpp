@@ -338,16 +338,6 @@ class NewtonSolver
         this->init_degree(cell_degree, face_degree, grad_degree);
         this->init();
 
-        // Precomputation
-        if (m_rp.m_precomputation)
-        {
-            timecounter t1;
-            t1.tic();
-            this->pre_computation();
-            t1.toc();
-            if (m_verbose)
-                std::cout << "Precomputation: " << t1.to_double() << " sec" << std::endl;
-        }
     }
 
     /**
@@ -492,6 +482,17 @@ class NewtonSolver
     SolverInfo
     compute(const LoadFunction& lf)
     {
+        // Precomputation
+        if (m_rp.m_precomputation)
+        {
+            timecounter t1;
+            t1.tic();
+            this->pre_computation();
+            t1.toc();
+            if (m_verbose)
+                std::cout << "Precomputation: " << t1.to_double() << " sec" << std::endl;
+        }
+
         SolverInfo  si;
         timecounter ttot;
         ttot.tic();
@@ -526,7 +527,7 @@ class NewtonSolver
 
             auto rlf = [&lf, &current_time ](const point<scalar_type, mesh_type::dimension>& p) -> auto
             {
-                return priv::inner_product(current_time, lf(p));
+                return disk::priv::inner_product(current_time, lf(p));
             };
 
             m_bnd.multiplyAllFunctionsByAFactor(current_time);

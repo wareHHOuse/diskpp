@@ -33,6 +33,7 @@
 #include "LinearIsotropicAndKinematicHardening/LinearIsotropicAndKinematicHardening_qp.hpp"
 #include "LinearLaw/LinearLaw_qp.hpp"
 #include "Neohookean/Neohookean_qp.hpp"
+#include "mechanics/behaviors/logarithmic_strain/LogarithmicStrain.hpp"
 #include "Mfront/Mfront_law.hpp"
 #include "core/methods/hho"
 #include "law_bones.hpp"
@@ -108,6 +109,11 @@ class Behavior
     LinearElasticityLaw<MeshType>                  m_elastic;
     LinearIsotropicAndKinematicHardening<MeshType> m_linearHard;
     IsotropicHardeningVMis<MeshType>               m_nonlinearHard;
+//
+    mechanics::LogarithmicStrain<LinearElasticityLaw<MeshType>>                  m_log_elastic;
+    mechanics::LogarithmicStrain<LinearIsotropicAndKinematicHardening<MeshType>> m_log_linearHard;
+    mechanics::LogarithmicStrain<IsotropicHardeningVMis<MeshType>>               m_log_nonlinearHard;
+
 #ifdef HAVE_MGIS
     Mfront<MeshType>                               m_mfront;
 #endif
@@ -145,10 +151,9 @@ class Behavior
             case DeformationMeasure::LOGARITHMIC_DEF:
                 switch (m_law)
                 {
-                    // case LawType::ELASTIC: m_id = 300; break;
-                    // case LawType::LINEAR_HARDENING: m_id = 301; break;
-                    // case LawType::NONLINEAR_HARDENING: m_id = 302; break;
-                    // case LawType::HENCKY_MISES: m_id = 303; break;
+                    case LawType::ELASTIC: m_id = 300; break;
+                    case LawType::LINEAR_HARDENING: m_id = 301; break;
+                    case LawType::NONLINEAR_HARDENING: m_id = 302; break;
 #ifdef HAVE_MGIS
                     case LawType::MFRONT: m_id = 500; break;
 #endif
@@ -177,6 +182,16 @@ class Behavior
             case 103: m_henckymises = HenckyMises<MeshType>(msh, degree); break;
             case 200: m_neohokean = Neohookean<MeshType>(msh, degree); break;
             case 201: m_cavitation = Cavitation<MeshType>(msh, degree); break;
+//
+            case 300: m_log_elastic = mechanics::LogarithmicStrain<LinearElasticityLaw<MeshType>>(msh, degree); break;
+            case 301:
+                m_log_linearHard =
+                  mechanics::LogarithmicStrain<LinearIsotropicAndKinematicHardening<MeshType>>(msh, degree);
+                break;
+            case 302:
+                m_log_nonlinearHard =
+                  mechanics::LogarithmicStrain<IsotropicHardeningVMis<MeshType>>(msh, degree);
+                break;
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");
         }
@@ -207,13 +222,20 @@ class Behavior
             m_behav       = std::make_shared<Behaviour>(load(filename, law, h));
         }
 
+        std::cout << "Behaviour type: " << (*m_behav).btype << std::endl;
+        std::cout << "Kinematic: " << (*m_behav).kinematic << std::endl;
+
         std::cout << "Material properties: (name, type)" << std::endl;
         for (const auto& mp : (*m_behav).mps)
-            std::cout << mp.name << ", " << mp.type << std::endl;
+            std::cout << mp.name << ", " << MfrontVariableTypeName(mp.type) << std::endl;
 
         std::cout << "Internal State Variables: (name, type)" << std::endl;
         for (const auto& is : (*m_behav).isvs)
-            std::cout << is.name << ", " << is.type << std::endl;
+            std::cout << is.name << ", " << MfrontVariableTypeName(is.type) << std::endl;
+
+        std::cout << "Thermodynamic forces: (name, type)" << std::endl;
+        for (const auto& fc : (*m_behav).thermodynamic_forces)
+            std::cout << fc.name << ", " << MfrontVariableTypeName(fc.type) << std::endl;
 
         select_law();
         switch (m_id)
@@ -253,6 +275,9 @@ class Behavior
             case 103: m_henckymises.addMaterialData(materialData); break;
             case 200: m_neohokean.addMaterialData(materialData); break;
             case 201: m_cavitation.addMaterialData(materialData); break;
+            case 300: m_log_elastic.addMaterialData(materialData); break;
+            case 301: m_log_linearHard.addMaterialData(materialData); break;
+            case 302: m_log_nonlinearHard.addMaterialData(materialData); break;
 #ifdef HAVE_MGIS
 
             case 500: m_mfront.addMaterialData(materialData); break;
@@ -290,6 +315,9 @@ class Behavior
             case 103: return m_henckymises.getNumberOfQP(); break;
             case 200: return m_neohokean.getNumberOfQP(); break;
             case 201: return m_cavitation.getNumberOfQP(); break;
+            case 300: return m_log_elastic.getNumberOfQP(); break;
+            case 301: return m_log_linearHard.getNumberOfQP(); break;
+            case 302: return m_log_nonlinearHard.getNumberOfQP(); break;
 #ifdef HAVE_MGIS
             case 500: return m_mfront.getNumberOfQP(); break;
 #endif
@@ -309,6 +337,9 @@ class Behavior
             case 103: return m_henckymises.getCellQPs(cell_id).getNumberOfQP(); break;
             case 200: return m_neohokean.getCellQPs(cell_id).getNumberOfQP(); break;
             case 201: return m_cavitation.getCellQPs(cell_id).getNumberOfQP(); break;
+            case 300: return m_log_elastic.getCellQPs(cell_id).getNumberOfQP(); break;
+            case 301: return m_log_linearHard.getCellQPs(cell_id).getNumberOfQP(); break;
+            case 302: return m_log_nonlinearHard.getCellQPs(cell_id).getNumberOfQP(); break;
 #ifdef HAVE_MGIS
             case 500: return m_mfront.getCellQPs(cell_id).getNumberOfQP(); break;
 #endif
@@ -336,6 +367,9 @@ class Behavior
             case 103: return m_henckymises.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
             case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
             case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
+            case 300: return m_log_elastic.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
+            case 301: return m_log_linearHard.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
+            case 302: return m_log_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
 #ifdef HAVE_MGIS
             case 500: return m_mfront.getCellQPs(cell_id).getQP(qp_id).quadrature_point(); break;
 #endif
@@ -357,6 +391,15 @@ class Behavior
                 break;
             case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent); break;
             case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
+                break;
+            case 300:
+                return m_log_elastic.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
+                break;
+            case 301:
+                return m_log_linearHard.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
+                break;
+            case 302:
+                return m_log_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
                 break;
 #ifdef HAVE_MGIS
             case 500:
@@ -389,6 +432,9 @@ class Behavior
             case 201:
                 return m_cavitation.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data);
                 break;
+            case 300: return m_log_elastic.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data); break;
+            case 301: return m_log_linearHard.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data); break;
+            case 302: return m_log_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data); break;
 #ifdef HAVE_MGIS
             case 500: return m_mfront.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data); break;
 #endif
@@ -426,6 +472,9 @@ class Behavior
             case 103: return m_henckymises.update(); break;
             case 200: return m_neohokean.update(); break;
             case 201: return m_cavitation.update(); break;
+            case 300: return m_log_elastic.update(); break;
+            case 301: return m_log_linearHard.update(); break;
+            case 302: return m_log_nonlinearHard.update(); break;
 #ifdef HAVE_MGIS
             case 500: return m_mfront.update(); break;
 #endif

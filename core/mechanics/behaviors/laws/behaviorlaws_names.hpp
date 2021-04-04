@@ -50,6 +50,14 @@ enum LawType : size_t
     MFRONT              = 6
 };
 
+enum MfrontVariableType : size_t
+{
+    SCALAR  = 0,
+    VECTOR  = 1,
+    STENSOR = 2,
+    TENSOR  = 3,
+};
+
 std::string
 DeformationMeasureName(const size_t& def)
 {
@@ -81,4 +89,17 @@ LawTypeName(const size_t& law)
     }
 }
 
+std::string
+MfrontVariableTypeName(const size_t& var)
+{
+    switch (var)
+    {
+        case MfrontVariableType::SCALAR: return "SCALAR"; break;
+        case MfrontVariableType::VECTOR: return "VECTOR"; break;
+        case MfrontVariableType::STENSOR: return "STENSOR"; break;
+        case MfrontVariableType::TENSOR: return "TENSOR"; break;
+
+        default: throw std::invalid_argument("Not known variable"); break;
+    }
+}
 };
