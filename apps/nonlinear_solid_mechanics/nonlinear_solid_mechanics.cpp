@@ -110,19 +110,49 @@ run_nl_solid_mechanics_solver(const Mesh<T, 3, Storage>&      msh,
     typedef disk::static_matrix<T, 3, 3>                result_grad_type;
     typedef disk::vector_boundary_conditions<mesh_type> Bnd_type;
 
+    Bnd_type bnd(msh);
+
     auto load = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0, 0, 0}; };
 
     auto solution = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0, 0, 0}; };
 
-    Bnd_type bnd(msh);
+    auto zero = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 0.0}; };
 
-    // Cook with quadrilaterals
-    auto zero = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0.0, 0, 0}; };
+    auto pres = [material_data](const disk::point<T, 3>& p) -> result_type {
+        result_type er = result_type::Zero();
 
-    auto trac = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0.0, 0.1125, 0}; };
+        er(0) = p.x();
+        er(1) = p.y();
+        er(2) = p.z();
 
-    // bnd.addDirichletBC(disk::CLAMPED, 3, zero);
-    // bnd.addNeumannBC(disk::NEUMANN, 8, trac);
+        er /= er.norm();
+
+        return 3 * er;
+    };
+
+    auto deplr = [material_data](const disk::point<T, 3>& p) -> result_type {
+        result_type er = result_type::Zero();
+
+        er(0) = p.x();
+        er(1) = p.y();
+        er(2) = p.z();
+
+        er /= er.norm();
+
+        return 0.157 * er;
+    };
+
+    // Sphere Hpp
+    // bnd.addDirichletBC(disk::DX, 3, zero);
+    // bnd.addDirichletBC(disk::DY, 13, zero);
+    // bnd.addDirichletBC(disk::DZ, 24, zero);
+    // bnd.addNeumannBC(disk::NEUMANN, 27, pres);
+
+    // // Sphere GDEF
+    bnd.addDirichletBC(disk::DX, 12, zero);
+    bnd.addDirichletBC(disk::DY, 24, zero);
+    bnd.addDirichletBC(disk::DZ, 19, zero);
+    bnd.addDirichletBC(disk::DIRICHLET, 27, deplr);
 
     disk::mechanics::NewtonSolver<mesh_type> nl(msh, bnd, rp);
 
@@ -130,7 +160,7 @@ run_nl_solid_mechanics_solver(const Mesh<T, 3, Storage>&      msh,
     // To use a law developped with Mfront
     const auto        hypo     = mgis::behaviour::Hypothesis::TRIDIMENSIONAL;
     const std::string filename = "src/libBehaviour.dylib";
-    nl.addBehavior(filename, "Elasticity", hypo);
+    nl.addBehavior(filename, "LogarithmicStrainPlasticity", hypo);
 #else
     // To use a native law from DiSk++
     nl.addBehavior(disk::DeformationMeasure::SMALL_DEF, disk::LawType::LINEAR_HARDENING);
@@ -252,12 +282,12 @@ main(int argc, char** argv)
         return 0;
     }
 
-    // /* Medit 3d*/
-    // if (std::regex_match(mesh_filename, std::regex(".*\\.medit3d$")))
-    // {
-    //     std::cout << "Guessed mesh format: Medit format" << std::endl;
-    //     auto msh = disk::load_medit_3d_mesh<RealType>(mesh_filename);
-    //     run_nl_solid_mechanics_solver(msh, rp, material_data);
-    //     return 0;
-    // }
+    /* Medit 3d*/
+    if (std::regex_match(mesh_filename, std::regex(".*\\.medit3d$")))
+    {
+        std::cout << "Guessed mesh format: Medit format" << std::endl;
+        auto msh = disk::load_medit_3d_mesh<RealType>(mesh_filename);
+        run_nl_solid_mechanics_solver(msh, rp, material_data);
+        return 0;
+    }
 }

@@ -482,6 +482,100 @@ convertTensorFromMgis(const std::vector<T2>& tens_vec, static_tensor<T, 3>& tens
             break;
         }
 
+        case 81:
+        {
+            coeff<T, 3>(tens, 0, 0, 0, 0, tens_vec[0]);
+            coeff<T, 3>(tens, 0, 0, 1, 1, tens_vec[1]);
+            coeff<T, 3>(tens, 0, 0, 2, 2, tens_vec[2]);
+            coeff<T, 3>(tens, 0, 0, 0, 1, tens_vec[3]);
+            coeff<T, 3>(tens, 0, 0, 1, 0, tens_vec[4]);
+            coeff<T, 3>(tens, 0, 0, 0, 2, tens_vec[5]);
+            coeff<T, 3>(tens, 0, 0, 2, 0, tens_vec[6]);
+            coeff<T, 3>(tens, 0, 0, 1, 2, tens_vec[7]);
+            coeff<T, 3>(tens, 0, 0, 2, 1, tens_vec[8]);
+            //
+            coeff<T, 3>(tens, 1, 1, 0, 0, tens_vec[9]);
+            coeff<T, 3>(tens, 1, 1, 1, 1, tens_vec[10]);
+            coeff<T, 3>(tens, 1, 1, 2, 2, tens_vec[11]);
+            coeff<T, 3>(tens, 1, 1, 0, 1, tens_vec[12]);
+            coeff<T, 3>(tens, 1, 1, 1, 0, tens_vec[13]);
+            coeff<T, 3>(tens, 1, 1, 0, 2, tens_vec[14]);
+            coeff<T, 3>(tens, 1, 1, 2, 0, tens_vec[15]);
+            coeff<T, 3>(tens, 1, 1, 1, 2, tens_vec[16]);
+            coeff<T, 3>(tens, 1, 1, 2, 1, tens_vec[17]);
+            //
+            coeff<T, 3>(tens, 2, 2, 0, 0, tens_vec[18]);
+            coeff<T, 3>(tens, 2, 2, 1, 1, tens_vec[19]);
+            coeff<T, 3>(tens, 2, 2, 2, 2, tens_vec[20]);
+            coeff<T, 3>(tens, 2, 2, 0, 1, tens_vec[21]);
+            coeff<T, 3>(tens, 2, 2, 1, 0, tens_vec[22]);
+            coeff<T, 3>(tens, 2, 2, 0, 2, tens_vec[23]);
+            coeff<T, 3>(tens, 2, 2, 2, 0, tens_vec[24]);
+            coeff<T, 3>(tens, 2, 2, 1, 2, tens_vec[25]);
+            coeff<T, 3>(tens, 2, 2, 2, 1, tens_vec[26]);
+            //
+            coeff<T, 3>(tens, 0, 1, 0, 0, tens_vec[27]);
+            coeff<T, 3>(tens, 0, 1, 1, 1, tens_vec[28]);
+            coeff<T, 3>(tens, 0, 1, 2, 2, tens_vec[29]);
+            coeff<T, 3>(tens, 0, 1, 0, 1, tens_vec[30]);
+            coeff<T, 3>(tens, 0, 1, 1, 0, tens_vec[31]);
+            coeff<T, 3>(tens, 0, 1, 0, 2, tens_vec[32]);
+            coeff<T, 3>(tens, 0, 1, 2, 0, tens_vec[33]);
+            coeff<T, 3>(tens, 0, 1, 1, 2, tens_vec[34]);
+            coeff<T, 3>(tens, 0, 1, 2, 1, tens_vec[35]);
+            //
+            coeff<T, 3>(tens, 1, 0, 0, 0, tens_vec[36]);
+            coeff<T, 3>(tens, 1, 0, 1, 1, tens_vec[37]);
+            coeff<T, 3>(tens, 1, 0, 2, 2, tens_vec[38]);
+            coeff<T, 3>(tens, 1, 0, 0, 1, tens_vec[39]);
+            coeff<T, 3>(tens, 1, 0, 1, 0, tens_vec[40]);
+            coeff<T, 3>(tens, 1, 0, 0, 2, tens_vec[41]);
+            coeff<T, 3>(tens, 1, 0, 2, 0, tens_vec[42]);
+            coeff<T, 3>(tens, 1, 0, 1, 2, tens_vec[43]);
+            coeff<T, 3>(tens, 1, 0, 2, 1, tens_vec[44]);
+            //
+            coeff<T, 3>(tens, 0, 2, 0, 0, tens_vec[45]);
+            coeff<T, 3>(tens, 0, 2, 1, 1, tens_vec[46]);
+            coeff<T, 3>(tens, 0, 2, 2, 2, tens_vec[47]);
+            coeff<T, 3>(tens, 0, 2, 0, 1, tens_vec[48]);
+            coeff<T, 3>(tens, 0, 2, 1, 0, tens_vec[49]);
+            coeff<T, 3>(tens, 0, 2, 0, 2, tens_vec[50]);
+            coeff<T, 3>(tens, 0, 2, 2, 0, tens_vec[51]);
+            coeff<T, 3>(tens, 0, 2, 1, 2, tens_vec[52]);
+            coeff<T, 3>(tens, 0, 2, 2, 1, tens_vec[53]);
+            //
+            coeff<T, 3>(tens, 2, 0, 0, 0, tens_vec[54]);
+            coeff<T, 3>(tens, 2, 0, 1, 1, tens_vec[55]);
+            coeff<T, 3>(tens, 2, 0, 2, 2, tens_vec[56]);
+            coeff<T, 3>(tens, 2, 0, 0, 1, tens_vec[57]);
+            coeff<T, 3>(tens, 2, 0, 1, 0, tens_vec[58]);
+            coeff<T, 3>(tens, 2, 0, 0, 2, tens_vec[59]);
+            coeff<T, 3>(tens, 2, 0, 2, 0, tens_vec[60]);
+            coeff<T, 3>(tens, 2, 0, 1, 2, tens_vec[61]);
+            coeff<T, 3>(tens, 2, 0, 2, 1, tens_vec[62]);
+            //
+            coeff<T, 3>(tens, 1, 2, 0, 0, tens_vec[63]);
+            coeff<T, 3>(tens, 1, 2, 1, 1, tens_vec[64]);
+            coeff<T, 3>(tens, 1, 2, 2, 2, tens_vec[65]);
+            coeff<T, 3>(tens, 1, 2, 0, 1, tens_vec[66]);
+            coeff<T, 3>(tens, 1, 2, 1, 0, tens_vec[67]);
+            coeff<T, 3>(tens, 1, 2, 0, 2, tens_vec[68]);
+            coeff<T, 3>(tens, 1, 2, 2, 0, tens_vec[69]);
+            coeff<T, 3>(tens, 1, 2, 1, 2, tens_vec[70]);
+            coeff<T, 3>(tens, 1, 2, 2, 1, tens_vec[71]);
+            //
+            coeff<T, 3>(tens, 2, 1, 0, 0, tens_vec[72]);
+            coeff<T, 3>(tens, 2, 1, 1, 1, tens_vec[73]);
+            coeff<T, 3>(tens, 2, 1, 2, 2, tens_vec[74]);
+            coeff<T, 3>(tens, 2, 1, 0, 1, tens_vec[75]);
+            coeff<T, 3>(tens, 2, 1, 1, 0, tens_vec[76]);
+            coeff<T, 3>(tens, 2, 1, 0, 2, tens_vec[77]);
+            coeff<T, 3>(tens, 2, 1, 2, 0, tens_vec[78]);
+            coeff<T, 3>(tens, 2, 1, 1, 2, tens_vec[79]);
+            coeff<T, 3>(tens, 2, 1, 2, 1, tens_vec[80]);
+            break;
+        }
+
         default: throw std::runtime_error("wrong size"); break;
     }
 }
