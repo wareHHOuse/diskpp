@@ -11,4 +11,9 @@ if (BUILD_APP_NSM)
 	add_executable(elasticity_test elasticity_test.cpp)
 	target_link_libraries(elasticity_test ${LINK_LIBS})
 	install(TARGETS elasticity_test RUNTIME DESTINATION bin)
+
+	add_executable(hyperelasticity_test hyperelasticity_test.cpp)
+	target_link_libraries(hyperelasticity_test ${LINK_LIBS})
+	install(TARGETS hyperelasticity_test RUNTIME DESTINATION bin)
+
 endif ()
