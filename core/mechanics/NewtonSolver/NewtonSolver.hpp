@@ -251,18 +251,19 @@ class NewtonSolver
                 {
                     case HHO:
                     {
-                        if (m_behavior.getDeformation() == SMALL_DEF)
-                        {
-                            const auto recons = make_vector_hho_symmetric_laplacian(m_msh, cl, m_degree_infos);
-                            m_stab_precomputed.push_back(
-                              make_vector_hho_stabilization(m_msh, cl, recons.first, m_degree_infos));
-                        }
-                        else
-                        {
+                        // we do not make any difference for the displacement reconstruction
+                        // if (m_behavior.getDeformation() == SMALL_DEF)
+                        // {
+                        //     const auto recons = make_vector_hho_symmetric_laplacian(m_msh, cl, m_degree_infos);
+                        //     m_stab_precomputed.push_back(
+                        //       make_vector_hho_stabilization(m_msh, cl, recons.first, m_degree_infos));
+                        // }
+                        // else
+                        // {
                             const auto recons_scalar = make_scalar_hho_laplacian(m_msh, cl, m_degree_infos);
                             m_stab_precomputed.push_back(
                               make_vector_hho_stabilization_optim(m_msh, cl, recons_scalar.first, m_degree_infos));
-                        }
+                        // }
                         break;
                     }
                     case HDG:
@@ -708,16 +709,17 @@ class NewtonSolver
                 {
                     case HHO:
                     {
-                        if (m_behavior.getDeformation() == SMALL_DEF)
-                        {
-                            const auto recons = make_vector_hho_symmetric_laplacian(m_msh, cl, m_degree_infos);
-                            stab              = make_vector_hho_stabilization(m_msh, cl, recons.first, m_degree_infos);
-                        }
-                        else
-                        {
+                        // we do not make any difference for thre displacement reconstruction
+                        // if (m_behavior.getDeformation() == SMALL_DEF)
+                        // {
+                        //     const auto recons = make_vector_hho_symmetric_laplacian(m_msh, cl, m_degree_infos);
+                        //     stab              = make_vector_hho_stabilization(m_msh, cl, recons.first, m_degree_infos);
+                        // }
+                        // else
+                        // {
                             const auto recons_scalar = make_scalar_hho_laplacian(m_msh, cl, m_degree_infos);
                             stab = make_vector_hho_stabilization_optim(m_msh, cl, recons_scalar.first, m_degree_infos);
-                        }
+                        // }
                         break;
                     }
                     case HDG:

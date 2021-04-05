@@ -230,17 +230,18 @@ class NewtonIteration
                         case HHO:
                         {
                             matrix_type stab_HHO;
-                            if (small_def)
-                            {
-                                const auto recons = make_vector_hho_symmetric_laplacian(msh, cl, degree_infos);
-                                stab_HHO          = make_vector_hho_stabilization(msh, cl, recons.first, degree_infos);
-                            }
-                            else
-                            {
+                            // we do not make any difference for the displacement reconstruction
+                            // if (small_def)
+                            // {
+                            //     const auto recons = make_vector_hho_symmetric_laplacian(msh, cl, degree_infos);
+                            //     stab_HHO          = make_vector_hho_stabilization(msh, cl, recons.first, degree_infos);
+                            // }
+                            // else
+                            // {
                                 const auto recons_scalar = make_scalar_hho_laplacian(msh, cl, degree_infos);
                                 stab_HHO =
                                   make_vector_hho_stabilization_optim(msh, cl, recons_scalar.first, degree_infos);
-                            }
+                            // }
 
                             assert(elem.K_int.rows() == stab_HHO.rows());
                             assert(elem.K_int.cols() == stab_HHO.cols());
