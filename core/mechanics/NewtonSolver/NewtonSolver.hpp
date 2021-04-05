@@ -591,7 +591,7 @@ class NewtonSolver
 
                         this->output_discontinuous_displacement(name + "depl_disc.msh");
                         this->output_continuous_displacement(name + "depl_cont.msh");
-                        this->output_stress_GP(name + "stress_GP.msh");
+                        this->output_CauchyStress_GP(name + "stress_GP.msh");
                         this->output_discontinuous_deformed(name + "deformed_disc.msh");
                         this->output_is_plastic_GP(name + "plastic_GP.msh");
 
@@ -862,7 +862,7 @@ class NewtonSolver
     }
 
     void
-    output_stress_GP(const std::string& filename) const
+    output_CauchyStress_GP(const std::string& filename) const
     {
         gmsh::Gmesh gmsh = convertMesh(m_post_mesh);
 

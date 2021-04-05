@@ -353,6 +353,40 @@ convertTensorFromMgis(const std::vector<T2>& tens_vec, static_tensor<T, 3>& tens
             break;
         }
 
+        case 25:
+        {
+            coeff<T, 3>(tens, 0, 0, 0, 0, tens_vec[0]);
+            coeff<T, 3>(tens, 0, 0, 1, 1, tens_vec[1]);
+            coeff<T, 3>(tens, 0, 0, 2, 2, tens_vec[2]);
+            coeff<T, 3>(tens, 0, 0, 0, 1, tens_vec[3]);
+            coeff<T, 3>(tens, 0, 0, 1, 0, tens_vec[4]);
+            //
+            coeff<T, 3>(tens, 1, 1, 0, 0, tens_vec[5]);
+            coeff<T, 3>(tens, 1, 1, 1, 1, tens_vec[6]);
+            coeff<T, 3>(tens, 1, 1, 2, 2, tens_vec[7]);
+            coeff<T, 3>(tens, 1, 1, 0, 1, tens_vec[8]);
+            coeff<T, 3>(tens, 1, 1, 1, 0, tens_vec[9]);
+            //
+            coeff<T, 3>(tens, 2, 2, 0, 0, tens_vec[10]);
+            coeff<T, 3>(tens, 2, 2, 1, 1, tens_vec[11]);
+            coeff<T, 3>(tens, 2, 2, 2, 2, tens_vec[12]);
+            coeff<T, 3>(tens, 2, 2, 0, 1, tens_vec[13]);
+            coeff<T, 3>(tens, 2, 2, 1, 0, tens_vec[14]);
+            //
+            coeff<T, 3>(tens, 0, 1, 0, 0, tens_vec[15]);
+            coeff<T, 3>(tens, 0, 1, 1, 1, tens_vec[16]);
+            coeff<T, 3>(tens, 0, 1, 2, 2, tens_vec[17]);
+            coeff<T, 3>(tens, 0, 1, 0, 1, tens_vec[18]);
+            coeff<T, 3>(tens, 0, 1, 1, 0, tens_vec[19]);
+            //
+            coeff<T, 3>(tens, 1, 0, 0, 0, tens_vec[20]);
+            coeff<T, 3>(tens, 1, 0, 1, 1, tens_vec[21]);
+            coeff<T, 3>(tens, 1, 0, 2, 2, tens_vec[22]);
+            coeff<T, 3>(tens, 1, 0, 0, 1, tens_vec[23]);
+            coeff<T, 3>(tens, 1, 0, 1, 0, tens_vec[24]);
+            break;
+        }
+
         case 36:
         {
             const T rac2 = sqrt(2.);

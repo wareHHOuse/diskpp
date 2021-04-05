@@ -59,7 +59,7 @@ run_nl_solid_mechanics_solver(const Mesh<T, 2, Storage>&      msh,
     // Cook with quadrilaterals
     auto zero = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
 
-    auto trac = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0.0, 0.1125}; };
+    auto trac = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0.0, 0.3125}; };
 
     bnd.addDirichletBC(disk::CLAMPED, 3, zero);
     bnd.addNeumannBC(disk::NEUMANN, 8, trac);
@@ -70,10 +70,11 @@ run_nl_solid_mechanics_solver(const Mesh<T, 2, Storage>&      msh,
     // To use a law developped with Mfront
     const auto hypo = mgis::behaviour::Hypothesis::PLANESTRAIN;
     const std::string filename = "src/libBehaviour.dylib";
-    nl.addBehavior(filename, "IsotropicLinearHardeningPlasticity", hypo);
+    // nl.addBehavior(filename, "IsotropicLinearHardeningPlasticity", hypo);
+    nl.addBehavior(filename, "LogarithmicStrainPlasticity", hypo);
 #else
     // To use a native law from DiSk++
-    nl.addBehavior(disk::DeformationMeasure::SMALL_DEF, disk::LawType::LINEAR_HARDENING);
+    nl.addBehavior(disk::DeformationMeasure::LOGARITHMIC_DEF, disk::LawType::LINEAR_HARDENING);
 #endif
 
     nl.addMaterialData(material_data);
