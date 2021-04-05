@@ -454,6 +454,9 @@ class Behavior
             case 103: return m_henckymises.getCellQPs(cell_id).getQP(qp_id).is_plastic(); break;
             case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).is_plastic(); break;
             case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).is_plastic(); break;
+            case 300: return m_log_elastic.getCellQPs(cell_id).getQP(qp_id).is_plastic(); break;
+            case 301: return m_log_linearHard.getCellQPs(cell_id).getQP(qp_id).is_plastic(); break;
+            case 302: return m_log_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).is_plastic(); break;
 #ifdef HAVE_MGIS
             case 500: return m_mfront.getCellQPs(cell_id).getQP(qp_id).is_plastic(); break;
 #endif
