@@ -551,6 +551,9 @@ class NewtonIteration
 
         const scalar_type error = std::max(relative_displ, relative_error);
 
+        if(!isfinite(error))
+            throw std::runtime_error("Norm of residual is not finite");
+
         if (error <= rp.m_epsilon)
         {
             return true;

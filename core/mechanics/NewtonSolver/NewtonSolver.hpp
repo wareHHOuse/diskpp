@@ -413,11 +413,15 @@ class NewtonSolver
     void
     addBehavior(const size_t deformation, const size_t law)
     {
+        if (m_verbose)
+        {
+            std::cout << "Add behavior ..." << std::endl;
+        }
+
         m_behavior = behavior_type(m_msh, 2 * m_rp.m_grad_degree, deformation, law);
 
         if (m_verbose)
         {
-            std::cout << "Add behavior ..." << std::endl;
             std::cout << "** Deformations: " << m_behavior.getDeformationName() << std::endl;
             std::cout << "** Law: " << m_behavior.getLawName() << std::endl;
             std::cout << "** Number of integration points: " << m_behavior.numberOfQP() << std::endl;
@@ -434,11 +438,15 @@ class NewtonSolver
     void
     addBehavior(const std::string& filename, const std::string& law, const mgis::behaviour::Hypothesis h)
     {
+        if (m_verbose)
+        {
+            std::cout << "Add behavior ..." << std::endl;
+        }
+
         m_behavior = behavior_type(m_msh, 2 * m_rp.m_grad_degree, filename, law, h);
 
         if (m_verbose)
         {
-            std::cout << "Add behavior ..." << std::endl;
             std::cout << "** Deformations: " << m_behavior.getDeformationName() << std::endl;
             std::cout << "** Law: " << m_behavior.getLawName() << std::endl;
             std::cout << "** Number of integration points: " << m_behavior.numberOfQP() << std::endl;
@@ -591,7 +599,8 @@ class NewtonSolver
 
                         this->output_discontinuous_displacement(name + "depl_disc.msh");
                         this->output_continuous_displacement(name + "depl_cont.msh");
-                        this->output_CauchyStress_GP(name + "stress_GP.msh");
+                        this->output_CauchyStress_GP(name + "CauchyStress_GP.msh");
+                        this->output_CauchyStress_GP(name + "CauchyStress_GP_def.msh", true);
                         this->output_discontinuous_deformed(name + "deformed_disc.msh");
                         this->output_is_plastic_GP(name + "plastic_GP.msh");
 
@@ -862,7 +871,7 @@ class NewtonSolver
     }
 
     void
-    output_CauchyStress_GP(const std::string& filename) const
+    output_CauchyStress_GP(const std::string& filename, bool def = false) const
     {
         gmsh::Gmesh gmsh = convertMesh(m_post_mesh);
 
@@ -898,6 +907,9 @@ class NewtonSolver
             const auto gb  = make_matrix_monomial_basis(m_msh, cl, di.grad_degree());
             const auto gbs = make_sym_matrix_monomial_basis(m_msh, cl, di.grad_degree());
 
+            const auto              cb = make_vector_monomial_basis(m_msh, cl, di.cell_degree());
+            const vector_type uT  = uTF.head(cb.size());
+
             // Loop on nodes
             const auto nb_qp = m_behavior.numberOfQP(cell_i);
 
@@ -923,10 +935,22 @@ class NewtonSolver
                     tens        = convertToVectorGmsh(stress);
                 }
 
+                std::array<double, 3> coor = init_coor(qp.point());
+
+                if(def)
+                {
+                    const auto cphi = cb.eval_functions(qp.point());
+                    const auto depl = eval(uT, cphi);
+
+                    // Compute new coordinates
+                    for (int j = 0; j < mesh_type::dimension; j++)
+                        coor[j] += depl(j);
+                }
+
                 // Add GP
                 // Create a node at gauss point
                 nb_nodes++;
-                const gmsh::Node    new_node = convertPoint(qp.point(), nb_nodes);
+                const gmsh::Node    new_node(coor, nb_nodes, 0);
                 const gmsh::SubData sdata(tens, new_node);
                 subdata.push_back(sdata); // add subdata
             }
@@ -934,7 +958,7 @@ class NewtonSolver
         }
 
         // Save
-        gmsh::NodeData nodedata(9, 0.0, "Stress_GP", data, subdata); // create and init a nodedata view
+        gmsh::NodeData nodedata(9, 0.0, "CauchyStress_GP", data, subdata); // create and init a nodedata view
 
         nodedata.saveNodeData(filename, gmsh); // save the view
     }
