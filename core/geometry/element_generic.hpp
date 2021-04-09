@@ -199,15 +199,11 @@ public:
     }
 };
 
-/* EDGE */
+/* NODE */
 template<size_t DIM>
-class generic_element<DIM, DIM-1>
+class generic_element<DIM, DIM>
 {
-    using sub_id_type = typename generic_element_traits<generic_element>::subelement_type::id_type;
-    using ptid_type = point_identifier<DIM>;
-
-    std::array<sub_id_type, 2>  sub_elem_ids;
-    std::array<ptid_type, 2>    assoc_points;
+    point_identifier<DIM>    m_assoc_point;
 
 public:
     typedef typename generic_element_traits<generic_element>::id_type          id_type;
@@ -215,7 +211,47 @@ public:
     generic_element()
     {}
 
-    generic_element(const sub_id_type& n0, const sub_id_type& n1)
+    explicit generic_element(point_identifier<DIM> assoc_point)
+    {
+        m_assoc_point = assoc_point;
+    }
+
+    std::vector<point_identifier<DIM>>
+    point_ids(void) const
+    {
+        return std::vector<point_identifier<DIM>>{{m_assoc_point}};
+    }
+
+    bool operator<(const generic_element& other) const
+    {
+        return this->m_assoc_point < other.m_assoc_point;
+    }
+
+    bool operator==(const generic_element& other) const
+    {
+        return this->m_assoc_point == other.m_assoc_point;
+    }
+};
+
+/* EDGE */
+template<size_t DIM, typename Derived>
+class generic_element_edge
+{
+public: 
+    using sub_id_type = typename generic_element_traits<Derived>::subelement_type::id_type;
+    using ptid_type = point_identifier<DIM>;
+
+private:
+    std::array<sub_id_type, 2>  sub_elem_ids;
+    std::array<ptid_type, 2>    assoc_points;
+
+public:
+    typedef typename generic_element_traits<Derived>::id_type          id_type;
+
+    generic_element_edge()
+    {}
+
+    generic_element_edge(const sub_id_type& n0, const sub_id_type& n1)
     {
         /* Assume node ids == point ids. Use set_point_ids() below if that
          * is not the case. */
@@ -252,12 +288,12 @@ public:
         return sub_elem_ids;
     }
 
-    bool operator<(const generic_element& other) const
+    bool operator<(const generic_element_edge& other) const
     {
         return (sub_elem_ids < other.sub_elem_ids);
     }
 
-    bool operator==(const generic_element& other) const
+    bool operator==(const generic_element_edge& other) const
     {
         return std::equal(sub_elem_ids.begin(), sub_elem_ids.end(),
                           other.sub_elem_ids.begin());
@@ -271,39 +307,53 @@ public:
     size_t subelement_size() const { return sub_elem_ids.size(); }
 };
 
-/* NODE */
-template<size_t DIM>
-class generic_element<DIM, DIM>
+template<>
+class generic_element<3,2> : public generic_element_edge<3, generic_element<3,2>>
 {
-    point_identifier<DIM>    m_assoc_point;
+    using base = generic_element_edge<3, generic_element<3,2>>;
 
 public:
-    typedef typename generic_element_traits<generic_element>::id_type          id_type;
-
     generic_element()
+        : base()
     {}
 
-    explicit generic_element(point_identifier<DIM> assoc_point)
-    {
-        m_assoc_point = assoc_point;
-    }
-
-    std::vector<point_identifier<DIM>>
-    point_ids(void) const
-    {
-        return std::vector<point_identifier<DIM>>{{m_assoc_point}};
-    }
-
-    bool operator<(const generic_element& other) const
-    {
-        return this->m_assoc_point < other.m_assoc_point;
-    }
-
-    bool operator==(const generic_element& other) const
-    {
-        return this->m_assoc_point == other.m_assoc_point;
-    }
+    generic_element(const base::sub_id_type& n0, const base::sub_id_type& n1)
+        : base(n0, n1)
+    {}
 };
+
+template<>
+class generic_element<2,1> : public generic_element_edge<2, generic_element<2,1>>
+{
+    using base = generic_element_edge<2, generic_element<2,1>>;
+
+public:
+    generic_element()
+        : base()
+    {}
+
+    generic_element(const base::sub_id_type& n0, const base::sub_id_type& n1)
+        : base(n0, n1)
+    {}
+};
+
+template<>
+class generic_element<1,0> : public generic_element_edge<1, generic_element<1,0>>
+{
+    using base = generic_element_edge<1, generic_element<1,0>>;
+
+public:
+    generic_element()
+        : base()
+    {}
+
+    generic_element(const base::sub_id_type& n0, const base::sub_id_type& n1)
+        : base(n0, n1)
+    {}
+};
+
+
+
 
 /* Output streaming operator for elements */
 template<size_t DIM, size_t CODIM>
