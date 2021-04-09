@@ -76,17 +76,17 @@ template<typename T>
 void
 register_E_complex_field_ut(sol::state& lua)
 {
-    sol::usertype<EH_complex_field<T>> EH_complex_field_type =
-        lua.new_usertype<EH_complex_field<T>>("E_complex_field",
-            sol::constructors<EH_complex_field<T>()>()
+    sol::usertype<E_complex_field<T>> E_complex_field_type =
+        lua.new_usertype<E_complex_field<T>>("E_complex_field",
+            sol::constructors<E_complex_field<T>()>()
         );
 
-    EH_complex_field_type["Ex_re"] = &EH_complex_field<T>::Ex_re;
-    EH_complex_field_type["Ex_im"] = &EH_complex_field<T>::Ex_im;
-    EH_complex_field_type["Ey_re"] = &EH_complex_field<T>::Ey_re;
-    EH_complex_field_type["Ey_im"] = &EH_complex_field<T>::Ey_im;
-    EH_complex_field_type["Ez_re"] = &EH_complex_field<T>::Ez_re;
-    EH_complex_field_type["Ez_im"] = &EH_complex_field<T>::Ez_im;
+    E_complex_field_type["Ex_re"] = &E_complex_field<T>::Ex_re;
+    E_complex_field_type["Ex_im"] = &E_complex_field<T>::Ex_im;
+    E_complex_field_type["Ey_re"] = &E_complex_field<T>::Ey_re;
+    E_complex_field_type["Ey_im"] = &E_complex_field<T>::Ey_im;
+    E_complex_field_type["Ez_re"] = &E_complex_field<T>::Ez_re;
+    E_complex_field_type["Ez_im"] = &E_complex_field<T>::Ez_im;
 }
 
 } // namespace priv
