@@ -91,10 +91,10 @@ register_E_complex_field_ut(sol::state& lua)
 
 } // namespace priv
 
-template<typename T>
+template<typename Mesh, typename T>
 class parameter_loader
 {
-    using point_type = disk::point<T,3>;
+    using point_type = typename Mesh::point_type;
     using complex_type = std::complex<T>;
     using real_type = T;
 
@@ -114,7 +114,7 @@ public:
         priv::register_E_complex_field_ut<T>(lua);
     }
 
-    bool load(const std::string& fn)
+    bool load(Mesh& msh, const std::string& fn)
     {
         bool success = true;
         lua.script_file(fn);
@@ -131,10 +131,30 @@ public:
             success = false;
         }
 
+        if ( not lua["sigma"].valid() )
+        {
+            std::cout << "CONFIG PROBLEM: Function sigma() not defined" << std::endl;
+            success = false;
+        }
+
         if ( not lua["frequency"].valid() )
         {
             std::cout << "CONFIG PROBLEM: Parameter frequency not defined" << std::endl;
             success = false;
+        }
+
+        if ( lua["mesh_transform"].valid() )
+        {
+            auto f = [&](const point_type& pt) -> point_type {
+                typename point_type::value_type new_x, new_y, new_z;
+
+                sol::tie(new_x, new_y, new_z) =
+                    lua["mesh_transform"](pt.x(), pt.y(), pt.z());
+
+                return point_type(new_x, new_y, new_z);
+            };
+
+            msh.transform(f);
         }
 
         return success;
@@ -154,6 +174,11 @@ public:
         return std::complex<double>(re, im);
     }
 
+    real_type sigma(size_t tag)
+    {
+        return lua["sigma"](tag);
+    }
+
     complex_type volume_source(size_t tag, const point_type& pt)
     {
         return complex_type(0.0);
@@ -164,7 +189,7 @@ public:
         return lua["frequency"];
     }
 
-    priv::E_complex_field<real_type>
+    Eigen::Matrix<complex_type,3,1>
     plane_wave_source(size_t tag, const point_type& pt)
     {
         auto bnd = lua["boundary"][tag];
@@ -174,8 +199,65 @@ public:
             throw std::invalid_argument("No boundary data");
         }
 
-        auto field = bnd["source"](tag, pt.x(), pt.y(), pt.z());
-        return field;
+        priv::E_complex_field<real_type> field =
+            bnd["source"](tag, pt.x(), pt.y(), pt.z());
+
+        Eigen::Matrix<complex_type,3,1> ret;
+        ret(0) = complex_type(field.Ex_re, field.Ex_im);
+        ret(1) = complex_type(field.Ey_re, field.Ey_im);
+        ret(2) = complex_type(field.Ez_re, field.Ez_im);
+
+        return ret;
+    }
+
+    Eigen::Matrix<complex_type,3,1>
+    dirichlet_data(size_t tag, const point_type& pt)
+    {
+        Eigen::Matrix<complex_type,3,1> ret = Eigen::Matrix<complex_type,3,1>::Zero();
+        auto bnd = lua["boundary"][tag];
+        if (not bnd.valid())
+            return ret;
+
+        auto src = bnd["source"];
+        if (not src.valid())
+            return ret;
+
+        priv::E_complex_field<real_type> field =
+            bnd["source"](tag, pt.x(), pt.y(), pt.z());
+
+        ret(0) = complex_type(field.Ex_re, field.Ex_im);
+        ret(1) = complex_type(field.Ey_re, field.Ey_im);
+        ret(2) = complex_type(field.Ez_re, field.Ez_im);
+
+        return ret;
+    }
+
+    std::pair<bool, complex_type>
+    impedance(size_t bndnum)
+    {
+        if (not is_impedance_like(bndnum))
+            return std::make_pair(false, 0.0);
+
+        auto z_data = lua["boundary"][bndnum]["value"];
+        if (not z_data.valid())
+            return std::make_pair(false, 0.0);
+
+        real_type ret_re = z_data;
+
+        return std::make_pair(true, complex_type(ret_re, 0));
+    }
+
+    bool is_dirichlet(size_t bndnum)
+    {
+        auto bnd_data = lua["boundary"][bndnum];
+        if (not bnd_data.valid())
+            return true;
+
+        std::string bndtype = bnd_data["kind"];
+        if (bndtype == "e_field")
+            return true;
+
+        return false;
     }
 
     bool is_impedance(size_t bndnum)

@@ -34,9 +34,9 @@
 namespace disk {
 
 /* Temporarly copied from curl.hpp */
-template<typename T>
+template<typename T, typename U>
 Matrix<T, Dynamic, 3>
-vcross(const static_vector<T, 3>& normal, const Matrix<T, Dynamic, 3>& field)
+vcross(const static_vector<U, 3>& normal, const Matrix<T, Dynamic, 3>& field)
 {
     Matrix<T, Dynamic, 3>   ret;
     ret = Matrix<T, Dynamic, 3>::Zero(field.rows(), field.cols());
@@ -57,10 +57,9 @@ vcross(const static_vector<T, 3>& normal, const Matrix<T, Dynamic, 3>& field)
     return ret;
 }
 
-/* Temporarly copied from curl.hpp */
-template<typename T>
+template<typename T, typename U>
 Matrix<T, Dynamic, 3>
-vcross(const Matrix<T, Dynamic, 3>& field, const static_vector<T, 3>& normal)
+vcross(const Matrix<T, Dynamic, 3>& field, const static_vector<U, 3>& normal)
 {
     Matrix<T, Dynamic, 3>   ret;
     ret = Matrix<T, Dynamic, 3>::Zero(field.rows(), field.cols());
@@ -182,12 +181,17 @@ void
 run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_type eta,
     const std::string& cfg_fn)
 {
-    parameter_loader<double> pl;
-    bool ok = pl.load(cfg_fn);
+    parameter_loader<Mesh, double> pl;
+    bool ok = pl.load(msh, cfg_fn);
     if (!ok)
         return;
 
     double omega = 2*M_PI*pl.frequency();
+    auto eps0 = parameter_loader<Mesh, double>::eps0;
+    auto mu0 = parameter_loader<Mesh, double>::mu0;
+    auto jw = std::complex<double>(0,omega);
+    auto jwmu0 = std::complex<double>(0,omega*mu0);
+    auto ksq = (eps0*omega)*(mu0*omega);
 
     auto cvf = connectivity_via_faces(msh);
     using coordinate_type = typename Mesh::coordinate_type;
@@ -204,9 +208,10 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
     {
         auto di = msh.domain_info(tcl);
 
-        auto eps = pl.epsilon( di.tag() );
-        auto mu = pl.mu( di.tag() );
-        auto Z = std::sqrt(mu/eps);
+        auto epsr = pl.epsilon( di.tag() );
+        auto mur = pl.mu( di.tag() );
+        auto sigma = pl.sigma( di.tag() );
+        auto Z = std::sqrt( (jw*mur*mu0) / (sigma + jw*epsr*eps0) );
 
         auto tbasis = disk::make_vector_monomial_basis(msh, tcl, degree);
         auto qps = disk::integrate(msh, tcl, 2*degree);
@@ -229,13 +234,8 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
         {
             auto bi = msh.boundary_info(fc);
 
-            auto f = [&](const disk::point<double,3>& pt) -> Matrix<std::complex<double>,3,1> {
-                Matrix<std::complex<double>,3,1> ret;
-                auto src = pl.plane_wave_source(bi.tag(), pt);
-                ret(0) = std::complex<double>(src.Ex_re, src.Ex_im);
-                ret(1) = std::complex<double>(src.Ey_re, src.Ey_im);
-                ret(2) = std::complex<double>(src.Ez_re, src.Ez_im);
-                return ret;
+            auto f = [&](const typename Mesh::point_type& pt) -> Matrix<std::complex<double>,3,1> {
+                return pl.plane_wave_source(bi.tag(), pt);
             };
 
             matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
@@ -277,13 +277,11 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
                     //loc_rhs -= fqp.weight() * tcphi_x_n;
                     //loc_rhs += fqp.weight() * eta_l * tphi;
 
-                    std::complex<double> jomega(0, omega);
-
                     if ( pl.is_impedance_like(bi.tag()) )
-                        Att -= fqp.weight() * (mu*jomega/Z) * n_x_tphi_x_n * n_x_tphi_x_n.transpose();
+                        Att += fqp.weight() * (jwmu0/Z) * n_x_tphi_x_n * n_x_tphi_x_n.transpose();
 
                     if ( pl.is_plane_wave(bi.tag()) )
-                        loc_rhs += 2*fqp.weight()*(mu*jomega/Z)*n_x_tphi_x_n*f(fqp.point());
+                        loc_rhs += 2*fqp.weight()*(jwmu0/Z)*n_x_tphi_x_n*f(fqp.point());
 
                     continue;
                 }
@@ -302,7 +300,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
                 assm.assemble(msh, tcl, ncl, Atn);
         }
 
-        matrix_type LC = K - (eps*omega)*(omega*mu)*M;
+        matrix_type LC = (1./mur)*K - (ksq*epsr - jwmu0*sigma)*M;
 
         assm.assemble(msh, tcl, LC, loc_rhs);
     }
@@ -328,63 +326,116 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
     sol = gmres.solve(assm.RHS);
     */
 
-    std::vector<scalar_type> data_ux, data_uy, data_uz, data_div;
+    std::vector<std::pair<scalar_type, int>> data_ex, data_ey, data_ez, data_diff;
+    data_ex.resize(msh.points_size(), std::make_pair(0.0, 0));
+    data_ey.resize(msh.points_size(), std::make_pair(0.0, 0));
+    data_ez.resize(msh.points_size(), std::make_pair(0.0, 0));
+    data_diff.resize(msh.points_size(), std::make_pair(0.0, 0));
 
-    //T err = 0.0;
     size_t cell_i = 0;
-    //T err_divergence = 0.0;
     for (auto& cl : msh)
     {
+        auto di = msh.domain_info(cl);
+        auto epsr = pl.epsilon( di.tag() );
+        auto mur = pl.mu( di.tag() );
+        auto sigma = pl.sigma( di.tag() );
+        auto Z = std::sqrt( (jw*mur*mu0) / (sigma + jw*epsr*eps0) );
+
         auto cb = make_vector_monomial_basis(msh, cl, degree);
         Matrix<scalar_type, Dynamic, 1> lsol = sol.segment(cell_i*cb.size(), cb.size());
 
-        //scalar_type divt = 0.0;
-        //auto qps = integrate(msh, cl, degree);
-        //for (auto& qp : qps)
-        //{
-        //    auto divphi = cb.eval_divergences(qp.point());
-        //    divt += qp.weight() * (asol-lsol).dot(divphi);
-        //}
-        //data_div.push_back( divt );
-        //err_divergence += divt;
+        auto pts = points(msh, cl);
+        auto ptids = cl.point_ids();
 
-        Matrix<scalar_type,1,3> acc = Matrix<scalar_type,1,3>::Zero();
-        auto bar = barycenter(msh, cl);
-        for (size_t i = 0; i < cb.size(); i++)
+        for (size_t i = 0; i < pts.size(); i++)
         {
-            auto phi = cb.eval_functions(bar);
-            acc += lsol(i)*phi.row(i);
+            auto phi = cb.eval_functions(pts[i]);
+            auto ls = phi.transpose()*lsol;
+            auto ptid = ptids.at(i);
+            data_ex.at(ptid).first += ls(0);
+            data_ex.at(ptid).second++;
+            data_ey.at(ptid).first += ls(1);
+            data_ey.at(ptid).second++;
+            data_ez.at(ptid).first += ls(2);
+            data_ez.at(ptid).second++;
         }
 
-        data_ux.push_back( acc(0) );
-        data_uy.push_back( acc(1) );
-        data_uz.push_back( acc(2) );
+
+        auto fcs = faces(msh, cl);
+        for (size_t i = 0; i < fcs.size(); i++)
+        {
+            auto& fc = fcs[i];
+            const auto n  = normal(msh, cl, fc);
+            auto cbs = cb.size();
+
+            auto fc_pts = points(msh, fc);
+            auto fc_ptids = fc.point_ids();
+
+            for (size_t j = 0; j < fc_pts.size(); j++)
+            {
+                Matrix<scalar_type, Dynamic, 3> cphi_tmp = cb.eval_functions(fc_pts[j]);
+                Matrix<scalar_type, Dynamic, 3> n_x_cphi_x_n = disk::vcross(n, disk::vcross(cphi_tmp, n));
+                Matrix<scalar_type, Dynamic, 3> ccphi_tmp = cb.eval_curls2(fc_pts[j]);
+                Matrix<scalar_type, Dynamic, 3> ccphi_x_n = disk::vcross(ccphi_tmp, n);
+
+                Matrix<scalar_type, Dynamic, 3> imp = (1./mur)*ccphi_x_n - (jwmu0/Z)*n_x_cphi_x_n;
+
+                auto ptid = fc_ptids.at(j);
+                data_diff.at(ptid).first += imp.norm();
+                data_diff.at(ptid).second++;
+            }
+        }
+
 
         cell_i++;
     }
 
-    //std::cout << "h = " << disk::average_diameter(msh) << " ";
-    //std::cout << "err = " << std::sqrt(err) << std::endl;
-    //std::cout << "Error divergence: " << err_divergence << std::endl;
+    auto tran = [](const std::pair<scalar_type, int>& nd) -> auto {
+        if (nd.second == 0)
+            return scalar_type(0.0);
+
+        return nd.first/scalar_type(nd.second);
+    };
+
+    std::vector<scalar_type> nodal_ex( data_ex.size() );
+    std::transform(data_ex.begin(), data_ex.end(), nodal_ex.begin(), tran);
+    
+    std::vector<scalar_type> nodal_ey( data_ey.size() );
+    std::transform(data_ey.begin(), data_ey.end(), nodal_ey.begin(), tran);
+
+    std::vector<scalar_type> nodal_ez( data_ez.size() );
+    std::transform(data_ez.begin(), data_ez.end(), nodal_ez.begin(), tran);
+
+    std::vector<double> nodal_mag( data_ex.size() );
+    for (size_t i = 0; i < nodal_mag.size(); i++)
+    {
+        auto ex = nodal_ex[i];
+        auto ey = nodal_ey[i];
+        auto ez = nodal_ez[i];
+        nodal_mag[i] = real(std::sqrt( ex*conj(ex) + ey*conj(ey) + ez*conj(ez) ));
+    }
+
+    std::vector<scalar_type> nodal_diff( data_diff.size() );
+    std::transform(data_diff.begin(), data_diff.end(), nodal_diff.begin(), tran);
 
     disk::silo_database silo_db;
     silo_db.create("maxwell_sip_dg.silo");
     silo_db.add_mesh(msh, "mesh");
 
-    disk::silo_zonal_variable<scalar_type> ux("ux", data_ux);
-    silo_db.add_variable("mesh", ux);
+    disk::silo_nodal_variable<scalar_type> ex("ex", nodal_ex);
+    silo_db.add_variable("mesh", ex);
 
-    disk::silo_zonal_variable<scalar_type> uy("uy", data_uy);
-    silo_db.add_variable("mesh", uy);
+    disk::silo_nodal_variable<scalar_type> ey("ey", nodal_ey);
+    silo_db.add_variable("mesh", ey);
 
-    disk::silo_zonal_variable<scalar_type> uz("uz", data_uz);
-    silo_db.add_variable("mesh", uz);
+    disk::silo_nodal_variable<scalar_type> ez("ez", nodal_ez);
+    silo_db.add_variable("mesh", ez);
 
-    silo_db.add_expression("u", "{ux, uy, uz}", DB_VARTYPE_VECTOR);
-    silo_db.add_expression("mag_u", "magnitude(u)", DB_VARTYPE_SCALAR);
+    disk::silo_nodal_variable<double> emag("e_mag", nodal_mag);
+    silo_db.add_variable("mesh", emag);
 
-    //disk::silo_zonal_variable<scalar_type> div("div", data_div);
-    //silo_db.add_variable("mesh", div);
+    disk::silo_nodal_variable<scalar_type> diff("diff", nodal_diff);
+    silo_db.add_variable("mesh", diff);
 
     silo_db.close();
 
@@ -592,9 +643,10 @@ int main(int argc, char **argv)
     size_t      degree = 1;
     bool        solve_eigvals = false;
     char *      mesh_filename = nullptr;
+    char *      param_filename = nullptr;
 
     int ch;
-    while ( (ch = getopt(argc, argv, "a:k:m:e")) != -1 )
+    while ( (ch = getopt(argc, argv, "a:k:m:eP:")) != -1 )
     {
         switch(ch)
         {
@@ -614,6 +666,10 @@ int main(int argc, char **argv)
                 mesh_filename = optarg;
                 break;
 
+            case 'P':
+                param_filename = optarg;
+                break;
+
             case '?':
             default:
                 std::cout << "Invalid option" << std::endl;
@@ -626,7 +682,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
         auto msh = disk::load_netgen_3d_mesh<T>(mesh_filename);
-        run_maxwell_solver(msh, degree, stab_param, "params.lua");
+        run_maxwell_solver(msh, degree, stab_param, param_filename);
         return 0;
     }
 
@@ -634,22 +690,13 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.geo$") ))
     {
         std::cout << "Guessed mesh format: GMSH" << std::endl;
-        disk::simplicial_mesh<T,3> msh;
-        disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
+        disk::generic_mesh<T,3> msh;
+        disk::gmsh_geometry_loader< disk::generic_mesh<T,3> > loader;
         
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        /*
-        for (auto itor = msh.points_begin(); itor != msh.points_end(); itor++)
-        {
-            auto pt = *itor;
-            auto newpt = disk::point<T,3>(pt.x()/1000, pt.y()/1000, pt.z()/1000);
-            *itor = newpt;
-        }
-        */
-
-        run_maxwell_solver(msh, degree, stab_param, "params.lua");
+        run_maxwell_solver(msh, degree, stab_param, param_filename);
 
         return 0;
     }

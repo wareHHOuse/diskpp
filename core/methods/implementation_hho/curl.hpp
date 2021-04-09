@@ -115,7 +115,7 @@ make_vector_mass_oper(const Mesh&                       msh,
 template<typename ScalT = double, typename Mesh>
 dynamic_matrix<ScalT>
 make_impedance_term(const Mesh& msh, const typename Mesh::face_type& fc,
-    size_t facdeg, ScalT admittance)
+    size_t facdeg)
 {
     using mesh_type = Mesh;
     using coord_type = typename Mesh::coordinate_type;
@@ -133,7 +133,7 @@ make_impedance_term(const Mesh& msh, const typename Mesh::face_type& fc,
     for (auto& qp : qps)
     {
         Matrix<scalar_type, Dynamic, 3> fphi = fb.eval_functions(qp.point());
-        Y += qp.weight() * admittance * fphi * fphi.transpose();
+        Y += qp.weight() * fphi * fphi.transpose();
     }
 
     return Y;
@@ -142,7 +142,7 @@ make_impedance_term(const Mesh& msh, const typename Mesh::face_type& fc,
 template<typename ScalT = double, typename Mesh, typename Function>
 std::pair<dynamic_matrix<ScalT>, dynamic_vector<ScalT>>
 make_plane_wave_term(const Mesh& msh, const typename Mesh::face_type& fc,
-    size_t facdeg, ScalT admittance, Function f)
+    size_t facdeg, Function f)
 {
     using mesh_type = Mesh;
     using coord_type = typename Mesh::coordinate_type;
@@ -162,8 +162,8 @@ make_plane_wave_term(const Mesh& msh, const typename Mesh::face_type& fc,
     for (auto& qp : qps)
     {
         Matrix<scalar_type, Dynamic, 3> fphi = fb.eval_functions(qp.point());
-        Y += qp.weight() * admittance * fphi * fphi.transpose();
-        y += qp.weight() * admittance * fphi * f(qp.point());
+        Y += qp.weight() * fphi * fphi.transpose();
+        y += qp.weight() * fphi * f(qp.point());
     }
 
     return std::make_pair(Y, y);
@@ -615,6 +615,88 @@ curl_hdg_stabilization(const Mesh<CoordT,3,Storage>&                     msh,
 
     return stab;
 }
+
+/* This essentialy enforces an impedance condition between the function on
+ * the cell and the function on the face:
+ *
+ *                      (∇×Eᵗ)×n - iωμY(n×Eᶠ)×n = 0.
+ *
+ * Looks like it does not work however. Still need to determine if it is
+ * actually supposed to not work or if it is just PEBKAC.
+ */
+template<typename ScalT=double, template<typename, size_t, typename> class Mesh, typename CoordT, typename Storage>
+dynamic_matrix<ScalT>
+curl_Z_stabilization(const Mesh<CoordT,3,Storage>&                     msh,
+                       const typename Mesh<CoordT,3,Storage>::cell_type& cl,
+                       const hho_degree_info&                       cell_infos,
+                       ScalT mur, ScalT jwmu0, ScalT Z)
+{
+    using mesh_type         = Mesh<CoordT,3,Storage>;
+    using scalar_type       = ScalT;
+    using matrix_type       = Matrix<scalar_type, Dynamic, Dynamic>;
+    using vector_type       = Matrix<scalar_type, Dynamic, 1>;
+    using point_type        = typename mesh_type::point_type;
+    using cell_type         = typename mesh_type::cell_type;
+    using face_type         = typename mesh_type::face_type;
+
+    static const size_t DIM = 3;
+
+    const auto facdeg = cell_infos.face_degree();
+    const auto celdeg = cell_infos.cell_degree();
+
+    const auto cb  = make_vector_monomial_basis<mesh_type, cell_type, scalar_type>(msh, cl, celdeg);
+    const auto fbs = vector_basis_size(facdeg, DIM - 1, DIM - 1);
+    const auto cbs = vector_basis_size(celdeg, DIM, DIM);
+
+    const auto fcs = faces(msh, cl);
+    const auto num_faces_dofs = fcs.size() * fbs;
+
+    matrix_type stab = matrix_type::Zero(cbs + num_faces_dofs, cbs + num_faces_dofs);
+
+    auto ht = diameter(msh, cl);
+
+    size_t offset = cbs;
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto fc = fcs[i];
+        const auto n  = normal(msh, cl, fc);
+        const auto fb = make_vector_monomial_tangential_basis<mesh_type, face_type, scalar_type>(msh, fc, facdeg);
+        const auto hf = diameter(msh, fc);
+
+        matrix_type mass = matrix_type::Zero(fbs, fbs);
+        matrix_type trace = matrix_type::Zero(fbs, cbs);
+        matrix_type rhs = matrix_type::Zero(fbs, cbs + num_faces_dofs);
+
+        /* Evaluate -2iωμ0Y(n×Eᶠ)×n */
+        rhs.block(0, offset, fbs, fbs) = (-/*2.**/jwmu0/Z)*matrix_type::Identity(fbs, fbs);
+
+        const auto qps_f = integrate(msh, fc, 2*std::max(celdeg,facdeg));
+        for (auto& qp : qps_f)
+        {
+            /* Evaluate iωμ0Y(n×Eᵗ)×n */
+            Matrix<scalar_type, Dynamic, 3> phi_tmp = cb.eval_functions(qp.point());
+            Matrix<scalar_type, Dynamic, 3> n_x_phi_x_n = disk::vcross(n, disk::vcross(phi_tmp, n));
+
+            /* Evaluate (1/mur)*(∇×Eᵗ)×n */
+            //Matrix<scalar_type, Dynamic, 3> cphi_tmp = cb.eval_curls2(qp.point());
+            //Matrix<scalar_type, Dynamic, 3> cphi_x_n = (1./mur)*disk::vcross(cphi_tmp, n);
+
+            Matrix<scalar_type, Dynamic, 3> f_phi = fb.eval_functions(qp.point());
+
+            mass += qp.weight() * f_phi * f_phi.transpose();
+            trace += qp.weight() * f_phi * n_x_phi_x_n.transpose();
+            //trace += qp.weight() * f_phi * cphi_x_n.transpose();
+        }
+
+        rhs.block(0,0,fbs,cbs) = (jwmu0/Z)*mass.ldlt().solve(trace);
+        stab += rhs.transpose() * mass * rhs;
+
+        offset += fbs;
+    }
+
+    return stab;
+}
+
 
 
 
