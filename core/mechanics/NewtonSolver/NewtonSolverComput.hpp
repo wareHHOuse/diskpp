@@ -51,7 +51,6 @@ class mechanical_computation
     typedef typename mesh_type::cell            cell_type;
 
     typedef NewtonSolverParameter<scalar_type>    param_type;
-    typedef vector_boundary_conditions<mesh_type> bnd_type;
     typedef Behavior<mesh_type>                   behavior_type;
 
     typedef static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> static_matrix_type;
@@ -325,7 +324,6 @@ class mechanical_computation
     void
     compute(const mesh_type&                 msh,
             const cell_type&                 cl,
-            const bnd_type&                  bnd,
             const param_type&                rp,
             const MeshDegreeInfo<mesh_type>& degree_infos,
             const Function&                  load,

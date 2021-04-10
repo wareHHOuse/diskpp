@@ -203,7 +203,7 @@ main(int argc, char** argv)
     // Elasticity Parameters
     disk::MaterialData<RealType> material_data;
 
-    // // Cook Parameters (mm, MPa, kN)
+    // // Cook Parameters HPP (mm, MPa, kN)
     RealType E  = 70;
     RealType nu = 0.4999;
 
@@ -272,6 +272,26 @@ main(int argc, char** argv)
     }
 
     mesh_filename = argv[0];
+
+    /* Poly 2d*/
+    if (std::regex_match(mesh_filename, std::regex(".*\\.poly2d$")))
+    {
+        std::cout << "Guessed mesh format: Poly2D format" << std::endl;
+        disk::generic_mesh<RealType, 2> msh;
+        disk::load_mesh_poly2d<RealType>(mesh_filename, msh);
+        run_nl_solid_mechanics_solver(msh, rp, material_data);
+        return 0;
+    }
+
+    /* Poly 3d*/
+    if (std::regex_match(mesh_filename, std::regex(".*\\.poly3d$")))
+    {
+        std::cout << "Guessed mesh format: Poly3D format" << std::endl;
+        disk::generic_mesh<RealType, 3> msh;
+        disk::load_mesh_poly3d<RealType>(mesh_filename, msh);
+        run_nl_solid_mechanics_solver(msh, rp, material_data);
+        return 0;
+    }
 
     /* Medit 2d*/
     if (std::regex_match(mesh_filename, std::regex(".*\\.medit2d$")))

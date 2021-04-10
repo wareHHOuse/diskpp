@@ -169,6 +169,7 @@ class NewtonIteration
         for (auto& cl : msh)
         {
             // Gradient Reconstruction
+            // std::cout << "Grad" << std::endl;
             matrix_type GT;
             tc.tic();
             if (rp.m_precomputation)
@@ -197,8 +198,9 @@ class NewtonIteration
             // Mechanical Computation
 
             tc.tic();
+            // std::cout << "Elem" << std::endl;
             elem.compute(
-              msh, cl, bnd, rp, degree_infos, lf, GT, m_solution.at(cell_i), behavior, small_def);
+              msh, cl, rp, degree_infos, lf, GT, m_solution.at(cell_i), behavior, small_def);
 
             matrix_type lhs = elem.K_int;
             vector_type rhs = elem.RTF;
@@ -209,6 +211,7 @@ class NewtonIteration
             ai.m_time_law += elem.time_law;
 
             // Stabilisation Contribution
+            // std::cout << "Stab" << std::endl;
             tc.tic();
 
             if (rp.m_stab)
@@ -289,6 +292,7 @@ class NewtonIteration
             bool check_size = true;
 
             // contact contribution
+            // std::cout << "Cont" << std::endl;
             if (bnd.cell_has_contact_faces(cl))
             {
                 const auto cell_infos  = degree_infos.cellDegreeInfo(msh, cl);
@@ -352,6 +356,7 @@ class NewtonIteration
             }
 
             // Static Condensation
+            // std::cout << "StatCond" << std::endl;
             tc.tic();
             const auto scnp = make_vector_static_condensation_withMatrix(msh, cl, degree_infos, lhs, rhs, check_size);
 
@@ -362,6 +367,7 @@ class NewtonIteration
             ai.m_time_statcond += tc.to_double();
 
             const auto& lc = std::get<0>(scnp);
+            // std::cout << "Assemb" << std::endl;
             m_assembler.assemble_nonlinear(msh, cl, bnd, contact_manager, lc.first, lc.second, m_solution_faces);
 
             cell_i++;
