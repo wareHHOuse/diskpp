@@ -2605,6 +2605,7 @@ class poly_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
     std::vector<std::pair<size_t, edge_type>> m_edges;
 
     std::vector<std::pair<size_t, std::array<T, 3>>> vts;
+    std::vector<std::pair<size_t, std::vector<size_t>>> vts_to_grp;
     std::vector<std::pair<size_t, std::vector<size_t>>> edges_to_vts;
     std::vector<std::pair<size_t, std::vector<size_t>>> edges_to_grp;
     std::vector<std::pair<size_t, std::vector<size_t>>> faces_to_edges;
@@ -2659,6 +2660,14 @@ class poly_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
                     std::cout << "Reading " << nb_elems << " nodes" << std::endl;
 
                 poly::read_nodes_block(ifs, nb_elems, vts);
+            }
+            else if (keyword == "*Nodes->Groups")
+            {
+                ifs >> nb_elems;
+                if (this->verbose())
+                    std::cout << "Reading " << nb_elems << " nodes->groups" << std::endl;
+
+                poly::read_grp_block(ifs, nb_elems, vts_to_grp);
             }
             else if (keyword == "*Edges->Nodes")
             {
@@ -2721,8 +2730,6 @@ class poly_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
     bool
     read_mesh(const std::string& s)
     {
-        this->verbose(true);
-
         if (this->verbose())
             std::cout << " *** READING POLY2D MESH ***" << std::endl;
         return poly2d_read(s);
@@ -2839,6 +2846,7 @@ class poly_mesh_loader<T, 3> : public mesh_loader<generic_mesh<T, 3>>
     std::vector<std::pair<size_t, edge_type>> m_edges;
 
     std::vector<std::pair<size_t, std::array<T, 3>>>    vts;
+    std::vector<std::pair<size_t, std::vector<size_t>>> vts_to_grp;
     std::vector<std::pair<size_t, std::vector<size_t>>> edges_to_vts;
     std::vector<std::pair<size_t, std::vector<size_t>>> edges_to_grp;
     std::vector<std::pair<size_t, std::vector<size_t>>> faces_to_edges;
@@ -2896,6 +2904,14 @@ class poly_mesh_loader<T, 3> : public mesh_loader<generic_mesh<T, 3>>
                     std::cout << "Reading " << nb_elems << " nodes" << std::endl;
 
                 poly::read_nodes_block(ifs, nb_elems, vts);
+            }
+            else if (keyword == "*Nodes->Groups")
+            {
+                ifs >> nb_elems;
+                if (this->verbose())
+                    std::cout << "Reading " << nb_elems << " nodes->groups" << std::endl;
+
+                poly::read_grp_block(ifs, nb_elems, vts_to_grp);
             }
             else if (keyword == "*Edges->Nodes")
             {
@@ -2990,10 +3006,8 @@ class poly_mesh_loader<T, 3> : public mesh_loader<generic_mesh<T, 3>>
     bool
     read_mesh(const std::string& s)
     {
-        this->verbose(true);
-
         if (this->verbose())
-            std::cout << " *** READING POLY2D MESH ***" << std::endl;
+            std::cout << " *** READING POLY3D MESH ***" << std::endl;
         return poly3d_read(s);
     }
 
@@ -3001,7 +3015,7 @@ class poly_mesh_loader<T, 3> : public mesh_loader<generic_mesh<T, 3>>
     populate_mesh(mesh_type& msh)
     {
         if (this->verbose())
-            std::cout << " *** POPULATE POLY2D MESH ***" << std::endl;
+            std::cout << " *** POPULATE POLY3D MESH ***" << std::endl;
 
         auto storage = msh.backend_storage();
 
@@ -3339,17 +3353,19 @@ load_mesh_fvca6_3d(const char *filename, disk::generic_mesh<T, 3>& msh)
 
 template<typename T>
 bool
-load_mesh_poly2d(const char* filename, disk::generic_mesh<T, 2>& msh)
+load_mesh_poly2d(const char* filename, disk::generic_mesh<T, 2>& msh, bool verbose = false)
 {
     disk::poly_mesh_loader<T, 2> loader;
+    loader.verbose(verbose);
     return priv::load_mesh(filename, loader, msh);
 }
 
 template<typename T>
 bool
-load_mesh_poly3d(const char* filename, disk::generic_mesh<T, 3>& msh)
+load_mesh_poly3d(const char* filename, disk::generic_mesh<T, 3>& msh, bool verbose = false)
 {
     disk::poly_mesh_loader<T, 3> loader;
+    loader.verbose(verbose);
     return priv::load_mesh(filename, loader, msh);
 }
 
