@@ -27,6 +27,7 @@ add_subdirectory(plasticity)
 add_subdirectory(finite_strains)
 add_subdirectory(bingham)
 add_subdirectory(unsteady_laplacian)
+if(HAVE_GMSH)
 add_subdirectory(maxwell)
 add_subdirectory(helmholtz)
-
+endif(HAVE_GMSH)

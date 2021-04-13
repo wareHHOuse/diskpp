@@ -78,6 +78,9 @@ if (BUILD_APP_DISKPP_TESTS)
     add_executable(test_conditionning test_conditionning.cpp)
     target_link_libraries(test_conditionning ${LINK_LIBS})
 
+    if(HAVE_GMSH)
     add_executable(gmsh_geometry_loader gmsh_geometry_loader.cpp)
     target_link_libraries(gmsh_geometry_loader ${LINK_LIBS})
+    endif(HAVE_GMSH)
+
 endif()
