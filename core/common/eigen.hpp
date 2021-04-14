@@ -31,10 +31,7 @@
 //#define EIGEN_USE_MKL_ALL
 // Fix for eigen version > 3.3.7
 #ifndef EIGEN_USING_STD
-#ifdef EIGEN_USING_STD_MATH
-#define EIGEN_USING_STD(X)
-EIGEN_USING_STD_MATH(X)
-#endif
+#define EIGEN_USING_STD(X) using std::X
 #endif
 #include <Eigen/PardisoSupport>
 #endif
