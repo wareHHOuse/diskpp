@@ -13,6 +13,9 @@ if (BUILD_APP_MAXWELL)
     add_executable(rectest rectest.cpp)
     target_link_libraries(rectest ${LINK_LIBS})
 
+    add_executable(meshio meshio.cpp)
+    target_link_libraries(meshio ${LINK_LIBS})
+
     add_executable(maxwell_solver_hho maxwell_solver_hho.cpp)
     target_link_libraries(maxwell_solver_hho ${LINK_LIBS})
     set_target_properties(maxwell_solver_hho PROPERTIES
