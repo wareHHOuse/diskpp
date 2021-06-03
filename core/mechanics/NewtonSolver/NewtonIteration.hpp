@@ -29,6 +29,7 @@
 #pragma once
 
 #include <iostream>
+#include <math.h>
 #include <string>
 #include <vector>
 
@@ -157,10 +158,6 @@ class NewtonIteration
         m_assembler.initialize();
         m_F_int = 0.0;
 
-        // Get materail data
-        const auto material_data = behavior.getMaterialData();
-        // Get Law
-        auto& law = behavior.law();
 
         const bool small_def = (behavior.getDeformation() == SMALL_DEF);
 
@@ -172,6 +169,7 @@ class NewtonIteration
         for (auto& cl : msh)
         {
             // Gradient Reconstruction
+            // std::cout << "Grad" << std::endl;
             matrix_type GT;
             tc.tic();
             if (rp.m_precomputation)
@@ -199,11 +197,10 @@ class NewtonIteration
 
             // Mechanical Computation
 
-            auto& law_cell = law.getCellQPs(cell_i);
-            // auto& law_qp   = behavior.getQPs(msh, cl);
             tc.tic();
+            // std::cout << "Elem" << std::endl;
             elem.compute(
-              msh, cl, bnd, rp, degree_infos, lf, GT, m_solution.at(cell_i), law_cell, material_data, small_def);
+              msh, cl, rp, degree_infos, lf, GT, m_solution.at(cell_i), behavior, small_def);
 
             matrix_type lhs = elem.K_int;
             vector_type rhs = elem.RTF;
@@ -214,6 +211,7 @@ class NewtonIteration
             ai.m_time_law += elem.time_law;
 
             // Stabilisation Contribution
+            // std::cout << "Stab" << std::endl;
             tc.tic();
 
             if (rp.m_stab)
@@ -236,17 +234,18 @@ class NewtonIteration
                         case HHO:
                         {
                             matrix_type stab_HHO;
-                            if (small_def)
-                            {
-                                const auto recons = make_vector_hho_symmetric_laplacian(msh, cl, degree_infos);
-                                stab_HHO          = make_vector_hho_stabilization(msh, cl, recons.first, degree_infos);
-                            }
-                            else
-                            {
+                            // we do not make any difference for the displacement reconstruction
+                            // if (small_def)
+                            // {
+                            //     const auto recons = make_vector_hho_symmetric_laplacian(msh, cl, degree_infos);
+                            //     stab_HHO          = make_vector_hho_stabilization(msh, cl, recons.first, degree_infos);
+                            // }
+                            // else
+                            // {
                                 const auto recons_scalar = make_scalar_hho_laplacian(msh, cl, degree_infos);
                                 stab_HHO =
                                   make_vector_hho_stabilization_optim(msh, cl, recons_scalar.first, degree_infos);
-                            }
+                            // }
 
                             assert(elem.K_int.rows() == stab_HHO.rows());
                             assert(elem.K_int.cols() == stab_HHO.cols());
@@ -293,6 +292,7 @@ class NewtonIteration
             bool check_size = true;
 
             // contact contribution
+            // std::cout << "Cont" << std::endl;
             if (bnd.cell_has_contact_faces(cl))
             {
                 const auto cell_infos  = degree_infos.cellDegreeInfo(msh, cl);
@@ -356,6 +356,7 @@ class NewtonIteration
             }
 
             // Static Condensation
+            // std::cout << "StatCond" << std::endl;
             tc.tic();
             const auto scnp = make_vector_static_condensation_withMatrix(msh, cl, degree_infos, lhs, rhs, check_size);
 
@@ -366,6 +367,7 @@ class NewtonIteration
             ai.m_time_statcond += tc.to_double();
 
             const auto& lc = std::get<0>(scnp);
+            // std::cout << "Assemb" << std::endl;
             m_assembler.assemble_nonlinear(msh, cl, bnd, contact_manager, lc.first, lc.second, m_solution_faces);
 
             cell_i++;
@@ -555,6 +557,9 @@ class NewtonIteration
         }
 
         const scalar_type error = std::max(relative_displ, relative_error);
+
+        if(!isfinite(error))
+            throw std::runtime_error("Norm of residual is not finite");
 
         if (error <= rp.m_epsilon)
         {

@@ -102,6 +102,18 @@ class LawTypeCellBones
         return m_list_qp;
     }
 
+    law_qp_type&
+    getQP(const size_t& qp_id)
+    {
+        return m_list_qp[qp_id];
+    }
+
+    const law_qp_type&
+    getQP(const size_t& qp_id) const
+    {
+        return m_list_qp[qp_id];
+    }
+
     std::vector<law_qp_type>
     getIVs() const
     {

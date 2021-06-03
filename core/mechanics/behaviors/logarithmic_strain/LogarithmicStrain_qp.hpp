@@ -154,6 +154,12 @@ class LogarithmicStrain_qp
         Pn           = static_tensor<scalar_type, 3>::Zero();
     }
 
+    quadrature_point<scalar_type, DIM>
+    quadrature_point() const
+    {
+        return make_qp(point(), weight());
+    }
+
     point<scalar_type, DIM>
     point() const
     {

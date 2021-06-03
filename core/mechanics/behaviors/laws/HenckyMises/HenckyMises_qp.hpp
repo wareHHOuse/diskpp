@@ -97,6 +97,17 @@ class HenckyMises_qp : public law_qp_bones<T, DIM>
     {
     }
 
+    static_matrix_type3D
+    compute_stress3D(const data_type& data) const
+    {
+        const static_matrix_type3D Id = static_matrix_type3D::Identity();
+        const static_matrix_type3D Gs = this->m_estrain_curr;
+
+        const scalar_type normFrodev = deviator(Gs).norm();
+
+        return tildemu(data, normFrodev) * Gs + tildelambda(data, normFrodev) * Gs.trace() * Id;
+    }
+
     static_matrix_type
     compute_stress(const data_type& data) const
     {

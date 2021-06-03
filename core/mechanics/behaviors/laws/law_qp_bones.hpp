@@ -31,8 +31,8 @@
 #include "core/mechanics/behaviors/maths_tensor.hpp"
 #include "core/mechanics/behaviors/maths_utils.hpp"
 #include "core/mechanics/behaviors/tensor_conversion.hpp"
+#include "core/quadratures/quad_bones.hpp"
 #include "mesh/point.hpp"
-
 
 namespace disk
 {
@@ -91,6 +91,12 @@ class law_qp_bones
       m_point(point), m_weight(weight), m_estrain_prev(static_matrix_type3D::Zero()),
       m_estrain_curr(static_matrix_type3D::Zero())
     {
+    }
+
+    quadrature_point<scalar_type, DIM>
+    quadrature_point() const
+    {
+        return make_qp(m_point, m_weight);
     }
 
     point<scalar_type, DIM>

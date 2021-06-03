@@ -181,7 +181,19 @@ class NewtonStep
 
             ni.updateAssemblyInfo(assembly_info);
             // test convergence
-            m_convergence = newton_iter.convergence(rp, iter);
+            try
+            {
+                m_convergence = newton_iter.convergence(rp, iter);
+            }
+            catch (const std::runtime_error& ia)
+            {
+                std::cerr << "Runtime error: " << ia.what() << std::endl;
+                m_convergence = false;
+                tc.toc();
+                ni.m_time_newton = tc.to_double();
+                return ni;
+            }
+
             if (m_convergence)
             {
                 newton_iter.save_solutions(m_solution, m_solution_faces, m_solution_mult);

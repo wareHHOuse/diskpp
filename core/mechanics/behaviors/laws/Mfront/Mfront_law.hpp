@@ -26,39 +26,40 @@
 
 #pragma once
 
+#ifdef HAVE_MGIS
+
 #include <vector>
 
-#include "common/eigen.hpp"
-#include "mechanics/behaviors/laws/law_cell_bones.hpp"
-#include "mechanics/behaviors/maths_tensor.hpp"
-#include "mechanics/behaviors/maths_utils.hpp"
+#include "MGIS/Behaviour/Behaviour.hxx"
+#include "core/mechanics/behaviors/laws/Mfront/Mfront_law_cell.hpp"
 
 namespace disk
 {
 
 // Law bones
 
-template<typename MeshType, typename LawTypeQp, bool PlasticBehavior>
-class LawTypeBones
+template<typename MeshType>
+class Mfront_law
 {
   public:
-    typedef MeshType                            mesh_type;
-    typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::cell            cell_type;
-    typedef LawTypeQp                           law_qp_type;
-    typedef typename law_qp_type::data_type     data_type;
+    typedef MeshType                                    mesh_type;
+    typedef typename mesh_type::coordinate_type         scalar_type;
+    typedef typename mesh_type::cell                    cell_type;
+    typedef MaterialData<scalar_type>                   data_type;
+    typedef std::shared_ptr<mgis::behaviour::Behaviour> BehaviourPtr;
 
   private:
-    typedef LawTypeCellBones<mesh_type, law_qp_type, PlasticBehavior> law_cell_type;
+    typedef Mfront_law_cell<mesh_type> law_cell_type;
 
     size_t                     m_nb_qp;
     std::vector<law_cell_type> m_list_cell_qp;
     data_type                  m_data;
+    BehaviourPtr               m_behav;
 
   public:
-    LawTypeBones() : m_nb_qp(0){};
+    Mfront_law() : m_nb_qp(0), m_behav(nullptr){};
 
-    LawTypeBones(const mesh_type& msh, const size_t degree)
+    Mfront_law(const mesh_type& msh, const size_t degree, const BehaviourPtr& b) : m_behav(b)
     {
         m_nb_qp = 0;
         m_list_cell_qp.clear();
@@ -66,7 +67,7 @@ class LawTypeBones
 
         for (auto& cl : msh)
         {
-            law_cell_type cell_qp(msh, cl, degree);
+            law_cell_type cell_qp(msh, cl, degree, m_behav, m_data);
 
             m_list_cell_qp.push_back(cell_qp);
             m_nb_qp += cell_qp.getNumberOfQP();
@@ -77,6 +78,10 @@ class LawTypeBones
     addMaterialData(const data_type materialData)
     {
         m_data = materialData;
+        for (auto& qp_cell : m_list_cell_qp)
+        {
+            qp_cell.addInitialMaterialParameters(m_data);
+        }
     }
 
     data_type
@@ -96,7 +101,7 @@ class LawTypeBones
     {
         for (auto& qp_cell : m_list_cell_qp)
         {
-            qp_cell.update();
+            qp_cell.update(m_data);
         }
     }
 
@@ -119,3 +124,4 @@ class LawTypeBones
     }
 };
 }
+#endif
