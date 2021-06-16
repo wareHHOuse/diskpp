@@ -91,7 +91,9 @@ class CellConverter:
         return self.mdim[typeC]
 
     def addCell(self, mtype, nodes, edges, faces, volumes):
-        if self.mdim[mtype] == 1:
+        if self.mdim[mtype] == 0:
+            logging.info("0D-cell are not supported. We skip them...")
+        elif self.mdim[mtype] == 1:
             mnodes = rotate(nodes[0:self.mnodes[mtype]])
             if mnodes in self.list_edges:
                 return self.list_edges[mnodes]
@@ -182,6 +184,8 @@ class PolyMesh:
             for group in medmesh.getGroupsOnSpecifiedLev(lev):
                 ids = cells_shift + medmesh.getGroupArr(lev, group)
                 val = [loc_glo_ind[cid] for cid in ids.getValues()]
+                if mdim == 0:
+                    logging.info("0D-groups are not supported. We skip them...")
                 if mdim == 1:
                     self.edges_grp.append([group, val])
                 elif mdim == 2:
@@ -353,7 +357,7 @@ class PolyMesh:
 # If you have not medcoupling but salome
 # ./salome shell
 # Then use the script (or directly)
-# python medconverter.py -fi myInputMesh.med -fo myOutputMesh.poly2d
+# python med2poly.py -fi myInputMesh.med -fo myOutputMesh.poly2d
 
 if __name__ == '__main__':
 
