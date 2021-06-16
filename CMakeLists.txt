@@ -46,7 +46,7 @@ endif()
 
 ######################################################################
 ## Package: MUMPS solver
-find_package(MUMPS COMPONENTS PAR)
+find_package(MUMPS COMPONENTS SEQ)
 if (MUMPS_FOUND)
     set(LINK_LIBS ${LINK_LIBS} MUMPS::MUMPS)
     add_definitions(-DHAVE_MUMPS)
@@ -180,6 +180,8 @@ endif()
 set(CMAKE_CXX_FLAGS_DEBUG "-g -fsanitize=address -fpermissive")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -g -fpermissive -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASEASSERT "-O3 -march=native -g -fpermissive")
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-anon-enum-enum-conversion")
 
 
 set(UP_EIGEN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/contrib/eigen")
