@@ -22,6 +22,7 @@
 #include "loaders/loader.hpp"
 #include "output/silo.hpp"
 #include "solvers/solver.hpp"
+#include "solvers/mumps.hpp"
 #include "methods/dg"
 
 #include "compinfo.h"
@@ -315,16 +316,17 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
 
     disk::dynamic_vector<scalar_type> sol = disk::dynamic_vector<scalar_type>::Zero(assm.syssz);
 
+    /*
     std::cout << "Running pardiso" << std::endl;
     disk::solvers::pardiso_params<scalar_type> pparams;
     pparams.report_factorization_Mflops = true;
     mkl_pardiso(pparams, assm.LHS, assm.RHS, sol);
-
-    /*
-    Eigen::GMRES<Eigen::SparseMatrix<T>, Eigen::IdentityPreconditioner> gmres;
-    gmres.compute(assm.LHS);
-    sol = gmres.solve(assm.RHS);
     */
+    ///*
+    std::cout << "Running MUMPS" << std::endl;
+    mumps_solver<scalar_type> mumps;
+    sol = mumps.solve(assm.LHS, assm.RHS);
+    //*
 
     std::vector<std::pair<scalar_type, int>> data_ex, data_ey, data_ez, data_diff;
     data_ex.resize(msh.points_size(), std::make_pair(0.0, 0));
@@ -690,8 +692,8 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.geo$") ))
     {
         std::cout << "Guessed mesh format: GMSH" << std::endl;
-        disk::generic_mesh<T,3> msh;
-        disk::gmsh_geometry_loader< disk::generic_mesh<T,3> > loader;
+        disk::simplicial_mesh<T,3> msh;
+        disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
         
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);

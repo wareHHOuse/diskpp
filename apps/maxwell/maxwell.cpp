@@ -1007,7 +1007,6 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
         auto mur = pl.mu( di.tag() );
         auto sigma = pl.sigma( di.tag() );
         auto Z = std::sqrt( (jw*mur*mu0) / (sigma + jw*epsr*eps0) );
-
         auto CR = disk::curl_reconstruction_pk(msh, cl, chdi);
         auto ST = disk::curl_hdg_stabilization(msh, cl, chdi);
         auto MM = disk::make_vector_mass_oper(msh, cl, chdi);
@@ -1095,20 +1094,20 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
 
     disk::dynamic_vector<scalar_type> sol = disk::dynamic_vector<scalar_type>::Zero(assm.syssz);
 
-    ///*
+    /*
     std::cout << "Running pardiso" << std::endl;
     disk::solvers::pardiso_params<scalar_type> pparams;
     pparams.report_factorization_Mflops = true;
     pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
     mkl_pardiso(pparams, assm.LHS, assm.RHS, sol);
-    //*/
-
-    /*
-    std::cout << "Running MUMPS" << std::endl;
-    mumps_solver<T> mumps;
-    sol = mumps.solve(assm.LHS, assm.RHS);
     */
 
+    ///*
+    std::cout << "Running MUMPS" << std::endl;
+    mumps_solver<scalar_type> mumps;
+    sol = mumps.solve(assm.LHS, assm.RHS);
+    //*/
+  
     std::vector<std::pair<scalar_type, int>> data_ex, data_ey, data_ez, data_diff, data_z;
     data_ex.resize(msh.points_size(), std::make_pair(0.0, 0));
     data_ey.resize(msh.points_size(), std::make_pair(0.0, 0));
@@ -1513,6 +1512,12 @@ int main(int argc, char **argv)
         }
     }
 
+    if (mesh_filename == nullptr or param_filename == nullptr)
+    {
+        std::cout << "forgot -m or -P?" << std::endl;
+        return 1;
+    }
+
 #if 0
     /* Netgen 2D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$") ))
@@ -1562,8 +1567,8 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.geo$") ))
     {
         std::cout << "Guessed mesh format: GMSH" << std::endl;
-        disk::generic_mesh<T,3> msh;
-        disk::gmsh_geometry_loader< disk::generic_mesh<T,3> > loader;
+        disk::simplicial_mesh<T,3> msh;
+        disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
         
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
