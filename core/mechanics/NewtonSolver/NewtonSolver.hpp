@@ -39,6 +39,7 @@
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "mechanics/behaviors/tensor_conversion.hpp"
 #include "mechanics/contact/ContactManager.hpp"
+#include "mechanics/NewtonSolver/StabilizationManger.hpp"
 #include "mechanics/stress_tensors.hpp"
 
 #include "adaptivity/adaptivity.hpp"
@@ -90,6 +91,7 @@ class NewtonSolver
     behavior_type             m_behavior;
     MeshDegreeInfo<mesh_type> m_degree_infos;
     ContactManager<mesh_type> m_contact_manager;
+    StabCoeffManager<scalar_type> m_stab_manager;
 
     std::vector<vector_type> m_solution, m_solution_faces, m_solution_mult;
     std::vector<matrix_type> m_gradient_precomputed, m_stab_precomputed;
@@ -288,7 +290,7 @@ class NewtonSolver
 
   public:
     NewtonSolver(const mesh_type& msh, const bnd_type& bnd, const param_type& rp) :
-      m_msh(msh), m_verbose(rp.m_verbose), m_convergence(false), m_rp(rp), m_bnd(bnd)
+      m_msh(msh), m_verbose(rp.m_verbose), m_convergence(false), m_rp(rp), m_bnd(bnd), m_stab_manager(msh, rp.m_beta)
     {
         if (m_verbose)
         {
@@ -550,7 +552,8 @@ class NewtonSolver
                                                                m_gradient_precomputed,
                                                                m_stab_precomputed,
                                                                m_behavior,
-                                                               m_contact_manager);
+                                                               m_contact_manager,
+                                                               m_stab_manager);
             si.updateInfo(newton_info);
 
             if (m_verbose)
@@ -603,6 +606,7 @@ class NewtonSolver
                         this->output_CauchyStress_GP(name + "CauchyStress_GP_def.msh", true);
                         this->output_discontinuous_deformed(name + "deformed_disc.msh");
                         this->output_is_plastic_GP(name + "plastic_GP.msh");
+                        this->output_stabCoeff(name + "stabCoeff.msh");
 
                         m_rp.m_time_save.pop_front();
                         if (m_rp.m_time_save.empty())
@@ -1044,6 +1048,36 @@ class NewtonSolver
         }
         // Save mesh
         gmsh.writeGmesh(filename, 2);
+    }
+
+    void
+    output_stabCoeff(const std::string& filename) const
+    {
+        gmsh::Gmesh gmsh = convertMesh(m_post_mesh);
+
+        std::vector<gmsh::Data>    data;    // create data (not used)
+        std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
+        size_t                     nb_nodes(gmsh.getNumberofNodes());
+
+        for (auto& cl : m_msh)
+        {
+
+            std::array<double, 3> coor = init_coor(barycenter(m_msh, cl));
+            double                beta = m_stab_manager.getValue(m_msh, cl);
+            std::vector<double>   tens(1, beta);
+
+            // Add GP
+            // Create a node at gauss point
+            nb_nodes++;
+            const gmsh::Node    new_node(coor, nb_nodes, 0);
+            const gmsh::SubData sdata(tens, new_node);
+            subdata.push_back(sdata); // add subdata
+        }
+
+        // Save
+        gmsh::NodeData nodedata(1, 0.0, "StabCoeff", data, subdata); // create and init a nodedata view
+
+        nodedata.saveNodeData(filename, gmsh); // save the view
     }
 };
 }
