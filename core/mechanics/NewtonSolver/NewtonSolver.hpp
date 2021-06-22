@@ -607,6 +607,7 @@ class NewtonSolver
                         this->output_discontinuous_deformed(name + "deformed_disc.msh");
                         this->output_is_plastic_GP(name + "plastic_GP.msh");
                         this->output_stabCoeff(name + "stabCoeff.msh");
+                        this->output_equivalentPlasticStrain_GP(name + "equivalentPlasticStrain_GP.msh");
 
                         m_rp.m_time_save.pop_front();
                         if (m_rp.m_time_save.empty())
@@ -1004,6 +1005,45 @@ class NewtonSolver
 
         // Save
         gmsh::NodeData nodedata(1, 0.0, "state_GP", data, subdata); // create and init a nodedata view
+
+        nodedata.saveNodeData(filename, gmsh); // save the view
+    }
+
+    void
+    output_equivalentPlasticStrain_GP(const std::string& filename) const
+    {
+        gmsh::Gmesh gmsh = convertMesh(m_post_mesh);
+
+        std::vector<gmsh::Data>    data;    // create data (not used)
+        std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
+        size_t                     nb_nodes(gmsh.getNumberofNodes());
+
+        int cell_i = 0;
+        for (auto& cl : m_msh)
+        {
+            // Loop on nodes
+            const auto nb_qp = m_behavior.numberOfQP(cell_i);
+
+            for (int i_qp = 0; i_qp < nb_qp; i_qp++)
+            {
+                const auto qp = m_behavior.quadrature_point(cell_i, i_qp);
+
+                scalar_type p = m_behavior.equivalentPlasticStrain(cell_i, i_qp);
+
+                const std::vector<double> p_s = convertToVectorGmsh(p);
+
+                // Add GP
+                // Create a node at gauss point
+                nb_nodes++;
+                const gmsh::Node    new_node = convertPoint(qp.point(), nb_nodes);
+                const gmsh::SubData sdata(p_s, new_node);
+                subdata.push_back(sdata); // add subdata
+            }
+            cell_i++;
+        }
+
+        // Save
+        gmsh::NodeData nodedata(1, 0.0, "equivalentPlasticStrain_GP", data, subdata); // create and init a nodedata view
 
         nodedata.saveNodeData(filename, gmsh); // save the view
     }

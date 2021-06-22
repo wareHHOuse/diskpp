@@ -101,6 +101,20 @@ class Mfront_qp : public law_qp_bones<T, DIM>
         mgis::behaviour::update(m_behavData);
     }
 
+    scalar_type
+    getEquivalentPlasticStrain() const
+    {
+        try
+        {
+            const auto ePSPtr = mgis::behaviour::getInternalStateVariable(m_behavData.s1, "EquivalentPlasticStrain");
+            return *ePSPtr;
+        }
+        catch(...)
+        {}
+
+        return 0.0;
+    }
+
     void
     addMaterialParameters(const data_type& data)
     {

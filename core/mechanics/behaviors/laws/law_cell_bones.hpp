@@ -163,7 +163,7 @@ class LawTypeCellBones
             for (auto& qp : m_list_qp)
             {
                 const auto pphi = pb.eval_functions(qp.point());
-                rhs += qp.weight() * qp.getAccumulatedPlasticStrain() * pphi;
+                rhs += qp.weight() * qp.getEquivalentPlasticStrain() * pphi;
             }
 
             return mass.ldlt().solve(rhs);
