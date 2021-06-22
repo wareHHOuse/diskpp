@@ -125,7 +125,7 @@ class ListOfTimeStep
 
         for (I i = 0; i < n_step; i++)
         {
-            if ((start_time + (i + 1) * delta_t) < user_end_time)
+            if ((start_time + (i + 1) * delta_t) <= user_end_time)
             {
                 const TimeStep<T> step(start_time + i * delta_t, start_time + (i + 1) * delta_t, level);
                 list_steps.push_back(step);

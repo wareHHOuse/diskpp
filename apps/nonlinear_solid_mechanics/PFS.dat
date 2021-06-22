@@ -18,6 +18,8 @@ Stabilization
 true
 StabType
 HH0
+AdaptativeStabilization
+false
 Beta
 100
 Verbose
