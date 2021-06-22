@@ -108,6 +108,7 @@ class ListOfTimeStep
   private:
     std::list<TimeStep<T>> list_steps;
     size_t                 n_time_step_comp;
+    T                      user_end_time;
 
     template<typename I>
     void
@@ -124,13 +125,21 @@ class ListOfTimeStep
 
         for (I i = 0; i < n_step; i++)
         {
-            const TimeStep<T> step(start_time + i * delta_t, start_time + (i + 1) * delta_t, level);
-            list_steps.push_back(step);
+            if ((start_time + (i + 1) * delta_t) < user_end_time)
+            {
+                const TimeStep<T> step(start_time + i * delta_t, start_time + (i + 1) * delta_t, level);
+                list_steps.push_back(step);
+            }
         }
     }
 
   public:
-    ListOfTimeStep(const T end_time, const size_t n_step) : n_time_step_comp(0)
+    ListOfTimeStep() : n_time_step_comp(0), user_end_time(0)
+    {
+        list_steps.clear();
+    }
+
+    ListOfTimeStep(const T end_time, const size_t n_step) : n_time_step_comp(0), user_end_time(end_time)
     {
         this->addTimeStepping(end_time, n_step, 0);
     }
@@ -138,10 +147,18 @@ class ListOfTimeStep
     template<typename I>
     ListOfTimeStep(const std::vector<std::pair<T, I>> list_of_time_step) : n_time_step_comp(0)
     {
+        user_end_time = list_of_time_step[list_of_time_step.size()-1].first;
         for (auto& [time, n_step] : list_of_time_step)
         {
             this->addTimeStepping(time, n_step, 0);
         }
+    }
+
+    template<typename I>
+    ListOfTimeStep(const std::vector<std::pair<T, I>> list_of_time_step, const T final_time) : n_time_step_comp(0)
+    {
+        user_end_time = final_time;
+        for (auto& [time, n_step] : list_of_time_step) { this->addTimeStepping(time, n_step, 0); }
     }
 
     /**

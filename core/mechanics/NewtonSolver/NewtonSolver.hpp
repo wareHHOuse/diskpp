@@ -509,7 +509,11 @@ class NewtonSolver
         ttot.tic();
 
         // list of time step
-        ListOfTimeStep<scalar_type> list_time_step(m_rp.m_time_step);
+        ListOfTimeStep<scalar_type> list_time_step;
+        if (m_rp.m_has_user_end_time)
+            list_time_step = ListOfTimeStep<scalar_type>(m_rp.m_time_step, m_rp.m_user_end_time);
+        else
+            list_time_step = ListOfTimeStep<scalar_type>(m_rp.m_time_step);
 
         if (m_verbose)
             std::cout << "** Number of time step: " << list_time_step.numberOfTimeStep() << std::endl;
