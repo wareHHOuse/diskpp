@@ -465,6 +465,28 @@ class Behavior
         }
     }
 
+    scalar_type
+    equivalentPlasticStrain(const size_t& cell_id, const size_t& qp_id) const
+    {
+        switch (m_id)
+        {
+            case 100: return m_elastic.getCellQPs(cell_id).getQP(qp_id).getEquivalentPlasticStrain(); break;
+            case 101: return m_linearHard.getCellQPs(cell_id).getQP(qp_id).getEquivalentPlasticStrain(); break;
+            case 102: return m_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).getEquivalentPlasticStrain(); break;
+            case 103: return m_henckymises.getCellQPs(cell_id).getQP(qp_id).getEquivalentPlasticStrain(); break;
+            case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).getEquivalentPlasticStrain(); break;
+            case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).getEquivalentPlasticStrain(); break;
+            case 300: return m_log_elastic.getCellQPs(cell_id).getQP(qp_id).getEquivalentPlasticStrain(); break;
+            case 301: return m_log_linearHard.getCellQPs(cell_id).getQP(qp_id).getEquivalentPlasticStrain(); break;
+            case 302: return m_log_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).getEquivalentPlasticStrain(); break;
+#ifdef HAVE_MGIS
+            case 500: return m_mfront.getCellQPs(cell_id).getQP(qp_id).getEquivalentPlasticStrain(); break;
+#endif
+
+            default: throw std::invalid_argument("Behavior error: Unknown id law");
+        }
+    }
+
     void update(void)
     {
         switch (m_id)

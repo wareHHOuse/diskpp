@@ -203,9 +203,9 @@ class LogarithmicStrain_qp
     }
 
     scalar_type
-    getAccumulatedPlasticStrain() const
+    getEquivalentPlasticStrain() const
     {
-        return m_law_hpp_qp.getAccumulatedPlasticStrain();
+        return m_law_hpp_qp.getEquivalentPlasticStrain();
     }
 
     void

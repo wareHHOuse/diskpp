@@ -101,7 +101,7 @@ class IsotropicHardeningVMis_qp : public law_qp_bones<T, DIM>
     }
 
     scalar_type
-    getAccumulatedPlasticStrain() const
+    getEquivalentPlasticStrain() const
     {
         return m_p_curr;
     }
