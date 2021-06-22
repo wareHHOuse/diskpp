@@ -49,6 +49,8 @@ class NewtonSolverParameter
     int m_grad_degree; // grad degree
 
     std::vector<std::pair<T, int>> m_time_step; // number of time time_step
+    bool                           m_has_user_end_time; // final time is given
+    T                              m_user_end_time; // final time of the simulation
     int                            m_sublevel;  // number of sublevel if there are problems
     int                            m_iter_max;  // maximun nexton iteration
     T                              m_epsilon;   // stop criteria
@@ -66,9 +68,10 @@ class NewtonSolverParameter
 
     NewtonSolverParameter() :
       m_face_degree(1), m_cell_degree(1), m_grad_degree(1), m_sublevel(5), m_iter_max(20), m_epsilon(T(1E-6)),
-      m_verbose(false), m_precomputation(false), m_stab(true), m_beta(1), m_stab_type(HHO), m_n_time_save(0)
+      m_verbose(false), m_precomputation(false), m_stab(true), m_beta(1), m_stab_type(HHO), m_n_time_save(0),
+      m_user_end_time(1.0), m_has_user_end_time(false)
     {
-        m_time_step.push_back(std::make_pair(1.0, 1));
+        m_time_step.push_back(std::make_pair(m_user_end_time, 1));
     }
 
     void
@@ -149,6 +152,13 @@ class NewtonSolverParameter
                     m_time_step.push_back(std::make_pair(time, time_step));
                     line++;
                 }
+            }
+            else if (keyword == "FinalTime")
+            {
+                ifs >> m_user_end_time;
+                line++;
+
+                m_has_user_end_time = true;
             }
             else if (keyword == "TimeSave")
             {
