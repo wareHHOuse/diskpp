@@ -153,7 +153,7 @@ class PolyMesh:
 
     def createMesh(self, args):
         medmesh = medcoupling.MEDFileUMesh(args.fileNameInput)
-        self.dimension = medmesh.getSpaceDimension()
+        self.dimension = 0
 
         nb_nodes = medmesh.getNumberOfNodes()
         logging.info("Reading %d nodes..."%(nb_nodes))
@@ -175,6 +175,7 @@ class PolyMesh:
                 mtype = cc.getType(medcoupling_cell_type)
                 logging.info("**Reading %d %s..."%(len(cells_by_type), mtype))
                 mdim = cc.getDim(mtype)
+                self.dimension = max(self.dimension, mdim)
                 for cell in cells_by_type :
                     element_nodes_med = mesh_lev.getNodeIdsOfCell(cell)
                     cell_id = cc.addCell(mtype, element_nodes_med, self.edges, self.faces, self.volumes)
@@ -248,8 +249,11 @@ class PolyMesh:
         i_node = 0
         for node in self.nodes:
             if len(node) == 2:
+                assert self.dimension == 2
                 f.write("%d %f %f %f \n"%(i_node, node[0], node[1], 0.0))
             else:
+                if self.dimension != 3:
+                    assert abs(node[2]) < 1E-12
                 f.write("%d %f %f %f \n"%(i_node, node[0], node[1], node[2]))
             i_node += 1
 
