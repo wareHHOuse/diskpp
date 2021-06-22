@@ -115,6 +115,15 @@ class Mfront_qp : public law_qp_bones<T, DIM>
         return 0.0;
     }
 
+    bool
+    is_plastic() const
+    {
+        if (getEquivalentPlasticStrain() != 0.0)
+            return true;
+
+        return false;
+    }
+
     void
     addMaterialParameters(const data_type& data)
     {
