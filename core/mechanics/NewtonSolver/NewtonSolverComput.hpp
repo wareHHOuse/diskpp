@@ -35,6 +35,8 @@
 #include "methods/hho"
 #include "quadratures/quadratures.hpp"
 
+#include "mechanics/NewtonSolver/StabilizationManger.hpp"
+
 #include "timecounter.h"
 
 namespace disk
@@ -50,8 +52,8 @@ class mechanical_computation
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::cell            cell_type;
 
-    typedef NewtonSolverParameter<scalar_type>    param_type;
-    typedef Behavior<mesh_type>                   behavior_type;
+    typedef NewtonSolverParameter<scalar_type> param_type;
+    typedef Behavior<mesh_type>                behavior_type;
 
     typedef static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> static_matrix_type;
     typedef static_tensor<scalar_type, mesh_type::dimension>                       static_tensor_type;
@@ -330,6 +332,7 @@ class mechanical_computation
             const matrix_type&               RkT,
             const vector_type&               uTF,
             behavior_type&                   behavior,
+            StabCoeffManager<scalar_type>&   stab_manager,
             const bool                       small_def)
     {
         time_law     = 0.0;
@@ -385,6 +388,8 @@ class mechanical_computation
         const auto cell_id             = msh.lookup(cl);
         const auto nb_qp               = behavior.numberOfQP(cell_id);
         const bool use_tangent_modulus = true;
+
+        scalar_type beta_comp = 0.0, total_weight = 0.0;
         for (int i_qp = 0; i_qp < nb_qp; i_qp++)
         {
             // Compute gradient basis function
@@ -403,12 +408,14 @@ class mechanical_computation
             assert(gphi.size() == grad_basis_size);
 
             // Compute local gradient and norm
+            // RkT_iqn = Grad_sym for small def else RkT_iqn = Grad
             const auto RkT_iqn = eval(RkT_uTF, gphi);
 
             // std::cout << "RkT_iqn" << std::endl;
             // std::cout << RkT_iqn << std::endl;
 
             // Compute behavior
+            // if small_def stress = Cauchy else stress = PK1
             tc.tic();
             const auto [stress, Cep] =
               compute_behavior(behavior, cell_id, i_qp, RkT_iqn, small_def, use_tangent_modulus);
@@ -428,6 +435,47 @@ class mechanical_computation
             this->compute_contact_terms();
             tc.toc();
             time_contact += tc.to_double();
+
+            // compute new possible value for stabilization 
+            if (rp.m_adapt_stab)
+            {
+                scalar_type sigma_dev_norm, eps_dev_norm;
+                if (small_def)
+                {
+                    sigma_dev_norm = deviator(stress).norm();
+                    eps_dev_norm   = deviator(RkT_iqn).norm();
+                }
+                else
+                {
+                    const auto F   = convertGtoF(RkT_iqn);
+                    const auto EGL = convertFtoGreenLagrange(F);
+                    eps_dev_norm   = deviator(EGL).norm();
+
+                    const auto PK2 = convertPK1toPK2(stress, F);
+                    sigma_dev_norm = deviator(PK2).norm();
+
+                    // const auto Cauchy = convertPK1toCauchy(stress, F);
+                    // const auto eps    = convertGtoLinearizedStrain(RkT_iqn);
+
+                    // std::cout << sigma_dev_norm / eps_dev_norm << " vs " << deviator(Cauchy).norm() / deviator(eps).norm()
+                    //           << std::endl;
+                }
+
+                total_weight += qp.weight();
+                if (eps_dev_norm < 1E-12)
+                    beta_comp += qp.weight() * rp.m_beta;
+                else
+                    beta_comp += qp.weight() * sigma_dev_norm / eps_dev_norm;
+            }
+        }
+
+        // save new stabilization coeff beta_s in [beta/1000, 1000*beta]
+        if (rp.m_adapt_stab)
+        {
+            beta_comp /= total_weight;
+            const auto beta_s = std::min(1000. * rp.m_beta, std::max(rp.m_beta / 10000., beta_comp));
+            // std::cout << beta_comp << " vs " << beta_s << std::endl;
+            stab_manager.setValueNext(msh, cl, beta_s);
         }
 
         // compute external forces

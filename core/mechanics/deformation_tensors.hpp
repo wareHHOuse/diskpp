@@ -37,6 +37,13 @@ namespace mechanics
 
 // G: gradient
 
+template<typename T, int DIM>
+static_matrix<T, DIM, DIM>
+convertGtoLinearizedStrain(const static_matrix<T, DIM, DIM>& Gradient)
+{
+    return 0.5 * Gradient * Gradient.transpose();
+}
+
 // Compute F = G + I
 
 template<typename T, int DIM>
@@ -101,6 +108,14 @@ static_matrix<T, DIM, DIM>
 convertFtoGreenLagrange(const static_matrix<T, DIM, DIM>& F)
 {
     const auto CauchyGreenRight = convertFtoCauchyGreenRight(F);
+    return convertCauchyGreenRighttoGreenLagrange(CauchyGreenRight);
+}
+
+template<typename T, int DIM>
+static_matrix<T, DIM, DIM>
+convertGtoGreenLagrange(const static_matrix<T, DIM, DIM>& G)
+{
+    const auto CauchyGreenRight = convertGtoCauchyGreenRight(G);
     return convertCauchyGreenRighttoGreenLagrange(CauchyGreenRight);
 }
 

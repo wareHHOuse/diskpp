@@ -227,15 +227,15 @@ class Behavior
 
         std::cout << "Material properties: (name, type)" << std::endl;
         for (const auto& mp : (*m_behav).mps)
-            std::cout << mp.name << ", " << MfrontVariableTypeName(mp.type) << std::endl;
+            std::cout << "* " << mp.name << ", " << MfrontVariableTypeName(mp.type) << std::endl;
 
         std::cout << "Internal State Variables: (name, type)" << std::endl;
         for (const auto& is : (*m_behav).isvs)
-            std::cout << is.name << ", " << MfrontVariableTypeName(is.type) << std::endl;
+            std::cout << "* " << is.name << ", " << MfrontVariableTypeName(is.type) << std::endl;
 
         std::cout << "Thermodynamic forces: (name, type)" << std::endl;
         for (const auto& fc : (*m_behav).thermodynamic_forces)
-            std::cout << fc.name << ", " << MfrontVariableTypeName(fc.type) << std::endl;
+            std::cout << "* " << fc.name << ", " << MfrontVariableTypeName(fc.type) << std::endl;
 
         select_law();
         switch (m_id)

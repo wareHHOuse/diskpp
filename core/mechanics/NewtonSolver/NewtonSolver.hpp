@@ -593,6 +593,7 @@ class NewtonSolver
             {
                 list_time_step.removeCurrentTimeStep();
                 m_behavior.update();
+                m_stab_manager.update();
 
                 if (time_saving)
                 {
@@ -1107,7 +1108,7 @@ class NewtonSolver
         {
 
             std::array<double, 3> coor = init_coor(barycenter(m_msh, cl));
-            double                beta = m_stab_manager.getValue(m_msh, cl);
+            double                beta = m_stab_manager.getValue(m_msh, cl) ;
             std::vector<double>   tens(1, beta);
 
             // Add GP

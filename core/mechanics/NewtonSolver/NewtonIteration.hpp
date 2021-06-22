@@ -200,7 +200,8 @@ class NewtonIteration
 
             tc.tic();
             // std::cout << "Elem" << std::endl;
-            elem.compute(msh, cl, rp, degree_infos, lf, GT, m_solution.at(cell_i), behavior, small_def);
+            elem.compute(msh, cl, rp, degree_infos, lf, GT, m_solution.at(cell_i),
+                        behavior, stab_manager, small_def);
 
             matrix_type lhs = elem.K_int;
             vector_type rhs = elem.RTF;
@@ -215,6 +216,7 @@ class NewtonIteration
             tc.tic();
 
             const auto beta = stab_manager.getValue(msh, cl);
+            // std::cout << beta << std::endl;
 
             if (rp.m_stab)
             {

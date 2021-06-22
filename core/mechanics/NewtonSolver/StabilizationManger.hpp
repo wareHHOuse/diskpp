@@ -85,6 +85,7 @@ class StabCoeffManager
 {
   private:
     std::vector<StabCoef<T>> m_stab_coeff;
+    std::vector<StabCoef<T>> m_stab_coeff_new;
 
   public:
     template<typename Mesh>
@@ -92,10 +93,13 @@ class StabCoeffManager
     {
         m_stab_coeff.clear();
         m_stab_coeff.reserve(mesh.cells_size());
+        m_stab_coeff_new.clear();
+        m_stab_coeff_new.reserve(mesh.cells_size());
 
         for( auto& cl : mesh )
         {
             m_stab_coeff.push_back(value);
+            m_stab_coeff_new.push_back(value);
         }
     }
 
@@ -108,9 +112,22 @@ class StabCoeffManager
 
     template<typename Mesh>
     void
-    setValue(const Mesh& mesh, const typename Mesh::cell& cl, const T& value) const
+    setValue(const Mesh& mesh, const typename Mesh::cell& cl, const T& value)
     {
         m_stab_coeff[mesh.lookup(cl)].setValue(value);
+    }
+
+    template<typename Mesh>
+    void
+    setValueNext(const Mesh& mesh, const typename Mesh::cell& cl, const T& value)
+    {
+        m_stab_coeff_new[mesh.lookup(cl)].setValue(value);
+    }
+
+    void
+    update()
+    {
+        m_stab_coeff = m_stab_coeff_new;
     }
 };
 }
