@@ -51,6 +51,8 @@ find_library(MKL_iomp5_LIBRARY
     PATHS	/opt/intel/lib
     			/opt/intel/lib/intel64
     			/opt/intel/lib/intel64_lin
+    			/opt/intel/oneapi/mkl/latest/lib
+    			/opt/intel/oneapi/mkl/latest/lib/intel64
 			${INTEL_MKL_HOME}/lib/intel64
 			${INTEL_MKL_HOME}/lib/intel64_lin
             "${INTEL_MKL_LIB_SEARCH_DIRS}"
@@ -61,6 +63,8 @@ find_library(MKL_mkl_core_LIBRARY
     NAMES   mkl_core
     PATHS   /opt/intel/mkl/lib
     /opt/intel/mkl/lib/intel64
+    /opt/intel/oneapi/mkl/latest/lib
+    /opt/intel/oneapi/mkl/latest/lib/intel64
     ${INTEL_MKL_HOME}/mkl/lib/
     ${INTEL_MKL_HOME}/mkl/lib/intel64_lin
 	    "/cygdrive/C/Program\ Files\ \(x86\)/Intel/Composer\ XE/redist/intel64/mkl/"
@@ -70,6 +74,8 @@ find_library(MKL_mkl_intel_thread_LIBRARY
     NAMES   mkl_intel_thread
     PATHS   /opt/intel/mkl/lib
             /opt/intel/mkl/lib/intel64
+            /opt/intel/oneapi/mkl/latest/lib
+            /opt/intel/oneapi/mkl/latest/lib/intel64
     ${INTEL_MKL_HOME}/mkl/lib/
     ${INTEL_MKL_HOME}/mkl/lib/intel64
     ${INTEL_MKL_HOME}/mkl/lib/intel64_lin
@@ -89,6 +95,8 @@ else ()
 		NAMES   mkl_rt
 		PATHS   /opt/intel/mkl/lib
 	    		/opt/intel/mkl/lib/intel64
+	    		/opt/intel/oneapi/mkl/latest/lib
+	    		/opt/intel/oneapi/mkl/latest/lib/intel64
     ${INTEL_MKL_HOME}/mkl/lib/
     ${INTEL_MKL_HOME}/mkl/lib/intel64
     ${INTEL_MKL_HOME}/mkl/lib/intel64_lin
@@ -100,6 +108,7 @@ endif ()
 find_path(MKL_INCLUDE_DIRS
     NAMES   mkl.h
     PATHS   /opt/intel/mkl/include
+    /opt/intel/oneapi/mkl/latest/include
     ${INTEL_MKL_HOME}/mkl/include/
     "/cygdrive/C/Program\ Files\ \(x86\)/Intel/Composer\ XE/mkl/include"
     "${INTEL_MKL_INCLUDE_SEARCH_DIRS}/include"
