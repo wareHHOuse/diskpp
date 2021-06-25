@@ -369,7 +369,53 @@ curl_reconstruction(const Mesh<CoordT,3,Storage>&                     msh,
     return std::make_pair(oper, data);
 }
 
+template<typename Mesh, typename Function>
+dynamic_vector<std::complex<double>>
+maxwell_prj(const Mesh& msh, const typename Mesh::cell_type& cl,
+            const hho_degree_info& hdi, const Function& f)
+{
+    using T = std::complex<double>;
 
+    const auto fbs = vector_basis_size(hdi.face_degree(), Mesh::dimension - 1, Mesh::dimension-1);
+    const auto cbs = vector_basis_size(hdi.cell_degree(), Mesh::dimension, Mesh::dimension);
+    
+    const auto fcs = faces(msh, cl);
+
+    dynamic_vector<T> ret = dynamic_vector<T>::Zero(cbs+fcs.size() * fbs);
+
+    dynamic_matrix<T> cmat = dynamic_matrix<T>::Zero(cbs, cbs);
+    dynamic_matrix<T> crhs = dynamic_vector<T>::Zero(cbs);
+
+    const auto cb = make_vector_monomial_basis(msh, cl, hdi.cell_degree());
+    const auto qps = integrate(msh, cl, 2*hdi.cell_degree());
+    for (const auto& qp : qps)
+    {
+        auto phi = cb.eval_functions(qp.point());
+        cmat += qp.weight() * phi * phi.transpose();
+        crhs += qp.weight() * phi * f(qp.point());
+    }
+
+    ret.segment(0, cbs) = cmat.ldlt().solve(crhs);
+
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto& fc = fcs[i];
+        const auto fb = make_vector_monomial_tangential_basis(msh, fc, hdi.face_degree());
+        const auto qps_f = integrate(msh, cl, 2*hdi.face_degree());
+        dynamic_matrix<T> fmat = dynamic_matrix<T>::Zero(fbs, fbs);
+        dynamic_matrix<T> frhs = dynamic_vector<T>::Zero(fbs);
+        for (const auto& qp : qps_f)
+        {
+            auto phi = fb.eval_functions(qp.point());
+            fmat += qp.weight() * phi * phi.transpose();
+            frhs += qp.weight() * phi * f(qp.point());
+        }
+
+        ret.segment(cbs+i*fbs, fbs) = fmat.ldlt().solve(frhs);
+    }
+
+    return ret;
+}
 
 template<typename Mesh>
 std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>

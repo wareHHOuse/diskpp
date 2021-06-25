@@ -974,6 +974,13 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
     const auto fbs = disk::vector_basis_size(chdi.face_degree(),2, 2);
     const auto cbs = disk::vector_basis_size(chdi.cell_degree(), 3, 3);
 
+    auto tfsf_src = [&](const point_type& pt) -> Matrix<std::complex<double>,3,1> {
+        Matrix<std::complex<double>,3,1> ret;
+        ret(2) = std::sin(M_PI*pt.y()/0.0229);
+        ret(0) = 0;
+        ret(1) = 0;
+        return ret;
+    };
 
     std::vector<bool> is_dirichlet(msh.faces_size(), false);
 
@@ -1016,6 +1023,7 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
         Matrix<scalar_type, Dynamic, 1> rhs =
             Matrix<scalar_type, Dynamic, 1>::Zero(lhs.rows());
 
+        const auto cb = make_vector_monomial_basis(msh, cl, chdi.reconstruction_degree());
         auto fcs = faces(msh, cl);
 
         Matrix<scalar_type, Dynamic, 1> dirichlet_data =
@@ -1028,10 +1036,43 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
             if (not bi.is_boundary())
                 continue;
 
-            if (bi.is_internal())
-                continue;
-
             auto tag = bi.tag();
+
+            if (bi.is_internal())
+            {
+                auto n = normal(msh, cl, fc);
+                if (di.tag() == 14 and bi.tag() == 1188)
+                {
+                    const auto fb = make_vector_monomial_tangential_basis<mesh_type, face_type, scalar_type>(msh, fc, chdi.face_degree());
+                    disk::dynamic_matrix<scalar_type> tfsf_mass =
+                        disk::dynamic_matrix<scalar_type>::Zero(fbs, fbs);
+                    
+                    disk::dynamic_matrix<scalar_type> tfsf_trace =
+                        disk::dynamic_matrix<scalar_type>::Zero(fbs, cbs);
+                    
+                    disk::dynamic_vector<scalar_type> tfsf_rhs =
+                        disk::dynamic_vector<scalar_type>::Zero(fbs);
+
+                    auto qps = disk::integrate(msh, fc, 2*chdi.face_degree());
+                    for (const auto& qp : qps)
+                    {
+                        auto c_phi = cb.eval_functions(qp.point());
+                        auto c_phi_n = disk::vcross(c_phi, n);
+                        auto f_phi = fb.eval_functions(qp.point());
+                        tfsf_mass += qp.weight() * f_phi * f_phi.transpose();
+                        tfsf_trace += qp.weight() * f_phi * c_phi_n.transpose();
+                        tfsf_rhs += qp.weight() * f_phi * tfsf_src(qp.point());
+                    }
+
+                    disk::dynamic_vector<scalar_type> s = disk::dynamic_vector<scalar_type>::Zero(lhs.rows()); 
+                    s.segment(cbs+i*fbs, fbs) = tfsf_mass.ldlt().solve(tfsf_rhs);
+                    rhs -= lhs*s;
+                    auto Y = disk::make_impedance_term(msh, fc, chdi.face_degree());
+                    rhs.segment(cbs+i*fbs, fbs) += (jwmu0/Z)*Y*tfsf_mass.ldlt().solve(tfsf_rhs); 
+
+                }
+            }
+
             if ( pl.is_impedance(tag) )
             {
                 auto bnd_Z = Z;
@@ -1114,6 +1155,9 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
     data_ez.resize(msh.points_size(), std::make_pair(0.0, 0));
     data_diff.resize(msh.points_size(), std::make_pair(0.0, 0));
     data_z.resize(msh.points_size(), std::make_pair(0.0, 0));
+
+    scalar_type P_incident = 0.0;
+    scalar_type P_reflected = 0.0;
 
     scalar_type err = 0.0;
     size_t cell_i = 0;
@@ -1212,11 +1256,40 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
                 data_diff.at(ptid).first += ls.norm();//std::complex<double>(ls1.norm(), ls2.norm());
                 data_diff.at(ptid).second++;
             }
-        }
 
+            auto bi = msh.boundary_info(fc);
+            auto tag = bi.tag();
+
+            //if (bi.is_internal())
+            {
+                if (bi.tag() == 1195)
+                {
+                    Matrix<scalar_type, Dynamic, 1> fdofs = esol.segment(offset, fbs);
+                    for (auto& qp : qps_f)
+                    {
+                        Matrix<scalar_type, Dynamic, 3> fphi = fb.eval_functions(qp.point());
+                        Matrix<scalar_type, 3, 1> fval = Matrix<scalar_type, 3, 1>::Zero();
+
+                        for (size_t kk = 0; kk < fdofs.size(); kk++)
+                        {
+                            fval += fdofs(kk)*fphi.row(kk);
+                        }
+
+                        auto Finc = tfsf_src(qp.point());
+                        P_reflected += qp.weight() * (fval).dot(fval);
+                        P_incident += qp.weight() * Finc.dot(Finc);
+                    }
+                }
+            }
+        }
 
         cell_i++;
     }
+
+    std::cout << P_reflected << std::endl;
+    std::cout << P_incident << std::endl;
+
+    std::cout << 10.0*log10(P_reflected/P_incident) << std::endl;
 
     auto tran = [](const std::pair<scalar_type, int>& nd) -> auto {
         if (nd.second == 0)
@@ -1567,8 +1640,10 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.geo$") ))
     {
         std::cout << "Guessed mesh format: GMSH" << std::endl;
-        disk::simplicial_mesh<T,3> msh;
-        disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
+        //disk::simplicial_mesh<T,3> msh;
+        //disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
+        disk::generic_mesh<T,3> msh;
+        disk::gmsh_geometry_loader< disk::generic_mesh<T,3> > loader;
         
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
