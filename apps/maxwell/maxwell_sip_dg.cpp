@@ -195,6 +195,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
     auto ksq = (eps0*omega)*(mu0*omega);
 
     auto cvf = connectivity_via_faces(msh);
+    using point_type = typename Mesh::point_type;
     using coordinate_type = typename Mesh::coordinate_type;
     using scalar_type = std::complex<double>;
 
@@ -282,7 +283,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
                         Att += fqp.weight() * (jwmu0/Z) * n_x_tphi_x_n * n_x_tphi_x_n.transpose();
 
                     if ( pl.is_plane_wave(bi.tag()) )
-                        loc_rhs += 2*fqp.weight()*(jwmu0/Z)*n_x_tphi_x_n*f(fqp.point());
+                        loc_rhs -= 2*fqp.weight()*(jwmu0/Z)*n_x_tphi_x_n*f(fqp.point());
 
                     continue;
                 }
@@ -391,6 +392,52 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
 
         cell_i++;
     }
+
+    /***************************************************************/
+    point_type eval_start(-46e-9, 0.0, 38e-9);
+    point_type eval_stop(46e-9, 0.0, 38e-9);
+    size_t samples = 100;
+
+    point_type eval_increment = (eval_stop - eval_start)/samples;
+
+    scalar_type voltage = 0.0;
+
+    for (size_t smp = 0; smp < samples; smp++)
+    {
+        size_t cell_i = 0;
+        for (auto& cl : msh)
+        {
+            auto di = msh.domain_info(cl);
+            if (di.tag() != 5)
+            {
+                cell_i++;
+                continue;
+            }
+
+            auto pt = eval_start + eval_increment*(smp+0.5);
+            if ( is_inside(msh, cl, pt) )
+            {
+                //std::cout << pt <<  " inside " << cl << std::endl;
+
+                auto cb = make_vector_monomial_basis(msh, cl, degree);
+                Matrix<scalar_type, Dynamic, 1> lsol = sol.segment(cell_i*cb.size(), cb.size());
+            
+                auto phi = cb.eval_functions(pt);
+                auto ls = phi.transpose()*lsol;
+
+                voltage += ls(0)*eval_increment.x() +
+                           ls(1)*eval_increment.y() +
+                           ls(2)*eval_increment.z();
+            
+                continue;
+            }
+            cell_i++;
+        }
+    }
+
+    std::cout << "Voltage = " << std::abs(voltage) << std::endl;
+
+    /***************************************************************/
 
     auto tran = [](const std::pair<scalar_type, int>& nd) -> auto {
         if (nd.second == 0)
@@ -692,11 +739,19 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.geo$") ))
     {
         std::cout << "Guessed mesh format: GMSH" << std::endl;
-        disk::simplicial_mesh<T,3> msh;
-        disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
+        using Mesh = disk::simplicial_mesh<T,3>;
+        Mesh msh;
+        disk::gmsh_geometry_loader< Mesh > loader;
         
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
+
+        auto tr = [](const typename Mesh::point_type& pt) -> auto {
+            typename Mesh::point_type ret(pt.x()*1e-9, pt.y()*1e-9, pt.z()*1e-9);
+            return ret;
+        };
+
+        msh.transform(tr);
 
         run_maxwell_solver(msh, degree, stab_param, param_filename);
 
