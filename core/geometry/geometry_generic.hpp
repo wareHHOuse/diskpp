@@ -145,6 +145,15 @@ faces_id(const generic_mesh<T, DIM>& msh, const typename generic_mesh<T, DIM>::c
     return cl.faces_ids();
 }
 
+template<typename T>
+std::vector<typename generic_mesh<T, 1>::face::id_type>
+faces_id(const generic_mesh<T, 1>& msh, const typename generic_mesh<T, 1>::cell& cl)
+{
+    /* This specialization is a quick hack, the real problem should be fixed in generic_element. */
+    auto face_ids = cl.faces_ids();
+    return std::vector<typename generic_mesh<T, 1>::face::id_type>(face_ids.begin(), face_ids.end());
+}
+
 /**
   * \brief Return the volume of the specified 3D cell
   *

@@ -21,6 +21,20 @@ template<typename Mesh>
 struct rhs_functor;
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+struct rhs_functor< Mesh<T, 1, Storage> >
+{
+    typedef Mesh<T,1,Storage>               mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::point_type  point_type;
+
+    scalar_type operator()(const point_type& pt) const
+    {
+        auto sin_px = std::sin(M_PI * pt.x());
+        return M_PI * M_PI * sin_px;
+    }
+};
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 struct rhs_functor< Mesh<T, 2, Storage> >
 {
     typedef Mesh<T,2,Storage>               mesh_type;
@@ -61,6 +75,20 @@ auto make_rhs_function(const Mesh& msh)
 /* Expected solution definition */
 template<typename Mesh>
 struct solution_functor;
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+struct solution_functor< Mesh<T, 1, Storage> >
+{
+    typedef Mesh<T,1,Storage>               mesh_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef typename mesh_type::point_type  point_type;
+
+    scalar_type operator()(const point_type& pt) const
+    {
+        auto sin_px = std::sin(M_PI * pt.x());
+        return sin_px;
+    }
+};
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 struct solution_functor< Mesh<T, 2, Storage> >
@@ -215,12 +243,13 @@ int main(int argc, char **argv)
 
     using T = double;
 
+    size_t      num_elems = 16;
     size_t      degree = 1;
     char *      mesh_filename = nullptr;
     bool        stat_cond = true, stab_diam_F = true;
 
     int ch;
-    while ( (ch = getopt(argc, argv, "k:m:tw")) != -1 )
+    while ( (ch = getopt(argc, argv, "k:m:twN:")) != -1 )
     {
         switch(ch)
         {
@@ -232,6 +261,11 @@ int main(int argc, char **argv)
                 degree = std::stoi(optarg);
                 break;
 
+            case 'N':
+                /* Only for 1D */
+                num_elems = std::stoi(optarg);
+                break;
+
             case 'm':
                 mesh_filename = optarg;
                 break;
@@ -241,6 +275,22 @@ int main(int argc, char **argv)
                 std::cout << "Invalid option" << std::endl;
                 return 1;
         }
+    }
+
+    if (mesh_filename == nullptr)
+    {
+        std::cout << "Mesh format: 1D uniform" << std::endl;
+
+        typedef disk::generic_mesh<T, 1>  mesh_type;
+
+        mesh_type msh;
+        disk::uniform_mesh_loader<T, 1> loader(0, 1, num_elems);
+        loader.populate_mesh(msh);
+
+        stab_diam_F = false;
+        run_hho_diffusion_solver(msh, degree, stat_cond, stab_diam_F);
+
+        return 0;
     }
 
     /* FVCA5 2D */
