@@ -280,7 +280,7 @@ struct temp_face
         nodes = std::vector<T>(l);
     }
 
-    bool operator<(const temp_face& other)
+    bool operator<(const temp_face& other) const
     {
         auto n_mine = nodes;
         auto n_other = other.nodes;
@@ -290,7 +290,7 @@ struct temp_face
                                             n_other.begin(), n_other.end());
     }
 
-    bool operator==(const temp_face& other)
+    bool operator==(const temp_face& other) const
     {
         if (nodes.size() != other.nodes.size())
             return false;
