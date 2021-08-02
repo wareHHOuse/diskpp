@@ -341,6 +341,49 @@ integrate(const disk::generic_mesh<T, 3>& msh, const typename disk::generic_mesh
     }
 }
 
+template<typename T>
+std::vector<disk::quadrature_point<T, 1>>
+integrate(const disk::generic_mesh<T,1>& msh, const typename generic_mesh<T, 1>::cell& cl, size_t degree)
+{
+    const auto qps = disk::edge_quadrature<T>(degree);
+    const auto pts = points(msh, cl);
+
+    assert(pts.size() == 2);
+
+    const auto scale = (pts[1] - pts[0]);
+    const auto meas  = scale.to_vector().norm();
+
+    std::vector<disk::quadrature_point<T, 1>> ret;
+    ret.reserve(qps.size());
+
+    for (auto itor = qps.begin(); itor != qps.end(); itor++)
+    {
+        const auto qp = *itor;
+        const auto t  = qp.first.x();
+        const auto p  = 0.5 * (1 - t) * pts[0] + 0.5 * (1 + t) * pts[1];
+        const auto w  = qp.second * meas * 0.5;
+
+        ret.push_back(disk::make_qp(p, w));
+    }
+
+    return ret;
+}
+
+template<typename T>
+std::vector<disk::quadrature_point<T, 1>>
+integrate(const disk::generic_mesh<T, 1>& msh, const typename generic_mesh<T, 1>::face& fc, size_t degree)
+{
+    using mesh_type = generic_mesh<T, 1>;
+    std::vector<disk::quadrature_point<typename mesh_type::coordinate_type, 1>> ret;
+
+    const auto bar  = barycenter(msh, fc);
+    const auto meas = 1.0;
+
+    ret.push_back(disk::make_qp(bar, meas));
+
+    return ret;
+}
+
 } // namespace disk
 
 #endif /* _QUAD_GENERIC_HPP_ */
