@@ -1043,7 +1043,7 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
                 auto n = normal(msh, cl, fc);
                 if (di.tag() == 14 and bi.tag() == 1188)
                 {
-                    const auto fb = make_vector_monomial_tangential_basis<mesh_type, face_type, scalar_type>(msh, fc, chdi.face_degree());
+                    const auto fb = disk::make_vector_monomial_tangential_basis<mesh_type, face_type, scalar_type>(msh, fc, chdi.face_degree());
                     disk::dynamic_matrix<scalar_type> tfsf_mass =
                         disk::dynamic_matrix<scalar_type>::Zero(fbs, fbs);
                     
@@ -1135,19 +1135,17 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
 
     disk::dynamic_vector<scalar_type> sol = disk::dynamic_vector<scalar_type>::Zero(assm.syssz);
 
-    /*
     std::cout << "Running pardiso" << std::endl;
     disk::solvers::pardiso_params<scalar_type> pparams;
     pparams.report_factorization_Mflops = true;
     pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
     mkl_pardiso(pparams, assm.LHS, assm.RHS, sol);
-    */
 
-    ///*
+    /*
     std::cout << "Running MUMPS" << std::endl;
     mumps_solver<scalar_type> mumps;
     sol = mumps.solve(assm.LHS, assm.RHS);
-    //*/
+    */
   
     std::vector<std::pair<scalar_type, int>> data_ex, data_ey, data_ez, data_diff, data_z;
     data_ex.resize(msh.points_size(), std::make_pair(0.0, 0));
