@@ -142,7 +142,7 @@ class law_qp_bones
     }
 
     scalar_type
-    getAccumulatedPlasticStrain() const
+    getEquivalentPlasticStrain() const
     {
         return scalar_type(0);
     }

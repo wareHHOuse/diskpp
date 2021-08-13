@@ -101,7 +101,7 @@ class IsotropicHardeningVMis_qp : public law_qp_bones<T, DIM>
     }
 
     scalar_type
-    getAccumulatedPlasticStrain() const
+    getEquivalentPlasticStrain() const
     {
         return m_p_curr;
     }
@@ -202,9 +202,11 @@ class IsotropicHardeningVMis_qp : public law_qp_bones<T, DIM>
             // std::cout << "se_eq: " << se_eq << ", Rp " << Rp0 + H0 * (m_p_prev - p0) << ", Phi: " << Phi_trial0 <<
             // std::endl;
 
-            if (std::abs(se.trace()) > 1E-8)
+            if ((std::abs(se.trace()) / se.norm()) > 1E-8)
             {
-                const std::string mess = "Se_trace= " + std::to_string(se.trace()) + " <= 0";
+                // std::cout << std::abs(se.trace()) << ", " << se.norm() << ", " << (std::abs(se.trace()) / se.norm())
+                //           << std::endl;
+                std::string mess = "Se_trace= " + std::to_string(se.trace()) + " <= 0";
                 throw std::invalid_argument(mess);
             }
 
