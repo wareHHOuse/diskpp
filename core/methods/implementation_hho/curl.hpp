@@ -443,7 +443,7 @@ curl_reconstruction_pk(const Mesh&                       msh,
     matrix_type mass = matrix_type::Zero(rbs, rbs);
     matrix_type cr_rhs = matrix_type::Zero(rbs, cbs + num_faces_dofs);
 
-    const auto qps = integrate(msh, cl, 2*recdeg);
+    const auto qps = integrate(msh, cl, 2*celdeg+1);
     for (auto& qp : qps)
     {
         const auto r_phi = rb.eval_functions(qp.point());
@@ -457,7 +457,7 @@ curl_reconstruction_pk(const Mesh&                       msh,
     size_t offset = cbs;
     for (size_t i = 0; i < fcs.size(); i++)
     {
-        const auto fc = fcs[i];
+        const auto fc     = fcs[i];
         const auto n      = normal(msh, cl, fc);
         const auto fb     = make_vector_monomial_tangential_basis(msh, fc, facdeg);
 
@@ -629,6 +629,7 @@ curl_hdg_stabilization(const Mesh<CoordT,3,Storage>&                     msh,
     auto ht = diameter(msh, cl);
 
     size_t offset = cbs;
+
     for (size_t i = 0; i < fcs.size(); i++)
     {
         const auto fc = fcs[i];
@@ -653,7 +654,15 @@ curl_hdg_stabilization(const Mesh<CoordT,3,Storage>&                     msh,
             trace += qp.weight() * f_phi * c_phi.transpose();
         }
 
-        rhs.block(0,0,fbs,cbs) = -mass.ldlt().solve(trace);
+        LLT<matrix_type> llt(mass);
+        if (llt.info() != Success)
+        {
+            std::cout << "Mass matrix LLT failed" << std::endl;
+            abort();
+        }
+
+        rhs.block(0,0,fbs,cbs) = -llt.solve(trace);   
+
         stab += rhs.transpose() * mass * rhs / ht;
 
         offset += fbs;

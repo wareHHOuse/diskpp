@@ -89,7 +89,7 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
             for (const auto& qp : qps)
             {
                 auto cphi = rb.eval_functions(qp.point());
-                auto diff = disk::eval(rf, cphi) - sol(qp.point());
+                Matrix<T,3,1> diff = disk::eval(rf, cphi) - sol(qp.point());
                 error += qp.weight() * diff.dot(diff);
             }
 

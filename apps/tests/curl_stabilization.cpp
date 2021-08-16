@@ -97,27 +97,25 @@ struct test_functor_curl_stab<Mesh<T,3,Storage>, mixed>
 
         auto f = [](const point_type& pt) -> Matrix<T,3,1> {
             Matrix<T,3,1> ret;
-            //ret(0) = std::sin(M_PI*pt.y());
-            //ret(1) = std::sin(M_PI*pt.z());
-            //ret(2) = std::sin(M_PI*pt.x());
+            //ret(0) = std::sin(M_PI*pt.x());
+            //ret(1) = std::sin(M_PI*pt.y());
+            //ret(2) = std::sin(M_PI*pt.z());
             ret(0) = 0.0;
             ret(1) = 0.0;
             ret(2) = std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+            //ret(2) = pt.x()*pt.x(); /* Beware of NaNs in std::sqrt */
             return ret;
         };
 
-        size_t fd = degree;
-        size_t cd = mixed ? degree+1 : degree;
-        size_t rd = degree+1;
-
-        disk::hho_degree_info hdi( disk::priv::hdi_named_args{ .rd = rd, .cd = cd, .fd = fd } );
+        disk::hho_degree_info hdi( mixed ? degree+1 : degree, degree );
 
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
-            auto CR = disk::curl_reconstruction(msh, cl, hdi);
-            auto stab = disk::curl_hho_stabilization(msh, cl, CR.first, hdi);
+            //auto CR = disk::curl_reconstruction(msh, cl, hdi);
+            //auto stab = disk::curl_hho_stabilization(msh, cl, CR.first, hdi);
 
+            auto stab = disk::curl_hdg_stabilization(msh, cl, hdi);
             Matrix<scalar_type, Dynamic, 1> proj = disk::project_tangent(msh, cl, hdi, f);
 
             error += proj.dot(stab * proj);
@@ -142,11 +140,11 @@ using test_functor_curl_stab_mo = test_functor_curl_stab<Mesh, true>;
 int
 main(void)
 {
-    std::cout << red << "Test HHO curl stabilization operator" << std::endl;
+    //std::cout << red << "Test HHO curl stabilization operator" << std::endl;
     // face order: k, cell order: k
-    std::cout << cyan << "Face order: k and Cell order: k" << std::endl;
-    tester<test_functor_curl_stab_eo> tstr1;
-    tstr1.run();
+    //std::cout << cyan << "Face order: k and Cell order: k" << std::endl;
+    //tester<test_functor_curl_stab_eo> tstr1;
+    //tstr1.run();
 
     // face order: k, cell order: k
     std::cout << cyan << "Face order: k and Cell order: k+1" << std::endl;
