@@ -129,8 +129,6 @@ public:
         for (size_t k = 1; k < basis_size; k++)
             ret(k) = (2*k/h)*iexp_pow(bp.x(), k-1);
 
-        assert(pos == basis_size);
-
         return ret;
     }
 

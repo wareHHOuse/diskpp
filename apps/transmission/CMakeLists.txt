@@ -1,0 +1,7 @@
+option(BUILD_APP_TRANSMISSION "Build transmission applications" ON)
+if (BUILD_APP_TRANSMISSION)
+    add_executable(linear_transmission linear_transmission.cpp)
+    target_link_libraries(linear_transmission ${LINK_LIBS})
+    add_executable(nonlinear_transmission nonlinear_transmission.cpp)
+    target_link_libraries(nonlinear_transmission ${LINK_LIBS})
+endif (BUILD_APP_TRANSMISSION)
