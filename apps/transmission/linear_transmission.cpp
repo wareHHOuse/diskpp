@@ -46,32 +46,266 @@ subdomain_tags(const Mesh& msh)
     return tags;
 }
 
-template<typename Mesh>
-size_t
-num_interface_faces(Mesh& msh)
+
+struct element_counts
 {
-    size_t nif = 0;
-    for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++)
+    size_t cells_int;
+    size_t faces_int;
+    size_t cells_ext;
+    size_t faces_ext;
+    size_t faces_iface;
+
+    element_counts()
+        : cells_int(0), faces_int(0), cells_ext(0), faces_ext(0), faces_iface(0)
+    {}
+};
+
+std::ostream& operator<<(std::ostream& os, const element_counts& ec)
+{
+    os << "IC: " << ec.cells_int << ", IF: " << ec.faces_int << ", EC: " << ec.cells_ext;
+    os << ", EF: " << ec.faces_ext << ", JF: " << ec.faces_iface;
+    return os;
+}
+
+template<typename Mesh>
+element_counts count_mesh_elements(const Mesh& msh, size_t internal_tag)
+{
+    element_counts ret;
+
+    std::set<size_t> ifaces;
+    std::set<size_t> efaces;
+
+    for (auto& cl : msh)
     {
-        auto& fc = *itor;
-        auto bi = msh.boundary_info(fc);
-        if (bi.is_internal())
-            nif++;
+        auto fcs = faces(msh, cl);
+        auto di = msh.domain_info(cl);
+
+        if (di.tag() == internal_tag)
+            ret.cells_int++;
+        else
+            ret.cells_ext++;
+
+        for (auto& fc : fcs)
+        {
+            if (di.tag() == internal_tag)
+                ifaces.insert( offset(msh, fc) );
+            else
+                efaces.insert( offset(msh, fc) );
+
+            auto bi = msh.boundary_info(fc);
+            if (bi.is_internal() and di.tag() == internal_tag)
+                ret.faces_iface++;
+        }
     }
 
-    return nif;
+    ret.faces_int = ifaces.size();
+    ret.faces_ext = efaces.size();
+
+    return ret;
 }
 
-template<typename Mesh>
-typename Mesh::coordinate_type
-rhs_term(const Mesh&, const typename Mesh::point_type& pt, size_t subdom)
+struct dof_bases
 {
-    return 1.0;
-}
+    size_t cells_int_base;
+    size_t cells_ext_base;
+    size_t global_constrain_base;
+    size_t faces_int_base;
+    size_t faces_ext_base;
+    size_t multiplier_base;
+    size_t total_dofs;
+};
 
 template<typename Mesh>
-void test(const Mesh& msh)
+dof_bases compute_dof_bases(const Mesh& msh, const disk::hho_degree_info& hdi, size_t internal_tag)
 {
+    auto ec  = count_mesh_elements(msh, internal_tag);
+    auto cbs = disk::scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+    auto fbs = disk::scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
+
+    dof_bases ret;
+
+    ret.cells_int_base          = 0;
+    ret.cells_ext_base          = ret.cells_int_base + cbs * ec.cells_int;
+    ret.global_constrain_base   = ret.cells_ext_base + cbs * ec.cells_ext;
+    ret.faces_int_base          = ret.global_constrain_base + 1;
+    ret.faces_ext_base          = ret.faces_int_base + fbs * ec.faces_int;
+    ret.multiplier_base         = ret.faces_ext_base + fbs * ec.faces_ext;
+    ret.total_dofs              = ret.multiplier_base + fbs * ec.faces_iface;
+
+    return ret;
+}
+struct offsets_g2s
+{
+    std::map<size_t, size_t>    cells_int_g2s;
+    std::map<size_t, size_t>    faces_int_g2s;
+    std::map<size_t, size_t>    cells_ext_g2s;
+    std::map<size_t, size_t>    faces_ext_g2s;
+    std::map<size_t, size_t>    interface_g2s;
+};
+
+/* Compute the subdomain-local element numberings */
+template<typename Mesh>
+void compute_g2s(const Mesh& msh, size_t internal_tag, offsets_g2s& g2s)
+{
+    size_t ci = 0;
+    size_t ce = 0;
+    size_t fi = 0;
+    size_t fe = 0;
+    size_t ii = 0;
+
+    auto count = [](size_t offset, std::map<size_t, size_t>& g2s_l, size_t& cnt) {
+        if ( g2s_l.find(offset) != g2s_l.end() )
+            return;
+
+        g2s_l[offset] = cnt++;
+    };
+
+    for (auto& cl : msh)
+    {
+        auto di = msh.domain_info(cl);
+        if (di.tag() == internal_tag)
+            g2s.cells_int_g2s[ offset(msh, cl) ] = ci++;
+        else
+            g2s.cells_ext_g2s[ offset(msh, cl) ] = ce++;
+
+        auto fcs = faces(msh, cl);
+        for (auto& fc : fcs)
+        {
+            auto fcofs = offset(msh, fc);
+            if (di.tag() == internal_tag)
+                count( fcofs, g2s.faces_int_g2s, fi);
+            else
+                count( fcofs, g2s.faces_ext_g2s, fe);
+
+            auto bi = msh.boundary_info(fc);
+            if ( bi.is_internal() )
+                count( fcofs, g2s.interface_g2s, ii);
+        }
+    }
+}
+
+template<typename T> struct problem_data;
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+struct problem_data<Mesh<T,2,Storage>>
+{
+    using mesh_type     = Mesh<T,2,Storage>;
+    using cell_type     = typename mesh_type::cell_type;
+    using face_type     = typename mesh_type::face_type;
+    using point_type    = typename mesh_type::point_type;
+    using scalar_type   = typename mesh_type::coordinate_type;
+    using vector_type   = Eigen::Matrix<scalar_type, 2, 1>;
+
+    scalar_type u1(const mesh_type&, const point_type& pt) {
+        return std::cos(M_PI*pt.x())*std::cos(M_PI*pt.y());
+    }
+
+    scalar_type u2(const mesh_type&, const point_type& pt) {
+        return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+    }
+
+    vector_type grad_u1(const mesh_type&, const point_type& pt) {
+        vector_type ret;
+        ret (0) = -M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y());
+        ret (1) = -M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y());
+        return ret;
+    }
+
+    vector_type grad_u2(const mesh_type&, const point_type& pt) {
+        vector_type ret;
+        ret (0) = M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y());
+        ret (1) = M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y());
+        return ret;
+    }
+
+    scalar_type f1(const mesh_type&, const point_type& pt) {
+        return 2*M_PI*M_PI*std::cos(M_PI*pt.x())*std::cos(M_PI*pt.y());
+    }
+
+    scalar_type f2(const mesh_type&, const point_type& pt) {
+        return 2*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+    }
+
+    scalar_type g(const mesh_type& msh, const point_type& pt) {
+        return u1(msh, pt) - u2(msh, pt);
+    }
+
+    scalar_type g1(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
+        auto n = normal(msh, cl, fc);
+        return grad_u1(msh, pt).dot(n) - grad_u2(msh, pt).dot(n);
+    }
+
+    scalar_type g2(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
+        auto n = normal(msh, cl, fc);
+        return grad_u2(msh, pt).dot(n);
+    }
+};
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+struct problem_data<Mesh<T,3,Storage>>
+{
+    using mesh_type     = Mesh<T,3,Storage>;
+    using cell_type     = typename mesh_type::cell_type;
+    using face_type     = typename mesh_type::face_type;
+    using point_type    = typename mesh_type::point_type;
+    using scalar_type   = typename mesh_type::coordinate_type;
+    using vector_type   = Eigen::Matrix<scalar_type, 3, 1>;
+
+    scalar_type u1(const mesh_type&, const point_type& pt) {
+        return std::cos(M_PI*pt.x())*std::cos(M_PI*pt.y())*std::cos(M_PI*pt.z());
+    }
+
+    scalar_type u2(const mesh_type&, const point_type& pt) {
+        return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::sin(M_PI*pt.z());
+    }
+
+    vector_type grad_u1(const mesh_type&, const point_type& pt) {
+        vector_type ret;
+        ret (0) = -M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y())*std::cos(M_PI*pt.z());
+        ret (1) = -M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::cos(M_PI*pt.z());
+        ret (2) = -M_PI*std::cos(M_PI*pt.x())*std::cos(M_PI*pt.y())*std::sin(M_PI*pt.z());
+        return ret;
+    }
+
+    vector_type grad_u2(const mesh_type&, const point_type& pt) {
+        vector_type ret;
+        ret (0) = M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::sin(M_PI*pt.z());
+        ret (1) = M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y())*std::sin(M_PI*pt.z());
+        ret (2) = M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::cos(M_PI*pt.z());
+        return ret;
+    }
+
+    scalar_type f1(const mesh_type&, const point_type& pt) {
+        return 3*M_PI*M_PI*std::cos(M_PI*pt.x())*std::cos(M_PI*pt.y())*std::cos(M_PI*pt.z());
+    }
+
+    scalar_type f2(const mesh_type&, const point_type& pt) {
+        return 3*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::sin(M_PI*pt.z());
+    }
+
+    scalar_type g(const mesh_type& msh, const point_type& pt) {
+        return u1(msh, pt) - u2(msh, pt);
+    }
+
+    scalar_type g1(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
+        auto n = normal(msh, cl, fc);
+        return grad_u1(msh, pt).dot(n) - grad_u2(msh, pt).dot(n);
+    }
+
+    scalar_type g2(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
+        auto n = normal(msh, cl, fc);
+        return grad_u2(msh, pt).dot(n);
+    }
+};
+
+
+
+
+template<typename Mesh>
+void test(Mesh& msh)
+{
+    using T = typename Mesh::coordinate_type;
+
     auto subdom_tags = subdomain_tags(msh);
     if (subdom_tags.size() != 2)
     {
@@ -79,73 +313,252 @@ void test(const Mesh& msh)
         return;
     }
 
+    struct problem_data<Mesh> pd;
+
     size_t internal_tag = 1;
-
-    size_t num_int_fcs = num_interface_faces(msh);
-    std::cout << num_int_fcs << std::endl;
-
-    using T = typename Mesh::coordinate_type;
-
     size_t degree = 1;
     disk::hho_degree_info hdi(degree);
 
-    size_t fbs = disk::scalar_basis_size(hdi.face_degree(), Mesh::dimension);
-    size_t num_dofs = (msh.faces_size() + 2*num_int_fcs) * fbs;
+    dof_bases db = compute_dof_bases(msh, hdi, internal_tag);
+    offsets_g2s g2s;
+    compute_g2s(msh, internal_tag, g2s);
 
-    size_t ibase = msh.faces_size() * fbs;
-    size_t iofs = 0;
+    auto cbs = disk::scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+    auto fbs = disk::scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
 
+    /* Global system data */
+    Eigen::SparseMatrix<T> LHS(db.total_dofs, db.total_dofs);
+    Eigen::Matrix<T, Eigen::Dynamic, 1> RHS = Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(db.total_dofs);
+    using triplet = Eigen::Triplet<T>;
+    std::vector< triplet > triplets;
 
+    /* Lambda to assemble the laplacian contribution */
+    auto asm_lapl = [&](const Mesh& msh, const typename Mesh::cell_type& cl,
+        disk::dynamic_matrix<T>& lhs, disk::dynamic_vector<T>& rhs, size_t tag) {
+        std::vector<size_t> l2g( lhs.rows() );
+        size_t clofs = offset(msh, cl);
+        size_t clbase;
+        if (tag == internal_tag) 
+            clbase = db.cells_int_base + cbs*g2s.cells_int_g2s.at(clofs);
+        else
+            clbase = db.cells_ext_base + cbs*g2s.cells_ext_g2s.at(clofs);
+
+        for (size_t i = 0; i < cbs; i++)
+            l2g[i] = clbase+i;
+
+        size_t face_i = 0;
+        auto fcs = faces(msh, cl);
+        for (auto& fc : fcs)
+        {
+            size_t fcofs = offset(msh, fc);
+            size_t fcbase;
+            if (tag == internal_tag) 
+                fcbase = db.faces_int_base + fbs*g2s.faces_int_g2s.at(fcofs);
+            else
+                fcbase = db.faces_ext_base + fbs*g2s.faces_ext_g2s.at(fcofs);
+
+            for(size_t i = 0; i < fbs; i++)
+                l2g[cbs + face_i*fbs + i] = fcbase+i;
+
+            face_i++;
+        }
+
+        for (size_t i = 0; i < lhs.rows(); i++)
+            for (size_t j = 0; j < lhs.cols(); j++)
+                triplets.push_back( triplet( l2g[i], l2g[j], lhs(i,j) ) );
+                
+        RHS.segment(clbase, cbs) = rhs;
+    };
+
+    /* Lambda to assemble integral global constraint */
+    auto asm_constraint = [&](const Mesh& msh, const typename Mesh::cell_type& cl,
+        disk::dynamic_vector<T>& average, size_t tag) {
+        size_t clofs = offset(msh, cl);
+        size_t clbase;
+        if (tag == internal_tag)
+            clbase = db.cells_int_base + cbs*g2s.cells_int_g2s.at(clofs);
+        else
+            clbase = db.cells_ext_base + cbs*g2s.cells_ext_g2s.at(clofs);
+
+        for (size_t i = 0; i < cbs; i++)
+        {
+            triplets.push_back( triplet(db.global_constrain_base, clbase+i, average[i]) );
+            triplets.push_back( triplet(clbase+i, db.global_constrain_base, average[i]) );
+        }
+    };
+
+    /* Lambda to assemble lagrange multipliers */
+    auto asm_lagrange = [&](const Mesh& msh, const typename Mesh::face_type& fc,
+        disk::dynamic_matrix<T>& M, disk::dynamic_vector<T>& m, size_t tag) {
+        size_t fcofs = offset(msh, fc);
+        size_t lfcbase = db.multiplier_base + fbs*g2s.interface_g2s.at(fcofs);
+        double sign = (tag == internal_tag) ? -1. : 1.;
+        size_t fcbase;
+        if (tag == internal_tag)
+            fcbase = db.faces_int_base + fbs*g2s.faces_int_g2s.at(fcofs);
+        else
+            fcbase = db.faces_ext_base + fbs*g2s.faces_ext_g2s.at(fcofs);
+
+        for (size_t i = 0; i < fbs; i++)
+        {
+            for (size_t j = 0; j < fbs; j++)
+            {
+                /* M is symmetric */
+                triplets.push_back( triplet(fcbase+i, lfcbase+j, sign*M(i,j)) );
+                triplets.push_back( triplet(lfcbase+i, fcbase+j, -sign*M(i,j)) );
+            }
+        }
+        if (tag == internal_tag)
+            RHS.segment(lfcbase, fbs) = m;
+    };
+
+    /* Lambda to assemble interface fluxes */
+    auto asm_interface_flux = [&](const Mesh& msh, const typename Mesh::face_type& fc,
+        disk::dynamic_vector<T>& g1, size_t tag) {
+        size_t fcofs = offset(msh, fc);
+        size_t fcbase;
+        if (tag == internal_tag)
+        {
+            fcbase = db.faces_int_base + fbs*g2s.faces_int_g2s.at(fcofs);
+            RHS.segment(fcbase, fbs) += g1;
+        }
+    };
+
+    /* Lambda to assemble boundary fluxes */
+    auto asm_boundary_flux = [&](const Mesh& msh, const typename Mesh::face_type& fc,
+        disk::dynamic_vector<T>& g2) {
+        size_t fcofs = offset(msh, fc);
+        size_t fcbase = db.faces_ext_base + fbs*g2s.faces_ext_g2s.at(fcofs);
+        RHS.segment(fcbase, fbs) += g2;
+    };
+
+    /* Assembly loop */
     for (auto& cl : msh)
     {
         auto di = msh.domain_info(cl);
 
-        auto rhs_fun = [&](const typename Mesh::point_type& pt) -> auto {
-            return rhs_term(msh, pt, di.tag());
-        };
-
         auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
         auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
         auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
-        auto rhs    = make_rhs(msh, cl, cb, rhs_fun);
-        disk::dynamic_matrix<T> A = gr.second + stab;
-        auto sc     = make_scalar_static_condensation(msh, cl, hdi, A, rhs);
 
-        auto fcs = faces(msh, cl);
-        for (size_t i = 0; i < fcs.size(); i++)
-        {
-            for (size_t j = 0; j < fcs.size(); j++)
-            {
+        /* Standard HHO Laplacian + stabilization */
+        auto cell_rhs_fun = [&](const typename Mesh::point_type& pt) -> auto {
+            if ( di.tag() == internal_tag )
+                return pd.f1(msh, pt);
+            else
+                return pd.f2(msh, pt);
+        };
+        disk::dynamic_matrix<T> lhs = gr.second + stab;
+        disk::dynamic_vector<T> rhs = make_rhs(msh, cl, cb, cell_rhs_fun);
+        asm_lapl(msh, cl, lhs, rhs, di.tag());
 
-            }
+        /* Pure Neumann global constraint */
+        disk::dynamic_vector<T> average = disk::dynamic_vector<T>::Zero(cb.size());
+        auto qps = integrate(msh, cl, hdi.cell_degree());
+        for (auto& qp : qps) {
+            auto phi = cb.eval_functions(qp.point());
+            average += qp.weight() * phi;
         }
+        asm_constraint(msh, cl, average, di.tag());
 
-
-            #if 0
+        /* Do the faces */
+        auto fcs = faces(msh, cl);
+        for (auto& fc : fcs)
+        {
             auto bi = msh.boundary_info(fc);
+
             if (bi.is_internal())
             {
-                /* We are on the interface */
-                if (di.tag() == internal_tag)
-                {
-                    /* We are in Ω₁ (the internal domain) */
-                    auto fb = disk::make_scalar_monomial_basis(msh, fc, hdi.face_degree());
-                    disk::dynamic_matrix<T> mass = disk::make_mass_matrix(msh, fc, fb);
-                    iofs += fbs;
-                }
-                else
-                {
-                    /* We are in Ω₂ (the external domain) */
-                    auto fb = disk::make_scalar_monomial_basis(msh, fc, hdi.face_degree());
-                    disk::dynamic_matrix<T> mass = disk::make_mass_matrix(msh, fc, fb);
-                }
-            }
-            else
-            {
+                auto lm_fun = [&](const typename Mesh::point_type& pt) -> auto {
+                    return pd.g(msh, pt);
+                };
 
+                auto fb = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
+                disk::dynamic_matrix<T> M = make_mass_matrix(msh, fc, fb);
+                disk::dynamic_vector<T> m = make_rhs(msh, fc, fb, lm_fun);
+                asm_lagrange(msh, fc, M, m, di.tag());
+
+                auto g1_fun = [&](const typename Mesh::point_type& pt) -> auto {
+                    return pd.g1(msh, cl, fc, pt);
+                };
+                disk::dynamic_vector<T> g1 = make_rhs(msh, fc, fb, g1_fun);
+                asm_interface_flux(msh, fc, g1, di.tag());
             }
-            #endif
+            else if (bi.is_boundary())
+            {
+                auto fb = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
+
+                auto g2_fun = [&](const typename Mesh::point_type& pt) -> auto {
+                    return pd.g2(msh, cl, fc, pt);
+                };
+                disk::dynamic_vector<T> g2 = make_rhs(msh, fc, fb, g2_fun);
+                asm_boundary_flux(msh, fc, g2);
+            }
+        }
     }
+
+    /* Initialize global matrix */
+    LHS.setFromTriplets(triplets.begin(), triplets.end());
+    triplets.clear();
+    //disk::dump_sparse_matrix(LHS, "trmat.txt");
+
+    /* Run solver */
+    std::cout << "Running pardiso" << std::endl;
+    disk::solvers::pardiso_params<T> pparams;
+    pparams.report_factorization_Mflops = true;
+    pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
+    disk::dynamic_vector<T> sol;
+    mkl_pardiso(pparams, LHS, RHS, sol);
+
+    /* Postprocess */
+    T l2_error_sq = 0.0;
+    std::vector<T> vec_u;
+    vec_u.reserve( msh.cells_size() );
+    for (auto& cl : msh)
+    {
+        auto di = msh.domain_info(cl);
+        size_t cell_ofs;
+        if (di.tag() == internal_tag)
+            cell_ofs = db.cells_int_base + cbs*g2s.cells_int_g2s.at( offset(msh, cl) );
+        else
+            cell_ofs = db.cells_ext_base + cbs*g2s.cells_ext_g2s.at( offset(msh, cl) );
+        
+        vec_u.push_back( sol[cell_ofs] );
+
+        auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        auto qps = integrate(msh, cl, 2*hdi.cell_degree());
+        for (auto& qp : qps)
+        {
+            auto phi = cb.eval_functions(qp.point());
+            auto uh_val = sol.segment(cell_ofs, cbs).dot(phi);
+            if ( di.tag() == internal_tag )
+                l2_error_sq += qp.weight() * std::pow((uh_val - pd.u1(msh, qp.point())), 2.);
+            else
+                l2_error_sq += qp.weight() * std::pow((uh_val - pd.u2(msh, qp.point())), 2.);
+        }
+    }
+
+    std::cout << "L2 error: " << std::sqrt(l2_error_sq) << std::endl;
+
+    /*
+    for (auto& cl : msh)
+    {
+        auto di = msh.domain_info(cl);
+        auto bar = barycenter(msh, cl);
+        if (di.tag() == internal_tag)
+            vec_u.push_back( pd.u1(msh, bar) );
+        else
+            vec_u.push_back( pd.u2(msh, bar) );
+    }
+    */
+
+    disk::silo_database silo_db;
+    silo_db.create("transmission.silo");
+    silo_db.add_mesh(msh, "mesh");
+
+    disk::silo_zonal_variable<T> u("u", vec_u);
+    silo_db.add_variable("mesh", u);
+
 }
 
 int main(int argc, const char **argv)
@@ -168,10 +581,6 @@ int main(int argc, const char **argv)
         loader.populate_mesh(msh);
 
         test(msh);
-
-        disk::silo_database silo;
-        silo.create("test.silo");
-        silo.add_mesh(msh, "mesh");
     }
 
     /* GMSH 3D simplicials */
@@ -185,10 +594,6 @@ int main(int argc, const char **argv)
         loader.populate_mesh(msh);
 
         test(msh);
-
-        disk::silo_database silo;
-        silo.create("test.silo");
-        silo.add_mesh(msh, "mesh");
     }
 
     /* GMSH 3D generic */
@@ -202,10 +607,6 @@ int main(int argc, const char **argv)
         loader.populate_mesh(msh);
 
         test(msh);
-
-        disk::silo_database silo;
-        silo.create("test.silo");
-        silo.add_mesh(msh, "mesh");
     }
 
     return 0;
