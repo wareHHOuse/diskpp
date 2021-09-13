@@ -20,6 +20,7 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
+/* this file deals with the heat equation with a backward Euler method */
 #include <iostream>
 #include <regex>
 #include <sstream>
@@ -33,6 +34,7 @@
 #include "output/silo.hpp"
 #include "timecounter.h"
 #include "colormanip.h"
+#include "bases/bases.hpp"
 
 using namespace disk;
 using namespace Eigen;
@@ -46,7 +48,7 @@ export_to_silo(const Mesh<T, 2, Storage>& msh,
     disk::silo_database silo;
 
     if (cycle == -1)
-        silo.create("obstacle.silo");
+        silo.create("heat.silo");
     else
     {
         std::stringstream ss;
@@ -56,13 +58,13 @@ export_to_silo(const Mesh<T, 2, Storage>& msh,
 
     silo.add_mesh(msh, "mesh");
 
-    silo.add_variable("mesh", "alpha", data, disk::zonal_variable_t );
+    silo.add_variable("mesh", "sol", data, disk::zonal_variable_t );
     silo.close();
 }
 
 template<typename Mesh>
 bool
-unsteady_laplacian_solver(const Mesh& msh, size_t degree, size_t maxiter,
+unsteady_laplacian_solver(const Mesh& msh, size_t degree, typename Mesh::coordinate_type dt,
                           typename Mesh::coordinate_type penalization)
 {
     typedef typename Mesh::coordinate_type  scalar_type;
@@ -85,13 +87,18 @@ unsteady_laplacian_solver(const Mesh& msh, size_t degree, size_t maxiter,
 
     LHS = SparseMatrix<scalar_type>(system_size, system_size);
     RHS = Matrix<scalar_type, Dynamic, 1>::Zero(system_size);
+    Matrix<scalar_type, Dynamic, 1> Mu_prev = Matrix<scalar_type, Dynamic, 1>::Zero(system_size);
 
     timecounter tc;
 
-    auto rhs_fun = [](const point_type& pt) -> auto { return 0.0; };
-    auto bcs_fun = [](const point_type& pt) -> auto { return std::exp(pt.x()); };
+    int K = 1; // index for the exact solution
 
-    scalar_type dt = 0.01;
+    auto rhs_fun = [](const point_type& pt) -> auto { return 0.0; };
+    auto bcs_fun = [](const point_type& pt) -> auto { return 0.0; };
+    auto solution= [K](const double t, const point_type& pt) -> auto { return std::exp(-2*M_PI*M_PI*K*K*t) * std::sin(M_PI*K*pt.x()) * std::sin(M_PI*K*pt.y()); };
+    auto init_fun = [K](const point_type& pt) -> scalar_type {
+			return std::sin(M_PI*K*pt.x()) * std::sin(M_PI*K*pt.y());
+		    };
 
     tc.tic();
     size_t cell_i = 0;
@@ -133,6 +140,9 @@ unsteady_laplacian_solver(const Mesh& msh, size_t degree, size_t maxiter,
             RHS(l2g[i]) += rhs(i);
         }
 
+	/* set initial datum */
+        Mu_prev.block(cell_i*cbs,0,cbs,1) = cell_mass * disk::project_function(msh, cl, degree, init_fun);
+
         cell_i++;
     }
 
@@ -141,39 +151,66 @@ unsteady_laplacian_solver(const Mesh& msh, size_t degree, size_t maxiter,
     tc.toc();
     std::cout << " Assembly time: " << tc << std::endl;
 
-    Matrix<scalar_type, Dynamic, 1> u_prev = Matrix<scalar_type, Dynamic, 1>::Zero(system_size);
+
     Matrix<scalar_type, Dynamic, 1> u;
-
     scalar_type t = 0.0;
+    scalar_type L2H1_error = 0.;
 
+    size_t freq_exp = 100;
+
+    // time loop
     for (size_t i = 0; t < 2.0; i++, t += dt)
     {
-        std::cout << "Step " << i << std::endl;
+        if(i % freq_exp == 0)
+            std::cout << "Step " << i << std::endl;
         disk::solvers::pardiso_params<scalar_type> pparams;
-        Matrix<scalar_type, Dynamic, 1> upp = u_prev;
-        upp.tail(msh.faces_size() * fbs) = Matrix<scalar_type, Dynamic, 1>::Zero(msh.faces_size() * fbs);
-        upp = upp + dt*RHS;
-        mkl_pardiso(pparams, LHS, upp, u);
+        Matrix<scalar_type, Dynamic, 1> Mupp = Mu_prev;
+        Mupp.tail(msh.faces_size() * fbs) = Matrix<scalar_type, Dynamic, 1>::Zero(msh.faces_size() * fbs);
+        Mupp = Mupp + dt*RHS;
+        mkl_pardiso(pparams, LHS, Mupp, u);
 
         Matrix<scalar_type, Dynamic, 1> sol_silo = Matrix<scalar_type, Dynamic, 1>::Zero(msh.cells_size());
 
         for (size_t i = 0; i < msh.cells_size(); i++)
             sol_silo(i) = u(i*cbs);
 
-        export_to_silo( msh, sol_silo, i );
+        if(i % freq_exp == 0)
+            export_to_silo( msh, sol_silo, i );
 
-        u_prev = Matrix<scalar_type, Dynamic, 1>::Zero(system_size);
+        Mu_prev = Matrix<scalar_type, Dynamic, 1>::Zero(system_size);
 
         cell_i = 0;
         for (auto& cl : msh)
         {
             auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
             Matrix<scalar_type, Dynamic, Dynamic> cell_mass = make_mass_matrix(msh, cl, cb);
-            u_prev.block(cbs*cell_i, 0, cbs, 1) = cell_mass*u.block(cbs*cell_i, 0, cbs, 1);
+            Mu_prev.block(cbs*cell_i, 0, cbs, 1) = cell_mass*u.block(cbs*cell_i, 0, cbs, 1);
+
+
+            // solution
+            auto sol_fun = [solution,t](const point_type& pt) -> scalar_type { return solution(t,pt); };
+
+            /* compute L2-H1-error of the current time step */
+            Matrix<scalar_type, Dynamic, 1> sol_ex
+                = disk::project_function(msh, cl, degree, sol_fun);
+            Matrix<scalar_type, Dynamic, 1> diff = u.block(cell_i*cbs, 0, cbs, 1) - sol_ex;
+
+            const auto qps = integrate(msh, cl, 2*hdi.cell_degree());
+            for(auto& qp : qps)
+            {
+                const auto g_phi = cb.eval_gradients( qp.point() );
+                Matrix<scalar_type, 1, 2> grad = Matrix<scalar_type, 1, 2>::Zero();
+                for (size_t i = 0; i < cbs; i++ )
+                    grad += diff(i) * g_phi.block(i, 0, 1, 2);
+
+                L2H1_error += dt * qp.weight() * grad.dot(grad);
+            }
+
             cell_i++;
         }
    }
 
+    std::cout << "L2-H1-error = " << std::sqrt(L2H1_error) << std::endl;
 
     /*
     size_t systsz = LHS.rows();
@@ -199,13 +236,45 @@ unsteady_laplacian_solver(const Mesh& msh, size_t degree, size_t maxiter,
     return true;
 }
 
+/* run main with :
+   ./unsteady_laplacian -m ../../../diskpp/meshes/2D_quads/diskpp/testmesh-16-16.quad -k 1 -t 0.01
+*/
+
+
 int main(int argc, char **argv)
 {
     using T = double;
     disk::cartesian_mesh<T, 2> msh;
 
-    msh = load_cartesian_2d_mesh<T>(argv[1]);
-    
-    unsteady_laplacian_solver(msh, 2, 100, 1.0);
+    T           dt = 0.01;
+    size_t      degree = 1;
+    char *      mesh_filename = nullptr;
+    int ch;
+    while ( (ch = getopt(argc, argv, "k:m:t:")) != -1 )
+    {
+	switch(ch)
+        {
+            case 'k':
+                degree = std::stoi(optarg);
+                break;
+
+            case 'm':
+                mesh_filename = optarg;
+                break;
+
+            case 't':
+                dt = std::stof(optarg);
+                break;
+
+            default:
+                std::cout << "Invalid option" << std::endl;
+                return 1;
+	}
+    }
+
+    msh = load_cartesian_2d_mesh<T>(mesh_filename);
+
+    std::cout << "Mesh loaded ..." << std::endl;
+    unsteady_laplacian_solver(msh, degree, dt, 1.0);
 }
 
