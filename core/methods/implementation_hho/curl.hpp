@@ -102,7 +102,7 @@ make_vector_mass_oper(const Mesh&                       msh,
 
     matrix_type mass = matrix_type::Zero(cbs + num_faces_dofs, cbs + num_faces_dofs);
 
-    const auto qps = integrate(msh, cl, 2*celdeg);
+    const auto qps = integrate(msh, cl, 2*celdeg+2);
     for (auto& qp : qps)
     {
         const auto phi = cb.eval_functions(qp.point());
@@ -443,7 +443,7 @@ curl_reconstruction_pk(const Mesh&                       msh,
     matrix_type mass = matrix_type::Zero(rbs, rbs);
     matrix_type cr_rhs = matrix_type::Zero(rbs, cbs + num_faces_dofs);
 
-    const auto qps = integrate(msh, cl, 2*celdeg+1);
+    const auto qps = integrate(msh, cl, 2*celdeg+2);
     for (auto& qp : qps)
     {
         const auto r_phi = rb.eval_functions(qp.point());
@@ -461,7 +461,7 @@ curl_reconstruction_pk(const Mesh&                       msh,
         const auto n      = normal(msh, cl, fc);
         const auto fb     = make_vector_monomial_tangential_basis(msh, fc, facdeg);
 
-        const auto qps_f = integrate(msh, fc, 2*recdeg);
+        const auto qps_f = integrate(msh, fc, 2*recdeg+2);
         for (auto& qp : qps_f)
         {
             Matrix<T, Dynamic, 3> r_phi     = rb.eval_functions(qp.point());
@@ -579,7 +579,7 @@ curl_hdg_stabilization(const Mesh<T,2,Storage>&                     msh,
 
         rhs.block(0, offset, fbs, fbs) = matrix_type::Identity(fbs, fbs);
 
-        const auto qps_f = integrate(msh, fc, 2*std::max(celdeg,facdeg));
+        const auto qps_f = integrate(msh, fc, 2*std::max(celdeg,facdeg)+2);
         for (auto& qp : qps_f)
         {
             Matrix<T, Dynamic, 1> f_phi = fb.eval_functions(qp.point());
@@ -643,7 +643,7 @@ curl_hdg_stabilization(const Mesh<CoordT,3,Storage>&                     msh,
 
         rhs.block(0, offset, fbs, fbs) = matrix_type::Identity(fbs, fbs);
 
-        const auto qps_f = integrate(msh, fc, 2*std::max(celdeg,facdeg));
+        const auto qps_f = integrate(msh, fc, 2*std::max(celdeg, facdeg)+2);
         for (auto& qp : qps_f)
         {
             Matrix<scalar_type, Dynamic, 3> f_phi = fb.eval_functions(qp.point());

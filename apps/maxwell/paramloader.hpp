@@ -114,6 +114,8 @@ public:
         priv::register_E_complex_field_ut<T>(lua);
     }
 
+    sol::state& state() { return lua; }
+
     bool load(Mesh& msh, const std::string& fn)
     {
         bool success = true;

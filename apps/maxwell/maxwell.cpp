@@ -746,9 +746,9 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
 
     auto curl_sol_fun = [&](const point_type& pt) -> Matrix<T, 3, 1> {
         Matrix<T, 3, 1> ret;
-        ret(0) =  M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y());
-        ret(1) = -M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y());
-        ret(2) = 0.0;
+        ret(0) =  pt.x()*std::sin(M_PI*pt.x())*( std::sin(M_PI*pt.y()) + M_PI*pt.y()*std::cos(M_PI*pt.y()) );
+        ret(1) = -pt.y()*std::sin(M_PI*pt.y())*( std::sin(M_PI*pt.x()) + M_PI*pt.x()*std::cos(M_PI*pt.x()) );
+        ret(2) =  0.0;
         return ret;
     };
 
@@ -791,6 +791,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
     std::vector<T> data_hx, data_hy, data_hz;
 
     T l2_err_e = 0.0;
+    T l2_err_R = 0.0;
     size_t cell_i = 0;
     for (auto& cl : msh)
     {
@@ -809,22 +810,27 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
 
         Matrix<T, Dynamic, 1> esol = disk::static_decondensation(lhs, rhs, edofs);
         Matrix<T,Dynamic,1> esolseg = esol.segment(0, cb.size());
+        Matrix<T,Dynamic,1> rsol = CR.first*esol;
 
-        auto qps = integrate(msh, cl, 2*chdi.cell_degree()+1);
+        auto qps = integrate(msh, cl, 2*chdi.cell_degree()+2);
         for (auto& qp : qps)
         {
             Matrix<T, Dynamic, 3> ephi = cb.eval_functions(qp.point());
             disk::dynamic_vector<T> ediff = disk::eval(esolseg, ephi) - sol_fun(qp.point());
             l2_err_e += qp.weight() * ediff.dot(ediff);
+
+            Matrix<T, Dynamic, 3> rphi = rb.eval_functions(qp.point());
+            disk::dynamic_vector<T> rdiff = disk::eval(rsol, rphi) - curl_sol_fun(qp.point());
+            l2_err_R += qp.weight() * rdiff.dot(rdiff);
         }
 
         cell_i++;
     }
 
     std::cout << "h = " << disk::average_diameter(msh) << " ";
-    std::cout << "√(Σ‖e - eₜ‖²) = " << std::sqrt(l2_err_e) << std::endl; //<< ", ";
+    std::cout << "√(Σ‖e - eₜ‖²) = " << std::sqrt(l2_err_e) << ", ";
     //std::cout << "√(Σ‖∇×(e - eₜ)‖²) = " << std::sqrt(l2_err_h) << ", ";
-    //std::cout << "‖∇×(u - C(uₕ))‖ = " << std::sqrt(l2_err_Rh) << ", ";
+    std::cout << "‖∇×(u - C(uₕ))‖ = " << std::sqrt(l2_err_R) << std::endl;// << ", ";
     //std::cout << "aₕ(I(u)-uₕ,I(u)-uₕ) = " << std::sqrt(energy_err) << std::endl;
 
     /*
@@ -860,7 +866,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
 
     return computation_info<T>({
             .l2_error_e = std::sqrt(l2_err_e),
-            .l2_error_h = 0.0,//std::sqrt(l2_err_h),
+            .l2_error_h = std::sqrt(l2_err_R),
             .nrg_error = 0.0,//std::sqrt(energy_err),
             .mflops = pparams.mflops,
             //.mflops = (int)mumps.get_Mflops(),
@@ -894,6 +900,10 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
     auto jwmu0 = scalar_type(0,omega*mu0);
     auto ksq = (eps0*omega)*(mu0*omega);
     
+    auto& lua = pl.state();
+
+    double wgz = lua["wgz"];
+
     disk::hho_degree_info chdi( { .rd = (size_t) order,
                                   .cd = (size_t) order,
                                   .fd = (size_t) order } );
@@ -903,9 +913,17 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
 
     auto tfsf_src = [&](const point_type& pt) -> Matrix<std::complex<double>,3,1> {
         Matrix<std::complex<double>,3,1> ret;
-        ret(2) = std::sin(M_PI*pt.y()/0.0229);
         ret(0) = 0;
         ret(1) = 0;
+        ret(2) = std::sin(M_PI*pt.y()/0.0229);
+        return ret;
+    };
+
+    auto tfsf_curlsrc = [&](const point_type& pt) -> Matrix<std::complex<double>,3,1> {
+        Matrix<std::complex<double>,3,1> ret;
+        ret(2) = -(M_PI/0.0229)*std::cos(M_PI*pt.y()/0.0229);
+        ret(1) = 0;
+        ret(0) = 0;
         return ret;
     };
 
@@ -980,6 +998,9 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
                     disk::dynamic_vector<scalar_type> tfsf_rhs =
                         disk::dynamic_vector<scalar_type>::Zero(fbs);
 
+                    disk::dynamic_vector<scalar_type> tfsf_curlrhs =
+                        disk::dynamic_vector<scalar_type>::Zero(fbs);
+
                     auto qps = disk::integrate(msh, fc, 2*chdi.face_degree());
                     for (const auto& qp : qps)
                     {
@@ -989,13 +1010,14 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
                         tfsf_mass += qp.weight() * f_phi * f_phi.transpose();
                         tfsf_trace += qp.weight() * f_phi * c_phi_n.transpose();
                         tfsf_rhs += qp.weight() * f_phi * tfsf_src(qp.point());
+                        tfsf_curlrhs += qp.weight() * f_phi * tfsf_curlsrc(qp.point());
                     }
 
                     disk::dynamic_vector<scalar_type> s = disk::dynamic_vector<scalar_type>::Zero(lhs.rows()); 
                     s.segment(cbs+i*fbs, fbs) = tfsf_mass.ldlt().solve(tfsf_rhs);
                     rhs -= lhs*s;
                     auto Y = disk::make_impedance_term(msh, fc, chdi.face_degree());
-                    rhs.segment(cbs+i*fbs, fbs) += (jwmu0/Z)*Y*tfsf_mass.ldlt().solve(tfsf_rhs); 
+                    rhs.segment(cbs+i*fbs, fbs) += (jwmu0/wgz)*tfsf_rhs; //Y*tfsf_mass.ldlt().solve(tfsf_rhs); 
 
                 }
             }
@@ -1187,7 +1209,7 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
 
             //if (bi.is_internal())
             {
-                if (bi.tag() == 1195)
+                if (bi.tag() == 1188)
                 {
                     Matrix<scalar_type, Dynamic, 1> fdofs = esol.segment(offset, fbs);
                     for (auto& qp : qps_f)
@@ -1417,7 +1439,7 @@ void autotest_convergence(size_t order_min, size_t order_max)
 
     std::ofstream ofs( "hho_convergence_convt.txt" );
 
-    for (size_t i = 1; i < 5; i++)
+    for (size_t i = 1; i < 4; i++)
     {
         Mesh msh;
         std::stringstream ss;
@@ -1434,7 +1456,7 @@ void autotest_convergence(size_t order_min, size_t order_max)
                 break;
 
             auto ci = vector_wave_solver(msh, order);
-            ofs << ci.l2_error_e << " ";// << ci.l2_error_h << " " << ci.nrg_error << " " << ci.mflops << " ";
+            ofs << ci.l2_error_e << " " << ci.l2_error_h << " ";// << ci.nrg_error << " " << ci.mflops << " ";
             //ofs << ci.dofs << " " << ci.nonzeros << " ";
         }
 
@@ -1450,12 +1472,12 @@ void autotest(size_t order)
     autotest_convergence(0, order);
 }
 
-int main(void)
+int main2(void)
 {
     autotest(3);
 }
 
-int main2(int argc, char **argv)
+int main(int argc, char **argv)
 {
     rusage_monitor rm;
 
