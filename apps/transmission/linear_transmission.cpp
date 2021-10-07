@@ -302,7 +302,7 @@ struct problem_data<Mesh<T,3,Storage>>
 
 
 template<typename Mesh>
-void test(Mesh& msh)
+void test(Mesh& msh, size_t degree)
 {
     using T = typename Mesh::coordinate_type;
 
@@ -316,7 +316,6 @@ void test(Mesh& msh)
     struct problem_data<Mesh> pd;
 
     size_t internal_tag = 1;
-    size_t degree = 1;
     disk::hho_degree_info hdi(degree);
 
     dof_bases db = compute_dof_bases(msh, hdi, internal_tag);
@@ -449,7 +448,7 @@ void test(Mesh& msh)
                 return pd.f2(msh, pt);
         };
         disk::dynamic_matrix<T> lhs = gr.second + stab;
-        disk::dynamic_vector<T> rhs = make_rhs(msh, cl, cb, cell_rhs_fun);
+        disk::dynamic_vector<T> rhs = make_rhs(msh, cl, cb, cell_rhs_fun, 1);
         asm_lapl(msh, cl, lhs, rhs, di.tag());
 
         /* Pure Neumann global constraint */
@@ -475,13 +474,13 @@ void test(Mesh& msh)
 
                 auto fb = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
                 disk::dynamic_matrix<T> M = make_mass_matrix(msh, fc, fb);
-                disk::dynamic_vector<T> m = make_rhs(msh, fc, fb, lm_fun);
+                disk::dynamic_vector<T> m = make_rhs(msh, fc, fb, lm_fun, 1);
                 asm_lagrange(msh, fc, M, m, di.tag());
 
                 auto g1_fun = [&](const typename Mesh::point_type& pt) -> auto {
                     return pd.g1(msh, cl, fc, pt);
                 };
-                disk::dynamic_vector<T> g1 = make_rhs(msh, fc, fb, g1_fun);
+                disk::dynamic_vector<T> g1 = make_rhs(msh, fc, fb, g1_fun, 1);
                 asm_interface_flux(msh, fc, g1, di.tag());
             }
             else if (bi.is_boundary())
@@ -491,7 +490,7 @@ void test(Mesh& msh)
                 auto g2_fun = [&](const typename Mesh::point_type& pt) -> auto {
                     return pd.g2(msh, cl, fc, pt);
                 };
-                disk::dynamic_vector<T> g2 = make_rhs(msh, fc, fb, g2_fun);
+                disk::dynamic_vector<T> g2 = make_rhs(msh, fc, fb, g2_fun, 1);
                 asm_boundary_flux(msh, fc, g2);
             }
         }
@@ -512,6 +511,11 @@ void test(Mesh& msh)
 
     /* Postprocess */
     T l2_error_sq = 0.0;
+    T l2_error_mm_sq = 0.0;
+    T l2_gradient_error_sq = 0.0;
+    T l2_reconstruction_error_sq = 0.0;
+    T l2_reconstruction_error_mm_sq = 0.0;
+
     std::vector<T> vec_u;
     vec_u.reserve( msh.cells_size() );
     for (auto& cl : msh)
@@ -522,35 +526,98 @@ void test(Mesh& msh)
             cell_ofs = db.cells_int_base + cbs*g2s.cells_int_g2s.at( offset(msh, cl) );
         else
             cell_ofs = db.cells_ext_base + cbs*g2s.cells_ext_g2s.at( offset(msh, cl) );
-        
-        vec_u.push_back( sol[cell_ofs] );
 
-        auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-        auto qps = integrate(msh, cl, 2*hdi.cell_degree());
+        auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+        auto gr     = make_scalar_hho_laplacian(msh, cl, hdi);
+        auto stab   = make_scalar_hho_stabilization(msh, cl, gr.first, hdi);
+
+        disk::dynamic_matrix<T> lhs = gr.second + stab;
+
+        disk::dynamic_vector<T> solH = disk::dynamic_vector<T>::Zero(lhs.rows());
+        solH.segment(0, cbs) = sol.segment(cell_ofs, cbs);
+        vec_u.push_back( solH(0) );
+
+        size_t face_i = 0;
+        auto fcs = faces(msh, cl);
+        for (auto& fc : fcs)
+        {
+            size_t fcofs = offset(msh, fc);
+            size_t fcbase;
+            if (di.tag() == internal_tag) 
+                fcbase = db.faces_int_base + fbs*g2s.faces_int_g2s.at(fcofs);
+            else
+                fcbase = db.faces_ext_base + fbs*g2s.faces_ext_g2s.at(fcofs);
+
+            solH.segment(cbs + face_i*fbs, fbs) = sol.segment(fcbase, fbs);
+
+            face_i++;
+        }
+        
+        auto rb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree()+1);
+        disk::dynamic_vector<T> solR = disk::dynamic_vector<T>::Zero(rb.size());
+        solR.segment(1, rb.size()-1) = gr.first*solH;
+        solR(0) = solH(0);
+
+        auto sol_fun = [&](const typename Mesh::point_type& pt) -> auto {
+            if ( di.tag() == internal_tag )
+                return pd.u1(msh, pt);
+            else
+                return pd.u2(msh, pt);
+        };
+
+        auto qps = integrate(msh, cl, 2*hdi.cell_degree()+3);
         for (auto& qp : qps)
         {
             auto phi = cb.eval_functions(qp.point());
-            auto uh_val = sol.segment(cell_ofs, cbs).dot(phi);
-            if ( di.tag() == internal_tag )
-                l2_error_sq += qp.weight() * std::pow((uh_val - pd.u1(msh, qp.point())), 2.);
-            else
-                l2_error_sq += qp.weight() * std::pow((uh_val - pd.u2(msh, qp.point())), 2.);
+            auto uh_val = solH.segment(0, cbs).dot(phi);
+
+            auto rphi = rb.eval_functions(qp.point());
+            auto rh_val = solR.dot(rphi);
+            
+            auto u_val = sol_fun(qp.point());
+            l2_error_sq += qp.weight() * std::pow(uh_val - u_val, 2.);
+            l2_reconstruction_error_sq += qp.weight() * std::pow(rh_val - u_val, 2.);
         }
+
+        disk::dynamic_matrix<T> massR = disk::dynamic_matrix<T>::Zero(rb.size(), rb.size());
+        disk::dynamic_vector<T> rhsR = disk::dynamic_vector<T>::Zero(rb.size());
+        for (auto& qp : qps)
+        {
+            auto phi = rb.eval_functions(qp.point());
+            massR += qp.weight() * phi * phi.transpose();
+            rhsR += qp.weight() * phi * sol_fun(qp.point());
+        }
+
+        disk::dynamic_vector<T> projH = disk::project_function(msh, cl, hdi, sol_fun, 1);
+        //disk::dynamic_vector<T> projR = disk::project_function(msh, cl, hdi.cell_degree()+1, sol_fun, 1);
+        disk::dynamic_vector<T> projC = disk::project_function(msh, cl, hdi.cell_degree(), sol_fun, 1);
+        disk::dynamic_vector<T> projR = massR.llt().solve(rhsR);
+
+        std::cout << "****" << std::endl;
+        std::cout << "projH: " << projH.transpose() << std::endl;
+        std::cout << "solH:  " << solH.transpose() << std::endl;
+        std::cout << "projC: " << projC.transpose() << std::endl;
+        std::cout << "projR: " << projR.transpose() << std::endl;
+        std::cout << "solR:  " << solR.transpose() << std::endl;
+
+        //disk::dynamic_matrix<T> massR = disk::make_mass_matrix(msh, cl, rb);
+        disk::dynamic_matrix<T> massC = massR.block(0,0,cbs,cbs);
+
+        disk::dynamic_vector<T> diffH = projH - solH;
+        disk::dynamic_vector<T> diffC = diffH.segment(0, cbs);
+        disk::dynamic_vector<T> diffR = projR - solR;
+
+        l2_gradient_error_sq += diffH.dot(lhs*diffH);
+        l2_error_mm_sq += diffC.dot(massC*diffC);
+        l2_reconstruction_error_mm_sq += diffR.dot(massR*diffR);
     }
 
+    std::cout << "h = " << disk::average_diameter(msh) << std::endl;
     std::cout << "L2 error: " << std::sqrt(l2_error_sq) << std::endl;
-
-    /*
-    for (auto& cl : msh)
-    {
-        auto di = msh.domain_info(cl);
-        auto bar = barycenter(msh, cl);
-        if (di.tag() == internal_tag)
-            vec_u.push_back( pd.u1(msh, bar) );
-        else
-            vec_u.push_back( pd.u2(msh, bar) );
-    }
-    */
+    std::cout << "L2 error MM: " << std::sqrt(l2_error_mm_sq) << std::endl;
+    std::cout << "Reconstruction L2 error: " << std::sqrt(l2_reconstruction_error_sq) << std::endl;
+    std::cout << "Reconstruction L2 error MM: " << std::sqrt(l2_reconstruction_error_mm_sq) << std::endl;
+    std::cout << "Gradient error: " << std::sqrt(l2_gradient_error_sq) << std::endl;
 
     disk::silo_database silo_db;
     silo_db.create("transmission.silo");
@@ -565,10 +632,11 @@ int main(int argc, const char **argv)
 {
     using T = double;
 
-    if (argc != 2)
+    if (argc != 3)
         return 1;
     
     const char *mesh_filename = argv[1];
+    size_t degree = atoi(argv[2]);
 
     /* GMSH 2D simplicials */
     if (std::regex_match(mesh_filename, std::regex(".*\\.geo2s$") ))
@@ -580,7 +648,7 @@ int main(int argc, const char **argv)
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        test(msh);
+        test(msh, degree);
     }
 
     /* GMSH 3D simplicials */
@@ -593,7 +661,7 @@ int main(int argc, const char **argv)
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        test(msh);
+        test(msh, degree);
     }
 
     /* GMSH 3D generic */
@@ -606,7 +674,7 @@ int main(int argc, const char **argv)
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        test(msh);
+        test(msh, degree);
     }
 
     return 0;
