@@ -200,7 +200,7 @@ struct problem_data<Mesh<T,2,Storage>>
         return std::cos(M_PI*pt.x())*std::cos(M_PI*pt.y());
     }
 
-    scalar_type u2(const mesh_type&, const point_type& pt) {
+    scalar_type u2(const mesh_type& msh, const point_type& pt) {
         return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
     }
 
@@ -211,7 +211,7 @@ struct problem_data<Mesh<T,2,Storage>>
         return ret;
     }
 
-    vector_type grad_u2(const mesh_type&, const point_type& pt) {
+    vector_type grad_u2(const mesh_type& msh, const point_type& pt) {
         vector_type ret;
         ret (0) = M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y());
         ret (1) = M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y());
@@ -222,7 +222,7 @@ struct problem_data<Mesh<T,2,Storage>>
         return 2*M_PI*M_PI*std::cos(M_PI*pt.x())*std::cos(M_PI*pt.y());
     }
 
-    scalar_type f2(const mesh_type&, const point_type& pt) {
+    scalar_type f2(const mesh_type& msh, const point_type& pt) {
         return 2*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
     }
 
@@ -238,6 +238,11 @@ struct problem_data<Mesh<T,2,Storage>>
     scalar_type g2(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
         auto n = normal(msh, cl, fc);
         return grad_u2(msh, pt).dot(n);
+    }
+
+    scalar_type xi(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
+        auto n = normal(msh, cl, fc);
+        return grad_u1(msh, pt).dot(n);
     }
 };
 
@@ -255,8 +260,8 @@ struct problem_data<Mesh<T,3,Storage>>
         return std::cos(M_PI*pt.x())*std::cos(M_PI*pt.y())*std::cos(M_PI*pt.z());
     }
 
-    scalar_type u2(const mesh_type&, const point_type& pt) {
-        return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::sin(M_PI*pt.z());
+    scalar_type u2(const mesh_type& msh, const point_type& pt) {
+        return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*(pt.z()-1.5);
     }
 
     vector_type grad_u1(const mesh_type&, const point_type& pt) {
@@ -267,11 +272,11 @@ struct problem_data<Mesh<T,3,Storage>>
         return ret;
     }
 
-    vector_type grad_u2(const mesh_type&, const point_type& pt) {
+    vector_type grad_u2(const mesh_type& msh, const point_type& pt) {
         vector_type ret;
-        ret (0) = M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::sin(M_PI*pt.z());
-        ret (1) = M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y())*std::sin(M_PI*pt.z());
-        ret (2) = M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::cos(M_PI*pt.z());
+        ret (0) = M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y())*(pt.z()-1.5);
+        ret (1) = M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y())*(pt.z()-1.5);
+        ret (2) = std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
         return ret;
     }
 
@@ -279,8 +284,8 @@ struct problem_data<Mesh<T,3,Storage>>
         return 3*M_PI*M_PI*std::cos(M_PI*pt.x())*std::cos(M_PI*pt.y())*std::cos(M_PI*pt.z());
     }
 
-    scalar_type f2(const mesh_type&, const point_type& pt) {
-        return 3*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::sin(M_PI*pt.z());
+    scalar_type f2(const mesh_type& msh, const point_type& pt) {
+        return 2*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*(pt.z()-1.5);
     }
 
     scalar_type g(const mesh_type& msh, const point_type& pt) {
@@ -293,6 +298,11 @@ struct problem_data<Mesh<T,3,Storage>>
     }
 
     scalar_type g2(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
+        auto n = normal(msh, cl, fc);
+        return grad_u2(msh, pt).dot(n);
+    }
+
+    scalar_type xi(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
         auto n = normal(msh, cl, fc);
         return grad_u2(msh, pt).dot(n);
     }
@@ -391,7 +401,7 @@ void test(Mesh& msh, size_t degree)
         disk::dynamic_matrix<T>& M, disk::dynamic_vector<T>& m, size_t tag) {
         size_t fcofs = offset(msh, fc);
         size_t lfcbase = db.multiplier_base + fbs*g2s.interface_g2s.at(fcofs);
-        double sign = (tag == internal_tag) ? -1. : 1.;
+        double sign = (tag == internal_tag) ? -1. : +1.;
         size_t fcbase;
         if (tag == internal_tag)
             fcbase = db.faces_int_base + fbs*g2s.faces_int_g2s.at(fcofs);
@@ -515,6 +525,7 @@ void test(Mesh& msh, size_t degree)
     T l2_gradient_error_sq = 0.0;
     T l2_reconstruction_error_sq = 0.0;
     T l2_reconstruction_error_mm_sq = 0.0;
+    T l2_trace_error_mm_sq = 0.0;
 
     std::vector<T> vec_u;
     vec_u.reserve( msh.cells_size() );
@@ -543,8 +554,27 @@ void test(Mesh& msh, size_t degree)
         {
             size_t fcofs = offset(msh, fc);
             size_t fcbase;
-            if (di.tag() == internal_tag) 
+            if (di.tag() == internal_tag)
+            {
                 fcbase = db.faces_int_base + fbs*g2s.faces_int_g2s.at(fcofs);
+             
+                auto xi_fun = [&](const typename Mesh::point_type& pt) -> auto {
+                    return pd.xi(msh, cl, fc, pt);
+                };
+             
+                auto bi = msh.boundary_info(fc);
+                if ( bi.is_internal() )
+                {
+                    auto multbase = db.multiplier_base + fbs*g2s.interface_g2s.at(fcofs);
+                    disk::dynamic_vector<T> solM = sol.segment(multbase, fbs);
+                    auto fb = disk::make_scalar_monomial_basis(msh, fc, hdi.face_degree());
+                    disk::dynamic_matrix<T> massM = disk::make_mass_matrix(msh, fc, fb);
+                    disk::dynamic_vector<T> rhsM = disk::make_rhs(msh, fc, fb, xi_fun, 1);
+                    disk::dynamic_vector<T> projM = massM.llt().solve(rhsM);
+                    disk::dynamic_vector<T> diffM = projM - solM;
+                    l2_trace_error_mm_sq += diffM.dot(massM*diffM)*diameter(msh, fc);
+                }
+            }
             else
                 fcbase = db.faces_ext_base + fbs*g2s.faces_ext_g2s.at(fcofs);
 
@@ -555,8 +585,24 @@ void test(Mesh& msh, size_t degree)
         
         auto rb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree()+1);
         disk::dynamic_vector<T> solR = disk::dynamic_vector<T>::Zero(rb.size());
+        disk::dynamic_vector<T> avefix = disk::dynamic_vector<T>::Zero(rb.size());
         solR.segment(1, rb.size()-1) = gr.first*solH;
-        solR(0) = solH(0);
+        avefix.head(cb.size()) = solH.head(cb.size());
+        avefix.tail(rb.size()-1) -= solR.tail(rb.size()-1);
+
+        auto qps = integrate(msh, cl, 2*hdi.cell_degree()+3);
+
+        T avg = 0.0;
+        for (auto& qp : qps)
+        {
+            auto rphi = rb.eval_functions(qp.point());
+            for (size_t i = 0; i < rb.size(); i++)
+                avg += qp.weight()*avefix(i)*rphi(i);
+        }
+        avg /= measure(msh,cl);
+
+
+        solR(0) = avg;
 
         auto sol_fun = [&](const typename Mesh::point_type& pt) -> auto {
             if ( di.tag() == internal_tag )
@@ -565,7 +611,6 @@ void test(Mesh& msh, size_t degree)
                 return pd.u2(msh, pt);
         };
 
-        auto qps = integrate(msh, cl, 2*hdi.cell_degree()+3);
         for (auto& qp : qps)
         {
             auto phi = cb.eval_functions(qp.point());
@@ -579,28 +624,12 @@ void test(Mesh& msh, size_t degree)
             l2_reconstruction_error_sq += qp.weight() * std::pow(rh_val - u_val, 2.);
         }
 
-        disk::dynamic_matrix<T> massR = disk::dynamic_matrix<T>::Zero(rb.size(), rb.size());
-        disk::dynamic_vector<T> rhsR = disk::dynamic_vector<T>::Zero(rb.size());
-        for (auto& qp : qps)
-        {
-            auto phi = rb.eval_functions(qp.point());
-            massR += qp.weight() * phi * phi.transpose();
-            rhsR += qp.weight() * phi * sol_fun(qp.point());
-        }
 
+
+        disk::dynamic_matrix<T> massR = disk::make_mass_matrix(msh, cl, rb);
         disk::dynamic_vector<T> projH = disk::project_function(msh, cl, hdi, sol_fun, 1);
-        //disk::dynamic_vector<T> projR = disk::project_function(msh, cl, hdi.cell_degree()+1, sol_fun, 1);
-        disk::dynamic_vector<T> projC = disk::project_function(msh, cl, hdi.cell_degree(), sol_fun, 1);
-        disk::dynamic_vector<T> projR = massR.llt().solve(rhsR);
-
-        std::cout << "****" << std::endl;
-        std::cout << "projH: " << projH.transpose() << std::endl;
-        std::cout << "solH:  " << solH.transpose() << std::endl;
-        std::cout << "projC: " << projC.transpose() << std::endl;
-        std::cout << "projR: " << projR.transpose() << std::endl;
-        std::cout << "solR:  " << solR.transpose() << std::endl;
-
-        //disk::dynamic_matrix<T> massR = disk::make_mass_matrix(msh, cl, rb);
+        disk::dynamic_vector<T> projR = disk::project_function(msh, cl, hdi.cell_degree()+1, sol_fun, 1);
+        
         disk::dynamic_matrix<T> massC = massR.block(0,0,cbs,cbs);
 
         disk::dynamic_vector<T> diffH = projH - solH;
@@ -618,6 +647,7 @@ void test(Mesh& msh, size_t degree)
     std::cout << "Reconstruction L2 error: " << std::sqrt(l2_reconstruction_error_sq) << std::endl;
     std::cout << "Reconstruction L2 error MM: " << std::sqrt(l2_reconstruction_error_mm_sq) << std::endl;
     std::cout << "Gradient error: " << std::sqrt(l2_gradient_error_sq) << std::endl;
+    std::cout << "Trace error: " << std::setprecision(15) << std::sqrt(l2_trace_error_mm_sq) << std::endl;
 
     disk::silo_database silo_db;
     silo_db.create("transmission.silo");
