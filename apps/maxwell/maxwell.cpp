@@ -763,7 +763,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
         Matrix<T, Dynamic, Dynamic> ST = disk::curl_hdg_stabilization(msh, cl, chdi);
         auto MM = make_vector_mass_oper(msh, cl, chdi);
 
-        Matrix<T, Dynamic, Dynamic> lhs = CR.second + omega*omega*(ST - MM);
+        Matrix<T, Dynamic, Dynamic> lhs = CR.second + omega*(ST - omega*MM);
         Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(lhs.rows());
 
         auto cb = make_vector_monomial_basis(msh, cl, chdi.cell_degree());
@@ -792,6 +792,8 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
 
     T l2_err_e = 0.0;
     T l2_err_R = 0.0;
+    T mass_err = 0.0;
+    T curl_err = 0.0;
     size_t cell_i = 0;
     for (auto& cl : msh)
     {
@@ -803,7 +805,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
         Matrix<T, Dynamic, Dynamic> ST = disk::curl_hdg_stabilization(msh, cl, chdi);
         
         auto MM = make_vector_mass_oper(msh, cl, chdi);
-        Matrix<T, Dynamic, Dynamic> lhs = CR.second + omega*omega*(ST - MM);
+        Matrix<T, Dynamic, Dynamic> lhs = CR.second + omega*(ST - omega*MM);
         Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(lhs.rows());
         rhs.segment(0, cb.size()) = make_rhs(msh, cl, cb, rhs_fun, 1);
         auto edofs = assm.get_element_dofs(msh, cl, sol);
@@ -811,6 +813,8 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
         Matrix<T, Dynamic, 1> esol = disk::static_decondensation(lhs, rhs, edofs);
         Matrix<T,Dynamic,1> esolseg = esol.segment(0, cb.size());
         Matrix<T,Dynamic,1> rsol = CR.first*esol;
+
+        Matrix<T,Dynamic,1> asol = disk::project_tangent(msh, cl, chdi, sol_fun, 1);
 
         auto qps = integrate(msh, cl, 2*chdi.cell_degree()+2);
         for (auto& qp : qps)
@@ -824,6 +828,11 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
             l2_err_R += qp.weight() * rdiff.dot(rdiff);
         }
 
+        Matrix<T, Dynamic, Dynamic> CC = CR.second + omega*ST;
+        Matrix<T,Dynamic,1> diff = esol - asol;
+        mass_err += diff.dot(MM*diff);
+        curl_err += diff.dot(CC*diff);
+
         cell_i++;
     }
 
@@ -832,6 +841,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
     //std::cout << "√(Σ‖∇×(e - eₜ)‖²) = " << std::sqrt(l2_err_h) << ", ";
     std::cout << "‖∇×(u - C(uₕ))‖ = " << std::sqrt(l2_err_R) << std::endl;// << ", ";
     //std::cout << "aₕ(I(u)-uₕ,I(u)-uₕ) = " << std::sqrt(energy_err) << std::endl;
+    std::cout << "mass_err = " << std::sqrt(mass_err) << " curl_err = " << std::sqrt(curl_err) << std::endl;
 
     /*
     disk::silo_database silo_db;
@@ -878,7 +888,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
 
 template<template<typename, size_t, typename> class Mesh, typename CoordT, typename Storage>
 void
-vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std::string& cfg_fn)
+vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, parameter_loader<Mesh<CoordT,3,Storage>, double> &pl)
 {
     typedef Mesh<CoordT,3,Storage>              mesh_type;
     typedef std::complex<double>                scalar_type;
@@ -887,11 +897,7 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
     typedef typename mesh_type::cell_type       cell_type;
     typedef typename mesh_type::face_type       face_type;
 
-    parameter_loader<mesh_type, double> pl;
-    bool ok = pl.load(msh, cfg_fn);
-    if (!ok)
-        return;
-
+    size_t order = pl.order();
     double omega = 2*M_PI*pl.frequency();
     double alpha = 1;
     auto eps0 = parameter_loader<mesh_type, double>::eps0;
@@ -911,7 +917,15 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
     const auto fbs = disk::vector_basis_size(chdi.face_degree(),2, 2);
     const auto cbs = disk::vector_basis_size(chdi.cell_degree(), 3, 3);
 
-    auto tfsf_src = [&](const point_type& pt) -> Matrix<std::complex<double>,3,1> {
+    auto src_y = [&](const point_type& pt) -> Matrix<std::complex<double>,3,1> {
+        Matrix<std::complex<double>,3,1> ret;
+        ret(0) = 0;
+        ret(1) = 1;
+        ret(2) = 0;
+        return ret;
+    };
+
+    auto tfsf_E = [&](const point_type& pt) -> Matrix<std::complex<double>,3,1> {
         Matrix<std::complex<double>,3,1> ret;
         ret(0) = 0;
         ret(1) = 0;
@@ -919,11 +933,11 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
         return ret;
     };
 
-    auto tfsf_curlsrc = [&](const point_type& pt) -> Matrix<std::complex<double>,3,1> {
+    auto tfsf_H = [&](const point_type& pt) -> Matrix<std::complex<double>,3,1> {
         Matrix<std::complex<double>,3,1> ret;
-        ret(2) = -(M_PI/0.0229)*std::cos(M_PI*pt.y()/0.0229);
-        ret(1) = 0;
         ret(0) = 0;
+        ret(1) = std::sin(M_PI*pt.y()/0.0229);
+        ret(2) = 0;
         return ret;
     };
 
@@ -963,7 +977,10 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
         auto ST = disk::curl_hdg_stabilization(msh, cl, chdi);
         auto MM = disk::make_vector_mass_oper(msh, cl, chdi);
         Matrix<scalar_type, Dynamic, Dynamic> lhs =
-            (1./mur) * CR.second + (ksq*epsr - jwmu0*sigma)*(ST - MM);
+            (1./mur) * CR.second + (ksq*epsr - jwmu0*sigma)*(4.0*ST - MM);
+
+        Matrix<scalar_type, Dynamic, Dynamic> lhst =
+            (1./mur) * CR.second + (ksq - jwmu0*sigma)*4.0*ST;
 
         Matrix<scalar_type, Dynamic, 1> rhs =
             Matrix<scalar_type, Dynamic, 1>::Zero(lhs.rows());
@@ -973,6 +990,22 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
 
         Matrix<scalar_type, Dynamic, 1> dirichlet_data =
             Matrix<scalar_type, Dynamic, 1>::Zero(fcs.size() * fbs);
+        /*
+        if (di.tag() == 14)
+        {
+            disk::dynamic_vector<scalar_type> tfsf =
+                        disk::dynamic_vector<scalar_type>::Zero(lhs.rows());
+            
+            auto qps = disk::integrate(msh, cl, 2*chdi.cell_degree());
+            for (const auto& qp : qps)
+            {
+                auto phi = cb.eval_functions(qp.point());
+                tfsf.head(cbs) += qp.weight() * phi * tfsf_E(qp.point())*std::exp( std::complex<double>(0.0, -1.0)*std::sqrt(ksq)*qp.point().x() );
+            }
+
+            rhs.head(cbs) += lhst*tfsf;
+        }
+        */
 
         for (size_t i = 0; i < fcs.size(); i++)
         {
@@ -987,37 +1020,36 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
             {
                 auto n = normal(msh, cl, fc);
                 if (di.tag() == 14 and bi.tag() == 1188)
+                //if (di.tag() == 5)
                 {
-                    const auto fb = disk::make_vector_monomial_tangential_basis<mesh_type, face_type, scalar_type>(msh, fc, chdi.face_degree());
+                    const auto fb = disk::make_vector_monomial_tangential_basis<mesh_type, face_type, scalar_type>(msh, fc, chdi.face_degree()); 
+
                     disk::dynamic_matrix<scalar_type> tfsf_mass =
                         disk::dynamic_matrix<scalar_type>::Zero(fbs, fbs);
-                    
-                    disk::dynamic_matrix<scalar_type> tfsf_trace =
-                        disk::dynamic_matrix<scalar_type>::Zero(fbs, cbs);
-                    
+
                     disk::dynamic_vector<scalar_type> tfsf_rhs =
                         disk::dynamic_vector<scalar_type>::Zero(fbs);
 
-                    disk::dynamic_vector<scalar_type> tfsf_curlrhs =
+                    disk::dynamic_vector<scalar_type> tfsf_rhsH =
                         disk::dynamic_vector<scalar_type>::Zero(fbs);
 
                     auto qps = disk::integrate(msh, fc, 2*chdi.face_degree());
                     for (const auto& qp : qps)
                     {
-                        auto c_phi = cb.eval_functions(qp.point());
-                        auto c_phi_n = disk::vcross(c_phi, n);
                         auto f_phi = fb.eval_functions(qp.point());
                         tfsf_mass += qp.weight() * f_phi * f_phi.transpose();
-                        tfsf_trace += qp.weight() * f_phi * c_phi_n.transpose();
-                        tfsf_rhs += qp.weight() * f_phi * tfsf_src(qp.point());
-                        tfsf_curlrhs += qp.weight() * f_phi * tfsf_curlsrc(qp.point());
+                        tfsf_rhs += qp.weight() * f_phi * tfsf_E(qp.point());
+                        tfsf_rhsH += qp.weight() * f_phi * tfsf_H(qp.point());
                     }
-
-                    disk::dynamic_vector<scalar_type> s = disk::dynamic_vector<scalar_type>::Zero(lhs.rows()); 
-                    s.segment(cbs+i*fbs, fbs) = tfsf_mass.ldlt().solve(tfsf_rhs);
-                    rhs -= lhs*s;
-                    auto Y = disk::make_impedance_term(msh, fc, chdi.face_degree());
-                    rhs.segment(cbs+i*fbs, fbs) += (jwmu0/wgz)*tfsf_rhs; //Y*tfsf_mass.ldlt().solve(tfsf_rhs); 
+                    //if (bi.tag() == 7)
+                    {
+                        disk::dynamic_vector<scalar_type> s = disk::dynamic_vector<scalar_type>::Zero(lhs.rows()); 
+                        s.segment(cbs+i*fbs, fbs) = tfsf_mass.ldlt().solve(tfsf_rhs);
+                        rhs += lhst*s;
+                        //auto Y = disk::make_impedance_term(msh, fc, chdi.face_degree());
+                        rhs.segment(cbs+i*fbs, fbs) -= (jwmu0/wgz)*tfsf_rhs; //Y*tfsf_mass.ldlt().solve(tfsf_rhs); 
+                        //rhs.segment(cbs+i*fbs, fbs) += (omega*mu0/wgz)*tfsf_rhs;
+                    }
 
                 }
             }
@@ -1087,7 +1119,7 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
     std::cout << "Running pardiso" << std::endl;
     disk::solvers::pardiso_params<scalar_type> pparams;
     pparams.report_factorization_Mflops = true;
-    pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
+    //pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
     mkl_pardiso(pparams, assm.LHS, assm.RHS, sol);
 
     /*
@@ -1164,6 +1196,7 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
             auto cbs = cb.size();
             const auto num_faces_dofs = fcs.size() * fbs;
             auto offset = cbs + i*fbs;
+
             Matrix<scalar_type, Dynamic, Dynamic> mass = Matrix<scalar_type, Dynamic, Dynamic>::Zero(fbs, fbs);
             Matrix<scalar_type, Dynamic, Dynamic> trace = Matrix<scalar_type, Dynamic, Dynamic>::Zero(fbs, cbs);
             Matrix<scalar_type, Dynamic, Dynamic> rhs1 = Matrix<scalar_type, Dynamic, Dynamic>::Zero(fbs, cbs + num_faces_dofs);
@@ -1222,7 +1255,7 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
                             fval += fdofs(kk)*fphi.row(kk);
                         }
 
-                        auto Finc = tfsf_src(qp.point());
+                        auto Finc = tfsf_E(qp.point());
                         P_reflected += qp.weight() * (fval).dot(fval);
                         P_incident += qp.weight() * Finc.dot(Finc);
                     }
@@ -1237,6 +1270,8 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
     std::cout << P_incident << std::endl;
 
     std::cout << 10.0*log10(P_reflected/P_incident) << std::endl;
+
+    lua["s11"] = real(10.0*log10(P_reflected/P_incident));
 
     auto tran = [](const std::pair<scalar_type, int>& nd) -> auto {
         if (nd.second == 0)
@@ -1269,8 +1304,10 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
     std::vector<scalar_type> nodal_z( data_z.size() );
     std::transform(data_z.begin(), data_z.end(), nodal_z.begin(), tran);
 
+    std::string silo_fn = lua["silo_fn"];
+
     disk::silo_database silo_db;
-    silo_db.create("maxwell.silo");
+    silo_db.create(silo_fn);
     silo_db.add_mesh(msh, "mesh");
 
     disk::silo_nodal_variable<scalar_type> ex("ex", nodal_ex);
@@ -1294,6 +1331,23 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, size_t order, const std:
     silo_db.close();
 }
 
+
+template<template<typename, size_t, typename> class Mesh, typename CoordT, typename Storage>
+void
+vector_wave_solver_complex_driver(Mesh<CoordT,3,Storage>& msh, const std::string& cfg_fn)
+{
+    using mesh_type = Mesh<CoordT,3,Storage>;
+    parameter_loader<mesh_type, double> pl;
+
+    auto run_solver = [&](){ vector_wave_solver_complex(msh, pl); };
+
+    sol::state& lua = pl.state();
+    lua["run_solver"] = run_solver;
+
+    bool ok = pl.load(msh, cfg_fn);
+    if (!ok)
+        return;
+}
 
 
 template<typename Mesh>
@@ -1469,15 +1523,16 @@ void autotest(size_t order)
     //for (size_t i = 0; i <= order; i++)
     //    autotest_alpha(i);
 
-    autotest_convergence(0, order);
+    autotest_convergence(1, order);
 }
 
-int main2(void)
+int main(void)
 {
+    //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
     autotest(3);
 }
 
-int main(int argc, char **argv)
+int main2(int argc, char **argv)
 {
     rusage_monitor rm;
 
@@ -1584,7 +1639,7 @@ int main(int argc, char **argv)
         //    maxwell_eigenvalue_solver(msh, degree, stab_param);
         //else
             //vector_wave_solver(msh, degree, stab_param, omega, false);
-            vector_wave_solver_complex(msh, degree, param_filename);
+            vector_wave_solver_complex_driver(msh, param_filename);
 
         return 0;
     }
@@ -1601,7 +1656,7 @@ int main(int argc, char **argv)
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        vector_wave_solver_complex(msh, degree, param_filename);
+        vector_wave_solver_complex_driver(msh, param_filename);
 
         return 0;
     }
@@ -1639,5 +1694,7 @@ int main(int argc, char **argv)
         return 0;
     }
 #endif
+
+    return 0;
 }
 

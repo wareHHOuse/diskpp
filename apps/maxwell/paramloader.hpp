@@ -106,7 +106,7 @@ public:
 
     parameter_loader()
     {
-        lua.open_libraries(sol::lib::base, sol::lib::math);
+        lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io);
         lua["eps0"] = eps0;
         lua["mu0"] = mu0;
         lua["boundary"] = lua.create_table();
@@ -189,6 +189,11 @@ public:
     real_type frequency()
     {
         return lua["frequency"];
+    }
+
+    size_t order()
+    {
+        return lua["order"];
     }
 
     Eigen::Matrix<complex_type,3,1>
