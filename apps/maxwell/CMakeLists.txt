@@ -22,5 +22,12 @@ if (BUILD_APP_MAXWELL)
                             CXX_STANDARD 20
                             CXX_STANDARD_REQUIRED YES
                             CXX_EXTENSIONS NO)
+
+    add_executable(maxwell_td maxwell_td.cpp)
+    target_link_libraries(maxwell_td ${LINK_LIBS})
+    set_target_properties(maxwell_td PROPERTIES
+                            CXX_STANDARD 20
+                            CXX_STANDARD_REQUIRED YES
+                            CXX_EXTENSIONS NO)
 endif()
 
