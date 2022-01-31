@@ -1256,8 +1256,8 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, parameter_loader<Mesh<Co
                         }
 
                         auto Finc = tfsf_E(qp.point());
-                        P_reflected += qp.weight() * (fval).dot(fval);
-                        P_incident += qp.weight() * Finc.dot(Finc);
+                        P_reflected += qp.weight() * (fval).dot(Finc);
+                        P_incident += qp.weight() * (Finc).dot(Finc);
                     }
                 }
             }
@@ -1269,9 +1269,9 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, parameter_loader<Mesh<Co
     std::cout << P_reflected << std::endl;
     std::cout << P_incident << std::endl;
 
-    std::cout << 10.0*log10(P_reflected/P_incident) << std::endl;
+    std::cout << "S11 = " << 10.0*log10(  abs(P_reflected/P_incident) ) << std::endl;
 
-    lua["s11"] = real(10.0*log10(P_reflected/P_incident));
+    lua["s11"] = 10.0*log10( abs(P_reflected/P_incident) );
 
     auto tran = [](const std::pair<scalar_type, int>& nd) -> auto {
         if (nd.second == 0)
@@ -1526,13 +1526,13 @@ void autotest(size_t order)
     autotest_convergence(1, order);
 }
 
-int main(void)
+int main2(void)
 {
     //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
     autotest(3);
 }
 
-int main2(int argc, char **argv)
+int main(int argc, char **argv)
 {
     rusage_monitor rm;
 

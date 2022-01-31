@@ -484,6 +484,72 @@ curl_reconstruction_pk(const Mesh&                       msh,
     return std::make_pair(oper, data);
 }
 
+template<typename Mesh>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+curl_reconstruction_nedelec(const Mesh&                       msh,
+                       const typename Mesh::cell_type&   cl,
+                       const hho_degree_info& hdi)
+{
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
+
+    const auto facdeg = hdi.face_degree();
+    const auto celdeg = hdi.cell_degree();
+    const auto recdeg = hdi.reconstruction_degree();
+
+    const auto cb = make_vector_monomial_basis(msh, cl, celdeg);
+    const auto rb = make_vector_monomial_basis(msh, cl, recdeg);
+    const auto fbs = nedelec_tangential_basis_size(facdeg);
+    const auto cbs = vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
+    const auto rbs = vector_basis_size(recdeg, Mesh::dimension, Mesh::dimension);
+
+    const auto      fcs = faces(msh, cl);
+    const auto num_faces_dofs = fcs.size() * fbs;
+
+    matrix_type mass = matrix_type::Zero(rbs, rbs);
+    matrix_type cr_rhs = matrix_type::Zero(rbs, cbs + num_faces_dofs);
+
+    const auto qps = integrate(msh, cl, 2*celdeg+2);
+    for (auto& qp : qps)
+    {
+        const auto r_phi = rb.eval_functions(qp.point());
+        mass += qp.weight() * r_phi * r_phi.transpose();
+
+        const auto r_cphi = rb.eval_curls2(qp.point());
+        const auto c_phi = cb.eval_functions(qp.point());
+        cr_rhs.block(0, 0, rbs, cbs) += qp.weight() * r_cphi * c_phi.transpose();
+    }
+
+    size_t offset = cbs;
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto fc     = fcs[i];
+        const auto n      = normal(msh, cl, fc);
+        const auto fb     = make_vector_monomial_nedelec_tangential_basis(msh, fc, facdeg);
+
+        const auto qps_f = integrate(msh, fc, 2*recdeg+2);
+        for (auto& qp : qps_f)
+        {
+            Matrix<T, Dynamic, 3> r_phi     = rb.eval_functions(qp.point());
+            Matrix<T, Dynamic, 3> r_phi_n   = vcross(r_phi, n);
+            Matrix<T, Dynamic, 3> f_phi     = fb.eval_functions(qp.point());
+
+            cr_rhs.block(0, offset, rbs, fbs) += qp.weight() * r_phi_n * f_phi.transpose();
+        }
+
+        offset += fbs;
+    }
+
+    LDLT<matrix_type> ldlt_lhs(mass);
+    if (ldlt_lhs.info() != Eigen::Success)
+        throw std::invalid_argument("Can't factorize matrix for curl reconstruction");
+
+    matrix_type oper = ldlt_lhs.solve(cr_rhs);
+    matrix_type data = cr_rhs.transpose() * oper;
+
+    return std::make_pair(oper, data);
+}
 
 
 
@@ -670,6 +736,83 @@ curl_hdg_stabilization(const Mesh<CoordT,3,Storage>&                     msh,
 
     return stab;
 }
+
+
+
+template<typename ScalT=double, template<typename, size_t, typename> class Mesh, typename CoordT, typename Storage>
+dynamic_matrix<ScalT>
+curl_hdg_stabilization_nedelec(const Mesh<CoordT,3,Storage>&                     msh,
+                       const typename Mesh<CoordT,3,Storage>::cell_type& cl,
+                       const hho_degree_info&                       cell_infos)
+{
+    using mesh_type         = Mesh<CoordT,3,Storage>;
+    using scalar_type       = ScalT;
+    using matrix_type       = Matrix<scalar_type, Dynamic, Dynamic>;
+    using vector_type       = Matrix<scalar_type, Dynamic, 1>;
+    using point_type        = typename mesh_type::point_type;
+    using cell_type         = typename mesh_type::cell_type;
+    using face_type         = typename mesh_type::face_type;
+
+    static const size_t DIM = 3;
+
+    const auto facdeg = cell_infos.face_degree();
+    const auto celdeg = cell_infos.cell_degree();
+
+    const auto cb  = make_vector_monomial_basis<mesh_type, cell_type, scalar_type>(msh, cl, celdeg);
+    const auto fbs = nedelec_tangential_basis_size(facdeg);
+    const auto cbs = vector_basis_size(celdeg, DIM, DIM);
+
+    const auto fcs = faces(msh, cl);
+    const auto num_faces_dofs = fcs.size() * fbs;
+
+    matrix_type stab = matrix_type::Zero(cbs + num_faces_dofs, cbs + num_faces_dofs);
+
+    auto ht = diameter(msh, cl);
+
+    size_t offset = cbs;
+
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto fc = fcs[i];
+        const auto n  = normal(msh, cl, fc);
+        const auto fb = make_vector_monomial_nedelec_tangential_basis<mesh_type, face_type, scalar_type>(msh, fc, facdeg);
+        const auto hf = diameter(msh, fc);
+
+        matrix_type mass = matrix_type::Zero(fbs, fbs);
+        matrix_type trace = matrix_type::Zero(fbs, cbs);
+        matrix_type rhs = matrix_type::Zero(fbs, cbs + num_faces_dofs);
+
+        rhs.block(0, offset, fbs, fbs) = matrix_type::Identity(fbs, fbs);
+
+        const auto qps_f = integrate(msh, fc, 2*std::max(celdeg, facdeg)+2);
+        for (auto& qp : qps_f)
+        {
+            Matrix<scalar_type, Dynamic, 3> f_phi = fb.eval_functions(qp.point());
+            Matrix<scalar_type, Dynamic, 3> c_phi_tmp = cb.eval_functions(qp.point());
+            Matrix<scalar_type, Dynamic, 3> c_phi = vcross(n, vcross(c_phi_tmp, n));
+
+            mass += qp.weight() * f_phi * f_phi.transpose();
+            trace += qp.weight() * f_phi * c_phi.transpose();
+        }
+
+        LLT<matrix_type> llt(mass);
+        if (llt.info() != Success)
+        {
+            std::cout << "Mass matrix LLT failed" << std::endl;
+            abort();
+        }
+
+        rhs.block(0,0,fbs,cbs) = -llt.solve(trace);   
+
+        stab += rhs.transpose() * mass * rhs / ht;
+
+        offset += fbs;
+    }
+
+    return stab;
+}
+
+
 
 /* This essentialy enforces an impedance condition between the function on
  * the cell and the function on the face:
