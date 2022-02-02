@@ -304,7 +304,7 @@ struct problem_data<Mesh<T,3,Storage>>
 
     scalar_type xi(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
         auto n = normal(msh, cl, fc);
-        return grad_u2(msh, pt).dot(n);
+        return grad_u1(msh, pt).dot(n);
     }
 };
 
@@ -426,10 +426,10 @@ void test(Mesh& msh, size_t degree)
         disk::dynamic_vector<T>& g1, size_t tag) {
         size_t fcofs = offset(msh, fc);
         size_t fcbase;
-        if (tag == internal_tag)
+        if (tag != internal_tag)
         {
-            fcbase = db.faces_int_base + fbs*g2s.faces_int_g2s.at(fcofs);
-            RHS.segment(fcbase, fbs) += g1;
+            fcbase = db.faces_ext_base + fbs*g2s.faces_ext_g2s.at(fcofs);
+            RHS.segment(fcbase, fbs) -= g1;
         }
     };
 
@@ -648,6 +648,14 @@ void test(Mesh& msh, size_t degree)
     std::cout << "Reconstruction L2 error MM: " << std::sqrt(l2_reconstruction_error_mm_sq) << std::endl;
     std::cout << "Gradient error: " << std::sqrt(l2_gradient_error_sq) << std::endl;
     std::cout << "Trace error: " << std::setprecision(15) << std::sqrt(l2_trace_error_mm_sq) << std::endl;
+
+
+    std::cout << "h ; L_2 u ; L_2 R(u) ; Grad ; trace" << std::endl;
+    std::cout << std::scientific << std::setprecision(3);
+    std::cout << disk::average_diameter(msh) << " ; " << std::sqrt(l2_error_mm_sq);
+    std::cout << " ; " << std::sqrt(l2_reconstruction_error_mm_sq);
+    std::cout << " ; " << std::sqrt(l2_gradient_error_sq) << " ; ";
+    std::cout << std::sqrt(l2_trace_error_mm_sq) << std::endl;
 
     disk::silo_database silo_db;
     silo_db.create("transmission.silo");
