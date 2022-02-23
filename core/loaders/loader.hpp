@@ -188,6 +188,9 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
     {
         std::vector<size_t>                 nodes;
         std::set<std::array<size_t, 2>>     attached_edges;
+        size_t                              domain_id;
+
+        fvca5_poly() : domain_id(0) {}
 
         bool operator<(const fvca5_poly& other) {
             return nodes < other.nodes;
@@ -239,6 +242,10 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
                 p.nodes.push_back(val-1);
             }
 
+            ifs >> std::ws;
+            if ( std::isdigit(ifs.peek()) )
+                ifs >> p.domain_id;
+
             m_polys.push_back(p);
         }
 
@@ -254,6 +261,40 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
             std::cout << "Reading " << elements_to_read << " boundary edges" << std::endl;
 
         m_boundary_edges.reserve(elements_to_read);
+
+        for (size_t i = 0; i < elements_to_read; i++)
+        {
+            std::array<ident_raw_t, 2> b_edge;
+            ifs >> b_edge[0]; b_edge[0] -= 1;
+            ifs >> b_edge[1]; b_edge[1] -= 1;
+
+            assert(b_edge[0] != b_edge[1]);
+
+            if (b_edge[0] > b_edge[1])
+                std::swap(b_edge[0], b_edge[1]);
+
+            m_boundary_edges.push_back({b_edge[0], b_edge[1]});
+        }
+
+        while( not std::isalpha(ifs.get()) and not ifs.eof() )
+            ;
+        ifs.unget();
+
+        int len = ifs.tellg();
+        std::string line;
+        getline(ifs, line);
+
+        if ( not std::regex_match(line, std::regex(".*edges of transmission.*") ) )
+        {  
+            ifs.seekg(len ,std::ios_base::beg);
+            return true;
+        }
+
+        ifs >> elements_to_read;
+        if (this->verbose())
+            std::cout << "Reading " << elements_to_read << " transmission edges" << std::endl;
+
+        //m_boundary_edges.reserve(elements_to_read);
 
         for (size_t i = 0; i < elements_to_read; i++)
         {
@@ -290,6 +331,11 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
             ifs >> edge[2];
             ifs >> edge[3];
 
+            ident_raw_t dummy;
+            ifs >> std::ws;
+            if ( std::isdigit(ifs.peek()) )
+                ifs >> dummy;
+            
             assert(edge[0] != edge[1]);
 
             if (edge[0] > edge[1])
@@ -468,7 +514,8 @@ public:
         storage->edges = std::move(edges);
 
         /* Surfaces */
-        std::vector<surface_type> surfaces;
+        using sd_pair = std::pair<surface_type, size_t>;
+        std::vector< sd_pair > surfaces;
         surfaces.reserve( m_polys.size() );
 
         for (auto& p : m_polys)
@@ -494,11 +541,35 @@ public:
             }
             auto surface = surface_type(surface_edges);
             surface.set_point_ids(p.nodes.begin(), p.nodes.end()); /* XXX: crap */
-            surfaces.push_back( surface );
+            surfaces.push_back( std::make_pair(surface, p.domain_id) );
+            //storage->subdomain_info.push_back( subdomain_descriptor(p.domain_id) );
         }
 
-        std::sort(surfaces.begin(), surfaces.end());
-        storage->surfaces = std::move(surfaces);
+        auto comp = [](const sd_pair& a, const sd_pair& b) -> bool {
+            return a.first < b.first;
+        };
+
+        std::sort(surfaces.begin(), surfaces.end(), comp);
+
+        auto get_surf = [](const sd_pair& sdp) -> auto { return sdp.first; };
+        storage->surfaces.resize( surfaces.size() );
+        std::transform(surfaces.begin(), surfaces.end(), storage->surfaces.begin(), get_surf);
+
+        auto get_id = [](const sd_pair& sdp) -> auto { return subdomain_descriptor(sdp.second); };
+        storage->subdomain_info.resize( surfaces.size() );
+        std::transform(surfaces.begin(), surfaces.end(), storage->subdomain_info.begin(), get_id);
+
+        
+        mark_internal_faces(msh);
+
+        if (this->verbose())
+        {
+            std::cout << "Nodes:    " << storage->nodes.size() << std::endl;
+            std::cout << "Edges:    " << storage->edges.size() << std::endl;
+            std::cout << "Faces:    " << storage->surfaces.size() << std::endl;
+            std::cout << "BND info: " << storage->boundary_info.size() << std::endl;
+            std::cout << "SD info:  " << storage->subdomain_info.size() << std::endl;
+        }
 
         return true;
     }
@@ -3146,12 +3217,13 @@ load_uniform_1d_mesh(T min, T max, size_t cells)
 template<typename T>
 [[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
 disk::generic_mesh<T,2>
-load_fvca5_2d_mesh(const char *filename)
+load_fvca5_2d_mesh(const char *filename, bool verbose = false)
 {
     typedef disk::generic_mesh<T, 2>  mesh_type;
 
     mesh_type msh;
     disk::fvca5_mesh_loader<T, 2> loader;
+    loader.verbose(verbose);
     loader.read_mesh(filename);
     loader.populate_mesh(msh);
 

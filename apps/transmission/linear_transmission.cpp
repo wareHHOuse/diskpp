@@ -84,7 +84,6 @@ element_counts count_mesh_elements(const Mesh& msh, size_t internal_tag)
             ret.cells_int++;
         else
             ret.cells_ext++;
-
         for (auto& fc : fcs)
         {
             if (di.tag() == internal_tag)
@@ -131,6 +130,12 @@ dof_bases compute_dof_bases(const Mesh& msh, const disk::hho_degree_info& hdi, s
     ret.faces_ext_base          = ret.faces_int_base + fbs * ec.faces_int;
     ret.multiplier_base         = ret.faces_ext_base + fbs * ec.faces_ext;
     ret.total_dofs              = ret.multiplier_base + fbs * ec.faces_iface;
+
+    //std::cout << ret.cells_int_base << " " << ret.cells_ext_base << " ";
+    //std::cout << ret.global_constrain_base << " " << ret.faces_int_base << " ";
+    //std::cout << ret.faces_ext_base << " " << ret.multiplier_base << " ";
+    //std::cout << ret.total_dofs << std::endl;
+    //std::cout << ec << std::endl;
 
     return ret;
 }
@@ -309,7 +314,79 @@ struct problem_data<Mesh<T,3,Storage>>
 };
 
 
+template<typename T> struct problem_data_lua;
 
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+struct problem_data_lua<Mesh<T,2,Storage>>
+{
+    sol::state lua;
+
+    using mesh_type     = Mesh<T,2,Storage>;
+    using cell_type     = typename mesh_type::cell_type;
+    using face_type     = typename mesh_type::face_type;
+    using point_type    = typename mesh_type::point_type;
+    using scalar_type   = typename mesh_type::coordinate_type;
+    using vector_type   = Eigen::Matrix<scalar_type, 2, 1>;
+
+    problem_data_lua()
+    {
+        lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io);
+        auto script = lua.script_file("linear_transmission_2D.lua");
+        if (not script.valid())
+            throw "Unable to open lua file";
+    }
+
+    scalar_type u1(const mesh_type&, const point_type& pt) {
+        return lua["u1"](pt.x(), pt.y());
+    }
+
+    scalar_type u2(const mesh_type& msh, const point_type& pt) {
+        return lua["u2"](pt.x(), pt.y());
+    }
+
+    vector_type grad_u1(const mesh_type&, const point_type& pt) {
+        scalar_type vx, vy;
+        sol::tie(vx, vy) = lua["grad_u1"](pt.x(), pt.y());
+        return vector_type(vx, vy);
+    }
+
+    vector_type grad_u2(const mesh_type& msh, const point_type& pt) {
+        scalar_type vx, vy;
+        sol::tie(vx, vy) = lua["grad_u2"](pt.x(), pt.y());
+        return vector_type(vx, vy);
+    }
+
+    scalar_type f1(const mesh_type&, const point_type& pt) {
+        return lua["f1"](pt.x(), pt.y());
+    }
+
+    scalar_type f2(const mesh_type& msh, const point_type& pt) {
+        return lua["f2"](pt.x(), pt.y());
+    }
+
+    scalar_type g(const mesh_type& msh, const point_type& pt) {
+        return u1(msh, pt) - u2(msh, pt); 
+    }
+
+    scalar_type g1(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
+        auto n = normal(msh, cl, fc);
+        return grad_u1(msh, pt).dot(n) - grad_u2(msh, pt).dot(n);
+    }
+
+    scalar_type g2(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
+        auto n = normal(msh, cl, fc);
+        return grad_u2(msh, pt).dot(n);
+    }
+
+    scalar_type xi(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
+        auto n = normal(msh, cl, fc);
+        return grad_u1(msh, pt).dot(n);
+    }
+};
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+struct problem_data_lua<Mesh<T,3,Storage>> : problem_data<Mesh<T,3,Storage>>
+{};
 
 template<typename Mesh>
 void test(Mesh& msh, size_t degree)
@@ -323,7 +400,7 @@ void test(Mesh& msh, size_t degree)
         return;
     }
 
-    struct problem_data<Mesh> pd;
+    struct problem_data_lua<Mesh> pd;
 
     size_t internal_tag = 1;
     disk::hho_degree_info hdi(degree);
@@ -670,11 +747,14 @@ int main(int argc, const char **argv)
 {
     using T = double;
 
-    if (argc != 3)
+    if (argc < 3)
         return 1;
     
     const char *mesh_filename = argv[1];
     size_t degree = atoi(argv[2]);
+    T scalefactor = 1.0;
+    if (argc > 3)
+        scalefactor = atof(argv[3]);
 
     /* GMSH 2D simplicials */
     if (std::regex_match(mesh_filename, std::regex(".*\\.geo2s$") ))
@@ -713,6 +793,27 @@ int main(int argc, const char **argv)
         loader.populate_mesh(msh);
 
         test(msh, degree);
+    }
+
+    /* FVCA5 2D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
+        disk::generic_mesh<T,2> msh;
+        disk::fvca5_mesh_loader<T,2> loader;
+
+        loader.read_mesh(mesh_filename);
+        loader.populate_mesh(msh);
+
+        using point_type = typename disk::generic_mesh<T,2>::point_type;
+        auto tr = [&](const point_type& pt) -> auto {
+            return point_type(pt.x()*scalefactor, pt.y()*scalefactor);
+        };
+
+        msh.transform(tr);
+
+        test(msh, degree);
+        return 0;
     }
 
     return 0;
