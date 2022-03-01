@@ -262,6 +262,222 @@ public:
     }
 };
 
+template<typename T>
+class gmsh_geometry_loader<simplicial_mesh<T,2>> : public mesh_loader<simplicial_mesh<T,2>>
+{
+    typedef simplicial_mesh<T,2>                    mesh_type;
+    typedef typename mesh_type::point_type          point_type;
+    typedef typename mesh_type::node_type           node_type;
+    typedef typename mesh_type::edge_type           edge_type;
+    typedef typename mesh_type::surface_type        surface_type;
+
+    std::vector<point_type>                         points;
+    std::vector<node_type>                          nodes;
+    std::vector<edge_type>                          edges;
+    std::vector<boundary_descriptor>                boundary_info;
+
+    std::vector<surface_type>                       surfaces;
+    std::vector<std::pair<surface_type, subdomain_descriptor>>   tmp_surfaces;
+
+    std::vector<size_t>     node_tag2ofs;
+
+    void gmsh_get_nodes()
+    {
+        std::vector<size_t>     nodeTags;
+        std::vector<double>     coords;
+        std::vector<double>     paraCoords;
+
+        gmsh::model::mesh::getNodes(nodeTags, coords, paraCoords, -1, -1, true, false);
+
+        auto maxtag_pos = std::max_element(nodeTags.begin(), nodeTags.end());
+        
+        size_t maxtag = 0;
+        if (maxtag_pos != nodeTags.end())
+            maxtag = (*maxtag_pos)+1;
+
+        points.resize( nodeTags.size() );
+
+        for (size_t i = 0; i < nodeTags.size(); i++)
+        {
+            auto x = coords[3*i+0];
+            auto y = coords[3*i+1];
+            points[i] = point_type(x,y);
+        }
+
+        node_tag2ofs.resize(maxtag, INVALID_OFS);
+        for (size_t i = 0; i < nodeTags.size(); i++)
+        {
+            node_tag2ofs.at( nodeTags[i] ) = i;
+            auto point_id = disk::point_identifier<2>( i );
+            auto node = node_type( { point_id } );
+            nodes.push_back(node);
+        }
+    }
+
+    void gmsh_get_elements()
+    {
+        gmsh::vectorpair entities;
+        gmsh::model::getEntities(entities, 2/*dimension*/);
+        size_t subdom_id = 0;
+        for (auto [dim, tag] : entities)
+        {
+            std::vector<int> elemTypes;
+            gmsh::model::mesh::getElementTypes(elemTypes, dim, tag);
+            for (auto& elemType : elemTypes)
+            {
+                std::vector<size_t> elemTags;
+                std::vector<size_t> elemNodeTags;
+                gmsh::model::mesh::getElementsByType(elemType, elemTags, elemNodeTags, tag);
+                auto nodesPerElem = elemNodeTags.size()/elemTags.size();
+                assert( elemTags.size() * nodesPerElem == elemNodeTags.size() );
+            
+                for (size_t i = 0; i < elemTags.size(); i++)
+                {
+                    auto base = nodesPerElem * i;
+
+                    auto node0_tag = elemNodeTags[base + 0];
+                    assert(node0_tag < node_tag2ofs.size());
+                    auto node0_ofs = node_tag2ofs[node0_tag];
+                    assert(node0_ofs != INVALID_OFS);
+
+                    auto node1_tag = elemNodeTags[base + 1];
+                    assert(node1_tag < node_tag2ofs.size());
+                    auto node1_ofs = node_tag2ofs[node1_tag];
+                    assert(node1_ofs != INVALID_OFS);
+
+                    auto node2_tag = elemNodeTags[base + 2];
+                    assert(node2_tag < node_tag2ofs.size());
+                    auto node2_ofs = node_tag2ofs[node2_tag];
+                    assert(node2_ofs != INVALID_OFS);
+
+                    point_identifier<2>     p0(node0_ofs);
+                    point_identifier<2>     p1(node1_ofs);
+                    point_identifier<2>     p2(node2_ofs);
+
+                    edges.push_back( edge_type( { p0, p1 } ) );
+                    edges.push_back( edge_type( { p0, p2 } ) );
+                    edges.push_back( edge_type( { p1, p2 } ) );
+
+                    subdomain_descriptor si(i, tag);
+                    auto vs = std::make_pair(surface_type( {p0, p1, p2} ), si);
+                    tmp_surfaces.push_back( vs );
+                }
+            }
+
+            subdom_id++;
+        }
+
+        using pvs = std::pair<surface_type, subdomain_descriptor>;
+        auto tmpsurf_comp = [](const pvs& a, const pvs& b) {
+            return a.first < b.first;
+        };
+
+        priv::sort_uniq(edges);
+        boundary_info.resize(edges.size());
+        std::sort(tmp_surfaces.begin(), tmp_surfaces.end(), tmpsurf_comp);
+    }
+
+    void detect_boundary_edges(void)
+    {
+        gmsh::vectorpair entities;
+
+        size_t b_id = 0;
+        gmsh::model::getEntities(entities, 1/*dimension*/);
+        for (auto [dim, tag] : entities)
+        {
+            std::vector<int> elemTypes;
+            gmsh::model::mesh::getElementTypes(elemTypes, dim, tag);
+            assert(elemTypes.size() == 1);
+            for (auto& elemType : elemTypes)
+            {
+                std::vector<size_t> nTags;
+                gmsh::model::mesh::getElementEdgeNodes(elemType, nTags, tag, true);
+                
+                std::vector<edge_type> fkeys;
+                for (size_t i = 0; i < nTags.size(); i+=2)
+                {
+                    auto node0_tag = nTags[i + 0];
+                    assert(node0_tag < node_tag2ofs.size());
+                    auto node0_ofs = node_tag2ofs[node0_tag];
+                    assert(node0_ofs != INVALID_OFS);
+
+                    auto node1_tag = nTags[i + 1];
+                    assert(node1_tag < node_tag2ofs.size());
+                    auto node1_ofs = node_tag2ofs[node1_tag];
+                    assert(node1_ofs != INVALID_OFS);
+
+                    point_identifier<2>     p0(node0_ofs);
+                    point_identifier<2>     p1(node1_ofs);
+
+                    boundary_descriptor bi(b_id, tag, true);
+                    edge_type edg( { p0, p1 } );
+
+                    auto itor = std::lower_bound(edges.begin(), edges.end(), edg);
+                    if ( (itor == edges.end()) or not (*itor == edg) )
+                        throw std::logic_error("Edge not found");
+
+                    auto ofs = std::distance(edges.begin(), itor);
+                    boundary_info.at(ofs) = bi;
+                }
+            }
+
+            b_id++;
+        }
+    }
+
+public:
+    static const char constexpr *expected_extension = "geo";
+    gmsh_geometry_loader() = default;
+
+    bool read_mesh(const std::string& s)
+    {
+        gmsh::initialize(0, nullptr);
+        
+        if (this->verbose())
+            gmsh::option::setNumber("General.Terminal", 1);
+        
+        gmsh::open( s ); //HANDLE ERRORS!
+        gmsh::model::mesh::generate( 2 /*dimension*/ );
+        gmsh::model::mesh::setOrder( 1 /*element order*/ );
+        gmsh_get_nodes();
+        gmsh_get_elements();
+        detect_boundary_edges();
+
+        gmsh::finalize();
+        return true;
+    }
+
+    bool populate_mesh(mesh_type& msh)
+    {
+        auto storage = msh.backend_storage();
+        storage->points = std::move(points);
+        storage->nodes = std::move(nodes);
+        storage->edges = std::move(edges);
+        storage->boundary_info = std::move(boundary_info);
+
+        std::vector<surface_type> surfs;
+        surfs.reserve( tmp_surfaces.size() );
+
+        std::vector<subdomain_descriptor> subdoms;
+        subdoms.reserve( tmp_surfaces.size() );
+
+        for (auto& [surf, sd] : tmp_surfaces)
+        {
+            surfs.push_back(surf);
+            subdoms.push_back(sd);
+        }
+
+        tmp_surfaces.clear();
+
+        storage->surfaces = std::move(surfs);
+        storage->subdomain_info = std::move(subdoms);
+
+        mark_internal_faces(msh);
+
+        return true;
+    }
+};
+
 namespace priv {
 
 template<typename T>
@@ -280,7 +496,7 @@ struct temp_face
         nodes = std::vector<T>(l);
     }
 
-    bool operator<(const temp_face& other)
+    bool operator<(const temp_face& other) const
     {
         auto n_mine = nodes;
         auto n_other = other.nodes;
@@ -290,7 +506,7 @@ struct temp_face
                                             n_other.begin(), n_other.end());
     }
 
-    bool operator==(const temp_face& other)
+    bool operator==(const temp_face& other) const
     {
         if (nodes.size() != other.nodes.size())
             return false;

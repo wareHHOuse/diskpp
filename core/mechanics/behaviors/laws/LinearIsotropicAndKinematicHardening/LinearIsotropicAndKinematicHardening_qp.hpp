@@ -99,7 +99,7 @@ class LinearIsotropicAndKinematicHardening_qp : public law_qp_bones<T, DIM>
     }
 
     scalar_type
-    getAccumulatedPlasticStrain() const
+    getEquivalentPlasticStrain() const
     {
         return m_p_curr;
     }
@@ -164,13 +164,13 @@ class LinearIsotropicAndKinematicHardening_qp : public law_qp_bones<T, DIM>
         const scalar_type          se_eq         = this->sigmaeq(se);
         const scalar_type          Phi_trial     = se_eq - data.getSigma_y0() - data.getH() * m_p_prev;
 
-        if (std::abs(X_prev.trace()) > 1E-8)
+        if ((std::abs(X_prev.trace()) / X_prev.norm()) > 1E-8)
         {
             const std::string mess = "X_trace= " + std::to_string(X_prev.trace()) + " <= 0";
             throw std::invalid_argument(mess);
         }
 
-        if (std::abs(se.trace()) > 1E-8)
+        if ((std::abs(se.trace()) / se.norm()) > 1E-8)
         {
             const std::string mess = "Se_trace= " + std::to_string(se.trace()) + " <= 0";
             throw std::invalid_argument(mess);
@@ -222,7 +222,7 @@ class LinearIsotropicAndKinematicHardening_qp : public law_qp_bones<T, DIM>
             m_p_curr             = m_p_prev;
         }
 
-        if (std::abs(m_pstrain_curr.trace()) > 1E-8)
+        if ((std::abs(m_pstrain_curr.trace()) / m_pstrain_curr.norm()) > 1E-8)
         {
             const std::string mess = "eps_p= " + std::to_string(m_pstrain_curr.trace()) + " <= 0";
             throw std::invalid_argument(mess);

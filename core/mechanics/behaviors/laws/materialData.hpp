@@ -59,6 +59,8 @@ class curve_point
 template<typename scalar_type>
 class MaterialData
 {
+    typedef std::pair<std::string, scalar_type> MfrontType;
+
   private:
     scalar_type                           m_lambda;
     scalar_type                           m_mu;
@@ -67,6 +69,7 @@ class MaterialData
     scalar_type                           m_sigma_y0;
     size_t                                m_type;
     std::vector<curve_point<scalar_type>> m_Rp_curve;
+    std::vector<MfrontType>               m_mfront_param;
 
   public:
     MaterialData() :
@@ -243,7 +246,23 @@ class MaterialData
     }
 
     void
-    print() const
+    addMfrontParameter(const std::string& param, const scalar_type& value)
+    {
+        m_mfront_param.push_back((std::make_pair(param, value)));
+    }
+
+    const std::vector<MfrontType>&
+    getMfrontParameters() const {
+        return m_mfront_param;
+    }
+
+    std::vector<MfrontType>
+    getMfrontParameters()
+    {
+        return m_mfront_param;
+    }
+
+    void print() const
     {
         std::cout << "Material parameters: " << std::endl;
         std::cout << "* E: " << getE() << std::endl;
@@ -258,6 +277,10 @@ class MaterialData
         std::cout << "(p, R(p))" << std::endl;
         for (auto& pt : m_Rp_curve)
             std::cout << "( " << pt.getP() << ", " << pt.getRp() << " )" << std::endl;
+        std::cout << "* Mfront parameters:" << std::endl;
+        std::cout << "(parameter, value)" << std::endl;
+        for (auto& [param, value] : m_mfront_param)
+            std::cout << "( " << param << ", " << value << " )" << std::endl;
     }
 };
 }

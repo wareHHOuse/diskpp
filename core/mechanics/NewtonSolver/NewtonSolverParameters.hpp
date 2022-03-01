@@ -49,6 +49,8 @@ class NewtonSolverParameter
     int m_grad_degree; // grad degree
 
     std::vector<std::pair<T, int>> m_time_step; // number of time time_step
+    bool                           m_has_user_end_time; // final time is given
+    T                              m_user_end_time; // final time of the simulation
     int                            m_sublevel;  // number of sublevel if there are problems
     int                            m_iter_max;  // maximun nexton iteration
     T                              m_epsilon;   // stop criteria
@@ -60,15 +62,17 @@ class NewtonSolverParameter
     int  m_stab_type; // type of stabilization
     T    m_beta;      // stabilization parameter
     bool m_stab;      // stabilization yes or no
+    bool m_adapt_stab; // adaptative stabilization
 
     int          m_n_time_save; // number of saving
     std::list<T> m_time_save;   // list of time where we save result;
 
     NewtonSolverParameter() :
-      m_face_degree(1), m_cell_degree(1), m_grad_degree(1), m_sublevel(1), m_iter_max(20), m_epsilon(T(1E-6)),
-      m_verbose(false), m_precomputation(false), m_stab(true), m_beta(1), m_stab_type(HHO), m_n_time_save(0)
+      m_face_degree(1), m_cell_degree(1), m_grad_degree(1), m_sublevel(5), m_iter_max(20), m_epsilon(T(1E-6)),
+      m_verbose(false), m_precomputation(false), m_stab(true), m_beta(1), m_stab_type(HHO), m_n_time_save(0),
+      m_user_end_time(1.0), m_has_user_end_time(false), m_adapt_stab(false)
     {
-        m_time_step.push_back(std::make_pair(1.0, 10));
+        m_time_step.push_back(std::make_pair(m_user_end_time, 1));
     }
 
     void
@@ -79,6 +83,7 @@ class NewtonSolverParameter
         std::cout << " - Cell degree: " << m_cell_degree << std::endl;
         std::cout << " - Grad degree: " << m_grad_degree << std::endl;
         std::cout << " - Stabilization ?: " << m_stab << std::endl;
+        std::cout << " - AdaptativeStabilization ?: " << m_adapt_stab << std::endl;
         std::cout << " - Type: " << m_stab_type << std::endl;
         std::cout << " - Beta: " << m_beta << std::endl;
         std::cout << " - Verbose: " << m_verbose << std::endl;
@@ -150,6 +155,13 @@ class NewtonSolverParameter
                     line++;
                 }
             }
+            else if (keyword == "FinalTime")
+            {
+                ifs >> m_user_end_time;
+                line++;
+
+                m_has_user_end_time = true;
+            }
             else if (keyword == "TimeSave")
             {
                 ifs >> m_n_time_save;
@@ -176,6 +188,15 @@ class NewtonSolverParameter
                     m_stab      = false;
                     m_stab_type = NO;
                 }
+            }
+            else if (keyword == "AdaptativeStabilization")
+            {
+                std::string logical;
+                ifs >> logical;
+                line++;
+                m_adapt_stab = false;
+                if (logical == "true" || logical == "True")
+                    m_adapt_stab = true;
             }
             else if (keyword == "StabType")
             {
@@ -238,5 +259,76 @@ class NewtonSolverParameter
 
         ifs.close();
         return true;
+    }
+
+    void setFaceDegree(const int face_degree)
+    {
+        m_face_degree = face_degree;
+    }
+
+    int
+    getFaceDegree( ) const
+    {
+        return m_face_degree;
+    }
+
+    void
+    setCellDegree(const int cell_degree)
+    {
+        m_cell_degree = cell_degree;
+    }
+
+    int
+    getCellDegree() const
+    {
+        return m_cell_degree;
+    }
+
+    void
+    setGradDegree(const int grad_degree)
+    {
+        m_grad_degree = grad_degree;
+    }
+
+    int
+    getGradDegree() const
+    {
+        return m_face_degree;
+    }
+
+    void
+    setStabilizationParameter(const T stab_para)
+    {
+        m_beta = stab_para;
+    }
+
+    T
+    getStabilizationParameter() const
+    {
+        return m_beta;
+    }
+
+    void
+    setVerbose(const bool verbose)
+    {
+        m_verbose = verbose;
+    }
+
+    bool
+    getVerbose() const
+    {
+        return m_verbose;
+    }
+
+    void
+    setPrecomputation(const bool precomp)
+    {
+        m_precomputation = precomp;
+    }
+
+    bool
+    getPrecomputation() const
+    {
+        return m_precomputation;
     }
 };

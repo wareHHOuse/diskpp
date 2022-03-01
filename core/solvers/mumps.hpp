@@ -94,7 +94,7 @@ template<>
 void
 call_mumps(typename mumps_types<float>::MUMPS_STRUC_C *id)
 {
-    //smumps_c(id);
+    smumps_c(id);
 }
 
 template<>
@@ -108,14 +108,14 @@ template<>
 void
 call_mumps(typename mumps_types<std::complex<float>>::MUMPS_STRUC_C *id)
 {
-    //cmumps_c(id);
+    cmumps_c(id);
 }
 
 template<>
 void
 call_mumps(typename mumps_types<std::complex<double>>::MUMPS_STRUC_C *id)
 {
-    //zmumps_c(id);
+    zmumps_c(id);
 }
 
 } // namespace mumps_priv

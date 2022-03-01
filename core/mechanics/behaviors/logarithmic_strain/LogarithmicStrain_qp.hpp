@@ -154,6 +154,12 @@ class LogarithmicStrain_qp
         Pn           = static_tensor<scalar_type, 3>::Zero();
     }
 
+    quadrature_point<scalar_type, DIM>
+    quadrature_point() const
+    {
+        return make_qp(point(), weight());
+    }
+
     point<scalar_type, DIM>
     point() const
     {
@@ -197,9 +203,9 @@ class LogarithmicStrain_qp
     }
 
     scalar_type
-    getAccumulatedPlasticStrain() const
+    getEquivalentPlasticStrain() const
     {
-        return m_law_hpp_qp.getAccumulatedPlasticStrain();
+        return m_law_hpp_qp.getEquivalentPlasticStrain();
     }
 
     void

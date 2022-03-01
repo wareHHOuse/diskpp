@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 project(diskpp)
 
 include(CheckLanguage)
@@ -46,10 +46,13 @@ endif()
 
 ######################################################################
 ## Package: MUMPS solver
-find_package(MUMPS COMPONENTS PAR)
+find_package(MUMPS COMPONENTS SEQ)
 if (MUMPS_FOUND)
     set(LINK_LIBS ${LINK_LIBS} MUMPS::MUMPS)
-  add_definitions(-DHAVE_MUMPS)
+    add_definitions(-DHAVE_MUMPS)
+    set(HAVE_MUMPS TRUE)
+else()
+    set(HAVE_MUMPS FALSE)
 endif()
 
 ######################################################################
@@ -95,22 +98,44 @@ set(LINK_LIBS ${LINK_LIBS} ${LUA_LIBRARIES})
 
 ######################################################################
 ## Package: GMSH
-
-set(GMSH_DIR "/opt/uliege/gmsh" CACHE PATH "GMSH install path")
-if (DEFINED ENV{GMSH_DIR})
+find_library(GMSH_LIB gmsh)
+find_path(GMSH_INC gmsh.h)
+if(GMSH_LIB AND GMSH_INC)
+    set(LINK_LIBS ${LINK_LIBS} ${GMSH_LIB})
+    include_directories(${GMSH_INC})
+    set(HAVE_GMSH TRUE)
+    add_definitions(-DHAVE_GMSH)
+    set(HAVE_GMSH TRUE)
+else()
+  set(GMSH_DIR "/opt/uliege/gmsh" CACHE PATH "GMSH install path")
+  if (DEFINED ENV{GMSH_DIR})
     set (GMSH_DIR $ENV{GMSH_DIR})
+  endif()
+  if (GMSH_DIR STREQUAL "" OR NOT EXISTS ${GMSH_DIR})
+      message(STATUS "GMSH not found")
+      set(HAVE_GMSH FALSE)
+  else()
+      set(LINK_LIBS ${LINK_LIBS} gmsh)
+      include_directories(${GMSH_DIR}/include)
+      link_directories(${GMSH_DIR}/lib)
+      set(HAVE_GMSH TRUE)
+      add_definitions(-DHAVE_GMSH)
+      set(HAVE_GMSH TRUE)
+  endif()
 endif()
 
-if (GMSH_DIR STREQUAL "" OR NOT EXISTS ${GMSH_DIR})
-    message(STATUS "GMSH not found")
+######################################################################
+## Package: MGIS support
+find_package(MFrontGenericInterface)
+if (MFrontGenericInterface_FOUND)
+    message(STATUS "MGIS found")
+#    include_directories(${MGIS_INCLUDE_DIRS})
+    set(LINK_LIBS ${LINK_LIBS} mgis::MFrontGenericInterface)
+    set(HAVE_MGIS TRUE)
+    add_definitions(-DHAVE_MGIS)
 else()
-    message(STATUS "GMSH found")
-    set(GMSH_INCLUDE ${GMSH_DIR}/include)
-    set(GMSH_LIB ${GMSH_DIR}/lib)
-    set(LINK_LIBS ${LINK_LIBS} gmsh)
-    include_directories(${GMSH_INCLUDE})
-    link_directories(${GMSH_LIB})
-    add_definitions(-DHAVE_GMSH)
+    message(STATUS "MGIS not found")
+    set(HAVE_MGIS FALSE)
 endif()
 
 
@@ -162,6 +187,8 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g -fsanitize=address -fpermissive")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -g -fpermissive -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASEASSERT "-O3 -march=native -g -fpermissive")
 
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-anon-enum-enum-conversion")
+
 
 set(UP_EIGEN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/contrib/eigen")
 if ( EXISTS ${UP_EIGEN_DIR} AND IS_DIRECTORY ${UP_EIGEN_DIR} )
@@ -181,6 +208,7 @@ include_directories(core contrib)
 SET(SOL2_BUILD_LUA OFF CACHE BOOL "Override sol2 build lua option")
 add_subdirectory(contrib/sol2)
 include_directories(contrib/sol2/include)
+include_directories(contrib/sol2/single)
 
 add_subdirectory(contrib)
 add_subdirectory(core)

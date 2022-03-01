@@ -803,7 +803,7 @@ class finite_strains_solver
             // Loop on nodes
             for (auto& qp : law_quadpoints)
             {
-                const auto                p   = qp.getAccumulatedPlasticStrain();
+                const auto                p   = qp.getEquivalentPlasticStrain();
                 const std::vector<double> p_s = disk::convertToVectorGmsh(p);
 
                 // Add GP

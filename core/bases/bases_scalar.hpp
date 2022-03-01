@@ -78,6 +78,111 @@ make_scalar_monomial_basis(const MeshType&    msh,
 
 /***************************************************************************************************/
 /***************************************************************************************************/
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_monomial_scalar_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Storage>::cell, ScalarType>
+{
+public:
+    typedef Mesh<T, 1, Storage>                     mesh_type;
+    typedef ScalarType                              scalar_type;
+    typedef typename mesh_type::coordinate_type     coordinate_type;
+
+    typedef typename mesh_type::cell                cell_type;
+    typedef typename mesh_type::point_type          point_type;
+    typedef Matrix<scalar_type, Dynamic, 1>         function_type;
+    typedef Matrix<scalar_type, Dynamic, 1>         gradient_type;
+
+private:
+    size_t          basis_degree, basis_size;
+    point_type      bar;
+    coordinate_type h;
+
+public:
+    scaled_monomial_scalar_basis(const mesh_type& msh, const cell_type& cl, size_t degree, bool)
+    {
+        basis_degree = degree;
+        basis_size = degree + 1;
+        bar = barycenter(msh, cl);
+        h = diameter(msh, cl);
+    }
+
+    function_type
+    eval_functions(const point_type& pt) const
+    {
+        function_type ret = function_type::Zero(basis_size);
+
+        const auto bp = 2*(pt - bar)/h;
+
+        ret(0) = 1;
+        for (size_t k = 1; k < basis_size; k++)
+            ret(k) = ret(k-1)*bp.x();
+
+        return ret;
+    }
+
+    gradient_type
+    eval_gradients(const point_type& pt) const
+    {
+        gradient_type ret = gradient_type::Zero(basis_size);
+
+        const auto bp = 2*(pt - bar)/h;
+
+        for (size_t k = 1; k < basis_size; k++)
+            ret(k) = (2*k/h)*iexp_pow(bp.x(), k-1);
+
+        return ret;
+    }
+
+    size_t size() const
+    {
+        return basis_size;
+    }
+
+    size_t degree() const
+    {
+        return basis_degree;
+    }
+};
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_monomial_scalar_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Storage>::face, ScalarType>
+{
+public:
+    typedef Mesh<T, 1, Storage>                     mesh_type;
+    typedef ScalarType                              scalar_type;
+    typedef typename mesh_type::coordinate_type     coordinate_type;
+
+    typedef typename mesh_type::face                face_type;
+    typedef typename mesh_type::point_type          point_type;
+    typedef Matrix<scalar_type, Dynamic, 1>         function_type;
+
+private:
+    size_t          basis_degree, basis_size;
+
+public:
+    scaled_monomial_scalar_basis(const mesh_type& msh, const face_type& cl, size_t degree, bool)
+    {
+        basis_degree = degree;
+        basis_size = 1;
+    }
+
+    function_type
+    eval_functions(const point_type& pt) const
+    {
+        function_type ret = function_type::Zero(basis_size);
+        ret(0) = 1;
+        return ret;
+    }
+
+    size_t size() const
+    {
+        return basis_size;
+    }
+
+    size_t degree() const
+    {
+        return basis_degree;
+    }
+};
 
 /* Specialization for 2D meshes, cells */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>

@@ -102,6 +102,18 @@ class LawTypeCellBones
         return m_list_qp;
     }
 
+    law_qp_type&
+    getQP(const size_t& qp_id)
+    {
+        return m_list_qp[qp_id];
+    }
+
+    const law_qp_type&
+    getQP(const size_t& qp_id) const
+    {
+        return m_list_qp[qp_id];
+    }
+
     std::vector<law_qp_type>
     getIVs() const
     {
@@ -151,7 +163,7 @@ class LawTypeCellBones
             for (auto& qp : m_list_qp)
             {
                 const auto pphi = pb.eval_functions(qp.point());
-                rhs += qp.weight() * qp.getAccumulatedPlasticStrain() * pphi;
+                rhs += qp.weight() * qp.getEquivalentPlasticStrain() * pphi;
             }
 
             return mass.ldlt().solve(rhs);

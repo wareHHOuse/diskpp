@@ -154,6 +154,12 @@ class PostMesh<Mesh<T, 2, Storage>>
       return post_mesh;
    }
 
+   const mesh_type&
+   mesh()
+   {
+       return post_mesh;
+   }
+
    list_type
    nodes_cell(const size_t cell_id) const
    {
@@ -331,6 +337,12 @@ class PostMesh<Mesh<T, 3, Storage>>
    mesh() const
    {
       return post_mesh;
+   }
+
+   const mesh_type&
+   mesh()
+   {
+       return post_mesh;
    }
 
    list_type

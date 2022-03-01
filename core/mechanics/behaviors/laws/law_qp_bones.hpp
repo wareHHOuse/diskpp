@@ -31,8 +31,8 @@
 #include "core/mechanics/behaviors/maths_tensor.hpp"
 #include "core/mechanics/behaviors/maths_utils.hpp"
 #include "core/mechanics/behaviors/tensor_conversion.hpp"
+#include "core/quadratures/quad_bones.hpp"
 #include "mesh/point.hpp"
-
 
 namespace disk
 {
@@ -93,6 +93,12 @@ class law_qp_bones
     {
     }
 
+    quadrature_point<scalar_type, DIM>
+    quadrature_point() const
+    {
+        return make_qp(m_point, m_weight);
+    }
+
     point<scalar_type, DIM>
     point() const
     {
@@ -136,7 +142,7 @@ class law_qp_bones
     }
 
     scalar_type
-    getAccumulatedPlasticStrain() const
+    getEquivalentPlasticStrain() const
     {
         return scalar_type(0);
     }

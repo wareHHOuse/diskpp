@@ -804,7 +804,7 @@ class plasticity_solver
             // Loop on nodes
             for (auto& qp : law_quadpoints)
             {
-                const auto                p   = qp.getAccumulatedPlasticStrain();
+                const auto                p   = qp.getEquivalentPlasticStrain();
                 const std::vector<double> p_s = disk::convertToVectorGmsh(p);
 
                 // Add GP
@@ -1227,7 +1227,7 @@ class plasticity_solver
                 const scalar_type ur       = depl.dot(er);
 
                 output << r << "\t" << ur << "\t" << sigma_rr << "\t" << sigma_oo << "\t" << stress.trace() << "\t"
-                       << qp.getAccumulatedPlasticStrain() << std ::endl;
+                       << qp.getEquivalentPlasticStrain() << std ::endl;
             }
             cell_i++;
         }

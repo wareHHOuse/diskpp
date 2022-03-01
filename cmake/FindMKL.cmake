@@ -42,14 +42,19 @@ if ( CYGWIN )
 find_library(MKL_iomp5_LIBRARY
     NAMES   libiomp5md
     PATHS	"/cygdrive/C/Program\ Files\ \(x86\)/Intel/Composer\ XE/redist/intel64/compiler/"
-            "${INTEL_MKL_LIB_SEARCH_DIRS}"
+    ${INTEL_MKL_HOME}/include
+    "${INTEL_MKL_LIB_SEARCH_DIRS}"
 )
 else ()
 find_library(MKL_iomp5_LIBRARY
     NAMES   iomp5
     PATHS	/opt/intel/lib
     			/opt/intel/lib/intel64
-    		    /opt/intel/lib/intel64_lin
+    			/opt/intel/lib/intel64_lin
+    			/opt/intel/oneapi/mkl/latest/lib
+    			/opt/intel/oneapi/mkl/latest/lib/intel64
+			${INTEL_MKL_HOME}/lib/intel64
+			${INTEL_MKL_HOME}/lib/intel64_lin
             "${INTEL_MKL_LIB_SEARCH_DIRS}"
 )
 endif()
@@ -57,7 +62,11 @@ endif()
 find_library(MKL_mkl_core_LIBRARY
     NAMES   mkl_core
     PATHS   /opt/intel/mkl/lib
-	    /opt/intel/mkl/lib/intel64
+    /opt/intel/mkl/lib/intel64
+    /opt/intel/oneapi/mkl/latest/lib
+    /opt/intel/oneapi/mkl/latest/lib/intel64
+    ${INTEL_MKL_HOME}/mkl/lib/
+    ${INTEL_MKL_HOME}/mkl/lib/intel64_lin
 	    "/cygdrive/C/Program\ Files\ \(x86\)/Intel/Composer\ XE/redist/intel64/mkl/"
             "${INTEL_MKL_LIB_SEARCH_DIRS}"
 )
@@ -65,6 +74,11 @@ find_library(MKL_mkl_intel_thread_LIBRARY
     NAMES   mkl_intel_thread
     PATHS   /opt/intel/mkl/lib
             /opt/intel/mkl/lib/intel64
+            /opt/intel/oneapi/mkl/latest/lib
+            /opt/intel/oneapi/mkl/latest/lib/intel64
+    ${INTEL_MKL_HOME}/mkl/lib/
+    ${INTEL_MKL_HOME}/mkl/lib/intel64
+    ${INTEL_MKL_HOME}/mkl/lib/intel64_lin
 	    "/cygdrive/C/Program\ Files\ \(x86\)/Intel/Composer\ XE/redist/intel64/mkl/"
             "${INTEL_MKL_LIB_SEARCH_DIRS}"
 )
@@ -79,8 +93,13 @@ if (APPLE)
 else ()
 	find_library(MKL_runtime_LIBRARY
 		NAMES   mkl_rt
-		PATHS   /opt/intel/mkl/lib			
+		PATHS   /opt/intel/mkl/lib
 	    		/opt/intel/mkl/lib/intel64
+	    		/opt/intel/oneapi/mkl/latest/lib
+	    		/opt/intel/oneapi/mkl/latest/lib/intel64
+    ${INTEL_MKL_HOME}/mkl/lib/
+    ${INTEL_MKL_HOME}/mkl/lib/intel64
+    ${INTEL_MKL_HOME}/mkl/lib/intel64_lin
 			"/cygdrive/C/Program\ Files\ \(x86\)/Intel/Composer\ XE/redist/intel64/mkl/"
 			"${INTEL_MKL_LIB_SEARCH_DIRS}"
 	)
@@ -89,8 +108,10 @@ endif ()
 find_path(MKL_INCLUDE_DIRS
     NAMES   mkl.h
     PATHS   /opt/intel/mkl/include
-	    "/cygdrive/C/Program\ Files\ \(x86\)/Intel/Composer\ XE/mkl/include"
-            "${INTEL_MKL_INCLUDE_SEARCH_DIRS}/include"
+    /opt/intel/oneapi/mkl/latest/include
+    ${INTEL_MKL_HOME}/mkl/include/
+    "/cygdrive/C/Program\ Files\ \(x86\)/Intel/Composer\ XE/mkl/include"
+    "${INTEL_MKL_INCLUDE_SEARCH_DIRS}/include"
 )
 
 
@@ -106,7 +127,7 @@ if (MKL_mkl_core_LIBRARY AND
 	MKL_iomp5_LIBRARY AND
 	MKL_INCLUDE_DIRS)
 	set(MKL_FOUND TRUE)
-	set(MKL_LIBRARIES ${MKL_mkl_core_LIBRARY} 
+	set(MKL_LIBRARIES ${MKL_mkl_core_LIBRARY}
 					  ${MKL_runtime_LIBRARY}
 					  ${MKL_mkl_intel_thread_LIBRARY} ${MKL_iomp5_LIBRARY})
 	set (HAVE_PARDISO TRUE)

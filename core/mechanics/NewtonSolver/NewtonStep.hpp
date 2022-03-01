@@ -148,7 +148,8 @@ class NewtonStep
             const std::vector<matrix_type>&  gradient_precomputed,
             const std::vector<matrix_type>&  stab_precomputed,
             behavior_type&                   behavior,
-            ContactManager<mesh_type>&       contact_manager)
+            ContactManager<mesh_type>&       contact_manager,
+            StabCoeffManager<scalar_type>&   stab_manager)
     {
         NewtonSolverInfo ni;
         timecounter      tc;
@@ -168,7 +169,9 @@ class NewtonStep
             try
             {
                 assembly_info = newton_iter.assemble(
-                  msh, bnd, rp, degree_infos, lf, gradient_precomputed, stab_precomputed, behavior, contact_manager);
+                  msh, bnd, rp, degree_infos, lf,
+                  gradient_precomputed, stab_precomputed,
+                  behavior, contact_manager, stab_manager);
             }
             catch (const std::invalid_argument& ia)
             {
@@ -181,7 +184,19 @@ class NewtonStep
 
             ni.updateAssemblyInfo(assembly_info);
             // test convergence
-            m_convergence = newton_iter.convergence(rp, iter);
+            try
+            {
+                m_convergence = newton_iter.convergence(rp, iter);
+            }
+            catch (const std::runtime_error& ia)
+            {
+                std::cerr << "Runtime error: " << ia.what() << std::endl;
+                m_convergence = false;
+                tc.toc();
+                ni.m_time_newton = tc.to_double();
+                return ni;
+            }
+
             if (m_convergence)
             {
                 newton_iter.save_solutions(m_solution, m_solution_faces, m_solution_mult);

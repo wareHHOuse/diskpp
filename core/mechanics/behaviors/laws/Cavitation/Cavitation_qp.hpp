@@ -125,7 +125,7 @@ class Cavitation_qp : public law_qp_bones<T, DIM>
         }
     }
 
-    static_tensor<scalar_type, DIM>
+    static_tensor<scalar_type, 3>
     compute_tangent_moduli_A(const data_type& data) const
     {
         const scalar_type J = this->m_estrain_curr.determinant();
@@ -135,18 +135,18 @@ class Cavitation_qp : public law_qp_bones<T, DIM>
             throw std::invalid_argument(mess);
         }
 
-        const static_matrix_type invF  = this->m_estrain_curr.inverse();
-        const static_matrix_type invFt = invF.transpose();
-        const static_matrix_type C     = convertFtoCauchyGreenRight(this->m_estrain_curr);
+        const static_matrix_type3D invF  = this->m_estrain_curr.inverse();
+        const static_matrix_type3D invFt = invF.transpose();
+        const static_matrix_type3D C     = mechanics::convertFtoCauchyGreenRight(this->m_estrain_curr);
 
         const scalar_type trace_C = C.trace();
-        const scalar_type T1      = compute_T1(J);
-        const scalar_type T2      = compute_T2(J);
+        const scalar_type T1      = compute_T1(data, J);
+        const scalar_type T2      = compute_T2(data, J);
 
-        const static_tensor<scalar_type, DIM> I4          = IdentityTensor4<scalar_type, DIM>();
-        const static_tensor<scalar_type, DIM> invFt_invF  = ProductInf(invFt, invF);
-        const static_tensor<scalar_type, DIM> invFt_invFt = Kronecker(invFt, invFt);
-        const static_tensor<scalar_type, DIM> F_F         = Kronecker(this->m_estrain_curr, this->m_estrain_curr);
+        const static_tensor<scalar_type, 3> I4          = IdentityTensor4<scalar_type, 3>();
+        const static_tensor<scalar_type, 3> invFt_invF  = ProductInf(invFt, invF);
+        const static_tensor<scalar_type, 3> invFt_invFt = Kronecker(invFt, invFt);
+        const static_tensor<scalar_type, 3> F_F         = Kronecker(this->m_estrain_curr, this->m_estrain_curr);
 
         const auto Aiso = data.getMu() * std::pow(3.0, -0.25) *
                           (std::pow(trace_C, -0.25) * I4 - 0.5 * std::pow(trace_C, -5.0 / 4.0) * F_F);
@@ -162,8 +162,8 @@ class Cavitation_qp : public law_qp_bones<T, DIM>
     {
     }
 
-    static_matrix_type
-    compute_stress(const data_type& data) const
+    static_matrix_type3D
+    compute_stress3D(const data_type& data) const
     {
         const scalar_type J = this->m_estrain_curr.determinant();
         if (J <= 0.0)
@@ -172,9 +172,9 @@ class Cavitation_qp : public law_qp_bones<T, DIM>
             throw std::invalid_argument(mess);
         }
 
-        const static_matrix_type invF = this->m_estrain_curr.inverse();
-        const scalar_type        T1   = compute_T1(J);
-        const static_matrix_type C    = this->m_estrain_curr.transpose() * this->m_estrain_curr;
+        const static_matrix_type3D invF = this->m_estrain_curr.inverse();
+        const scalar_type          T1   = compute_T1(data, J);
+        const static_matrix_type3D C    = this->m_estrain_curr.transpose() * this->m_estrain_curr;
 
         const auto Piso = data.getMu() * std::pow(3.0 * C.trace(), -1.0 / 4.0) * this->m_estrain_curr;
         const auto Pvol = (data.getLambda() * T1 - data.getMu()) * invF.transpose();
@@ -183,7 +183,13 @@ class Cavitation_qp : public law_qp_bones<T, DIM>
     }
 
     static_matrix_type
-    compute_stressPrev(const data_type& data) const
+    compute_stress(const data_type& data) const
+    {
+        return convertMatrix<scalar_type, DIM>(compute_stress3D(data));
+    }
+
+    static_matrix_type3D
+    compute_stressPrev3D(const data_type& data) const
     {
         const scalar_type J = this->m_estrain_prev.determinant();
         if (J <= 0.0)
@@ -192,9 +198,9 @@ class Cavitation_qp : public law_qp_bones<T, DIM>
             throw std::invalid_argument(mess);
         }
 
-        const static_matrix_type invF = this->m_estrain_prev.inverse();
-        const scalar_type        T1   = compute_T1(J);
-        const static_matrix_type C    = this->m_estrain_prev.transpose() * this->m_estrain_prev;
+        const static_matrix_type3D invF = this->m_estrain_prev.inverse();
+        const scalar_type          T1   = compute_T1(data, J);
+        const static_matrix_type3D C    = this->m_estrain_prev.transpose() * this->m_estrain_prev;
 
         const auto Piso = data.getMu() * std::pow(3.0 * C.trace(), -1.0 / 4.0) * this->m_estrain_prev;
         const auto Pvol = (data.getLambda() * T1 - data.getMu()) * invF.transpose();
@@ -212,22 +218,35 @@ class Cavitation_qp : public law_qp_bones<T, DIM>
             throw std::invalid_argument(mess);
         }
 
-        const static_matrix_type C = this->m_estrain_curr.transpose() * this->m_estrain_curr;
+        const static_matrix_type3D C = this->m_estrain_curr.transpose() * this->m_estrain_curr;
 
         const scalar_type Wiso = 2.0 * data.getMu() / std::pow(3.0, 5.0 / 4.0) * std::pow(C.trace(), 3.0 / 4.0);
-        const scalar_type Wvol = data.getLambda() / 2.0 * compute_U(J) * compute_U(J) - data.getMu() * log(J);
+        const scalar_type Wvol =
+          data.getLambda() / 2.0 * compute_U(data, J) * compute_U(data, J) - data.getMu() * log(J);
 
         return Wiso + Wvol;
+    }
+
+    std::pair<static_matrix_type3D, static_tensor<scalar_type, 3>>
+    compute_whole3D(const static_matrix_type3D& F_curr, const data_type& data, bool tangentmodulus = true)
+    {
+        // is always elastic
+        this->m_estrain_curr = F_curr;
+
+        const auto PK1 = this->compute_stress3D(data);
+        const auto A   = this->compute_tangent_moduli_A(data);
+
+        return std::make_pair(PK1, A);
     }
 
     std::pair<static_matrix_type, static_tensor<scalar_type, DIM>>
     compute_whole(const static_matrix_type& F_curr, const data_type& data, bool tangentmodulus = true)
     {
-        // is always elastic
-        this->m_estrain_curr = F_curr;
+        const static_matrix_type3D F3D         = convertMatrix3DwithOne(F_curr);
+        const auto                 behaviors3D = compute_whole3D(F3D, data, tangentmodulus);
 
-        const auto PK1 = this->compute_stress(data);
-        const auto A   = this->compute_tangent_moduli_A(data);
+        const static_matrix_type              PK1 = convertMatrix<scalar_type, DIM>(behaviors3D.first);
+        const static_tensor<scalar_type, DIM> A   = convertTensor<scalar_type, DIM>(behaviors3D.second);
 
         return std::make_pair(PK1, A);
     }

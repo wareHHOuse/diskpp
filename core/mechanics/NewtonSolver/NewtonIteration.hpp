@@ -29,6 +29,7 @@
 #pragma once
 
 #include <iostream>
+#include <math.h>
 #include <string>
 #include <vector>
 
@@ -39,6 +40,7 @@
 
 #include "adaptivity/adaptivity.hpp"
 #include "boundary_conditions/boundary_conditions.hpp"
+#include "mechanics/NewtonSolver/StabilizationManger.hpp"
 #include "mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "mechanics/contact/ContactManager.hpp"
 
@@ -148,7 +150,8 @@ class NewtonIteration
              const std::vector<matrix_type>&  gradient_precomputed,
              const std::vector<matrix_type>&  stab_precomputed,
              behavior_type&                   behavior,
-             ContactManager<mesh_type>&       contact_manager)
+             ContactManager<mesh_type>&       contact_manager,
+             StabCoeffManager<scalar_type>&   stab_manager)
     {
         elem_type    elem;
         AssemblyInfo ai;
@@ -156,11 +159,6 @@ class NewtonIteration
         // set RHS to zero
         m_assembler.initialize();
         m_F_int = 0.0;
-
-        // Get materail data
-        const auto material_data = behavior.getMaterialData();
-        // Get Law
-        auto& law = behavior.law();
 
         const bool small_def = (behavior.getDeformation() == SMALL_DEF);
 
@@ -172,6 +170,7 @@ class NewtonIteration
         for (auto& cl : msh)
         {
             // Gradient Reconstruction
+            // std::cout << "Grad" << std::endl;
             matrix_type GT;
             tc.tic();
             if (rp.m_precomputation)
@@ -199,11 +198,10 @@ class NewtonIteration
 
             // Mechanical Computation
 
-            auto& law_cell = law.getCellQPs(cell_i);
-            // auto& law_qp   = behavior.getQPs(msh, cl);
             tc.tic();
-            elem.compute(
-              msh, cl, bnd, rp, degree_infos, lf, GT, m_solution.at(cell_i), law_cell, material_data, small_def);
+            // std::cout << "Elem" << std::endl;
+            elem.compute(msh, cl, rp, degree_infos, lf, GT, m_solution.at(cell_i),
+                        behavior, stab_manager, small_def);
 
             matrix_type lhs = elem.K_int;
             vector_type rhs = elem.RTF;
@@ -214,7 +212,11 @@ class NewtonIteration
             ai.m_time_law += elem.time_law;
 
             // Stabilisation Contribution
+            // std::cout << "Stab" << std::endl;
             tc.tic();
+
+            const auto beta = stab_manager.getValue(msh, cl);
+            // std::cout << beta << std::endl;
 
             if (rp.m_stab)
             {
@@ -226,8 +228,8 @@ class NewtonIteration
                     assert(elem.RTF.rows() == stab.rows());
                     assert(elem.RTF.cols() == m_solution.at(cell_i).cols());
 
-                    lhs += rp.m_beta * stab;
-                    rhs -= rp.m_beta * stab * m_solution.at(cell_i);
+                    lhs += beta * stab;
+                    rhs -= beta * stab * m_solution.at(cell_i);
                 }
                 else
                 {
@@ -236,25 +238,26 @@ class NewtonIteration
                         case HHO:
                         {
                             matrix_type stab_HHO;
-                            if (small_def)
-                            {
-                                const auto recons = make_vector_hho_symmetric_laplacian(msh, cl, degree_infos);
-                                stab_HHO          = make_vector_hho_stabilization(msh, cl, recons.first, degree_infos);
-                            }
-                            else
-                            {
-                                const auto recons_scalar = make_scalar_hho_laplacian(msh, cl, degree_infos);
-                                stab_HHO =
-                                  make_vector_hho_stabilization_optim(msh, cl, recons_scalar.first, degree_infos);
-                            }
+                            // we do not make any difference for the displacement reconstruction
+                            // if (small_def)
+                            // {
+                            //     const auto recons = make_vector_hho_symmetric_laplacian(msh, cl, degree_infos);
+                            //     stab_HHO          = make_vector_hho_stabilization(msh, cl, recons.first,
+                            //     degree_infos);
+                            // }
+                            // else
+                            // {
+                            const auto recons_scalar = make_scalar_hho_laplacian(msh, cl, degree_infos);
+                            stab_HHO = make_vector_hho_stabilization_optim(msh, cl, recons_scalar.first, degree_infos);
+                            // }
 
                             assert(elem.K_int.rows() == stab_HHO.rows());
                             assert(elem.K_int.cols() == stab_HHO.cols());
                             assert(elem.RTF.rows() == stab_HHO.rows());
                             assert(elem.RTF.cols() == m_solution.at(cell_i).cols());
 
-                            lhs += rp.m_beta * stab_HHO;
-                            rhs -= rp.m_beta * stab_HHO * m_solution.at(cell_i);
+                            lhs += beta * stab_HHO;
+                            rhs -= beta * stab_HHO * m_solution.at(cell_i);
                             break;
                         }
                         case HDG:
@@ -265,8 +268,8 @@ class NewtonIteration
                             assert(elem.RTF.rows() == stab_HDG.rows());
                             assert(elem.RTF.cols() == m_solution.at(cell_i).cols());
 
-                            lhs += rp.m_beta * stab_HDG;
-                            rhs -= rp.m_beta * stab_HDG * m_solution.at(cell_i);
+                            lhs += beta * stab_HDG;
+                            rhs -= beta * stab_HDG * m_solution.at(cell_i);
                             break;
                         }
                         case DG:
@@ -277,11 +280,13 @@ class NewtonIteration
                             assert(elem.RTF.rows() == stab_DG.rows());
                             assert(elem.RTF.cols() == m_solution.at(cell_i).cols());
 
-                            lhs += rp.m_beta * stab_DG;
-                            rhs -= rp.m_beta * stab_DG * m_solution.at(cell_i);
+                            lhs += beta * stab_DG;
+                            rhs -= beta * stab_DG * m_solution.at(cell_i);
                             break;
                         }
-                        case NO: { break;
+                        case NO:
+                        {
+                            break;
                         }
                         default: throw std::invalid_argument("Unknown stabilization");
                     }
@@ -293,6 +298,7 @@ class NewtonIteration
             bool check_size = true;
 
             // contact contribution
+            // std::cout << "Cont" << std::endl;
             if (bnd.cell_has_contact_faces(cl))
             {
                 const auto cell_infos  = degree_infos.cellDegreeInfo(msh, cl);
@@ -356,6 +362,7 @@ class NewtonIteration
             }
 
             // Static Condensation
+            // std::cout << "StatCond" << std::endl;
             tc.tic();
             const auto scnp = make_vector_static_condensation_withMatrix(msh, cl, degree_infos, lhs, rhs, check_size);
 
@@ -366,6 +373,7 @@ class NewtonIteration
             ai.m_time_statcond += tc.to_double();
 
             const auto& lc = std::get<0>(scnp);
+            // std::cout << "Assemb" << std::endl;
             m_assembler.assemble_nonlinear(msh, cl, bnd, contact_manager, lc.first, lc.second, m_solution_faces);
 
             cell_i++;
@@ -428,8 +436,8 @@ class NewtonIteration
                 const vector_type mult =
                   m_assembler.take_local_multiplier(msh, cl, bnd, contact_manager, m_system_solution);
 
-                vector_type x_cont = vector_type::Zero(xdT.size()+mult.size());
-                x_cont.head(xdT.size()) = xdT;
+                vector_type x_cont       = vector_type::Zero(xdT.size() + mult.size());
+                x_cont.head(xdT.size())  = xdT;
                 x_cont.tail(mult.size()) = mult;
 
                 x_cond = x_cont;
@@ -555,6 +563,9 @@ class NewtonIteration
         }
 
         const scalar_type error = std::max(relative_displ, relative_error);
+
+        if (!isfinite(error))
+            throw std::runtime_error("Norm of residual is not finite");
 
         if (error <= rp.m_epsilon)
         {

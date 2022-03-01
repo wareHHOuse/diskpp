@@ -25,11 +25,16 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wall"
 #pragma clang diagnostic ignored "-Wshadow"
+#pragma clang diagnostic ignored "-Weverything"
 
 #ifdef HAVE_INTEL_MKL
-    /* Don't use MKL! It makes everything slower! */
-    //#define EIGEN_USE_MKL_ALL
-    #include <Eigen/PardisoSupport>
+/* Don't use MKL! It makes everything slower! */
+//#define EIGEN_USE_MKL_ALL
+// Fix for eigen version > 3.3.7
+#if !defined(EIGEN_USING_STD)
+#define EIGEN_USING_STD(X) using std::X
+#endif
+#include <Eigen/PardisoSupport>
 #endif
 
 #include <Eigen/Dense>
@@ -43,7 +48,7 @@
 
 #pragma clang diagnostic pop
 
-namespace disk{
+  namespace disk{
 
 template<typename T>
 using dynamic_matrix = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;

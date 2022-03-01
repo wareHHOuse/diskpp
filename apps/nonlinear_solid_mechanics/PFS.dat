@@ -8,6 +8,8 @@ GradDegree
 TimeStep
 1
 1.0   1
+FinalTime
+1.0
 Sublevel
 4
 TimeSave
@@ -16,6 +18,8 @@ Stabilization
 true
 StabType
 HH0
+AdaptativeStabilization
+false
 Beta
 100
 Verbose
