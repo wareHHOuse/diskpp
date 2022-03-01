@@ -386,6 +386,38 @@ measure(const simplicial_mesh<T, 2>& msh,
     return (pts[1] - pts[0]).to_vector().norm();
 }
 
+template<typename T>
+bool
+is_inside(const simplicial_mesh<T,3>& msh,
+          const typename simplicial_mesh<T,3>::cell_type& cl,
+          const typename simplicial_mesh<T,3>::point_type& pt)
+{
+    auto pts = points(msh, cl);
+    auto v0 = to_vector(pts[1] - pts[0]);
+    auto v1 = to_vector(pts[2] - pts[0]);
+    auto v2 = to_vector(pts[2] - pts[1]);
+    auto v3 = to_vector(pts[3] - pts[0]);
+    auto v4 = to_vector(pts[3] - pts[1]);
+    auto v5 = to_vector(pts[3] - pts[2]);
+
+    int count = 0;
+
+    T t0 = v3.cross(v0).dot( to_vector(pt - pts[0]) );
+    if (t0 < 0) count--; else count++;
+
+    T t1 = v0.cross(v1).dot( to_vector(pt - pts[0]) );
+    if (t1 < 0) count--; else count++;
+    
+    T t2 = v4.cross(v2).dot( to_vector(pt - pts[1]) );
+    if (t2 < 0) count--; else count++;
+    
+    T t3 = v1.cross(v3).dot( to_vector(pt - pts[0]) );
+    if (t3 < 0) count--; else count++;
+
+    return (count == 4) or (count == -4);
+}
+
+
 } // namespace disk
 
 #endif /* _GEOMETRY_SIMPLICIAL_HPP_ */

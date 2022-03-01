@@ -496,9 +496,6 @@ public:
 
         auto [e0, e1] = this->reference_frame();
 
-        auto ih0 = 1./e0.norm();
-        auto ih1 = 1./e1.norm();
-
         function_type ret = function_type::Zero(basis_size, 3);
         size_t pos = 0;
         for (size_t k = 0; k < basis_degree; k++)
@@ -532,8 +529,8 @@ public:
             const auto pow_y    = i;
             const auto px       = iexp_pow(bx, pow_x);
             const auto py       = iexp_pow(by, pow_y);
-            const auto dx       = (pow_x == 0) ? 0 : pow_x * ih0 * iexp_pow(bx, pow_x - 1);
-            const auto dy       = (pow_y == 0) ? 0 : pow_y * ih1 * iexp_pow(by, pow_y - 1);
+            const auto dx       = (pow_x == 0) ? 0 : pow_x * iexp_pow(bx, pow_x - 1);
+            const auto dy       = (pow_y == 0) ? 0 : pow_y * iexp_pow(by, pow_y - 1);
             const auto dpdx     = dx * py;
             const auto dpdy     = px * dy;
             const Matrix<T,3,1> grad = e0*dpdx + e1*dpdy;

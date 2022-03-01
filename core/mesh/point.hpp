@@ -292,6 +292,16 @@ public:
     }
 };
 
+template<typename T, size_t DIM>
+static_vector<T, DIM>
+to_vector(const point<T,DIM>& pt)
+{
+    static_vector<T, DIM> ret;
+    for (size_t i = 0; i < DIM; i++)
+        ret(i) = pt[i];
+    return ret;
+}
+
 template<typename T>
 T
 det(const point<T,2>& p1, const point<T,2>& p2)

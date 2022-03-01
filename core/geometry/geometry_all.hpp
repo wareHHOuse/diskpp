@@ -314,6 +314,32 @@ normal(const Mesh<T,2,Storage>& msh,
 }
 
 /**
+ * @brief Compute a normal of a 2D face. No guarantee on the direction.
+ *
+ * @tparam Mesh type of mesh
+ * @tparam T scalar type
+ * @tparam Storage type of storage for the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param fc face
+ * @return static_vector<T, 2> A normal to the 2D face
+ */
+template<template<typename, size_t, typename> class Mesh,
+         typename T, typename Storage>
+static_vector<T, 2>
+normal(const Mesh<T,2,Storage>& msh,
+       const typename Mesh<T,2,Storage>::face& fc)
+{
+    auto pts = points(msh, fc);
+    assert(pts.size() == 2);
+
+    auto v = pts[1] - pts[0];
+    auto n = (point<T,2>({-v.y(), v.x()})).to_vector();
+
+    return n/n.norm();
+}
+
+/**
  * @brief Compute the outward unit normal to a 3D face
  *
  * @tparam Mesh type of mesh
@@ -344,6 +370,33 @@ normal(const Mesh<T, 3, Storage>& msh,
 
     if ( n.dot(outward_vector) < T(0) )
         return -n/n.norm();
+
+    return n/n.norm();
+}
+
+/**
+ * @brief Compute a normal to a 3D face. No guarantee on the direction.
+ *
+ * @tparam Mesh type of mesh
+ * @tparam T scalar type
+ * @tparam Storage type of storage for the mesh
+ * @param msh mesh
+ * @param cl cell
+ * @param fc face
+ * @return static_vector<T, 3> A normal to a 3D face
+ */
+template<template<typename, size_t, typename> class Mesh,
+         typename T, typename Storage>
+static_vector<T, 3>
+normal(const Mesh<T, 3, Storage>& msh,
+       const typename Mesh<T, 3, Storage>::face& fc)
+{
+    auto pts = points(msh, fc);
+    assert(pts.size() >= 3);
+
+    auto v0 = (pts[1] - pts[0]).to_vector();
+    auto v1 = (pts[2] - pts[1]).to_vector();
+    auto n = v0.cross(v1);
 
     return n/n.norm();
 }

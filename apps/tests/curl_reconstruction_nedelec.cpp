@@ -70,8 +70,8 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
             return ret;
         };
 
-        size_t fd = degree;
-        size_t cd = mixed ? degree+1 : degree;
+        size_t fd = degree+1;
+        size_t cd = degree+1;
         size_t rd = degree;
 
         disk::hho_degree_info hdi(disk::priv::hdi_named_args{.rd = rd, .cd = cd, .fd = fd});
@@ -79,8 +79,8 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
         scalar_type error = 0.0;
         for (const auto& cl : msh)
         {
-            auto CR = disk::curl_reconstruction_pk(msh, cl, hdi);
-            auto proj = disk::project_tangent(msh, cl, hdi, f, 1);
+            auto CR = disk::curl_reconstruction_nedelec(msh, cl, hdi);
+            auto proj = disk::project_tangent_nedelec(msh, cl, hdi, f, 1);
             Matrix<T, Dynamic, 1> rf = CR.first * proj;
 
             auto rb = disk::make_vector_monomial_basis(msh, cl, rd);
