@@ -479,11 +479,9 @@ class scaled_monomial_abstract_face_basis<Mesh<T, 3, Storage>, typename Mesh<T, 
         if (!ok)
             throw std::invalid_argument("Degenerate polyhedron, cannot proceed");
 
-        /* Don't normalize, in order to keep axes of the same order of lenght
-         * of v in make_face_point_3d_to_2d() */
-        e0 = v0; // / v0.norm();
+        e0 = v0 / v0.norm();
         e1 = v1 - (v1.dot(v0) * v0) / (v0.dot(v0));
-        e1 = e1; // / e1.norm();
+        e1 = e1 / e1.norm();
     }
 
   protected:
@@ -531,7 +529,7 @@ class scaled_monomial_abstract_face_basis<Mesh<T, 3, Storage>, typename Mesh<T, 
     bool
     is_orthonormal() const
     {
-        return false;
+        return true;
     }
 };
 

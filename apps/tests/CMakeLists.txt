@@ -72,6 +72,15 @@ if (BUILD_APP_DISKPP_TESTS)
     add_executable(curl_stabilization curl_stabilization.cpp)
     target_link_libraries(curl_stabilization ${LINK_LIBS})
 
+    add_executable(curl_interpolation curl_interpolation.cpp)
+    target_link_libraries(curl_interpolation ${LINK_LIBS})
+
+    add_executable(curl_reconstruction_nedelec curl_reconstruction_nedelec.cpp)
+    target_link_libraries(curl_reconstruction_nedelec ${LINK_LIBS})
+
+    add_executable(curl_stabilization_nedelec curl_stabilization_nedelec.cpp)
+    target_link_libraries(curl_stabilization_nedelec ${LINK_LIBS})
+
     add_executable(conditionning_basis conditionning_basis.cpp)
     target_link_libraries(conditionning_basis ${LINK_LIBS})
 

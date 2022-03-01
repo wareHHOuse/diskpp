@@ -144,7 +144,31 @@ project_tangent(const Mesh<T,2,Storage>&                        msh,
                 const scalar_rhs_function<Mesh<T,2,Storage>>&   u,
                 size_t                                          di = 0)
 {
+    throw "not implemented";
     return project_function(msh, cl, hdi, u, di);
+}
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+dynamic_vector<typename Mesh<T,2,Storage>::coordinate_type>
+project_tangent(const Mesh<T,2,Storage>&                        msh,
+                const typename Mesh<T,2,Storage>::cell_type&    cl,
+                const hho_degree_info&                          hdi,
+                const vector_rhs_function<Mesh<T,2,Storage>>&   u,
+                size_t                                          di = 0)
+{
+    throw "not implemented";
+    return project_function(msh, cl, hdi, u, di);
+}
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+dynamic_vector<typename Mesh<T,2,Storage>::coordinate_type>
+project_tangent(const Mesh<T,2,Storage>&                        msh,
+                const typename Mesh<T,2,Storage>::face_type&    fc,
+                size_t                                          degree,
+                const vector_rhs_function<Mesh<T,2,Storage>>&   u,
+                size_t                                          di = 0)
+{
+    throw "not implemented";
 }
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
@@ -183,6 +207,36 @@ project_tangent(const Mesh<T,3,Storage>&                        msh,
         const auto fb = make_vector_monomial_tangential_basis(msh, fc, hdi.face_degree());
         ret.segment(cbs + i * fbs, fbs) = project_function(msh, fcs[i], fb, trace_u, di);
     }
+
+    return ret;
+}
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+dynamic_vector<typename Mesh<T,3,Storage>::coordinate_type>
+project_tangent(const Mesh<T,3,Storage>&                        msh,
+                const typename Mesh<T,3,Storage>::face_type&    fc,
+                size_t                                          degree,
+                const vector_rhs_function<Mesh<T,3,Storage>>&   u,
+                size_t                                          di = 0)
+{
+    using mesh_type         = Mesh<T,3,Storage>;
+    using scalar_type       = typename mesh_type::coordinate_type;
+    using vector_type       = dynamic_vector<scalar_type>;
+    using point_type        = typename mesh_type::point_type;
+
+    static const size_t DIM = 3;
+
+    const auto fbs      = vector_basis_size(degree, DIM - 1, DIM - 1);
+    vector_type ret     = vector_type::Zero(fbs);
+
+    auto n = normal(msh, fc);
+    auto trace_u = [&](const point_type& pt) -> auto {
+        auto uval = u(pt);
+        return n.cross(uval.cross(n));
+    };
+
+    const auto fb = make_vector_monomial_tangential_basis(msh, fc, degree);
+    ret = project_function(msh, fc, fb, trace_u, di);
 
     return ret;
 }
