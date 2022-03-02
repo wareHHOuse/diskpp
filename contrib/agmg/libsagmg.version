@@ -1,4 +1,0 @@
-SAGMG {
-  global: sagmg_;
-  local: *;
-};

@@ -12,3 +12,6 @@
 [submodule "contrib/gmsh_tools"]
 	path = contrib/gmsh_tools
 	url = https://github.com/npaster/gmsh_tools
+[submodule "contrib/eigen"]
+	path = contrib/eigen
+	url = https://gitlab.com/libeigen/eigen.git

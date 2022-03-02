@@ -12,15 +12,45 @@ set(diskpp_VERSION_MAJOR 0)
 set(diskpp_VERSION_MINOR 0)
 set(diskpp_VERSION_PATCH 0)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 # Additional modules path for cmake
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 include(safeguards)
-include(agmg)
 include(Tools)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+find_package(Git QUIET)
+if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
+# Update submodules as needed
+    option(GIT_SUBMODULE "Check submodules during build" ON)
+    if(GIT_SUBMODULE)
+        message(STATUS "Submodule update")
+        execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
+                        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                        RESULT_VARIABLE GIT_SUBMOD_RESULT)
+        if(NOT GIT_SUBMOD_RESULT EQUAL "0")
+            message(FATAL_ERROR "git submodule update --init --recursive failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
+        endif()
+    endif()
+endif()
+
+######################################################################
+## Eigen3
+add_subdirectory(contrib/eigen)
+set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
+
+######################################################################
+## Solver wrappers
+add_subdirectory(contrib/solver_wrappers)
+if (HAVE_AGMG)
+    set(LINK_LIBS ${LINK_LIBS} AGMG)
+endif()
+
+if (HAVE_MUMPS)
+    set(LINK_LIBS ${LINK_LIBS} MUMPS)
+endif()
 
 ######################################################################
 ## Helpers for compiler identification
@@ -42,17 +72,6 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
                  either upgrade your system or use a compiler different than \
                  AppleClang.")
     endif()
-endif()
-
-######################################################################
-## Package: MUMPS solver
-find_package(MUMPS COMPONENTS SEQ)
-if (MUMPS_FOUND)
-    set(LINK_LIBS ${LINK_LIBS} MUMPS::MUMPS)
-    add_definitions(-DHAVE_MUMPS)
-    set(HAVE_MUMPS TRUE)
-else()
-    set(HAVE_MUMPS FALSE)
 endif()
 
 ######################################################################
@@ -189,14 +208,6 @@ set(CMAKE_CXX_FLAGS_RELEASEASSERT "-O3 -march=native -g -fpermissive")
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-anon-enum-enum-conversion")
 
-
-set(UP_EIGEN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/contrib/eigen")
-if ( EXISTS ${UP_EIGEN_DIR} AND IS_DIRECTORY ${UP_EIGEN_DIR} )
-    include_directories(${UP_EIGEN_DIR})
-else ( EXISTS ${UP_EIGEN_DIR} AND IS_DIRECTORY ${UP_EIGEN_DIR} )
-    find_package(Eigen3 REQUIRED)
-    include_directories(${EIGEN3_INCLUDE_DIR})
-endif ( EXISTS ${UP_EIGEN_DIR} AND IS_DIRECTORY ${UP_EIGEN_DIR} )
 
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
