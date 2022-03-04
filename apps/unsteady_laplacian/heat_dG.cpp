@@ -208,8 +208,8 @@ class heat_dG_assembler
                 //     RHS(asm_map[i]) -= lhs(i, j) * dirichlet_data(j);
             }
 
-            RHS(asm_map[i]) += rhs_modif(i);
-            RHS_F(asm_map[i]) += rhs(i);
+            RHS[ asm_map[i] ] += rhs_modif(i);
+            RHS_F[ asm_map[i] ] += rhs(i);
         }
     } // assemble()
 

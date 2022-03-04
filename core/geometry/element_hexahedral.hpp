@@ -45,7 +45,8 @@ class cartesian_element
 {
     static_assert(DIM == 2 or DIM == 3, "cartesian elements must be 2D or 3D");
 
-    typedef point_identifier<DIM>       point_id_type;
+    //typedef point_identifier<DIM>       point_id_type;
+    typedef size_t point_id_type;
 
     typedef std::array<point_id_type, cartesian_priv::howmany<DIM, CODIM>::nodes>
         node_array_type;

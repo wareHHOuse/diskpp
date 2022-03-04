@@ -59,36 +59,6 @@ class diffusion_condensed_assembler
 
     size_t num_all_faces, num_dirichlet_faces, num_other_faces, system_size;
 
-    class assembly_index
-    {
-        size_t idx;
-        bool   assem;
-
-      public:
-        assembly_index(size_t i, bool as) : idx(i), assem(as) {}
-
-        operator size_t() const
-        {
-            if (!assem)
-                throw std::logic_error("Invalid assembly_index");
-
-            return idx;
-        }
-
-        bool
-        assemble() const
-        {
-            return assem;
-        }
-
-        friend std::ostream&
-        operator<<(std::ostream& os, const assembly_index& as)
-        {
-            os << "(" << as.idx << "," << as.assem << ")";
-            return os;
-        }
-    };
-
   public:
     typedef dynamic_matrix<T> matrix_type;
     typedef dynamic_vector<T> vector_type;
@@ -210,10 +180,10 @@ class diffusion_condensed_assembler
                 if (asm_map[j].assemble())
                     triplets.push_back(Triplet<T>(asm_map[i], asm_map[j], lhs(i, j)));
                 else
-                    RHS( size_t(asm_map[i]) ) -= lhs(i, j) * dirichlet_data(j);
+                    RHS[ asm_map[i] ] -= lhs(i, j) * dirichlet_data(j);
             }
 
-            RHS( size_t(asm_map[i]) ) += rhs(i);
+            RHS[ asm_map[i] ]  += rhs(i);
         }
     } // assemble()
 
@@ -266,10 +236,10 @@ class diffusion_condensed_assembler
                 if (asm_map[j].assemble())
                     triplets.push_back(Triplet<T>(asm_map[i], asm_map[j], lhs(i, j)));
                 else
-                    RHS(asm_map[i]) -= lhs(i, j) * dirichlet_data(j);
+                    RHS[ asm_map[i] ] -= lhs(i, j) * dirichlet_data(j);
             }
 
-            RHS(asm_map[i]) += rhs(i);
+            RHS[ asm_map[i] ] += rhs(i);
         }
     } // assemble()
 
@@ -318,9 +288,7 @@ class diffusion_condensed_assembler
 
                         assert(neumann.size() == num_face_dofs);
                         for (size_t i = 0; i < neumann.size(); i++)
-                        {
-                            RHS(asm_map[i]) += neumann[i];
-                        }
+                            RHS[ asm_map[i] ] += neumann[i];
                     }
                 }
             }
@@ -389,7 +357,7 @@ class diffusion_condensed_assembler
 
                         for (size_t i = 0; i < num_face_dofs; i++)
                         {
-                            RHS(asm_map[i]) += robin[i];
+                            RHS[ asm_map[i] ] += robin[i];
 
                             for (size_t j = 0; j < num_face_dofs; j++)
                             {
@@ -541,36 +509,6 @@ class stokes_assembler
     size_t cbs_A, cbs_B, fbs_A;
     size_t system_size;
 
-    class assembly_index
-    {
-        size_t idx;
-        bool   assem;
-
-      public:
-        assembly_index(size_t i, bool as) : idx(i), assem(as) {}
-
-        operator size_t() const
-        {
-            if (!assem)
-                throw std::logic_error("Invalid assembly_index");
-
-            return idx;
-        }
-
-        bool
-        assemble() const
-        {
-            return assem;
-        }
-
-        friend std::ostream&
-        operator<<(std::ostream& os, const assembly_index& as)
-        {
-            os << "(" << as.idx << "," << as.assem << ")";
-            return os;
-        }
-    };
-
   public:
     typedef dynamic_matrix<T> matrix_type;
     typedef dynamic_vector<T> vector_type;
@@ -695,7 +633,7 @@ class stokes_assembler
                 if (asm_map[j].assemble())
                     triplets.push_back(Triplet<T>(asm_map[i], asm_map[j], lhs_A(i, j)));
                 else
-                    RHS(asm_map[i]) -= lhs_A(i, j) * dirichlet_data(j);
+                    RHS[ asm_map[i] ] -= lhs_A(i, j) * dirichlet_data(j);
             }
         }
 
@@ -704,7 +642,7 @@ class stokes_assembler
             for (size_t j = 0; j < lhs_B.cols(); j++)
             {
                 auto global_i = B_offset + i;
-                auto global_j = asm_map[j];
+                size_t global_j = asm_map[j];
                 if (asm_map[j].assemble())
                 {
                     triplets.push_back(Triplet<T>(global_i, global_j, lhs_B(i, j)));
@@ -788,14 +726,14 @@ class stokes_assembler
             if (!asm_map[i].assemble())
                 continue;
 
-            RHS(asm_map[i]) += rhs(i);
+            RHS[ asm_map[i] ] += rhs(i);
 
             for (size_t j = 0; j < lhs_A.cols(); j++)
             {
                 if (asm_map[j].assemble())
                     triplets.push_back(Triplet<T>(asm_map[i], asm_map[j], lhs_A(i, j)));
                 else
-                    RHS(asm_map[i]) -= lhs_A(i, j) * dirichlet_data(j);
+                    RHS[ asm_map[i] ] -= lhs_A(i, j) * dirichlet_data(j);
             }
         }
 
@@ -804,7 +742,7 @@ class stokes_assembler
             for (size_t j = 0; j < lhs_B.cols(); j++)
             {
                 auto global_i = B_offset + i;
-                auto global_j = asm_map[j];
+                size_t global_j = asm_map[j];
                 if (asm_map[j].assemble())
                 {
                     triplets.push_back(Triplet<T>(global_i, global_j, lhs_B(i, j)));
@@ -943,36 +881,6 @@ class stokes_assembler_alg
     size_t cbs_A, cbs_B, fbs_A;
     size_t system_size;
 
-    class assembly_index
-    {
-        size_t idx;
-        bool   assem;
-
-      public:
-        assembly_index(size_t i, bool as) : idx(i), assem(as) {}
-
-        operator size_t() const
-        {
-            if (!assem)
-                throw std::logic_error("Invalid assembly_index");
-
-            return idx;
-        }
-
-        bool
-        assemble() const
-        {
-            return assem;
-        }
-
-        friend std::ostream&
-        operator<<(std::ostream& os, const assembly_index& as)
-        {
-            os << "(" << as.idx << "," << as.assem << ")";
-            return os;
-        }
-    };
-
   public:
     typedef dynamic_matrix<T> matrix_type;
     typedef dynamic_vector<T> vector_type;
@@ -1099,7 +1007,7 @@ class stokes_assembler_alg
                 if (asm_map[j].assemble())
                     triplets.push_back(Triplet<T>(asm_map[i], asm_map[j], lhs_A(i, j)));
                 else
-                    RHS_DIRICHLET(asm_map[i]) -= lhs_A(i, j) * dirichlet_data(j);
+                    RHS_DIRICHLET[ asm_map[i] ] -= lhs_A(i, j) * dirichlet_data(j);
             }
         }
 
@@ -1108,7 +1016,7 @@ class stokes_assembler_alg
             for (size_t j = 0; j < lhs_B.cols(); j++)
             {
                 auto global_i = B_offset + i;
-                auto global_j = asm_map[j];
+                size_t global_j = asm_map[j];
                 if (asm_map[j].assemble())
                 {
                     triplets.push_back(Triplet<T>(global_i, global_j, lhs_B(i, j)));
@@ -1173,7 +1081,7 @@ class stokes_assembler_alg
             if (!asm_map[i].assemble())
                 continue;
 
-            RHS(asm_map[i]) += rhs(i);
+            RHS[ asm_map[i] ] += rhs(i);
         }
     } // assemble_alg()
 
@@ -2356,36 +2264,6 @@ make_mechanics_assembler(const Mesh& msh, const hho_degree_info hdi, const Bound
 {
     return assembler_mechanics<Mesh>(msh, hdi, bnd);
 }
-
-class assembly_index
-{
-    size_t idx;
-    bool   assem;
-
-  public:
-    assembly_index(const size_t i, const bool as) : idx(i), assem(as) {}
-
-    operator size_t() const
-    {
-        if (!assem)
-            throw std::logic_error("Invalid assembly_index");
-
-        return idx;
-    }
-
-    bool
-    assemble(void) const
-    {
-        return assem;
-    }
-
-    friend std::ostream&
-    operator<<(std::ostream& os, const assembly_index& as)
-    {
-        os << "(" << as.idx << "," << as.assem << ")";
-        return os;
-    }
-};
 
 /**
  * @brief Assembler for HHO methods where the discrete problem is scalar and formulated only in terms of primal unknowns

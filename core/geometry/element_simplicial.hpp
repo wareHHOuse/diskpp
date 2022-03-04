@@ -43,7 +43,9 @@ struct howmany;
 template<size_t DIM, size_t CODIM>
 class simplicial_element
 {
-    typedef point_identifier<DIM>       point_id_type;
+    //typedef point_identifier<DIM>       point_id_type;
+
+    typedef size_t point_id_type;
 
     typedef std::array<point_id_type, priv::howmany<DIM, CODIM>::nodes> node_array_type;
 

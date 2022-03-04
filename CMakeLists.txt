@@ -147,6 +147,7 @@ endif()
 ## Package: GMSH
 find_package(GMSH)
 if (GMSH_FOUND)
+    set(HAVE_GMSH TRUE)
     set(LINK_LIBS ${LINK_LIBS} GMSH)
 endif()
 
@@ -184,6 +185,15 @@ if (OPT_VECTORIZER_REMARKS)
 
     if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopt-info-vec-optimized")
+    endif()
+endif()
+
+######################################################################
+## Compiler reporting: disable deprecation wa
+option(OPT_DISABLE_DEPRECATION_WARNINGS "Disable deprecation warnings" OFF)
+if(OPT_DISABLE_DEPRECATION_WARNINGS)
+    if (COMPILER_IS_GNU OR COMPILER_IS_CLANG)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
     endif()
 endif()
 

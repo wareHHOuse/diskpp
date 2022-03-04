@@ -1784,38 +1784,7 @@ class diffusion_condensed_assembler_nitsche_cells
     size_t       num_all_faces, num_dirichlet_faces, num_other_faces;
     size_t       system_size;
 
-
-    class assembly_index
-    {
-        size_t  idx;
-        bool    assem;
-
-    public:
-        assembly_index(size_t i, bool as)
-            : idx(i), assem(as)
-        {}
-
-        operator size_t() const
-        {
-            if (!assem)
-                throw std::logic_error("Invalid assembly_index");
-
-            return idx;
-        }
-
-        bool assemble() const
-        {
-            return assem;
-        }
-
-        friend std::ostream& operator<<(std::ostream& os, const assembly_index& as)
-        {
-            os << "(" << as.idx << "," << as.assem << ")";
-            return os;
-        }
-    };
-
-    public:
+public:
 
     SparseMatrix<T>         LHS;
     Matrix<T, Dynamic, 1>   RHS;
@@ -1906,7 +1875,7 @@ class diffusion_condensed_assembler_nitsche_cells
         {
             if (!asm_map[i].assemble())
                 continue;
-            RHS(asm_map[i]) += rhs(i);
+            RHS[ asm_map[i] ] += rhs(i);
         }
     }
 
@@ -1991,38 +1960,7 @@ class diffusion_condensed_assembler_nitsche_faces
     size_t       num_all_faces, num_dirichlet_faces, num_other_faces;
     size_t       system_size;
 
-
-    class assembly_index
-    {
-        size_t  idx;
-        bool    assem;
-
-    public:
-        assembly_index(size_t i, bool as)
-            : idx(i), assem(as)
-        {}
-
-        operator size_t() const
-        {
-            if (!assem)
-                throw std::logic_error("Invalid assembly_index");
-
-            return idx;
-        }
-
-        bool assemble() const
-        {
-            return assem;
-        }
-
-        friend std::ostream& operator<<(std::ostream& os, const assembly_index& as)
-        {
-            os << "(" << as.idx << "," << as.assem << ")";
-            return os;
-        }
-    };
-
-    public:
+public:
 
     SparseMatrix<T>         LHS;
     Matrix<T, Dynamic, 1>   RHS;
@@ -2099,7 +2037,7 @@ class diffusion_condensed_assembler_nitsche_faces
                     throw std::invalid_argument("It shouldn't come here!!");
             }
 
-            RHS(asm_map[i]) += rhs(i);
+            RHS[ asm_map[i] ] += rhs(i);
         }
     }
 
@@ -2171,36 +2109,6 @@ class diffusion_full_assembler
     size_t      num_all_faces, num_dirichlet_faces, num_other_faces;
     size_t      cbs, fbs;
     size_t      system_size;
-
-    class assembly_index
-    {
-        size_t  idx;
-        bool    assem;
-
-    public:
-        assembly_index(size_t i, bool as)
-            : idx(i), assem(as)
-        {}
-
-        operator size_t() const
-        {
-            if (!assem)
-                throw std::logic_error("Invalid assembly_index");
-
-            return idx;
-        }
-
-        bool assemble() const
-        {
-            return assem;
-        }
-
-        friend std::ostream& operator<<(std::ostream& os, const assembly_index& as)
-        {
-            os << "(" << as.idx << "," << as.assem << ")";
-            return os;
-        }
-    };
 
 public:
 
@@ -2300,7 +2208,7 @@ public:
         {
             if (!asm_map[i].assemble())
                 continue;
-            RHS(asm_map[i]) += rhs(i);
+            RHS[ asm_map[i] ] += rhs(i);
         }
 
     } // assemble()
@@ -2561,7 +2469,7 @@ public:
                 if ( asm_map[j].assemble() )
                     triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs(i,j)) );
                 else if(asm_map[j].type() ==  DIRICHLET_FACE)
-                    RHS(asm_map[i]) -= lhs(i,j) * dirichlet_data(j);
+                    RHS[ asm_map[i] ] -= lhs(i,j) * dirichlet_data(j);
 
             }
         }
@@ -2570,7 +2478,7 @@ public:
         {
             if (!asm_map[i].assemble())
                 continue;
-            RHS(asm_map[i]) += rhs(i);
+            RHS[ asm_map[i] ] += rhs(i);
         }
 
     } // assemble()
@@ -2617,7 +2525,7 @@ public:
                         assert(neumann.size() == num_face_dofs);
                         for (size_t i = 0; i < neumann.size() ; i++)
                         {
-                            RHS(asm_map[i]) += neumann[i];
+                            RHS[ asm_map[i] ] += neumann[i];
                         }
                     }
                 }
@@ -2885,7 +2793,7 @@ public:
                 if ( asm_map[j].assemble() )
                     triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs(i,j)) );
                 else if(asm_map[j].type() ==  DIRICHLET_FACE)
-                    RHS(asm_map[i]) -= lhs(i,j) * dirichlet_data(j);
+                    RHS[ asm_map[i] ] -= lhs(i,j) * dirichlet_data(j);
             }
         }
 
@@ -2893,7 +2801,7 @@ public:
         {
             if (!asm_map[i].assemble())
                 continue;
-            RHS(asm_map[i]) += rhs(i);
+            RHS[ asm_map[i] ] += rhs(i);
         }
 
     } // assemble()
@@ -2940,7 +2848,7 @@ public:
 
                         assert(neumann.size() == num_face_dofs);
                         for (size_t i = 0; i < neumann.size() ; i++)
-                            RHS(asm_map[i]) += neumann[i];
+                            RHS[ asm_map[i] ] += neumann[i];
                     }
                 }
             }
@@ -3191,7 +3099,7 @@ public:
         {
             if (!asm_map[i].assemble())
                 continue;
-            RHS(asm_map[i]) += rhs(i);
+            RHS[ asm_map[i] ] += rhs(i);
         }
 
     } // assemble()
@@ -3264,7 +3172,7 @@ public:
 
                         assert(neumann.size() == num_face_dofs);
                         for (size_t i = 0; i < neumann.size() ; i++)
-                            RHS(asm_map[i]) += neumann[i];
+                            RHS[ asm_map[i] ] += neumann[i];
                     }
                 }
             }
@@ -3342,36 +3250,6 @@ class contact_face_assembler_new
 
     typedef disk::scalar_boundary_conditions<Mesh> boundary_type;
     boundary_type m_bnd;
-
-    class assembly_index
-    {
-        size_t  idx;
-        bool    assem;
-
-    public:
-        assembly_index(size_t i, bool as)
-            : idx(i), assem(as)
-        {}
-
-        operator size_t() const
-        {
-            if (!assem)
-                throw std::logic_error("Invalid assembly_index");
-
-            return idx;
-        }
-
-        bool assemble() const
-        {
-            return assem;
-        }
-
-        friend std::ostream& operator<<(std::ostream& os, const assembly_index& as)
-        {
-            os << "(" << as.idx << "," << as.assem << ")";
-            return os;
-        }
-    };
 
 public:
 
@@ -3458,7 +3336,7 @@ public:
                     triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs(i,j)) );
             }
 
-            RHS(asm_map[i]) += rhs(i);
+            RHS[ asm_map[i] ] += rhs(i);
         }
     } // assemble()
 
@@ -3506,7 +3384,7 @@ public:
                         assert(neumann.size() == num_face_dofs);
                         for (size_t i = 0; i < neumann.size() ; i++)
                         {
-                            RHS(asm_map[i]) += neumann[i];
+                            RHS[ asm_map[i] ] += neumann[i];
                         }
                     }
                 }
@@ -3576,7 +3454,7 @@ public:
 
                         for (size_t i = 0; i < num_face_dofs; i++)
                         {
-                            RHS(asm_map[i]) += robin[i];
+                            RHS[ asm_map[i] ] += robin[i];
 
                             for (size_t j = 0; j < num_face_dofs; j++)
                             {

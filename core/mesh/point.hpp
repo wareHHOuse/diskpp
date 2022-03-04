@@ -327,6 +327,6 @@ operator<<(std::ostream& os, const point<T, DIM>& pt)
 
 struct dummy_point_type {};
 template<size_t DIM>
-using point_identifier = identifier<point<dummy_point_type, DIM>, ident_raw_t, 0>;
+using point_identifier = ident_raw_t;
 
 } // end disk

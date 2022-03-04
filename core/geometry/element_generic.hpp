@@ -206,7 +206,7 @@ class generic_element<DIM, DIM>
     point_identifier<DIM>    m_assoc_point;
 
 public:
-    typedef typename generic_element_traits<generic_element>::id_type          id_type;
+    typedef typename generic_element_traits<generic_element>::id_type id_type;
 
     generic_element()
     {}
@@ -219,7 +219,7 @@ public:
     std::vector<point_identifier<DIM>>
     point_ids(void) const
     {
-        return std::vector<point_identifier<DIM>>{{m_assoc_point}};
+        return std::vector<point_identifier<DIM>>{m_assoc_point};
     }
 
     bool operator<(const generic_element& other) const
@@ -239,7 +239,8 @@ class generic_element_edge
 {
 public: 
     using sub_id_type = typename generic_element_traits<Derived>::subelement_type::id_type;
-    using ptid_type = point_identifier<DIM>;
+    //using ptid_type = point_identifier<DIM>;
+    using ptid_type = size_t;
 
 private:
     std::array<sub_id_type, 2>  sub_elem_ids;
