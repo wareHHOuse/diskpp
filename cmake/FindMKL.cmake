@@ -89,7 +89,6 @@ find_path(MKL_INCLUDE_DIRS
     PATHS   /opt/intel/mkl/include
     /opt/intel/oneapi/mkl/latest/include
     ${INTEL_MKL_HOME}/mkl/include/
-    "/cygdrive/C/Program\ Files\ \(x86\)/Intel/Composer\ XE/mkl/include"
     "${INTEL_MKL_INCLUDE_SEARCH_DIRS}/include"
 )
 

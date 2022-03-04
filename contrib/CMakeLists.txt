@@ -7,7 +7,7 @@ add_subdirectory(triangle)
 set(diskpp_source ${diskpp_source} ${triangle_source})
 
 set(diskpp_source ${diskpp_source} 
-    ${CMAKE_CURRENT_SOURCE_DIR}/simpleps.cpp
+    #${CMAKE_CURRENT_SOURCE_DIR}/simpleps.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/timecounter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/mapped_file.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/colormanip.cpp

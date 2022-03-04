@@ -210,10 +210,10 @@ class diffusion_condensed_assembler
                 if (asm_map[j].assemble())
                     triplets.push_back(Triplet<T>(asm_map[i], asm_map[j], lhs(i, j)));
                 else
-                    RHS(asm_map[i]) -= lhs(i, j) * dirichlet_data(j);
+                    RHS( size_t(asm_map[i]) ) -= lhs(i, j) * dirichlet_data(j);
             }
 
-            RHS(asm_map[i]) += rhs(i);
+            RHS( size_t(asm_map[i]) ) += rhs(i);
         }
     } // assemble()
 

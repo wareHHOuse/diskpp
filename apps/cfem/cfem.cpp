@@ -149,7 +149,7 @@ cfem_solver(const disk::simplicial_mesh<T, 2>& msh)
 
             double val = 0.0;
             for (size_t i = 0; i < 3; i++)
-                val += e_gx(ptids[i]) * phi(i);
+                val += e_gx( size_t(ptids[i]) ) * phi(i);
 
             ofs << bar.x() << " " << bar.y() << " " << val << std::endl;
             solution_vals.push_back(val);

@@ -7,23 +7,51 @@ if ( WIN32 )
     message(FATAL_ERROR "Sorry, Windows is not supported.")
 endif()
 
-# project version
+######################################################################
+## project version
 set(diskpp_VERSION_MAJOR 0)
 set(diskpp_VERSION_MINOR 0)
 set(diskpp_VERSION_PATCH 0)
 
+######################################################################
+## Required C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Additional modules path for cmake
+######################################################################
+## RPATH settings
+set(CMAKE_SKIP_BUILD_RPATH FALSE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+######################################################################
+## Build Release by default
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release")
+endif()
+
+######################################################################
+## Disallow in-tree builds
+if(${PROJECT_SOURCE_DIR} STREQUAL ${PROJECT_BINARY_DIR})
+    message(FATAL_ERROR "In-source builds not allowed. Please create a build directory and run CMake from there.")
+endif()
+
+######################################################################
+## Additional modules path for cmake
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+set (SITE_CONFIGS "${PROJECT_SOURCE_DIR}/cmake/sites")
 
-include(safeguards)
-include(Tools)
+set(SITE_PRESET "default" CACHE STRING "Site-specific environment to load")
+if ( NOT (${SITE_PRESET} STREQUAL "default") )
+    include("${SITE_CONFIGS}/Site${SITE_PRESET}.cmake")
+endif()
 
+######################################################################
+## Update submodules if necessary
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
-# Update submodules as needed
+    # Update submodules as needed
     option(GIT_SUBMODULE "Check submodules during build" ON)
     if(GIT_SUBMODULE)
         message(STATUS "Submodule update")
@@ -44,13 +72,7 @@ set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
 ######################################################################
 ## Solver wrappers
 add_subdirectory(contrib/solver_wrappers)
-if (HAVE_AGMG)
-    set(LINK_LIBS ${LINK_LIBS} AGMG)
-endif()
-
-if (HAVE_MUMPS)
-    set(LINK_LIBS ${LINK_LIBS} MUMPS)
-endif()
+set(LINK_LIBS ${LINK_LIBS} SOLVER_WRAPPERS)
 
 ######################################################################
 ## Helpers for compiler identification
@@ -95,19 +117,16 @@ endif()
 ######################################################################
 ## Package: LLNL Silo library support - To be made optional
 find_package(SILO REQUIRED)
-#if (SILO_FOUND)
-    include_directories("${SILO_INCLUDE_DIRS}")
-    set(LINK_LIBS ${LINK_LIBS} ${SILO_LIBRARIES})
-    set(HAVE_SILO TRUE)
-    add_definitions(-DHAVE_SILO)
-#endif()
+if (SILO_FOUND)
+    set(LINK_LIBS ${LINK_LIBS} SILO)
+endif()
 
 ######################################################################
 ## Package: HDF5 Support - To be made optional
-find_package(HDF5 REQUIRED)
-    include_directories(${HDF5_INCLUDE_DIRS})
-    set(LINK_LIBS ${LINK_LIBS} ${HDF5_LIBRARIES})
-    set(HAVE_HDF5 TRUE)
+find_package(HDF5)
+include_directories(${HDF5_INCLUDE_DIRS})
+set(LINK_LIBS ${LINK_LIBS} ${HDF5_LIBRARIES})
+set(HAVE_HDF5 TRUE)
 
 ######################################################################
 ## Package: Lua language support
@@ -116,48 +135,20 @@ include_directories("${LUA_INCLUDE_DIR}")
 set(LINK_LIBS ${LINK_LIBS} ${LUA_LIBRARIES})
 
 ######################################################################
-## Package: GMSH
-find_library(GMSH_LIB gmsh)
-find_path(GMSH_INC gmsh.h)
-if(GMSH_LIB AND GMSH_INC)
-    set(LINK_LIBS ${LINK_LIBS} ${GMSH_LIB})
-    include_directories(${GMSH_INC})
-    set(HAVE_GMSH TRUE)
-    add_definitions(-DHAVE_GMSH)
-    set(HAVE_GMSH TRUE)
-else()
-  set(GMSH_DIR "/opt/uliege/gmsh" CACHE PATH "GMSH install path")
-  if (DEFINED ENV{GMSH_DIR})
-    set (GMSH_DIR $ENV{GMSH_DIR})
-  endif()
-  if (GMSH_DIR STREQUAL "" OR NOT EXISTS ${GMSH_DIR})
-      message(STATUS "GMSH not found")
-      set(HAVE_GMSH FALSE)
-  else()
-      set(LINK_LIBS ${LINK_LIBS} gmsh)
-      include_directories(${GMSH_DIR}/include)
-      link_directories(${GMSH_DIR}/lib)
-      set(HAVE_GMSH TRUE)
-      add_definitions(-DHAVE_GMSH)
-      set(HAVE_GMSH TRUE)
-  endif()
+## Package: MGIS support
+find_package(MGIS)
+if (MGIS_FOUND)
+    set(LINK_LIBS ${LINK_LIBS} MGIS)
+    set(HAVE_MGIS TRUE)
+    add_definitions(-DHAVE_MGIS)
 endif()
 
 ######################################################################
-## Package: MGIS support
-find_package(MFrontGenericInterface)
-if (MFrontGenericInterface_FOUND)
-    message(STATUS "MGIS found")
-#    include_directories(${MGIS_INCLUDE_DIRS})
-    set(LINK_LIBS ${LINK_LIBS} mgis::MFrontGenericInterface)
-    set(HAVE_MGIS TRUE)
-    add_definitions(-DHAVE_MGIS)
-else()
-    message(STATUS "MGIS not found")
-    set(HAVE_MGIS FALSE)
+## Package: GMSH
+find_package(GMSH)
+if (GMSH_FOUND)
+    set(LINK_LIBS ${LINK_LIBS} GMSH)
 endif()
-
-
 
 ######################################################################
 ## Optimization: Prefer 512 bit vectors on certain architectures.
@@ -194,10 +185,6 @@ if (OPT_VECTORIZER_REMARKS)
     if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopt-info-vec-optimized")
     endif()
-
-    if (CMAKE_CXX_COMPILER_ID STREQUAL "PGI")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Minfo")
-    endif()
 endif()
 
 ######################################################################
@@ -207,10 +194,6 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -g -fpermissive -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASEASSERT "-O3 -march=native -g -fpermissive")
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-anon-enum-enum-conversion")
-
-
-
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 
 include_directories("${PROJECT_SOURCE_DIR}")
 

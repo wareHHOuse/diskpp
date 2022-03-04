@@ -15,3 +15,6 @@
 [submodule "contrib/eigen"]
 	path = contrib/eigen
 	url = https://gitlab.com/libeigen/eigen.git
+[submodule "contrib/sgr"]
+	path = contrib/sgr
+	url = https://github.com/datafl4sh/sgr

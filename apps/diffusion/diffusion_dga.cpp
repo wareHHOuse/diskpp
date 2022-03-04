@@ -165,7 +165,7 @@ int main(int argc, char **argv)
         for (size_t i = 0; i < 4; i++)
         {
             realsol(i) = sol_fun(pts[i]);
-            compsol(i) = sol(ptids[i]);
+            compsol(i) = sol( size_t(ptids[i]) );
         }
 
         auto diff = realsol - compsol;
