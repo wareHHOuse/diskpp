@@ -33,7 +33,7 @@ include(FindPackageHandleStandardArgs)
 set(MKL_HINTS /opt/intel /opt/intel/mkl /opt/intel/oneapi/mkl)
 
 find_path(MKL_INCLUDE_DIR
-	NAMES mkl.h
+    NAMES mkl.h
     HINTS ENV MKL_ROOT ${MKL_ROOT} ${MKL_HINTS}
     PATH_SUFFIXES mkl/include)
 
@@ -82,20 +82,18 @@ if (APPLE)
         NAMES   mkl_intel
         HINTS ENV MKL_ROOT ${MKL_ROOT} ${MKL_HINTS}
         PATH_SUFFIXES lib lib/intel64 lib/intel64_lin
-                      mkl/lib mkl/lib/intel64 mkl/lib/intel64_lin
-	)
+                      mkl/lib mkl/lib/intel64 mkl/lib/intel64_lin)
 else ()
     find_library(MKL_runtime_LIBRARY
         NAMES   mkl_rt
         HINTS ENV MKL_ROOT ${MKL_ROOT} ${MKL_HINTS}
         PATH_SUFFIXES lib lib/intel64 lib/intel64_lin
-                      mkl/lib mkl/lib/intel64 mkl/lib/intel64_lin
-	)
+                      mkl/lib mkl/lib/intel64 mkl/lib/intel64_lin)
 endif ()
 
-if (MKL_mkl_runtime_LIBRARY)
+if (MKL_runtime_LIBRARY)
     message(STATUS "MKL: found mkl_runtime")
-    list(APPEND MKL_LIBRARIES ${MKL_mkl_runtime_LIBRARY})
+    list(APPEND MKL_LIBRARIES ${MKL_runtime_LIBRARY})
 endif()
 
 
@@ -108,3 +106,4 @@ if (MKL_FOUND)
     target_compile_definitions(MKL INTERFACE -DHAVE_INTEL_MKL)
     target_compile_definitions(MKL INTERFACE -DHAVE_PARDISO)
 endif()
+
