@@ -108,10 +108,8 @@ endif()
 ## Package: Intel MKL support - To be made optional
 find_package(MKL REQUIRED)
 if (MKL_FOUND)
-  include_directories(${MKL_INCLUDE_DIRS})
-  set(LINK_LIBS ${LINK_LIBS} ${MKL_LIBRARIES})
+  set(LINK_LIBS ${LINK_LIBS} MKL)
   set(HAVE_INTEL_MKL TRUE)
-  add_definitions(-DHAVE_INTEL_MKL)
 endif()
 
 ######################################################################
