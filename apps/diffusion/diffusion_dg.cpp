@@ -38,16 +38,18 @@
 
 #include <map>
 
-#include "colormanip.h"
+#include "diskpp/common/colormanip.h"
 
-#include "geometry/geometry.hpp"
-#include "loaders/loader.hpp"
-#include "methods/hho"
-#include "methods/dg"
-#include "solvers/solver.hpp"
-#include "output/silo.hpp"
 
-#include "../tests/common.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/methods/dg"
+//#include "diskpp/solvers/solver.hpp"
+#include "diskpp/output/silo.hpp"
+
+#include "mumps.hpp"
+
+//#include "../tests/common.hpp"
 
 /***************************************************************************/
 /* RHS definition */
@@ -226,11 +228,8 @@ run_diffusion_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_t
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.syssz);
 
-    std::cout << "Running pardiso" << std::endl;
-    disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = true;
-    mkl_pardiso(pparams, assm.LHS, assm.RHS, sol);
-
+    std::cout << "Running MUMPS" << std::endl;
+    sol = mumps_ldlt(assm.LHS, assm.RHS);
 
     auto sol_fun = make_solution_function(msh);
 

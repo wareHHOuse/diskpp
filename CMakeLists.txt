@@ -66,13 +66,18 @@ endif()
 
 ######################################################################
 ## Eigen3
-add_subdirectory(contrib/eigen)
-set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
+#add_subdirectory(contrib/eigen)
+#set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
+
+######################################################################
+## ~jburkardt code
+#add_subdirectory(contrib/jburkardt)
+#set(LINK_LIBS ${LINK_LIBS} JBURKARDT)
 
 ######################################################################
 ## Solver wrappers
-add_subdirectory(contrib/solver_wrappers)
-set(LINK_LIBS ${LINK_LIBS} SOLVER_WRAPPERS)
+#add_subdirectory(contrib/solver_wrappers)
+#set(LINK_LIBS ${LINK_LIBS} SOLVER_WRAPPERS)
 
 ######################################################################
 ## Helpers for compiler identification
@@ -197,30 +202,31 @@ endif()
 
 ######################################################################
 ## Compiler settings: Settings for different build types
-set(CMAKE_CXX_FLAGS_DEBUG "-g -fsanitize=address -fpermissive")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -g -fpermissive -DNDEBUG")
-set(CMAKE_CXX_FLAGS_RELEASEASSERT "-O3 -march=native -g -fpermissive")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_DEBUGSANITIZED "-g -fsanitize=address")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASENATIVE "-O3 -DNDEBUG -march=native")
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-anon-enum-enum-conversion")
 
-include_directories("${PROJECT_SOURCE_DIR}")
+#include_directories("${PROJECT_SOURCE_DIR}")
 
-include_directories(core contrib)
+#include_directories(core contrib)
 
-SET(SOL2_BUILD_LUA OFF CACHE BOOL "Override sol2 build lua option")
-add_subdirectory(contrib/sol2)
-include_directories(contrib/sol2/include)
-include_directories(contrib/sol2/single)
+#SET(SOL2_BUILD_LUA OFF CACHE BOOL "Override sol2 build lua option")
+#add_subdirectory(contrib/sol2)
+#include_directories(contrib/sol2/include)
+#include_directories(contrib/sol2/single)
 
-add_subdirectory(contrib)
-add_subdirectory(core)
-add_subdirectory(utils)
-add_subdirectory(doc)
+#add_subdirectory(contrib)
+#add_subdirectory(doc)
 
-add_library(diskpp SHARED ${diskpp_source})
-set(LINK_LIBS "${LINK_LIBS}" diskpp)
-install(TARGETS diskpp LIBRARY DESTINATION lib)
+#add_library(diskpp SHARED ${diskpp_source})
+#set(LINK_LIBS "${LINK_LIBS}" diskpp)
+#install(TARGETS diskpp LIBRARY DESTINATION lib)
 
-install(DIRECTORY meshes DESTINATION share)
+#install(DIRECTORY meshes DESTINATION share)
 
+add_subdirectory(libdiskpp)
 add_subdirectory(apps)
