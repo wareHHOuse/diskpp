@@ -126,10 +126,10 @@ endif()
 
 ######################################################################
 ## Package: HDF5 Support - To be made optional
-find_package(HDF5)
-include_directories(${HDF5_INCLUDE_DIRS})
-set(LINK_LIBS ${LINK_LIBS} ${HDF5_LIBRARIES})
-set(HAVE_HDF5 TRUE)
+#find_package(HDF5)
+#include_directories(${HDF5_INCLUDE_DIRS})
+#set(LINK_LIBS ${LINK_LIBS} ${HDF5_LIBRARIES})
+#set(HAVE_HDF5 TRUE)
 
 ######################################################################
 ## Package: Lua language support
