@@ -342,6 +342,12 @@ quadrangle_quadrature(const size_t degree)
     return ret;
 }
 
+/* pqrst is there only to squelch -fpermissive
+ * GCC warnings. sorry for this. */
+
+template<typename T, size_t DIM>
+using pqrst = point<T,DIM>;
+
 /**
  * @brief This class represents a quadrature point, which is composed by the
  * coordinates and the weight
@@ -350,9 +356,9 @@ quadrangle_quadrature(const size_t degree)
  * @tparam DIM dimension of the point
  */
 template<typename T, size_t DIM>
-class quadrature_point : private std::pair<point<T,DIM>, T>
+class quadrature_point : private std::pair<pqrst<T,DIM>, T>
 {
-    typedef std::pair<point<T,DIM>, T> base_type;
+    typedef std::pair<pqrst<T,DIM>, T> base_type;
 
 public:
     /**
@@ -370,7 +376,7 @@ public:
      * @param p a point which represents the coordinates of the quadrature point
      * @param w weight assoicated to the point
      */
-    quadrature_point(const point<T, DIM>& p, const T& w)
+    quadrature_point(const pqrst<T, DIM>& p, const T& w)
         : base_type(p, w)
     {}
 
@@ -379,7 +385,7 @@ public:
      *
      * @return point<T, DIM> coordinate
      */
-    point<T, DIM>
+    pqrst<T, DIM>
     point() const
     { return this->first; }
 

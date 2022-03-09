@@ -31,15 +31,12 @@
 
 #include <map>
 
-#include "colormanip.h"
+#include "diskpp/mesh/mesh.hpp"
+#include "diskpp/geometry/geometry.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
 
-#include "geometry/geometry.hpp"
-#include "loaders/loader.hpp"
-#include "methods/hho"
-#include "solvers/solver.hpp"
-
-#include "../tests/common.hpp"
-
+#include "mumps.hpp"
 /***************************************************************************/
 /* RHS definition */
 template<typename Mesh>
@@ -244,9 +241,8 @@ run_hho_variable_diffusion_solver_RT(const Mesh& msh, const size_t degree, bool 
 
     vector_type sol = vector_type::Zero(systsz);
 
-    disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = false;
-    mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+    std::cout << "Running MUMPS" << std::endl;
+    sol = mumps_lu(assembler.LHS, assembler.RHS);
 
     T error = 0.0;
 
@@ -321,9 +317,8 @@ run_hho_variable_diffusion_solver(const Mesh& msh, const size_t degree, bool pri
 
     vector_type sol = vector_type::Zero(systsz);
 
-    disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = false;
-    mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+    std::cout << "Running MUMPS" << std::endl;
+    sol = mumps_lu(assembler.LHS, assembler.RHS);
 
     T error = 0.0;
 
@@ -551,13 +546,13 @@ main(int argc, char** argv)
     {
         if (use_RT)
         {
-            tester_simplicial<test_functor_RT> tstr;
-            tstr.run();
+            //tester_simplicial<test_functor_RT> tstr;
+            //tstr.run();
         }
         else
         {
-            tester<test_functor> tstr;
-            tstr.run();
+            //tester<test_functor> tstr;
+            //tstr.run();
         }
     }
 

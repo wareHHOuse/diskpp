@@ -6,12 +6,11 @@
 
 #include <map>
 
-#include "colormanip.h"
 
-#include "geometry/geometry.hpp"
-#include "loaders/loader.hpp"
-#include "methods/hho"
-#include "solvers/solver.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+
+#include "mumps.hpp"
 
 /***************************************************************************/
 /* RHS definition */
@@ -182,9 +181,8 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
     #endif
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
 
-    disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = false;
-    mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+    std::cout << "Running MUMPS" << std::endl;
+    sol = mumps_lu(assembler.LHS, assembler.RHS);
 
     T error = 0.0;
 

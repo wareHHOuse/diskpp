@@ -38,9 +38,6 @@
 
 #include <map>
 
-#include "diskpp/common/colormanip.h"
-
-
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/methods/dg"
@@ -226,7 +223,7 @@ run_diffusion_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_t
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.syssz);
 
     std::cout << "Running MUMPS" << std::endl;
-    sol = mumps_ldlt(assm.LHS, assm.RHS);
+    sol = mumps_lu(assm.LHS, assm.RHS);
 
     auto sol_fun = make_solution_function(msh);
 

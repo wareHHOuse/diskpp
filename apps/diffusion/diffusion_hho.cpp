@@ -6,13 +6,10 @@
 
 #include <map>
 
-#include "diskpp/common/colormanip.h"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
 
 #include "mumps.hpp"
-
-//#include "../tests/common.hpp"
 
 /***************************************************************************/
 /* RHS definition */
@@ -164,7 +161,7 @@ run_hho_diffusion_solver(const Mesh& msh, size_t degree, const bool statcond, co
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
 
     std::cout << "Running MUMPS" << std::endl;
-    sol = mumps_ldlt(assembler.LHS, assembler.RHS);
+    sol = mumps_lu(assembler.LHS, assembler.RHS);
 
     T error = 0.0;
 

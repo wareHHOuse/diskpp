@@ -30,15 +30,13 @@
 
 #include <unistd.h>
 
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
-#include "methods/hho"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/output/silo.hpp"
+#include "mumps.hpp"
 
-#include "core/loaders/loader.hpp"
+//#include "solvers/solver.hpp"
 
-#include "solvers/solver.hpp"
-
-#include "output/silo.hpp"
 
 
 template<typename Mesh>
@@ -286,9 +284,8 @@ public:
 
         vector_type sol_faces = vector_type::Zero(systsz);
 
-        disk::solvers::pardiso_params<scalar_type> pparams;
-        pparams.report_factorization_Mflops = false;
-        mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol_faces);
+        std::cout << "Running MUMPS" << std::endl;
+        sol_faces = mumps_lu(assembler.LHS, assembler.RHS);
 
         scalar_type error = 0.0;
 

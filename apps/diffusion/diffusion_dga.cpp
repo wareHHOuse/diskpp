@@ -133,7 +133,7 @@ int main(int argc, char **argv)
     std::cout << "Dofs: " << gA.rows() << std::endl;
 
     std::cout << "Running MUMPS" << std::endl;
-    gx = mumps_ldlt(gA, gb);
+    gx = mumps_lu(gA, gb);
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero( msh.points_size() );
 
