@@ -55,8 +55,8 @@
 
 #pragma once
 
-#include "mesh/mesh.hpp"
-#include "geometry/geometry.hpp"
+#include "diskpp/mesh/mesh.hpp"
+#include "diskpp/geometry/geometry.hpp"
 
 namespace disk {
 

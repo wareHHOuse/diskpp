@@ -23,9 +23,10 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-#include "methods/dga"
-#include "loaders/loader.hpp"
-#include "solvers/solver.hpp"
+#include "diskpp/methods/dga"
+#include "diskpp/loaders/loader.hpp"
+
+#include "mumps.hpp"
 
 int main(int argc, char **argv)
 {
@@ -131,9 +132,8 @@ int main(int argc, char **argv)
     std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
     std::cout << "Dofs: " << gA.rows() << std::endl;
 
-    disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = true;
-    mkl_pardiso(pparams, gA, gb, gx);
+    std::cout << "Running MUMPS" << std::endl;
+    gx = mumps_ldlt(gA, gb);
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero( msh.points_size() );
 
@@ -176,7 +176,7 @@ int main(int argc, char **argv)
         error += diff.dot(lapl*diff);
     }
 
-    std::cout << std::sqrt(error) << std::endl;
+    std::cout << "Error: " << std::sqrt(error) << std::endl;
 
     return 0;
 }

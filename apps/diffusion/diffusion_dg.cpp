@@ -44,12 +44,9 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/methods/dg"
-//#include "diskpp/solvers/solver.hpp"
 #include "diskpp/output/silo.hpp"
 
 #include "mumps.hpp"
-
-//#include "../tests/common.hpp"
 
 /***************************************************************************/
 /* RHS definition */
