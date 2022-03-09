@@ -110,8 +110,8 @@ if (COMPILER_IS_CLANG OR COMPILER_IS_INTEL OR COMPILER_IS_GNU)
 endif()
 
 ######################################################################
-## Package: Intel MKL support - To be made optional
-find_package(MKL REQUIRED)
+## Package: Intel MKL support
+find_package(MKL)
 if (MKL_FOUND)
   set(LINK_LIBS ${LINK_LIBS} MKL)
   set(HAVE_INTEL_MKL TRUE)
