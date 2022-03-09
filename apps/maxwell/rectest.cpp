@@ -7,13 +7,12 @@
 
 #include <unistd.h>
 
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
-#include "methods/hho"
-#include "methods/implementation_hho/curl.hpp"
-#include "core/loaders/loader.hpp"
-#include "output/silo.hpp"
-#include "solvers/solver.hpp"
+#include "diskpp/bases/bases.hpp"
+#include "diskpp/quadratures/quadratures.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/methods/implementation_hho/curl.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/output/silo.hpp"
 
 template<typename Mesh>
 void rectest(Mesh& msh, size_t order)
@@ -21,7 +20,8 @@ void rectest(Mesh& msh, size_t order)
     using T = typename Mesh::coordinate_type;
     using point_type = typename Mesh::point_type;
 
-    disk::hho_degree_info chdi( { .rd = (size_t) order+1,
+    disk::hho_degree_info chdi( disk::priv::hdi_named_args{
+                                  .rd = (size_t) order+1,
                                   .cd = (size_t) order,
                                   .fd = (size_t) order } );
 

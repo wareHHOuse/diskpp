@@ -90,8 +90,8 @@ target_link_libraries(test_curl_stabilization_nedelec ${LINK_LIBS})
 add_executable(test_conditionning_basis conditionning_basis.cpp)
 target_link_libraries(test_conditionning_basis ${LINK_LIBS})
 
-add_executable(test_conditionning test_conditionning.cpp)
-target_link_libraries(test_conditionning ${LINK_LIBS})
+#add_executable(test_conditionning test_conditionning.cpp)
+#target_link_libraries(test_conditionning ${LINK_LIBS})
 
 if(HAVE_GMSH)
     add_executable(test_gmsh_geometry_loader gmsh_geometry_loader.cpp)

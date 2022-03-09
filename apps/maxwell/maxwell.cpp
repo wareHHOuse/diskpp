@@ -17,19 +17,17 @@
 
 #include <unistd.h>
 
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
-#include "methods/hho"
-#include "methods/implementation_hho/curl.hpp"
-#include "core/loaders/loader.hpp"
-#include "output/silo.hpp"
-#include "solvers/solver.hpp"
-#include "solvers/mumps.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/methods/implementation_hho/curl.hpp"
+#include "diskpp/output/silo.hpp"
+
+#include "mumps.hpp"
 
 #include "compinfo.h"
 
-#include <Eigen/IterativeLinearSolvers>
-#include <unsupported/Eigen/IterativeSolvers>
+//#include <Eigen/IterativeLinearSolvers>
+//#include <unsupported/Eigen/IterativeSolvers>
 
 #include "paramloader.hpp"
 
@@ -548,6 +546,7 @@ public:
 
 #define USE_STATIC_CONDENSATION
 
+#if 0
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 computation_info<typename Mesh<T,2,Storage>::coordinate_type>
 vector_wave_solver(Mesh<T,2,Storage>& msh, size_t order,
@@ -614,10 +613,8 @@ vector_wave_solver(Mesh<T,2,Storage>& msh, size_t order,
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.syssz);
 
-    std::cout << "Running pardiso" << std::endl;
-    disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = true;
-    mkl_pardiso(pparams, assm.LHS, assm.RHS, sol);
+    std::cout << "Running MUMPS" << std::endl;
+    sol = mumps_lu(assm.LHS, assm.RHS);
 
 
     std::vector<T> data_uz;
@@ -781,11 +778,8 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.syssz);
 
-    std::cout << "Running pardiso" << std::endl;
-    disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = true;
-    pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
-    mkl_pardiso(pparams, assm.LHS, assm.RHS, sol);
+    std::cout << "Running MUMPS" << std::endl;
+    sol = mumps_lu(assm.LHS, assm.RHS);
 
     std::vector<T> data_ex, data_ey, data_ez;
     std::vector<T> data_hx, data_hy, data_hz;
@@ -884,7 +878,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
             .nonzeros = assm.LHS.nonZeros()
         });
 }
-
+#endif
 
 template<template<typename, size_t, typename> class Mesh, typename CoordT, typename Storage>
 void
@@ -910,9 +904,11 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, parameter_loader<Mesh<Co
 
     double wgz = lua["wgz"];
 
-    disk::hho_degree_info chdi( { .rd = (size_t) order,
+    disk::hho_degree_info chdi( disk::priv::hdi_named_args{
+                                  .rd = (size_t) order,
                                   .cd = (size_t) order,
-                                  .fd = (size_t) order } );
+                                  .fd = (size_t) order
+                                } );
 
     const auto fbs = disk::vector_basis_size(chdi.face_degree(),2, 2);
     const auto cbs = disk::vector_basis_size(chdi.cell_degree(), 3, 3);
@@ -1116,18 +1112,9 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, parameter_loader<Mesh<Co
 
     disk::dynamic_vector<scalar_type> sol = disk::dynamic_vector<scalar_type>::Zero(assm.syssz);
 
-    std::cout << "Running pardiso" << std::endl;
-    disk::solvers::pardiso_params<scalar_type> pparams;
-    pparams.report_factorization_Mflops = true;
-    //pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
-    mkl_pardiso(pparams, assm.LHS, assm.RHS, sol);
-
-    /*
     std::cout << "Running MUMPS" << std::endl;
-    mumps_solver<scalar_type> mumps;
-    sol = mumps.solve(assm.LHS, assm.RHS);
-    */
-  
+    sol = mumps_lu(assm.LHS, assm.RHS);
+
     std::vector<std::pair<scalar_type, int>> data_ex, data_ey, data_ez, data_diff, data_z;
     data_ex.resize(msh.points_size(), std::make_pair(0.0, 0));
     data_ey.resize(msh.points_size(), std::make_pair(0.0, 0));
@@ -1349,7 +1336,7 @@ vector_wave_solver_complex_driver(Mesh<CoordT,3,Storage>& msh, const std::string
         return;
 }
 
-
+#if 0
 template<typename Mesh>
 void maxwell_eigenvalue_solver(Mesh& msh, size_t order, const typename Mesh::coordinate_type& alpha)
 {
@@ -1442,6 +1429,7 @@ void maxwell_eigenvalue_solver(Mesh& msh, size_t order, const typename Mesh::coo
     }
     
 }
+#endif
 
 #if 0
 void autotest_alpha(size_t order)
@@ -1485,6 +1473,7 @@ void autotest_alpha(size_t order)
 }
 #endif
 
+#if 0
 void autotest_convergence(size_t order_min, size_t order_max)
 {
     using T = double;
@@ -1531,6 +1520,7 @@ int main2(void)
     //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
     autotest(3);
 }
+#endif
 
 int main(int argc, char **argv)
 {
@@ -1570,9 +1560,9 @@ int main(int argc, char **argv)
                 mesh_filename = optarg;
                 break;
 
-            case 'A':
-                autotest(degree);
-                return 0;
+            //case 'A':
+            //    autotest(degree);
+            //    return 0;
 
             case 'w':
                 omega = M_PI*std::stod(optarg);

@@ -7,21 +7,9 @@
 
 #include <unistd.h>
 
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
-#include "methods/hho"
-#include "methods/implementation_hho/curl.hpp"
-#include "core/loaders/loader.hpp"
-#include "output/silo.hpp"
-#include "solvers/solver.hpp"
-#include "solvers/mumps.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/output/silo.hpp"
 
-#include "compinfo.h"
-
-#include <Eigen/IterativeLinearSolvers>
-#include <unsupported/Eigen/IterativeSolvers>
-
-#include "paramloader.hpp"
 
 
 int main(int argc, const char *argv[])

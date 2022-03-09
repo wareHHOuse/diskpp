@@ -22,14 +22,12 @@
 
 #include <unistd.h>
 
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
-#include "methods/hho"
-#include "methods/implementation_hho/curl.hpp"
-#include "core/loaders/loader.hpp"
-#include "output/silo.hpp"
-#include "solvers/solver.hpp"
-#include "solvers/mumps.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/output/silo.hpp"
+
+#include "sol/sol.hpp"
+#include "mumps.hpp"
 
 template<typename Mesh>
 std::set<size_t>
@@ -589,12 +587,9 @@ void test(Mesh& msh, size_t degree)
     //disk::dump_sparse_matrix(LHS, "trmat.txt");
 
     /* Run solver */
-    std::cout << "Running pardiso" << std::endl;
-    disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = true;
-    pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
+    std::cout << "Running MUMPS" << std::endl;
     disk::dynamic_vector<T> sol;
-    mkl_pardiso(pparams, LHS, RHS, sol);
+    sol = mumps_lu(LHS, RHS);
 
     /* Postprocess */
     T l2_error_sq = 0.0;

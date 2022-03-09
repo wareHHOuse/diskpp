@@ -17,15 +17,12 @@
 
 #include <unistd.h>
 
-#include "mumps_new.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/methods/implementation_hho/curl.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/output/silo.hpp"
 
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
-#include "methods/hho"
-#include "methods/implementation_hho/curl.hpp"
-#include "core/loaders/loader.hpp"
-#include "output/silo.hpp"
-#include "solvers/solver.hpp"
+#include "mumps.hpp"
 
 
 template<typename Mesh, typename ScalT = typename Mesh::coordinate_type>
@@ -320,7 +317,8 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type      point_type;
     
-    disk::hho_degree_info chdi( { .rd = (size_t) order,
+    disk::hho_degree_info chdi( disk::priv::hdi_named_args {
+                                  .rd = (size_t) order,
                                   .cd = (size_t) order,
                                   .fd = (size_t) order } );
 

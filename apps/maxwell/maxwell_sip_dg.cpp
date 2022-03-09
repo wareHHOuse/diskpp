@@ -17,30 +17,28 @@
 
 #include <unistd.h>
 
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
-#include "loaders/loader.hpp"
-#include "output/silo.hpp"
-#include "solvers/solver.hpp"
-#include "solvers/mumps.hpp"
-#include "methods/dg"
+#include "diskpp/bases/bases.hpp"
+#include "diskpp/mesh/mesh.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/output/silo.hpp"
+#include "diskpp/methods/dg"
+
+#include "mumps.hpp"
 
 #include "compinfo.h"
 
-#include <Eigen/IterativeLinearSolvers>
-#include <unsupported/Eigen/IterativeSolvers>
-
 #include "paramloader.hpp"
 
+using namespace Eigen;
 namespace disk {
 
 /* Temporarly copied from curl.hpp */
 template<typename T, typename U>
-Matrix<T, Dynamic, 3>
-vcross(const static_vector<U, 3>& normal, const Matrix<T, Dynamic, 3>& field)
+Eigen::Matrix<T, Dynamic, 3>
+vcross(const static_vector<U, 3>& normal, const Eigen::Matrix<T, Eigen::Dynamic, 3>& field)
 {
-    Matrix<T, Dynamic, 3>   ret;
-    ret = Matrix<T, Dynamic, 3>::Zero(field.rows(), field.cols());
+    Eigen::Matrix<T, Eigen::Dynamic, 3>   ret;
+    ret = Eigen::Matrix<T, Eigen::Dynamic, 3>::Zero(field.rows(), field.cols());
 
     for (size_t i = 0; i < field.rows(); i++)
     {
@@ -59,11 +57,11 @@ vcross(const static_vector<U, 3>& normal, const Matrix<T, Dynamic, 3>& field)
 }
 
 template<typename T, typename U>
-Matrix<T, Dynamic, 3>
-vcross(const Matrix<T, Dynamic, 3>& field, const static_vector<U, 3>& normal)
+Eigen::Matrix<T, Eigen::Dynamic, 3>
+vcross(const Eigen::Matrix<T, Eigen::Dynamic, 3>& field, const static_vector<U, 3>& normal)
 {
-    Matrix<T, Dynamic, 3>   ret;
-    ret = Matrix<T, Dynamic, 3>::Zero(field.rows(), field.cols());
+    Eigen::Matrix<T, Eigen::Dynamic, 3>   ret;
+    ret = Eigen::Matrix<T, Eigen::Dynamic, 3>::Zero(field.rows(), field.cols());
 
     for (size_t i = 0; i < field.rows(); i++)
     {
@@ -112,9 +110,9 @@ struct rhs_functor< Mesh<T, 3, Storage> >
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
-    Matrix<T,3,1> operator()(const point_type& pt) const
+    Eigen::Matrix<T,3,1> operator()(const point_type& pt) const
     {
-        Matrix<T, 3, 1> ret;
+        Eigen::Matrix<T, 3, 1> ret;
         //ret(0) = M_PI * M_PI * std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::sin(M_PI*pt.z());
         //ret(1) = M_PI * M_PI * std::cos(M_PI*pt.x())*std::cos(M_PI*pt.y())*std::sin(M_PI*pt.z());
         //ret(2) = M_PI * M_PI * std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::cos(M_PI*pt.z());
@@ -160,9 +158,9 @@ struct solution_functor< Mesh<T, 3, Storage> >
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
-    Matrix<T,3,1> operator()(const point_type& pt) const
+    Eigen::Matrix<T,3,1> operator()(const point_type& pt) const
     {
-        Matrix<T, 3, 1> ret;
+        Eigen::Matrix<T, 3, 1> ret;
         ret(0) = std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*std::sin(M_PI*pt.z());
         ret(1) = 0.0;
         ret(2) = 0.0;
@@ -325,8 +323,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
     */
     ///*
     std::cout << "Running MUMPS" << std::endl;
-    mumps_solver<scalar_type> mumps;
-    sol = mumps.solve(assm.LHS, assm.RHS);
+    sol = mumps_lu(assm.LHS, assm.RHS);
     //*
 
     std::vector<std::pair<scalar_type, int>> data_ex, data_ey, data_ez, data_diff;
@@ -578,7 +575,7 @@ run_maxwell_eigenvalue_solver(Mesh& msh, size_t degree, const typename Mesh::coo
 
     assm.finalize();
 
-
+    #if 0
     disk::feast_eigensolver_params<T> fep;
 
     fep.verbose = true;
@@ -646,6 +643,7 @@ run_maxwell_eigenvalue_solver(Mesh& msh, size_t degree, const typename Mesh::coo
         std::cout << std::setprecision(8) << dg_eigvals(i) << " -> ";
         std::cout << std::sqrt( dg_eigvals(i) ) << std::endl;
     }
+    #endif
 }
 
 #if 0

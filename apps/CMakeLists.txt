@@ -12,3 +12,13 @@ option(BUILD_APP_DISKPP_TESTS "Build DiSk++ tests" ON)
 if (BUILD_APP_DISKPP_TESTS)
     add_subdirectory(tests)
 endif()
+
+option(BUILD_APP_MAXWELL "Build Maxwell application" ON)
+if (BUILD_APP_MAXWELL)
+    add_subdirectory(maxwell)
+endif()
+
+option(BUILD_APP_TRANSMISSION "Build transmission applications" ON)
+if (BUILD_APP_TRANSMISSION)
+    add_subdirectory(transmission)
+endif()

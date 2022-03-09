@@ -10,8 +10,7 @@
 
 #pragma once
 
-#include <Eigen/Sparse>
-#include <Eigen/Dense>
+#include "diskpp/common/eigen.hpp"
 
 namespace disk {
 
@@ -26,13 +25,13 @@ class discontinuous_galerkin_assembler
     using scal_type = ScalT;
     using matrix_type = Eigen::Matrix<scal_type, Eigen::Dynamic, Eigen::Dynamic>;
     using vector_type = Eigen::Matrix<scal_type, Eigen::Dynamic, 1>;
-    using triplet_type = Triplet<scal_type>;
+    using triplet_type = Eigen::Triplet<scal_type>;
 
     std::vector<triplet_type> triplets;
 
 public:
-    SparseMatrix<scal_type>         LHS;
-    Matrix<scal_type, Dynamic, 1>   RHS;
+    Eigen::SparseMatrix<scal_type>         LHS;
+    Eigen::Matrix<scal_type, Eigen::Dynamic, 1>   RHS;
 
     size_t                  syssz;
 
@@ -41,8 +40,8 @@ public:
         cbs = pcbs;
         syssz = cbs * msh.cells_size();
 
-        LHS = SparseMatrix<scal_type>(syssz, syssz);
-        RHS = Matrix<scal_type, Dynamic, 1>::Zero(syssz);
+        LHS = Eigen::SparseMatrix<scal_type>(syssz, syssz);
+        RHS = Eigen::Matrix<scal_type, Eigen::Dynamic, 1>::Zero(syssz);
     }
 
     void
@@ -95,15 +94,15 @@ class discontinuous_galerkin_eigenvalue_assembler
     using scal_type = typename mesh_type::coordinate_type;
     using matrix_type = Eigen::Matrix<scal_type, Eigen::Dynamic, Eigen::Dynamic>;
     using vector_type = Eigen::Matrix<scal_type, Eigen::Dynamic, 1>;
-    using triplet_type = Triplet<scal_type>;
+    using triplet_type = Eigen::Triplet<scal_type>;
     using T = scal_type;
 
     std::vector<triplet_type> triplets_gK;
     std::vector<triplet_type> triplets_gM;
 
 public:
-    SparseMatrix<T>         gK;
-    SparseMatrix<T>         gM;
+    Eigen::SparseMatrix<T>         gK;
+    Eigen::SparseMatrix<T>         gM;
 
     size_t                  syssz;
 
@@ -112,8 +111,8 @@ public:
         cbs = pcbs;
         syssz = cbs * msh.cells_size();
 
-        gK = SparseMatrix<T>(syssz, syssz);
-        gM = SparseMatrix<T>(syssz, syssz);
+        gK = Eigen::SparseMatrix<T>(syssz, syssz);
+        gM = Eigen::SparseMatrix<T>(syssz, syssz);
     }
 
     void
