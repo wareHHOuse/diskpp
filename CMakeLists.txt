@@ -214,8 +214,10 @@ set(CMAKE_CXX_FLAGS_RELEASENATIVE "-O3 -DNDEBUG -march=native")
 
 #include_directories(core contrib)
 
-#SET(SOL2_BUILD_LUA OFF CACHE BOOL "Override sol2 build lua option")
-#add_subdirectory(contrib/sol2)
+SET(SOL2_BUILD_LUA OFF CACHE BOOL "Override sol2 build lua option")
+add_subdirectory(contrib/sol2)
+set(LINK_LIBS ${LINK_LIBS} sol2::sol2)
+
 #include_directories(contrib/sol2/include)
 #include_directories(contrib/sol2/single)
 
@@ -230,3 +232,20 @@ set(CMAKE_CXX_FLAGS_RELEASENATIVE "-O3 -DNDEBUG -march=native")
 
 add_subdirectory(libdiskpp)
 add_subdirectory(apps)
+
+##
+## Packaging
+##
+set(CPACK_PACKAGE_NAME "diskpp")
+set(CPACK_PACKAGE_VENDOR "The DiSk++ team")
+set(CPACK_PACKAGE_CONTACT "Matteo Cicuttin <datafl4sh@toxicnet.eu>")
+set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+#set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+#set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+
+set(CPACK_DEBIAN_PACKAGE_SECTION "science")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6,libgcc1,libstdc++6")
+
+include(CPack)

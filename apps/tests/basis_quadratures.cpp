@@ -23,25 +23,18 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
+#include <xmmintrin.h>
 
-#include <iostream>
-#include <iomanip>
-#include <regex>
-
-#include <unistd.h>
-
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
-#include "methods/hho"
-
-#include "core/loaders/loader.hpp"
+#include "diskpp/bases/bases.hpp"
+#include "diskpp/quadratures/quadratures.hpp"
+#include "diskpp/methods/hho"
 
 #include "common.hpp"
-
 
 template<typename Mesh>
 struct test_functor
 {
+    /* Expect k+1 convergence on the cells and k+0.5 on the faces. */
     typename Mesh::coordinate_type
     operator()(const Mesh& msh, size_t degree) const
     {
@@ -51,38 +44,31 @@ struct test_functor
         typedef typename mesh_type::coordinate_type scalar_type;
         typedef typename mesh_type::point_type  point_type;
 
-        typedef Matrix<scalar_type, Mesh::dimension, 1> ret_type;
-        typedef Matrix<scalar_type, Dynamic, 1>         vector_type;
 
-        auto f = make_vector_testing_data(msh);
-
-        typename disk::hho_degree_info hdi(degree);
-
-        const auto DIM = mesh_type::dimension;
+        auto f = make_scalar_testing_data(msh);
 
         scalar_type error = 0.0;
-        for (auto& cl : msh)
+
+        for (auto itor = msh.cells_begin(); itor != msh.cells_end(); itor++)
         {
-            vector_type proj = disk::project_function(msh, cl, hdi, f, 2);
-            auto gr = disk::make_vector_hho_symmetric_laplacian(msh, cl, hdi);
+            auto cl = *itor;
+            auto basis = disk::make_scalar_monomial_basis(msh, cl, degree);
 
-            size_t rec_size = disk::vector_basis_size(hdi.reconstruction_degree(), Mesh::dimension, Mesh::dimension);
+            Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, degree, f);
 
-            vector_type reconstr = vector_type::Zero(rec_size);
-            reconstr.tail(rec_size-DIM) = gr.first * proj;
-            reconstr.head(DIM) = proj.head(DIM);
+            auto qps = disk::integrate(msh, cl, 2*degree+2);
+            for (auto& qp : qps)
+            {
+                auto tv = f(qp.point());
 
-            auto cb = disk::make_vector_monomial_basis(msh, cl, hdi.reconstruction_degree());
-            Matrix<scalar_type, Dynamic, Dynamic> mass = disk::make_mass_matrix(msh, cl, cb);
-            vector_type rhs = disk::make_rhs(msh, cl, cb, f);
-            vector_type exp_reconstr = mass.llt().solve(rhs);
+                auto phi = basis.eval_functions(qp.point());
+                auto pv = proj.dot(phi);
 
-            vector_type diff = reconstr - exp_reconstr;
-
-            error += diff.dot(mass*diff);
+                error += qp.weight() * (tv - pv) * (tv - pv);
+            }
         }
 
-        return std::sqrt(error);
+        return std::sqrt( error );
     }
 
     size_t

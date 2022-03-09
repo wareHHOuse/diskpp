@@ -26,10 +26,14 @@
 #pragma once
 
 #include <iomanip>
+#include <cstdio>
 
-#include "core/loaders/loader.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/common/colormanip.h"
+
 #include "sol/sol.hpp"
-#include "contrib/colormanip.h"
+
+#define MESH_PATH_ENV_VAR_NAME "DISKPP_MESH_PATH"
 
 const size_t MIN_TEST_DEGREE = 0;
 const size_t MAX_TEST_DEGREE = 3;
@@ -227,12 +231,18 @@ template<typename T>
 std::vector< disk::generic_mesh<T, 2> >
 get_triangle_generic_meshes(void)
 {
+    std::string mesh_path;
+
+    const char *mesh_path_env = getenv(MESH_PATH_ENV_VAR_NAME);
+    if (mesh_path_env != nullptr)
+        mesh_path = mesh_path_env;
+
 	std::vector<std::string> meshfiles;
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_1.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_2.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_3.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_4.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_5.typ1");
+    meshfiles.push_back(mesh_path + "2D_triangles/fvca5/mesh1_1.typ1");
+    meshfiles.push_back(mesh_path + "2D_triangles/fvca5/mesh1_2.typ1");
+    meshfiles.push_back(mesh_path + "2D_triangles/fvca5/mesh1_3.typ1");
+    meshfiles.push_back(mesh_path + "2D_triangles/fvca5/mesh1_4.typ1");
+    meshfiles.push_back(mesh_path + "2D_triangles/fvca5/mesh1_5.typ1");
 
     typedef disk::generic_mesh<T, 2>  mesh_type;
 
@@ -245,7 +255,8 @@ get_triangle_generic_meshes(void)
         if (!loader.read_mesh(meshfiles.at(i)))
         {
             std::cout << "Problem loading mesh." << std::endl;
-            continue;
+            ret.clear();
+            return ret;
         }
         loader.populate_mesh(msh);
 
@@ -259,12 +270,18 @@ template<typename T>
 std::vector< disk::generic_mesh<T, 2> >
 get_polygonal_generic_meshes(void)
 {
+    std::string mesh_path;
+
+    const char *mesh_path_env = getenv(MESH_PATH_ENV_VAR_NAME);
+    if (mesh_path_env != nullptr)
+        mesh_path = mesh_path_env;
+
 	std::vector<std::string> meshfiles;
-    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_1.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_2.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_3.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_4.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_5.typ1");
+    meshfiles.push_back(mesh_path + "2D_hex/fvca5/hexagonal_1.typ1");
+    meshfiles.push_back(mesh_path + "2D_hex/fvca5/hexagonal_2.typ1");
+    meshfiles.push_back(mesh_path + "2D_hex/fvca5/hexagonal_3.typ1");
+    meshfiles.push_back(mesh_path + "2D_hex/fvca5/hexagonal_4.typ1");
+    meshfiles.push_back(mesh_path + "2D_hex/fvca5/hexagonal_5.typ1");
 
     typedef disk::generic_mesh<T, 2>  mesh_type;
 
@@ -277,7 +294,8 @@ get_polygonal_generic_meshes(void)
         if (!loader.read_mesh(meshfiles.at(i)))
         {
             std::cout << "Problem loading mesh." << std::endl;
-            continue;
+            ret.clear();
+            return ret;
         }
         loader.populate_mesh(msh);
 
@@ -291,12 +309,18 @@ template<typename T>
 std::vector< disk::simplicial_mesh<T, 2> >
 get_triangle_netgen_meshes(void)
 {
+    std::string mesh_path;
+
+    const char *mesh_path_env = getenv(MESH_PATH_ENV_VAR_NAME);
+    if (mesh_path_env != nullptr)
+        mesh_path = mesh_path_env;
+
 	std::vector<std::string> meshfiles;
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri01.mesh2d");
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri02.mesh2d");
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri03.mesh2d");
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri04.mesh2d");
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/netgen/tri05.mesh2d");
+    meshfiles.push_back(mesh_path + "2D_triangles/netgen/tri01.mesh2d");
+    meshfiles.push_back(mesh_path + "2D_triangles/netgen/tri02.mesh2d");
+    meshfiles.push_back(mesh_path + "2D_triangles/netgen/tri03.mesh2d");
+    meshfiles.push_back(mesh_path + "2D_triangles/netgen/tri04.mesh2d");
+    meshfiles.push_back(mesh_path + "2D_triangles/netgen/tri05.mesh2d");
 
 
     typedef disk::simplicial_mesh<T, 2>  mesh_type;
@@ -310,7 +334,8 @@ get_triangle_netgen_meshes(void)
         if (!loader.read_mesh(meshfiles.at(i)))
         {
             std::cout << "Problem loading mesh." << std::endl;
-            continue;
+            ret.clear();
+            return ret;
         }
         loader.populate_mesh(msh);
 
@@ -324,12 +349,18 @@ template<typename T>
 std::vector< disk::simplicial_mesh<T, 3> >
 get_tetrahedra_netgen_meshes(void)
 {
+    std::string mesh_path;
+
+    const char *mesh_path_env = getenv(MESH_PATH_ENV_VAR_NAME);
+    if (mesh_path_env != nullptr)
+        mesh_path = mesh_path_env;
+
     std::vector<std::string> meshfiles;
-    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/cube1.mesh");
-    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/cube2.mesh");
-    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/cube3.mesh");
-    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/cube4.mesh");
-    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/netgen/cube5.mesh");
+    meshfiles.push_back(mesh_path + "3D_tetras/netgen/cube1.mesh");
+    meshfiles.push_back(mesh_path + "3D_tetras/netgen/cube2.mesh");
+    meshfiles.push_back(mesh_path + "3D_tetras/netgen/cube3.mesh");
+    meshfiles.push_back(mesh_path + "3D_tetras/netgen/cube4.mesh");
+    meshfiles.push_back(mesh_path + "3D_tetras/netgen/cube5.mesh");
 
 
     typedef disk::simplicial_mesh<T, 3>  mesh_type;
@@ -343,7 +374,8 @@ get_tetrahedra_netgen_meshes(void)
         if (!loader.read_mesh(meshfiles.at(i)))
         {
             std::cout << "Problem loading mesh." << std::endl;
-            continue;
+            ret.clear();
+            return ret;
         }
         loader.populate_mesh(msh);
 
@@ -357,12 +389,18 @@ template<typename T>
 std::vector< disk::cartesian_mesh<T, 3> >
 get_cartesian_3d_diskpp_meshes(void)
 {
+    std::string mesh_path;
+
+    const char *mesh_path_env = getenv(MESH_PATH_ENV_VAR_NAME);
+    if (mesh_path_env != nullptr)
+        mesh_path = mesh_path_env;
+
     std::vector<std::string> meshfiles;
-    meshfiles.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-2-2-2.hex");
-    meshfiles.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-4-4-4.hex");
-    meshfiles.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-8-8-8.hex");
-    meshfiles.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-16-16-16.hex");
-    meshfiles.push_back("../../../diskpp/meshes/3D_hexa/diskpp/testmesh-32-32-32.hex");
+    meshfiles.push_back(mesh_path + "3D_hexa/diskpp/testmesh-2-2-2.hex");
+    meshfiles.push_back(mesh_path + "3D_hexa/diskpp/testmesh-4-4-4.hex");
+    meshfiles.push_back(mesh_path + "3D_hexa/diskpp/testmesh-8-8-8.hex");
+    meshfiles.push_back(mesh_path + "3D_hexa/diskpp/testmesh-16-16-16.hex");
+    meshfiles.push_back(mesh_path + "3D_hexa/diskpp/testmesh-32-32-32.hex");
 
     typedef disk::cartesian_mesh<T, 3>  mesh_type;
 
@@ -375,7 +413,8 @@ get_cartesian_3d_diskpp_meshes(void)
         if (!loader.read_mesh(meshfiles.at(i)))
         {
             std::cout << "Problem loading mesh." << std::endl;
-            continue;
+            ret.clear();
+            return ret;
         }
         loader.populate_mesh(msh);
 
@@ -389,11 +428,17 @@ template<typename T>
 std::vector< disk::generic_mesh<T, 3> >
 get_generic_fvca6_meshes(void)
 {
+    std::string mesh_path;
+
+    const char *mesh_path_env = getenv(MESH_PATH_ENV_VAR_NAME);
+    if (mesh_path_env != nullptr)
+        mesh_path = mesh_path_env;
+
     std::vector<std::string> meshfiles;
-    meshfiles.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_10.msh");
-    meshfiles.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_20.msh");
-    meshfiles.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_30.msh");
-    meshfiles.push_back("../../../diskpp/meshes/3D_general/fvca6/dbls_40.msh");
+    meshfiles.push_back(mesh_path + "3D_general/fvca6/dbls_10.msh");
+    meshfiles.push_back(mesh_path + "3D_general/fvca6/dbls_20.msh");
+    meshfiles.push_back(mesh_path + "3D_general/fvca6/dbls_30.msh");
+    meshfiles.push_back(mesh_path + "3D_general/fvca6/dbls_40.msh");
 
     typedef disk::generic_mesh<T, 3>  mesh_type;
 
@@ -406,7 +451,8 @@ get_generic_fvca6_meshes(void)
         if (!loader.read_mesh(meshfiles.at(i)))
         {
             std::cout << "Problem loading mesh." << std::endl;
-            continue;
+            ret.clear();
+            return ret;
         }
         loader.populate_mesh(msh);
 
@@ -420,11 +466,17 @@ template<typename T>
 std::vector<disk::generic_mesh<T, 3>>
 get_tetrahedra_fvca6_meshes(void)
 {
+    std::string mesh_path;
+
+    const char *mesh_path_env = getenv(MESH_PATH_ENV_VAR_NAME);
+    if (mesh_path_env != nullptr)
+        mesh_path = mesh_path_env;
+
     std::vector<std::string> meshfiles;
-    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.0.msh");
-    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.1.msh");
-    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.2.msh");
-    meshfiles.push_back("../../../diskpp/meshes/3D_tetras/fvca6/tet.3.msh");
+    meshfiles.push_back(mesh_path + "3D_tetras/fvca6/tet.0.msh");
+    meshfiles.push_back(mesh_path + "3D_tetras/fvca6/tet.1.msh");
+    meshfiles.push_back(mesh_path + "3D_tetras/fvca6/tet.2.msh");
+    meshfiles.push_back(mesh_path + "3D_tetras/fvca6/tet.3.msh");
 
     typedef disk::generic_mesh<T, 3> mesh_type;
 
@@ -437,7 +489,8 @@ get_tetrahedra_fvca6_meshes(void)
         if (!loader.read_mesh(meshfiles.at(i)))
         {
             std::cout << "Problem loading mesh." << std::endl;
-            continue;
+            ret.clear();
+            return ret;
         }
         loader.populate_mesh(msh);
 
@@ -451,12 +504,18 @@ template<typename T>
 std::vector< disk::generic_mesh<T, 2> >
 get_quad_generic_meshes(void)
 {
+    std::string mesh_path;
+
+    const char *mesh_path_env = getenv(MESH_PATH_ENV_VAR_NAME);
+    if (mesh_path_env != nullptr)
+        mesh_path = mesh_path_env;
+
 	std::vector<std::string> meshfiles;
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_1.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_2.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_3.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
+    meshfiles.push_back(mesh_path + "2D_quads/fvca5/mesh2_1.typ1");
+    meshfiles.push_back(mesh_path + "2D_quads/fvca5/mesh2_2.typ1");
+    meshfiles.push_back(mesh_path + "2D_quads/fvca5/mesh2_3.typ1");
+    meshfiles.push_back(mesh_path + "2D_quads/fvca5/mesh2_4.typ1");
+    meshfiles.push_back(mesh_path + "2D_quads/fvca5/mesh2_5.typ1");
 
     typedef disk::generic_mesh<T, 2>  mesh_type;
 
@@ -469,7 +528,8 @@ get_quad_generic_meshes(void)
         if (!loader.read_mesh(meshfiles.at(i)))
         {
             std::cout << "Problem loading mesh." << std::endl;
-            continue;
+            ret.clear();
+            return ret;
         }
         loader.populate_mesh(msh);
 
@@ -495,13 +555,19 @@ template<typename T>
 std::vector< disk::cartesian_mesh<T, 2> >
 get_cartesian_2d_diskpp_meshes(void)
 {
+    std::string mesh_path;
+
+    const char *mesh_path_env = getenv(MESH_PATH_ENV_VAR_NAME);
+    if (mesh_path_env != nullptr)
+        mesh_path = mesh_path_env;
+
     std::vector<std::string> meshfiles;
-    //meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-2-2.quad");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-4-4.quad");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-8-8.quad");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-16-16.quad");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-32-32.quad");
-    meshfiles.push_back("../../../diskpp/meshes/2D_quads/diskpp/testmesh-64-64.quad");
+    //meshfiles.push_back("2D_quads/diskpp/testmesh-2-2.quad");
+    meshfiles.push_back(mesh_path + "2D_quads/diskpp/testmesh-4-4.quad");
+    meshfiles.push_back(mesh_path + "2D_quads/diskpp/testmesh-8-8.quad");
+    meshfiles.push_back(mesh_path + "2D_quads/diskpp/testmesh-16-16.quad");
+    meshfiles.push_back(mesh_path + "2D_quads/diskpp/testmesh-32-32.quad");
+    meshfiles.push_back(mesh_path + "2D_quads/diskpp/testmesh-64-64.quad");
 
     typedef disk::cartesian_mesh<T, 2>  mesh_type;
 
@@ -514,7 +580,8 @@ get_cartesian_2d_diskpp_meshes(void)
         if (!loader.read_mesh(meshfiles.at(i)))
         {
             std::cout << "Problem loading mesh." << std::endl;
-            continue;
+            ret.clear();
+            return ret;
         }
         loader.populate_mesh(msh);
 
@@ -527,9 +594,10 @@ get_cartesian_2d_diskpp_meshes(void)
 template<typename Mesh, typename Function>
 void
 do_testing(std::vector<Mesh>& meshes, const Function& run_test,
-           const std::function<size_t(size_t)>& expected_rate,
-           size_t min_test_degree = MIN_TEST_DEGREE,
-           size_t max_test_degree = MAX_TEST_DEGREE)
+           const std::function<double(size_t)>& expected_rate,
+           size_t min_test_degree,
+           size_t max_test_degree,
+           double rate_tolerance)
 {
 	using T = typename Mesh::coordinate_type;
 
@@ -566,9 +634,9 @@ do_testing(std::vector<Mesh>& meshes, const Function& run_test,
                 std::cout << std::scientific << std::setprecision(5) << l2_errors.at(i) << "    ";
                 std::cout << std::defaultfloat << std::setprecision(3) << rate << "    ";
 
-                if ( rate < expected_rate(k)-0.5 )
+                if ( rate < expected_rate(k)-rate_tolerance )
                     std::cout << "[" << red << "FAIL" << nocolor << "]";
-                else if ( rate > expected_rate(k)+0.5 )
+                else if ( rate > expected_rate(k)+rate_tolerance )
                     std::cout << "[" << yellow << "FAIL" << nocolor << "]";
                 else
                     std::cout << "[" << green << " OK " << nocolor << "]";
@@ -578,6 +646,7 @@ do_testing(std::vector<Mesh>& meshes, const Function& run_test,
         }
     }
 }
+
 
 template< template<typename> class TestFunctor >
 class tester
@@ -590,7 +659,7 @@ class tester
     }
 
     void
-    test_triangles_generic(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
+    test_triangles_generic(size_t min_degree, size_t max_degree, double rate_tolerance)
     {
         std::cout << yellow << "Mesh under test: triangles on generic mesh";
         std::cout << nocolor << std::endl;
@@ -599,11 +668,11 @@ class tester
         auto meshes = get_triangle_generic_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er, min_degree, max_degree);
+        do_testing(meshes, tf, er, min_degree, max_degree, rate_tolerance);
     }
 
     void
-    test_polygonal_generic(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
+    test_polygonal_generic(size_t min_degree, size_t max_degree, double rate_tolerance)
     {
         std::cout << yellow << "Mesh under test: polygons on generic mesh";
         std::cout << nocolor << std::endl;
@@ -612,11 +681,11 @@ class tester
         auto meshes = get_polygonal_generic_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er, min_degree, max_degree);
+        do_testing(meshes, tf, er, min_degree, max_degree, rate_tolerance);
     }
 
     void
-    test_triangles_netgen(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
+    test_triangles_netgen(size_t min_degree, size_t max_degree, double rate_tolerance)
     {
         std::cout << yellow << "Mesh under test: triangles on netgen mesh";
         std::cout << nocolor << std::endl;
@@ -625,11 +694,11 @@ class tester
         auto meshes = get_triangle_netgen_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er, min_degree, max_degree);
+        do_testing(meshes, tf, er, min_degree, max_degree, rate_tolerance);
     }
-
+ 
     void
-    test_quads(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
+    test_quads(size_t min_degree, size_t max_degree, double rate_tolerance)
     {
         std::cout << yellow << "Mesh under test: quads on generic mesh";
         std::cout << nocolor << std::endl;
@@ -638,11 +707,11 @@ class tester
         auto meshes = get_quad_generic_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er, min_degree, max_degree);
+        do_testing(meshes, tf, er, min_degree, max_degree, rate_tolerance);
     }
 
     void
-    test_cartesian_2d_diskpp(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
+    test_cartesian_2d_diskpp(size_t min_degree, size_t max_degree, double rate_tolerance)
     {
         std::cout << yellow << "Mesh under test: 2D cartesian mesh (DiSk++)";
         std::cout << nocolor << std::endl;
@@ -651,11 +720,11 @@ class tester
         auto meshes = get_cartesian_2d_diskpp_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er, min_degree, max_degree);
+        do_testing(meshes, tf, er, min_degree, max_degree, rate_tolerance);
     }
 
     void
-    test_tetrahedra_netgen(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
+    test_tetrahedra_netgen(size_t min_degree, size_t max_degree, double rate_tolerance)
     {
         std::cout << yellow << "Mesh under test: tetrahedra on netgen mesh";
         std::cout << nocolor << std::endl;
@@ -664,11 +733,11 @@ class tester
         auto meshes = get_tetrahedra_netgen_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er, min_degree, max_degree);
+        do_testing(meshes, tf, er, min_degree, max_degree, rate_tolerance);
     }
 
     void
-    test_cartesian_3d_diskpp(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
+    test_cartesian_3d_diskpp(size_t min_degree, size_t max_degree, double rate_tolerance)
     {
         std::cout << yellow << "Mesh under test: 3D cartesian mesh (DiSk++)";
         std::cout << nocolor << std::endl;
@@ -677,11 +746,11 @@ class tester
         auto meshes = get_cartesian_3d_diskpp_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er, min_degree, max_degree);
+        do_testing(meshes, tf, er, min_degree, max_degree, rate_tolerance);
     }
 
     void
-    test_generic_fvca6(size_t min_degree = MIN_TEST_DEGREE, size_t max_degree = MAX_TEST_DEGREE)
+    test_generic_fvca6(size_t min_degree, size_t max_degree, double rate_tolerance)
     {
         std::cout << yellow << "Mesh under test: polyhedra on generic mesh";
         std::cout << nocolor << std::endl;
@@ -690,7 +759,7 @@ class tester
         auto meshes = get_generic_fvca6_meshes<T>();
         auto tf = get_test_functor(meshes);
         auto er = [&](size_t k) { return tf.expected_rate(k); };
-        do_testing(meshes, tf, er, min_degree, max_degree);
+        do_testing(meshes, tf, er, min_degree, max_degree, rate_tolerance);
     }
 
 public:
@@ -708,6 +777,7 @@ public:
       bool do_tetrahedra_netgen   = true;
       bool do_cartesian_3d_diskpp = true;
       bool do_generic_fvca6       = true;
+      double rate_tolerance       = 0.3;
 
       auto r = lua.do_file("test_config.lua");
       if (r.valid())
@@ -723,34 +793,35 @@ public:
           do_generic_fvca6       = lua["do_generic_fvca6"].get_or(false);
           min_degree             = lua["min_degree"].get_or(min_degree);
           max_degree             = lua["max_degree"].get_or(max_degree);
+          rate_tolerance         = lua["rate_tolerance"].get_or(rate_tolerance);
       }
 
       if (crash_on_nan)
           _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
 
       if (do_triangles_generic)
-          test_triangles_generic(min_degree, max_degree);
+          test_triangles_generic(min_degree, max_degree, rate_tolerance);
 
       if (do_triangles_netgen)
-          test_triangles_netgen(min_degree, max_degree);
+          test_triangles_netgen(min_degree, max_degree, rate_tolerance);
 
       if (do_polygonal_generic)
-          test_polygonal_generic(min_degree, max_degree);
+          test_polygonal_generic(min_degree, max_degree, rate_tolerance);
 
       if (do_quads)
-          test_quads(min_degree, max_degree);
+          test_quads(min_degree, max_degree, rate_tolerance);
 
       if (do_cartesian_2d_diskpp)
-          test_cartesian_2d_diskpp(min_degree, max_degree);
+          test_cartesian_2d_diskpp(min_degree, max_degree, rate_tolerance);
 
       if (do_tetrahedra_netgen)
-          test_tetrahedra_netgen(min_degree, max_degree);
+          test_tetrahedra_netgen(min_degree, max_degree, rate_tolerance);
 
       if (do_cartesian_3d_diskpp)
-          test_cartesian_3d_diskpp(min_degree, max_degree);
+          test_cartesian_3d_diskpp(min_degree, max_degree, rate_tolerance);
 
       if (do_generic_fvca6)
-          test_generic_fvca6(min_degree, max_degree);
+          test_generic_fvca6(min_degree, max_degree, rate_tolerance);
 
       return 0;
     }

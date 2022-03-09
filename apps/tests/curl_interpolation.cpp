@@ -28,16 +28,15 @@
 #include <iomanip>
 #include <regex>
 
-#include "contrib/colormanip.h"
 #include <unistd.h>
 
 #include <xmmintrin.h>
-//#define EIGEN_USE_MKL_ALL
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
-#include "methods/hho"
 
-#include "core/loaders/loader.hpp"
+#include "diskpp/bases/bases.hpp"
+#include "diskpp/quadratures/quadratures.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/common/colormanip.h"
 
 #include "common.hpp"
 

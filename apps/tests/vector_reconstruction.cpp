@@ -24,17 +24,16 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-#include <iomanip>
+
 #include <iostream>
+#include <iomanip>
 #include <regex>
 
 #include <unistd.h>
 
-#include "bases/bases.hpp"
-#include "methods/hho"
-#include "quadratures/quadratures.hpp"
-
-#include "core/loaders/loader.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/common/colormanip.h"
 
 #include "common.hpp"
 
@@ -45,16 +44,15 @@ struct test_functor_equal_order
     typename Mesh::coordinate_type
     operator()(const Mesh& msh, size_t degree) const
     {
-        typedef Mesh                                mesh_type;
-        typedef typename mesh_type::cell            cell_type;
-        typedef typename mesh_type::face            face_type;
+        typedef Mesh mesh_type;
+        typedef typename mesh_type::cell        cell_type;
+        typedef typename mesh_type::face        face_type;
         typedef typename mesh_type::coordinate_type scalar_type;
-        typedef typename mesh_type::point_type      point_type;
+        typedef typename mesh_type::point_type  point_type;
 
         typedef Matrix<scalar_type, Mesh::dimension, 1> ret_type;
 
-        auto f    = make_vector_testing_data(msh);
-        auto divf = make_vector_testing_data_div(msh);
+        auto f = make_vector_testing_data(msh);
 
         typename disk::hho_degree_info hdi(degree);
 
@@ -62,27 +60,34 @@ struct test_functor_equal_order
         for (auto& cl : msh)
         {
             Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
-            const auto                      dr   = make_hho_divergence_reconstruction(msh, cl, hdi);
+            auto gr = disk::make_vector_hho_laplacian(msh, cl, hdi);
 
-            Matrix<scalar_type, Dynamic, 1> div = dr.first * proj;
+            size_t rec_size = disk::vector_basis_size(hdi.reconstruction_degree(), Mesh::dimension, Mesh::dimension);
 
-            const auto                            cb   = disk::make_scalar_monomial_basis(msh, cl, hdi.face_degree());
+            Matrix<scalar_type, Dynamic, 1> reconstr = Matrix<scalar_type, Dynamic, 1>::Zero(rec_size);
+            reconstr.tail(rec_size-Mesh::dimension) = gr.first * proj;
+
+            reconstr.head(Mesh::dimension) = proj.head(Mesh::dimension);
+
+            auto cb = disk::make_vector_monomial_basis(msh, cl, hdi.reconstruction_degree());
             Matrix<scalar_type, Dynamic, Dynamic> mass = disk::make_mass_matrix(msh, cl, cb);
-            Matrix<scalar_type, Dynamic, 1>       rhs  = disk::make_rhs(msh, cl, cb, divf);
-            Matrix<scalar_type, Dynamic, 1>       exp_div = mass.llt().solve(rhs);
+            Matrix<scalar_type, Dynamic, 1> rhs = disk::make_rhs(msh, cl, cb, f);
+            Matrix<scalar_type, Dynamic, 1> exp_reconstr = mass.llt().solve(rhs);
 
-            Matrix<scalar_type, Dynamic, 1> diff = div - exp_div;
+            Matrix<scalar_type, Dynamic, 1> diff = reconstr - exp_reconstr;
 
-            error += diff.dot(mass * diff);
+            Matrix<scalar_type, Dynamic, Dynamic> stiffness = disk::make_stiffness_matrix(msh, cl, cb);
+
+            error += diff.dot(stiffness*diff);
         }
 
         return std::sqrt(error);
     }
 
-    size_t
+    double
     expected_rate(size_t k)
     {
-        return k + 1;
+        return k+1;
     }
 };
 
@@ -101,33 +106,39 @@ struct test_functor_mixed_order1
 
         typedef Matrix<scalar_type, Mesh::dimension, 1> ret_type;
 
-        auto f    = make_vector_testing_data(msh);
-        auto divf = make_vector_testing_data_div(msh);
+        auto f = make_vector_testing_data(msh);
 
-        typename disk::hho_degree_info hdi(degree + 1, degree);
+        typename disk::hho_degree_info hdi(degree+1, degree);
 
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
             Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
-            const auto                      dr   = make_hho_divergence_reconstruction(msh, cl, hdi);
+            auto                            gr   = disk::make_vector_hho_laplacian(msh, cl, hdi);
 
-            Matrix<scalar_type, Dynamic, 1> div = dr.first * proj;
+            size_t rec_size = disk::vector_basis_size(hdi.reconstruction_degree(), Mesh::dimension, Mesh::dimension);
 
-            const auto                            cb   = disk::make_scalar_monomial_basis(msh, cl, hdi.face_degree());
-            Matrix<scalar_type, Dynamic, Dynamic> mass = disk::make_mass_matrix(msh, cl, cb);
-            Matrix<scalar_type, Dynamic, 1>       rhs  = disk::make_rhs(msh, cl, cb, divf);
-            Matrix<scalar_type, Dynamic, 1>       exp_div = mass.llt().solve(rhs);
+            Matrix<scalar_type, Dynamic, 1> reconstr  = Matrix<scalar_type, Dynamic, 1>::Zero(rec_size);
+            reconstr.tail(rec_size - Mesh::dimension) = gr.first * proj;
 
-            Matrix<scalar_type, Dynamic, 1> diff = div - exp_div;
+            reconstr.head(Mesh::dimension) = proj.head(Mesh::dimension);
 
-            error += diff.dot(mass * diff);
+            auto cb = disk::make_vector_monomial_basis(msh, cl, hdi.reconstruction_degree());
+            Matrix<scalar_type, Dynamic, Dynamic> mass         = disk::make_mass_matrix(msh, cl, cb);
+            Matrix<scalar_type, Dynamic, 1>       rhs          = disk::make_rhs(msh, cl, cb, f);
+            Matrix<scalar_type, Dynamic, 1>       exp_reconstr = mass.llt().solve(rhs);
+
+            Matrix<scalar_type, Dynamic, 1> diff = reconstr - exp_reconstr;
+
+            Matrix<scalar_type, Dynamic, Dynamic> stiffness = disk::make_stiffness_matrix(msh, cl, cb);
+
+            error += diff.dot(stiffness * diff);
         }
 
         return std::sqrt(error);
     }
 
-    size_t
+    double
     expected_rate(size_t k)
     {
         return k + 1;
@@ -149,27 +160,33 @@ struct test_functor_mixed_order2
 
         typedef Matrix<scalar_type, Mesh::dimension, 1> ret_type;
 
-        auto f    = make_vector_testing_data(msh);
-        auto divf = make_vector_testing_data_div(msh);
+        auto f = make_vector_testing_data(msh);
 
-        typename disk::hho_degree_info hdi(degree - 1, degree);
+        typename disk::hho_degree_info hdi(degree-1, degree);
 
         scalar_type error = 0.0;
         for (auto& cl : msh)
         {
             Matrix<scalar_type, Dynamic, 1> proj = disk::project_function(msh, cl, hdi, f, 2);
-            const auto                      dr   = make_hho_divergence_reconstruction(msh, cl, hdi);
+            auto                            gr   = disk::make_vector_hho_laplacian(msh, cl, hdi);
 
-            Matrix<scalar_type, Dynamic, 1> div = dr.first * proj;
+            size_t rec_size = disk::vector_basis_size(hdi.reconstruction_degree(), Mesh::dimension, Mesh::dimension);
 
-            const auto                            cb   = disk::make_scalar_monomial_basis(msh, cl, hdi.face_degree());
-            Matrix<scalar_type, Dynamic, Dynamic> mass = disk::make_mass_matrix(msh, cl, cb);
-            Matrix<scalar_type, Dynamic, 1>       rhs  = disk::make_rhs(msh, cl, cb, divf);
-            Matrix<scalar_type, Dynamic, 1>       exp_div = mass.llt().solve(rhs);
+            Matrix<scalar_type, Dynamic, 1> reconstr  = Matrix<scalar_type, Dynamic, 1>::Zero(rec_size);
+            reconstr.tail(rec_size - Mesh::dimension) = gr.first * proj;
 
-            Matrix<scalar_type, Dynamic, 1> diff = div - exp_div;
+            reconstr.head(Mesh::dimension) = proj.head(Mesh::dimension);
 
-            error += diff.dot(mass * diff);
+            auto cb = disk::make_vector_monomial_basis(msh, cl, hdi.reconstruction_degree());
+            Matrix<scalar_type, Dynamic, Dynamic> mass         = disk::make_mass_matrix(msh, cl, cb);
+            Matrix<scalar_type, Dynamic, 1>       rhs          = disk::make_rhs(msh, cl, cb, f);
+            Matrix<scalar_type, Dynamic, 1>       exp_reconstr = mass.llt().solve(rhs);
+
+            Matrix<scalar_type, Dynamic, 1> diff = reconstr - exp_reconstr;
+
+            Matrix<scalar_type, Dynamic, Dynamic> stiffness = disk::make_stiffness_matrix(msh, cl, cb);
+
+            error += diff.dot(stiffness * diff);
         }
 
         return std::sqrt(error);
@@ -182,8 +199,7 @@ struct test_functor_mixed_order2
     }
 };
 
-int
-main(void)
+int main(void)
 {
     // face order: k, cell order: k
     std::cout << blue << "Face order: k and Cell order: k" << std::endl;

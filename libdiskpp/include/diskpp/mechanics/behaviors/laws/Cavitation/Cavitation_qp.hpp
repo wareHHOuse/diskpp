@@ -25,14 +25,14 @@
 
 #pragma once
 
-#include "common/eigen.hpp"
-#include "core/mechanics/behaviors/laws/law_qp_bones.hpp"
-#include "core/mechanics/behaviors/laws/materialData.hpp"
-#include "core/mechanics/behaviors/maths_tensor.hpp"
-#include "core/mechanics/behaviors/maths_utils.hpp"
-#include "core/mechanics/behaviors/tensor_conversion.hpp"
-#include "core/mechanics/deformation_tensors.hpp"
-#include "mesh/point.hpp"
+#include "diskpp/common/eigen.hpp"
+#include "diskpp/mechanics/behaviors/laws/law_qp_bones.hpp"
+#include "diskpp/mechanics/behaviors/laws/materialData.hpp"
+#include "diskpp/mechanics/behaviors/maths_tensor.hpp"
+#include "diskpp/mechanics/behaviors/maths_utils.hpp"
+#include "diskpp/mechanics/behaviors/tensor_conversion.hpp"
+#include "diskpp/mechanics/deformation_tensors.hpp"
+#include "diskpp/mesh/point.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>

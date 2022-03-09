@@ -30,11 +30,11 @@
 
 #include <map>
 
-#include "loaders/loader.hpp"
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/bases/bases.hpp"
+#include "diskpp/quadratures/quadratures.hpp"
 
-#include "timecounter.h"
+#include "diskpp/common/timecounter.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>

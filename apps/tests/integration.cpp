@@ -26,10 +26,9 @@
 #include <iostream>
 #include <regex>
 
-#include "loaders/loader.hpp"
-
-#include "core/bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/bases/bases.hpp"
+#include "diskpp/quadratures/quadratures.hpp"
 
 
 template<typename MeshType>

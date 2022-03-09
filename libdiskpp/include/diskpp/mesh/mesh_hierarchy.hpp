@@ -28,8 +28,7 @@
 #include <list>
 #include <random>
 
-#include "geometry/geometry.hpp"
-#include "loaders/loader.hpp"
+#include "diskpp/loaders/loader.hpp"
 
 namespace disk {
 

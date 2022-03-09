@@ -23,12 +23,12 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-#include "core/mechanics/behaviors/laws/Cavitation/Cavitation_qp.hpp"
-#include "core/mechanics/behaviors/laws/HenckyMises/HenckyMises_qp.hpp"
-#include "core/mechanics/behaviors/laws/IsotropicHardeningVMis/IsotropicHardeningVMis_qp.hpp"
-#include "core/mechanics/behaviors/laws/LinearIsotropicAndKinematicHardening/LinearIsotropicAndKinematicHardening_qp.hpp"
-#include "core/mechanics/behaviors/laws/LinearLaw/LinearLaw_qp.hpp"
-#include "core/mechanics/behaviors/laws/Neohookean/Neohookean_qp.hpp"
+#include "diskpp/mechanics/behaviors/laws/Cavitation/Cavitation_qp.hpp"
+#include "diskpp/mechanics/behaviors/laws/HenckyMises/HenckyMises_qp.hpp"
+#include "diskpp/mechanics/behaviors/laws/IsotropicHardeningVMis/IsotropicHardeningVMis_qp.hpp"
+#include "diskpp/mechanics/behaviors/laws/LinearIsotropicAndKinematicHardening/LinearIsotropicAndKinematicHardening_qp.hpp"
+#include "diskpp/mechanics/behaviors/laws/LinearLaw/LinearLaw_qp.hpp"
+#include "diskpp/mechanics/behaviors/laws/Neohookean/Neohookean_qp.hpp"
 
 // this is to test that the compilation of the different behaviors is ok
 

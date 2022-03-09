@@ -29,9 +29,9 @@
 
 #include <unistd.h>
 
-#include "bases/bases.hpp"
+#include "diskpp/bases/bases.hpp"
 
-#include "loaders/loader.hpp"
+#include "diskpp/loaders/loader.hpp"
 
 #include "common.hpp"
 

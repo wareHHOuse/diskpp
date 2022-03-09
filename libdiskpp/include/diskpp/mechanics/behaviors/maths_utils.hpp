@@ -25,8 +25,8 @@
 
 #pragma once
 
-#include "common/eigen.hpp"
-#include "mechanics/behaviors/maths_tensor.hpp"
+#include "diskpp/common/eigen.hpp"
+#include "diskpp/mechanics/behaviors/maths_tensor.hpp"
 
 namespace disk
 {
