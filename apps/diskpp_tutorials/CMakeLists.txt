@@ -15,4 +15,8 @@ add_executable(diskpp_tutorial_3 diskpp_tutorial_3.cpp)
 target_link_libraries(diskpp_tutorial_3 ${LINK_LIBS})
 install(TARGETS diskpp_tutorial_3 DESTINATION bin)
 
-
+if (HAVE_GMSH)
+	add_executable(diskpp_tutorial_4 diskpp_tutorial_4.cpp)
+	target_link_libraries(diskpp_tutorial_4 ${LINK_LIBS})
+	install(TARGETS diskpp_tutorial_4 DESTINATION bin)
+endif()

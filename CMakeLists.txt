@@ -214,9 +214,9 @@ set(CMAKE_CXX_FLAGS_RELEASENATIVE "-O3 -DNDEBUG -march=native")
 
 #include_directories(core contrib)
 
-SET(SOL2_BUILD_LUA OFF CACHE BOOL "Override sol2 build lua option")
-add_subdirectory(contrib/sol2)
-set(LINK_LIBS ${LINK_LIBS} sol2::sol2)
+#SET(SOL2_BUILD_LUA OFF CACHE BOOL "Override sol2 build lua option")
+#add_subdirectory(contrib/sol2)
+#set(LINK_LIBS ${LINK_LIBS} sol2::sol2)
 
 #include_directories(contrib/sol2/include)
 #include_directories(contrib/sol2/single)
