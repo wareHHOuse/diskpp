@@ -67,7 +67,8 @@ endif()
 ######################################################################
 ## Eigen3
 #add_subdirectory(contrib/eigen)
-#set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
+find_package(Eigen3 REQUIRED)
+set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
 
 ######################################################################
 ## ~jburkardt code
@@ -204,7 +205,7 @@ endif()
 
 ######################################################################
 ## Compiler settings: Settings for different build types
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive -Wshadow")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_DEBUGSANITIZED "-g -fsanitize=address")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")

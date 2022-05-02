@@ -11,7 +11,7 @@ set(jburkardt_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tetrahedron_arbq_rule.cpp)
 
 include_directories(include)
-add_library(jburkardt_archive STATIC ${jburkardt_sources})
+add_library(jburkardt_archive SHARED ${jburkardt_sources})
 
 add_library(JBURKARDT INTERFACE)
 target_link_libraries(JBURKARDT INTERFACE jburkardt_archive)

@@ -394,6 +394,13 @@ struct problem_data_lua<Mesh<T,2,Storage>>
             throw "Unable to open lua file";
     }
 
+    std::string solver() {
+        auto sname = lua["solver"];
+        if (sname.valid())
+            return sname;
+        return std::string("internal");
+    }
+
     scalar_type u1(const mesh_type&, const point_type& pt) {
         return lua["u1"](pt.x(), pt.y());
     }
@@ -468,6 +475,13 @@ struct problem_data_lua<Mesh<T,3,Storage>>
         auto script = lua.script_file("linear_transmission_3D.lua");
         if (not script.valid())
             throw "Unable to open lua file";
+    }
+
+    std::string solver() {
+        auto sname = lua["solver"];
+        if (sname.valid())
+            return sname;
+        return std::string("internal");
     }
 
     scalar_type u1(const mesh_type&, const point_type& pt) {
@@ -588,8 +602,14 @@ void test(Mesh& msh, size_t degree)
         }
 
         for (size_t i = 0; i < lhs.rows(); i++)
+        {
             for (size_t j = 0; j < lhs.cols(); j++)
+            {
+                assert(l2g[i] < LHS.rows());
+                assert(l2g[j] < LHS.cols());
                 triplets.push_back( triplet( l2g[i], l2g[j], lhs(i,j) ) );
+            }
+        }
                 
         RHS.segment(clbase, cbs) = rhs;
     };
@@ -606,6 +626,8 @@ void test(Mesh& msh, size_t degree)
 
         for (size_t i = 0; i < cbs; i++)
         {
+            assert( db.global_constrain_base < LHS.rows() and db.global_constrain_base < LHS.cols() );
+            assert( clbase+i < LHS.rows() and clbase+i < LHS.cols() );
             triplets.push_back( triplet(db.global_constrain_base, clbase+i, average[i]) );
             triplets.push_back( triplet(clbase+i, db.global_constrain_base, average[i]) );
         }
@@ -628,6 +650,8 @@ void test(Mesh& msh, size_t degree)
             for (size_t j = 0; j < fbs; j++)
             {
                 /* M is symmetric */
+                assert(fcbase+i < LHS.rows() and fcbase+i < LHS.cols() );
+                assert(lfcbase+j < LHS.rows() and lfcbase+j < LHS.cols() );
                 triplets.push_back( triplet(fcbase+i, lfcbase+j, sign*M(i,j)) );
                 triplets.push_back( triplet(lfcbase+i, fcbase+j, -sign*M(i,j)) );
             }
@@ -723,40 +747,47 @@ void test(Mesh& msh, size_t degree)
 
     /* Initialize global matrix */
     LHS.setFromTriplets(triplets.begin(), triplets.end());
-    std::cout << triplets.size() << std::endl;
+    std::cout << "Triplets: " << triplets.size() << std::endl;
     triplets.clear();
     //disk::dump_sparse_matrix(LHS, "trmat.txt");
 
-    std::cout << LHS.nonZeros() << std::endl;
+    std::cout << LHS.nonZeros() << " " << LHS.rows() << " " << LHS.cols() << std::endl;
 
     /* Run solver */
-    /*
-    std::cout << "Running MUMPS" << std::endl;
     disk::dynamic_vector<T> sol;
-    sol = mumps_lu(LHS, RHS);
-    */
-    
-    std::cout << "Running pardiso" << std::endl;
-    pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = true;
-    pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
-    disk::dynamic_vector<T> sol;
-    
-    bool success = mkl_pardiso(pparams, LHS, RHS, sol);
-    if (!success)
-    {
-        std::cout << "Pardiso failed" << std::endl;
-        return;
-    }
-    
 
-    /*
-    disk::dynamic_vector<T> sol;
-    SparseLU<SparseMatrix<T>, COLAMDOrdering<int> >   solver;
-    solver.analyzePattern(LHS);
-    solver.factorize(LHS);
-    sol = solver.solve(RHS); 
-    */
+    if (pd.solver() == "mumps")
+    {
+        std::cout << "Running MUMPS" << std::endl;
+        sol = mumps_lu(LHS, RHS);
+    }
+    else if (pd.solver() == "pardiso")
+    {
+        std::cout << "Running pardiso" << std::endl;
+        pardiso_params<T> pparams;
+        pparams.report_factorization_Mflops = true;
+        pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
+
+        bool success = mkl_pardiso(pparams, LHS, RHS, sol);
+        if (!success)
+        {
+            std::cout << "Pardiso failed" << std::endl;
+            return;
+        }
+    }
+    else
+    {
+        std::cout << "Eigen SparseLU" << std::endl;
+        SparseLU<SparseMatrix<T>, COLAMDOrdering<int> >   solver;
+        solver.analyzePattern(LHS);
+        if ( solver.info() != Eigen::Success )
+        {
+            std::cout << "SparseLU failed." << std::endl;
+            return; 
+        }
+        solver.factorize(LHS);
+        sol = solver.solve(RHS); 
+    }
 
     /* Postprocess */
     T l2_error_sq = 0.0;
@@ -918,6 +949,7 @@ int main(int argc, const char **argv)
     if (argc > 3)
         scalefactor = atof(argv[3]);
 
+#ifdef HAVE_GMSH
     /* GMSH 2D simplicials */
     if (std::regex_match(mesh_filename, std::regex(".*\\.geo2s$") ))
     {
@@ -956,6 +988,7 @@ int main(int argc, const char **argv)
 
         test(msh, degree);
     }
+#endif /* HAVE_GMSH */
 
     /* FVCA5 2D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))

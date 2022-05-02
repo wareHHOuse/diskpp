@@ -15,8 +15,8 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 ######################################################################
 ## Find Eigen 3
-find_package(Eigen3 REQUIRED)
-set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
+#find_package(Eigen3 REQUIRED)
+#set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
 
 include_directories(include)
 
