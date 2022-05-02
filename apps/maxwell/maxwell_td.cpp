@@ -23,7 +23,7 @@
 #include "diskpp/output/silo.hpp"
 
 #include "mumps.hpp"
-
+#include "sgr.hpp"
 
 template<typename Mesh, typename ScalT = typename Mesh::coordinate_type>
 class maxwell_assembler_condensed
@@ -308,9 +308,22 @@ public:
     }
 };
 
+double cavity_freq(double mu, double eps)
+{
+    double  c = 1/std::sqrt(mu*eps);
+    double  a = 1.0, b = 1.0, d = 1.0;
+    int     m = 1, n = 0, l = 1;
+
+    double aa = std::pow(m*M_PI/a, 2);
+    double bb = std::pow(n*M_PI/b, 2);
+    double dd = std::pow(l*M_PI/d, 2);
+
+    return (c/(2*M_PI))*std::sqrt(aa + bb + dd);
+}
+
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 void
-vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
+vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order, T alpha, size_t num_ts)
 {
     typedef Mesh<T,3,Storage>                   mesh_type;
     typedef typename mesh_type::cell_type       cell_type;
@@ -322,10 +335,9 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
                                   .cd = (size_t) order,
                                   .fd = (size_t) order } );
 
-    T alpha = 10.;
-    T delta_t = 1e-12;
-    T epsilon = 8.85e-12;
-    T mu = 4e-7*M_PI;
+    T delta_t = 1e-4;
+    T epsilon = 1;//8.85e-12;
+    T mu = 1;//4e-7*M_PI;
     T sigma = 0;
 
     T beta = 0.25;
@@ -357,7 +369,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
         auto CR = disk::curl_reconstruction_pk(msh, cl, chdi);
         Matrix<T, Dynamic, Dynamic> ST = disk::curl_hdg_stabilization(msh, cl, chdi);
 
-        Matrix<T, Dynamic, Dynamic> mK = (1./mu)*(CR.second + alpha*ST);
+        Matrix<T, Dynamic, Dynamic> mK = (1./mu)*CR.second + alpha*ST;
 
         Matrix<T, Dynamic, Dynamic> mass = make_vector_mass_oper(msh, cl, chdi);
         Matrix<T, Dynamic, Dynamic> mM = epsilon*mass;
@@ -417,7 +429,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
         Matrix<T, Dynamic, Dynamic> mA_cond = mA_FF - mA_FT*mA_TT_ldlt.solve(mA_TF);
 
         Matrix<T, Dynamic, 1> x_curr = project_tangent(msh, cl, chdi, sol_fun);
-        auto freq = 211.98528005809e6; //M_SQRT1_2 * M_PI * M_PI;
+        auto freq = cavity_freq(mu, epsilon);
         Matrix<T, Dynamic, 1> x_prev = x_curr*std::cos(-2.0*M_PI*freq*dt);
 
         assm.assemble(msh, cl, mA_cond, cond1, cond2, decond1, decond2, decond3, x_prev, x_curr);
@@ -429,13 +441,14 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
 
     //disk::dump_sparse_matrix(assm.LHS, "lhs_hho.txt");
 
+    std::cout << "Running MUMPS" << std::endl;
     auto fact_start = std::chrono::steady_clock::now();
     solver.factorize(assm.LHS);
     auto fact_end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = fact_end - fact_start;
-    std::cout << "Factorization time: " << elapsed_seconds.count() << " s\n";
-
-
+    std::chrono::duration<double> elapsed_fact = fact_end - fact_start;
+    std::cout << sgr::Yellowfg << "Factorization time: ";
+    std::cout << elapsed_fact.count() << " s\n";
+    
     disk::dynamic_vector<T> RHS = disk::dynamic_vector<T>::Zero(assm.RHS.rows());
     disk::dynamic_vector<T> X_prev = assm.X_prev;
     disk::dynamic_vector<T> X_curr = assm.X_curr;
@@ -446,30 +459,43 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
 
     disk::dynamic_vector<T> X_next_decond;
 
-    size_t num_ts = 5000;
+    std::ofstream ofs("l2err.txt");
+
     for (size_t i = 0; i < num_ts; i++)
     {
         auto start = std::chrono::steady_clock::now();
-        std::cout << "Iteration " << i << std::endl;
         RHS = assm.Cond1 * X_curr
             + assm.Cond2 * X_prev;
+        auto rhs_end = std::chrono::steady_clock::now();
             //+ dt2*beta*B_next
             //+ dt2*(0.5 + gamma - 2.0*beta)*B_curr
             //+ dt2*(0.5 - gamma + beta)*B_prev;
 
+        
         X_next = solver.solve(RHS);
+        auto bs_end = std::chrono::steady_clock::now();
 
         X_next_decond = assm.Decond1*X_curr 
                       + assm.Decond2*X_prev
                       + assm.Decond3*X_next;
+        auto decond_end = std::chrono::steady_clock::now();
+
+        std::chrono::duration<double> rhs_time = rhs_end-start;
+        std::chrono::duration<double> bs_time = bs_end-rhs_end;
+        std::chrono::duration<double> decond_time = decond_end-bs_end;
 
 
         if (i%100 == 0)
         {
+            auto freq = cavity_freq(mu, epsilon);
             std::vector<scalar_type> data_ex( msh.cells_size() );
             std::vector<scalar_type> data_ey( msh.cells_size() );
             std::vector<scalar_type> data_ez( msh.cells_size() );
+            std::vector<scalar_type> sol_ez( msh.cells_size() );
             size_t cell_i = 0;
+            scalar_type err = 0.0;
+            scalar_type energy = 0.0;
+            scalar_type energy_ana = 0.0;
             for (auto& cl : msh)
             {
                 auto cb = make_vector_monomial_basis(msh, cl, chdi.cell_degree());
@@ -481,8 +507,30 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
                 data_ex[cell_i] = ls(0);
                 data_ey[cell_i] = ls(1);
                 data_ez[cell_i] = ls(2);
+
+                Matrix<T, 3, 1> fval = sol_fun(bar) * std::cos(2.0*M_PI*freq*dt*i);
+                sol_ez[cell_i] = fval(2);
+
+                auto qps = disk::integrate(msh, cl, 2*chdi.cell_degree()+1);
+                for (auto& qp : qps)
+                {
+                    auto qphi = cb.eval_functions(qp.point());
+                    Matrix<T, 3, 1> nval = qphi.transpose()*esolseg;
+                    Matrix<T, 3, 1> fval = sol_fun(qp.point()) * std::cos(2.0*M_PI*freq*dt*i);
+                    Matrix<T, 3, 1> diff = nval - fval;
+                    err += qp.weight() * diff.dot(diff);
+                    energy += qp.weight() * nval.dot(nval);
+                    energy_ana += qp.weight() * fval.dot(fval);
+                }
+
                 cell_i++;
             }
+
+            std::cout << std::scientific;
+            std::cout << sgr::Greenfg << "\nL2 error at iteration " << i << ": ";
+            std::cout << std::setprecision(6) << std::sqrt(err) << sgr::nofg << std::endl;
+
+            ofs << i << " " << std::sqrt(err) << " " << 0.5*energy << " " << 0.5*energy_ana << std::endl;
 
             disk::silo_database silo_db;
 
@@ -499,16 +547,27 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
 
             disk::silo_zonal_variable<scalar_type> ez("ez", data_ez);
             silo_db.add_variable("mesh", ez);
+
+            disk::silo_zonal_variable<scalar_type> sol_ez_silo("sol_ez", sol_ez);
+            silo_db.add_variable("mesh", sol_ez_silo);
         }
 
         X_prev = X_curr;
         X_curr = X_next_decond;
         auto end = std::chrono::steady_clock::now();
 
-        std::chrono::duration<double> elapsed_seconds = end-start;
-        std::cout << "elapsed time: " << elapsed_seconds.count() << " s, ";
-        std::cout << std::scientific << double(assm.LHS.rows())/elapsed_seconds.count() << " DoFs/s \n";
+        std::chrono::duration<double> elapsed_run = end-start;
+        std::cout << sgr::cr << "Iteration " << i << " - ";
+        std::cout << std::setprecision(2);
+        std::cout << "[T: " << elapsed_run.count() << "s] ";
+        std::cout << sgr::Cyanfg << "[R: " << rhs_time.count() << "s] ";
+        std::cout << sgr::Magentafg << "[B: " << bs_time.count() << "s] ";
+        std::cout << sgr::Bluefg << "[D: " << decond_time.count() << "s] " << sgr::nofg;
+        std::cout << "DoFs/s: " << double(assm.LHS.rows())/elapsed_run.count();
+        std::cout << std::flush;
     }
+
+    std::cout << std::endl;
 }
 
 int main(int argc, char **argv)
@@ -527,18 +586,15 @@ int main(int argc, char **argv)
     char *      mesh_filename = nullptr;
     char *      param_filename = nullptr;
     bool        use_ho_stab = false;
+    size_t      num_ts = 101;
 
     int ch;
-    while ( (ch = getopt(argc, argv, "a:ek:m:w:")) != -1 )
+    while ( (ch = getopt(argc, argv, "a:k:m:n:")) != -1 )
     {
         switch(ch)
         {
             case 'a':
                 stab_param = std::stod(optarg);
-                break;
-
-            case 'e':
-                solve_eigvals = true;
                 break;
 
             case 'k':
@@ -549,8 +605,8 @@ int main(int argc, char **argv)
                 mesh_filename = optarg;
                 break;
 
-            case 'w':
-                omega = M_PI*std::stod(optarg);
+            case 'n':
+                num_ts = std::stoi(optarg);
                 break;
 
             case '?':
@@ -573,11 +629,7 @@ int main(int argc, char **argv)
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
         auto msh = disk::load_netgen_3d_mesh<coord_T>(mesh_filename);
 
-        //if (solve_eigvals)
-        //    maxwell_eigenvalue_solver(msh, degree, stab_param);
-        //else
-            //vector_wave_solver(msh, degree, stab_param, omega, false);
-            vector_wave_solver(msh, degree);
+        vector_wave_solver(msh, degree, stab_param, num_ts);
 
         return 0;
     }
@@ -594,7 +646,7 @@ int main(int argc, char **argv)
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        vector_wave_solver(msh, degree);
+        vector_wave_solver(msh, degree, stab_param, num_ts);
 
         return 0;
     }
@@ -607,7 +659,7 @@ int main(int argc, char **argv)
         
         disk::load_mesh_fvca6_3d<coord_T>(mesh_filename, msh);
         
-        vector_wave_solver(msh, degree);
+        vector_wave_solver(msh, degree, stab_param, num_ts);
         
         return 0;
     }

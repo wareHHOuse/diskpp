@@ -29,6 +29,66 @@
 #include "sol/sol.hpp"
 #include "mumps.hpp"
 
+#define PARDISO_IN_CORE                 0
+#define PARDISO_OUT_OF_CORE_IF_NEEDED   1
+#define PARDISO_OUT_OF_CORE_ALWAYS      2
+
+template<typename T>
+struct pardiso_params
+{
+    bool    report_factorization_Mflops;
+    int     out_of_core; //0: IC, 1: IC, OOC if limits passed, 2: OOC
+    int     mflops;
+
+    pardiso_params() :
+        report_factorization_Mflops(false), out_of_core(0), mflops(0)
+    {}
+};
+
+template<typename T>
+bool
+mkl_pardiso(pardiso_params<T>& params,
+            const Eigen::SparseMatrix<T>& A,
+            const Eigen::Matrix<T, Eigen::Dynamic, 1>& b,
+            Eigen::Matrix<T, Eigen::Dynamic, 1>& x)
+{
+    Eigen::PardisoLU<Eigen::SparseMatrix<T>>  solver;
+
+    if (params.out_of_core >= 0 && params.out_of_core <= 2)
+        solver.pardisoParameterArray()[59] = params.out_of_core;
+
+    if (params.report_factorization_Mflops)
+        solver.pardisoParameterArray()[18] = -1; //report flops
+
+    solver.analyzePattern(A);
+    if (solver.info() != Eigen::Success) {
+       std::cerr << "ERROR: analyzePattern failed" << std::endl;
+       return false;
+    }
+
+    solver.factorize(A);
+    if (solver.info() != Eigen::Success) {
+       std::cerr << "ERROR: Could not factorize the matrix" << std::endl;
+       std::cerr << "Try to tweak MKL_PARDISO_OOC_MAX_CORE_SIZE" << std::endl;
+       return false;
+    }
+
+    x = solver.solve(b);
+    if (solver.info() != Eigen::Success) {
+       std::cerr << "ERROR: Could not solve the linear system" << std::endl;
+       return false;
+    }
+
+    if (params.report_factorization_Mflops)
+    {
+        int mflops = solver.pardisoParameterArray()[18];
+        params.mflops = mflops;
+        std::cout << "[PARDISO] Factorization Mflops: " << mflops << std::endl;
+    }
+
+    return true;
+}
+
 template<typename Mesh>
 std::set<size_t>
 subdomain_tags(const Mesh& msh)
@@ -380,11 +440,91 @@ struct problem_data_lua<Mesh<T,2,Storage>>
         auto n = normal(msh, cl, fc);
         return grad_u1(msh, pt).dot(n);
     }
+
+    int omega1(void) {
+        return lua["omega1"].get_or(1);
+    }
+
+    int omega2(void) {
+        return lua["omega2"].get_or(2);
+    }
 };
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-struct problem_data_lua<Mesh<T,3,Storage>> : problem_data<Mesh<T,3,Storage>>
-{};
+struct problem_data_lua<Mesh<T,3,Storage>>
+{
+    sol::state lua;
+
+    using mesh_type     = Mesh<T,3,Storage>;
+    using cell_type     = typename mesh_type::cell_type;
+    using face_type     = typename mesh_type::face_type;
+    using point_type    = typename mesh_type::point_type;
+    using scalar_type   = typename mesh_type::coordinate_type;
+    using vector_type   = Eigen::Matrix<scalar_type, 3, 1>;
+
+    problem_data_lua()
+    {
+        lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io);
+        auto script = lua.script_file("linear_transmission_3D.lua");
+        if (not script.valid())
+            throw "Unable to open lua file";
+    }
+
+    scalar_type u1(const mesh_type&, const point_type& pt) {
+        return lua["u1"](pt.x(), pt.y(), pt.z());
+    }
+
+    scalar_type u2(const mesh_type& msh, const point_type& pt) {
+        return lua["u2"](pt.x(), pt.y(), pt.z());
+    }
+
+    vector_type grad_u1(const mesh_type&, const point_type& pt) {
+        scalar_type vx, vy, vz;
+        sol::tie(vx, vy, vz) = lua["grad_u1"](pt.x(), pt.y(), pt.z());
+        return vector_type(vx, vy, vz);
+    }
+
+    vector_type grad_u2(const mesh_type& msh, const point_type& pt) {
+        scalar_type vx, vy, vz;
+        sol::tie(vx, vy, vz) = lua["grad_u2"](pt.x(), pt.y(), pt.z());
+        return vector_type(vx, vy, vz);
+    }
+
+    scalar_type f1(const mesh_type&, const point_type& pt) {
+        return lua["f1"](pt.x(), pt.y(), pt.z());
+    }
+
+    scalar_type f2(const mesh_type& msh, const point_type& pt) {
+        return lua["f2"](pt.x(), pt.y(), pt.z());
+    }
+
+    scalar_type g(const mesh_type& msh, const point_type& pt) {
+        return u1(msh, pt) - u2(msh, pt); 
+    }
+
+    scalar_type g1(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
+        auto n = normal(msh, cl, fc);
+        return grad_u1(msh, pt).dot(n) - grad_u2(msh, pt).dot(n);
+    }
+
+    scalar_type g2(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
+        auto n = normal(msh, cl, fc);
+        return grad_u2(msh, pt).dot(n);
+    }
+
+    scalar_type xi(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
+        auto n = normal(msh, cl, fc);
+        return grad_u1(msh, pt).dot(n);
+    }
+
+    int omega1(void) {
+        return lua["omega1"].get_or(1);
+    }
+
+    int omega2(void) {
+        return lua["omega2"].get_or(2);
+    }
+};
 
 template<typename Mesh>
 void test(Mesh& msh, size_t degree)
@@ -400,7 +540,7 @@ void test(Mesh& msh, size_t degree)
 
     struct problem_data_lua<Mesh> pd;
 
-    size_t internal_tag = 1;
+    size_t internal_tag = pd.omega1();
     disk::hho_degree_info hdi(degree);
 
     dof_bases db = compute_dof_bases(msh, hdi, internal_tag);
@@ -583,13 +723,40 @@ void test(Mesh& msh, size_t degree)
 
     /* Initialize global matrix */
     LHS.setFromTriplets(triplets.begin(), triplets.end());
+    std::cout << triplets.size() << std::endl;
     triplets.clear();
     //disk::dump_sparse_matrix(LHS, "trmat.txt");
 
+    std::cout << LHS.nonZeros() << std::endl;
+
     /* Run solver */
+    /*
     std::cout << "Running MUMPS" << std::endl;
     disk::dynamic_vector<T> sol;
     sol = mumps_lu(LHS, RHS);
+    */
+    
+    std::cout << "Running pardiso" << std::endl;
+    pardiso_params<T> pparams;
+    pparams.report_factorization_Mflops = true;
+    pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
+    disk::dynamic_vector<T> sol;
+    
+    bool success = mkl_pardiso(pparams, LHS, RHS, sol);
+    if (!success)
+    {
+        std::cout << "Pardiso failed" << std::endl;
+        return;
+    }
+    
+
+    /*
+    disk::dynamic_vector<T> sol;
+    SparseLU<SparseMatrix<T>, COLAMDOrdering<int> >   solver;
+    solver.analyzePattern(LHS);
+    solver.factorize(LHS);
+    sol = solver.solve(RHS); 
+    */
 
     /* Postprocess */
     T l2_error_sq = 0.0;
