@@ -175,4 +175,17 @@ void dump_sparse_matrix(Eigen::SparseMatrix<double>& M, const std::string& filen
     ofs.close();
 }
 
+void dump_sparse_matrix_with_header(Eigen::SparseMatrix<double>& M, const std::string& filename)
+{
+    std::ofstream ofs(filename);
+
+    ofs << M.rows() << " " << M.cols() << " " << M.nonZeros() << std::endl;
+
+    for (int k=0; k < M.outerSize(); ++k)
+        for (Eigen::SparseMatrix<double>::InnerIterator it(M,k); it; ++it)
+            ofs << it.row() << " " << it.col() << " " << std::setprecision(20) << it.value() << std::endl;
+
+    ofs.close();
+}
+
 } // end disk

@@ -565,6 +565,7 @@ void test(Mesh& msh, size_t degree)
     auto fbs = disk::scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
 
     /* Global system data */
+    std::cout << "Total system DoFs: " << db.total_dofs << std::endl;
     Eigen::SparseMatrix<T> LHS(db.total_dofs, db.total_dofs);
     Eigen::Matrix<T, Eigen::Dynamic, 1> RHS = Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(db.total_dofs);
     using triplet = Eigen::Triplet<T>;
@@ -745,23 +746,30 @@ void test(Mesh& msh, size_t degree)
         }
     }
 
+    //triplets.clear();
+    //for (size_t i = 0; i < LHS.rows(); i++)
+    //    triplets.push_back( triplet(i,i,1.0) );
+    
+   
+
     /* Initialize global matrix */
     LHS.setFromTriplets(triplets.begin(), triplets.end());
     std::cout << "Triplets: " << triplets.size() << std::endl;
     triplets.clear();
-    //disk::dump_sparse_matrix(LHS, "trmat.txt");
 
     std::cout << LHS.nonZeros() << " " << LHS.rows() << " " << LHS.cols() << std::endl;
 
     /* Run solver */
-    disk::dynamic_vector<T> sol;
+    disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(LHS.rows());
 
-    if (pd.solver() == "mumps")
+    std::string solver_name = pd.solver();
+
+    if (solver_name == "mumps")
     {
         std::cout << "Running MUMPS" << std::endl;
         sol = mumps_lu(LHS, RHS);
     }
-    else if (pd.solver() == "pardiso")
+    else if (solver_name == "pardiso")
     {
         std::cout << "Running pardiso" << std::endl;
         pardiso_params<T> pparams;
@@ -775,16 +783,35 @@ void test(Mesh& msh, size_t degree)
             return;
         }
     }
+    else if (solver_name == "file")
+    {
+        disk::dump_sparse_matrix_with_header(LHS, "trmat.txt");
+        std::ofstream ofs("trvec.txt");
+        ofs << RHS.size() << std::endl;
+        for (size_t i = 0; i < RHS.size(); i++)
+            ofs << RHS[i] << std::endl;
+        
+        system("./pardisotest");
+
+        std::ifstream ifs("trsol.txt");
+        size_t sz;
+        ifs >> sz;
+        sol = disk::dynamic_vector<T>::Zero(sz);
+        for (size_t i = 0; i < sz; i++)
+            ifs >> sol[i];
+    }
     else
     {
         std::cout << "Eigen SparseLU" << std::endl;
         SparseLU<SparseMatrix<T>, COLAMDOrdering<int> >   solver;
         solver.analyzePattern(LHS);
+        /*
         if ( solver.info() != Eigen::Success )
         {
             std::cout << "SparseLU failed." << std::endl;
             return; 
         }
+        */
         solver.factorize(LHS);
         sol = solver.solve(RHS); 
     }
@@ -938,6 +965,8 @@ void test(Mesh& msh, size_t degree)
 
 int main(int argc, const char **argv)
 {
+    _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+
     using T = double;
 
     if (argc < 3)

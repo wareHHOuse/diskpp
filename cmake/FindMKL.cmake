@@ -30,12 +30,12 @@
 
 include(FindPackageHandleStandardArgs)
 
-set(MKL_HINTS /opt/intel /opt/intel/mkl /opt/intel/oneapi/mkl)
+#set(MKL_HINTS /usr /opt/intel /opt/intel/mkl /opt/intel/oneapi/mkl)
 
 find_path(MKL_INCLUDE_DIR
     NAMES mkl.h
     HINTS ENV MKL_ROOT ${MKL_ROOT} ${MKL_HINTS}
-    PATH_SUFFIXES mkl/include)
+    PATH_SUFFIXES mkl mkl/include)
 
 ###########################################################
 ## iomp5
