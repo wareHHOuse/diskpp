@@ -824,8 +824,9 @@ void test(Mesh& msh, size_t degree)
     T l2_reconstruction_error_mm_sq = 0.0;
     T l2_trace_error_mm_sq = 0.0;
 
-    std::vector<T> vec_u;
+    std::vector<T> vec_u, vec_u_ref;
     vec_u.reserve( msh.cells_size() );
+    vec_u_ref.reserve( msh.cells_size() );
     for (auto& cl : msh)
     {
         auto di = msh.domain_info(cl);
@@ -844,6 +845,12 @@ void test(Mesh& msh, size_t degree)
         disk::dynamic_vector<T> solH = disk::dynamic_vector<T>::Zero(lhs.rows());
         solH.segment(0, cbs) = sol.segment(cell_ofs, cbs);
         vec_u.push_back( solH(0) );
+
+        auto bar = barycenter(msh, cl);
+        if (di.tag() == internal_tag)
+            vec_u_ref.push_back( pd.u1(msh, bar) );
+        else
+            vec_u_ref.push_back( pd.u2(msh, bar) );
 
         size_t face_i = 0;
         auto fcs = faces(msh, cl);
@@ -961,6 +968,8 @@ void test(Mesh& msh, size_t degree)
     disk::silo_zonal_variable<T> u("u", vec_u);
     silo_db.add_variable("mesh", u);
 
+    disk::silo_zonal_variable<T> u_ref("u_ref", vec_u_ref);
+    silo_db.add_variable("mesh", u_ref);
 }
 
 int main(int argc, const char **argv)

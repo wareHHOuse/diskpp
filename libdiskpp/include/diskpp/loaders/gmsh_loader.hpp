@@ -218,6 +218,8 @@ public:
         
         if (this->verbose())
             gmsh::option::setNumber("General.Terminal", 1);
+        else
+            gmsh::option::setNumber("General.Terminal", 0);
         
         gmsh::open( s ); //HANDLE ERRORS!
         gmsh::model::mesh::generate( 3 /*dimension*/ );
@@ -435,6 +437,8 @@ public:
         
         if (this->verbose())
             gmsh::option::setNumber("General.Terminal", 1);
+        else
+            gmsh::option::setNumber("General.Terminal", 0);
         
         gmsh::open( s ); //HANDLE ERRORS!
         gmsh::model::mesh::generate( 2 /*dimension*/ );
@@ -936,6 +940,8 @@ public:
         
         if (this->verbose())
             gmsh::option::setNumber("General.Terminal", 1);
+        else
+            gmsh::option::setNumber("General.Terminal", 0);
         
         gmsh::open( s ); //HANDLE ERRORS!
         gmsh::model::mesh::generate( 3 /*dimension*/ );
