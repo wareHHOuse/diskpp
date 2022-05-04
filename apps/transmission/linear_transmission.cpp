@@ -29,6 +29,8 @@
 #include "sol/sol.hpp"
 #include "mumps.hpp"
 
+#include "sgr.hpp"
+
 #define PARDISO_IN_CORE                 0
 #define PARDISO_OUT_OF_CORE_IF_NEEDED   1
 #define PARDISO_OUT_OF_CORE_ALWAYS      2
@@ -394,16 +396,15 @@ struct problem_data_lua_base : public problem_data_base<Mesh>
 {
     sol::state lua;
 
-    static_assert(Mesh::dimension == 2 or Mesh::dimension == 3, "Invalid mesh dimension");
+    bool m_state_valid;
 
     problem_data_lua_base()
-    {
-        std::string script_filename;
-        if constexpr (Mesh::dimension == 2)
-            script_filename = "linear_transmission_2D.lua";
-        if constexpr (Mesh::dimension == 3)
-            script_filename = "linear_transmission_3D.lua";
+        : m_state_valid(false)
+    {}
 
+    void
+    open_problem_definitions(const std::string& script_filename)
+    {
         lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io);
         auto script = lua.script_file(script_filename);
         if (not script.valid())
@@ -430,10 +431,23 @@ struct problem_data_lua_base : public problem_data_base<Mesh>
 
         if (not lua["f2"].valid())
             throw std::runtime_error("Function 'f2' not defined.");
+        
+        if (not lua["testcase_name"].valid())
+            throw std::runtime_error("Test case name not defined");
 
+        std::string tn = lua["testcase_name"];
+        std::cout << "Test case: " << sgr::yellowfg << tn << sgr::nofg << std::endl;
+
+        m_state_valid = true;
+    }
+
+    void ensure_state_valid() {
+        if (!m_state_valid)
+            throw std::runtime_error("Problem definition not valid");
     }
 
     std::string solver(){
+        ensure_state_valid();
         auto sname = lua["solver"];
         if (sname.valid())
             return sname;
@@ -441,10 +455,12 @@ struct problem_data_lua_base : public problem_data_base<Mesh>
     }
 
     int omega1(void) {
+        ensure_state_valid();
         return lua["omega1"].get_or(1);
     }
 
     int omega2(void) {
+        ensure_state_valid();
         return lua["omega2"].get_or(2);
     }
 };
@@ -465,30 +481,36 @@ struct problem_data_lua<Mesh<T,2,Storage>> : public problem_data_lua_base<Mesh<T
     problem_data_lua() {}
 
     scalar_type u1(const mesh_type&, const point_type& pt) {
+        this->ensure_state_valid();
         return this->lua["u1"](pt.x(), pt.y());
     }
 
     scalar_type u2(const mesh_type& msh, const point_type& pt) {
+        this->ensure_state_valid();
         return this->lua["u2"](pt.x(), pt.y());
     }
 
     vector_type grad_u1(const mesh_type&, const point_type& pt) {
+        this->ensure_state_valid();
         scalar_type vx, vy;
         sol::tie(vx, vy) = this->lua["grad_u1"](pt.x(), pt.y());
         return vector_type(vx, vy);
     }
 
     vector_type grad_u2(const mesh_type& msh, const point_type& pt) {
+        this->ensure_state_valid();
         scalar_type vx, vy;
         sol::tie(vx, vy) = this->lua["grad_u2"](pt.x(), pt.y());
         return vector_type(vx, vy);
     }
 
     scalar_type f1(const mesh_type&, const point_type& pt) {
+        this->ensure_state_valid();
         return this->lua["f1"](pt.x(), pt.y());
     }
 
     scalar_type f2(const mesh_type& msh, const point_type& pt) {
+        this->ensure_state_valid();
         return this->lua["f2"](pt.x(), pt.y());
     }
 };
@@ -506,37 +528,43 @@ struct problem_data_lua<Mesh<T,3,Storage>> : public problem_data_lua_base<Mesh<T
     problem_data_lua() {}
 
     scalar_type u1(const mesh_type&, const point_type& pt) {
+        this->ensure_state_valid();
         return this->lua["u1"](pt.x(), pt.y(), pt.z());
     }
 
     scalar_type u2(const mesh_type& msh, const point_type& pt) {
+        this->ensure_state_valid();
         return this->lua["u2"](pt.x(), pt.y(), pt.z());
     }
 
     vector_type grad_u1(const mesh_type&, const point_type& pt) {
+        this->ensure_state_valid();
         scalar_type vx, vy, vz;
         sol::tie(vx, vy, vz) = this->lua["grad_u1"](pt.x(), pt.y(), pt.z());
         return vector_type(vx, vy, vz);
     }
 
     vector_type grad_u2(const mesh_type& msh, const point_type& pt) {
+        this->ensure_state_valid();
         scalar_type vx, vy, vz;
         sol::tie(vx, vy, vz) = this->lua["grad_u2"](pt.x(), pt.y(), pt.z());
         return vector_type(vx, vy, vz);
     }
 
     scalar_type f1(const mesh_type&, const point_type& pt) {
+        this->ensure_state_valid();
         return this->lua["f1"](pt.x(), pt.y(), pt.z());
     }
 
     scalar_type f2(const mesh_type& msh, const point_type& pt) {
+        this->ensure_state_valid();
         return this->lua["f2"](pt.x(), pt.y(), pt.z());
     }
 };
 
 /***************************************************************************/
 template<typename Mesh>
-void test(Mesh& msh, size_t degree)
+void lt_solver(Mesh& msh, size_t degree, const std::string& pbdefs_fn)
 {
     using T = typename Mesh::coordinate_type;
 
@@ -548,6 +576,7 @@ void test(Mesh& msh, size_t degree)
     }
 
     struct problem_data_lua<Mesh> pd;
+    pd.open_problem_definitions(pbdefs_fn);
 
     if ( subdom_tags.find( pd.omega1() ) == subdom_tags.end() )
     {
@@ -784,11 +813,13 @@ void test(Mesh& msh, size_t degree)
         std::cout << "Eigen SparseLU" << std::endl;
         SparseLU<SparseMatrix<T>, COLAMDOrdering<int> >   solver;
         solver.analyzePattern(LHS);
+        /*
         if ( solver.info() != Eigen::Success )
         {
             std::cout << "SparseLU failed." << std::endl;
             return; 
         }
+        */
         solver.factorize(LHS);
         sol = solver.solve(RHS); 
     }
@@ -955,12 +986,13 @@ int main(int argc, char * const *argv)
 
     int degree = 0;
     const char *mesh_filename = nullptr;
+    const char *pbdefs_filename = nullptr;
     T scalefactor = 1.0;
     T displacement_x = 0.0;
     T displacement_y = 0.0;
 
     int ch;
-    while ( (ch = getopt(argc, argv, "k:nm:s:x:y:")) != -1 )
+    while ( (ch = getopt(argc, argv, "k:nm:p:s:x:y:")) != -1 )
     {
         switch(ch)
         {
@@ -974,6 +1006,10 @@ int main(int argc, char * const *argv)
 
             case 'm': /* Mesh filename */
                 mesh_filename = optarg;
+                break;
+
+            case 'p': /* Problem definitions filename */
+                pbdefs_filename = optarg;
                 break;
 
             case 's': /* Scale factor (only for FVCA5) */
@@ -1001,6 +1037,12 @@ int main(int argc, char * const *argv)
         return -1;
     }
 
+    if (!pbdefs_filename)
+    {
+        std::cout << "Please specify problem definitions (-p)" << std::endl;
+        return -1;
+    }
+
 #ifdef HAVE_GMSH
     /* GMSH 2D simplicials */
     if (std::regex_match(mesh_filename, std::regex(".*\\.geo2s$") ))
@@ -1012,7 +1054,7 @@ int main(int argc, char * const *argv)
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        test(msh, degree);
+        lt_solver(msh, degree, pbdefs_filename);
     }
 
     /* GMSH 3D simplicials */
@@ -1025,7 +1067,7 @@ int main(int argc, char * const *argv)
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        test(msh, degree);
+        lt_solver(msh, degree, pbdefs_filename);
     }
 
     /* GMSH 3D generic */
@@ -1038,7 +1080,7 @@ int main(int argc, char * const *argv)
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        test(msh, degree);
+        lt_solver(msh, degree, pbdefs_filename);
     }
 #endif /* HAVE_GMSH */
 
@@ -1061,7 +1103,7 @@ int main(int argc, char * const *argv)
 
         msh.transform(tr);
 
-        test(msh, degree);
+        lt_solver(msh, degree, pbdefs_filename);
         return 0;
     }
 
