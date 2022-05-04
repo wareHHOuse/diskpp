@@ -357,5 +357,21 @@ int main(int argc, char **argv)
         
         return 0;
     }
+
+#ifdef HAVE_GMSH
+    /* GMSH 2D simplicials */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.geo2s$") ))
+    {
+        std::cout << "Guessed mesh format: GMSH 2D simplicials" << std::endl;
+        disk::simplicial_mesh<T,2> msh;
+        disk::gmsh_geometry_loader< disk::simplicial_mesh<T,2> > loader;
+
+        loader.read_mesh(mesh_filename);
+        loader.populate_mesh(msh);
+
+        run_diffusion_solver(msh, degree, stab_param);
+    }
+#endif
+
 }
 
