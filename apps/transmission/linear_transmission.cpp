@@ -1048,12 +1048,14 @@ int main(int argc, char * const *argv)
     if (!mesh_filename)
     {
         std::cout << "Please specify mesh filename (-m)" << std::endl;
+        usage(argv[0]);
         return -1;
     }
 
     if (!pbdefs_filename)
     {
         std::cout << "Please specify problem definitions (-p)" << std::endl;
+        usage(argv[0]);
         return -1;
     }
 
