@@ -82,7 +82,7 @@ set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
 #add_subdirectory(contrib/solver_wrappers)
 #set(LINK_LIBS ${LINK_LIBS} SOLVER_WRAPPERS)
 
-include_directories(contrib/sgr)
+include_directories(refactor_old_diskpp_code/contrib/sgr)
 
 ######################################################################
 ## Helpers for compiler identification
@@ -220,7 +220,7 @@ set(CMAKE_CXX_FLAGS_RELEASENATIVE "-O3 -DNDEBUG -march=native")
 #include_directories(core contrib)
 
 set(SOL2_BUILD_LUA OFF CACHE BOOL "Override sol2 build lua option")
-add_subdirectory(contrib/sol2)
+add_subdirectory(refactor_old_diskpp_code/contrib/sol2)
 set(LINK_LIBS ${LINK_LIBS} sol2::sol2)
 
 #include_directories(contrib/sol2/include)

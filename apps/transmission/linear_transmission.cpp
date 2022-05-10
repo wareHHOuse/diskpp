@@ -980,6 +980,19 @@ void lt_solver(Mesh& msh, size_t degree, const std::string& pbdefs_fn)
     silo_db.add_variable("mesh", u_ref);
 }
 
+static void
+usage(const char *progname)
+{
+    std::cout << "Usage: " << progname << " <options>" << std::endl;
+    std::cout << " -k <integer>     Polynomial degree" << std::endl;
+    std::cout << " -n               Crash if NaNs are generated" << std::endl;
+    std::cout << " -m <string>      Mesh file name" << std::endl;
+    std::cout << " -p <string>      Problem definition file name" << std::endl;
+    std::cout << " -s <float>       Scale factor (Only FVCA5)" << std::endl;
+    std::cout << " -x <float>       X shift (Only FVCA5)" << std::endl;
+    std::cout << " -y <float>       Y shift (Only FVCA5)" << std::endl;
+}
+
 int main(int argc, char * const *argv)
 {
     using T = double;
@@ -1027,6 +1040,7 @@ int main(int argc, char * const *argv)
             case '?':
             default:
                 std::cout << "Invalid option" << std::endl;
+                usage(argv[0]);
                 return -1;
         }
     }
