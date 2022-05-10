@@ -9,7 +9,7 @@ BooleanDifference(5) = { Volume{4}; Delete; }{ Volume{3}; };
 
 Coherence;
 
-Point(42) = { 0.5, 0.5, 0.5 };
+//Point(42) = { 0.5, 0.5, 0.5 };
 
-MeshSize{ PointsOf{ Volume{:}; } } = 0.05;
-MeshSize{ 42 } = 0.0001;
+MeshSize{ PointsOf{ Volume{:}; } } = 0.4;
+//MeshSize{ 42 } = 0.0001;

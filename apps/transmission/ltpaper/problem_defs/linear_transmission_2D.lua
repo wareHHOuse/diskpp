@@ -2,6 +2,7 @@ solver = "pardiso"
 
 --[[ TEST CASE 1: regular function ]]--
 testcase_regular_1 = {};
+testcase_regular_1.testcase_name = "Regular 2D";
 
 testcase_regular_1.u1 = function (x, y)
     return math.cos(math.pi*x) * math.cos(math.pi*y);
@@ -33,13 +34,10 @@ testcase_regular_1.f2 = function (x, y)
     return twopisq * math.sin(math.pi*x) * math.sin(math.pi*y);
 end
 
-testcase_regular_1.testcase_name = "Regular 2D";
-
-
-
 
 --[[ TEST CASE 2: singularity ]]--
 testcase_singularity = {};
+testcase_singularity.testcase_name = "Singularity 2D";
 
 testcase_singularity.u1 = function (x, y)
     local num = x*y;
@@ -80,15 +78,35 @@ testcase_singularity.f2 = function (x, y)
     return a + b + c + d + e;
 end
 
-testcase_singularity.testcase_name = "Singularity 2D";
 
+--[[ TEST CASE 3: nonsmooth ]]--
+testcase_nonsmooth = {};
+testcase_nonsmooth.testcase_name = "Nonsmooth 2D";
 
+testcase_nonsmooth.u1 = function(x, y)
+    return x*y/(x^2 + y^2) - 5*math.log(5)/14 + 13*math.log(2)/14;
+end
+
+testcase_nonsmooth.grad_u1 = function(x, y)
+    local gx = -2*x^2*y/(x^2 + y^2)^2 + y/(x^2 + y^2);
+    local gy = -2*x*y^2/(x^2 + y^2)^2 + x/(x^2 + y^2);
+    return gx, gy;
+end
+
+testcase_nonsmooth.f1 = function(x, y)
+    return 8*x^3*y/(x^2 + y^2)^3 + 8*x*y^3/(x^2 + y^2)^3 - 12*x*y/(x^2 + y^2)^2;
+end
+
+testcase_nonsmooth.omega1 = 10;
+testcase_nonsmooth.omega2 = 11;
 
 
 --[[ SELECT TEST CASE ]]--
 testcase = testcase_regular_1;
 
 --[[ DO NOT TOUCH ]]--
+omega1 = testcase.omega1
+omega2 = testcase.omega2
 u1 = testcase.u1;
 u2 = testcase.u2;
 grad_u1 = testcase.grad_u1;
