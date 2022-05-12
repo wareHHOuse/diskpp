@@ -121,7 +121,7 @@ testcase_nonsmooth.grad_u2 = function(x, y)
 end
 
 testcase_nonsmooth.f1 = function(x, y)
-    return -(8*x^3*y/(x^2 + y^2)^3 + 8*x*y^3/(x^2 + y^2)^3 - 12*x*y/(x^2 + y^2)^2);
+    return -8*x^3*y/(x^2 + y^2)^3 - 8*x*y^3/(x^2 + y^2)^3 + 12*x*y/(x^2 + y^2)^2;
 end
 
 testcase_nonsmooth.f2 = function(x, y)
