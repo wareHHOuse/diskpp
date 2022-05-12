@@ -80,11 +80,23 @@ end
 
 
 --[[ TEST CASE 3: nonsmooth ]]--
+function ctop(x, y)
+    local r = math.sqrt(x*x + y*y);
+    local theta = math.atan2(y, x);
+    return r, theta;
+end
+
 testcase_nonsmooth = {};
 testcase_nonsmooth.testcase_name = "Nonsmooth 2D";
 
 testcase_nonsmooth.u1 = function(x, y)
     return x*y/(x^2 + y^2) - 5*math.log(5)/14 + 13*math.log(2)/14;
+end
+
+testcase_nonsmooth.u2 = function(x, y)
+    c = 0.214582922451721;
+    r, t = ctop(x, y);
+    return r^(2/3)*math.sin(2*t/3) - c;
 end
 
 testcase_nonsmooth.grad_u1 = function(x, y)
@@ -93,8 +105,27 @@ testcase_nonsmooth.grad_u1 = function(x, y)
     return gx, gy;
 end
 
+testcase_nonsmooth.grad_u2 = function(x, y)
+    r, t = ctop(x, y);
+    local u_r = 2*math.sin(2*t/3)/(3*r^(1/3))
+    local u_t = 2*r^(2/3)*math.cos(2*t/3)/3
+ 
+    local xxyy = x*x + y*y;
+    local a11 = x/math.sqrt(xxyy);
+    local a12 = y/xxyy;
+    local a21 = y/math.sqrt(xxyy);
+    local a22 = x/xxyy;
+    local u_x = a11*u_r + a12*u_t;
+    local u_y = a21*u_r + a22*u_t;
+    return u_x, u_y;
+end
+
 testcase_nonsmooth.f1 = function(x, y)
-    return 8*x^3*y/(x^2 + y^2)^3 + 8*x*y^3/(x^2 + y^2)^3 - 12*x*y/(x^2 + y^2)^2;
+    return -(8*x^3*y/(x^2 + y^2)^3 + 8*x*y^3/(x^2 + y^2)^3 - 12*x*y/(x^2 + y^2)^2);
+end
+
+testcase_nonsmooth.f2 = function(x, y)
+    return 0;
 end
 
 testcase_nonsmooth.omega1 = 10;
@@ -102,7 +133,7 @@ testcase_nonsmooth.omega2 = 11;
 
 
 --[[ SELECT TEST CASE ]]--
-testcase = testcase_regular_1;
+testcase = testcase_nonsmooth;
 
 --[[ DO NOT TOUCH ]]--
 omega1 = testcase.omega1

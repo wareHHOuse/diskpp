@@ -717,6 +717,24 @@ void lt_solver(Mesh& msh, size_t degree, const std::string& pbdefs_fn)
         RHS.segment(fcbase, fbs) += g2;
     };
 
+    double volume = 0.0;
+    double omega2_integral = 0.0;
+    for (auto& cl : msh)
+    {
+        auto di = msh.domain_info(cl);
+        if ( di.tag() == internal_tag )
+            continue;
+        
+        auto qps = integrate(msh, cl, 10);
+        for (auto& qp : qps)
+        {   volume += qp.weight();
+            omega2_integral += qp.weight() * pd.u2(msh, qp.point());
+        }
+    }
+
+    std::cout << "mean of u₂ on Ω₂: " << std::setprecision(15);
+    std::cout << omega2_integral/volume << std::endl;
+
     /* Assembly loop */
     for (auto& cl : msh)
     {
