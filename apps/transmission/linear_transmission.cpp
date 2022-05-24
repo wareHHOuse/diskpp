@@ -306,6 +306,7 @@ struct problem_data_base
 /***************************************************************************/
 template<typename T> struct problem_data;
 
+#if 0
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 struct problem_data<Mesh<T,2,Storage>> : problem_data_base<Mesh<T,2,Storage>>
 {
@@ -346,6 +347,65 @@ struct problem_data<Mesh<T,2,Storage>> : problem_data_base<Mesh<T,2,Storage>>
         return 2*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
     }
 };
+#endif
+
+
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+struct problem_data<Mesh<T,2,Storage>> : problem_data_base<Mesh<T,2,Storage>>
+{
+    using mesh_type     = Mesh<T,2,Storage>;
+    using cell_type     = typename mesh_type::cell_type;
+    using face_type     = typename mesh_type::face_type;
+    using point_type    = typename mesh_type::point_type;
+    using scalar_type   = typename mesh_type::coordinate_type;
+    using vector_type   = Eigen::Matrix<scalar_type, 2, 1>;
+
+    scalar_type u1(const mesh_type&, const point_type& pt) {
+        double aa = (13*std::log(2)-5*std::log(5))/14;
+        double aux = std::pow(pt.x(),2)+std::pow(pt.y(),2);
+        return pt.x()*pt.y()*std::pow(aux, -1)-aa;
+    }
+
+    scalar_type u2(const mesh_type& msh, const point_type& pt) {
+        std::complex<double> mycomplex (pt.y()-pt.x(),-pt.x()-pt.y()); 
+        double a = std::arg(mycomplex)+0.75*M_PI;
+        double r = std::pow(pt.x(), 2)+std::pow(pt.y(), 2);
+        return std::pow(r,1./3)*sin((2./3)* a) - 1.08782791064557;
+    }
+
+    vector_type grad_u1(const mesh_type&, const point_type& pt) {
+        double aux = std::pow(pt.x(),2)+std::pow(pt.y(),2);
+        
+        vector_type ret;
+        ret(0) = pt.y()*(std::pow(pt.y(),2)-std::pow(pt.x(),2))*std::pow(aux,-2),
+        ret(1) = pt.x()*(std::pow(pt.x(),2)-std::pow(pt.y(),2))*std::pow(aux,-2);
+        return ret;
+    }
+
+    vector_type grad_u2(const mesh_type& msh, const point_type& pt) {
+        std::complex<double> mycomplex (pt.y()-pt.x(),-pt.x()-pt.y()); 
+        double a = std::arg(mycomplex)+0.75*M_PI;
+        double r = std::pow(pt.x(), 2)+std::pow(pt.y(), 2);
+        vector_type ret;
+                     
+        ret(0) = -(2./3)*std::pow(r,-1./6) * sin(a/3),
+        ret(1) = (2./3)*std::pow(r,-1./6) * cos(a/3);          
+        return ret;
+    }
+
+    scalar_type f1(const mesh_type&, const point_type& pt) {
+        double aux = std::pow(pt.x(),2)+std::pow(pt.y(),2);          
+        return 4*pt.x()*pt.y()*std::pow(aux, -2);
+    }
+
+    scalar_type f2(const mesh_type& msh, const point_type& pt) {
+        return 0.0;
+    }
+};
+
+
+
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 struct problem_data<Mesh<T,3,Storage>> : problem_data_base<Mesh<T,3,Storage>>
@@ -717,23 +777,38 @@ void lt_solver(Mesh& msh, size_t degree, const std::string& pbdefs_fn)
         RHS.segment(fcbase, fbs) += g2;
     };
 
-    double volume = 0.0;
+    /* Compute averages to check */
+    double volume1 = 0.0;
+    double volume2 = 0.0;
+    double omega1_integral = 0.0;
     double omega2_integral = 0.0;
     for (auto& cl : msh)
     {
+        auto qps = integrate(msh, cl, 10);
+
         auto di = msh.domain_info(cl);
         if ( di.tag() == internal_tag )
-            continue;
-        
-        auto qps = integrate(msh, cl, 10);
-        for (auto& qp : qps)
-        {   volume += qp.weight();
-            omega2_integral += qp.weight() * pd.u2(msh, qp.point());
+        {
+            for (auto& qp : qps)
+            {
+                volume1 += qp.weight();
+                omega1_integral += qp.weight() * pd.u1(msh, qp.point());
+            }
+        }
+        else
+        {
+            for (auto& qp : qps)
+            {
+                volume2 += qp.weight();
+                omega2_integral += qp.weight() * pd.u2(msh, qp.point());
+            }
         }
     }
 
+    std::cout << "mean of u₁ on Ω₁: " << std::setprecision(15);
+    std::cout << omega1_integral/volume1 << std::endl;
     std::cout << "mean of u₂ on Ω₂: " << std::setprecision(15);
-    std::cout << omega2_integral/volume << std::endl;
+    std::cout << omega2_integral/volume2 << std::defaultfloat << std::endl;
 
     /* Assembly loop */
     for (auto& cl : msh)

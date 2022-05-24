@@ -45,9 +45,10 @@ testcase_singularity.omega1 = 3;
 testcase_singularity.omega2 = 5;
 
 testcase_singularity.u1 = function (x, y, z)
-    num = 1 - x*x - y*y - z*z;
-    den = (x - 0.55)^2 + (y - 0.55)^2 + (z - 0.55)^2;
-    return num/den;
+    local num = 1 - x*x - y*y - z*z;
+    local den = (x - 0.55)^2 + (y - 0.55)^2 + (z - 0.55)^2;
+    local c = 0.680554952610983;
+    return num/den - c;
 end
 
 testcase_singularity.u2 = function (x, y, z)

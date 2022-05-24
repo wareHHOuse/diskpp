@@ -10,4 +10,4 @@ BooleanDifference(11) = { Surface{3}; Delete; }{ Surface{4}; Delete; };
 
 Coherence;
 
-MeshSize{:} = 0.01;
+MeshSize{:} = 0.05;
