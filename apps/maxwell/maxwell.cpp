@@ -972,11 +972,14 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, parameter_loader<Mesh<Co
         auto CR = disk::curl_reconstruction_pk(msh, cl, chdi);
         auto ST = disk::curl_hdg_stabilization(msh, cl, chdi);
         auto MM = disk::make_vector_mass_oper(msh, cl, chdi);
+
+        auto stabparam = omega*mu0*std::sqrt(real(epsr)/real(mur));// omega*(mu0/Z);
+
         Matrix<scalar_type, Dynamic, Dynamic> lhs =
-            (1./mur) * CR.second + (ksq*epsr - jwmu0*sigma)*(4.0*ST - MM);
+            (1./mur) * CR.second - (ksq*epsr - jwmu0*sigma)*MM + stabparam*ST;
 
         Matrix<scalar_type, Dynamic, Dynamic> lhst =
-            (1./mur) * CR.second + (ksq - jwmu0*sigma)*4.0*ST;
+            (1./mur) * CR.second + stabparam*ST;
 
         Matrix<scalar_type, Dynamic, 1> rhs =
             Matrix<scalar_type, Dynamic, 1>::Zero(lhs.rows());
@@ -1642,6 +1645,23 @@ int main(int argc, char **argv)
         //disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
         disk::generic_mesh<T,3> msh;
         disk::gmsh_geometry_loader< disk::generic_mesh<T,3> > loader;
+        
+        loader.read_mesh(mesh_filename);
+        loader.populate_mesh(msh);
+
+        vector_wave_solver_complex_driver(msh, param_filename);
+
+        return 0;
+    }
+
+    /* GMSH */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.geo3s$") ))
+    {
+        std::cout << "Guessed mesh format: GMSH" << std::endl;
+        disk::simplicial_mesh<T,3> msh;
+        disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
+        //disk::generic_mesh<T,3> msh;
+        //disk::gmsh_geometry_loader< disk::generic_mesh<T,3> > loader;
         
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);

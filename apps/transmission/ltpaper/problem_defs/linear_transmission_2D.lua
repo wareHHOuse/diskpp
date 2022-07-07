@@ -149,7 +149,7 @@ testcase_nonsmooth.omega2 = 11;
 
 
 --[[ SELECT TEST CASE ]]--
-testcase = testcase_nonsmooth;
+testcase = testcase_regular_1;
 
 --[[ DO NOT TOUCH ]]--
 omega1 = testcase.omega1

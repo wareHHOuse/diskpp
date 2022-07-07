@@ -729,7 +729,7 @@ curl_hdg_stabilization(const Mesh<CoordT,3,Storage>&                     msh,
 
         rhs.block(0,0,fbs,cbs) = -llt.solve(trace);   
 
-        stab += rhs.transpose() * mass * rhs / ht;
+        stab += rhs.transpose() * mass * rhs;// / ht;
 
         offset += fbs;
     }
