@@ -32,6 +32,8 @@
 #define NODE_NAME_SIM       "sim"
 #define NODE_NAME_MATERIALS "materials"
 #define NODE_NAME_SILO      "silo"
+#define NODE_NAME_DOMAIN    "domain"
+#define NODE_NAME_BOUNDARY  "boundary"
 
 
 
@@ -140,7 +142,7 @@ public:
         
         lua[NODE_NAME_CONST]["eps0"] = EPS_0;
         lua[NODE_NAME_CONST]["mu0"] = MU_0;
-        lua["boundary"] = lua.create_table();
+        lua[NODE_NAME_BOUNDARY] = lua.create_table();
     }
     sol::state& lua_state() { return lua; }
 
@@ -267,7 +269,7 @@ public:
 
     size_t order()
     {
-        return lua["order"];
+        return lua[NODE_NAME_SIM]["order"];
     }
 
     #if 0
@@ -275,7 +277,7 @@ public:
     dirichlet_data(size_t tag, const point_type& pt)
     {
         Eigen::Matrix<complex_type,3,1> ret = Eigen::Matrix<complex_type,3,1>::Zero();
-        auto bnd = lua["boundary"][tag];
+        auto bnd = lua[NODE_NAME_BOUNDARY][tag];
         if (not bnd.valid())
             return ret;
 
@@ -297,7 +299,7 @@ public:
 
     bool is_dirichlet(size_t bndnum)
     {
-        auto bnd_data = lua["boundary"][bndnum];
+        auto bnd_data = lua[NODE_NAME_BOUNDARY][bndnum];
         if (not bnd_data.valid())
             return true;
 
@@ -316,7 +318,7 @@ public:
         ret.source = source_type::UNDEFINED;
         ret.has_parameter = false;
 
-        auto bnd_data = lua["boundary"][bndnum];
+        auto bnd_data = lua[NODE_NAME_BOUNDARY][bndnum];
         if ( bnd_data.valid() )
         {
             auto kind = bnd_data["kind"];
@@ -339,17 +341,30 @@ public:
         return ret;
     }
 
-    real_type
-    impedance(size_t bndnum)
+    bool is_scattered_field_region(size_t di)
     {
-        real_type z_data = lua["boundary"][bndnum]["value"];
+        auto dom_data = lua[NODE_NAME_DOMAIN][di];
+        if ( dom_data.valid() )
+        {
+            auto scattered_field = dom_data["scattered_field"];
+            if (scattered_field.valid() and scattered_field == true)
+                return true;
+        }
+
+        return false;
+    }
+
+    real_type
+    bnd_param_value(size_t bndnum)
+    {
+        real_type z_data = lua[NODE_NAME_BOUNDARY][bndnum]["value"];
         return z_data;    
     }
 
     Eigen::Matrix<complex_type,3,1>
-    plane_wave_source(size_t bndnum, const point_type& pt)
+    eval_boundary_source(size_t bndnum, const point_type& pt)
     {
-        sol::function source = lua["boundary"][bndnum]["source"];
+        sol::function source = lua[NODE_NAME_BOUNDARY][bndnum]["source"];
         complex3_type src = source(bndnum, pt.x(), pt.y(), pt.z());
 
         Eigen::Matrix<complex_type,3,1> ret;
@@ -598,6 +613,7 @@ struct hho_maxwell_solver_state
     disk::hho_degree_info                           hdi;
     maxwell_hho_assembler<mesh_type, scalar_type>   assm;
     disk::dynamic_vector<scalar_type>               sol;
+    disk::dynamic_vector<scalar_type>               sol_full;
 };
 
 
@@ -608,6 +624,9 @@ compute_element_contribution(hho_maxwell_solver_state<Mesh>& state,
                              config_loader<clT>& cfg,
                              typename Mesh::cell_type& cl)
 {
+    using mesh_type = Mesh;
+    using cell_type = typename Mesh::cell_type;
+    using face_type = typename Mesh::face_type;
     using scalar_type = typename hho_maxwell_solver_state<Mesh>::scalar_type;
     using point_type = typename Mesh::point_type;
 
@@ -671,12 +690,12 @@ compute_element_contribution(hho_maxwell_solver_state<Mesh>& state,
         {
             auto bnd_Z = Z;
             if ( bcd.has_parameter )
-                bnd_Z = cfg.impedance(face_tag);
+                bnd_Z = cfg.bnd_param_value(face_tag);
 
             if ( bcd.source == source_type::NON_HOMOGENEOUS )
             {
                 auto f = [&](const point_type& pt) -> Matrix<std::complex<double>,3,1> {
-                    return cfg.plane_wave_source(face_tag, pt);
+                    return cfg.eval_boundary_source(face_tag, pt);
                 };
                 auto jw = scalar_type(0,omega);
                 auto [Y, y] = disk::make_plane_wave_term<std::complex<double>>(msh, fc, fd, f);
@@ -688,6 +707,47 @@ compute_element_contribution(hho_maxwell_solver_state<Mesh>& state,
                 auto Y = disk::make_impedance_term(msh, fc, fd);
                 lhs.block(cbs+iF*fbs, cbs+iF*fbs, fbs, fbs) += (jwmu0/bnd_Z)*Y;
             }
+        }
+
+        if ( bi.is_internal() and bcd.condition == boundary_type::TFSF_INTERFACE )
+        {
+            if ( cfg.is_scattered_field_region(di.tag()) )
+            {
+                auto bnd_Z = Z;
+                if ( bcd.has_parameter )
+                    bnd_Z = cfg.bnd_param_value(face_tag);
+
+                auto n = normal(msh, cl, fc);
+
+                auto f = [&](const point_type& pt) -> Matrix<std::complex<double>,3,1> {
+                    return cfg.eval_boundary_source(face_tag, pt);
+                };
+
+                const auto fb = disk::make_vector_monomial_tangential_basis<
+                    mesh_type, face_type, scalar_type>(
+                        msh, fc, hdi.face_degree()); 
+
+                disk::dynamic_matrix<scalar_type> tfsf_mass =
+                    disk::dynamic_matrix<scalar_type>::Zero(fbs, fbs);
+
+                disk::dynamic_vector<scalar_type> tfsf_rhs =
+                    disk::dynamic_vector<scalar_type>::Zero(fbs);
+
+                auto qps = disk::integrate(msh, fc, 2*hdi.face_degree());
+                for (const auto& qp : qps)
+                {
+                    auto f_phi = fb.eval_functions(qp.point());
+                    tfsf_mass += qp.weight() * f_phi * f_phi.transpose();
+                    tfsf_rhs += qp.weight() * f_phi * f(qp.point());
+                }
+
+                disk::dynamic_vector<scalar_type> s =
+                    disk::dynamic_vector<scalar_type>::Zero(lhs.rows()); 
+                s.segment(cbs+iF*fbs, fbs) = tfsf_mass.ldlt().solve(tfsf_rhs);
+                rhs += lhst*s;
+                rhs.segment(cbs+iF*fbs, fbs) += (jwmu0/bnd_Z)*tfsf_rhs;
+            }
+
         }
 
     }
@@ -752,14 +812,53 @@ template<typename Mesh, typename clT>
 void
 solve(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
 {
+    using mesh_type = Mesh;
+    using cell_type = typename Mesh::cell_type;
+    using face_type = typename Mesh::face_type;
     using scalar_type = typename hho_maxwell_solver_state<Mesh>::scalar_type;
+
     auto& msh = state.msh;
     auto& assm = state.assm;
     auto& sol = state.sol;
+    auto& hdi = state.hdi;
 
     sol = disk::dynamic_vector<scalar_type>::Zero(assm.syssz);
     std::cout << "Running MUMPS" << std::endl;
     sol = mumps_lu(assm.LHS, assm.RHS);
+
+    std::cout << "Expanding solution" << std::endl;
+    auto cd = hdi.cell_degree();
+    auto fd = hdi.face_degree();
+    auto cbs = disk::vector_basis_size(cd, 3, 3);
+    auto fbs = disk::vector_basis_size(fd, 2, 2);
+    auto fullsz = cbs*msh.cells_size() + fbs*msh.faces_size();
+
+    state.sol_full = disk::dynamic_vector<scalar_type>::Zero(fullsz);
+    
+    size_t cell_i = 0;
+    for (auto& cl : msh)
+    {
+        auto [lhs, rhs, dd] = compute_element_contribution(state, cfg, cl);
+        auto cb = disk::make_vector_monomial_basis<mesh_type, cell_type, scalar_type>(msh, cl, state.hdi.cell_degree());
+
+        auto edofs = assm.get_element_dofs(msh, cl, sol);
+        edofs += dd;
+
+        Matrix<scalar_type, Dynamic, 1> esol = disk::static_decondensation(lhs, rhs, edofs);
+    
+        state.sol_full.segment(cbs*cell_i, cbs) = esol.head(cbs);
+
+        auto fcs = faces(msh, cl);
+        for (size_t iF = 0; iF < fcs.size(); iF++)
+        {
+            auto& fc = fcs[iF];
+            auto lofs = cbs + fbs*iF;
+            auto gofs = cbs*msh.cells_size() + fbs*offset(msh, fc);
+            state.sol_full.segment(gofs, fbs) = esol.segment(lofs, fbs);
+        }
+        cell_i++;
+    }
+    std::cout << "Done" << std::endl;
 }
 
 template<typename Mesh, typename clT>
@@ -774,6 +873,7 @@ save_to_silo(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
     auto& msh = state.msh;
     auto& assm = state.assm;
     auto& sol = state.sol;
+    auto& hdi = state.hdi;
 
     auto& lua = cfg.lua_state();
 
@@ -784,19 +884,14 @@ save_to_silo(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
     size_t cell_i = 0;
     for (auto& cl : msh)
     {
-        auto [lhs, rhs, dd] = compute_element_contribution(state, cfg, cl);
         auto cb = disk::make_vector_monomial_basis<mesh_type, cell_type, scalar_type>(msh, cl, state.hdi.cell_degree());
-
-        auto edofs = assm.get_element_dofs(msh, cl, sol);
-        edofs += dd;
-
-        Matrix<scalar_type, Dynamic, 1> esol = disk::static_decondensation(lhs, rhs, edofs);
+        auto cbs = cb.size();
+        Matrix<scalar_type, Dynamic, 1> esolT = state.sol_full.segment(cbs*cell_i, cbs);
 
         auto bar = barycenter(msh, cl);
-        Matrix<scalar_type,Dynamic,1> esolseg = esol.segment(0, cb.size());
 
         auto phi = cb.eval_functions(bar);
-        auto ls = phi.transpose()*esolseg;
+        auto ls = phi.transpose()*esolT;
 
         data_ex[cell_i] = ls(0);
         data_ey[cell_i] = ls(1);
@@ -825,14 +920,156 @@ save_to_silo(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
     disk::silo_zonal_variable<scalar_type> ex("ex", data_ex);
     silo_db.add_variable("mesh", ex);
 
-    disk::silo_zonal_variable<scalar_type> ey("ey", data_ex);
+    disk::silo_zonal_variable<scalar_type> ey("ey", data_ey);
     silo_db.add_variable("mesh", ey);
 
-    disk::silo_zonal_variable<scalar_type> ez("ez", data_ex);
+    disk::silo_zonal_variable<scalar_type> ez("ez", data_ez);
     silo_db.add_variable("mesh", ez);
 
     disk::silo_zonal_variable<double> mag_e("mag_e", data_mag_e);
     silo_db.add_variable("mesh", mag_e);
+}
+
+template<typename Mesh, typename clT>
+clT
+compute_return_loss(hho_maxwell_solver_state<Mesh>& state,
+    config_loader<clT>& cfg, size_t face_tag)
+{
+    using mesh_type = Mesh;
+    using cell_type = typename Mesh::cell_type;
+    using face_type = typename Mesh::face_type;
+    using scalar_type = std::complex<double>;
+    using point_type = typename Mesh::point_type;
+
+    auto& msh = state.msh;
+    auto& assm = state.assm;
+    auto& sol_full = state.sol_full;
+    auto& hdi = state.hdi;
+
+    auto cbs = disk::vector_basis_size(hdi.cell_degree(), 3, 3);
+    auto num_cells = msh.cells_size();
+    auto c_ofs = cbs*num_cells;
+
+    size_t elem_count = 0;
+    scalar_type P_incident = 0.0;
+    scalar_type P_reflected_1 = 0.0;
+    scalar_type P_reflected_2 = 0.0;
+    scalar_type P_total = 0.0;
+
+    for ( auto& fc : faces(msh) )
+    {
+        auto bi = msh.boundary_info(fc);
+        auto tag = bi.tag();
+
+        if (bi.tag() == face_tag)
+        {
+            const auto fb = disk::make_vector_monomial_tangential_basis<
+                mesh_type, face_type, scalar_type>(
+                    msh, fc, hdi.face_degree());
+            auto fbs = fb.size();
+            
+            auto Y = disk::make_impedance_term(msh, fc, hdi.face_degree());
+
+            auto ofs = c_ofs + fbs*offset(msh,fc);
+
+            Matrix<scalar_type, Dynamic, 1> fdofs = sol_full.segment(ofs, fbs);
+            const auto qps_f = integrate(msh, fc, 2*hdi.face_degree() );
+            for (auto& qp : qps_f)
+            {
+                Matrix<scalar_type, Dynamic, 3> fphi = fb.eval_functions(qp.point());
+                Matrix<scalar_type, 3, 1> Ecalc = Matrix<scalar_type, 3, 1>::Zero();
+
+                for (size_t kk = 0; kk < fdofs.size(); kk++)
+                    Ecalc += fdofs(kk)*fphi.row(kk);
+
+                auto f = [&](const point_type& pt) -> Matrix<std::complex<double>,3,1> {
+                    return cfg.eval_boundary_source(face_tag, pt);
+                };
+
+                Matrix<scalar_type, 3, 1> Einc = f(qp.point());
+                P_reflected_1 += qp.weight() * (Ecalc - Einc).dot(Einc);
+                P_reflected_2 += qp.weight() * (Ecalc - Einc).dot(Ecalc-Einc);
+                P_incident += qp.weight() * (Einc).dot(Einc);
+                P_total += qp.weight() * (Ecalc).dot(Ecalc);
+            }
+            elem_count++;
+        }
+    }
+
+    std::cout << elem_count << std::endl;
+    std::cout << "Ref1:  " << P_reflected_1 << std::endl;
+    std::cout << "Ref2:  " << P_reflected_2 << std::endl;
+    std::cout << "Inc:   " << P_incident << std::endl;
+    std::cout << "Total: " << P_total << std::endl;
+
+    std::cout << "S11 (ref1) = " << 20.0*log10(  abs(P_reflected_1/P_incident) ) << std::endl;
+    std::cout << "S11 (ref2) = " << 10.0*log10(  abs(P_reflected_2/P_incident) ) << std::endl;
+
+    return 20.0*log10(  abs(P_reflected_1/P_incident) );
+}
+
+template<typename Mesh, typename clT>
+clT
+compute_error(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
+{
+    using mesh_type = Mesh;
+    using cell_type = typename Mesh::cell_type;
+    using face_type = typename Mesh::face_type;
+    using scalar_type = typename hho_maxwell_solver_state<Mesh>::scalar_type;
+    using point_type = typename Mesh::point_type;
+
+    auto& msh = state.msh;
+    auto& assm = state.assm;
+    auto& sol_full = state.sol_full;
+    auto& hdi = state.hdi;
+
+    auto& lua = cfg.lua_state();
+    sol::function lua_ref_fun = lua["reference_solution"];
+
+    size_t cell_i = 0;
+    scalar_type err = 0.0;
+    for (auto& cl : msh)
+    {
+        auto di = msh.domain_info(cl);
+
+        auto ref_fun = [&](const point_type& pt) -> Matrix<scalar_type, 3, 1> {
+            complex3<clT> field = lua_ref_fun(di.tag(), pt.x(), pt.y(), pt.z());
+            Matrix<scalar_type, 3, 1> ret;
+            ret(0) = field.x;
+            ret(1) = field.y;
+            ret(2) = field.z;
+            return ret;
+        };
+
+        auto cb = disk::make_vector_monomial_basis<mesh_type, cell_type, scalar_type>(msh, cl, state.hdi.cell_degree());
+        auto cbs = cb.size();
+        Matrix<scalar_type, Dynamic, 1> num_sol = state.sol_full.segment(cbs*cell_i, cbs);
+
+        Matrix<scalar_type, Dynamic, Dynamic> MM = 
+            Matrix<scalar_type, Dynamic, Dynamic>::Zero(cbs, cbs);
+    
+        Matrix<scalar_type, Dynamic, 1> rhs =
+            Matrix<scalar_type, Dynamic, 1>::Zero(cbs);
+
+        auto qps = disk::integrate(msh, cl, 2*hdi.cell_degree()+1);
+        for (auto& qp : qps)
+        {
+            auto phi = cb.eval_functions(qp.point());
+            MM += qp.weight() * phi * phi.transpose();
+            rhs += qp.weight() * phi * ref_fun( qp.point() );
+
+            Matrix<scalar_type, 3, 1> ls = phi.transpose()*num_sol;
+            Matrix<scalar_type, 3, 1> vdiff = ls - ref_fun(qp.point());
+            err += qp.weight() * vdiff.dot(vdiff);
+        }
+        
+        //Matrix<scalar_type, Dynamic, 1> ref_sol = MM.ldlt().solve(rhs);
+        //Matrix<scalar_type, Dynamic, 1> diff = ref_sol - num_sol;
+        //err += diff.dot(MM*diff);
+        cell_i++;
+    }
+
+    return std::sqrt( real(err) );
 }
 
 template<typename Mesh, typename clT>
@@ -851,11 +1088,21 @@ register_lua_functions(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>
         save_to_silo(state, cfg);
     };
 
+    auto lua_compute_error = [&]() {
+        return compute_error(state, cfg);
+    };
+
+    auto lua_compute_return_loss = [&](size_t face_tag) {
+        return compute_return_loss(state, cfg, face_tag);
+    };
+
     auto& lua = cfg.lua_state();
 
     lua["assemble"] = lua_assemble;
     lua["solve"] = lua_solve;
     lua["save_to_silo"] = lua_save_to_silo;
+    lua["compute_error"] = lua_compute_error;
+    lua["compute_return_loss"] = lua_compute_return_loss;
 }
 
 template<typename Mesh, typename clT>
@@ -864,7 +1111,7 @@ run_maxwell_solver(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cf
 {
     rusage_monitor rm;
 
-    size_t order = 1;
+    size_t order = cfg.order();
     disk::hho_degree_info chdi( disk::priv::hdi_named_args{
                                   .rd = (size_t) order,
                                   .cd = (size_t) order,
