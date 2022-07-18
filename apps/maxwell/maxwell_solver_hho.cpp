@@ -127,6 +127,11 @@ private:
                     complex3_type(const complex_type&, const complex_type&, const complex_type&)
                     >()
                 );
+
+        auto yr =[](const complex3_type& c3) -> auto { return real(c3.y); };
+        auto yi =[](const complex3_type& c3) -> auto { return imag(c3.y); };
+        lua["yr"] = yr;
+        lua["yi"] = yi;
     }
 
 public:
@@ -794,15 +799,19 @@ assemble(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
     size_t cell_i = 1;
     for (auto& cl : msh)
     {
-        std::cout << "\rAssemblying system matrix : " << cell_i << "/";
-        std::cout << msh.cells_size() << std::flush;
+        if (cell_i%100 == 0)
+        {
+            std::cout << "\rAssemblying system matrix : " << cell_i << "/";
+            std::cout << msh.cells_size() << std::flush;
+        }
         auto cbs = disk::vector_basis_size(hdi.cell_degree(), 3, 3);
         auto [lhs, rhs, dirichlet_data] = compute_element_contribution(state, cfg, cl);
         auto [LC, bC] = disk::static_condensation(lhs, rhs, cbs);
         assm.assemble(msh, cl, LC, bC, dirichlet_data);
         cell_i++;
     }
-    std::cout << std::endl;
+    std::cout << "\rAssemblying system matrix : " << cell_i << "/";
+    std::cout << msh.cells_size() << std::endl;
     assm.finalize();
 
     std::cout << "Assembly finished." << std::endl;
@@ -1031,6 +1040,10 @@ compute_error(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
     for (auto& cl : msh)
     {
         auto di = msh.domain_info(cl);
+        auto enabled = lua["err_enabled"];
+        if ( enabled.valid() )
+            if ( not enabled( di.tag() ) )
+                continue;
 
         auto ref_fun = [&](const point_type& pt) -> Matrix<scalar_type, 3, 1> {
             complex3<clT> field = lua_ref_fun(di.tag(), pt.x(), pt.y(), pt.z());
