@@ -147,6 +147,7 @@ public:
         
         lua[NODE_NAME_CONST]["eps0"] = EPS_0;
         lua[NODE_NAME_CONST]["mu0"] = MU_0;
+        lua[NODE_NAME_DOMAIN] = lua.create_table();
         lua[NODE_NAME_BOUNDARY] = lua.create_table();
     }
     sol::state& lua_state() { return lua; }
@@ -364,6 +365,27 @@ public:
     {
         real_type z_data = lua[NODE_NAME_BOUNDARY][bndnum]["value"];
         return z_data;    
+    }
+
+    Eigen::Matrix<complex_type,3,1>
+    eval_volume_source(size_t di, const point_type& pt)
+    {
+        Eigen::Matrix<complex_type,3,1> ret = Eigen::Matrix<complex_type,3,1>::Zero();
+
+        auto dom_node = lua[NODE_NAME_DOMAIN][di];
+        if (not dom_node.valid())
+            return ret;
+        
+        auto source = dom_node["source"];
+        if (not source.valid())
+            return ret;
+
+        complex3_type src = source(di, pt.x(), pt.y(), pt.z());
+
+        ret(0) = src.x;
+        ret(1) = src.y;
+        ret(2) = src.z;
+        return ret;
     }
 
     Eigen::Matrix<complex_type,3,1>
@@ -619,6 +641,7 @@ struct hho_maxwell_solver_state
     maxwell_hho_assembler<mesh_type, scalar_type>   assm;
     disk::dynamic_vector<scalar_type>               sol;
     disk::dynamic_vector<scalar_type>               sol_full;
+    disk::dynamic_vector<scalar_type>               reco;
 };
 
 
@@ -643,7 +666,7 @@ compute_element_contribution(hho_maxwell_solver_state<Mesh>& state,
     auto omega = 2*M_PI*cfg.frequency();
     auto jw = scalar_type(0,omega);
     auto jwmu0 = scalar_type(0,omega*mu0);
-    auto ksq = (eps0*omega)*(mu0*omega);
+    auto k0sq = (eps0*omega)*(mu0*omega);
 
     auto rd = hdi.reconstruction_degree();
     auto cd = hdi.cell_degree();
@@ -660,19 +683,28 @@ compute_element_contribution(hho_maxwell_solver_state<Mesh>& state,
     auto ST = disk::curl_hdg_stabilization(msh, cl, hdi);
     auto MM = disk::make_vector_mass_oper(msh, cl, hdi);
 
-    auto stabparam = omega*mu0*std::sqrt(real(epsr)/real(mur));
-
-    Matrix<scalar_type, Dynamic, Dynamic> lhs =
-        (1./mur) * CR.second - (ksq*epsr - jwmu0*sigma)*MM + stabparam*ST;
+    auto stabparam = omega*std::sqrt(real(epsr*eps0)/real(mur));
+    //auto stabparam = omega*std::sqrt(epsr*eps0/mur);
 
     Matrix<scalar_type, Dynamic, Dynamic> lhst =
         (1./mur) * CR.second + stabparam*ST;
+
+    Matrix<scalar_type, Dynamic, Dynamic> lhs =
+        lhst - (k0sq*epsr - jwmu0*sigma)*MM;
 
     Matrix<scalar_type, Dynamic, 1> rhs =
         Matrix<scalar_type, Dynamic, 1>::Zero(lhs.rows());
 
     const auto cb = make_vector_monomial_basis(msh, cl, rd);
     auto cbs = cb.size();
+
+    auto qps = disk::integrate(msh, cl, 2*cb.degree()+2);
+    for (auto& qp : qps)
+    {
+        auto phi = cb.eval_functions(qp.point());
+        rhs.segment(0, cbs) +=
+            qp.weight() * phi * cfg.eval_volume_source(di.tag(), qp.point());
+    }
 
     auto fcs = faces(msh, cl);
     auto fbs = disk::vector_basis_size(hdi.face_degree(), 2, 2);
@@ -796,7 +828,7 @@ assemble(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
 
     state.assm.initialize(state.msh, state.hdi, is_dirichlet);
 
-    size_t cell_i = 1;
+    size_t cell_i = 0;
     for (auto& cl : msh)
     {
         if (cell_i%100 == 0)
@@ -843,7 +875,8 @@ solve(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
     auto fullsz = cbs*msh.cells_size() + fbs*msh.faces_size();
 
     state.sol_full = disk::dynamic_vector<scalar_type>::Zero(fullsz);
-    
+    state.reco = disk::dynamic_vector<scalar_type>::Zero(cbs*msh.cells_size());
+
     size_t cell_i = 0;
     for (auto& cl : msh)
     {
@@ -856,6 +889,9 @@ solve(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
         Matrix<scalar_type, Dynamic, 1> esol = disk::static_decondensation(lhs, rhs, edofs);
     
         state.sol_full.segment(cbs*cell_i, cbs) = esol.head(cbs);
+
+        auto CR = disk::curl_reconstruction_pk(msh, cl, hdi);
+        state.reco.segment(cbs*cell_i, cbs) = CR.first*esol;
 
         auto fcs = faces(msh, cl);
         for (size_t iF = 0; iF < fcs.size(); iF++)
@@ -1086,6 +1122,74 @@ compute_error(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
 }
 
 template<typename Mesh, typename clT>
+clT
+compute_reconstruction_error(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
+{
+    using mesh_type = Mesh;
+    using cell_type = typename Mesh::cell_type;
+    using face_type = typename Mesh::face_type;
+    using scalar_type = typename hho_maxwell_solver_state<Mesh>::scalar_type;
+    using point_type = typename Mesh::point_type;
+
+    auto& msh = state.msh;
+    auto& assm = state.assm;
+    auto& sol_full = state.sol_full;
+    auto& hdi = state.hdi;
+
+    auto& lua = cfg.lua_state();
+    sol::function lua_ref_fun = lua["reference_reconstruction"];
+
+    size_t cell_i = 0;
+    scalar_type err_int = 0.0;
+    scalar_type err_MM = 0.0;
+
+    for (auto& cl : msh)
+    {
+        auto di = msh.domain_info(cl);
+
+        auto ref_fun = [&](const point_type& pt) -> Matrix<scalar_type, 3, 1> {
+            complex3<clT> field = lua_ref_fun(di.tag(), pt.x(), pt.y(), pt.z());
+            Matrix<scalar_type, 3, 1> ret;
+            ret(0) = field.x;
+            ret(1) = field.y;
+            ret(2) = field.z;
+            return ret;
+        };
+
+        auto cb = disk::make_vector_monomial_basis<mesh_type, cell_type, scalar_type>(msh, cl, state.hdi.cell_degree());
+        auto cbs = cb.size();
+        Matrix<scalar_type, Dynamic, 1> num_sol = state.reco.segment(cbs*cell_i, cbs);
+
+        Matrix<scalar_type, Dynamic, Dynamic> MM = 
+            Matrix<scalar_type, Dynamic, Dynamic>::Zero(cbs, cbs);
+    
+        Matrix<scalar_type, Dynamic, 1> rhs =
+            Matrix<scalar_type, Dynamic, 1>::Zero(cbs);
+
+        auto qps = disk::integrate(msh, cl, 2*hdi.cell_degree()+1);
+        for (auto& qp : qps)
+        {
+            auto phi = cb.eval_functions(qp.point());
+            MM += qp.weight() * phi * phi.transpose();
+            rhs += qp.weight() * phi * ref_fun( qp.point() );
+
+            Matrix<scalar_type, 3, 1> ls = phi.transpose()*num_sol;
+            Matrix<scalar_type, 3, 1> vdiff = ls - ref_fun(qp.point());
+            err_int += qp.weight() * vdiff.dot(vdiff);
+        }
+        
+        Matrix<scalar_type, Dynamic, 1> ref_sol = MM.ldlt().solve(rhs);
+        Matrix<scalar_type, Dynamic, 1> diff = ref_sol - num_sol;
+        err_MM += diff.dot(MM*diff);
+        cell_i++;
+    }
+
+    std::cout << err_int << " " << err_MM << std::endl;
+
+    return std::sqrt( real(err_int) );
+}
+
+template<typename Mesh, typename clT>
 void
 register_lua_functions(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
 {
@@ -1105,6 +1209,10 @@ register_lua_functions(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>
         return compute_error(state, cfg);
     };
 
+    auto lua_compute_reconstruction_error = [&]() {
+        return compute_reconstruction_error(state, cfg);
+    };
+
     auto lua_compute_return_loss = [&](size_t face_tag) {
         return compute_return_loss(state, cfg, face_tag);
     };
@@ -1115,6 +1223,7 @@ register_lua_functions(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>
     lua["solve"] = lua_solve;
     lua["save_to_silo"] = lua_save_to_silo;
     lua["compute_error"] = lua_compute_error;
+    lua["compute_reconstruction_error"] = lua_compute_reconstruction_error;
     lua["compute_return_loss"] = lua_compute_return_loss;
 }
 
