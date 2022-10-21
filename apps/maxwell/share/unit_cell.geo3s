@@ -1,0 +1,11 @@
+SetFactory("OpenCASCADE");
+Geometry.OCCScaling = 0.001;
+Merge "/home/matteo/Documents/research/CameraNecoicaBlochi.step";
+Coherence;
+Mesh.Algorithm=1;
+Mesh.Algorithm3D=10;
+//Mesh.MinumumElementsPerTwoPi=5;
+MeshSize{ PointsOf{ Volume{1}; } } = 50*0.001;
+MeshSize{ PointsOf{ Volume{2}; } } = 20*0.001;
+MeshSize{ PointsOf{ Volume{3}; } } = 20*0.001;
+MeshSize{ PointsOf{ Volume{4}; } } = 20*0.001;

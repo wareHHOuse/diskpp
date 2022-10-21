@@ -1,0 +1,10 @@
+SetFactory("OpenCASCADE");
+
+Box(1) = {0, 0,    0, 0.1, 0.1, 1};
+Box(2) = {0, 0,    1, 0.1, 0.1, 1};
+Box(3) = {0, 0, -0.2, 0.1, 0.1, 0.2};
+
+Coherence;
+
+MeshSize{ PointsOf{ Volume{1,2,3}; } } = 0.0125;
+
