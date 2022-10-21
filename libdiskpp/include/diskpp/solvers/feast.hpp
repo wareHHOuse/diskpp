@@ -57,7 +57,9 @@
 #include <type_traits>
 #include <fstream>
 
-#include "common/eigen.hpp"
+#include "diskpp/common/eigen.hpp"
+#include "diskpp/common/colormanip.h"
+#include "diskpp/common/timecounter.hpp"
 
 /****************************************************************************/
 // feast prototypes

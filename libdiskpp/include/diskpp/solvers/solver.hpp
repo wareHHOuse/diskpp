@@ -21,7 +21,7 @@
  */
 
 #include "sol/sol.hpp"
-#include "common/eigen.hpp"
+#include "diskpp/common/eigen.hpp"
 
 #ifdef HAVE_AGMG
     #include "agmg.hpp"

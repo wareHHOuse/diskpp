@@ -30,12 +30,10 @@
 
 #include <unistd.h>
 
-#include "loaders/loader.hpp"
-#include "methods/hho"
-#include "solvers/solver.hpp"
-#include "output/silo.hpp"
-#include "timecounter.h"
-#include "colormanip.h"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/output/silo.hpp"
+#include "diskpp/solvers/solver.hpp"
 
 using namespace disk;
 using namespace Eigen;

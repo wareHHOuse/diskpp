@@ -22,3 +22,8 @@ option(BUILD_APP_TRANSMISSION "Build transmission applications" ON)
 if (BUILD_APP_TRANSMISSION)
     add_subdirectory(transmission)
 endif()
+
+option(BUILD_APP_OBSTACLE "Build obstacle application" ON)
+if (BUILD_APP_OBSTACLE)
+    add_subdirectory(obstacle)
+endif()
