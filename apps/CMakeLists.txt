@@ -28,8 +28,7 @@ if (BUILD_APP_OBSTACLE)
     add_subdirectory(obstacle)
 endif()
 
-# DISABLED: Fails to link as it uses GMSH internal API
-option(BUILD_APP_BINGHAM "Build Bingham applications" OFF)
+option(BUILD_APP_BINGHAM "Build Bingham applications" ON)
 if (BUILD_APP_BINGHAM)
     add_subdirectory(bingham)
 endif()

@@ -235,7 +235,14 @@ set(LINK_LIBS ${LINK_LIBS} sol2::sol2)
 
 #install(DIRECTORY meshes DESTINATION share)
 
+## Super-temporary hack
 include_directories(contrib)
+set(npaster_gmshtools_sources "contrib/gmsh_tools/gmshData.cpp"
+                              "contrib/gmsh_tools/gmshElement.cpp"
+                              "contrib/gmsh_tools/gmshMesh.cpp")
+add_library(npaster_gmshtools STATIC ${npaster_gmshtools_sources})
+set(LINK_LIBS ${LINK_LIBS} npaster_gmshtools)
+
 
 add_subdirectory(libdiskpp)
 add_subdirectory(apps)
