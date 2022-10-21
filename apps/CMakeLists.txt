@@ -33,3 +33,8 @@ option(BUILD_APP_BINGHAM "Build Bingham applications" OFF)
 if (BUILD_APP_BINGHAM)
     add_subdirectory(bingham)
 endif()
+
+option(BUILD_APP_HELMHOLTZ "Build Helmholtz applications" ON)
+if (BUILD_APP_HELMHOLTZ)
+    add_subdirectory(helmholtz)
+endif()
