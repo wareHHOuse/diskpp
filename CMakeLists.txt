@@ -235,6 +235,8 @@ set(LINK_LIBS ${LINK_LIBS} sol2::sol2)
 
 #install(DIRECTORY meshes DESTINATION share)
 
+include_directories(contrib)
+
 add_subdirectory(libdiskpp)
 add_subdirectory(apps)
 

@@ -31,10 +31,10 @@
 #include <list>
 #include <vector>
 
-#include "mesh/mesh.hpp"
-#include "mesh/point.hpp"
+#include "diskpp/mesh/mesh.hpp"
+#include "diskpp/mesh/point.hpp"
 
-#include "quadratures/raw_simplices.hpp"
+#include "diskpp/quadratures/raw_simplices.hpp"
 
 namespace disk {
 

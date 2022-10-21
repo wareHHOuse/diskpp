@@ -31,14 +31,12 @@
 #include <utility>
 #include <vector>
 
-#include "contrib/gmsh_tools/gmshData.hpp"
-#include "contrib/gmsh_tools/gmshElement.hpp"
-#include "contrib/gmsh_tools/gmshMesh.hpp"
-#include "geometry/geometry.hpp"
-#include "loaders/loader.hpp"
-#include "mesh/point.hpp"
-#include "output/gmshDisk.hpp"
-#include "output/postMesh.hpp"
+#include "gmsh_tools/gmshData.hpp"
+#include "gmsh_tools/gmshElement.hpp"
+#include "gmsh_tools/gmshMesh.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/output/gmshDisk.hpp"
+#include "diskpp/output/postMesh.hpp"
 
 namespace disk {
 

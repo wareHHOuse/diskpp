@@ -30,18 +30,18 @@
 
 #include <unistd.h>
 
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
-#include "methods/hho"
+#include "diskpp/bases/bases.hpp"
+#include "diskpp/quadratures/quadratures.hpp"
+#include "diskpp/methods/hho"
 
-#include "core/loaders/loader.hpp"
+#include "diskpp/loaders/loader.hpp"
 
-#include "output/gmshConvertMesh.hpp"
-#include "output/gmshDisk.hpp"
-#include "output/postMesh.hpp"
+#include "diskpp/output/gmshConvertMesh.hpp"
+#include "diskpp/output/gmshDisk.hpp"
+#include "diskpp/output/postMesh.hpp"
 
-#include "output/silo.hpp"
-#include "solvers/solver.hpp"
+#include "diskpp/output/silo.hpp"
+#include "diskpp/solvers/solver.hpp"
 #include "viscoplasticity_utils.hpp"
 
 

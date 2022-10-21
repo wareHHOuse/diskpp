@@ -20,6 +20,8 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
+#pragma once
+
 #include "sol/sol.hpp"
 #include "diskpp/common/eigen.hpp"
 

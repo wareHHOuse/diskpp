@@ -31,10 +31,10 @@
 #include <utility>
 #include <vector>
 
-#include "contrib/gmsh_tools/gmshElement.hpp"
-#include "contrib/gmsh_tools/gmshMesh.hpp"
-#include "geometry/geometry.hpp"
-#include "mesh/point.hpp"
+#include "gmsh_tools/gmshElement.hpp"
+#include "gmsh_tools/gmshMesh.hpp"
+#include "diskpp/geometry/geometry.hpp"
+#include "diskpp/mesh/point.hpp"
 
 namespace disk {
 
