@@ -25,16 +25,13 @@
  #include <iostream>
  #include <iomanip>
  #include <regex>
-
  #include <unistd.h>
 
- #include "methods/hho"
-
- #include "core/loaders/loader.hpp"
-
- #include "output/silo.hpp"
- #include "common.hpp"
- #include "solvers/solver.hpp"
+ #include "diskpp/methods/hho"
+ #include "diskpp/loaders/loader.hpp"
+ #include "diskpp/output/silo.hpp"
+ #include "diskpp/solvers/solver.hpp"
+ #include "src/common.hpp"
 
 template<typename Mesh>
 class hho_newton_solver

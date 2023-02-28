@@ -26,19 +26,13 @@
  #include <iostream>
  #include <iomanip>
  #include <regex>
-
  #include <unistd.h>
 
- #include "bases/bases.hpp"
- #include "quadratures/quadratures.hpp"
- #include "methods/hho"
-
- #include "core/loaders/loader.hpp"
-
- #include "output/silo.hpp"
+ #include "diskpp/methods/hho"
+ #include "diskpp/loaders/loader.hpp"
+ #include "diskpp/output/silo.hpp"
+ #include "diskpp/solvers/solver.hpp"
  #include "common.hpp"
-
- #include "solvers/solver.hpp"
 
 template<typename Mesh, typename T, typename Function>
 auto

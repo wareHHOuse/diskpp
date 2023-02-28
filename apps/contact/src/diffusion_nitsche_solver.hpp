@@ -22,11 +22,11 @@
 * Journal of Computational and Applied Mathematics.
 * DOI: 10.1016/j.cam.2017.09.017
 */
-#include "geometry/geometry.hpp"
-#include "loaders/loader.hpp"
-#include "methods/hho"
-#include "solvers/solver.hpp"
- #include "common.hpp"
+#include "diskpp/geometry/geometry.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/solvers/solver.hpp"
+ #include "src/common.hpp"
 /***************************************************************************/
 /* RHS definition */
 template<typename Mesh>
