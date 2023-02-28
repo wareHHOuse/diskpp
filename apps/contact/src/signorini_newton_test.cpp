@@ -27,19 +27,14 @@
 #include <unistd.h>
 #include <sstream>
 #include <iomanip>
-
 #include <map>
-
-#include "colormanip.h"
-
-#include "loaders/loader.hpp"
-
-#include "timecounter.h"
-
 #define _USE_MATH_DEFINES
 #include <cmath>
 
- #include "signorini_newton_solver.hpp"
+#include "colormanip.h"
+#include "timecounter.h"
+#include "diskpp/loaders/loader.hpp"
+ #include "src/signorini_newton_solver.hpp"
 
 
 template<typename MeshType, typename LoaderType>

@@ -37,3 +37,9 @@ option(BUILD_APP_HELMHOLTZ "Build Helmholtz applications" ON)
 if (BUILD_APP_HELMHOLTZ)
     add_subdirectory(helmholtz)
 endif()
+
+option(BUILD_APP_CONTACT "Build contact applications" ON)
+if (BUILD_APP_CONTACT)
+    add_subdirectory(contact)
+endif()
+

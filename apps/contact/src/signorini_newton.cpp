@@ -25,16 +25,14 @@
  #include <iostream>
  #include <iomanip>
  #include <regex>
-
  #include <unistd.h>
 
- #include "geometry/geometry.hpp"
- #include "bases/bases.hpp"
- #include "quadratures/quadratures.hpp"
- #include "methods/hho"
-
- #include "core/loaders/loader.hpp"
- #include "signorini_newton_solver.hpp"
+ #include "diskpp/geometry/geometry.hpp"
+ #include "diskpp/bases/bases.hpp"
+ #include "diskpp/quadratures/quadratures.hpp"
+ #include "diskpp/methods/hho"
+ #include "diskpp/loaders/loader.hpp"
+ #include "src/signorini_newton_solver.hpp"
 
 int main(int argc, char **argv)
 {

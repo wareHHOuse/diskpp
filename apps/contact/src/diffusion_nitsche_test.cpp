@@ -28,18 +28,14 @@
 #include <sstream>
 #include <iomanip>
 #include <map>
-
-#include "colormanip.h"
-
-
-#include "loaders/loader.hpp"
-
-#include "timecounter.h"
-
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-#include "diffusion_nitsche_solver.hpp"
+#include "colormanip.h"
+#include "timecounter.h"
+
+#include "diskpp/loaders/loader.hpp"
+#include "src/diffusion_nitsche_solver.hpp"
 
 
 template<typename MeshType, typename LoaderType>
