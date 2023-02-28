@@ -34,17 +34,12 @@
 #include <iostream>
 #include <sstream>
 
-#include "bases/bases.hpp"
-#include "methods/hho"
-#include "quadratures/quadratures.hpp"
-
-#include "solvers/solver.hpp"
-
-#include "output/gmshConvertMesh.hpp"
-#include "output/gmshDisk.hpp"
-#include "output/postMesh.hpp"
-
-#include "timecounter.h"
+#include "diskpp/methods/hho"
+#include "diskpp/solvers/solver.hpp"
+#include "diskpp/output/gmshConvertMesh.hpp"
+#include "diskpp/output/gmshDisk.hpp"
+#include "diskpp/output/postMesh.hpp"
+#include "diskpp/common/timecounter.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -183,12 +178,12 @@ class linear_elasticity_solver
             const auto sgr = make_vector_hho_symmetric_laplacian(m_msh, cl, m_hdi);
             const auto sg  = make_matrix_symmetric_gradrec(m_msh, cl, m_hdi);
             tc.toc();
-            ai.time_gradrec += tc.to_double();
+            ai.time_gradrec += tc.elapsed();
 
             tc.tic();
             const auto dr = make_hho_divergence_reconstruction(m_msh, cl, m_hdi);
             tc.toc();
-            ai.time_divrec += tc.to_double();
+            ai.time_divrec += tc.elapsed();
 
             tc.tic();
             matrix_dynamic stab;
@@ -201,7 +196,7 @@ class linear_elasticity_solver
                 stab = make_vector_hho_stabilization(m_msh, cl, sgr.first, m_hdi);
             }
             tc.toc();
-            ai.time_stab += tc.to_double();
+            ai.time_stab += tc.elapsed();
 
             tc.tic();
             auto                 cb       = disk::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
@@ -213,7 +208,7 @@ class linear_elasticity_solver
             m_AL.push_back(std::get<1>(scnp));
             m_bL.push_back(std::get<2>(scnp));
             tc.toc();
-            ai.time_statcond += tc.to_double();
+            ai.time_statcond += tc.elapsed();
 
             m_assembler.assemble(m_msh, cl, m_bnd, std::get<0>(scnp), 2);
         }
@@ -250,7 +245,7 @@ class linear_elasticity_solver
         mkl_pardiso(pparams, m_assembler.LHS, m_assembler.RHS, m_system_solution);
 
         tc.toc();
-        si.time_solver = tc.to_double();
+        si.time_solver = tc.elapsed();
 
         return si;
     }
@@ -299,7 +294,7 @@ class linear_elasticity_solver
             cell_i++;
         }
         tc.toc();
-        pi.time_postprocess = tc.to_double();
+        pi.time_postprocess = tc.elapsed();
 
         return pi;
     }
