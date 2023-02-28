@@ -30,18 +30,15 @@
 #include <sstream>
 #include <unistd.h>
 
-#include "colormanip.h"
-
-#include "loaders/loader.hpp"
-
-#include "timecounter.h"
-
-#include "Informations.hpp"
-#include "Parameters.hpp"
-#include "boundary_conditions/boundary_conditions.hpp"
-#include "loaders/loader.hpp"
-#include "mechanics/behaviors/laws/materialData.hpp"
-#include "tresca_solver.hpp"
+#include "diskpp/common/colormanip.h"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/common/timecounter.hpp"
+#include "diskpp/boundary_conditions/boundary_conditions.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/mechanics/behaviors/laws/materialData.hpp"
+#include "src/tresca_solver.hpp"
+#include "src/Informations.hpp"
+#include "src/Parameters.hpp"
 
 struct error_type
 {

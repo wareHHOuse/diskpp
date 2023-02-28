@@ -29,21 +29,18 @@
 #include <regex>
 #include <sstream>
 #include <unistd.h>
-
 #include <map>
-
-#include "Informations.hpp"
-#include "Parameters.hpp"
-#include "boundary_conditions/boundary_conditions.hpp"
-#include "loaders/loader.hpp"
-#include "mechanics/behaviors/laws/materialData.hpp"
-
-#include "timecounter.h"
-
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-#include "tresca_solver.hpp"
+#include "src/Informations.hpp"
+#include "src/Parameters.hpp"
+#include "diskpp/boundary_conditions/boundary_conditions.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/mechanics/behaviors/laws/materialData.hpp"
+
+#include "diskpp/common/timecounter.hpp"
+//#include "src/tresca_solver.hpp"
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 void

@@ -37,3 +37,9 @@ option(BUILD_APP_HELMHOLTZ "Build Helmholtz applications" ON)
 if (BUILD_APP_HELMHOLTZ)
     add_subdirectory(helmholtz)
 endif()
+
+option(BUILD_APP_TRESCA "Build Tresca applications" ON)
+if (BUILD_APP_TRESCA)
+    add_subdirectory(tresca)
+endif()
+

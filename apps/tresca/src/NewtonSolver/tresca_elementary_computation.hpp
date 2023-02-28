@@ -27,11 +27,9 @@
 
 #include <cassert>
 
-#include "bases/bases.hpp"
-#include "common/eigen.hpp"
-#include "mechanics/behaviors/maths_tensor.hpp"
-#include "methods/hho"
-#include "quadratures/quadratures.hpp"
+#include "diskpp/common/eigen.hpp"
+#include "diskpp/mechanics/behaviors/maths_tensor.hpp"
+#include "diskpp/methods/hho"
 
 #include "timecounter.h"
 
