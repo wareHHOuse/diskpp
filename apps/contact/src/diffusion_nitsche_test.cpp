@@ -31,11 +31,11 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-#include "colormanip.h"
-#include "timecounter.h"
+#include "diskpp/common/colormanip.h"
+#include "diskpp/common/timecounter.hpp"
 
 #include "diskpp/loaders/loader.hpp"
-#include "src/diffusion_nitsche_solver.hpp"
+#include "diffusion_nitsche_solver.hpp"
 
 
 template<typename MeshType, typename LoaderType>

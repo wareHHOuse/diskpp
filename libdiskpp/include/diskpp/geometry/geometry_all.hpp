@@ -40,9 +40,11 @@
  * and put the specialization in the right geometry_<whatever>.hpp file.
  */
 
+#include <numeric>
 #include <algorithm>
 #include <vector>
 
+#include "diskpp/mesh/point.hpp"
 #include "diskpp/common/util.h"
 #include "diskpp/common/eigen.hpp"
 

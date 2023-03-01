@@ -31,10 +31,10 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-#include "colormanip.h"
-#include "timecounter.h"
+#include "diskpp/common/colormanip.h"
+#include "diskpp/common/timecounter.hpp"
 #include "diskpp/loaders/loader.hpp"
- #include "src/signorini_newton_solver.hpp"
+#include "signorini_newton_solver.hpp"
 
 
 template<typename MeshType, typename LoaderType>

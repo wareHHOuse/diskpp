@@ -26,8 +26,8 @@
 #include "diskpp/methods/hho"
 #include "diskpp/output/silo.hpp"
 #include "diskpp/solvers/solver.hpp"
-#include "diskpp/contrib/colormanip.h"
-#include "src/common.hpp"
+#include "diskpp/common/colormanip.h"
+#include "common.hpp"
 
 template<typename Mesh, typename Function, typename Analytical>
 std::pair<typename Mesh::coordinate_type, typename Mesh::coordinate_type>

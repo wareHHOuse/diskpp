@@ -32,7 +32,7 @@
 #include "diskpp/common/colormanip.h"
 #include "diskpp/geometry/geometry.hpp"
 #include "diskpp/loaders/loader.hpp"
-#include "src/diffusion_nitsche_solver.hpp"
+#include "diffusion_nitsche_solver.hpp"
 
 
 int main(int argc, char **argv)

@@ -32,7 +32,7 @@
  #include "diskpp/quadratures/quadratures.hpp"
  #include "diskpp/methods/hho"
  #include "diskpp/loaders/loader.hpp"
- #include "src/signorini_newton_solver.hpp"
+ #include "signorini_newton_solver.hpp"
 
 int main(int argc, char **argv)
 {

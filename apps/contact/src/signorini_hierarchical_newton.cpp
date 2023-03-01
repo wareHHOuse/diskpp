@@ -38,12 +38,12 @@
 #include "diskpp/mesh/mesh_hierarchy.hpp"
 
 
-#include "diskpp/sol/sol.hpp"
-#include "diskpp/contrib/timecounter.h"
-#include "diskpp/contrib/colormanip.h"
+#include "sol/sol.hpp"
+#include "diskpp/common/timecounter.hpp"
+#include "diskpp/common/colormanip.h"
 
-#include "diskpp/output/hdf5_io.hpp"
-#include "src/signorini_newton_solver.hpp"
+//#include "diskpp/output/hdf5_io.hpp"
+#include "signorini_newton_solver.hpp"
 
 #if 0
 template<template<typename, size_t, typename> class Mesh,

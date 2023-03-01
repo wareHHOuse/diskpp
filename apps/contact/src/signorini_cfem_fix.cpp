@@ -29,7 +29,7 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/cfem/cfem.hpp"
 #include "diskpp/output/silo.hpp"
-#include "src/common.hpp"
+#include "common.hpp"
 
 template<typename T>
 class cfem_fix_solver

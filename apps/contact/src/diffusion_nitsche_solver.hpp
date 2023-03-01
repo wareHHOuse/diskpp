@@ -26,7 +26,7 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/solvers/solver.hpp"
- #include "src/common.hpp"
+#include "common.hpp"
 /***************************************************************************/
 /* RHS definition */
 template<typename Mesh>
