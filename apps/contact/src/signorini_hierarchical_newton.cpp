@@ -32,18 +32,17 @@
 
 #include <Eigen/Eigenvalues>
 
-#include "loaders/loader.hpp"
-#include "cfem/cfem.hpp"
-#include "methods/hho"
-#include "mesh/mesh_hierarchy.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/cfem/cfem.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/mesh/mesh_hierarchy.hpp"
 
-//#include "output/silo.hpp"
 
 #include "sol/sol.hpp"
-#include "contrib/timecounter.h"
-#include "contrib/colormanip.h"
+#include "diskpp/common/timecounter.hpp"
+#include "diskpp/common/colormanip.h"
 
-#include "core/output/hdf5_io.hpp"
+//#include "diskpp/output/hdf5_io.hpp"
 #include "signorini_newton_solver.hpp"
 
 #if 0

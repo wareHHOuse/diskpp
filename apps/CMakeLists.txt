@@ -42,3 +42,9 @@ option(BUILD_APP_LINEAR_ELASTICITY "Build linear elasticity applications" ON)
 if (BUILD_APP_LINEAR_ELASTICITY)
     add_subdirectory(linear_elasticity)
 endif()
+
+option(BUILD_APP_CONTACT "Build contact applications" ON)
+if (BUILD_APP_CONTACT)
+    add_subdirectory(contact)
+endif()
+

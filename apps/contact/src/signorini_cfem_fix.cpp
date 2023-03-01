@@ -26,10 +26,9 @@
 #include <iostream>
 #include <regex>
 
-#include "loaders/loader.hpp"
-
-#include "cfem/cfem.hpp"
-#include "output/silo.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/cfem/cfem.hpp"
+#include "diskpp/output/silo.hpp"
 #include "common.hpp"
 
 template<typename T>

@@ -27,7 +27,7 @@
 #include <hdf5.h>
 #include <unistd.h>
 
-#include "common/eigen.hpp"
+#include "diskpp/common/eigen.hpp"
 
 namespace disk{
 

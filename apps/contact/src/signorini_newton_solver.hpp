@@ -23,12 +23,11 @@
 * DOI: 10.1016/j.cam.2017.09.017
 */
 
-
-#include "methods/hho"
-#include "output/silo.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/output/silo.hpp"
+#include "diskpp/solvers/solver.hpp"
+#include "diskpp/common/colormanip.h"
 #include "common.hpp"
-#include "solvers/solver.hpp"
-#include "contrib/colormanip.h"
 
 template<typename Mesh, typename Function, typename Analytical>
 std::pair<typename Mesh::coordinate_type, typename Mesh::coordinate_type>
