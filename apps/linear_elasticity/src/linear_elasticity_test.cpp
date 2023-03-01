@@ -29,16 +29,12 @@
 #include <regex>
 #include <sstream>
 #include <unistd.h>
-
-#include "colormanip.h"
-
-#include "loaders/loader.hpp"
-
-#include "timecounter.h"
-
 #define _USE_MATH_DEFINES
 #include <cmath>
 
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/common/timecounter.hpp"
+#include "diskpp/common/colormanip.h"
 #include "linear_elasticity_solver.hpp"
 
 struct error_type
@@ -632,35 +628,35 @@ main(int argc, char** argv)
         std::cout << "-Tetrahedras fvca6:" << std::endl;
         test_tetrahedra_fvca6<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Tetrahedras netgen:" << std::endl;
         test_tetrahedra_netgen<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Hexahedras fvca6:" << std::endl;
         test_hexahedra_fvca6<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Hexahedras diskpp:" << std::endl;
         test_hexahedra_diskpp<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Polyhedra:" << std::endl;
         test_polyhedra_fvca6<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
         std::cout << " " << std::endl;
     }
     else if (dim == 2)
@@ -670,42 +666,42 @@ main(int argc, char** argv)
         std::cout << "-Triangles fvca5:" << std::endl;
         test_triangles_fvca5<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Triangles netgen:" << std::endl;
         test_triangles_netgen<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Quadrangles fvca5:" << std::endl;
         test_quads_fvca5<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Quadrangles diskpp:" << std::endl;
         test_quads_diskpp<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Hexagons:" << std::endl;
         test_hexagons<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Kershaws:" << std::endl;
         test_kershaws<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
         std::cout << " " << std::endl;
     }
 }

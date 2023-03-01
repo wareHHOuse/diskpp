@@ -37,3 +37,8 @@ option(BUILD_APP_HELMHOLTZ "Build Helmholtz applications" ON)
 if (BUILD_APP_HELMHOLTZ)
     add_subdirectory(helmholtz)
 endif()
+
+option(BUILD_APP_LINEAR_ELASTICITY "Build linear elasticity applications" ON)
+if (BUILD_APP_LINEAR_ELASTICITY)
+    add_subdirectory(linear_elasticity)
+endif()
