@@ -47,7 +47,9 @@ if ( NOT (${SITE_PRESET} STREQUAL "default") )
     include("${SITE_CONFIGS}/Site${SITE_PRESET}.cmake")
 endif()
 
-add_link_options("-Wl,--no-as-needed")
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    add_link_options("-Wl,--no-as-needed")
+endif()
 
 ######################################################################
 ## Update submodules if necessary
