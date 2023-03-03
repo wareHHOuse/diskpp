@@ -7,4 +7,4 @@ set_target_properties(helmholtz PROPERTIES
                       CXX_STANDARD_REQUIRED YES
                       CXX_EXTENSIONS NO)
 
-
+install(TARGETS helmholtz RUNTIME DESTINATION bin)
