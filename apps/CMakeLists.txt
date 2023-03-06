@@ -48,3 +48,8 @@ if (BUILD_APP_CONTACT)
     add_subdirectory(contact)
 endif()
 
+option(BUILD_APP_STABFREE "Build stabilization-free hho test applications" ON)
+if (BUILD_APP_STABFREE)
+    add_subdirectory(stabfree)
+endif()
+
