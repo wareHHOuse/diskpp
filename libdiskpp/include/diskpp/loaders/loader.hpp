@@ -198,54 +198,114 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
         }
     };
 
-    std::vector<point_type>                         m_points;
-    std::vector<fvca5_poly>                         m_polys;
-    std::vector<std::array<ident_raw_t, 2>>        m_boundary_edges;
-    std::vector<std::array<ident_raw_t, 4>>        m_edges;
+    std::ifstream   ifs;
+    size_t          current_line;
 
-    bool fvca5_read_points(std::ifstream& ifs)
+    std::vector<point_type>                     m_points;
+    std::vector<fvca5_poly>                     m_polys;
+    std::vector<std::array<ident_raw_t, 2>>     m_boundary_edges;
+    std::vector<std::array<ident_raw_t, 4>>     m_edges;
+
+    bool
+    get_next_line(std::istringstream& iss)
     {
-        size_t      elements_to_read;
-        T           x, y;
-
-        ifs >> elements_to_read;
-
-        if (this->verbose())
-            std::cout << "Attempting to read " << elements_to_read << " points" << std::endl;
-
-        m_points.reserve(elements_to_read);
-
-        for (size_t i = 0; i < elements_to_read; i++)
-        {
-            ifs >> x >> y;
-            m_points.push_back(point_type{x,y});
-        }
-
+        std::string line;
+        getline(ifs, line);
+        iss = std::istringstream(line);
+        current_line++;
+        return true;
+    }
+    
+    bool
+    get_next_line(std::string& line)
+    {
+        getline(ifs, line);
+        current_line++;
         return true;
     }
 
-    bool fvca5_read_polygons(std::ifstream& ifs, size_t polynum)
+    bool failure(std::istringstream& ifs)
     {
-        size_t      elements_to_read;
-
-        ifs >> elements_to_read;
+        return ifs.rdstate() & std::ifstream::failbit;
+    }
+    
+    bool fvca5_parse_vertices()
+    {
+        std::istringstream iss;
+        get_next_line(iss);
+        
+        size_t num_vertices;
+        iss >> num_vertices;
+        if ( failure(iss) ) {
+            std::cout << "Line " << current_line << ": Error while parsing ";
+            std::cout << "'vertices' block (number of vertices)" << std::endl;
+            return false;
+        }
+        
         if (this->verbose())
-            std::cout << "Reading " << elements_to_read << " " << polynum << "-angles" << std::endl;
+            std::cout << "Reading " << num_vertices << " vertices" << std::endl;
+        
+        for (size_t i = 0; i < num_vertices; i++) {
+            get_next_line(iss);
+            T x, y;
+            iss >> x >> y;
+            if ( failure(iss) ) {
+                std::cout << "Line " << current_line << ": Error while parsing ";
+                std::cout << "'vertices' block (vertex " << i << ")" << std::endl;
+                return false;
+            }
+            
+            m_points.push_back(point_type{x,y});
+        }
+        
+        return true;
+    }
 
-        for (size_t i = 0; i < elements_to_read; i++)
+    bool fvca5_parse_polygons(size_t polynum)
+    {
+        std::istringstream iss;
+        get_next_line(iss);
+        
+        size_t num_polygons;
+
+        iss >> num_polygons;
+        if ( failure(iss) ) {
+            std::cout << "Line " << current_line << ": Error while parsing ";
+            std::cout << "'" << polynum << "-angles' block (number of polygons)";
+            std::cout << std::endl;
+            return false;
+        }
+        
+        if (this->verbose())
+            std::cout << "Reading " << num_polygons << " " << polynum << "-angles" << std::endl;
+
+        for (size_t i = 0; i < num_polygons; i++)
         {
+            get_next_line(iss);
+            
             fvca5_poly p;
 
             for (size_t j = 0; j < polynum; j++)
             {
                 ident_raw_t val;
-                ifs >> val;
+                iss >> val;
                 p.nodes.push_back(val-1);
             }
+            
+            if ( failure(iss) ) {
+                std::cout << "Line " << current_line << ": Error while parsing '";
+                std::cout << polynum << "-angles' block (polygon ";
+                std::cout << i << ")" << std::endl;
+                return false;
+            }
 
-            ifs >> std::ws;
-            if ( std::isdigit(ifs.peek()) )
-                ifs >> p.domain_id;
+            // JMLC extension
+            iss >> std::ws;
+            if ( std::isdigit(iss.peek()) )
+            {
+                std::cout << "d_id" << std::endl;
+                iss >> p.domain_id;
+            }
 
             m_polys.push_back(p);
         }
@@ -253,204 +313,211 @@ class fvca5_mesh_loader<T,2> : public mesh_loader<generic_mesh<T, 2>>
         return true;
     }
 
-    bool fvca5_read_boundary_edges(std::ifstream& ifs)
+    bool fvca5_parse_boundary_edges()
     {
-        size_t      elements_to_read;
+        std::istringstream iss;
+        get_next_line(iss);
+        
+        size_t num_edges;
 
-        ifs >> elements_to_read;
-        if (this->verbose())
-            std::cout << "Reading " << elements_to_read << " boundary edges" << std::endl;
-
-        m_boundary_edges.reserve(elements_to_read);
-
-        for (size_t i = 0; i < elements_to_read; i++)
-        {
-            std::array<ident_raw_t, 2> b_edge;
-            ifs >> b_edge[0]; b_edge[0] -= 1;
-            ifs >> b_edge[1]; b_edge[1] -= 1;
-
-            assert(b_edge[0] != b_edge[1]);
-
-            if (b_edge[0] > b_edge[1])
-                std::swap(b_edge[0], b_edge[1]);
-
-            m_boundary_edges.push_back({b_edge[0], b_edge[1]});
+        iss >> num_edges;
+        if ( failure(iss) ) {
+            std::cout << "Line " << current_line << ": Error while parsing ";
+            std::cout << "'edges of the boundary' block (number of edges)";
+            std::cout << std::endl;
+            return false;
         }
-
-        while( not std::isalpha(ifs.get()) and not ifs.eof() )
-            ;
-        ifs.unget();
-
-        int len = ifs.tellg();
-        std::string line;
-        getline(ifs, line);
-
-        if ( not std::regex_match(line, std::regex(".*edges of transmission.*") ) )
-        {  
-            ifs.seekg(len ,std::ios_base::beg);
-            return true;
-        }
-
-        ifs >> elements_to_read;
+        
         if (this->verbose())
-            std::cout << "Reading " << elements_to_read << " transmission edges" << std::endl;
+            std::cout << "Reading " << num_edges << " boundary edges" << std::endl;
 
-        //m_boundary_edges.reserve(elements_to_read);
+        m_boundary_edges.reserve(num_edges);
 
-        for (size_t i = 0; i < elements_to_read; i++)
+        for (size_t i = 0; i < num_edges; i++)
         {
-            std::array<ident_raw_t, 2> b_edge;
-            ifs >> b_edge[0]; b_edge[0] -= 1;
-            ifs >> b_edge[1]; b_edge[1] -= 1;
-
-            assert(b_edge[0] != b_edge[1]);
-
-            if (b_edge[0] > b_edge[1])
-                std::swap(b_edge[0], b_edge[1]);
-
-            m_boundary_edges.push_back({b_edge[0], b_edge[1]});
-        }
-
-        return true;
-    }
-
-    bool fvca5_read_edges(std::ifstream& ifs)
-    {
-        size_t      elements_to_read;
-
-        ifs >> elements_to_read;
-        if (this->verbose())
-            std::cout << "Reading " << elements_to_read << " edges" << std::endl;
-
-        m_edges.reserve(elements_to_read);
-
-        for (size_t i = 0; i < elements_to_read; i++)
-        {
-            std::array<ident_raw_t, 4> edge;
-            ifs >> edge[0]; edge[0] -= 1;
-            ifs >> edge[1]; edge[1] -= 1;
-            ifs >> edge[2];
-            ifs >> edge[3];
-
-            ident_raw_t dummy;
-            ifs >> std::ws;
-            if ( std::isdigit(ifs.peek()) )
-                ifs >> dummy;
+            get_next_line(iss);
+            ident_raw_t node_a, node_b;
+            iss >> node_a >> node_b;
             
-            assert(edge[0] != edge[1]);
-
-            if (edge[0] > edge[1])
-                std::swap(edge[0], edge[1]);
-
-            if (edge[2] != 0)
-                m_polys.at(edge[2]-1).attached_edges.insert({edge[0], edge[1]});
-
-            if (edge[3] != 0)
-                m_polys.at(edge[3]-1).attached_edges.insert({edge[0], edge[1]});
-
-            m_edges.push_back(edge);
+            if ( failure(iss) ) {
+                std::cout << "Line " << current_line << ": Error while parsing ";
+                std::cout << "'edges of the boundary' block (edge " << i << ")";
+                std::cout << std::endl;
+                return false;
+            }
+            
+            if (node_a < 1 or node_b < 1) {
+                std::cout << "Line " << current_line << ": FVCA5 format ";
+                std::cout << "expects 1-based indices" << std::endl;
+                return false;
+            }
+            
+            node_a -= 1;
+            node_b -= 1;
+            
+            if (node_a == node_b) {
+                std::cout << "Line " << current_line << ": Edge starting and ";
+                std::cout << "finishing on the same node" << std::endl;
+                return false;
+            }
+            
+            if (node_a > node_b)
+                std::swap(node_a, node_b);
+            
+            m_boundary_edges.push_back({node_a, node_b});
         }
-
+        
         return true;
     }
 
-    bool fvca5_read(const std::string& filename)
+    bool fvca5_parse_all_edges()
     {
-        std::ifstream   ifs(filename);
-        std::string     keyword;
+        std::istringstream iss;
+        get_next_line(iss);
+        
+        size_t num_edges;
 
-        if (!ifs.is_open())
-        {
-            std::cout << "Error opening " << filename << std::endl;
+        iss >> num_edges;
+        if ( failure(iss) ) {
+            std::cout << "Line " << current_line << ": Error while parsing ";
+            std::cout << "'all edges' block (number of edges)";
+            std::cout << std::endl;
             return false;
         }
+        
+        if (this->verbose())
+            std::cout << "Reading " << num_edges << " edges" << std::endl;
 
-        ifs >> keyword;
-        if ( keyword != "vertices" )
+        for (size_t i = 0; i < num_edges; i++)
         {
-            std::cout << "Expected keyword \"vertices\"" << std::endl;
+            get_next_line(iss);
+            ident_raw_t node_a, node_b, neigh_a, neigh_b;
+
+            iss >> node_a >> node_b >> neigh_a >> neigh_b;
+            if ( failure(iss) ) {
+                std::cout << "Line " << current_line << ": Error while parsing ";
+                std::cout << "'all edges' block (edge " << i << ")";
+                std::cout << std::endl;
+                return false;
+            }
+            
+            if (node_a < 1 or node_b < 1) {
+                std::cout << "Line " << current_line << ": FVCA5 format ";
+                std::cout << "expects 1-based indices" << std::endl;
+                return false;
+            }
+            
+            node_a -= 1;
+            node_b -= 1;
+            
+            if (node_a == node_b) {
+                std::cout << "Line " << current_line << ": Edge starting and ";
+                std::cout << "finishing on the same node" << std::endl;
+                return false;
+            }
+            
+            if (node_a > node_b)
+                std::swap(node_a, node_b);
+            
+            if (neigh_a > 0)
+                m_polys.at(neigh_a-1).attached_edges.insert({node_a, node_b});
+            
+            if (neigh_b > 0)
+                m_polys.at(neigh_b-1).attached_edges.insert({node_a, node_b});
+            
+            // JMLC extension
+            iss >> std::ws;
+            if ( std::isdigit(iss.peek()) )
+            {
+                std::cout << "b_id" << std::endl;
+                //iss >> p.domain_id;
+            }
+            
+            m_edges.push_back({node_a, node_b, neigh_a, neigh_b});
+        }
+        
+        return true;
+    }
+
+    bool fvca5_parse_block()
+    {
+        std::string line;
+        get_next_line(line);
+        
+        if ( std::regex_match(line, std::regex("^\\s*$")) )
+            return true;
+        
+        if ( std::regex_match(line, std::regex("^\\s*vertices\\s*$")) )
+            return fvca5_parse_vertices();
+        
+        if ( std::regex_match(line, std::regex("^\\s*triangles\\s*$")) )
+            return fvca5_parse_polygons(3);
+        
+        if ( std::regex_match(line, std::regex("^\\s*quadrangles\\s*$")) )
+            return fvca5_parse_polygons(4);
+        
+        if ( std::regex_match(line, std::regex("^\\s*pentagons\\s*$")) )
+            return fvca5_parse_polygons(5);
+        
+        if ( std::regex_match(line, std::regex("^\\s*hexagons\\s*$")) )
+            return fvca5_parse_polygons(6);
+        
+        if ( std::regex_match(line, std::regex("^\\s*ennagons\\s*$")) )
+            return fvca5_parse_polygons(7);
+        
+        if ( std::regex_match(line, std::regex("^\\s*ettagons\\s*$")) )
+            return fvca5_parse_polygons(8);
+        
+        if ( std::regex_match(line, std::regex("^\\s*edges\\s+of\\s+the\\s+boundary\\s*$")) )
+            return fvca5_parse_boundary_edges();
+        
+        /* JMLC format extension */
+        if ( std::regex_match(line, std::regex("^\\s*edges\\s+of\\s+transmission\\s*$")) )
+            return fvca5_parse_boundary_edges(); /* Yes, it is fvca5_parse_boundary_edges() */
+        
+        if ( std::regex_match(line, std::regex("^\\s*all\\s+edges\\s*$")) )
+            return fvca5_parse_all_edges();
+        
+        std::cout << "Line " << current_line << ": Unknown block '";
+        std::cout << line << "'" << std::endl;
+        return false;
+    }
+
+    bool parse(const std::string& filename)
+    {
+        ifs.open(filename);
+        if ( not ifs.is_open() ) {
+            std::cout << "Can't open " << filename << std::endl;
             return false;
         }
+        
+        while ( !ifs.eof() ) {
+            bool success = fvca5_parse_block();
 
-        fvca5_read_points(ifs);
-
-        ifs >> keyword;
-        if ( keyword == "triangles" )
-        {
-            fvca5_read_polygons(ifs, 3);
-            ifs >> keyword;
+            if (not success) {
+                m_points.clear();
+                m_polys.clear();
+                m_boundary_edges.clear();
+                m_edges.clear();
+                return false;
+            }
         }
-
-        if ( keyword == "quadrangles" )
-        {
-            fvca5_read_polygons(ifs, 4);
-            ifs >> keyword;
-        }
-
-        if ( keyword == "pentagons" )
-        {
-            fvca5_read_polygons(ifs, 5);
-            ifs >> keyword;
-        }
-
-        if ( keyword == "hexagons" )
-        {
-            fvca5_read_polygons(ifs, 6);
-            ifs >> keyword;
-        }
-
-        if ( keyword == "ennagons" )
-        {
-            fvca5_read_polygons(ifs, 7);
-            ifs >> keyword;
-        }
-
-        if ( keyword == "ettagons" )
-        {
-            fvca5_read_polygons(ifs, 8);
-            ifs >> keyword;
-        }
-
-        if ( keyword == "edges" )
-        {
-            std::getline(ifs, keyword); //drop the rest of the line
-            m_boundary_edges.clear();
-            fvca5_read_boundary_edges(ifs);
-            ifs >> keyword;
-        }
-        else
-        {
-            std::cout << "Error parsing FVCA5 file" << std::endl;
-            return false;
-        }
-
-        if ( keyword == "all" )
-        {
-            std::getline(ifs, keyword); //drop the rest of the line
-            m_edges.clear();
-            fvca5_read_edges(ifs);
-        }
-        else
-        {
-            std::cout << "Error parsing FVCA5 file" << std::endl;
-            return false;
-        }
-
-        ifs.close();
+        
         return true;
     }
 
 public:
-  static const char constexpr* expected_extension = "typ1";
+    static const char constexpr* expected_extension = "typ1";
 
-  fvca5_mesh_loader() = default;
+    fvca5_mesh_loader() : current_line(0)
+    {}
 
-  bool
-  read_mesh(const std::string& filename)
-  {
-      if (this->verbose())
-          std::cout << " *** READING FVCA5 MESH ***" << std::endl;
-      return fvca5_read(filename);
+    bool
+    read_mesh(const std::string& filename)
+    {
+        if (this->verbose())
+            std::cout << " *** READING FVCA5 MESH ***" << std::endl;
+        return parse(filename);
     }
 
     bool populate_mesh(mesh_type& msh)
