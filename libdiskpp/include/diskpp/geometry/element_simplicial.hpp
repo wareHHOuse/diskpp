@@ -74,6 +74,11 @@ public:
         return m_pts_ptrs == other.m_pts_ptrs;
     }
 
+    bool operator!=(const simplicial_element& other) const
+    {
+        return m_pts_ptrs != other.m_pts_ptrs;
+    }
+
     size_t subelement_size() const
     {
         return priv::howmany<DIM, CODIM>::subelements;
