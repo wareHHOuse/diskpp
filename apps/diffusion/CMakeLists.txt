@@ -7,6 +7,14 @@ add_executable(diffusion_hho src/diffusion_hho.cpp)
 target_link_libraries(diffusion_hho ${LINK_LIBS})
 install(TARGETS diffusion_hho RUNTIME DESTINATION bin)
 
+add_executable(diffusion_hho_stabfree_test src/diffusion_hho_stabfree_test.cpp)
+target_link_libraries(diffusion_hho_stabfree_test ${LINK_LIBS})
+install(TARGETS diffusion_hho_stabfree_test RUNTIME DESTINATION bin)
+
+add_executable(hho_stabfree_eigs src/hho_stabfree_eigs.cpp)
+target_link_libraries(hho_stabfree_eigs ${LINK_LIBS})
+install(TARGETS hho_stabfree_eigs RUNTIME DESTINATION bin)
+
 add_executable(diffusion_dg src/diffusion_dg.cpp)
 target_link_libraries(diffusion_dg ${LINK_LIBS})
 install(TARGETS diffusion_dg RUNTIME DESTINATION bin)
