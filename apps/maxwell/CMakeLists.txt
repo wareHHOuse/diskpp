@@ -16,10 +16,6 @@ add_executable(rectest src/rectest.cpp)
 target_link_libraries(rectest ${LINK_LIBS})
 install(TARGETS rectest RUNTIME DESTINATION bin)
 
-add_executable(meshio src/meshio.cpp)
-target_link_libraries(meshio ${LINK_LIBS})
-install(TARGETS meshio RUNTIME DESTINATION bin)
-
 add_executable(maxwell_solver_hho src/maxwell_solver_hho.cpp)
 target_link_libraries(maxwell_solver_hho ${LINK_LIBS})
 set_target_properties(maxwell_solver_hho PROPERTIES
