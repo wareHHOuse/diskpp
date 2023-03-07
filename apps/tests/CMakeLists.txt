@@ -93,6 +93,9 @@ target_link_libraries(test_conditionning_basis ${LINK_LIBS})
 #add_executable(test_conditionning test_conditionning.cpp)
 #target_link_libraries(test_conditionning ${LINK_LIBS})
 
+add_executable(meshgen meshgen.cpp)
+target_link_libraries(meshgen ${LINK_LIBS})
+
 if(HAVE_GMSH)
     add_executable(test_gmsh_geometry_loader gmsh_geometry_loader.cpp)
     target_link_libraries(test_gmsh_geometry_loader ${LINK_LIBS})
