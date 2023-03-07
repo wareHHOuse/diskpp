@@ -53,3 +53,7 @@ if (BUILD_APP_STOKES)
     add_subdirectory(stokes)
 endif()
 
+option(BUILD_APP_TEMPLATE "Build template applications" ON)
+if (BUILD_APP_TEMPLATE)
+    add_subdirectory(app_template)
+endif()
