@@ -121,6 +121,71 @@ make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, c
     return std::make_pair(oper, data);
 }
 
+
+template<typename Mesh>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
+{
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
+
+    const size_t DIM = Mesh::dimension;
+
+    const auto rb = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+    const auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+
+    const auto rbs = rb.size();
+    const auto cbs = cb.size();
+    const auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
+
+    const auto fcs = faces(msh, cl);
+
+    const auto num_faces_dofs = fbs * fcs.size();
+    const auto num_total_dofs = cbs + num_faces_dofs;
+
+    const matrix_type stiff  = make_stiffness_matrix(msh, cl, rb);
+    matrix_type       gr_lhs = matrix_type::Zero(rbs - 1, rbs - 1);
+    matrix_type       gr_rhs = matrix_type::Zero(rbs - 1, num_total_dofs);
+
+    gr_lhs                           = stiff.block(1, 1, rbs - 1, rbs - 1);
+    gr_rhs.block(0, 0, rbs - 1, cbs) = stiff.block(1, 0, rbs - 1, cbs);
+
+    size_t     offset = cbs;
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto fc  = fcs[i];
+
+        const auto face_degree = hdi.face_degree();
+        const auto n           = normal(msh, cl, fc);
+        const auto fb          = make_scalar_monomial_basis(msh, fc, face_degree);
+        const auto fbs         = fb.size();
+
+        auto rd = hdi.reconstruction_degree();
+        auto cd = hdi.face_degree();
+        auto fd = hdi.face_degree();
+
+        auto qps_f = integrate(msh, fc, rd + std::max(cd, fd) );
+        for (auto& qp : qps_f)
+        {
+            Matrix<T, Dynamic, DIM> r_dphi_tmp = rb.eval_gradients(qp.point());
+            Matrix<T, Dynamic, DIM> r_dphi     = r_dphi_tmp.block(1, 0, rbs - 1, DIM);
+            vector_type             c_phi      = cb.eval_functions(qp.point());
+            vector_type             f_phi      = fb.eval_functions(qp.point());
+            gr_rhs.block(0, offset, rbs - 1, fbs) += qp.weight() * (r_dphi * n) * f_phi.transpose();
+            gr_rhs.block(0, 0, rbs - 1, cbs) -= qp.weight() * (r_dphi * n) * c_phi.transpose();
+        }
+
+        offset += fbs;
+    }
+
+    matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
+    matrix_type data = gr_rhs.transpose() * oper;
+
+    return std::make_pair(oper, data);
+}
+
+
 /**
  * @brief Compute the term \f$ (\nabla R^{k+1}_T(\hat{u}), \nabla R^{k+1}_T(\hat{v}) )_T   \f$  where \f$ R^{k+1}_T \f$
 is the high-order
@@ -140,6 +205,7 @@ n_T)_{\partial T}, \quad \forall w \f$
 dynamic_matrix<typename Mesh::coordinate_type>  > the first term is \f$ \nabla R^{k+1}_T \f$ and the second term is \f$
 (\nabla R^{k+1}_T(\hat{u}), \nabla R^{k+1}_T(\hat{v}) )_T   \f$
  */
+#if 0
 template<typename Mesh>
 std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
 make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
@@ -148,6 +214,7 @@ make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, c
 
     return make_scalar_hho_laplacian(msh, cl, cell_infos);
 }
+#endif
 
 /**
  * @brief Compute the term \f$ (\nabla R^{k+1}_T(\hat{u}), \nabla R^{k+1}_T(\hat{v}) )_T   \f$  where \f$ R^{k+1}_T \f$

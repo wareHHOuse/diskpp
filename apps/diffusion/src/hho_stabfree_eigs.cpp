@@ -9,37 +9,28 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
 
-#include "mumps.hpp"
-
-#include "diffusion_hho_common.hpp"
-
-#if 0
-template<typename Mesh>
-struct test_functor
-{
-    /* Expect k+1 convergence (hho stabilization, energy norm) */
-    typename Mesh::coordinate_type
-    operator()(const Mesh& msh, size_t degree) const
-    {
-        return run_hho_diffusion_solver(msh, degree);
-    }
-
-    size_t
-    expected_rate(size_t k)
-    {
-        return k+1;
-    }
-};
 
 template<typename Mesh>
-void
-run_diffusion_solver(const Mesh& msh)
+void compute_eigs(const Mesh& msh, size_t sk)
 {
-    run_hho_diffusion_solver(msh, 0);
+    disk::hho_degree_info hdi;
+    
+    hdi.cell_degree(sk);
+    hdi.face_degree(sk);
+
+    for (size_t rk = sk+1; rk < sk+5; rk++)
+    {
+        std::cout << "HHO space degree: " << sk << ", reconstruction degree: " << rk << std::endl;
+        hdi.reconstruction_degree(rk);
+
+        for (auto& cl : msh)
+        {
+            auto gr = make_scalar_hho_laplacian(msh, cl, hdi);
+            std::cout << gr.second.eigenvalues().transpose() << std::endl;
+            break;
+        }
+    }
 }
-#endif
-
-
 
 
 int main(int argc, char **argv)
@@ -49,40 +40,21 @@ int main(int argc, char **argv)
     using T = double;
 
     size_t      num_elems = 16;
-    hho_degree_info hdi(1);
+    size_t      degree = 1;
     char *      mesh_filename = nullptr;
     bool        stat_cond = true, stab_diam_F = true;
 
-    size_t tmpdeg;
-    bool rflag = false;
-    bool lflag = false;
-
     int ch;
-    while ( (ch = getopt(argc, argv, "k:m:N:r:l:")) != -1 )
+    while ( (ch = getopt(argc, argv, "k:m:twN:")) != -1 )
     {
         switch(ch)
         {
+            case 't': stab_diam_F = false; break;
+
+            case 'w': stat_cond = false; break;
+
             case 'k':
-                tmpdeg = std::stoi(optarg);
-                if (not lflag)
-                    hdi.cell_degree(tmpdeg);
-                
-                hdi.face_degree(tmpdeg);
-                
-                if (not rflag)
-                    hdi.reconstruction_degree(tmpdeg+1);
-                break;
-
-            case 'r':
-                tmpdeg = std::stoi(optarg);
-                rflag = true;
-                hdi.reconstruction_degree(tmpdeg);
-                break;
-
-            case 'l':
-                tmpdeg = std::stoi(optarg);
-                lflag = true;
-                hdi.cell_degree(tmpdeg);
+                degree = std::stoi(optarg);
                 break;
 
             case 'N':
@@ -103,18 +75,8 @@ int main(int argc, char **argv)
 
     if (mesh_filename == nullptr)
     {
-        std::cout << "Mesh format: 1D uniform" << std::endl;
-
-        typedef disk::generic_mesh<T, 1>  mesh_type;
-
-        mesh_type msh;
-        disk::uniform_mesh_loader<T, 1> loader(0, 1, num_elems);
-        loader.populate_mesh(msh);
-
-        stab_diam_F = false;
-        run_hho_diffusion_solver(msh, hdi, stat_cond, stab_diam_F);
-
-        return 0;
+        std::cout << "Please specify the mesh (-m)" << std::endl;
+        return 1;
     }
 
     /* FVCA5 2D */
@@ -122,7 +84,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
         auto msh = disk::load_fvca5_2d_mesh<T>(mesh_filename);
-        run_hho_diffusion_solver(msh, hdi, stat_cond, stab_diam_F);
+        compute_eigs(msh, degree);
         return 0;
     }
 
@@ -131,10 +93,8 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
         auto msh = disk::load_netgen_2d_mesh<T>(mesh_filename);
-
         std::cout << msh.faces_size() << std::endl;
-
-        run_hho_diffusion_solver(msh, hdi, stat_cond, stab_diam_F);
+        compute_eigs(msh, degree);
         return 0;
     }
 
@@ -143,7 +103,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
         auto msh = disk::load_cartesian_2d_mesh<T>(mesh_filename);
-        run_hho_diffusion_solver(msh, hdi, stat_cond, stab_diam_F);
+        compute_eigs(msh, degree);
         return 0;
     }
 
@@ -153,7 +113,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
         auto msh = disk::load_netgen_3d_mesh<T>(mesh_filename);
-        run_hho_diffusion_solver(msh, hdi, stat_cond, stab_diam_F);
+        compute_eigs(msh, degree);
         return 0;
     }
 
@@ -162,7 +122,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
         auto msh = disk::load_cartesian_3d_mesh<T>(mesh_filename);
-        run_hho_diffusion_solver(msh, hdi, stat_cond, stab_diam_F);
+        compute_eigs(msh, degree);
         return 0;
     }
 
@@ -171,21 +131,11 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
         disk::generic_mesh<T,3> msh;
-
         disk::load_mesh_fvca6_3d<T>(mesh_filename, msh);
-
-        run_hho_diffusion_solver(msh, hdi, stat_cond, stab_diam_F);
-
+        compute_eigs(msh, degree);
         return 0;
     }
-}
 
-
-#if 0
-int main(void)
-{
-    tester<test_functor> tstr;
-    tstr.run();
-    return 0;
+    std::cout << "Unable to detect mesh format." << std::endl;
+    return 1;
 }
-#endif

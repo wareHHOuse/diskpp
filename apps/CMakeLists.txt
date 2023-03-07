@@ -47,4 +47,3 @@ option(BUILD_APP_CONTACT "Build contact applications" ON)
 if (BUILD_APP_CONTACT)
     add_subdirectory(contact)
 endif()
-
