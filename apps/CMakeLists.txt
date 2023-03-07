@@ -57,3 +57,8 @@ option(BUILD_APP_TEMPLATE "Build template applications" ON)
 if (BUILD_APP_TEMPLATE)
     add_subdirectory(app_template)
 endif()
+
+option(BUILD_UTILS "Build utilities" ON)
+if (BUILD_UTILS)
+    add_subdirectory(utils)
+endif()
