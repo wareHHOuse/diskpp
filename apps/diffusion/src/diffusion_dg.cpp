@@ -262,13 +262,13 @@ run_diffusion_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_t
     std::cout << "err = " << std::sqrt(err) << std::endl;
 }
 
+
+
 int main(int argc, char **argv)
 {
     rusage_monitor rm;
 
-    using T = double;
-
-    T           stab_param = 1.0;
+    double      stab_param = 1.0;
     size_t      degree = 1;
     char *      mesh_filename = nullptr;
 
@@ -296,86 +296,8 @@ int main(int argc, char **argv)
         }
     }
 
-    /* FVCA5 2D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
-    {
-        std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
-        disk::generic_mesh<T, 2> msh;
-        if ( load_mesh_fvca5_2d(mesh_filename, msh) ) {
-            run_diffusion_solver(msh, degree, stab_param);
-            return 0;
-        }
-    }
-
-    /* Netgen 2D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$") ))
-    {
-        std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
-        disk::simplicial_mesh<T, 2> msh;
-        if ( load_mesh_netgen(mesh_filename, msh) ) {
-            run_diffusion_solver(msh, degree, stab_param);
-            return 0;
-        }
-    }
-
-    /* DiSk++ cartesian 2D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.quad$") ))
-    {
-        disk::cartesian_mesh<T, 2> msh;
-        if ( load_mesh_diskpp_cartesian(mesh_filename, msh) ) {
-            run_diffusion_solver(msh, degree, stab_param);
-            return 0;
-        }
-    }
-
-
-    /* Netgen 3D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$") ))
-    {
-        std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-        disk::simplicial_mesh<T, 3> msh;
-        if ( load_mesh_netgen(mesh_filename, msh) ) {
-            run_diffusion_solver(msh, degree, stab_param);
-            return 0;
-        }
-    }
-
-    /* DiSk++ cartesian 3D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.hex$") ))
-    {
-        std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
-        disk::cartesian_mesh<T, 3> msh;
-        if ( load_mesh_diskpp_cartesian(mesh_filename, msh) ) {
-            run_diffusion_solver(msh, degree, stab_param);
-            return 0;
-        }
-    }
-
-    /* FVCA6 3D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.msh$") ))
-    {
-        std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
-        disk::generic_mesh<T, 3> msh;
-        if ( load_mesh_fvca6_3d(mesh_filename, msh) ) {
-            run_diffusion_solver(msh, degree, stab_param);
-            return 0;
-        }
-    }
-
-#ifdef HAVE_GMSH
-    /* GMSH 2D simplicials */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.geo2s$") ))
-    {
-        std::cout << "Guessed mesh format: GMSH 2D simplicials" << std::endl;
-        disk::simplicial_mesh<T,2> msh;
-        disk::gmsh_geometry_loader< disk::simplicial_mesh<T,2> > loader;
-
-        loader.read_mesh(mesh_filename);
-        loader.populate_mesh(msh);
-
-        run_diffusion_solver(msh, degree, stab_param);
-    }
-#endif
-
+    return disk::dispatch_all_meshes(mesh_filename,
+              [](auto ...args) { run_diffusion_solver(args...); },
+              degree, stab_param );
 }
 

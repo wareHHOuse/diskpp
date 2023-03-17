@@ -8,6 +8,7 @@
 
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
+#include "diskpp/mesh/meshgen.hpp"
 
 
 template<typename Mesh>
@@ -73,69 +74,22 @@ int main(int argc, char **argv)
         }
     }
 
-    if (mesh_filename == nullptr)
+    if (mesh_filename)
     {
-        std::cout << "Please specify the mesh (-m)" << std::endl;
-        return 1;
+        disk::dispatch_all_meshes(mesh_filename,
+            [](auto& ...args) { compute_eigs(args...); },
+            degree );
     }
-
-    /* FVCA5 2D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
+    else
     {
-        std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
-        auto msh = disk::load_fvca5_2d_mesh<T>(mesh_filename);
-        compute_eigs(msh, degree);
-        return 0;
+        using T = double;
+        disk::triangular_mesh<T> msh;
+        auto mesher = make_simple_mesher(msh);
+        
+        for (size_t i = 0; i < 4; i++)
+        {
+            mesher.refine();
+            compute_eigs(msh, degree);
+        }
     }
-
-    /* Netgen 2D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$") ))
-    {
-        std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
-        auto msh = disk::load_netgen_2d_mesh<T>(mesh_filename);
-        std::cout << msh.faces_size() << std::endl;
-        compute_eigs(msh, degree);
-        return 0;
-    }
-
-    /* DiSk++ cartesian 2D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.quad$") ))
-    {
-        std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
-        auto msh = disk::load_cartesian_2d_mesh<T>(mesh_filename);
-        compute_eigs(msh, degree);
-        return 0;
-    }
-
-
-    /* Netgen 3D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$") ))
-    {
-        std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-        auto msh = disk::load_netgen_3d_mesh<T>(mesh_filename);
-        compute_eigs(msh, degree);
-        return 0;
-    }
-
-    /* DiSk++ cartesian 3D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.hex$") ))
-    {
-        std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
-        auto msh = disk::load_cartesian_3d_mesh<T>(mesh_filename);
-        compute_eigs(msh, degree);
-        return 0;
-    }
-
-    /* FVCA6 3D */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.msh$") ))
-    {
-        std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
-        disk::generic_mesh<T,3> msh;
-        disk::load_mesh_fvca6_3d<T>(mesh_filename, msh);
-        compute_eigs(msh, degree);
-        return 0;
-    }
-
-    std::cout << "Unable to detect mesh format." << std::endl;
-    return 1;
 }

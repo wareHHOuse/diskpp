@@ -414,40 +414,42 @@ project_gradient(const Mesh& msh, const Element& elem, size_t degree, const matr
 
 template<typename T>
 T
-eval(const dynamic_vector<T>& tab_coeff, const dynamic_vector<T>& base)
+eval(const dynamic_vector<T>& dofs, const dynamic_vector<T>& basis)
 {
-    assert(tab_coeff.rows() == base.rows());
-
-    return tab_coeff.dot(base);
+    assert(dofs.rows() == basis.rows());
+    return dofs.dot(basis);
 }
 
 template<typename T, int DIM>
 static_vector<T, DIM>
-eval(const dynamic_vector<T>& tab_coeff, const Matrix<T, Dynamic, DIM>& base)
+eval(const dynamic_vector<T>& dofs, const Matrix<T, Dynamic, DIM>& basis)
 {
     static_vector<T, DIM> ret = static_vector<T, DIM>::Zero();
-    assert(tab_coeff.size() == (base.rows()));
+    assert(dofs.size() == (basis.rows()));
+    return basis.transpose() * dofs;
+}
 
-    for (int i = 0; i < tab_coeff.size(); i++)
-    {
-        ret += tab_coeff(i) * (base.row(i)).transpose();
-    }
-
-    return ret;
+template<typename T, int DIM>
+static_vector<T, DIM>
+eval(const dynamic_vector<T>& dofs, const Matrix<T, DIM, DIM>& tens, const Matrix<T, Dynamic, DIM>& basis)
+{
+    static_vector<T, DIM> ret = static_vector<T, DIM>::Zero();
+    assert(dofs.size() == (basis.rows()));
+    return (tens * basis.transpose()) * dofs;
 }
 
 template<typename T, int DIM>
 static_matrix<T, DIM, DIM>
 eval(const dynamic_vector<T>&                                      tab_coeff,
-     const eigen_compatible_stdvector<static_matrix<T, DIM, DIM>>& base,
+     const eigen_compatible_stdvector<static_matrix<T, DIM, DIM>>& basis,
      const size_t                                                  begin = 0)
 {
     static_matrix<T, DIM, DIM> ret = static_matrix<T, DIM, DIM>::Zero();
-    assert(tab_coeff.size() == (base.size() - begin));
+    assert(tab_coeff.size() == (basis.size() - begin));
 
     for (int i = 0; i < tab_coeff.size(); i++)
     {
-        ret += tab_coeff(i) * base[i + begin];
+        ret += tab_coeff(i) * basis[i + begin];
     }
 
     return ret;

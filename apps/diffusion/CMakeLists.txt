@@ -3,6 +3,9 @@ project(diskpp_diffusion)
 
 set(LINK_LIBS diskpp)
 
+find_package(MathGL REQUIRED)
+set(LINK_LIBS ${LINK_LIBS} MathGL)
+
 add_executable(diffusion_hho src/diffusion_hho.cpp)
 target_link_libraries(diffusion_hho ${LINK_LIBS})
 install(TARGETS diffusion_hho RUNTIME DESTINATION bin)

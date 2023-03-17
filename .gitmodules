@@ -18,3 +18,6 @@
 [submodule "contrib/sgr"]
 	path = refactor_old_diskpp_code/contrib/sgr
 	url = https://github.com/datafl4sh/sgr
+[submodule "libdiskpp/contrib/matplotplusplus"]
+	path = libdiskpp/contrib/matplotplusplus
+	url = https://github.com/alandefreitas/matplotplusplus/

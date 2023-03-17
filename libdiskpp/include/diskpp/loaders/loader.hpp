@@ -3050,6 +3050,145 @@ load_mesh_poly3d(const char* filename, disk::generic_mesh<T, 3>& msh, bool verbo
 } // namespace disk
 
 
+
 #ifdef HAVE_GMSH
 #include "loader_gmsh.hpp"
 #endif
+
+
+namespace disk {
+
+/**
+ * @brief Deduce mesh type from filename extension, create appropriate mesh object
+ *        and dispatch a function on it
+ * 
+ * If you have the function `process_mesh(msh, p1, p2, ..., pn)` you can
+ * 
+ *  ```
+ *  disk::dispatch_all_meshes(mesh_filename,
+ *        [](auto ...args) { process_mesh(args...); },
+ *        p1, p2, ..., pn);
+ *  ```
+ * 
+ * @tparam Function 
+ * @tparam Args 
+ * @param mesh_filename Name of the file containing the mesh.
+ * @param func Function to dispatch. The mesh object is passed as first parameter.
+ * @param args Arguments to the function to dispatch.
+ * @return int 
+ */
+
+template<typename Function, typename... Args>
+int
+dispatch_all_meshes(const char *mesh_filename, Function func, Args && ...args)
+{
+    using T = double;
+    /* FVCA5 2D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
+        disk::generic_mesh<T, 2> msh;
+        if ( load_mesh_fvca5_2d(mesh_filename, msh) ) {
+            func(msh, args...);
+            return 0;
+        }
+    }
+
+    /* Netgen 2D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$") ))
+    {
+        std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
+        disk::simplicial_mesh<T, 2> msh;
+        if ( load_mesh_netgen(mesh_filename, msh) ) {
+            func(msh, args...);
+            return 0;
+        }
+    }
+
+    /* DiSk++ cartesian 2D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.quad$") ))
+    {
+        disk::cartesian_mesh<T, 2> msh;
+        if ( load_mesh_diskpp_cartesian(mesh_filename, msh) ) {
+            func(msh, args...);
+            return 0;
+        }
+    }
+
+
+    /* Netgen 3D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$") ))
+    {
+        std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
+        disk::simplicial_mesh<T, 3> msh;
+        if ( load_mesh_netgen(mesh_filename, msh) ) {
+            func(msh, args...);
+            return 0;
+        }
+    }
+
+    /* DiSk++ cartesian 3D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.hex$") ))
+    {
+        std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
+        disk::cartesian_mesh<T, 3> msh;
+        if ( load_mesh_diskpp_cartesian(mesh_filename, msh) ) {
+            func(msh, args...);
+            return 0;
+        }
+    }
+
+    /* FVCA6 3D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.msh$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
+        disk::generic_mesh<T, 3> msh;
+        if ( load_mesh_fvca6_3d(mesh_filename, msh) ) {
+            func(msh, args...);
+            return 0;
+        }
+    }
+
+#ifdef HAVE_GMSH
+    /* GMSH 2D simplicials */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.geo2s$") ))
+    {
+        std::cout << "Guessed mesh format: GMSH 2D simplicials" << std::endl;
+        disk::simplicial_mesh<T,2> msh;
+        disk::gmsh_geometry_loader< disk::simplicial_mesh<T,2> > loader;
+        loader.read_mesh(mesh_filename);
+        loader.populate_mesh(msh);
+        func(msh, args...);
+        return 0;
+    }
+
+    /* GMSH 3D simplicials */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.geo3s$") ))
+    {
+        std::cout << "Guessed mesh format: GMSH 3D simplicials" << std::endl;
+        disk::simplicial_mesh<T,3> msh;
+        disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
+        loader.read_mesh(mesh_filename);
+        loader.populate_mesh(msh);
+        func(msh, args...);
+        return 0;
+    }
+
+    /* GMSH 3D generic */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.geo3g$") ))
+    {
+        std::cout << "Guessed mesh format: GMSH 3D general elements" << std::endl;
+        disk::generic_mesh<T,3> msh;
+        disk::gmsh_geometry_loader< disk::generic_mesh<T,3> > loader;
+        loader.read_mesh(mesh_filename);
+        loader.populate_mesh(msh);
+        func(msh, args...);
+        return 0;
+    }
+#endif
+
+    return 1;
+}
+
+} // namespace disk
+
