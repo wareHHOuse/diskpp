@@ -33,9 +33,9 @@
 #include "LinearIsotropicAndKinematicHardening/LinearIsotropicAndKinematicHardening_qp.hpp"
 #include "LinearLaw/LinearLaw_qp.hpp"
 #include "Neohookean/Neohookean_qp.hpp"
-#include "mechanics/behaviors/logarithmic_strain/LogarithmicStrain.hpp"
+#include "diskpp/mechanics/behaviors/logarithmic_strain/LogarithmicStrain.hpp"
 #include "Mfront/Mfront_law.hpp"
-#include "core/methods/hho"
+#include "diskpp/methods/hho"
 #include "law_bones.hpp"
 #include "behaviorlaws_names.hpp"
 

@@ -27,8 +27,8 @@
 
 #pragma once
 
-#include "mechanics/behaviors/maths_utils.hpp"
-#include "common/eigen.hpp"
+#include "diskpp/mechanics/behaviors/maths_utils.hpp"
+#include "diskpp/common/eigen.hpp"
 
 // Function to convert Stress to an other
 // F is the deformation gradient

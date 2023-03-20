@@ -27,10 +27,10 @@
 
 #include <vector>
 
-#include "common/eigen.hpp"
-#include "core/mechanics/behaviors/logarithmic_strain/LogarithmicStrain_qp.hpp"
-#include "mechanics/behaviors/laws/behaviorlaws.hpp"
-#include "mechanics/behaviors/laws/law_cell_bones.hpp"
+#include "diskpp/common/eigen.hpp"
+#include "diskpp/mechanics/behaviors/logarithmic_strain/LogarithmicStrain_qp.hpp"
+#include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "diskpp/mechanics/behaviors/laws/law_cell_bones.hpp"
 
 namespace disk
 {

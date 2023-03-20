@@ -28,13 +28,13 @@
 
 #include <vector>
 
-#include "core/bases/bases.hpp"
-#include "core/common/eigen.hpp"
-#include "core/mechanics/behaviors/laws/behaviorlaws.hpp"
-#include "core/mechanics/behaviors/maths_tensor.hpp"
-#include "core/mechanics/behaviors/maths_utils.hpp"
-#include "core/quadratures/quadratures.hpp"
-#include "core/methods/hho"
+#include "diskpp/bases/bases.hpp"
+#include "diskpp/common/eigen.hpp"
+#include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "diskpp/mechanics/behaviors/maths_tensor.hpp"
+#include "diskpp/mechanics/behaviors/maths_utils.hpp"
+#include "diskpp/quadratures/quadratures.hpp"
+#include "diskpp/methods/hho"
 
 
 namespace disk

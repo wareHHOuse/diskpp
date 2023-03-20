@@ -25,7 +25,7 @@
 
 #pragma once
 
-#include "common/eigen.hpp"
+#include "diskpp/common/eigen.hpp"
 #include <array>
 #include <tuple>
 

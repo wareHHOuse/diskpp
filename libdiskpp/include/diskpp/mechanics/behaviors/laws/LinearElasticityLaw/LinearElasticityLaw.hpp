@@ -26,13 +26,13 @@
 
 #pragma once
 
-#include "common/eigen.hpp"
-#include "core/mechanics/behaviors/laws/law_qp_bones.hpp"
-#include "core/mechanics/behaviors/laws/materialData.hpp"
-#include "core/mechanics/behaviors/maths_tensor.hpp"
-#include "core/mechanics/behaviors/maths_utils.hpp"
-#include "core/mechanics/behaviors/tensor_conversion.hpp"
-#include "mesh/point.hpp"
+#include "diskpp/common/eigen.hpp"
+#include "diskpp/mechanics/behaviors/laws/law_qp_bones.hpp"
+#include "diskpp/mechanics/behaviors/laws/materialData.hpp"
+#include "diskpp/mechanics/behaviors/maths_tensor.hpp"
+#include "diskpp/mechanics/behaviors/maths_utils.hpp"
+#include "diskpp/mechanics/behaviors/tensor_conversion.hpp"
+#include "diskpp/mesh/point.hpp"
 
 namespace disk
 {

@@ -28,10 +28,10 @@
 
 #include <vector>
 
-#include "common/eigen.hpp"
-#include "mechanics/behaviors/laws/law_cell_bones.hpp"
-#include "mechanics/behaviors/maths_tensor.hpp"
-#include "mechanics/behaviors/maths_utils.hpp"
+#include "diskpp/common/eigen.hpp"
+#include "diskpp/mechanics/behaviors/laws/law_cell_bones.hpp"
+#include "diskpp/mechanics/behaviors/maths_tensor.hpp"
+#include "diskpp/mechanics/behaviors/maths_utils.hpp"
 
 namespace disk
 {
