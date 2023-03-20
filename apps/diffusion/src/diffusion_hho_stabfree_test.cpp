@@ -24,60 +24,8 @@
 #include "mumps.hpp"
 #include "diffusion_hho_common.hpp"
 
-#if 0
+#include "sgr.hpp"
 
-#define CSV_SEPARATOR ';'
-
-template<typename T>
-struct error_table {
-    std::vector<hho_degree_info>    hdis;
-    std::vector<T>                  hs;
-    std::vector<std::vector<T>>     errors;
-};
-
-template<typename T>
-std::ostream& operator<<(std::ostream& os, const error_table<T>& et)
-{
-    assert(et.hs.size() == et.errors.size());
-
-    os << CSV_SEPARATOR;
-    for (auto& hdi : et.hdis)
-    {
-        os << "HHO(" << hdi.cell_degree() << ',' << hdi.face_degree() << ',';
-        os << hdi.reconstruction_degree() << ")" << CSV_SEPARATOR << CSV_SEPARATOR;
-    }
-    os << std::endl;
-
-    for (size_t row = 0; row < et.hs.size(); row++)
-    {
-        os << et.hs.at(row) << CSV_SEPARATOR;
-
-        if (row == 0) {
-            const auto& errs = et.errors.at(row); 
-            for (size_t col = 0; col < errs.size(); col++)
-                os << errs.at(col) << CSV_SEPARATOR << CSV_SEPARATOR;
-            os << std::endl;
-        }
-        else {
-            const auto& errs_prev = et.errors.at(row-1);
-            const auto& errs_curr = et.errors.at(row);
-            assert(errs_prev.size() == errs_curr.size());
-
-            const auto& h_prev = et.hs.at(row-1);
-            const auto& h_curr = et.hs.at(row);
-            for (size_t col = 0; col < errs_curr.size(); col++) {
-                os << errs_curr.at(col) << CSV_SEPARATOR;
-                auto rate = std::log(errs_prev.at(col)/errs_curr.at(col)) / std::log(h_prev/h_curr);
-                os << rate << CSV_SEPARATOR;
-            }
-            os << std::endl;
-        }
-    }
-
-    return os;
-}
-
-#endif
 
 template<typename T>
 struct convergence_history {
@@ -126,25 +74,25 @@ class convergence_database {
     
     using varhist_t = std::map<variant_t, convhist_t>;
 
-    std::map<hdi_t, varhist_t> convergence_histories_byhdi;
+    std::map<size_t, varhist_t> convergence_histories;
 
 public:
     convergence_database() {}
 
-    void add(const hdi_t& hdi, const variant_t& variant, const errinfo_t& ch) {
-        convergence_histories_byhdi[hdi][variant].add(ch);
+    void add(size_t deg, const variant_t& variant, const errinfo_t& ch) {
+        convergence_histories[deg][variant].add(ch);
     }
 
-    void mark_failed(const hdi_t& hdi, const variant_t& variant) {
-        convergence_histories_byhdi[hdi][variant].failed(true);
+    void mark_failed(size_t deg, const variant_t& variant) {
+        convergence_histories[deg][variant].failed(true);
     }
 
     auto begin() const {
-        return convergence_histories_byhdi.begin();
+        return convergence_histories.begin();
     }
 
     auto end() const {
-        return convergence_histories_byhdi.end();
+        return convergence_histories.end();
     }
 };
 
@@ -153,61 +101,178 @@ void make_images(const convergence_database<T>& cdb)
 {
     using namespace matplot;
 
-    for (const auto& [hdi, variant_histories] : cdb) {
-        figure();
+    auto style = [] (const hho_degree_info& hdi) {
+        auto cd = hdi.cell_degree();
+        auto fd = hdi.face_degree();
+        auto rd = hdi.reconstruction_degree();
 
+        if (cd == fd and fd+1 == rd)
+            return '.'; /* equal order */
+        
+        if (cd+1 == fd and fd+1 == rd)
+            return '-'; /* mixed order */
+        
+        return 'x';
+    };
+
+    for (const auto& [degree, variants] : cdb) {
+        figure();
         /* L2 errors */
-        subplot(3,1,0);
         hold(on);
-        for (const auto& [variant, history] : variant_histories) {
+        for (const auto& [variant, history] : variants) {
             if ( history.failed() )
                 continue;
-
+            std::cout << "Plot: " << variant << std::endl;
             auto p = loglog(history.hs, history.L2errs);
-            p->display_name(variant);
+            p->display_name( variant );
         }
         auto l = legend();
-        l->location(legend::general_alignment::bottomleft);
+        l->location(legend::general_alignment::bottomright);
         hold(off);
 
+        {
+            std::stringstream title_ss;
+            title_ss << "Degree " << degree << " L2 error";
+            sgtitle(title_ss.str());
+
+            std::stringstream ss;
+            ss << "img/convergence_" << degree << "_L2.eps";
+            save(ss.str());
+        }
+
         /* H1 errors */
-        subplot(3,1,1);
+        figure();
         hold(on);
-        for (const auto& [variant, history] : variant_histories) {
+        for (const auto& [variant, history] : variants) {
             if ( history.failed() )
                 continue;
 
             auto p = loglog(history.hs, history.H1errs);
-            p->display_name(variant);
-        }
-        l = legend();
-        l->location(legend::general_alignment::bottomleft);
-        hold(off);
-
-        /* Operator errors */
-        subplot(3,1,2);
-        hold(on);
-        for (const auto& [variant, history] : variant_histories) {
-            if ( history.failed() )
-                continue;
-
-            auto p = loglog(history.hs, history.Aerrs);
-            p->display_name(variant);
+            p->display_name( variant );
         }
         l = legend();
         l->location(legend::general_alignment::bottomright);
         hold(off);
 
+        {
+            std::stringstream title_ss;
+            title_ss << "Degree " << degree << " energy error";
+            sgtitle(title_ss.str());
 
-        std::stringstream title_ss;
-        title_ss << "HHO(" << hdi.cell_degree() << ", " << hdi.face_degree() << ", ";
-        title_ss << hdi.reconstruction_degree() << ")";
-        sgtitle(title_ss.str());
+            std::stringstream ss;
+            ss << "img/convergence_" << degree << "_energy.eps";
+            save(ss.str());
+        }
 
-        std::stringstream ss;
-        ss << "img/convergence_" << hdi.cell_degree() << "_" << hdi.face_degree() << "_";
-        ss << hdi.reconstruction_degree() << ".png";
-        save(ss.str());
+        /* Operator errors */
+        figure();
+        hold(on);
+        for (const auto& [variant, history] : variants) {
+            if ( history.failed() )
+                continue;
+
+            auto p = loglog(history.hs, history.Aerrs);
+            p->display_name( variant );
+        }
+        l = legend();
+        l->location(legend::general_alignment::bottomright);
+        hold(off);
+
+        {
+            std::stringstream title_ss;
+            title_ss << "Degree " << degree << " operator error";
+            sgtitle(title_ss.str());
+
+            std::stringstream ss;
+            ss << "img/convergence_" << degree << "_operator.eps";
+            save(ss.str());
+        }
+    }
+}
+
+template<typename T>
+auto compute_orders(const std::vector<T>& hs, const std::vector<T>& errs)
+{
+    assert(hs.size() == errs.size());
+    std::vector<T> ret;
+    for (size_t i = 1; i < hs.size(); i++) {
+        auto num = std::log( errs.at(i-1)/errs.at(i) );
+        auto den = std::log( hs.at(i-1)/hs.at(i) );
+        ret.push_back(num/den);
+    }
+
+    return ret;
+}
+
+namespace mpriv {
+template<typename T>
+struct range_check
+{
+    T value;
+    T lower_limit, upper_limit;
+    
+    range_check(const T& val, const T& tol)
+        : value(val), lower_limit(-tol),upper_limit(tol)
+    {}
+
+    range_check(const T& val, const std::array<T,2>& minmax)
+        : value(val), lower_limit(minmax[0]), upper_limit(minmax[1])
+    {}
+};
+}//namespace mpriv
+
+template<typename T>
+std::ostream&
+operator<<(std::ostream& os, const mpriv::range_check<T>& rc) 
+{
+    if (rc.value < rc.lower_limit)
+        os << sgr::redfg << rc.value << sgr::nofg;
+    else if (rc.value > rc.upper_limit)
+        os << sgr::yellowfg << rc.value << sgr::nofg;
+    else
+        os << sgr::greenfg << rc.value << sgr::nofg;
+    return os;
+}
+
+template<typename T>
+inline mpriv::range_check<T>
+range_check(const T& val, const T& tol)
+{
+    return mpriv::range_check<T>(val, tol);
+}
+
+template<typename T>
+inline mpriv::range_check<T>
+range_check(const T& val, const std::array<T,2>& minmax)
+{
+    return mpriv::range_check<T>(val, minmax);
+}
+
+template<typename T>
+void make_reports(const convergence_database<T>& cdb)
+{
+    std::ofstream ofs("report.txt");
+
+    for (const auto& [degree, variants] : cdb)
+    {
+        for (const auto& [variant, history] : variants)
+        {
+            std::cout << sgr::Bon << " * * * " << variant << " * * *" << sgr::Boff << std::endl;
+            if ( history.failed() ) {
+                std::cout << "This variant failed to run" << std::endl;
+                continue;
+            }
+            std::cout << " Expected order for L2: " << degree+2 << std::endl << '\t';
+            auto L2orders = compute_orders(history.hs, history.L2errs);
+            for (const auto& order : L2orders)
+                std::cout << range_check(order, {degree+2-0.3, degree+2+0.3}) << " ";
+            std::cout << std::endl;
+            std::cout << " Expected order for H1: " << degree+1 << std::endl << '\t';
+            auto H1orders = compute_orders(history.hs, history.H1errs);
+            for (const auto& order : H1orders)
+                std::cout << range_check(order, {degree+1-0.3, degree+1+0.3}) << " ";
+            std::cout << std::endl;
+        }
     }
 }
 
@@ -227,10 +292,20 @@ struct test_configuration
         mixed_order(false), use_projection(false), k00(1.0), k11(1.0)
     {}
 
+    test_configuration(const test_configuration&) = default;
+
     test_configuration(const std::string& vn) : k_min(0), k_max(3), rincrmin(1),
         rincrmax(4), mixed_order(false), use_projection(false), k00(1.0), k11(1.0),
         variant_name(vn)
     {}
+
+    std::string name(void) const { 
+        return variant_name;
+    }
+
+    void name(const std::string& name) {
+        variant_name = name;
+    }
 };
 
 template<typename Mesh>
@@ -243,6 +318,15 @@ test_stabfree_hho(Mesh& msh, convergence_database<typename Mesh::coordinate_type
     disk::diffusion_tensor<Mesh> diff_tens = disk::diffusion_tensor<Mesh>::Zero();
     diff_tens(0,0) = tc.k00;
     diff_tens(1,1) = tc.k11;
+
+    auto make_display_name = [] (const std::string& variant, const hho_degree_info& hdi) {
+        auto cd = hdi.cell_degree();
+        auto fd = hdi.face_degree();
+        auto rd = hdi.reconstruction_degree();
+        std::stringstream ss;
+        ss << variant << '(' << cd << ',' << fd << ',' << rd << ')';
+        return ss.str();
+    };
 
     for (size_t k = tc.k_min; k <= tc.k_max; k++)
     {
@@ -259,10 +343,10 @@ test_stabfree_hho(Mesh& msh, convergence_database<typename Mesh::coordinate_type
 
             try {
                 auto error = run_hho_diffusion_solver(msh, hdi, true, true, diff_tens, tc.use_projection);
-                cdb.add(hdi, tc.variant_name, error);
+                cdb.add(hdi.face_degree(), make_display_name(tc.variant_name, hdi), error);
             }
             catch (...) {
-                cdb.mark_failed(hdi, tc.variant_name);
+                cdb.mark_failed(hdi.face_degree(), make_display_name(tc.variant_name, hdi));
             }
         }
     }
@@ -270,18 +354,21 @@ test_stabfree_hho(Mesh& msh, convergence_database<typename Mesh::coordinate_type
 
 int main(int argc, char **argv)
 {
+    using T = double;
     rusage_monitor rm;
 
     std::vector<char *> meshes;
-
     bool meshes_from_file = false;
-    bool use_proj = false;
+    size_t max_refinements = 6;
+    
+    std::string shape = "tri";
+
+    test_configuration default_test_config;
+    default_test_config.k00 = 1.0;
+    default_test_config.k11 = 1.0;
+
     int ch;
-
-    double k00 = 0.008;
-    double k11 = 1.0;
-
-    while ( (ch = getopt(argc, argv, "m:Px:y:")) != -1 )
+    while ( (ch = getopt(argc, argv, "m:x:y:h:k:K:r:R:s:")) != -1 )
     {
         switch(ch)
         {
@@ -290,64 +377,83 @@ int main(int argc, char **argv)
                 meshes.push_back(optarg);
                 break;
 
-            case 'P':
-                use_proj = true;
-                break;
-
             case 'x':
-                k00 = std::stod(optarg);
+                default_test_config.k00 = std::stod(optarg);
                 break;
             
             case 'y':
-                k11 = std::stod(optarg);
+                default_test_config.k11 = std::stod(optarg);
+                break;
+
+            case 'h':
+                max_refinements = std::stoi(optarg);
+                break;
+
+            case 'k':
+                default_test_config.k_min = std::stoi(optarg);
+                break;
+
+            case 'K':
+                default_test_config.k_max = std::stoi(optarg);
+                break;
+
+            case 'r':
+                default_test_config.rincrmin = std::stoi(optarg);
+                break;
+
+            case 'R':
+                default_test_config.rincrmax = std::stoi(optarg);
+                break;
+                
+            case 's':
+                shape = optarg;
                 break;
         }
     }
 
-    test_configuration plain_hho("HHO-E");
+    test_configuration plain_hho(default_test_config);
+    plain_hho.variant_name = "HHO-E";
 
-    test_configuration mixed_hho("HHO-M");
+    test_configuration mixed_hho(default_test_config);
+    mixed_hho.variant_name = "HHO-M";
     mixed_hho.mixed_order = true;
 
-    test_configuration mixed_proj_hho("HHO-MP");
+    test_configuration mixed_proj_hho(default_test_config);
+    mixed_proj_hho.variant_name = "HHO-MP";
     mixed_proj_hho.mixed_order = true;
     mixed_proj_hho.use_projection = true;
 
-    convergence_database<double> cdb;
+    convergence_database<T> cdb;
 
-    if (meshes_from_file)
-    {
-        for (const auto& mesh : meshes)
-        {
-            disk::dispatch_all_meshes(mesh,
-                [](auto& ...args) { test_stabfree_hho(args...); },
-                cdb, plain_hho );
-
-            disk::dispatch_all_meshes(mesh,
-                [](auto& ...args) { test_stabfree_hho(args...); },
-                cdb, mixed_hho );
-
-            disk::dispatch_all_meshes(mesh,
-                [](auto& ...args) { test_stabfree_hho(args...); },
-                cdb, mixed_proj_hho );
-        }
-    }
-    else
-    {
-        using T = double;
+    if (shape == "tri") {
         disk::triangular_mesh<T> msh;
         auto mesher = make_simple_mesher(msh);
+        mesher.refine();
 
-        for (size_t i = 0; i < 7; i++)
+        for (size_t i = 0; i < max_refinements; i++)
         {
-            mesher.refine();
             test_stabfree_hho(msh, cdb, plain_hho);
             test_stabfree_hho(msh, cdb, mixed_hho);
             test_stabfree_hho(msh, cdb, mixed_proj_hho);
         }
     }
 
-    make_images(cdb);
+    if (shape == "hex") {
+        disk::generic_mesh<T,2> msh;
+        auto mesher = make_fvca5_hex_mesher(msh);
+
+        for (size_t i = 0; i < max_refinements; i++)
+        {
+            const auto offset = 1;
+            mesher.make_level(i+offset);
+            test_stabfree_hho(msh, cdb, plain_hho);
+            test_stabfree_hho(msh, cdb, mixed_hho);
+            test_stabfree_hho(msh, cdb, mixed_proj_hho);
+        }
+    }
+
+    //make_images(cdb);
+    make_reports(cdb);
 
     return 0;
 }

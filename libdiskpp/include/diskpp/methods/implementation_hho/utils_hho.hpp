@@ -223,13 +223,6 @@ class hho_degree_info
         std::cout << "gradient degree: " << grad_deg << std::endl;
         std::cout << "reconstruction degree: " << rec_deg << std::endl;
     }
-
-    bool operator<(const hho_degree_info& other) const
-    {
-        std::array<size_t, 4> degs_this{cell_deg, face_deg, grad_deg, rec_deg};
-        std::array<size_t, 4> degs_other{other.cell_deg, other.face_deg, other.grad_deg, other.rec_deg};
-        return std::lexicographical_compare(degs_this.begin(), degs_this.end(), degs_other.begin(), degs_other.end());
-    }
 };
 
 class assembly_index

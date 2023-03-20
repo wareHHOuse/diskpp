@@ -33,6 +33,8 @@
 #include "diskpp/mesh/mesh.hpp"
 #include "diskpp/geometry/geometry.hpp"
 
+#include "meshgen_fvca5hex.hpp"
+
 namespace disk {
 
 /**
@@ -204,6 +206,133 @@ template<typename Mesh>
 auto make_simple_mesher(Mesh& msh)
 {
     return simple_mesher<Mesh>(msh);
+}
+
+
+template<typename Mesh>
+class fvca5_hex_mesher
+{
+    static_assert(sizeof(Mesh) == -1, "fvca5_hex_mesher does not have a specialization for the specified mesh type");
+};
+
+template<typename T>
+class fvca5_hex_mesher<generic_mesh<T,2>>
+{
+    typedef generic_mesh<T,2>                   mesh_type;
+    static const size_t DIM = 2;
+
+    typedef typename mesh_type::storage_type    storage_type;
+    typedef typename mesh_type::node_type       node_type;
+    typedef typename mesh_type::edge_type       edge_type;
+    typedef typename mesh_type::surface_type    surface_type;
+    typedef typename mesh_type::point_type      point_type;
+
+    std::shared_ptr<storage_type>               storage;
+
+public:
+    fvca5_hex_mesher(mesh_type& msh)
+        : storage( msh.backend_storage() )
+    {
+    }
+
+    void make_level(size_t level)
+    {
+        fvca5::hexmesh hm;
+        fvca5::make_hexmesh(hm, level);
+
+        /* Points */
+        storage->points.resize( hm.points.size() );
+        auto point_transform = [&](const fvca5::point& pt) -> point_type {
+            return point_type( T(pt.x)/hm.coord_max, T(pt.y)/hm.coord_max );
+        };
+        std::transform(hm.points.begin(), hm.points.end(), storage->points.begin(), point_transform);
+
+        /* Nodes */
+        std::vector<node_type> nodes(hm.points.size());
+        for (size_t i = 0; i < nodes.size(); i++)
+            nodes[i] = node_type(point_identifier<2>(i));
+        std::swap(storage->nodes, nodes);
+
+        /* Edges */
+        storage->edges.resize(hm.edges.size());
+        auto edge_transform = [&](const fvca5::edge& edge) -> edge_type {
+            auto ea_ofs = fvca5::offset(hm, edge.a, false);
+            auto eb_ofs = fvca5::offset(hm, edge.b, false);
+            assert(ea_ofs != eb_ofs);
+            auto node_a = typename node_type::id_type(ea_ofs);
+            auto node_b = typename node_type::id_type(eb_ofs);
+            return edge_type(node_a, node_b);
+        };
+        std::transform(hm.edges.begin(), hm.edges.end(), storage->edges.begin(), edge_transform);
+        std::sort(storage->edges.begin(), storage->edges.end());
+
+        /* Boundary edges */
+        storage->boundary_info.resize( storage->edges.size() );
+        for (const auto& [boundary, edges] : hm.boundary_edges)
+        {
+            for (const auto& edge : edges)
+            {
+                auto e = edge_transform(edge);
+                auto position = find_element_id(storage->edges.begin(), storage->edges.end(), e);
+                if (position.first == false)
+                    throw std::logic_error("edge not found, this is a bug.");
+
+                boundary_descriptor bi(0, true);
+                storage->boundary_info.at(position.second) = bi;
+            }
+        }
+
+        /* Surfaces */
+        using sd_pair = std::pair<surface_type, size_t>;
+        std::vector< sd_pair > surfaces;
+        surfaces.reserve( hm.polygons.size() );
+        for (const auto& polygon : hm.polygons)
+        {
+            std::vector<size_t> surface_nodes;
+            std::vector<typename edge_type::id_type> surface_edges;
+            for (size_t i = 0; i < polygon.points.size(); i++)
+            {
+                auto pa = polygon.points[i];
+                auto pb = polygon.points[(i+1)%polygon.points.size()];
+                auto edge = fvca5::edge(pa, pb);
+                auto e = edge_transform(edge);
+                auto position = find_element_id(storage->edges.begin(), storage->edges.end(), e);
+                if (position.first == false)
+                    throw std::logic_error("edge not found, this is a bug.");
+                surface_edges.push_back(position.second);
+
+                auto ea_ofs = fvca5::offset(hm, pa, false);
+                surface_nodes.push_back(ea_ofs);
+            }
+            
+            auto domain_id = 0;
+            auto surface = surface_type(surface_edges);
+            surface.set_point_ids(surface_nodes.begin(), surface_nodes.end()); /* XXX: crap */
+            surfaces.push_back( std::make_pair(surface, domain_id) );
+        }
+
+        auto comp = [](const sd_pair& a, const sd_pair& b) -> bool {
+            return a.first < b.first;
+        };
+
+        std::sort(surfaces.begin(), surfaces.end(), comp);
+
+        auto get_surf = [](const sd_pair& sdp) -> auto { return sdp.first; };
+        storage->surfaces.resize( surfaces.size() );
+        std::transform(surfaces.begin(), surfaces.end(), storage->surfaces.begin(), get_surf);
+
+        auto get_id = [](const sd_pair& sdp) -> auto { return subdomain_descriptor(sdp.second); };
+        storage->subdomain_info.resize( surfaces.size() );
+        std::transform(surfaces.begin(), surfaces.end(), storage->subdomain_info.begin(), get_id);
+
+        //mark_internal_faces(msh);
+    }
+};
+
+template<typename Mesh>
+auto make_fvca5_hex_mesher(Mesh& msh)
+{
+    return fvca5_hex_mesher<Mesh>(msh);
 }
 
 } //namespace disk
