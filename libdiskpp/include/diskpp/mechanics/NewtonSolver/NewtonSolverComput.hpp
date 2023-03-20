@@ -28,16 +28,16 @@
 
 #include <cassert>
 
-#include "bases/bases.hpp"
-#include "common/eigen.hpp"
-#include "mechanics/behaviors/laws/behaviorlaws.hpp"
-#include "mechanics/deformation_tensors.hpp"
-#include "methods/hho"
-#include "quadratures/quadratures.hpp"
+#include "diskpp/bases/bases.hpp"
+#include "diskpp/common/eigen.hpp"
+#include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "diskpp/mechanics/deformation_tensors.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/quadratures/quadratures.hpp"
 
-#include "mechanics/NewtonSolver/StabilizationManger.hpp"
+#include "diskpp/mechanics/NewtonSolver/StabilizationManger.hpp"
 
-#include "timecounter.h"
+#include "diskpp/common/timecounter.hpp"
 
 namespace disk
 {
@@ -424,7 +424,7 @@ class mechanical_computation
             // std::cout << "Cep: " << Cep.norm() << std::endl;
             // std::cout << Cep << std::endl;
             tc.toc();
-            time_law += tc.to_double();
+            time_law += tc.elapsed();
 
             // Compute rigidity
             this->compute_rigidity(Cep, gphi, small_def, qp.weight(), grad_dim_dofs, grad_basis_size, AT);
@@ -434,9 +434,9 @@ class mechanical_computation
             tc.tic();
             this->compute_contact_terms();
             tc.toc();
-            time_contact += tc.to_double();
+            time_contact += tc.elapsed();
 
-            // compute new possible value for stabilization 
+            // compute new possible value for stabilization
             if (rp.m_adapt_stab)
             {
                 scalar_type sigma_dev_norm, eps_dev_norm;

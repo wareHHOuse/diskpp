@@ -36,25 +36,25 @@
 #include "NewtonSolverParameters.hpp"
 #include "NewtonStep.hpp"
 #include "TimeManager.hpp"
-#include "mechanics/behaviors/laws/behaviorlaws.hpp"
-#include "mechanics/behaviors/tensor_conversion.hpp"
-#include "mechanics/contact/ContactManager.hpp"
-#include "mechanics/NewtonSolver/StabilizationManger.hpp"
-#include "mechanics/stress_tensors.hpp"
+#include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "diskpp/mechanics/behaviors/tensor_conversion.hpp"
+#include "diskpp/mechanics/contact/ContactManager.hpp"
+#include "diskpp/mechanics/NewtonSolver/StabilizationManger.hpp"
+#include "diskpp/mechanics/stress_tensors.hpp"
 
-#include "adaptivity/adaptivity.hpp"
-#include "boundary_conditions/boundary_conditions.hpp"
-#include "methods/hho"
+#include "diskpp/adaptivity/adaptivity.hpp"
+#include "diskpp/boundary_conditions/boundary_conditions.hpp"
+#include "diskpp/methods/hho"
 
-#include "output/gmshConvertMesh.hpp"
-#include "output/gmshDisk.hpp"
-#include "output/postMesh.hpp"
+#include "diskpp/output/gmshConvertMesh.hpp"
+#include "diskpp/output/gmshDisk.hpp"
+#include "diskpp/output/postMesh.hpp"
 
 #ifdef HAVE_MGIS
 #include "MGIS/Behaviour/Behaviour.hxx"
 #endif
 
-#include "timecounter.h"
+#include "diskpp/common/timecounter.hpp"
 
 namespace disk
 {
@@ -501,7 +501,7 @@ class NewtonSolver
             this->pre_computation();
             t1.toc();
             if (m_verbose)
-                std::cout << "Precomputation: " << t1.to_double() << " sec" << std::endl;
+                std::cout << "Precomputation: " << t1.elapsed() << " sec" << std::endl;
         }
 
         SolverInfo  si;
@@ -627,7 +627,7 @@ class NewtonSolver
         si.m_time_step = list_time_step.numberOfTimeStep();
 
         ttot.toc();
-        si.m_time_solver = ttot.to_double();
+        si.m_time_solver = ttot.elapsed();
 
         return si;
     }
