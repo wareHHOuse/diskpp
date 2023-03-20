@@ -34,10 +34,10 @@
 #include "../Informations.hpp"
 #include "../Parameters.hpp"
 
-#include "boundary_conditions/boundary_conditions.hpp"
+#include "diskpp/boundary_conditions/boundary_conditions.hpp"
 #include "newton_step.hpp"
 
-#include "timecounter.h"
+#include "diskpp/common/timecounter.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -142,7 +142,7 @@ class NewtonRaphson_solver_plasticity
                 std::cerr << "Invalid argument: " << ia.what() << std::endl;
                 m_convergence = false;
                 tc.toc();
-                ni.m_time_newton = tc.to_double();
+                ni.m_time_newton = tc.elapsed();
                 return ni;
             }
 
@@ -167,7 +167,7 @@ class NewtonRaphson_solver_plasticity
             newton_step.save_solutions(m_solution_cells, m_solution_faces, m_solution_data);
 
         tc.toc();
-        ni.m_time_newton = tc.to_double();
+        ni.m_time_newton = tc.elapsed();
         return ni;
     }
 

@@ -27,14 +27,12 @@
 
 #include <cassert>
 
-#include "common/eigen.hpp"
-#include "mechanics/behaviors/laws/behaviorlaws.hpp"
-#include "mechanics/behaviors/maths_tensor.hpp"
-#include "bases/bases.hpp"
-#include "methods/hho"
-#include "quadratures/quadratures.hpp"
+#include "diskpp/common/eigen.hpp"
+#include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "diskpp/mechanics/behaviors/maths_tensor.hpp"
+#include "diskpp/methods/hho"
 
-#include "timecounter.h"
+#include "diskpp/common/timecounter.hpp"
 
 namespace NLE
 {
@@ -151,7 +149,7 @@ class plasticity
             tc.tic();
             const auto tensor_behavior = qp.compute_whole(GsT_iqn, material_data, !elatic_modulus);
             tc.toc();
-            time_law += tc.to_double();
+            time_law += tc.elapsed();
 
             //std::cout << "module " << tensor_behavior.second << std::endl;
 

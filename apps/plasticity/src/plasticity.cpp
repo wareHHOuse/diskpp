@@ -34,11 +34,11 @@
 
 #include "Informations.hpp"
 #include "Parameters.hpp"
-#include "boundary_conditions/boundary_conditions.hpp"
-#include "core/mechanics/behaviors/laws/materialData.hpp"
-#include "loaders/loader.hpp"
+#include "diskpp/boundary_conditions/boundary_conditions.hpp"
+#include "diskpp/mechanics/behaviors/laws/materialData.hpp"
+#include "diskpp/loaders/loader.hpp"
 
-#include "timecounter.h"
+#include "diskpp/common/timecounter.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>

@@ -29,22 +29,21 @@
 #include <list>
 #include <vector>
 
-#include "bases/bases.hpp"
-#include "methods/hho"
-#include "quadratures/quadratures.hpp"
+
+#include "diskpp/methods/hho"
 
 #include "Informations.hpp"
 #include "NewtonSolver/newton_solver.hpp"
 #include "Parameters.hpp"
-#include "boundary_conditions/boundary_conditions.hpp"
-#include "core/mechanics/behaviors/laws/materialData.hpp"
-#include "mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "diskpp/boundary_conditions/boundary_conditions.hpp"
+#include "diskpp/mechanics/behaviors/laws/materialData.hpp"
+#include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
 
-#include "output/gmshConvertMesh.hpp"
-#include "output/gmshDisk.hpp"
-#include "output/postMesh.hpp"
+#include "diskpp/output/gmshConvertMesh.hpp"
+#include "diskpp/output/gmshDisk.hpp"
+#include "diskpp/output/postMesh.hpp"
 
-#include "timecounter.h"
+#include "diskpp/common/timecounter.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -284,7 +283,7 @@ class plasticity_solver
             this->pre_computation();
             t1.toc();
             if (m_verbose)
-                std::cout << "-Precomputation: " << t1.to_double() << " sec" << std::endl;
+                std::cout << "-Precomputation: " << t1.elapsed() << " sec" << std::endl;
         }
 
         // Newton solver
@@ -408,7 +407,7 @@ class plasticity_solver
         si.m_time_step = total_step;
 
         ttot.toc();
-        si.m_time_solver = ttot.to_double();
+        si.m_time_solver = ttot.elapsed();
 
         return si;
     }
