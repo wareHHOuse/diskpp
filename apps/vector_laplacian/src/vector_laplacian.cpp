@@ -30,11 +30,11 @@
 #include <sstream>
 #include <unistd.h>
 
-#include "boundary_conditions/boundary_conditions.hpp"
-#include "geometry/geometry.hpp"
-#include "loaders/loader.hpp"
+#include "diskpp/boundary_conditions/boundary_conditions.hpp"
+#include "diskpp/geometry/geometry.hpp"
+#include "diskpp/loaders/loader.hpp"
 
-#include "timecounter.h"
+#include "diskpp/common/timecounter.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -102,7 +102,7 @@ run_vector_laplacian_solver(const Mesh<T, 2, Storage>& msh, const run_params& rp
     {
         std::cout << std::endl;
         std::cout << "************************************************************" << std::endl;
-        std::cout << "** Time to solve the problem " << tc.to_double() << " sec" << std::endl;
+        std::cout << "** Time to solve the problem " << tc.elapsed() << " sec" << std::endl;
         std::cout << "**** Assembly time: " << assembling_info.time_assembly << " sec" << std::endl;
         std::cout << "****** Gradient reconstruction: " << assembling_info.time_gradrec << " sec" << std::endl;
         std::cout << "****** Divergence reconstruction: " << assembling_info.time_divrec << " sec" << std::endl;
@@ -181,7 +181,7 @@ run_vector_laplacian_solver(const Mesh<T, 3, Storage>& msh, const run_params& rp
     {
         std::cout << std::endl;
         std::cout << "***********************************************************" << std::endl;
-        std::cout << "** Time to solve the problem " << tc.to_double() << " sec" << std::endl;
+        std::cout << "** Time to solve the problem " << tc.elapsed() << " sec" << std::endl;
         std::cout << "**** Assembly time: " << assembling_info.time_assembly << " sec" << std::endl;
         std::cout << "****** Gradient reconstruction: " << assembling_info.time_gradrec << " sec" << std::endl;
         std::cout << "****** Divergence reconstruction: " << assembling_info.time_divrec << " sec" << std::endl;

@@ -29,17 +29,14 @@
 #include <iostream>
 #include <sstream>
 
-#include "bases/bases.hpp"
-#include "methods/hho"
-#include "quadratures/quadratures.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/solvers/solver.hpp"
 
-#include "solvers/solver.hpp"
+#include "diskpp/output/gmshConvertMesh.hpp"
+#include "diskpp/output/gmshDisk.hpp"
+#include "diskpp/output/postMesh.hpp"
 
-#include "output/gmshConvertMesh.hpp"
-#include "output/gmshDisk.hpp"
-#include "output/postMesh.hpp"
-
-#include "timecounter.h"
+#include "diskpp/common/timecounter.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -178,7 +175,7 @@ class vector_laplacian_solver
           const auto gr = make_vector_hho_laplacian(m_msh, cl, m_hdi);
 #endif
           tc.toc();
-          ai.time_gradrec += tc.to_double();
+          ai.time_gradrec += tc.elapsed();
 
           tc.tic();
           matrix_dynamic stab;
@@ -195,7 +192,7 @@ class vector_laplacian_solver
 #endif
           }
           tc.toc();
-          ai.time_stab += tc.to_double();
+          ai.time_stab += tc.elapsed();
 
           tc.tic();
           auto                 cb       = disk::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
@@ -206,7 +203,7 @@ class vector_laplacian_solver
           m_AL.push_back(std::get<1>(scnp));
           m_bL.push_back(std::get<2>(scnp));
           tc.toc();
-          ai.time_statcond += tc.to_double();
+          ai.time_statcond += tc.elapsed();
 
           m_assembler.assemble(m_msh, cl, m_bnd, std::get<0>(scnp));
       }
@@ -243,7 +240,7 @@ class vector_laplacian_solver
       mkl_pardiso(pparams, m_assembler.LHS, m_assembler.RHS, m_system_solution);
 
       tc.toc();
-      si.time_solver = tc.to_double();
+      si.time_solver = tc.elapsed();
 
       return si;
    }
@@ -290,7 +287,7 @@ class vector_laplacian_solver
          cell_i++;
       }
       tc.toc();
-      pi.time_postprocess = tc.to_double();
+      pi.time_postprocess = tc.elapsed();
 
       return pi;
    }

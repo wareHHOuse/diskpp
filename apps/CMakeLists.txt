@@ -83,6 +83,11 @@ if (BUILD_APP_UNST_LAPLACIAN)
     add_subdirectory(unsteady_laplacian)
 endif()
 
+option(BUILD_APP_VECTOR_LAPLACIAN "Build vector laplacian application" ON)
+if (BUILD_APP_VECTOR_LAPLACIAN)
+    add_subdirectory(vector_laplacian)
+endif()
+
 option(BUILD_UTILS "Build utilities" ON)
 if (BUILD_UTILS)
     add_subdirectory(utils)
