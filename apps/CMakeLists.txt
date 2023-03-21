@@ -78,6 +78,11 @@ if (BUILD_APP_PLASTICITY)
     add_subdirectory(plasticity)
 endif()
 
+option(BUILD_APP_UNST_LAPLACIAN "Build unsteady laplacian application" ON)
+if (BUILD_APP_UNST_LAPLACIAN)
+    add_subdirectory(unsteady_laplacian)
+endif()
+
 option(BUILD_UTILS "Build utilities" ON)
 if (BUILD_UTILS)
     add_subdirectory(utils)

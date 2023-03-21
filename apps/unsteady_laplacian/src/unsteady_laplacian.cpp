@@ -28,13 +28,12 @@
 
 #include <unistd.h>
 
-#include "loaders/loader.hpp"
-#include "methods/hho"
-#include "solvers/solver.hpp"
-#include "output/silo.hpp"
-#include "timecounter.h"
-#include "colormanip.h"
-#include "bases/bases.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/solvers/solver.hpp"
+#include "diskpp/output/silo.hpp"
+#include "diskpp/common/timecounter.hpp"
+#include "diskpp/common/colormanip.h"
 
 using namespace disk;
 using namespace Eigen;
@@ -277,4 +276,3 @@ int main(int argc, char **argv)
     std::cout << "Mesh loaded ..." << std::endl;
     unsteady_laplacian_solver(msh, degree, dt, 1.0);
 }
-

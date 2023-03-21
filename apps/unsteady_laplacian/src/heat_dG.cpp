@@ -36,13 +36,12 @@
 
 #include <unistd.h>
 
-#include "loaders/loader.hpp"
-#include "methods/hho"
-#include "solvers/solver.hpp"
-#include "output/silo.hpp"
-#include "timecounter.h"
-#include "colormanip.h"
-#include "bases/bases.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/solvers/solver.hpp"
+#include "diskpp/output/silo.hpp"
+#include "diskpp/common/timecounter.hpp"
+#include "diskpp/common/colormanip.h"
 
 using namespace disk;
 using namespace Eigen;
@@ -181,11 +180,12 @@ class heat_dG_assembler
             // if (dirichlet)
             // {
             //     dirichlet_data.block(face_i * fbs, 0, fbs, 1) =
-            // 	    project_function(msh, fc, di.face_degree(), dirichlet_bf, di.face_degree());
+            // 	    project_function(msh, fc, di.face_degree(), dirichlet_bf,
+            //      di.face_degree());
             // }
         }
 
-	
+
 	// compute initial datum contribution to RHS
         vector_type u0 = vector_type::Zero(loc_size);
         u0.block(0,0,cbs,1) = project_function(msh, cl, di.cell_degree(), init_fun, di.cell_degree());
@@ -202,7 +202,7 @@ class heat_dG_assembler
                 {
                     triplets.push_back(Triplet<T>(asm_map[i], asm_map[j], lhs(i, j)));
                     triplets_MAT_RHS.push_back(Triplet<T>(asm_map[i], asm_map[j], mat_rhs(i, j)));
-		}
+		        }
                 // Dirichlet not taken into account
                 // else
                 //     RHS(asm_map[i]) -= lhs(i, j) * dirichlet_data(j);
@@ -257,7 +257,7 @@ class heat_dG_assembler
                 const auto face_SOL_offset = num_cells * cbs * (time_degree+1)
                     + compress_table.at(face_offset) * fbs * (time_degree+1);
 
-		
+
                 ret.block(cbs * (time_degree+1) + face_i * (time_degree+1) * fbs, 0, (time_degree+1) * fbs, 1)
                     = solution.block(face_SOL_offset, 0, fbs * (time_degree+1), 1);
             }
@@ -379,7 +379,7 @@ unsteady_laplacian_solver(const Mesh& msh, size_t degree, size_t time_steps, siz
         auto phi_t = time_cb.eval_gradients( qp.point() );
         time_deriv += qp.weight() * phi * phi_t.transpose();
     }
-    
+
     //////
     Matrix<T, Dynamic, Dynamic> time_loc = Matrix<T, Dynamic, Dynamic>::Zero(time_degree+1, time_degree+1);
     auto t_fcs = faces(time_mesh, time_cell);
@@ -478,7 +478,7 @@ unsteady_laplacian_solver(const Mesh& msh, size_t degree, size_t time_steps, siz
     cout << "LHS.rows() = " << LHS.rows() << endl;
 
     tc.toc();
-    std::cout << " Assembly time: " << tc << std::endl;    
+    std::cout << " Assembly time: " << tc << std::endl;
 
 
     Matrix<scalar_type, Dynamic, 1> u;
@@ -623,7 +623,7 @@ int main(int argc, char **argv)
             default:
                 std::cout << "Invalid option" << std::endl;
                 return 1;
-	}
+	    }
     }
 
     msh = load_cartesian_2d_mesh<T>(mesh_filename);
@@ -631,4 +631,3 @@ int main(int argc, char **argv)
     std::cout << "Mesh loaded ..." << std::endl;
     unsteady_laplacian_solver(msh, degree, N, time_degree);
 }
-
