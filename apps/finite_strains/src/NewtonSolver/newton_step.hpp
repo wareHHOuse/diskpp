@@ -33,15 +33,12 @@
 
 #include "../Informations.hpp"
 #include "../Parameters.hpp"
-#include "bases/bases.hpp"
 #include "finite_strains_elementary_computation.hpp"
-#include "boundary_conditions/boundary_conditions.hpp"
-#include "methods/hho"
-#include "quadratures/quadratures.hpp"
+#include "diskpp/boundary_conditions/boundary_conditions.hpp"
+#include "diskpp/methods/hho"
 
-#include "solvers/solver.hpp"
-
-#include "timecounter.h"
+#include "diskpp/solvers/solver.hpp"
+#include "diskpp/common/timecounter.hpp"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -168,7 +165,7 @@ class NewtonRaphson_step_finite_strains
                 GT                      = gradrec_full.first;
             }
             tc.toc();
-            ai.m_time_gradrec += tc.to_double();
+            ai.m_time_gradrec += tc.elapsed();
 
             // Begin Assembly
             // Build rhs and lhs
@@ -184,7 +181,7 @@ class NewtonRaphson_step_finite_strains
             m_F_int += elem.F_int.squaredNorm();
 
             tc.toc();
-            ai.m_time_elem += tc.to_double();
+            ai.m_time_elem += tc.elapsed();
             ai.m_time_law += elem.time_law;
 
             // Stabilisation Contribution
@@ -252,7 +249,7 @@ class NewtonRaphson_step_finite_strains
                 }
             }
             tc.toc();
-            ai.m_time_stab += tc.to_double();
+            ai.m_time_stab += tc.elapsed();
 
             // Static Condensation
             tc.tic();
@@ -262,7 +259,7 @@ class NewtonRaphson_step_finite_strains
             m_bL[cell_i] = std::get<2>(scnp);
 
             tc.toc();
-            ai.m_time_statcond += tc.to_double();
+            ai.m_time_statcond += tc.elapsed();
 
             m_assembler.assemble_nl(m_msh, cl, m_bnd, std::get<0>(scnp), m_solution_faces);
 
@@ -275,7 +272,7 @@ class NewtonRaphson_step_finite_strains
         m_assembler.finalize();
 
         ttot.toc();
-        ai.m_time_assembly      = ttot.to_double();
+        ai.m_time_assembly      = ttot.elapsed();
         ai.m_linear_system_size = m_assembler.LHS.rows();
         return ai;
     }
@@ -292,7 +289,7 @@ class NewtonRaphson_step_finite_strains
         mkl_pardiso(pparams, m_assembler.LHS, m_assembler.RHS, m_system_solution);
         tc.toc();
 
-        return SolveInfo(m_assembler.LHS.rows(), m_assembler.LHS.nonZeros(), tc.to_double());
+        return SolveInfo(m_assembler.LHS.rows(), m_assembler.LHS.nonZeros(), tc.elapsed());
     }
 
     scalar_type
@@ -361,7 +358,7 @@ class NewtonRaphson_step_finite_strains
         }
 
         tc.toc();
-        return tc.to_double();
+        return tc.elapsed();
     }
 
     bool

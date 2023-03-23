@@ -27,14 +27,12 @@
 
 #include <cassert>
 
-#include "bases/bases.hpp"
-#include "common/eigen.hpp"
-#include "mechanics/behaviors/laws/behaviorlaws.hpp"
-#include "mechanics/deformation_tensors.hpp"
-#include "methods/hho"
-#include "quadratures/quadratures.hpp"
+#include "diskpp/common/eigen.hpp"
+#include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "diskpp/mechanics/deformation_tensors.hpp"
+#include "diskpp/methods/hho"
 
-#include "timecounter.h"
+#include "diskpp/common/timecounter.hpp"
 
 namespace NLE
 {
@@ -159,7 +157,7 @@ class finite_strains
             tc.tic();
             const auto tensor_behavior = qp.compute_whole(FT_iqn, material_data, !elatic_modulus);
             tc.toc();
-            time_law += tc.to_double();
+            time_law += tc.elapsed();
 
             // std::cout << "module " << tensor_behavior.second << std::endl;
             const auto qp_A_gphi = compute_A_gphi(qp.weight() * tensor_behavior.second, gphi);

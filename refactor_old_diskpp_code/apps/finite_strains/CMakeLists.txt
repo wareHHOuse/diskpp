@@ -1,6 +1,0 @@
-option(BUILD_APP_FINITE_STRAINS "Build Finite Strains application" ON)
-if (BUILD_APP_FINITE_STRAINS)
-	add_executable(finite_strains finite_strains.cpp)
-	target_link_libraries(finite_strains ${LINK_LIBS})
-	install(TARGETS finite_strains RUNTIME DESTINATION bin)
-endif()

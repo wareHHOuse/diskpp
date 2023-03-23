@@ -25,15 +25,15 @@
 
 #pragma once
 
-#include "common/eigen.hpp"
-#include "core/mechanics/behaviors/laws/behaviorlaws.hpp"
-#include "core/mechanics/behaviors/logarithmic_strain/logarithmic_tools.hpp"
-#include "core/mechanics/behaviors/maths_tensor.hpp"
-#include "core/mechanics/behaviors/maths_utils.hpp"
-#include "core/mechanics/behaviors/tensor_conversion.hpp"
-#include "core/mechanics/deformation_tensors.hpp"
-#include "core/mechanics/stress_tensors.hpp"
-#include "mesh/point.hpp"
+#include "diskpp/common/eigen.hpp"
+#include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "diskpp/mechanics/behaviors/logarithmic_strain/logarithmic_tools.hpp"
+#include "diskpp/mechanics/behaviors/maths_tensor.hpp"
+#include "diskpp/mechanics/behaviors/maths_utils.hpp"
+#include "diskpp/mechanics/behaviors/tensor_conversion.hpp"
+#include "diskpp/mechanics/deformation_tensors.hpp"
+#include "diskpp/mechanics/stress_tensors.hpp"
+#include "diskpp/mesh/point.hpp"
 
 namespace disk
 {
