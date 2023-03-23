@@ -412,18 +412,17 @@ project_gradient(const Mesh& msh, const Element& elem, size_t degree, const matr
     return stiff.block(N, N, basis_size - N, basis_size - N).ldlt().solve(rhs.tail(basis_size - N));
 }
 
-/*
 template<typename T>
-auto
+T
 eval(const dynamic_vector<T>& dofs, const dynamic_vector<T>& basis)
 {
     assert(dofs.rows() == basis.rows());
     return dofs.dot(basis);
 }
-*/
+
 
 template<typename T, int DIM>
-auto //static_vector<T, DIM>
+static_vector<T, DIM>
 eval(const dynamic_vector<T>& dofs, const Matrix<T, Dynamic, DIM>& basis)
 {
     static_vector<T, DIM> ret = static_vector<T, DIM>::Zero();

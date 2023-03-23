@@ -242,7 +242,9 @@ struct solution_gradient_functor< Mesh<T, 1, Storage> >
 
     gradient_type operator()(const point_type& pt) const
     {
-        return M_PI * std::cos(M_PI * pt.x());
+        gradient_type ret;
+        ret(0,0) = M_PI * std::cos(M_PI * pt.x());
+        return ret;
     }
 };
 
@@ -472,8 +474,8 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
             auto dphi_tmp = rb.eval_gradients( qp.point() );
             Matrix<T, Dynamic, Mesh::dimension> dphi = dphi_tmp.block(1, 0, rbs-1, Mesh::dimension);
             auto grad_Ruh = disk::eval(Rsol, dphi);
-            H1err += qp.weight() * (grad_u - grad_Ruh).dot( diff_tens*(grad_u - grad_Ruh) );
-            H1norm += qp.weight() * grad_u.dot(diff_tens*grad_u);
+            //H1err += qp.weight() * (grad_u - grad_Ruh).dot( diff_tens*(grad_u - grad_Ruh) );
+            //H1norm += qp.weight() * grad_u.dot(diff_tens*grad_u);
         }
 
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> MM = disk::make_mass_matrix(msh, cl, cb);
@@ -484,6 +486,7 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
         Merr += diffT.dot(MM*diffT);
     }
 
+    /*
     std::stringstream ss;
     ss << "stabfree_" << hdi.cell_degree() << "_" << hdi.face_degree() << "_" << hdi.reconstruction_degree();
     ss << ".silo";
@@ -499,7 +502,7 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
     db.add_variable("mesh", silo_u_var);
     db.add_variable("mesh", silo_f_var);
     db.close();
-
+    */
     
 
     error_info<T> ei;
