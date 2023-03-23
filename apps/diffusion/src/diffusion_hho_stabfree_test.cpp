@@ -16,7 +16,7 @@
 #include <iomanip>
 #include <map>
 
-#include <matplot/matplot.h>
+//#include <matplot/matplot.h>
 
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/loaders/loader.hpp"
@@ -96,6 +96,7 @@ public:
     }
 };
 
+#if 0
 template<typename T>
 void make_images(const convergence_database<T>& cdb)
 {
@@ -189,6 +190,7 @@ void make_images(const convergence_database<T>& cdb)
         }
     }
 }
+#endif
 
 template<typename T>
 auto compute_orders(const std::vector<T>& hs, const std::vector<T>& errs)

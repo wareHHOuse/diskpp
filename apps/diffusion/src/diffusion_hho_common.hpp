@@ -237,7 +237,7 @@ template<template<typename, size_t, typename> class Mesh, typename T, typename S
 struct solution_gradient_functor< Mesh<T, 1, Storage> >
 {
     typedef Mesh<T,1,Storage>                   mesh_type;
-    typedef typename mesh_type::coordinate_type gradient_type;
+    typedef typename Eigen::Matrix<T,1,1>       gradient_type;
     typedef typename mesh_type::point_type      point_type;
 
     gradient_type operator()(const point_type& pt) const
@@ -509,4 +509,13 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
     ei.Aerr = std::sqrt(Aerr)/std::sqrt(Anorm);
 
     return ei;
+}
+
+template<typename Mesh>
+auto
+run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statcond,
+    const bool stab_diam_F)
+{
+    diffusion_tensor<Mesh> dt = diffusion_tensor<Mesh>::Identity();
+    return run_hho_diffusion_solver(msh, hdi, statcond, stab_diam_F, dt, false);
 }
