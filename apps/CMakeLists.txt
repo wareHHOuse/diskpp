@@ -62,3 +62,9 @@ option(BUILD_UTILS "Build utilities" ON)
 if (BUILD_UTILS)
     add_subdirectory(utils)
 endif()
+
+option(BUILD_APP_BARYTEST "Build barycenter test application" ON)
+if (BUILD_APP_BARYTEST)
+    add_subdirectory(barycenter_test)
+endif()
+
