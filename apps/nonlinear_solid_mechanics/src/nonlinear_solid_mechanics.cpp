@@ -31,13 +31,12 @@
 #include <sstream>
 #include <unistd.h>
 
-#include "boundary_conditions/boundary_conditions.hpp"
-#include "loaders/loader.hpp"
-#include "mechanics/NewtonSolver/NewtonSolver.hpp"
-#include "mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "diskpp/boundary_conditions/boundary_conditions.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/mechanics/NewtonSolver/NewtonSolver.hpp"
+#include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
 
-
-#include "timecounter.h"
+#include "diskpp/common/timecounter.hpp"
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
 void

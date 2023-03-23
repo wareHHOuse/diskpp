@@ -35,14 +35,14 @@
 #include "NewtonIteration.hpp"
 #include "NewtonSolverInformations.hpp"
 #include "NewtonSolverParameters.hpp"
-#include "mechanics/behaviors/laws/behaviorlaws.hpp"
-#include "mechanics/contact/ContactManager.hpp"
+#include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "diskpp/mechanics/contact/ContactManager.hpp"
 
-#include "adaptivity/adaptivity.hpp"
-#include "boundary_conditions/boundary_conditions.hpp"
-#include "methods/hho"
+#include "diskpp/adaptivity/adaptivity.hpp"
+#include "diskpp/boundary_conditions/boundary_conditions.hpp"
+#include "diskpp/methods/hho"
 
-#include "timecounter.h"
+#include "diskpp/common/timecounter.hpp"
 
 namespace disk
 {
@@ -178,7 +178,7 @@ class NewtonStep
                 std::cerr << "Invalid argument: " << ia.what() << std::endl;
                 m_convergence = false;
                 tc.toc();
-                ni.m_time_newton = tc.to_double();
+                ni.m_time_newton = tc.elapsed();
                 return ni;
             }
 
@@ -193,7 +193,7 @@ class NewtonStep
                 std::cerr << "Runtime error: " << ia.what() << std::endl;
                 m_convergence = false;
                 tc.toc();
-                ni.m_time_newton = tc.to_double();
+                ni.m_time_newton = tc.elapsed();
                 return ni;
             }
 
@@ -201,7 +201,7 @@ class NewtonStep
             {
                 newton_iter.save_solutions(m_solution, m_solution_faces, m_solution_mult);
                 tc.toc();
-                ni.m_time_newton = tc.to_double();
+                ni.m_time_newton = tc.elapsed();
                 return ni;
             }
 
@@ -215,7 +215,7 @@ class NewtonStep
         }
 
         tc.toc();
-        ni.m_time_newton = tc.to_double();
+        ni.m_time_newton = tc.elapsed();
         return ni;
     }
 

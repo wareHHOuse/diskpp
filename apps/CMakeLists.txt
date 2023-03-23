@@ -68,6 +68,11 @@ if (BUILD_APP_FINITE_STRAINS)
     add_subdirectory(finite_strains)
 endif()
 
+option(BUILD_APP_NSM "Build Non-linear Solid Mechanics applications" ON)
+if (BUILD_APP_NSM)
+    add_subdirectory(nonlinear_solid_mechanics)
+endif()
+
 option(BUILD_UTILS "Build utilities" ON)
 if (BUILD_UTILS)
     add_subdirectory(utils)
