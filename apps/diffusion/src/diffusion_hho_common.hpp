@@ -522,3 +522,4 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
     diffusion_tensor<Mesh> dt = diffusion_tensor<Mesh>::Identity();
     return run_hho_diffusion_solver(msh, hdi, statcond, stab_diam_F, dt, false);
 }
+

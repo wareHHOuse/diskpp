@@ -1145,4 +1145,108 @@ compute_averages(const Mesh& msh, const Element& elem, const Basis& basis)
     return avgs * (1/meas);
 }
 */
+
+
+
+/* Generic template for bases. */
+template<typename MeshType, typename Element, typename ScalarType>
+struct scaled_harmonic_scalar_basis
+{
+    static_assert(sizeof(MeshType) == -1, "scaled_harmonic_scalar_basis: not suitable for the requested kind of mesh");
+    static_assert(sizeof(Element) == -1,
+                  "scaled_harmonic_scalar_basis: not suitable for the requested kind of element");
+};
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_harmonic_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell, ScalarType>
+    : public scaled_monomial_abstract_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell, ScalarType>
+{
+
+public:
+    typedef Mesh<T, 2, Storage>                 mesh_type;
+    typedef ScalarType                          scalar_type;
+    typedef typename mesh_type::coordinate_type coordinate_type;
+
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef Matrix<scalar_type, Dynamic, 2>     gradient_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     function_type;
+
+    using base = scaled_monomial_abstract_basis<mesh_type, cell_type, scalar_type>;
+
+private:
+    size_t basis_degree, basis_size;
+
+public:
+    scaled_harmonic_scalar_basis(const mesh_type& msh, const cell_type& cl, size_t degree)
+        : base(msh, cl, false)
+    {
+        basis_degree = degree;
+        basis_size   = 1+2*basis_degree;
+    }
+
+    function_type
+    eval_functions(const point_type& pt) const
+    {
+        const auto bp = this->scaling_point(pt);
+        function_type ret = function_type::Zero(basis_size);
+        ret(0) = 1.0;
+
+        if ( basis_degree > 0 ) {
+            ret(1) = bp.x();
+            ret(2) = bp.y();
+        }
+
+        for (size_t i = 2; i <= basis_degree; i++) {
+            auto Pi = ret(2*i-3);
+            auto Qi = ret(2*i-2);
+            ret(2*i-1) = pt.x()*Pi - bp.y()*Qi;
+            ret(2*i) = bp.y()*Pi + bp.x()*Qi;
+        }
+
+        return ret;
+    }
+
+    gradient_type
+    eval_gradients(const point_type& pt) const
+    {
+        const auto bp = this->scaling_point(pt);
+        gradient_type ret = gradient_type::Zero(basis_size, 2);
+        ret(0,0) = 0.0; ret(0,1) = 0.0;
+
+        if ( basis_degree > 0 ) {
+            ret(1,0) = 1.0; ret(1,1) = 0.0;
+            ret(2,0) = 0.0; ret(2,1) = 1.0;
+
+            if (basis_degree == 1)
+                return ret;
+        }
+
+        auto funcs = eval_functions(pt);
+
+        for (size_t i = 2; i <= basis_degree; i++) {
+            auto Pi = funcs(2*i-3);
+            auto Qi = funcs(2*i-2);
+            ret(2*i-1, 0) = i*Pi; ret(2*i-1, 1) = -i*Qi;
+            ret(2*i, 0) = i*Qi; ret(2*i, 1) = i*Pi;
+        }
+
+        return ret;
+    }
+
+    size_t size() const {
+        return basis_size;
+    }
+};
+
+
+template<typename Mesh, typename ElemType, typename ScalarType = typename Mesh::coordinate_type>
+auto
+make_scalar_harmonic_basis(const Mesh& msh, const ElemType& elem,size_t degree)
+{
+    return scaled_harmonic_scalar_basis<Mesh, ElemType, ScalarType>(msh, elem, degree);
 }
+
+
+
+} // namespace disk

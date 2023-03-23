@@ -66,6 +66,63 @@ struct convergence_history {
 };
 
 template<typename T>
+struct error_table {
+    std::vector<hho_degree_info>    hdis;
+    using epair = std::pair<T, std::vector<T>>;
+    std::vector<epair>              errors;
+
+    error_table()
+    {}
+
+    void add_hdi(const hho_degree_info& hdi) {
+        if (errors.size() == 0)
+            hdis.push_back(hdi);
+    }
+
+    void add_errors(const epair& errs) {
+        errors.push_back(errs);
+    }
+};
+
+template<typename T>
+std::ostream&
+operator<<(std::ostream& os, const error_table<T>& et)
+{
+    os << ";";
+    for (const auto& hdi : et.hdis) {
+        os << "HHO(" << hdi.cell_degree() << "," << hdi.face_degree() << ",";
+        os << hdi.reconstruction_degree() << ");;";
+    }
+    os << std::endl;
+
+    for (size_t i = 0; i < et.errors.size(); i++) {
+        if (i == 0) {
+            const auto& ep = et.errors[i];
+            os << ep.first << ";";
+            for (const auto& err : ep.second)
+                os << err << ";;";
+        }
+        else {
+            const auto& ep_prev = et.errors[i-1];
+            const auto& ep_curr = et.errors[i];
+            assert(ep_prev.second.size() == ep_curr.second.size());
+            os << ep_curr.first << ";";
+            for (size_t j = 0; j < ep_curr.second.size(); j++) {
+                auto h_prev = ep_prev.first;
+                auto h_curr = ep_curr.first;
+                auto e_prev = ep_prev.second[j];
+                auto e_curr = ep_curr.second[j];
+                auto rate = std::log(e_prev/e_curr)/std::log(h_prev/h_curr);
+                os << e_curr << ";" << rate << ";";
+            }
+        }
+        os << std::endl;
+    }
+
+    return os;
+}
+
+template<typename T>
 class convergence_database {
     using variant_t = std::string;
     using hdi_t = disk::hho_degree_info;
@@ -97,6 +154,14 @@ public:
 };
 
 #if 0
+template<typename T>
+struct convergence_database_new
+{
+    error_table<T>      all_L2_errors;
+    error_table<T>      all_H1_errors;
+    error_table<T>      all_A_errors;
+};
+
 template<typename T>
 void make_images(const convergence_database<T>& cdb)
 {
@@ -312,7 +377,7 @@ struct test_configuration
 
 template<typename Mesh>
 void
-test_stabfree_hho(Mesh& msh, convergence_database<typename Mesh::coordinate_type>& cdb,
+test_stabfree_hho(Mesh& msh, convergence_database_new<typename Mesh::coordinate_type>& cdb,
     const test_configuration& tc)
 {
     using T = typename Mesh::coordinate_type;
@@ -330,6 +395,11 @@ test_stabfree_hho(Mesh& msh, convergence_database<typename Mesh::coordinate_type
         return ss.str();
     };
 
+    auto h = disk::average_diameter(msh);
+    std::vector<T> L2errs;
+    std::vector<T> H1errs;
+    std::vector<T> Aerrs;
+
     for (size_t k = tc.k_min; k <= tc.k_max; k++)
     {
         for (size_t r = k+tc.rincrmin; r <= k+tc.rincrmax; r++)
@@ -343,15 +413,29 @@ test_stabfree_hho(Mesh& msh, convergence_database<typename Mesh::coordinate_type
             hdi.face_degree(k);
             hdi.reconstruction_degree(r);
 
+            cdb.all_L2_errors.add_hdi(hdi);
+            cdb.all_H1_errors.add_hdi(hdi);
+            cdb.all_A_errors.add_hdi(hdi);
+
             try {
                 auto error = run_hho_diffusion_solver(msh, hdi, true, true, diff_tens, tc.use_projection);
-                cdb.add(hdi.face_degree(), make_display_name(tc.variant_name, hdi), error);
+                //cdb.add(hdi.face_degree(), make_display_name(tc.variant_name, hdi), error);
+                L2errs.push_back(error.L2err);
+                H1errs.push_back(error.H1err);
+                Aerrs.push_back(error.Aerr);
             }
             catch (...) {
-                cdb.mark_failed(hdi.face_degree(), make_display_name(tc.variant_name, hdi));
+                L2errs.push_back(-1.0);
+                H1errs.push_back(-1.0);
+                Aerrs.push_back(-1.0);
+                //cdb.mark_failed(hdi.face_degree(), make_display_name(tc.variant_name, hdi));
             }
         }
     }
+
+    cdb.all_L2_errors.add_errors( std::make_pair(h, L2errs) );
+    cdb.all_H1_errors.add_errors( std::make_pair(h, H1errs) );
+    cdb.all_A_errors.add_errors( std::make_pair(h, Aerrs) );
 }
 
 int main(int argc, char **argv)
@@ -425,7 +509,9 @@ int main(int argc, char **argv)
     mixed_proj_hho.mixed_order = true;
     mixed_proj_hho.use_projection = true;
 
-    convergence_database<T> cdb;
+    convergence_database_new<T> cdb_plain;
+    convergence_database_new<T> cdb_mixed;
+    convergence_database_new<T> cdb_mixed_proj;
 
     if (shape == "tri") {
         disk::triangular_mesh<T> msh;
@@ -434,9 +520,10 @@ int main(int argc, char **argv)
 
         for (size_t i = 0; i < max_refinements; i++)
         {
-            test_stabfree_hho(msh, cdb, plain_hho);
-            test_stabfree_hho(msh, cdb, mixed_hho);
-            test_stabfree_hho(msh, cdb, mixed_proj_hho);
+            test_stabfree_hho(msh, cdb_plain, plain_hho);
+            test_stabfree_hho(msh, cdb_mixed, mixed_hho);
+            test_stabfree_hho(msh, cdb_mixed_proj, mixed_proj_hho);
+            mesher.refine();
         }
     }
 
@@ -448,14 +535,30 @@ int main(int argc, char **argv)
         {
             const auto offset = 1;
             mesher.make_level(i+offset);
-            test_stabfree_hho(msh, cdb, plain_hho);
-            test_stabfree_hho(msh, cdb, mixed_hho);
-            test_stabfree_hho(msh, cdb, mixed_proj_hho);
+            std::cout << disk::average_diameter(msh) << std::endl;
+            test_stabfree_hho(msh, cdb_plain, plain_hho);
+            test_stabfree_hho(msh, cdb_mixed, mixed_hho);
+            test_stabfree_hho(msh, cdb_mixed_proj, mixed_proj_hho);
         }
     }
 
     //make_images(cdb);
-    make_reports(cdb);
+    //make_reports(cdb);
+
+    std::ofstream ofs_L2("errors_L2.txt");
+    ofs_L2 << cdb_plain.all_L2_errors << std::endl;
+    ofs_L2 << cdb_mixed.all_L2_errors << std::endl;
+    ofs_L2 << cdb_mixed_proj.all_L2_errors << std::endl;
+
+    std::ofstream ofs_H1("errors_H1.txt");
+    ofs_H1 << cdb_plain.all_H1_errors << std::endl;
+    ofs_H1 << cdb_mixed.all_H1_errors << std::endl;
+    ofs_H1 << cdb_mixed_proj.all_H1_errors << std::endl;
+    
+    std::ofstream ofs_A("errors_A.txt");
+    ofs_A << cdb_plain.all_A_errors << std::endl;
+    ofs_A << cdb_mixed.all_A_errors << std::endl;
+    ofs_A << cdb_mixed_proj.all_A_errors << std::endl;
 
     return 0;
 }
