@@ -58,6 +58,11 @@ if (BUILD_APP_TEMPLATE)
     add_subdirectory(app_template)
 endif()
 
+option(BUILD_APP_CFEM "Build Continuous FEM application" ON)
+if (BUILD_APP_CFEM)
+    add_subdirectory(cfem)
+endif()
+
 option(BUILD_UTILS "Build utilities" ON)
 if (BUILD_UTILS)
     add_subdirectory(utils)
