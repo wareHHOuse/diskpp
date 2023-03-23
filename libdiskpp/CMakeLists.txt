@@ -26,8 +26,8 @@ set(LINK_LIBS ${LINK_LIBS} JBURKARDT)
 add_subdirectory(contrib/solver_wrappers)
 set(LINK_LIBS ${LINK_LIBS} SOLVER_WRAPPERS)
 
-add_subdirectory(contrib/matplotplusplus)
-set(LINK_LIBS ${LINK_LIBS} matplot)
+#add_subdirectory(contrib/matplotplusplus)
+#set(LINK_LIBS ${LINK_LIBS} matplot)
 
 add_library(diskpp SHARED src/common/util.cpp src/common/mapped_file.cpp src/common/colormanip.cpp)
 target_link_libraries(diskpp ${LINK_LIBS})
