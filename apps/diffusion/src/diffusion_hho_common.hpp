@@ -474,8 +474,8 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
             auto dphi_tmp = rb.eval_gradients( qp.point() );
             Matrix<T, Dynamic, Mesh::dimension> dphi = dphi_tmp.block(1, 0, rbs-1, Mesh::dimension);
             auto grad_Ruh = disk::eval(Rsol, dphi);
-            //H1err += qp.weight() * (grad_u - grad_Ruh).dot( diff_tens*(grad_u - grad_Ruh) );
-            //H1norm += qp.weight() * grad_u.dot(diff_tens*grad_u);
+            H1err += qp.weight() * (grad_u - grad_Ruh).dot( diff_tens*(grad_u - grad_Ruh) );
+            H1norm += qp.weight() * grad_u.dot(diff_tens*grad_u);
         }
 
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> MM = disk::make_mass_matrix(msh, cl, cb);

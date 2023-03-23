@@ -112,7 +112,7 @@ int main(int argc, char **argv)
         loader.populate_mesh(msh);
 
         stab_diam_F = false;
-        run_hho_diffusion_solver(msh, hdi, stat_cond, stab_diam_F);
+        //run_hho_diffusion_solver(msh, hdi, stat_cond, stab_diam_F);
 
         return 0;
     }
