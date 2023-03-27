@@ -82,6 +82,49 @@ end
 
 testcase_singularity.testcase_name = "Singularity 3D";
 
+--[[ TEST CASE 3: nonsmooth ]]--
+testcase_nonsmooth = {};
+testcase_nonsmooth.omega1 = 3;
+testcase_nonsmooth.omega2 = 5;
+
+testcase_nonsmooth.u1 = function(x, y, z)
+    local rtarg = x*x + y*y + z*z;
+    return math.pow(rtarg, 0.25);
+end
+
+testcase_nonsmooth.u2 = function(x, y, z)
+    local twopi = 2*math.pi
+    return math.sin(twopi*x) * math.sin(twopi*y) * math.sin(twopi*z)
+end
+
+testcase_nonsmooth.grad_u1 = function(x, y, z)
+    local xx = x*x;
+    local yy = y*y;
+    local zz = z*z;
+    local den = math.pow(xx + yy + zz, 7.0/4.0);
+    local gx = 0.5*(-0.5*xx + yy + zz)/den;
+    local gy = 0.5*(xx - 0.5*yy + zz)/den;
+    local gz = 0.5*(xx + yy - 0.5*zz)/den;
+    return gx, gy, gz
+end
+
+testcase_nonsmooth.grad_u2 = function (x, y, z)
+    local twopi = 2*math.pi
+    local gx = twopi * math.cos(twopi*x) * math.sin(twopi*y) * math.sin(twopi * z)
+    local gy = twopi * math.sin(twopi*x) * math.cos(twopi*y) * math.sin(twopi * z)
+    local gz = twopi * math.sin(twopi*x) * math.sin(twopi*y) * math.cos(twopi * z)
+    return gx, gy, gz
+end
+
+testcase_nonsmooth.f1 = function (x, y, z)
+    return 0.75*math.pow(xx*yy*zz,-3.0/4.0);
+end
+
+testcase_nonsmooth.f2 = function (x, y, z)
+    local twopi = 2*math.pi
+    return 3 * twopi^2 * math.sin(twopi*x) * math.sin(twopi*y) * math.sin(twopi*z)
+end
+
 
 
 --[[ SELECT TEST CASE ]]--
