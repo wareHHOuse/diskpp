@@ -374,9 +374,9 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
         if (not stabfree)
         {   
             if (hdgstab)
-                A = A + make_scalar_hdg_stabilization(msh, cl, hdi, stab_diam_F);
+                A = A + make_scalar_hdg_stabilization(msh, cl, hdi);
             else
-                A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi, stab_diam_F);
+                A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
         }
 
         Eigen::Matrix<T, Eigen::Dynamic, 1> rhs = make_rhs(msh, cl, cb, rhs_fun);
@@ -412,6 +412,8 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
     {
         auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
         auto rb = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+        //rb.maximum_polynomial_degree(hdi.face_degree()+1);
+
         auto rbs = rb.size();
 
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A;
@@ -430,9 +432,9 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
         if (not stabfree)
         {   
             if (hdgstab)
-                A = A + make_scalar_hdg_stabilization(msh, cl, hdi, stab_diam_F);
+                A = A + make_scalar_hdg_stabilization(msh, cl, hdi);
             else
-                A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi, stab_diam_F);
+                A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
         }
 
         auto rhs = make_rhs(msh, cl, cb, rhs_fun);

@@ -153,7 +153,6 @@ public:
     }
 };
 
-#if 0
 template<typename T>
 struct convergence_database_new
 {
@@ -162,6 +161,7 @@ struct convergence_database_new
     error_table<T>      all_A_errors;
 };
 
+#if 0
 template<typename T>
 void make_images(const convergence_database<T>& cdb)
 {
@@ -520,8 +520,8 @@ int main(int argc, char **argv)
 
         for (size_t i = 0; i < max_refinements; i++)
         {
-            test_stabfree_hho(msh, cdb_plain, plain_hho);
-            test_stabfree_hho(msh, cdb_mixed, mixed_hho);
+            //test_stabfree_hho(msh, cdb_plain, plain_hho);
+            //test_stabfree_hho(msh, cdb_mixed, mixed_hho);
             test_stabfree_hho(msh, cdb_mixed_proj, mixed_proj_hho);
             mesher.refine();
         }

@@ -335,4 +335,41 @@ auto make_fvca5_hex_mesher(Mesh& msh)
     return fvca5_hex_mesher<Mesh>(msh);
 }
 
+
+
+template<typename T>
+void make_single_element_mesh(cartesian_mesh<T,2>& msh)
+{
+    using mesh_type = cartesian_mesh<T,2>;
+    using point_type = typename mesh_type::point_type;
+    using node_type = typename mesh_type::node_type;
+    using edge_type = typename mesh_type::edge_type;
+    using nodeid_type = typename node_type::id_type;
+
+    auto storage = msh.backend_storage();
+
+    storage->points.push_back( point_type(0.5, 0.5) );
+    storage->points.push_back( point_type(1.0, 0.5) );
+    storage->points.push_back( point_type(1.0, 1.0) );
+    storage->points.push_back( point_type(0.5, 1.0) );
+
+    auto p0 = point_identifier<2>(0);
+    auto p1 = point_identifier<2>(1);
+    auto p2 = point_identifier<2>(2);
+    auto p3 = point_identifier<2>(3);
+
+    storage->nodes.push_back( { p0 } );
+    storage->nodes.push_back( { p1 } );
+    storage->nodes.push_back( { p2 } );
+    storage->nodes.push_back( { p3 } );
+
+    storage->edges.push_back( {p0, p1} );
+    storage->edges.push_back( {p0, p3} );
+    storage->edges.push_back( {p1, p2} );
+    storage->edges.push_back( {p2, p3} );
+
+    storage->surfaces.push_back( {p0, p1, p2, p3} );
+    storage->subdomain_info.resize( 1 );
+}
+
 } //namespace disk

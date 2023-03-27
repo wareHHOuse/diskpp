@@ -647,13 +647,13 @@ make_scalar_hho_stabilization(const Mesh&                                       
  * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
-template<typename Mesh>
+template<typename Mesh, typename ScalarReconstructionBasis>
 dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hho_stabilization(const Mesh&                                           msh,
                               const typename Mesh::cell_type&                       cl,
+                              const ScalarReconstructionBasis&                      rb,
                               const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
-                              const hho_degree_info&                                hdi,
-                              bool x)
+                              const hho_degree_info&                                hdi)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -662,7 +662,6 @@ make_scalar_hho_stabilization(const Mesh&                                       
     const auto celdeg = hdi.cell_degree();
     const auto facdeg = hdi.face_degree();
 
-    const auto rb = make_scalar_monomial_basis(msh, cl, recdeg);
     const auto cb = make_scalar_monomial_basis(msh, cl, celdeg);
 
     const auto rbs = rb.size();
@@ -741,6 +740,17 @@ make_scalar_hho_stabilization(const Mesh&                                       
     }
 
     return data;
+}
+
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+make_scalar_hho_stabilization(const Mesh&                                           msh,
+                              const typename Mesh::cell_type&                       cl,
+                              const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
+                              const hho_degree_info&                                hdi)
+{
+    auto rb = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+    return make_scalar_hho_stabilization(msh, cl, rb, reconstruction, hdi);
 }
 
 /**

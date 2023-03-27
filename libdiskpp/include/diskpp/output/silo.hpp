@@ -256,6 +256,29 @@ public:
     }
 
     template<typename T>
+    bool add_mesh(const std::vector<point<T,2>>& pts, const std::string& name)
+    {
+        std::cout << "Point mesh: " << pts.size() << std::endl;
+        std::vector<double> x_coords, y_coords;
+        x_coords.reserve(pts.size());
+        y_coords.reserve(pts.size());
+
+        for (auto& pt : pts) 
+        {
+            x_coords.push_back(pt.x());
+            y_coords.push_back(pt.y());
+        }
+
+        double *coords[] = { x_coords.data(), y_coords.data() };
+
+        int ndims = 2;
+        int nels = pts.size();
+
+        auto err = DBPutPointmesh(m_siloDb, name.c_str(), ndims, coords, nels, DB_DOUBLE, nullptr);
+        return err == 0;
+    }
+
+    template<typename T>
     bool add_mesh(const simplicial_mesh<T,2>& msh, const std::string& name)
     {
         std::vector<double> x_coords, y_coords;
@@ -687,6 +710,34 @@ public:
             return false;
 
         return true;
+    }
+
+    bool add_variable(const std::string& mesh_name, const std::string& vars_name,
+        std::vector<std::vector<double>>& vars)
+    {
+        std::vector<const double*> pvars;
+        pvars.resize(vars.size());
+        auto tr = [](const std::vector<double>& v) { return v.data(); };
+        std::transform(vars.begin(), vars.end(), pvars.begin(), tr);
+
+        int nvars = vars.size();
+        int nels = vars[0].size();
+
+        auto err = DBPutPointvar(m_siloDb, vars_name.c_str(), mesh_name.c_str(),
+            nvars, pvars.data(), nels, DB_DOUBLE, nullptr);
+
+        return err == 0;
+    }
+
+    bool add_variable(const std::string& mesh_name, const std::string& var_name,
+        std::vector<double>& var)
+    {
+        int nels = var.size();
+
+        auto err = DBPutPointvar1(m_siloDb, var_name.c_str(), mesh_name.c_str(),
+            var.data(), nels, DB_DOUBLE, nullptr);
+
+        return err == 0;
     }
 
     bool add_expression(const std::string& expr_name,
