@@ -260,7 +260,12 @@ struct problem_data_base
     using scalar_type   = typename mesh_type::coordinate_type;
     using vector_type   = Eigen::Matrix<scalar_type, Mesh::dimension, 1>;
 
-    problem_data_base() {}
+    scalar_type     avgcomp1_val;
+    scalar_type     avgcomp2_val;
+
+    problem_data_base()
+        : avgcomp1_val(0.0), avgcomp2_val(0.0)
+    {}
 
     virtual scalar_type u1(const mesh_type&, const point_type&) = 0;
     virtual scalar_type u2(const mesh_type&, const point_type&) = 0;
@@ -270,6 +275,22 @@ struct problem_data_base
 
     virtual scalar_type f1(const mesh_type&, const point_type&) = 0;
     virtual scalar_type f2(const mesh_type&, const point_type&) = 0;
+
+    scalar_type avgcomp1(void) const {
+        return avgcomp1_val;
+    }
+
+    void avgcomp1(scalar_type val) {
+        avgcomp1_val = val;
+    }
+
+    scalar_type avgcomp2(void) const {
+        return avgcomp2_val;
+    }
+
+    void avgcomp2(scalar_type val) {
+        avgcomp2_val = val;
+    }
 
     scalar_type g(const mesh_type& msh, const point_type& pt) {
         return u1(msh, pt) - u2(msh, pt);
@@ -523,6 +544,16 @@ struct problem_data_lua_base : public problem_data_base<Mesh>
         ensure_state_valid();
         return lua["omega2"].get_or(2);
     }
+
+    bool compensate_average1(void) {
+        ensure_state_valid();
+        return lua["avgcomp1"].get_or(false);
+    }
+
+    bool compensate_average2(void) {
+        ensure_state_valid();
+        return lua["avgcomp2"].get_or(false);
+    }
 };
 
 /***************************************************************************/
@@ -542,12 +573,14 @@ struct problem_data_lua<Mesh<T,2,Storage>> : public problem_data_lua_base<Mesh<T
 
     scalar_type u1(const mesh_type&, const point_type& pt) {
         this->ensure_state_valid();
-        return this->lua["u1"](pt.x(), pt.y());
+        scalar_type u1_val = this->lua["u1"](pt.x(), pt.y());
+        return u1_val - this->avgcomp1_val;
     }
 
     scalar_type u2(const mesh_type& msh, const point_type& pt) {
         this->ensure_state_valid();
-        return this->lua["u2"](pt.x(), pt.y());
+        scalar_type u2_val = this->lua["u2"](pt.x(), pt.y());
+        return u2_val - this->avgcomp2_val;
     }
 
     vector_type grad_u1(const mesh_type&, const point_type& pt) {
@@ -589,12 +622,14 @@ struct problem_data_lua<Mesh<T,3,Storage>> : public problem_data_lua_base<Mesh<T
 
     scalar_type u1(const mesh_type&, const point_type& pt) {
         this->ensure_state_valid();
-        return this->lua["u1"](pt.x(), pt.y(), pt.z());
+        scalar_type u1_val = this->lua["u1"](pt.x(), pt.y(), pt.z());
+        return u1_val - this->avgcomp1_val;
     }
 
     scalar_type u2(const mesh_type& msh, const point_type& pt) {
         this->ensure_state_valid();
-        return this->lua["u2"](pt.x(), pt.y(), pt.z());
+        scalar_type u2_val = this->lua["u2"](pt.x(), pt.y(), pt.z());
+        return u2_val - this->avgcomp2_val;
     }
 
     vector_type grad_u1(const mesh_type&, const point_type& pt) {
@@ -782,23 +817,18 @@ void lt_solver(Mesh& msh, size_t degree, const std::string& pbdefs_fn)
     double volume2 = 0.0;
     double omega1_integral = 0.0;
     double omega2_integral = 0.0;
-    for (auto& cl : msh)
-    {
+    for (auto& cl : msh) {
         auto qps = integrate(msh, cl, 10);
 
         auto di = msh.domain_info(cl);
-        if ( di.tag() == internal_tag )
-        {
-            for (auto& qp : qps)
-            {
+        if ( di.tag() == internal_tag ) {
+            for (auto& qp : qps) {
                 volume1 += qp.weight();
                 omega1_integral += qp.weight() * pd.u1(msh, qp.point());
             }
         }
-        else
-        {
-            for (auto& qp : qps)
-            {
+        else {
+            for (auto& qp : qps) {
                 volume2 += qp.weight();
                 omega2_integral += qp.weight() * pd.u2(msh, qp.point());
             }
@@ -806,9 +836,17 @@ void lt_solver(Mesh& msh, size_t degree, const std::string& pbdefs_fn)
     }
 
     std::cout << "mean of u₁ on Ω₁: " << std::setprecision(15);
-    std::cout << omega1_integral/volume1 << std::endl;
+    std::string comp1 = pd.compensate_average1() ? " (compensation ON)" : "";
+    std::cout << omega1_integral/volume1 << comp1 << std::endl;
     std::cout << "mean of u₂ on Ω₂: " << std::setprecision(15);
-    std::cout << omega2_integral/volume2 << std::defaultfloat << std::endl;
+    std::string comp2 = pd.compensate_average2() ? " (compensation ON)" : "";
+    std::cout << omega2_integral/volume2 << comp2 << std::defaultfloat << std::endl;
+
+    if ( pd.compensate_average1() )
+        pd.avgcomp1_val = omega1_integral/volume1;
+
+    if ( pd.compensate_average2() )
+        pd.avgcomp2_val = omega2_integral/volume2;
 
     /* Assembly loop */
     for (auto& cl : msh)

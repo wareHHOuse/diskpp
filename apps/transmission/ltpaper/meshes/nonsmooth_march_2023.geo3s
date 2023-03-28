@@ -11,5 +11,5 @@ Coherence;
 
 //Point(42) = { 0.5, 0.5, 0.5 };
 
-MeshSize{ PointsOf{ Volume{:}; } } = 0.1;
+MeshSize{ PointsOf{ Volume{:}; } } = 0.25;
 //MeshSize{ 42 } = 0.0001;

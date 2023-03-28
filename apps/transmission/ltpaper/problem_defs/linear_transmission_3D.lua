@@ -87,9 +87,11 @@ testcase_nonsmooth = {};
 testcase_nonsmooth.omega1 = 3;
 testcase_nonsmooth.omega2 = 5;
 
+testcase_nonsmooth.avgcomp1 = true;
+
 testcase_nonsmooth.u1 = function(x, y, z)
     local rtarg = x*x + y*y + z*z;
-    return math.pow(rtarg, 1.0/4.0)-0.968110352555118;
+    return math.pow(rtarg, 1.0/4.0);
 end
 
 testcase_nonsmooth.u2 = function(x, y, z)
@@ -142,4 +144,6 @@ grad_u1 = testcase.grad_u1;
 grad_u2 = testcase.grad_u2;
 f1 = testcase.f1;
 f2 = testcase.f2;
+avgcomp1 = testcase.avgcomp1;
+avgcomp2 = testcase.avgcomp2;
 testcase_name = testcase.testcase_name;
