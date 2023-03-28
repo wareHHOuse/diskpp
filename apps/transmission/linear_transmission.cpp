@@ -843,10 +843,10 @@ void lt_solver(Mesh& msh, size_t degree, const std::string& pbdefs_fn)
     std::cout << omega2_integral/volume2 << comp2 << std::defaultfloat << std::endl;
 
     if ( pd.compensate_average1() )
-        pd.avgcomp1_val = omega1_integral/volume1;
+        pd.avgcomp1( omega1_integral/volume1 );
 
     if ( pd.compensate_average2() )
-        pd.avgcomp2_val = omega2_integral/volume2;
+        pd.avgcomp2( omega2_integral/volume2 );
 
     /* Assembly loop */
     for (auto& cl : msh)

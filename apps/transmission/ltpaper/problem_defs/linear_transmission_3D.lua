@@ -118,7 +118,7 @@ end
 
 testcase_nonsmooth.f1 = function (x, y, z)
     local rtarg = x*x + y*y + z*z;
-    return 0.75*math.pow(rtarg, -3.0/4.0);
+    return -0.75*math.pow(rtarg, -3.0/4.0);
 end
 
 testcase_nonsmooth.f2 = function (x, y, z)
