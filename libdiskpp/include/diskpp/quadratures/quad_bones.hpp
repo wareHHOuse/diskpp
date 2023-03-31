@@ -30,6 +30,8 @@
 #include <utility>
 
 #include "diskpp/mesh/point.hpp"
+#include "diskpp/quadratures/quadrature_point.hpp"
+
 #include "triangle_dunavant_rule.hpp"
 
 #define USE_ARBQ
@@ -340,79 +342,6 @@ quadrangle_quadrature(const size_t degree)
     }
 
     return ret;
-}
-
-/* pqrst is there only to squelch -fpermissive
- * GCC warnings. sorry for this. */
-
-template<typename T, size_t DIM>
-using pqrst = point<T,DIM>;
-
-/**
- * @brief This class represents a quadrature point, which is composed by the
- * coordinates and the weight
- *
- * @tparam T scalar type
- * @tparam DIM dimension of the point
- */
-template<typename T, size_t DIM>
-class quadrature_point : private std::pair<pqrst<T,DIM>, T>
-{
-    typedef std::pair<pqrst<T,DIM>, T> base_type;
-
-public:
-    /**
-     * @brief Construct a new quadrature point object
-     *
-     * Default constructor
-     *
-     */
-    quadrature_point()
-    {}
-
-    /**
-     * @brief Construct a new quadrature point object
-     *
-     * @param p a point which represents the coordinates of the quadrature point
-     * @param w weight assoicated to the point
-     */
-    quadrature_point(const pqrst<T, DIM>& p, const T& w)
-        : base_type(p, w)
-    {}
-
-    /**
-     * @brief Return the coordinate of the quadrature point
-     *
-     * @return point<T, DIM> coordinate
-     */
-    pqrst<T, DIM>
-    point() const
-    { return this->first; }
-
-    /**
-     * @brief Return the weight of the quadrature point
-     *
-     * @return T
-     */
-    T
-    weight() const
-    { return this->second; }
-};
-
-template<typename T, size_t DIM>
-quadrature_point<T, DIM>
-make_qp(const point<T, DIM>& point, const T& weight)
-{
-    return quadrature_point<T, DIM>(point, weight);
-}
-
-//
-template<typename T, size_t DIM>
-std::ostream&
-operator<<(std::ostream& os, const quadrature_point<T,DIM>& qp)
-{
-    os << qp.point() << " " << qp.weight();
-    return os;
 }
 
 

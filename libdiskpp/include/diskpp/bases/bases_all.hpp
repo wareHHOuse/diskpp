@@ -36,29 +36,15 @@ namespace disk
 
 /* Perform exponentiation by integer exponent. */
 template<typename T>
-T
-iexp_pow(T x, size_t n)
+T iexp_pow(const T& x, size_t n)
 {
     if (n == 0)
         return 1;
 
-    T y = 1;
-    while (n > 1)
-    {
-        if (n % 2 == 0)
-        {
-            x = x * x;
-            n = n / 2;
-        }
-        else
-        {
-            y = x * y;
-            x = x * x;
-            n = (n - 1) / 2;
-        }
-    }
+    if (n%2 == 0)
+        return iexp_pow(x*x, n/2);
 
-    return x * y;
+    return x*iexp_pow(x*x, (n-1)/2);
 }
 
 template<typename Mesh, typename Element, typename ScalarType>
