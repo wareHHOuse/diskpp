@@ -335,7 +335,41 @@ auto make_fvca5_hex_mesher(Mesh& msh)
     return fvca5_hex_mesher<Mesh>(msh);
 }
 
+template<typename T>
+void make_single_element_mesh(generic_mesh<T,1>& msh, const T& a, const T& b)
+{
+    using mesh_type = generic_mesh<T,1>;
+    using point_type = typename mesh_type::point_type;
+    using node_type = typename mesh_type::node_type;
+    using edge_type = typename mesh_type::edge_type;
+    using nodeid_type = typename node_type::id_type;
 
+    auto storage = msh.backend_storage();
+
+    auto num_edges = 1;
+    auto num_nodes = 2;
+
+    storage->points.resize(num_nodes);
+    storage->nodes.resize(num_nodes);
+    storage->edges.resize(num_edges);
+
+    storage->points.at(0)   = point_type(a);
+    storage->points.at(1) = point_type(b);
+
+    auto n0 = typename node_type::id_type(0);
+    auto n1 = typename node_type::id_type(1);
+
+    storage->nodes.at(0) = node_type(n0);
+    storage->nodes.at(1) = node_type(n1);
+
+    auto e = edge_type(n0, n1);
+    storage->edges.at(0) = e;
+
+    storage->boundary_info.resize(num_nodes);
+    boundary_descriptor bi(0, true);
+    storage->boundary_info.at(0) = bi;
+    storage->boundary_info.at(1) = bi;    
+}
 
 template<typename T>
 void make_single_element_mesh(cartesian_mesh<T,2>& msh)
