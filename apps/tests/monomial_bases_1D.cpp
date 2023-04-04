@@ -75,9 +75,19 @@ int main(void)
     auto fe = 100.0*std::sqrt(fun_error/fun_norm);
     auto ge = 100.0*std::sqrt(grad_error/grad_norm);
 
-    std::cout << __FILE__ << std::endl;
-    std::cout << "  Function relative error = " << fe << "%" << std::endl;
-    std::cout << "  Gradient relative error = " << ge << "%" << std::endl;
+    bool fepass = false, gepass = false;
+    if (fe < 1.65e-12) fepass = true;
+    if (ge < 8.79e-5) gepass = true;
 
-    return 0;
+    auto passfail = [](bool pass) {
+        if (pass)
+            return "[PASS]";
+        return "[FAIL]";
+    };
+
+    std::cout << __FILE__ << std::endl;
+    std::cout << "  Function relative error = " << fe << "% " << passfail(fe) << std::endl;
+    std::cout << "  Gradient relative error = " << ge << "% " << passfail(ge) << std::endl;
+
+    return not (fepass and gepass);
 }

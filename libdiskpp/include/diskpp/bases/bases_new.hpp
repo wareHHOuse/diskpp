@@ -17,12 +17,6 @@ namespace disk {
 
 namespace basis {
 
-
-
-
-
-
-
 struct scalar_basis {};
 struct vector_basis {};
 struct matrix_basis {};
