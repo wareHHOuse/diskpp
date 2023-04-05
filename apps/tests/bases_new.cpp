@@ -20,19 +20,22 @@ int main(void)
     using namespace disk::basis;
 
     using T = double;
-    using mesh_type = cartesian_mesh<T,2>;
+    using mesh_type = generic_mesh<T,1>;
 
     using point_type = typename mesh_type::point_type;
     using cell_type = typename mesh_type::cell_type;
 
-    scalar_monomial<mesh_type, cell_type> u;
-    scalar_monomial<mesh_type, cell_type> v;
+    mesh_type msh;
+    cell_type cl = *msh.cells_begin();
+
+    auto u = scaled_monomial_basis(msh, cl, 7);
+    auto v = scaled_monomial_basis(msh, cl, 7);
 
     point_type x;
     auto n = 2.0;
     std::cout << u(x) << std::endl;
 
-    std::cout << grad(v).dot(n)(x) << std::endl;
+    //std::cout << grad(v).dot(n)(x) << std::endl;
 
-    bilinear_form a( u, grad(v).dot(n) );
+    //auto a = scalar_product( u, u );
 }
