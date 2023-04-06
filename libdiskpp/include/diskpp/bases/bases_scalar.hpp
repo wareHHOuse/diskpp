@@ -1145,4 +1145,317 @@ compute_averages(const Mesh& msh, const Element& elem, const Basis& basis)
     return avgs * (1/meas);
 }
 */
+
+
+
+size_t
+harmonic_basis_size(size_t k, size_t d)
+{
+    if (d != 2)
+        throw std::invalid_argument("not yet implemented");
+
+    return 2*k+1;
 }
+
+
+/* Generic template for bases. */
+template<typename MeshType, typename Element, typename ScalarType>
+struct scaled_harmonic_scalar_basis
+{
+    static_assert(sizeof(MeshType) == -1, "scaled_harmonic_scalar_basis: not suitable for the requested kind of mesh");
+    static_assert(sizeof(Element) == -1,
+                  "scaled_harmonic_scalar_basis: not suitable for the requested kind of element");
+};
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_harmonic_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell, ScalarType>
+    : public scaled_monomial_abstract_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell, ScalarType>
+{
+
+public:
+    typedef Mesh<T, 2, Storage>                 mesh_type;
+    typedef ScalarType                          scalar_type;
+    typedef typename mesh_type::coordinate_type coordinate_type;
+
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef Matrix<scalar_type, Dynamic, 2>     gradient_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     function_type;
+
+    using base = scaled_monomial_abstract_basis<mesh_type, cell_type, scalar_type>;
+
+private:
+    size_t basis_degree, basis_size;
+
+public:
+    scaled_harmonic_scalar_basis(const mesh_type& msh, const cell_type& cl, size_t degree)
+        : base(msh, cl, false)
+    {
+        basis_degree = degree;
+        basis_size   = 1+2*basis_degree;
+    }
+
+    function_type
+    eval_functions(const point_type& pt) const
+    {
+        const auto bp = this->scaling_point(pt);
+        function_type ret = function_type::Zero(basis_size);
+        ret(0) = 1.0;
+
+        if ( basis_degree > 0 ) {
+            ret(1) = bp.x();
+            ret(2) = bp.y();
+        }
+
+        for (size_t i = 2; i <= basis_degree; i++) {
+            auto Pi = ret(2*i-3);
+            auto Qi = ret(2*i-2);
+            ret(2*i-1) = bp.x()*Pi - bp.y()*Qi;
+            ret(2*i) = bp.y()*Pi + bp.x()*Qi;
+        }
+
+        return ret;
+    }
+
+    gradient_type
+    eval_gradients(const point_type& pt) const
+    {
+        const auto bp = this->scaling_point(pt);
+        gradient_type ret = gradient_type::Zero(basis_size, 2);
+        ret(0,0) = 0.0; ret(0,1) = 0.0;
+
+        if ( basis_degree > 0 ) {
+            ret(1,0) = 1.0; ret(1,1) = 0.0;
+            ret(2,0) = 0.0; ret(2,1) = 1.0;
+
+            if (basis_degree == 1)
+                return ret;
+        }
+
+        auto funcs = eval_functions(pt);
+
+        for (size_t i = 2; i <= basis_degree; i++) {
+            auto iPi = i*funcs(2*i-3);
+            auto iQi = i*funcs(2*i-2);
+            ret(2*i-1, 0) = iPi; ret(2*i-1, 1) = -iQi;
+            ret(2*i, 0) = iQi; ret(2*i, 1) = iPi;
+        }
+
+        return ret;
+    }
+
+    size_t size() const {
+        return basis_size;
+    }
+};
+
+
+template<typename Mesh, typename ElemType, typename ScalarType = typename Mesh::coordinate_type>
+auto
+make_scalar_harmonic_basis(const Mesh& msh, const ElemType& elem,size_t degree)
+{
+    return scaled_harmonic_scalar_basis<Mesh, ElemType, ScalarType>(msh, elem, degree);
+}
+
+
+
+
+
+template<typename MeshType, typename Element, typename ScalarType>
+struct scaled_harmonic_top_scalar_basis
+{
+    static_assert(sizeof(MeshType) == -1, "scaled_harmonic_top_scalar_basis: not suitable for the requested kind of mesh");
+    static_assert(sizeof(Element) == -1,
+                  "scaled_harmonic_top_scalar_basis: not suitable for the requested kind of element");
+};
+
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_harmonic_top_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell, ScalarType>
+    : public scaled_monomial_abstract_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Storage>::cell, ScalarType>
+{
+
+public:
+    typedef Mesh<T, 2, Storage>                 mesh_type;
+    typedef ScalarType                          scalar_type;
+    typedef typename mesh_type::coordinate_type coordinate_type;
+
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef Matrix<scalar_type, Dynamic, 2>     gradient_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     function_type;
+
+    using base = scaled_monomial_abstract_basis<mesh_type, cell_type, scalar_type>;
+
+private:
+    size_t full_basis_degree, full_basis_size;
+    size_t polynomial_max_degree, polynomial_part_size;
+    size_t harmonic_min_degree, harmonic_max_degree, harmonic_part_size;
+
+    function_type
+    eval_harmonic(const point_type& bp) const
+    {
+        auto hbs = harmonic_basis_size(full_basis_degree, 2);
+        function_type ret = function_type::Zero(hbs);
+        ret(0) = 1.0;
+
+        if ( full_basis_degree > 0 ) {
+            ret(1) = bp.x();
+            ret(2) = bp.y();
+        }
+
+        for (size_t i = 2; i <= full_basis_degree; i++) {
+            auto Pi = ret(2*i-3);
+            auto Qi = ret(2*i-2);
+            ret(2*i-1) = bp.x()*Pi - bp.y()*Qi;
+            ret(2*i) = bp.y()*Pi + bp.x()*Qi;
+        }
+
+        return ret;
+    }
+
+    gradient_type
+    eval_harmonic_gradients(const point_type& bp) const
+    {
+        auto hbs = harmonic_basis_size(full_basis_degree, 2);
+        gradient_type ret = gradient_type::Zero(hbs, 2);
+        ret(0,0) = 0.0; ret(0,1) = 0.0;
+
+        const auto p = this->passage_new2old();
+        auto sx = p(0,0)/2.0;
+        auto sy = p(1,1)/2.0;
+
+        if ( full_basis_degree > 0 ) {
+            ret(1,0) = sx; ret(1,1) = 0.0;
+            ret(2,0) = 0.0; ret(2,1) = sy;
+
+            if (full_basis_degree == 1)
+                return ret;
+        }
+
+        auto funcs = eval_harmonic(bp);
+
+        for (size_t i = 2; i <= full_basis_degree; i++) {
+            auto iPi = i*funcs(2*i-3);
+            auto iQi = i*funcs(2*i-2);
+            ret(2*i-1, 0) = sx*iPi; ret(2*i-1, 1) = -sy*iQi;
+            ret(2*i, 0) = sx*iQi; ret(2*i, 1) = sy*iPi;
+        }
+
+        return ret;
+    }
+
+public:
+    scaled_harmonic_top_scalar_basis(const mesh_type& msh, const cell_type& cl, size_t fbd)
+        : base(msh, cl, false)
+    {
+        full_basis_degree       = fbd;
+        full_basis_size         = scalar_basis_size(full_basis_degree, 2);
+        polynomial_max_degree   = full_basis_degree;
+        polynomial_part_size    = full_basis_size;
+        harmonic_min_degree     = full_basis_degree+1;
+        harmonic_part_size      = 0;
+    }
+
+    void
+    maximum_polynomial_degree(size_t pd)
+    {
+        if (pd > full_basis_degree)
+            return;
+        
+        polynomial_max_degree = pd;
+        polynomial_part_size = scalar_basis_size(polynomial_max_degree, 2);
+        harmonic_min_degree = polynomial_max_degree+1;
+        assert(harmonic_min_degree > 0);
+        size_t hs_notused = harmonic_basis_size(harmonic_min_degree-1, 2);
+        size_t hs_used = harmonic_basis_size(full_basis_degree, 2);
+        assert(hs_notused <= hs_used);
+        harmonic_part_size = hs_used - hs_notused;
+        full_basis_size = polynomial_part_size + harmonic_part_size;
+    }
+
+    size_t
+    maximum_polynomial_degree(void) const
+    {
+        return polynomial_max_degree;
+    }
+
+    function_type
+    eval_functions(const point_type& pt) const
+    {
+        const auto bp = this->scaling_point(pt);
+        function_type ret = function_type::Zero(full_basis_size);
+
+        size_t pos = 0;
+        for (size_t k = 0; k <= polynomial_max_degree; k++) {
+            for (size_t i = 0; i <= k; i++) {
+                const auto pow_x = k - i;
+                const auto pow_y = i;
+                const auto px = iexp_pow(bp.x(), pow_x);
+                const auto py = iexp_pow(bp.y(), pow_y);
+                ret(pos++) = px * py;
+            }
+        }
+        assert(pos == polynomial_part_size);
+        if (harmonic_part_size > 0) {
+            assert(polynomial_max_degree < full_basis_degree);
+            function_type hp = eval_harmonic(bp);
+            ret.tail(harmonic_part_size) = hp.tail(harmonic_part_size);
+        }
+        return ret;
+    }
+
+    gradient_type
+    eval_gradients(const point_type& pt) const
+    {
+        gradient_type ret = gradient_type::Zero(full_basis_size, 2);
+        const auto bp = this->scaling_point(pt);
+        const auto bx = bp.x();
+        const auto by = bp.y();
+
+        const auto p = this->passage_new2old();
+        size_t pos = 0;
+        for (size_t k = 0; k <= polynomial_max_degree; k++) {
+            for (size_t i = 0; i <= k; i++) {
+                const auto pow_x = k - i;
+                const auto pow_y = i;
+                const auto px = iexp_pow(bx, pow_x);
+                const auto py = iexp_pow(by, pow_y);
+                const auto dx = (pow_x == 0) ? 0 : pow_x * iexp_pow(bx, pow_x - 1);
+                const auto dy = (pow_y == 0) ? 0 : pow_y * iexp_pow(by, pow_y - 1);
+                ret(pos, 0) = p(0,0) * dx * py;
+                ret(pos, 1) = p(1,1) * px * dy;
+                pos++;
+            }
+        }
+        assert(pos == polynomial_part_size);
+        if (harmonic_part_size > 0) {
+            assert(polynomial_max_degree < full_basis_degree);
+            gradient_type hg = eval_harmonic_gradients(bp);
+            ret.block(ret.rows()-harmonic_part_size, 0, harmonic_part_size, 2) =
+                hg.block(hg.rows()-harmonic_part_size, 0, harmonic_part_size, 2);
+        }
+        return ret;
+    }
+
+    size_t size() const {
+        return full_basis_size;
+    }
+
+    size_t degree() const {
+        return full_basis_degree;
+    }
+};
+
+
+template<typename Mesh, typename ElemType, typename ScalarType = typename Mesh::coordinate_type>
+auto
+make_scalar_harmonic_top_basis(const Mesh& msh, const ElemType& elem,size_t degree)
+{
+    return scaled_harmonic_top_scalar_basis<Mesh, ElemType, ScalarType>(msh, elem, degree);
+}
+
+
+
+
+} // namespace disk

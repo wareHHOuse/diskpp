@@ -1,7 +1,8 @@
-cmake_minimum_required(VERSION 3.18)
-project(diskpp_tutorials)
 
 set(LINK_LIBS diskpp)
+
+add_executable(basis_function_plot basis_function_plot.cpp)
+target_link_libraries(basis_function_plot ${LINK_LIBS})
 
 add_executable(test_scalar_reconstruction scalar_reconstruction.cpp)
 target_link_libraries(test_scalar_reconstruction ${LINK_LIBS})

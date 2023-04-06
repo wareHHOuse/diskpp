@@ -647,17 +647,110 @@ make_scalar_hho_stabilization(const Mesh&                                       
  * @param hF use diameter of face for scaling if true (or cell diameter if false)
  * @return dynamic_matrix<typename Mesh::coordinate_type> return the stabilization term
  */
+template<typename Mesh, typename ScalarReconstructionBasis>
+dynamic_matrix<typename Mesh::coordinate_type>
+make_scalar_hho_stabilization(const Mesh&                                           msh,
+                              const typename Mesh::cell_type&                       cl,
+                              const ScalarReconstructionBasis&                      rb,
+                              const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
+                              const hho_degree_info&                                hdi)
+{
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+
+    const auto recdeg = hdi.reconstruction_degree();
+    const auto celdeg = hdi.cell_degree();
+    const auto facdeg = hdi.face_degree();
+
+    const auto cb = make_scalar_monomial_basis(msh, cl, celdeg);
+
+    const auto rbs = rb.size();
+    const auto cbs = cb.size();
+    const auto fbs = scalar_basis_size(facdeg, Mesh::dimension-1);
+
+    // Build \pi_F^k (v_F - P_T^K v) equations (21) and (22)
+
+    // Step 1: compute \pi_T^k p_T^k v (third term).
+    const matrix_type M1    = make_mass_matrix(msh, cl, cb);
+
+    matrix_type M2    = matrix_type::Zero(cbs, rbs - 1);
+    auto qps = integrate(msh, cl, recdeg+celdeg);
+    for(auto& qp : qps)
+    {
+        auto trial_tmp = rb.eval_functions( qp.point() );
+        auto trial = trial_tmp.tail(rbs-1);
+        auto test = cb.eval_functions( qp.point() );
+        M2 += qp.weight() * test * trial.transpose();
+    }
+    
+    matrix_type       proj1 = -M1.ldlt().solve(M2 * reconstruction);
+
+    assert(M2.cols() == reconstruction.rows());
+
+    // Step 2: v_T - \pi_T^k p_T^k v (first term minus third term)
+    proj1.block(0, 0, cbs, cbs) += matrix_type::Identity(cbs, cbs);
+
+    const auto fcs            = faces(msh, cl);
+    const auto num_faces_dofs = fcs.size() * fbs;
+
+    matrix_type data = matrix_type::Zero(cbs + num_faces_dofs, cbs + num_faces_dofs);
+
+    T h = diameter(msh, cl);
+
+    // Step 3: project on faces (eqn. 21)
+    size_t offset = cbs;
+    for (size_t face_i = 0; face_i < fcs.size(); face_i++)
+    {
+        const auto& fc = fcs[face_i];
+        const auto fb     = make_scalar_monomial_basis(msh, fc, facdeg);
+        const auto fbs    = scalar_basis_size(facdeg, Mesh::dimension - 1);
+
+        matrix_type face_mass_matrix  = make_mass_matrix(msh, fc, fb);
+        matrix_type face_trace_matrix = matrix_type::Zero(fbs, rbs-1);
+        matrix_type face_trace_matrix2 = matrix_type::Zero(fbs, cbs);
+
+        const auto face_quadpoints = integrate(msh, fc, recdeg + facdeg);
+        for (auto& qp : face_quadpoints)
+        {
+            const auto f_phi = fb.eval_functions(qp.point());
+            const auto c_phi = cb.eval_functions(qp.point());
+            const auto r_phi_tmp = rb.eval_functions(qp.point());
+            const auto r_phi = r_phi_tmp.tail(rbs-1);
+            face_trace_matrix += qp.weight() * f_phi * r_phi.transpose();
+            face_trace_matrix2 += qp.weight() * f_phi * c_phi.transpose();
+        }
+
+        LLT<matrix_type> piKF;
+        piKF.compute(face_mass_matrix);
+
+        // Step 3a: \pi_F^k( v_F - p_T^k v )
+        const matrix_type MR1 = face_trace_matrix;
+
+        matrix_type proj2 = piKF.solve(MR1 * reconstruction);
+        proj2.block(0, offset, fbs, fbs) -= matrix_type::Identity(fbs, fbs);
+
+        // Step 3b: \pi_F^k( v_T - \pi_T^k p_T^k v )
+        const matrix_type MR2   = face_trace_matrix2;
+        const matrix_type proj3 = piKF.solve(MR2 * proj1);
+        const matrix_type BRF   = proj2 + proj3;
+
+        data += BRF.transpose() * face_mass_matrix * BRF / h;
+
+        offset += fbs;
+    }
+
+    return data;
+}
+
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hho_stabilization(const Mesh&                                           msh,
                               const typename Mesh::cell_type&                       cl,
                               const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
-                              const hho_degree_info&                                di,
-                              bool                                                  hF = true)
+                              const hho_degree_info&                                hdi)
 {
-    const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
-
-    return make_scalar_hho_stabilization(msh, cl, reconstruction, cell_infos, hF);
+    auto rb = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+    return make_scalar_hho_stabilization(msh, cl, rb, reconstruction, hdi);
 }
 
 /**
