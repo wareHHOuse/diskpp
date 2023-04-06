@@ -7,20 +7,84 @@ if ( WIN32 )
     message(FATAL_ERROR "Sorry, Windows is not supported.")
 endif()
 
-# project version
+######################################################################
+## project version
 set(diskpp_VERSION_MAJOR 0)
 set(diskpp_VERSION_MINOR 0)
 set(diskpp_VERSION_PATCH 0)
 
-# Additional modules path for cmake
-set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-
-include(safeguards)
-include(agmg)
-include(Tools)
-
+######################################################################
+## Required C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+######################################################################
+## RPATH settings
+set(CMAKE_SKIP_BUILD_RPATH FALSE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+######################################################################
+## Build Release by default
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release")
+endif()
+
+######################################################################
+## Disallow in-tree builds
+if(${PROJECT_SOURCE_DIR} STREQUAL ${PROJECT_BINARY_DIR})
+    message(FATAL_ERROR "In-source builds not allowed. Please create a build directory and run CMake from there.")
+endif()
+
+######################################################################
+## Additional modules path for cmake
+set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+set (SITE_CONFIGS "${PROJECT_SOURCE_DIR}/cmake/sites")
+
+set(SITE_PRESET "default" CACHE STRING "Site-specific environment to load")
+if ( NOT (${SITE_PRESET} STREQUAL "default") )
+    include("${SITE_CONFIGS}/Site${SITE_PRESET}.cmake")
+endif()
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    add_link_options("-Wl,--no-as-needed")
+endif()
+
+######################################################################
+## Update submodules if necessary
+find_package(Git QUIET)
+if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
+    # Update submodules as needed
+    option(GIT_SUBMODULE "Check submodules during build" ON)
+    if(GIT_SUBMODULE)
+        message(STATUS "Submodule update")
+        execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
+                        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                        RESULT_VARIABLE GIT_SUBMOD_RESULT)
+        if(NOT GIT_SUBMOD_RESULT EQUAL "0")
+            message(FATAL_ERROR "git submodule update --init --recursive failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
+        endif()
+    endif()
+endif()
+
+######################################################################
+## Eigen3
+#add_subdirectory(contrib/eigen)
+find_package(Eigen3 REQUIRED)
+set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
+
+######################################################################
+## ~jburkardt code
+#add_subdirectory(contrib/jburkardt)
+#set(LINK_LIBS ${LINK_LIBS} JBURKARDT)
+
+######################################################################
+## Solver wrappers
+#add_subdirectory(contrib/solver_wrappers)
+#set(LINK_LIBS ${LINK_LIBS} SOLVER_WRAPPERS)
+
+include_directories(refactor_old_diskpp_code/contrib/sgr)
 
 ######################################################################
 ## Helpers for compiler identification
@@ -45,17 +109,6 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
 endif()
 
 ######################################################################
-## Package: MUMPS solver
-find_package(MUMPS COMPONENTS SEQ)
-if (MUMPS_FOUND)
-    set(LINK_LIBS ${LINK_LIBS} MUMPS::MUMPS)
-    add_definitions(-DHAVE_MUMPS)
-    set(HAVE_MUMPS TRUE)
-else()
-    set(HAVE_MUMPS FALSE)
-endif()
-
-######################################################################
 ## Package: Threading support
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -64,31 +117,26 @@ if (COMPILER_IS_CLANG OR COMPILER_IS_INTEL OR COMPILER_IS_GNU)
 endif()
 
 ######################################################################
-## Package: Intel MKL support - To be made optional
-find_package(MKL REQUIRED)
+## Package: Intel MKL support
+find_package(MKL)
 if (MKL_FOUND)
-  include_directories(${MKL_INCLUDE_DIRS})
-  set(LINK_LIBS ${LINK_LIBS} ${MKL_LIBRARIES})
+  set(LINK_LIBS ${LINK_LIBS} MKL)
   set(HAVE_INTEL_MKL TRUE)
-  add_definitions(-DHAVE_INTEL_MKL)
 endif()
 
 ######################################################################
 ## Package: LLNL Silo library support - To be made optional
 find_package(SILO REQUIRED)
-#if (SILO_FOUND)
-    include_directories("${SILO_INCLUDE_DIRS}")
-    set(LINK_LIBS ${LINK_LIBS} ${SILO_LIBRARIES})
-    set(HAVE_SILO TRUE)
-    add_definitions(-DHAVE_SILO)
-#endif()
+if (SILO_FOUND)
+    set(LINK_LIBS ${LINK_LIBS} SILO)
+endif()
 
 ######################################################################
 ## Package: HDF5 Support - To be made optional
-find_package(HDF5 REQUIRED)
-    include_directories(${HDF5_INCLUDE_DIRS})
-    set(LINK_LIBS ${LINK_LIBS} ${HDF5_LIBRARIES})
-    set(HAVE_HDF5 TRUE)
+#find_package(HDF5)
+#include_directories(${HDF5_INCLUDE_DIRS})
+#set(LINK_LIBS ${LINK_LIBS} ${HDF5_LIBRARIES})
+#set(HAVE_HDF5 TRUE)
 
 ######################################################################
 ## Package: Lua language support
@@ -97,48 +145,21 @@ include_directories("${LUA_INCLUDE_DIR}")
 set(LINK_LIBS ${LINK_LIBS} ${LUA_LIBRARIES})
 
 ######################################################################
-## Package: GMSH
-find_library(GMSH_LIB gmsh)
-find_path(GMSH_INC gmsh.h)
-if(GMSH_LIB AND GMSH_INC)
-    set(LINK_LIBS ${LINK_LIBS} ${GMSH_LIB})
-    include_directories(${GMSH_INC})
-    set(HAVE_GMSH TRUE)
-    add_definitions(-DHAVE_GMSH)
-    set(HAVE_GMSH TRUE)
-else()
-  set(GMSH_DIR "/opt/uliege/gmsh" CACHE PATH "GMSH install path")
-  if (DEFINED ENV{GMSH_DIR})
-    set (GMSH_DIR $ENV{GMSH_DIR})
-  endif()
-  if (GMSH_DIR STREQUAL "" OR NOT EXISTS ${GMSH_DIR})
-      message(STATUS "GMSH not found")
-      set(HAVE_GMSH FALSE)
-  else()
-      set(LINK_LIBS ${LINK_LIBS} gmsh)
-      include_directories(${GMSH_DIR}/include)
-      link_directories(${GMSH_DIR}/lib)
-      set(HAVE_GMSH TRUE)
-      add_definitions(-DHAVE_GMSH)
-      set(HAVE_GMSH TRUE)
-  endif()
+## Package: MGIS support
+find_package(MGIS)
+if (MGIS_FOUND)
+    set(LINK_LIBS ${LINK_LIBS} MGIS)
+    set(HAVE_MGIS TRUE)
+    add_definitions(-DHAVE_MGIS)
 endif()
 
 ######################################################################
-## Package: MGIS support
-find_package(MFrontGenericInterface)
-if (MFrontGenericInterface_FOUND)
-    message(STATUS "MGIS found")
-#    include_directories(${MGIS_INCLUDE_DIRS})
-    set(LINK_LIBS ${LINK_LIBS} mgis::MFrontGenericInterface)
-    set(HAVE_MGIS TRUE)
-    add_definitions(-DHAVE_MGIS)
-else()
-    message(STATUS "MGIS not found")
-    set(HAVE_MGIS FALSE)
+## Package: GMSH
+find_package(GMSH)
+if (GMSH_FOUND)
+    set(HAVE_GMSH TRUE)
+    set(LINK_LIBS ${LINK_LIBS} GMSH)
 endif()
-
-
 
 ######################################################################
 ## Optimization: Prefer 512 bit vectors on certain architectures.
@@ -175,50 +196,72 @@ if (OPT_VECTORIZER_REMARKS)
     if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopt-info-vec-optimized")
     endif()
+endif()
 
-    if (CMAKE_CXX_COMPILER_ID STREQUAL "PGI")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Minfo")
+######################################################################
+## Compiler reporting: disable deprecation wa
+option(OPT_DISABLE_DEPRECATION_WARNINGS "Disable deprecation warnings" OFF)
+if(OPT_DISABLE_DEPRECATION_WARNINGS)
+    if (COMPILER_IS_GNU OR COMPILER_IS_CLANG)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
     endif()
 endif()
 
 ######################################################################
 ## Compiler settings: Settings for different build types
-set(CMAKE_CXX_FLAGS_DEBUG "-g -fsanitize=address -fpermissive")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -g -fpermissive -DNDEBUG")
-set(CMAKE_CXX_FLAGS_RELEASEASSERT "-O3 -march=native -g -fpermissive")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_DEBUGSANITIZED "-g -fsanitize=address")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASENATIVE "-O3 -DNDEBUG -march=native")
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-anon-enum-enum-conversion")
 
+#include_directories("${PROJECT_SOURCE_DIR}")
 
-set(UP_EIGEN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/contrib/eigen")
-if ( EXISTS ${UP_EIGEN_DIR} AND IS_DIRECTORY ${UP_EIGEN_DIR} )
-    include_directories(${UP_EIGEN_DIR})
-else ( EXISTS ${UP_EIGEN_DIR} AND IS_DIRECTORY ${UP_EIGEN_DIR} )
-    find_package(Eigen3 REQUIRED)
-    include_directories(${EIGEN3_INCLUDE_DIR})
-endif ( EXISTS ${UP_EIGEN_DIR} AND IS_DIRECTORY ${UP_EIGEN_DIR} )
+#include_directories(core contrib)
+
+set(SOL2_BUILD_LUA OFF CACHE BOOL "Override sol2 build lua option")
+add_subdirectory(refactor_old_diskpp_code/contrib/sol2)
+set(LINK_LIBS ${LINK_LIBS} sol2::sol2)
+
+#include_directories(contrib/sol2/include)
+#include_directories(contrib/sol2/single)
+
+#add_subdirectory(contrib)
+#add_subdirectory(doc)
+
+#add_library(diskpp SHARED ${diskpp_source})
+#set(LINK_LIBS "${LINK_LIBS}" diskpp)
+#install(TARGETS diskpp LIBRARY DESTINATION lib)
+
+#install(DIRECTORY meshes DESTINATION share)
+
+## Super-temporary hack
+include_directories(contrib)
+set(npaster_gmshtools_sources "contrib/gmsh_tools/gmshData.cpp"
+                              "contrib/gmsh_tools/gmshElement.cpp"
+                              "contrib/gmsh_tools/gmshMesh.cpp")
+add_library(npaster_gmshtools STATIC ${npaster_gmshtools_sources})
+set(LINK_LIBS ${LINK_LIBS} npaster_gmshtools)
 
 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
-
-include_directories("${PROJECT_SOURCE_DIR}")
-
-include_directories(core contrib)
-
-SET(SOL2_BUILD_LUA OFF CACHE BOOL "Override sol2 build lua option")
-add_subdirectory(contrib/sol2)
-include_directories(contrib/sol2/include)
-include_directories(contrib/sol2/single)
-
-add_subdirectory(contrib)
-add_subdirectory(core)
-add_subdirectory(utils)
-add_subdirectory(doc)
-
-add_library(diskpp SHARED ${diskpp_source})
-set(LINK_LIBS "${LINK_LIBS}" diskpp)
-install(TARGETS diskpp LIBRARY DESTINATION lib)
-
-install(DIRECTORY meshes DESTINATION share)
-
+add_subdirectory(libdiskpp)
 add_subdirectory(apps)
+
+##
+## Packaging
+##
+set(CPACK_PACKAGE_NAME "diskpp")
+set(CPACK_PACKAGE_VENDOR "The DiSk++ team")
+set(CPACK_PACKAGE_CONTACT "Matteo Cicuttin <datafl4sh@toxicnet.eu>")
+set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+#set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+#set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+
+set(CPACK_DEBIAN_PACKAGE_SECTION "science")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6,libgcc1,libstdc++6")
+
+include(CPack)

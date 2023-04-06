@@ -30,13 +30,10 @@
 
 #include <unistd.h>
 
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
-#include "methods/hho"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
 
-#include "core/loaders/loader.hpp"
-
-#include "solvers/solver.hpp"
+#include "mumps.hpp"
 
 
 template<typename Mesh>
@@ -125,8 +122,7 @@ run_stokes(const Mesh& msh, size_t degree)
 
     disk::dynamic_vector<scalar_type> sol = disk::dynamic_vector<scalar_type>::Zero(systsz);
 
-    disk::solvers::pardiso_params<scalar_type> pparams;
-    mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);
+    sol = mumps_lu(assembler.LHS, assembler.RHS);
 
     //std::ofstream ofs("velocity.dat");
 

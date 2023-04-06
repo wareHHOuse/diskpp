@@ -14,12 +14,10 @@
 
 #include <unistd.h>
 
-#include "bases/bases.hpp"
-#include "methods/hho"
-#include "methods/implementation_hho/curl.hpp"
-#include "quadratures/quadratures.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/methods/implementation_hho/curl.hpp"
 
-#include "core/loaders/loader.hpp"
 
 #include "common.hpp"
 

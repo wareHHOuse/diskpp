@@ -22,14 +22,74 @@
 
 #include <unistd.h>
 
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
-#include "methods/hho"
-#include "methods/implementation_hho/curl.hpp"
-#include "core/loaders/loader.hpp"
-#include "output/silo.hpp"
-#include "solvers/solver.hpp"
-#include "solvers/mumps.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/output/silo.hpp"
+
+#include "sol/sol.hpp"
+#include "mumps.hpp"
+
+#include "sgr.hpp"
+
+#define PARDISO_IN_CORE                 0
+#define PARDISO_OUT_OF_CORE_IF_NEEDED   1
+#define PARDISO_OUT_OF_CORE_ALWAYS      2
+
+template<typename T>
+struct pardiso_params
+{
+    bool    report_factorization_Mflops;
+    int     out_of_core; //0: IC, 1: IC, OOC if limits passed, 2: OOC
+    int     mflops;
+
+    pardiso_params() :
+        report_factorization_Mflops(false), out_of_core(0), mflops(0)
+    {}
+};
+
+template<typename T>
+bool
+mkl_pardiso(pardiso_params<T>& params,
+            const Eigen::SparseMatrix<T>& A,
+            const Eigen::Matrix<T, Eigen::Dynamic, 1>& b,
+            Eigen::Matrix<T, Eigen::Dynamic, 1>& x)
+{
+    Eigen::PardisoLU<Eigen::SparseMatrix<T>>  solver;
+
+    if (params.out_of_core >= 0 && params.out_of_core <= 2)
+        solver.pardisoParameterArray()[59] = params.out_of_core;
+
+    if (params.report_factorization_Mflops)
+        solver.pardisoParameterArray()[18] = -1; //report flops
+
+    solver.analyzePattern(A);
+    if (solver.info() != Eigen::Success) {
+       std::cerr << "ERROR: analyzePattern failed" << std::endl;
+       return false;
+    }
+
+    solver.factorize(A);
+    if (solver.info() != Eigen::Success) {
+       std::cerr << "ERROR: Could not factorize the matrix" << std::endl;
+       std::cerr << "Try to tweak MKL_PARDISO_OOC_MAX_CORE_SIZE" << std::endl;
+       return false;
+    }
+
+    x = solver.solve(b);
+    if (solver.info() != Eigen::Success) {
+       std::cerr << "ERROR: Could not solve the linear system" << std::endl;
+       return false;
+    }
+
+    if (params.report_factorization_Mflops)
+    {
+        int mflops = solver.pardisoParameterArray()[18];
+        params.mflops = mflops;
+        std::cout << "[PARDISO] Factorization Mflops: " << mflops << std::endl;
+    }
+
+    return true;
+}
 
 template<typename Mesh>
 std::set<size_t>
@@ -189,10 +249,87 @@ void compute_g2s(const Mesh& msh, size_t internal_tag, offsets_g2s& g2s)
     }
 }
 
+/***************************************************************************/
+template<typename Mesh>
+struct problem_data_base
+{
+    using mesh_type     = Mesh;
+    using cell_type     = typename mesh_type::cell_type;
+    using face_type     = typename mesh_type::face_type;
+    using point_type    = typename mesh_type::point_type;
+    using scalar_type   = typename mesh_type::coordinate_type;
+    using vector_type   = Eigen::Matrix<scalar_type, Mesh::dimension, 1>;
+
+    scalar_type     avgcomp1_val;
+    scalar_type     avgcomp2_val;
+
+    problem_data_base()
+        : avgcomp1_val(0.0), avgcomp2_val(0.0)
+    {}
+
+    virtual scalar_type u1(const mesh_type&, const point_type&) = 0;
+    virtual scalar_type u2(const mesh_type&, const point_type&) = 0;
+
+    virtual vector_type grad_u1(const mesh_type&, const point_type&) = 0;
+    virtual vector_type grad_u2(const mesh_type&, const point_type&) = 0;
+
+    virtual scalar_type f1(const mesh_type&, const point_type&) = 0;
+    virtual scalar_type f2(const mesh_type&, const point_type&) = 0;
+
+    scalar_type avgcomp1(void) const {
+        return avgcomp1_val;
+    }
+
+    void avgcomp1(scalar_type val) {
+        avgcomp1_val = val;
+    }
+
+    scalar_type avgcomp2(void) const {
+        return avgcomp2_val;
+    }
+
+    void avgcomp2(scalar_type val) {
+        avgcomp2_val = val;
+    }
+
+    scalar_type g(const mesh_type& msh, const point_type& pt) {
+        return u1(msh, pt) - u2(msh, pt);
+    }
+
+    scalar_type g1(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
+        auto n = normal(msh, cl, fc);
+        return grad_u1(msh, pt).dot(n) - grad_u2(msh, pt).dot(n);
+    }
+
+    scalar_type g2(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
+        auto n = normal(msh, cl, fc);
+        return grad_u2(msh, pt).dot(n);
+    }
+
+    scalar_type xi(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
+        auto n = normal(msh, cl, fc);
+        return grad_u1(msh, pt).dot(n);
+    }
+
+    virtual std::string solver() {
+        return "pardiso";
+    }
+
+    virtual int omega1(void) {
+        return 1;
+    }
+
+    virtual int omega2(void) {
+        return 2;
+    }
+};
+
+/***************************************************************************/
 template<typename T> struct problem_data;
 
+#if 0
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-struct problem_data<Mesh<T,2,Storage>>
+struct problem_data<Mesh<T,2,Storage>> : problem_data_base<Mesh<T,2,Storage>>
 {
     using mesh_type     = Mesh<T,2,Storage>;
     using cell_type     = typename mesh_type::cell_type;
@@ -230,29 +367,69 @@ struct problem_data<Mesh<T,2,Storage>>
     scalar_type f2(const mesh_type& msh, const point_type& pt) {
         return 2*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
     }
+};
+#endif
 
-    scalar_type g(const mesh_type& msh, const point_type& pt) {
-        return u1(msh, pt) - u2(msh, pt);
+
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+struct problem_data<Mesh<T,2,Storage>> : problem_data_base<Mesh<T,2,Storage>>
+{
+    using mesh_type     = Mesh<T,2,Storage>;
+    using cell_type     = typename mesh_type::cell_type;
+    using face_type     = typename mesh_type::face_type;
+    using point_type    = typename mesh_type::point_type;
+    using scalar_type   = typename mesh_type::coordinate_type;
+    using vector_type   = Eigen::Matrix<scalar_type, 2, 1>;
+
+    scalar_type u1(const mesh_type&, const point_type& pt) {
+        double aa = (13*std::log(2)-5*std::log(5))/14;
+        double aux = std::pow(pt.x(),2)+std::pow(pt.y(),2);
+        return pt.x()*pt.y()*std::pow(aux, -1)-aa;
     }
 
-    scalar_type g1(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
-        auto n = normal(msh, cl, fc);
-        return grad_u1(msh, pt).dot(n) - grad_u2(msh, pt).dot(n);
+    scalar_type u2(const mesh_type& msh, const point_type& pt) {
+        std::complex<double> mycomplex (pt.y()-pt.x(),-pt.x()-pt.y()); 
+        double a = std::arg(mycomplex)+0.75*M_PI;
+        double r = std::pow(pt.x(), 2)+std::pow(pt.y(), 2);
+        return std::pow(r,1./3)*sin((2./3)* a) - 1.08782791064557;
     }
 
-    scalar_type g2(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
-        auto n = normal(msh, cl, fc);
-        return grad_u2(msh, pt).dot(n);
+    vector_type grad_u1(const mesh_type&, const point_type& pt) {
+        double aux = std::pow(pt.x(),2)+std::pow(pt.y(),2);
+        
+        vector_type ret;
+        ret(0) = pt.y()*(std::pow(pt.y(),2)-std::pow(pt.x(),2))*std::pow(aux,-2),
+        ret(1) = pt.x()*(std::pow(pt.x(),2)-std::pow(pt.y(),2))*std::pow(aux,-2);
+        return ret;
     }
 
-    scalar_type xi(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
-        auto n = normal(msh, cl, fc);
-        return grad_u1(msh, pt).dot(n);
+    vector_type grad_u2(const mesh_type& msh, const point_type& pt) {
+        std::complex<double> mycomplex (pt.y()-pt.x(),-pt.x()-pt.y()); 
+        double a = std::arg(mycomplex)+0.75*M_PI;
+        double r = std::pow(pt.x(), 2)+std::pow(pt.y(), 2);
+        vector_type ret;
+                     
+        ret(0) = -(2./3)*std::pow(r,-1./6) * sin(a/3),
+        ret(1) = (2./3)*std::pow(r,-1./6) * cos(a/3);          
+        return ret;
+    }
+
+    scalar_type f1(const mesh_type&, const point_type& pt) {
+        double aux = std::pow(pt.x(),2)+std::pow(pt.y(),2);          
+        return 4*pt.x()*pt.y()*std::pow(aux, -2);
+    }
+
+    scalar_type f2(const mesh_type& msh, const point_type& pt) {
+        return 0.0;
     }
 };
 
+
+
+
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-struct problem_data<Mesh<T,3,Storage>>
+struct problem_data<Mesh<T,3,Storage>> : problem_data_base<Mesh<T,3,Storage>>
 {
     using mesh_type     = Mesh<T,3,Storage>;
     using cell_type     = typename mesh_type::cell_type;
@@ -292,35 +469,99 @@ struct problem_data<Mesh<T,3,Storage>>
     scalar_type f2(const mesh_type& msh, const point_type& pt) {
         return 2*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y())*(pt.z()-1.5);
     }
-
-    scalar_type g(const mesh_type& msh, const point_type& pt) {
-        return u1(msh, pt) - u2(msh, pt);
-    }
-
-    scalar_type g1(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
-        auto n = normal(msh, cl, fc);
-        return grad_u1(msh, pt).dot(n) - grad_u2(msh, pt).dot(n);
-    }
-
-    scalar_type g2(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
-        auto n = normal(msh, cl, fc);
-        return grad_u2(msh, pt).dot(n);
-    }
-
-    scalar_type xi(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
-        auto n = normal(msh, cl, fc);
-        return grad_u1(msh, pt).dot(n);
-    }
 };
 
-
-template<typename T> struct problem_data_lua;
-
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-struct problem_data_lua<Mesh<T,2,Storage>>
+/***************************************************************************/
+template<typename Mesh>
+struct problem_data_lua_base : public problem_data_base<Mesh>
 {
     sol::state lua;
 
+    bool m_state_valid;
+
+    problem_data_lua_base()
+        : m_state_valid(false)
+    {}
+
+    void
+    open_problem_definitions(const std::string& script_filename)
+    {
+        lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io);
+        auto script = lua.script_file(script_filename);
+        if (not script.valid())
+        {
+            std::cout << "Script not found. Expected filename is '";
+            std::cout << script_filename << "'" << std::endl;
+            throw std::runtime_error("");
+        }
+
+        if (not lua["u1"].valid())
+            throw std::runtime_error("Function 'u1' not defined.");
+
+        if (not lua["u2"].valid())
+            throw std::runtime_error("Function 'u2' not defined.");
+
+        if (not lua["grad_u1"].valid())
+            throw std::runtime_error("Function 'grad_u1' not defined.");
+
+        if (not lua["grad_u2"].valid())
+            throw std::runtime_error("Function 'grad_u2' not defined.");
+
+        if (not lua["f1"].valid())
+            throw std::runtime_error("Function 'f1' not defined.");
+
+        if (not lua["f2"].valid())
+            throw std::runtime_error("Function 'f2' not defined.");
+        
+        if (not lua["testcase_name"].valid())
+            throw std::runtime_error("Test case name not defined");
+
+        std::string tn = lua["testcase_name"];
+        std::cout << "Test case: " << sgr::yellowfg << tn << sgr::nofg << std::endl;
+
+        m_state_valid = true;
+    }
+
+    void ensure_state_valid() {
+        if (!m_state_valid)
+            throw std::runtime_error("Problem definition not valid");
+    }
+
+    std::string solver(){
+        ensure_state_valid();
+        auto sname = lua["solver"];
+        if (sname.valid())
+            return sname;
+        return std::string("internal");
+    }
+
+    int omega1(void) {
+        ensure_state_valid();
+        return lua["omega1"].get_or(1);
+    }
+
+    int omega2(void) {
+        ensure_state_valid();
+        return lua["omega2"].get_or(2);
+    }
+
+    bool compensate_average1(void) {
+        ensure_state_valid();
+        return lua["avgcomp1"].get_or(false);
+    }
+
+    bool compensate_average2(void) {
+        ensure_state_valid();
+        return lua["avgcomp2"].get_or(false);
+    }
+};
+
+/***************************************************************************/
+template<typename T> struct problem_data_lua;
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+struct problem_data_lua<Mesh<T,2,Storage>> : public problem_data_lua_base<Mesh<T,2,Storage>>
+{
     using mesh_type     = Mesh<T,2,Storage>;
     using cell_type     = typename mesh_type::cell_type;
     using face_type     = typename mesh_type::face_type;
@@ -328,68 +569,97 @@ struct problem_data_lua<Mesh<T,2,Storage>>
     using scalar_type   = typename mesh_type::coordinate_type;
     using vector_type   = Eigen::Matrix<scalar_type, 2, 1>;
 
-    problem_data_lua()
-    {
-        lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io);
-        auto script = lua.script_file("linear_transmission_2D.lua");
-        if (not script.valid())
-            throw "Unable to open lua file";
-    }
+    problem_data_lua() {}
 
     scalar_type u1(const mesh_type&, const point_type& pt) {
-        return lua["u1"](pt.x(), pt.y());
+        this->ensure_state_valid();
+        scalar_type u1_val = this->lua["u1"](pt.x(), pt.y());
+        return u1_val - this->avgcomp1_val;
     }
 
     scalar_type u2(const mesh_type& msh, const point_type& pt) {
-        return lua["u2"](pt.x(), pt.y());
+        this->ensure_state_valid();
+        scalar_type u2_val = this->lua["u2"](pt.x(), pt.y());
+        return u2_val - this->avgcomp2_val;
     }
 
     vector_type grad_u1(const mesh_type&, const point_type& pt) {
+        this->ensure_state_valid();
         scalar_type vx, vy;
-        sol::tie(vx, vy) = lua["grad_u1"](pt.x(), pt.y());
+        sol::tie(vx, vy) = this->lua["grad_u1"](pt.x(), pt.y());
         return vector_type(vx, vy);
     }
 
     vector_type grad_u2(const mesh_type& msh, const point_type& pt) {
+        this->ensure_state_valid();
         scalar_type vx, vy;
-        sol::tie(vx, vy) = lua["grad_u2"](pt.x(), pt.y());
+        sol::tie(vx, vy) = this->lua["grad_u2"](pt.x(), pt.y());
         return vector_type(vx, vy);
     }
 
     scalar_type f1(const mesh_type&, const point_type& pt) {
-        return lua["f1"](pt.x(), pt.y());
+        this->ensure_state_valid();
+        return this->lua["f1"](pt.x(), pt.y());
     }
 
     scalar_type f2(const mesh_type& msh, const point_type& pt) {
-        return lua["f2"](pt.x(), pt.y());
-    }
-
-    scalar_type g(const mesh_type& msh, const point_type& pt) {
-        return u1(msh, pt) - u2(msh, pt); 
-    }
-
-    scalar_type g1(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
-        auto n = normal(msh, cl, fc);
-        return grad_u1(msh, pt).dot(n) - grad_u2(msh, pt).dot(n);
-    }
-
-    scalar_type g2(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
-        auto n = normal(msh, cl, fc);
-        return grad_u2(msh, pt).dot(n);
-    }
-
-    scalar_type xi(const mesh_type& msh, const cell_type& cl, const face_type& fc, const point_type& pt) {
-        auto n = normal(msh, cl, fc);
-        return grad_u1(msh, pt).dot(n);
+        this->ensure_state_valid();
+        return this->lua["f2"](pt.x(), pt.y());
     }
 };
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-struct problem_data_lua<Mesh<T,3,Storage>> : problem_data<Mesh<T,3,Storage>>
-{};
+struct problem_data_lua<Mesh<T,3,Storage>> : public problem_data_lua_base<Mesh<T,3,Storage>>
+{
+    using mesh_type     = Mesh<T,3,Storage>;
+    using cell_type     = typename mesh_type::cell_type;
+    using face_type     = typename mesh_type::face_type;
+    using point_type    = typename mesh_type::point_type;
+    using scalar_type   = typename mesh_type::coordinate_type;
+    using vector_type   = Eigen::Matrix<scalar_type, 3, 1>;
 
+    problem_data_lua() {}
+
+    scalar_type u1(const mesh_type&, const point_type& pt) {
+        this->ensure_state_valid();
+        scalar_type u1_val = this->lua["u1"](pt.x(), pt.y(), pt.z());
+        return u1_val - this->avgcomp1_val;
+    }
+
+    scalar_type u2(const mesh_type& msh, const point_type& pt) {
+        this->ensure_state_valid();
+        scalar_type u2_val = this->lua["u2"](pt.x(), pt.y(), pt.z());
+        return u2_val - this->avgcomp2_val;
+    }
+
+    vector_type grad_u1(const mesh_type&, const point_type& pt) {
+        this->ensure_state_valid();
+        scalar_type vx, vy, vz;
+        sol::tie(vx, vy, vz) = this->lua["grad_u1"](pt.x(), pt.y(), pt.z());
+        return vector_type(vx, vy, vz);
+    }
+
+    vector_type grad_u2(const mesh_type& msh, const point_type& pt) {
+        this->ensure_state_valid();
+        scalar_type vx, vy, vz;
+        sol::tie(vx, vy, vz) = this->lua["grad_u2"](pt.x(), pt.y(), pt.z());
+        return vector_type(vx, vy, vz);
+    }
+
+    scalar_type f1(const mesh_type&, const point_type& pt) {
+        this->ensure_state_valid();
+        return this->lua["f1"](pt.x(), pt.y(), pt.z());
+    }
+
+    scalar_type f2(const mesh_type& msh, const point_type& pt) {
+        this->ensure_state_valid();
+        return this->lua["f2"](pt.x(), pt.y(), pt.z());
+    }
+};
+
+/***************************************************************************/
 template<typename Mesh>
-void test(Mesh& msh, size_t degree)
+void lt_solver(Mesh& msh, size_t degree, const std::string& pbdefs_fn)
 {
     using T = typename Mesh::coordinate_type;
 
@@ -401,8 +671,21 @@ void test(Mesh& msh, size_t degree)
     }
 
     struct problem_data_lua<Mesh> pd;
+    pd.open_problem_definitions(pbdefs_fn);
 
-    size_t internal_tag = 1;
+    if ( subdom_tags.find( pd.omega1() ) == subdom_tags.end() )
+    {
+        std::cout << "Subdomain " << pd.omega1() << " not present in mesh" << std::endl;
+        exit(-1);
+    }
+
+    if ( subdom_tags.find( pd.omega2() ) == subdom_tags.end() )
+    {
+        std::cout << "Subdomain " << pd.omega2() << " not present in mesh" << std::endl;
+        exit(-1);
+    }
+
+    size_t internal_tag = pd.omega1();
     disk::hho_degree_info hdi(degree);
 
     dof_bases db = compute_dof_bases(msh, hdi, internal_tag);
@@ -413,6 +696,7 @@ void test(Mesh& msh, size_t degree)
     auto fbs = disk::scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
 
     /* Global system data */
+    std::cout << "Total system DoFs: " << db.total_dofs << std::endl;
     Eigen::SparseMatrix<T> LHS(db.total_dofs, db.total_dofs);
     Eigen::Matrix<T, Eigen::Dynamic, 1> RHS = Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(db.total_dofs);
     using triplet = Eigen::Triplet<T>;
@@ -450,8 +734,14 @@ void test(Mesh& msh, size_t degree)
         }
 
         for (size_t i = 0; i < lhs.rows(); i++)
+        {
             for (size_t j = 0; j < lhs.cols(); j++)
+            {
+                assert(l2g[i] < LHS.rows());
+                assert(l2g[j] < LHS.cols());
                 triplets.push_back( triplet( l2g[i], l2g[j], lhs(i,j) ) );
+            }
+        }
                 
         RHS.segment(clbase, cbs) = rhs;
     };
@@ -468,6 +758,8 @@ void test(Mesh& msh, size_t degree)
 
         for (size_t i = 0; i < cbs; i++)
         {
+            assert( db.global_constrain_base < LHS.rows() and db.global_constrain_base < LHS.cols() );
+            assert( clbase+i < LHS.rows() and clbase+i < LHS.cols() );
             triplets.push_back( triplet(db.global_constrain_base, clbase+i, average[i]) );
             triplets.push_back( triplet(clbase+i, db.global_constrain_base, average[i]) );
         }
@@ -490,6 +782,8 @@ void test(Mesh& msh, size_t degree)
             for (size_t j = 0; j < fbs; j++)
             {
                 /* M is symmetric */
+                assert(fcbase+i < LHS.rows() and fcbase+i < LHS.cols() );
+                assert(lfcbase+j < LHS.rows() and lfcbase+j < LHS.cols() );
                 triplets.push_back( triplet(fcbase+i, lfcbase+j, sign*M(i,j)) );
                 triplets.push_back( triplet(lfcbase+i, fcbase+j, -sign*M(i,j)) );
             }
@@ -517,6 +811,42 @@ void test(Mesh& msh, size_t degree)
         size_t fcbase = db.faces_ext_base + fbs*g2s.faces_ext_g2s.at(fcofs);
         RHS.segment(fcbase, fbs) += g2;
     };
+
+    /* Compute averages to check */
+    double volume1 = 0.0;
+    double volume2 = 0.0;
+    double omega1_integral = 0.0;
+    double omega2_integral = 0.0;
+    for (auto& cl : msh) {
+        auto qps = integrate(msh, cl, 10);
+
+        auto di = msh.domain_info(cl);
+        if ( di.tag() == internal_tag ) {
+            for (auto& qp : qps) {
+                volume1 += qp.weight();
+                omega1_integral += qp.weight() * pd.u1(msh, qp.point());
+            }
+        }
+        else {
+            for (auto& qp : qps) {
+                volume2 += qp.weight();
+                omega2_integral += qp.weight() * pd.u2(msh, qp.point());
+            }
+        }
+    }
+
+    std::cout << "mean of u₁ on Ω₁: " << std::setprecision(15);
+    std::string comp1 = pd.compensate_average1() ? " (compensation ON)" : "";
+    std::cout << omega1_integral/volume1 << comp1 << std::endl;
+    std::cout << "mean of u₂ on Ω₂: " << std::setprecision(15);
+    std::string comp2 = pd.compensate_average2() ? " (compensation ON)" : "";
+    std::cout << omega2_integral/volume2 << comp2 << std::defaultfloat << std::endl;
+
+    if ( pd.compensate_average1() )
+        pd.avgcomp1( omega1_integral/volume1 );
+
+    if ( pd.compensate_average2() )
+        pd.avgcomp2( omega2_integral/volume2 );
 
     /* Assembly loop */
     for (auto& cl : msh)
@@ -585,16 +915,45 @@ void test(Mesh& msh, size_t degree)
 
     /* Initialize global matrix */
     LHS.setFromTriplets(triplets.begin(), triplets.end());
+    std::cout << "Triplets: " << triplets.size() << std::endl;
     triplets.clear();
-    //disk::dump_sparse_matrix(LHS, "trmat.txt");
+
+    std::cout << LHS.nonZeros() << " " << LHS.rows() << " " << LHS.cols() << std::endl;
 
     /* Run solver */
-    std::cout << "Running pardiso" << std::endl;
-    disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = true;
-    pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
-    disk::dynamic_vector<T> sol;
-    mkl_pardiso(pparams, LHS, RHS, sol);
+    disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(LHS.rows());
+
+    std::string solver_name = pd.solver();
+
+    if (solver_name == "pardiso")
+    {
+        std::cout << "Running pardiso" << std::endl;
+        pardiso_params<T> pparams;
+        pparams.report_factorization_Mflops = true;
+        pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
+
+        bool success = mkl_pardiso(pparams, LHS, RHS, sol);
+        if (!success)
+        {
+            std::cout << "Pardiso failed" << std::endl;
+            return;
+        }
+    }
+    else
+    {
+        std::cout << "Eigen SparseLU" << std::endl;
+        SparseLU<SparseMatrix<T>, COLAMDOrdering<int> >   solver;
+        solver.analyzePattern(LHS);
+        /*
+        if ( solver.info() != Eigen::Success )
+        {
+            std::cout << "SparseLU failed." << std::endl;
+            return; 
+        }
+        */
+        solver.factorize(LHS);
+        sol = solver.solve(RHS); 
+    }
 
     /* Postprocess */
     T l2_error_sq = 0.0;
@@ -604,8 +963,9 @@ void test(Mesh& msh, size_t degree)
     T l2_reconstruction_error_mm_sq = 0.0;
     T l2_trace_error_mm_sq = 0.0;
 
-    std::vector<T> vec_u;
+    std::vector<T> vec_u, vec_u_ref;
     vec_u.reserve( msh.cells_size() );
+    vec_u_ref.reserve( msh.cells_size() );
     for (auto& cl : msh)
     {
         auto di = msh.domain_info(cl);
@@ -624,6 +984,12 @@ void test(Mesh& msh, size_t degree)
         disk::dynamic_vector<T> solH = disk::dynamic_vector<T>::Zero(lhs.rows());
         solH.segment(0, cbs) = sol.segment(cell_ofs, cbs);
         vec_u.push_back( solH(0) );
+
+        auto bar = barycenter(msh, cl);
+        if (di.tag() == internal_tag)
+            vec_u_ref.push_back( pd.u1(msh, bar) );
+        else
+            vec_u_ref.push_back( pd.u2(msh, bar) );
 
         size_t face_i = 0;
         auto fcs = faces(msh, cl);
@@ -741,21 +1107,90 @@ void test(Mesh& msh, size_t degree)
     disk::silo_zonal_variable<T> u("u", vec_u);
     silo_db.add_variable("mesh", u);
 
+    disk::silo_zonal_variable<T> u_ref("u_ref", vec_u_ref);
+    silo_db.add_variable("mesh", u_ref);
 }
 
-int main(int argc, const char **argv)
+static void
+usage(const char *progname)
+{
+    std::cout << "Usage: " << progname << " <options>" << std::endl;
+    std::cout << " -k <integer>     Polynomial degree" << std::endl;
+    std::cout << " -n               Crash if NaNs are generated" << std::endl;
+    std::cout << " -m <string>      Mesh file name" << std::endl;
+    std::cout << " -p <string>      Problem definition file name" << std::endl;
+    std::cout << " -s <float>       Scale factor (Only FVCA5)" << std::endl;
+    std::cout << " -x <float>       X shift (Only FVCA5)" << std::endl;
+    std::cout << " -y <float>       Y shift (Only FVCA5)" << std::endl;
+}
+
+int main(int argc, char * const *argv)
 {
     using T = double;
 
-    if (argc < 3)
-        return 1;
-    
-    const char *mesh_filename = argv[1];
-    size_t degree = atoi(argv[2]);
+    int degree = 0;
+    const char *mesh_filename = nullptr;
+    const char *pbdefs_filename = nullptr;
     T scalefactor = 1.0;
-    if (argc > 3)
-        scalefactor = atof(argv[3]);
+    T displacement_x = 0.0;
+    T displacement_y = 0.0;
 
+    int ch;
+    while ( (ch = getopt(argc, argv, "k:nm:p:s:x:y:")) != -1 )
+    {
+        switch(ch)
+        {
+            case 'k': /* Polynomial degree */
+                degree = std::stoi(optarg);
+                break;
+
+            case 'n': /* Make program crash if NaNs are generated */
+                _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+                break;
+
+            case 'm': /* Mesh filename */
+                mesh_filename = optarg;
+                break;
+
+            case 'p': /* Problem definitions filename */
+                pbdefs_filename = optarg;
+                break;
+
+            case 's': /* Scale factor (only for FVCA5) */
+                scalefactor = std::stod(optarg);
+                break;
+
+            case 'x': /* Displacement in X (only for FVCA5) */
+                displacement_x = std::stod(optarg);
+                break;
+
+            case 'y': /* Displacement in X (only for FVCA5) */
+                displacement_y = std::stod(optarg);
+                break;
+
+            case '?':
+            default:
+                std::cout << "Invalid option" << std::endl;
+                usage(argv[0]);
+                return -1;
+        }
+    }
+
+    if (!mesh_filename)
+    {
+        std::cout << "Please specify mesh filename (-m)" << std::endl;
+        usage(argv[0]);
+        return -1;
+    }
+
+    if (!pbdefs_filename)
+    {
+        std::cout << "Please specify problem definitions (-p)" << std::endl;
+        usage(argv[0]);
+        return -1;
+    }
+
+#ifdef HAVE_GMSH
     /* GMSH 2D simplicials */
     if (std::regex_match(mesh_filename, std::regex(".*\\.geo2s$") ))
     {
@@ -766,7 +1201,7 @@ int main(int argc, const char **argv)
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        test(msh, degree);
+        lt_solver(msh, degree, pbdefs_filename);
     }
 
     /* GMSH 3D simplicials */
@@ -779,7 +1214,7 @@ int main(int argc, const char **argv)
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        test(msh, degree);
+        lt_solver(msh, degree, pbdefs_filename);
     }
 
     /* GMSH 3D generic */
@@ -792,8 +1227,9 @@ int main(int argc, const char **argv)
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        test(msh, degree);
+        lt_solver(msh, degree, pbdefs_filename);
     }
+#endif /* HAVE_GMSH */
 
     /* FVCA5 2D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
@@ -807,12 +1243,14 @@ int main(int argc, const char **argv)
 
         using point_type = typename disk::generic_mesh<T,2>::point_type;
         auto tr = [&](const point_type& pt) -> auto {
-            return point_type(pt.x()*scalefactor, pt.y()*scalefactor);
+            auto npx = pt.x()*scalefactor + displacement_x;
+            auto npy = pt.y()*scalefactor + displacement_y;
+            return point_type(npx, npy);
         };
 
         msh.transform(tr);
 
-        test(msh, degree);
+        lt_solver(msh, degree, pbdefs_filename);
         return 0;
     }
 

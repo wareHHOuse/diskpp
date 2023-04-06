@@ -1,0 +1,6 @@
+SetFactory("OpenCASCADE");
+Rectangle(1) = {1, 1, 0, 1, 1, 0};
+Rectangle(2) = {0, 0, 0, 3, 3, 0};
+BooleanFragments{ Surface{1,2}; Delete; }{}
+
+MeshSize{:} = 0.5;

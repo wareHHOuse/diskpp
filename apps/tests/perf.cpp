@@ -1,10 +1,9 @@
 
-#include "core/loaders/loader.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/bases/bases.hpp"
+#include "diskpp/quadratures/quadratures.hpp"
 
-#include "core/bases/bases.hpp"
-#include "core/quadratures/quadratures.hpp"
-
-#include "timecounter.h"
+#include "diskpp/common/timecounter.hpp"
 
 template<typename Mesh>
 void testperf_pre(const Mesh& msh, size_t degree)

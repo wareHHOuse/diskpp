@@ -1,0 +1,15 @@
+SetFactory("OpenCASCADE");
+
+Box(1) = {0, 0, 0, 1, 1, 1};
+Box(2) = {0.5, 0.5, 0.5, 0.5, 0.5, 0.5};
+BooleanDifference(3) = { Volume{1}; Delete; }{ Volume{2}; Delete; };
+
+Box(4) = {-0.5, -0.5, -0.5, 2, 2, 2};
+BooleanDifference(5) = { Volume{4}; Delete; }{ Volume{3}; };
+
+Coherence;
+
+//Point(42) = { 0.5, 0.5, 0.5 };
+
+MeshSize{ PointsOf{ Volume{:}; } } = 0.5;
+//MeshSize{ 42 } = 0.0001;

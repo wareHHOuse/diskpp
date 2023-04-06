@@ -1,4 +1,0 @@
-ZAGMG {
-  global: zagmg_;
-  local: *;
-};

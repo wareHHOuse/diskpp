@@ -4,13 +4,13 @@
 #include <sstream>
 #include <iomanip>
 
-#include "colormanip.h"
+#include "diskpp/common/colormanip.h"
 
-#include "geometry/geometry.hpp"
-#include "loaders/loader.hpp"
-#include "methods/hho"
-#include "solvers/solver.hpp"
-#include "output/silo.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/methods/implementation_hho/curl.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/output/silo.hpp"
+#include "diskpp/solvers/solver.hpp"
 
 /***************************************************************************/
 /* RHS definition */

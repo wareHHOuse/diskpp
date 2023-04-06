@@ -30,12 +30,10 @@
 
 #include <unistd.h>
 
-#include "loaders/loader.hpp"
-#include "methods/hho"
-#include "solvers/solver.hpp"
-#include "output/silo.hpp"
-#include "timecounter.h"
-#include "colormanip.h"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/output/silo.hpp"
+#include "diskpp/solvers/solver.hpp"
 
 using namespace disk;
 using namespace Eigen;
@@ -227,34 +225,6 @@ class obstacle_assembler
     size_t      num_all_faces, num_dirichlet_faces, num_other_faces;
     size_t      num_all_cells, num_A_cells, num_I_cells;
 
-    class assembly_index
-    {
-        size_t  idx;
-        bool    assem;
-
-    public:
-        assembly_index(size_t i, bool as)
-            : idx(i), assem(as)
-        {}
-
-        operator size_t() const
-        {
-            if (!assem)
-                throw std::logic_error("Invalid assembly_index");
-
-            return idx;
-        }
-
-        bool assemble() const { return assem; }
-
-        friend std::ostream& operator<<(std::ostream& os, const assembly_index& as)
-        {
-            os << "(" << as.idx << "," << as.assem << ")";
-            return os;
-        }
-    };
-
-
 public:
 
     SparseMatrix<T>         LHS;
@@ -420,9 +390,9 @@ public:
                 else
                 {
                     if (j < cbs)
-                        RHS(asm_map_row[i]) -= lhs(i,j)*gamma(cell_offset);
+                        RHS[ asm_map_row[i] ] -= lhs(i,j)*gamma(cell_offset);
                     else
-                        RHS(asm_map_row[i]) -= lhs(i,j)*dirichlet_data(j);
+                        RHS[ asm_map_row[i] ] -= lhs(i,j)*dirichlet_data(j);
                 }
             }
         }
@@ -515,34 +485,6 @@ class obstacle_assembler_nitsche
 
     size_t      num_faces;
     size_t      num_all_cells, num_A_cells, num_I_cells;
-
-    class assembly_index
-    {
-        size_t  idx;
-        bool    assem;
-
-    public:
-        assembly_index(size_t i, bool as)
-            : idx(i), assem(as)
-        {}
-
-        operator size_t() const
-        {
-            if (!assem)
-                throw std::logic_error("Invalid assembly_index");
-
-            return idx;
-        }
-
-        bool assemble() const { return assem; }
-
-        friend std::ostream& operator<<(std::ostream& os, const assembly_index& as)
-        {
-            os << "(" << as.idx << "," << as.assem << ")";
-            return os;
-        }
-    };
-
 
 public:
 
@@ -672,10 +614,10 @@ public:
                     triplets.push_back( Triplet<T>(asm_map_row[i], asm_map_col[j], lhs(i,j)) );
                 else
                     if (j < cbs)
-                        RHS(asm_map_row[i]) -= lhs(i,j)*gamma(cell_offset);
+                        RHS[ asm_map_row[i] ] -= lhs(i,j)*gamma(cell_offset);
             }
 
-            RHS(asm_map_row[i]) += rhs(i);
+            RHS[ asm_map_row[i] ] += rhs(i);
         }
 
         if (cell_needs_asm_B)

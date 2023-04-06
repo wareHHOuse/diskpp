@@ -30,11 +30,9 @@
 
 #include <unistd.h>
 
-#include "bases/bases.hpp"
-#include "methods/hho"
-#include "quadratures/quadratures.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
 
-#include "core/loaders/loader.hpp"
 
 #include "common.hpp"
 
