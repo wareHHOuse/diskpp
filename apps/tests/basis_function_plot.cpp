@@ -35,7 +35,7 @@ int main(void)
     using mesh_type = disk::cartesian_mesh<T,2>;
 
     mesh_type msh;
-    disk::make_single_element_mesh(msh);
+    disk::make_single_element_mesh(msh, {0.5, 0.5}, 1.0, M_PI);
 
     auto cl = *msh.cells_begin();
 

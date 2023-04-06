@@ -335,10 +335,76 @@ auto make_fvca5_hex_mesher(Mesh& msh)
     return fvca5_hex_mesher<Mesh>(msh);
 }
 
+template<typename T>
+void make_single_element_mesh(generic_mesh<T,1>& msh, const T& a, const T& b)
+{
+    using mesh_type = generic_mesh<T,1>;
+    using point_type = typename mesh_type::point_type;
+    using node_type = typename mesh_type::node_type;
+    using edge_type = typename mesh_type::edge_type;
+    using nodeid_type = typename node_type::id_type;
 
+    auto storage = msh.backend_storage();
+
+    auto num_edges = 1;
+    auto num_nodes = 2;
+
+    storage->points.resize(num_nodes);
+    storage->nodes.resize(num_nodes);
+    storage->edges.resize(num_edges);
+
+    storage->points.at(0)   = point_type(a);
+    storage->points.at(1) = point_type(b);
+
+    auto n0 = typename node_type::id_type(0);
+    auto n1 = typename node_type::id_type(1);
+
+    storage->nodes.at(0) = node_type(n0);
+    storage->nodes.at(1) = node_type(n1);
+
+    auto e = edge_type(n0, n1);
+    storage->edges.at(0) = e;
+
+    storage->boundary_info.resize(num_nodes);
+    boundary_descriptor bi(0, true);
+    storage->boundary_info.at(0) = bi;
+    storage->boundary_info.at(1) = bi;    
+}
 
 template<typename T>
-void make_single_element_mesh(cartesian_mesh<T,2>& msh)
+void make_single_element_mesh(simplicial_mesh<T,2>& msh, const point<T,2>& a, const point<T,2>& b,
+    const point<T,2>& c)
+{
+    using mesh_type = simplicial_mesh<T,2>;
+    using point_type = typename mesh_type::point_type;
+    using node_type = typename mesh_type::node_type;
+    using edge_type = typename mesh_type::edge_type;
+    using nodeid_type = typename node_type::id_type;
+
+    auto storage = msh.backend_storage();
+
+    storage->points.push_back( a );
+    storage->points.push_back( b );
+    storage->points.push_back( c );
+
+    auto p0 = point_identifier<2>(0);
+    auto p1 = point_identifier<2>(1);
+    auto p2 = point_identifier<2>(2);
+
+    storage->nodes.push_back( { p0 } );
+    storage->nodes.push_back( { p1 } );
+    storage->nodes.push_back( { p2 } );
+
+    storage->edges.push_back( {p0, p1} );
+    storage->edges.push_back( {p0, p2} );
+    storage->edges.push_back( {p1, p2} );
+
+    storage->surfaces.push_back( {p0, p1, p2} );
+    storage->subdomain_info.resize( 1 );
+}
+
+template<typename T>
+void make_single_element_mesh(cartesian_mesh<T,2>& msh, const point<T,2>& base, const T& hx, const T& hy)
 {
     using mesh_type = cartesian_mesh<T,2>;
     using point_type = typename mesh_type::point_type;
@@ -348,10 +414,10 @@ void make_single_element_mesh(cartesian_mesh<T,2>& msh)
 
     auto storage = msh.backend_storage();
 
-    storage->points.push_back( point_type(0.5, 0.5) );
-    storage->points.push_back( point_type(1.0, 0.5) );
-    storage->points.push_back( point_type(1.0, 1.0) );
-    storage->points.push_back( point_type(0.5, 1.0) );
+    storage->points.push_back( point_type(    base.x(),    base.y() ) );
+    storage->points.push_back( point_type( base.x()+hx,    base.y() ) );
+    storage->points.push_back( point_type( base.x()+hx, base.y()+hy ) );
+    storage->points.push_back( point_type(    base.x(), base.y()+hy ) );
 
     auto p0 = point_identifier<2>(0);
     auto p1 = point_identifier<2>(1);

@@ -31,22 +31,15 @@
 #ifndef _QUAD_HEXAHEDRAL_HPP_
 #define _QUAD_HEXAHEDRAL_HPP_
 
-
+#include "diskpp/quadratures/quad_raw_gauss.hpp"
 namespace disk {
 
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
 integrate(const disk::cartesian_mesh<T, 2>& msh, const typename disk::cartesian_mesh<T, 2>::cell& cl, const size_t degree)
 {
-    if (degree == 0)
-    {
-        return priv::integrate_degree0(msh, cl);
-    }
-
     const auto pts = points(msh, cl);
-    // transform arry to vector
-    std::vector<point<T, 2>> ptsv{pts[0], pts[1], pts[3], pts[2]};
-    return priv::integrate_quadrangle_tens(degree, ptsv);
+    return disk::quadrature::tensorized_gauss_legendre(degree, pts);
 }
 
 template<typename T>
