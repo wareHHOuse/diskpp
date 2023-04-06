@@ -336,7 +336,7 @@ public:
         assert(pts.size() == 2);
         pa_ = pts[0];
         pb_ = pts[1];
-        bar = (pa_ + pb_)/2.;
+        bar_ = (pa_ + pb_)/2.;
         h_ = distance(pa_, pb_);
     }
 
@@ -352,7 +352,7 @@ public:
     }
 
     gradient_array_type grad(const point_type& pt) const {
-        throw std::exception("not implemented yet");
+        throw std::logic_error("not implemented yet");
         value_array_type ret = value_array_type::Zero(size_, immersion_dimension);
         return ret;
     }
