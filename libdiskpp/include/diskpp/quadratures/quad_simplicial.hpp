@@ -32,6 +32,7 @@
 #define _QUAD_SIMPLICIAL_HPP_
 
 #include "diskpp/common/simplicial_formula.hpp"
+#include "diskpp/quadratures/quad_raw_dunavant.hpp"
 
 namespace disk
 {
@@ -51,13 +52,8 @@ integrate(const disk::simplicial_mesh<T, 2>&                msh,
           const typename disk::simplicial_mesh<T, 2>::cell& cl,
           const size_t                                      degree)
 {
-    if (degree == 0)
-    {
-        return priv::integrate_degree0(msh, cl);
-    }
-
     const auto pts = points(msh, cl);
-    return priv::integrate_triangle<T>(degree, pts);
+    return disk::quadrature::dunavant(degree, pts);
 }
 
 /**

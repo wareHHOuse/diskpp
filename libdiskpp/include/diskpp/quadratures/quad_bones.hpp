@@ -414,6 +414,7 @@ triangle_quadrature_low_order(const point<T,2>& p0,
 /* Get quadrature points for a triangle specified as a list of points. The
  * list of points is contained in a STL random-access containter (PtA) */
 template<typename T, typename PtA>
+[[deprecated("please use disk::quadrature::dunavant()")]]
 std::vector<disk::quadrature_point<T, 2>>
 integrate_triangle(size_t degree, const PtA& pts)
 {
@@ -455,6 +456,7 @@ integrate_triangle(size_t degree, const PtA& pts)
  * @return template<typename T> integrate_quadrangle_tens quadrature
  */
 template<typename T>
+[[deprecated("please use disk::quadrature::tensorized_gauss_legendre()")]]
 std::vector<disk::quadrature_point<T, 2>>
 integrate_quadrangle_tens(size_t degree, const std::vector<point<T, 2>>& pts)
 {

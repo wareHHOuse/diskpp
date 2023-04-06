@@ -203,6 +203,4 @@ eval(const typename Basis::point_type& pt,
     return priv::eval(pt, dofs, basis, basis_category);
 }
 
-
-
 } //namespace disk::basis

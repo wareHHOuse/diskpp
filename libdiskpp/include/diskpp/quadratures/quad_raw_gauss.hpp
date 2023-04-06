@@ -174,4 +174,74 @@ gauss_legendre(size_t degree, const point<T,DIM>& a, const point<T,DIM>& b)
     return qps;
 }
 
+
+template<typename T>
+std::vector<quadrature_point<T,2>>
+tensorized_gauss_legendre(size_t degree, const std::array<point<T,2>, 4>& pts)
+{
+    const auto num_rules = sizeof(priv::gauss_rules)/sizeof(priv::gauss_rule) - 1;
+    const auto rule_num = degree/2;
+    if (rule_num >= num_rules)
+        throw std::invalid_argument("tensorized_gauss_legendre: order too high");
+
+    const auto& qrule = priv::gauss_rules[rule_num];
+
+    auto npts = qrule.num_entries;
+    std::vector<quadrature_point<T,2>> qps;
+    qps.reserve(npts*npts); /* Collect the points in the [-1, 1]^2 square */
+    for (size_t i = 0; i < npts; i++) {
+        const auto &qpy = qrule.points[i];
+        for (size_t j = 0; j < npts; j++) {
+            const auto &qpx = qrule.points[j];
+            point<T,2> qp(qpx.point, qpy.point);
+            auto qw = qpx.weight * qpy.weight;
+            qps.push_back({qp, qw});
+        }
+    }
+
+    /* points in pts must be in _counterclockwise_ order */
+    auto X = [&](T xi, T eta) -> T {
+        return 0.25 * pts[0].x() * (1 - xi) * (1 - eta) +
+               0.25 * pts[1].x() * (1 + xi) * (1 - eta) +
+               0.25 * pts[2].x() * (1 + xi) * (1 + eta) +
+               0.25 * pts[3].x() * (1 - xi) * (1 + eta);
+    };
+
+    auto Y = [&](T xi, T eta) -> T {
+        return 0.25 * pts[0].y() * (1 - xi) * (1 - eta) +
+               0.25 * pts[1].y() * (1 + xi) * (1 - eta) +
+               0.25 * pts[2].y() * (1 + xi) * (1 + eta) +
+               0.25 * pts[3].y() * (1 - xi) * (1 + eta);
+    };
+
+    auto J = [&](T xi, T eta) -> T {
+        auto j11 = 0.25 * ( (pts[1].x() - pts[0].x()) * (1 - eta) +
+                            (pts[2].x() - pts[3].x()) * (1 + eta) );
+
+        auto j12 = 0.25 * ( (pts[1].y() - pts[0].y()) * (1 - eta) +
+                            (pts[2].y() - pts[3].y()) * (1 + eta) );
+
+        auto j21 = 0.25 * ( (pts[3].x() - pts[0].x()) * (1 - xi) +
+                            (pts[2].x() - pts[1].x()) * (1 + xi) );
+
+        auto j22 = 0.25 * ( (pts[3].y() - pts[0].y()) * (1 - xi) +
+                            (pts[2].y() - pts[1].y()) * (1 + xi) );
+
+        return std::abs(j11 * j22 - j12 * j21);
+    };
+
+    /* do ref->phys transform in place */
+    for (auto& qp : qps)
+    {
+        const T xi  = qp.point().x();
+        const T eta = qp.point().y();
+
+        point<T,2> phys_point(X(xi, eta), Y(xi, eta));
+        const T phys_weight = qp.weight() * J(xi, eta);
+        qp = disk::make_qp(phys_point, phys_weight);
+    }
+
+    return qps;
+}
+
 } // namespace disk::quadrature

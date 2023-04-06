@@ -322,5 +322,12 @@ dunavant(size_t degree, const point<T,DIM>& p0, const point<T,DIM>& p1, const po
     return ret;
 }
 
+template<typename T, size_t DIM>
+std::vector<quadrature_point<T,DIM>>
+dunavant(size_t degree, const std::array<point<T,DIM>, 3>& pts)
+{
+    return dunavant(degree, pts[0], pts[1], pts[2]);
+}
+
 } // namespace disk::quadrature
 

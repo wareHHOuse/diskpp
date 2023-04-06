@@ -180,12 +180,11 @@ int main(void)
     simplicial_mesh<T,2> msh;
     make_single_element_mesh(msh, a, b, c);
     test_basis_functions(msh);
-    
 
     //point<T,2> base;
     //cartesian_mesh<T,2> msh;
-    //make_single_element_mesh(msh, {0.5, 0.5}, M_PI, M_PI);
-   //test_basis_functions(msh);
+    //make_single_element_mesh(msh, {0.5, 0.5}, 1.0, M_PI);
+    //test_basis_functions(msh);
 
     return 0;
 }

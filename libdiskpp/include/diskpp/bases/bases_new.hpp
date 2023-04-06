@@ -315,20 +315,46 @@ public:
     using gradient_array_type = typename tensor<scalar_type, basis_dimension, tensor_order+1>::array_type;
 
 private:
-    size_t          degree_;
-    size_t          size_;
+    point_type  pa_, pb_;
+    point_type  bar_;
+    CoordT      h_;
+    size_t      degree_;
+    size_t      size_;
+
+    coordinate_type phys2ref(const point_type& pt) {
+        auto bv = (pb_ - bar_).to_vector();
+        auto dv = (pt - bar_).to_vector();
+        auto nbv = h_/2.;
+        return rs_point_type( bv.dot(dv)/(nbv*nbv) );
+    }
 
 public:
     scalar_monomial(const mesh_type& msh, const face_type& fc, size_t degree)
         : degree_(degree), size_( size_of_degree(degree) )
-    {}
+    {
+        auto pts = points(msh, fc);
+        assert(pts.size() == 2);
+        pa_ = pts[0];
+        pb_ = pts[1];
+        bar = (pa_ + pb_)/2.;
+        h_ = distance(pa_, pb_);
+    }
 
     value_array_type operator()(const point_type& pt) const {
-        return 1.;
+        value_array_type ret = value_array_type::Zero(size_);
+        auto ep = phys2ref(pt);
+
+        ret(0) = 1.0;
+        for (size_t k = 1; k <= degree_; k++)
+            ret(k) = ret(k-1)*ep;
+        
+        return ret;
     }
 
     gradient_array_type grad(const point_type& pt) const {
-        return 0.;
+        throw std::exception("not implemented yet");
+        value_array_type ret = value_array_type::Zero(size_, immersion_dimension);
+        return ret;
     }
 
     size_t size() const {
@@ -336,7 +362,7 @@ public:
     }
 
     static size_t size_of_degree(size_t k) {
-        return 1;
+        return k+1;
     }
 
     size_t degree() const {
@@ -447,23 +473,30 @@ class L2_scalar_product
     static_assert(std::is_same<typename Trial::coordinate_type, typename Test::coordinate_type>::value);
     using coordinate_type = typename Test::coordinate_type;
     static const size_t immersion_dimension = Test::immersion_dimension;
+    using scalar_type = decltype(typename Trial::scalar_value{} * typename Test::scalar_value{});
     
     std::vector<quadrature_point<coordinate_type, immersion_dimension>> qps_;
 
     const Trial& trial_;
     const Test& test_;
 
-    using scalar_type = double;
-
     using matrix_type = Eigen::Matrix<scalar_type, Eigen::Dynamic, Eigen::Dynamic>;
     using vector_type = Eigen::Matrix<scalar_type, Eigen::Dynamic, 1>;
+
+    matrix_type mat_;
 
     template<typename Mesh, typename Element>
     L2_scalar_product(const Mesh& msh, const Element& elem, const Trial& trial, const Test& test)
         : trial_(trial), test_(test)
     {
         auto degree = trial_.integration_degree() + test_.integration_degree();
+        mat_ = matrix_type::Zero(test_.size(), trial_.size());
         qps_ = integrate(msh, elem, degree);
+        for (auto& qp : qps_) {
+            /* This must be fixed, for now it works only with
+             * scalar-valued and vector-valued functions */
+            mat_ += qp.weight() * test_(qp.point()) * trial(qp.point()).transpose();
+        }
     }
 };
 
