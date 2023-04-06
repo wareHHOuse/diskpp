@@ -416,8 +416,9 @@ void make_single_element_mesh(cartesian_mesh<T,2>& msh, const point<T,2>& base, 
 
     storage->points.push_back( point_type(    base.x(),    base.y() ) );
     storage->points.push_back( point_type( base.x()+hx,    base.y() ) );
-    storage->points.push_back( point_type( base.x()+hx, base.y()+hy ) );
     storage->points.push_back( point_type(    base.x(), base.y()+hy ) );
+    storage->points.push_back( point_type( base.x()+hx, base.y()+hy ) );
+    
 
     auto p0 = point_identifier<2>(0);
     auto p1 = point_identifier<2>(1);

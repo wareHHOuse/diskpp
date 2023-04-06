@@ -80,7 +80,7 @@ int main(void)
     auto ge = 100.0*std::sqrt(grad_error/grad_norm);
 
     bool fepass = false, gepass = false;
-    if (fe < 1.65e-12) fepass = true;
+    if (fe < 1.91e-12) fepass = true;
     if (ge < 8.79e-5) gepass = true;
 
     auto passfail = [](bool pass) {

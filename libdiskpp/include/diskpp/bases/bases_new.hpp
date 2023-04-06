@@ -198,7 +198,7 @@ private:
         auto pts = points(msh, cl);
         assert(pts.size() >= 3);
         v0_ = (pts[1] - pts[0]).to_vector();
-        v1_ = (pts[2] - pts[1]).to_vector();
+        v1_ = (pts[2] - pts[0]).to_vector();
         v1_ = v1_ - v1_.dot(v0_)*v0_/(v0_.dot(v0_)); // Gram-Schmidt
         tr_.col(0) = v0_;
         tr_.col(1) = v1_;
@@ -206,7 +206,7 @@ private:
     }
 
     point_type phys2ref(const point_type& pt) const {
-        auto v = tr_*(pt - bar_).to_vector();
+        Eigen::Matrix<coordinate_type,2,1> v = tr_*(pt - bar_).to_vector();
         return point_type(v(0), v(1));
     }
 
@@ -321,11 +321,11 @@ private:
     size_t      degree_;
     size_t      size_;
 
-    coordinate_type phys2ref(const point_type& pt) {
+    coordinate_type phys2ref(const point_type& pt) const {
         auto bv = (pb_ - bar_).to_vector();
         auto dv = (pt - bar_).to_vector();
-        auto nbv = h_/2.;
-        return rs_point_type( bv.dot(dv)/(nbv*nbv) );
+        auto nbv = h_;
+        return bv.dot(dv)/(nbv*nbv);
     }
 
 public:
@@ -370,7 +370,7 @@ public:
     }
 
     size_t integration_degree() const {
-        return 0;
+        return degree_;
     }
 };
 

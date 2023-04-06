@@ -39,19 +39,29 @@ std::vector<disk::quadrature_point<T, 2>>
 integrate(const disk::cartesian_mesh<T, 2>& msh, const typename disk::cartesian_mesh<T, 2>::cell& cl, const size_t degree)
 {
     const auto pts = points(msh, cl);
-    return disk::quadrature::tensorized_gauss_legendre(degree, pts);
+    std::array<point<T,2>, 4> pp;
+    pp[0] = pts[0];
+    pp[1] = pts[1];
+    pp[2] = pts[3]; // in cartesian_mesh<T,2> the nodes are
+    pp[3] = pts[2]; // *not* stored in ccw order (see issue #46)
+    return disk::quadrature::tensorized_gauss_legendre(degree, pp);
 }
 
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
 integrate(const disk::cartesian_mesh<T, 2>& msh, const typename disk::cartesian_mesh<T, 2>::face& fc, const size_t degree)
 {
+    /*
     if (degree == 0)
     {
         return priv::integrate_degree0(msh, fc);
     }
 
     return priv::integrate_2D_face(msh, fc, degree);
+    */
+    const auto pts = points(msh, fc);
+    assert(pts.size() == 2);
+    return disk::quadrature::gauss_legendre(degree, pts[0], pts[1]);
 }
 
 namespace priv {
