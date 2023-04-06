@@ -31,11 +31,9 @@
 
 #include <unistd.h>
 
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
-#include "methods/hho"
-
-#include "core/loaders/loader.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/common/colormanip.h"
 
 #include "common.hpp"
 
@@ -86,7 +84,7 @@ struct test_functor_equal_order
         return std::sqrt(error);
     }
 
-    size_t
+    double
     expected_rate(size_t k)
     {
         return k+1;
@@ -140,7 +138,7 @@ struct test_functor_mixed_order1
         return std::sqrt(error);
     }
 
-    size_t
+    double
     expected_rate(size_t k)
     {
         return k + 1;

@@ -26,7 +26,7 @@
 #include <iostream>
 #include <regex>
 
-#include "loaders/loader.hpp"
+#include "diskpp/loaders/loader.hpp"
 
 
 template<typename MeshType>

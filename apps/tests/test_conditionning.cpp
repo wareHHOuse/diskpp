@@ -29,12 +29,10 @@
 
 #include <unistd.h>
 
-#include "bases/bases.hpp"
-
-#include "loaders/loader.hpp"
-#include "output/gmshConvertMesh.hpp"
-#include "output/gmshDisk.hpp"
-#include "output/postMesh.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/output/gmshConvertMesh.hpp"
+#include "diskpp/output/gmshDisk.hpp"
+#include "diskpp/output/postMesh.hpp"
 
 #include "common.hpp"
 

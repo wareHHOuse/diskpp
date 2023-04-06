@@ -26,36 +26,22 @@
 
 include(FindPackageHandleStandardArgs)
 
-find_library(MGIS_MFRONT_LIBRARY
-    NAMES   libMFrontGenericInterface.so libMFrontGenericInterface.dylib
-    PATHS	/usr/local/lib /usr/lib
-)
-
-#if(MGIS_MFRONT_LIBRARY)
-#    message("MGIS_MFRONT_LIBRARY found")
-#else()
-#    message("MGIS_MFRONT_LIBRARY not found")
-#endif()
-
-
 find_path(MGIS_INCLUDE_DIRS
-    NAMES   Integrate.hxx
-    PATHS   /usr/local/include/MGIS/Behaviour /usr/include/MGIS/Behaviour
+    NAMES Integrate.hxx
+    HINTS ENV MGIS_ROOT ${MGIS_ROOT}
+    PATH_SUFFIXES include/MGIS/Behaviour
 )
 
-#if(MGIS_INCLUDE_DIRS)
-#    message("MGIS_INCLUDE_DIRS found")
-#else()
-#    message("MGIS_INCLUDE_DIRS not found")
-#endif()
+find_library(MGIS_MFRONT_LIBRARIES
+    NAMES MFrontGenericInterface
+    HINTS ENV MGIS_ROOT ${MGIS_ROOT}
+    PATH_SUFFIXES lib
+)
 
+find_package_handle_standard_args(MGIS DEFAULT_MSG MGIS_MFRONT_LIBRARIES MGIS_INCLUDE_DIRS)
 
-
-if (MGIS_MFRONT_LIBRARY AND MGIS_INCLUDE_DIRS)
-	set(MGIS_FOUND TRUE)
-	set(MGIS_LIBRARIES ${MGIS_MFRONT_LIBRARY} )
-endif ()
-
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(MGIS DEFAULT_MSG MGIS_LIBRARIES MGIS_INCLUDE_DIRS)
-
-
+if (MGIS_FOUND)
+    add_library(MGIS INTERFACE)
+    target_link_libraries(MGIS INTERFACE "${MGIS_MFRONT_LIBRARIES}")
+    target_include_directories(MGIS INTERFACE "${MGIS_INCLUDE_DIRS}")
+endif()

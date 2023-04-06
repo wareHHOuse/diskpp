@@ -29,10 +29,10 @@
 #include <iostream>
 
 // For the mesh data structure
-#include "core/mesh/mesh.hpp"
+#include "diskpp/mesh/mesh.hpp"
 
 // For the loaders and related helper functions
-#include "core/loaders/loader.hpp"
+#include "diskpp/loaders/loader.hpp"
 
 using disk::cells;
 using disk::faces;

@@ -23,7 +23,8 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-#include "quadratures/quadratures.hpp"
+#include "diskpp/mesh/mesh.hpp"
+#include "diskpp/quadratures/quadratures.hpp"
 #include "common.hpp"
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>

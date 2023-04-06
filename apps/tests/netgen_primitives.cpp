@@ -25,14 +25,13 @@
 
 #include <algorithm>
 
-#include "core/loaders/loader.hpp"
-#include "geometry/geometry.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/geometry/geometry.hpp"
+#include "diskpp/mesh/rational.hpp"
+#include "diskpp/mesh/mesh_hierarchy.hpp"
+#include "diskpp/output/silo.hpp"
+
 #include "common.hpp"
-
-#include "mesh/rational.hpp"
-#include "mesh/mesh_hierarchy.hpp"
-
-#include "output/silo.hpp"
 
 disk::point<disk::rational<int>,2>
 barycenter(const std::vector<disk::point<disk::rational<int>,2>>& mp,

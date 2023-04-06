@@ -30,14 +30,11 @@
 
 #include <unistd.h>
 
-#include "contrib/colormanip.h"
 #include <xmmintrin.h>
 
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
-#include "methods/hho"
-
-#include "core/loaders/loader.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/common/colormanip.h"
 
 #include "common.hpp"
 

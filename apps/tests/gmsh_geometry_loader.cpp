@@ -10,9 +10,9 @@
 
 #include <iostream>
 
-#include "mesh/mesh.hpp"
-#include "core/loaders/loader.hpp"
-#include "core/output/silo.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/mesh/mesh.hpp"
+#include "diskpp/output/silo.hpp"
 
 int main(int argc, char **argv)
 {

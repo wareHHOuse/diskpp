@@ -1,10 +1,10 @@
-option(BUILD_APP_HELMHOLTZ "Build Helmholtz application" ON)
-if (BUILD_APP_HELMHOLTZ)
-    add_executable(helmholtz helmholtz.cpp)
-    target_link_libraries(helmholtz ${LINK_LIBS})
-    set_target_properties(helmholtz PROPERTIES
-                            CXX_STANDARD 20
-                            CXX_STANDARD_REQUIRED YES
-                            CXX_EXTENSIONS NO)
-endif()
+set(LINK_LIBS diskpp)
 
+add_executable(helmholtz helmholtz.cpp)
+target_link_libraries(helmholtz ${LINK_LIBS})
+set_target_properties(helmholtz PROPERTIES
+                      CXX_STANDARD 20
+                      CXX_STANDARD_REQUIRED YES
+                      CXX_EXTENSIONS NO)
+
+install(TARGETS helmholtz RUNTIME DESTINATION bin)

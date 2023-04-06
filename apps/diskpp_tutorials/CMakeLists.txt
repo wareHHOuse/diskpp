@@ -1,11 +1,22 @@
-option(BUILD_DISKPP_TUTORIALS "Build DiSk++ tutorials" ON)
-if (BUILD_DISKPP_TUTORIALS)
-    add_executable(diskpp_tutorial_1 diskpp_tutorial_1.cpp)
-    target_link_libraries(diskpp_tutorial_1 ${LINK_LIBS})
+cmake_minimum_required(VERSION 3.18)
+project(diskpp_tutorials)
 
-    add_executable(diskpp_tutorial_2 diskpp_tutorial_2.cpp)
-    target_link_libraries(diskpp_tutorial_2 ${LINK_LIBS})
+set(LINK_LIBS diskpp)
 
-    add_executable(diskpp_tutorial_3 diskpp_tutorial_3.cpp)
-    target_link_libraries(diskpp_tutorial_3 ${LINK_LIBS})
+add_executable(diskpp_tutorial_1 diskpp_tutorial_1.cpp)
+target_link_libraries(diskpp_tutorial_1 ${LINK_LIBS})
+install(TARGETS diskpp_tutorial_1 DESTINATION bin)
+
+add_executable(diskpp_tutorial_2 diskpp_tutorial_2.cpp)
+target_link_libraries(diskpp_tutorial_2 ${LINK_LIBS})
+install(TARGETS diskpp_tutorial_2 DESTINATION bin)
+
+add_executable(diskpp_tutorial_3 diskpp_tutorial_3.cpp)
+target_link_libraries(diskpp_tutorial_3 ${LINK_LIBS})
+install(TARGETS diskpp_tutorial_3 DESTINATION bin)
+
+if (HAVE_GMSH)
+	add_executable(diskpp_tutorial_4 diskpp_tutorial_4.cpp)
+	target_link_libraries(diskpp_tutorial_4 ${LINK_LIBS})
+	install(TARGETS diskpp_tutorial_4 DESTINATION bin)
 endif()

@@ -1,0 +1,13 @@
+SetFactory("OpenCASCADE");
+
+Rectangle(1) = {-2, -2, 0, 4, 4, 0};
+Rectangle(2) = {-1, -2, 0, 3, 3, 0};
+BooleanDifference(10) = { Surface{1}; Delete; }{ Surface{2}; Delete; };
+
+Rectangle(3) = {-3, -3, 0, 6, 6, 0};
+Rectangle(4) = {0, -3, 0, 3, 3, 0};
+BooleanDifference(11) = { Surface{3}; Delete; }{ Surface{4}; Delete; };
+
+Coherence;
+
+MeshSize{:} = 0.2;

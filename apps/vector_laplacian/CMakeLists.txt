@@ -1,9 +1,9 @@
-option(BUILD_APP_VECTOR_LAPLACIAN "Build vector laplacian application" ON)
-if (BUILD_APP_VECTOR_LAPLACIAN)
-	add_executable(vector_laplacian vector_laplacian.cpp)
-	target_link_libraries(vector_laplacian ${LINK_LIBS})
+set(LINK_LIBS diskpp)
 
-	add_executable(vector_laplacian_test vector_laplacian_test.cpp)
-	target_link_libraries(vector_laplacian_test ${LINK_LIBS})
-	install(TARGETS vector_laplacian_test RUNTIME DESTINATION bin)
-endif()
+add_executable(vector_laplacian src/vector_laplacian.cpp)
+target_link_libraries(vector_laplacian ${LINK_LIBS})
+install(TARGETS vector_laplacian RUNTIME DESTINATION bin)
+
+add_executable(vector_laplacian_test src/vector_laplacian_test.cpp)
+target_link_libraries(vector_laplacian_test ${LINK_LIBS})
+install(TARGETS vector_laplacian_test RUNTIME DESTINATION bin)

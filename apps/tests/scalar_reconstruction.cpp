@@ -28,16 +28,12 @@
 #include <iomanip>
 #include <regex>
 
-#include "contrib/colormanip.h"
 #include <unistd.h>
 
 #include <xmmintrin.h>
-//#define EIGEN_USE_MKL_ALL
-#include "bases/bases.hpp"
-#include "quadratures/quadratures.hpp"
-#include "methods/hho"
-
-#include "core/loaders/loader.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/common/colormanip.h"
 
 #include "common.hpp"
 
@@ -87,7 +83,7 @@ struct test_functor_equal_order
         return std::sqrt(error);
     }
 
-    size_t
+    double
     expected_rate(size_t k)
     {
         return k+1;
@@ -138,7 +134,7 @@ struct test_functor_mixed_order1
         return std::sqrt(error);
     }
 
-    size_t
+    double
     expected_rate(size_t k)
     {
         return k + 1;
@@ -189,7 +185,7 @@ struct test_functor_mixed_order2
         return std::sqrt(error);
     }
 
-    size_t
+    double 
     expected_rate(size_t k)
     {
         return k + 1;
