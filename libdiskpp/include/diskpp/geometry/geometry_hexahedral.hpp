@@ -249,33 +249,29 @@ faces_id(const cartesian_mesh<T, 3>& msh, const typename cartesian_mesh<T, 3>::c
  * @param cl specified cell
  * @return T measure of the cell
  */
-template<typename T, size_t DIM>
+template<typename T>
 T
-measure(const cartesian_mesh<T, DIM>& msh,
-        const typename cartesian_mesh<T, DIM>::cell& cl)
+measure(const cartesian_mesh<T,2>& msh,
+        const typename cartesian_mesh<T,2>::cell& cl)
 {
-    static_assert(DIM == 2 or DIM == 3, "Wrong dimension for cartesian mesh");
-
     auto pts = points(msh, cl);
+    assert(pts.size() == 2);
+    auto v0 = (pts[1] - pts[0]).to_vector().norm();
+    auto v1 = (pts[2] - pts[0]).to_vector().norm();
+    return v0 * v1;
+}
 
-    if (DIM == 2)
-    {
-        auto v0 = (pts[1] - pts[0]).to_vector().norm();
-        auto v1 = (pts[2] - pts[0]).to_vector().norm();
-
-        return v0 * v1;
-    }
-
-    if (DIM == 3)
-    {
-        auto v0 = (pts[1] - pts[0]).to_vector().norm();
-        auto v1 = (pts[2] - pts[0]).to_vector().norm();
-        auto v2 = (pts[4] - pts[0]).to_vector().norm();
-
-        return v0 * v1 * v2;
-    }
-
-    /* NOTREACHED */
+template<typename T>
+T
+measure(const cartesian_mesh<T,3>& msh,
+        const typename cartesian_mesh<T,3>::cell& cl)
+{
+    auto pts = points(msh, cl);
+    assert(pts.size() == 4);
+    auto v0 = (pts[1] - pts[0]).to_vector().norm();
+    auto v1 = (pts[2] - pts[0]).to_vector().norm();
+    auto v2 = (pts[4] - pts[0]).to_vector().norm();
+    return v0 * v1 * v2;
 }
 
 /**
@@ -287,27 +283,26 @@ measure(const cartesian_mesh<T, DIM>& msh,
  * @param fc specified face
  * @return T measure of the face
  */
-template<typename T, size_t DIM>
+template<typename T>
 T
-measure(const cartesian_mesh<T, DIM>& msh,
-        const typename cartesian_mesh<T, DIM>::face& fc)
+measure(const cartesian_mesh<T,2>& msh,
+        const typename cartesian_mesh<T,2>::face& fc)
 {
-    static_assert(DIM == 2 or DIM == 3, "Wrong dimension for cartesian mesh");
-
     auto pts = points(msh, fc);
+    assert(pts.size() == 2);
+    return (pts[1] - pts[0]).to_vector().norm();
+}
 
-    if (DIM == 2)
-        return (pts[1] - pts[0]).to_vector().norm();
-
-    if (DIM == 3)
-    {
-        auto v0 = (pts[1] - pts[0]).to_vector().norm();
-        auto v1 = (pts[3] - pts[0]).to_vector().norm();
-
-        return v0 * v1;
-    }
-
-    /* NOTREACHED */
+template<typename T>
+T
+measure(const cartesian_mesh<T,3>& msh,
+        const typename cartesian_mesh<T,3>::face& fc)
+{
+    auto pts = points(msh, fc);
+    assert(pts.size() == 4);
+    auto v0 = (pts[1] - pts[0]).to_vector().norm();
+    auto v1 = (pts[3] - pts[0]).to_vector().norm();
+    return v0 * v1;
 }
 
 } // namespace disk
