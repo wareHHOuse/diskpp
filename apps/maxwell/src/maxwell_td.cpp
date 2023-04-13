@@ -1,11 +1,11 @@
 /*
  * DISK++, a template library for DIscontinuous SKeletal methods.
- *  
+ *
  * Matteo Cicuttin (C) 2020,2021
  * matteo.cicuttin@uliege.be
  *
  * University of Liège - Montefiore Institute
- * Applied and Computational Electromagnetics group  
+ * Applied and Computational Electromagnetics group
  */
 
 #include <iostream>
@@ -84,7 +84,7 @@ class maxwell_assembler_condensed
     }
 
 public:
-    
+
     SparseMatrix<ScalT>         LHS;
     SparseMatrix<ScalT>         Cond1;
     SparseMatrix<ScalT>         Cond2;
@@ -115,7 +115,7 @@ public:
 
         sysfcs = std::count_if(msh.faces_begin(), msh.faces_end(), in_system);
         syssz = fbs*sysfcs;
-        fullsz = cbs*msh.cells_size() + syssz; 
+        fullsz = cbs*msh.cells_size() + syssz;
 
         LHS = SparseMatrix<ScalT>(syssz, syssz);
         Cond1 = SparseMatrix<ScalT>(syssz, fullsz);
@@ -187,7 +187,7 @@ public:
                 auto lofsi = fi*fbs;
                 auto lofsj = fj*fbs;
 
-                if ( not is_in_system(msh, fcs[fj]) ) 
+                if ( not is_in_system(msh, fcs[fj]) )
                 {
                     //RHS.segment(cofsi, fbs) += -lhsc.block(lofsi, lofsj, fbs, fbs)*dirichlet_data.segment(lofsj, fbs);
                     continue;
@@ -234,11 +234,11 @@ public:
 
         for (size_t fj = 0; fj < fcs.size(); fj++)
         {
-            if ( not is_in_system(msh, fcs[fj]) ) 
+            if ( not is_in_system(msh, fcs[fj]) )
                 continue;
-            
+
             auto cofsj = get_system_offset(msh, fcs[fj]);
-            
+
             for (size_t i = 0; i < cbs; i++)
             {
                 for (size_t j = 0; j < fbs; j++)
@@ -267,7 +267,7 @@ public:
         triplets_decond2.clear();
         triplets_decond3.clear();
         std::cout << "Solving for " << syssz << " DOFs. ";
-        std::cout << "Matrix has " << LHS.nonZeros() << " nonzeros." << std::endl; 
+        std::cout << "Matrix has " << LHS.nonZeros() << " nonzeros." << std::endl;
     }
 
     disk::dynamic_vector<ScalT>
@@ -329,7 +329,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order, T alpha, size_t num_ts)
     typedef typename mesh_type::cell_type       cell_type;
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type      point_type;
-    
+
     disk::hho_degree_info chdi( disk::priv::hdi_named_args {
                                   .rd = (size_t) order,
                                   .cd = (size_t) order,
@@ -365,7 +365,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order, T alpha, size_t num_ts)
         auto fcs = faces(msh, cl);
         auto num_faces = fcs.size();
         auto fbs = disk::vector_basis_size(chdi.face_degree(), 2, 2);
-        auto nfd = num_faces * fbs; 
+        auto nfd = num_faces * fbs;
         auto CR = disk::curl_reconstruction_pk(msh, cl, chdi);
         Matrix<T, Dynamic, Dynamic> ST = disk::curl_hdg_stabilization(msh, cl, chdi);
 
@@ -377,7 +377,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order, T alpha, size_t num_ts)
 
         Matrix<T, Dynamic, Dynamic> mA = beta*dt2*mK + gamma*dt*mC + mM;
         Matrix<T, Dynamic, Dynamic> mP = 2.0*mM + (2.0*gamma - 1.0)*dt*mC - (0.5 - 2.0*beta + gamma)*dt2*mK;
-        Matrix<T, Dynamic, Dynamic> mQ = -mM - (gamma - 1.0)*dt*mC - (0.5 + beta - gamma)*dt2*mK; 
+        Matrix<T, Dynamic, Dynamic> mQ = -mM - (gamma - 1.0)*dt*mC - (0.5 + beta - gamma)*dt2*mK;
 
         Matrix<T, Dynamic, Dynamic> mA_TT = mA.block(  0,   0, cbs, cbs);
         Matrix<T, Dynamic, Dynamic> mA_TF = mA.block(  0, cbs, cbs, nfd);
@@ -448,7 +448,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order, T alpha, size_t num_ts)
     std::chrono::duration<double> elapsed_fact = fact_end - fact_start;
     std::cout << sgr::Yellowfg << "Factorization time: ";
     std::cout << elapsed_fact.count() << " s\n";
-    
+
     disk::dynamic_vector<T> RHS = disk::dynamic_vector<T>::Zero(assm.RHS.rows());
     disk::dynamic_vector<T> X_prev = assm.X_prev;
     disk::dynamic_vector<T> X_curr = assm.X_curr;
@@ -471,11 +471,11 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order, T alpha, size_t num_ts)
             //+ dt2*(0.5 + gamma - 2.0*beta)*B_curr
             //+ dt2*(0.5 - gamma + beta)*B_prev;
 
-        
+
         X_next = solver.solve(RHS);
         auto bs_end = std::chrono::steady_clock::now();
 
-        X_next_decond = assm.Decond1*X_curr 
+        X_next_decond = assm.Decond1*X_curr
                       + assm.Decond2*X_prev
                       + assm.Decond3*X_next;
         auto decond_end = std::chrono::steady_clock::now();
@@ -627,7 +627,8 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$") ))
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-        auto msh = disk::load_netgen_3d_mesh<coord_T>(mesh_filename);
+        disk::simplicial_mesh<T, 3> msh;
+        disk::load_mesh_netgen<coord_T>(mesh_filename, msh);
 
         vector_wave_solver(msh, degree, stab_param, num_ts);
 
@@ -642,7 +643,7 @@ int main(int argc, char **argv)
         disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
         //disk::generic_mesh<T,3> msh;
         //disk::gmsh_geometry_loader< disk::generic_mesh<T,3> > loader;
-        
+
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
@@ -656,11 +657,10 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
         disk::generic_mesh<coord_T,3> msh;
-        
         disk::load_mesh_fvca6_3d<coord_T>(mesh_filename, msh);
-        
+
         vector_wave_solver(msh, degree, stab_param, num_ts);
-        
+
         return 0;
     }
 

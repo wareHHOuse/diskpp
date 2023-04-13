@@ -593,7 +593,6 @@ unsteady_laplacian_solver(const Mesh& msh, size_t degree, size_t time_steps, siz
 int main(int argc, char **argv)
 {
     using T = double;
-    disk::cartesian_mesh<T, 2> msh;
 
     size_t      degree = 1;
     size_t      time_degree = 0;
@@ -626,7 +625,8 @@ int main(int argc, char **argv)
 	    }
     }
 
-    msh = load_cartesian_2d_mesh<T>(mesh_filename);
+    disk::cartesian_mesh<T, 2> msh;
+    disk::load_mesh_diskpp_cartesian<T>(mesh_filename, msh);
 
     std::cout << "Mesh loaded ..." << std::endl;
     unsteady_laplacian_solver(msh, degree, N, time_degree);

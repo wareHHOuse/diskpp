@@ -247,7 +247,8 @@ test_triangles_fvca5(const run_params& rp, const Parameters material_data)
 
     for (size_t i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -270,7 +271,8 @@ test_triangles_netgen(const run_params& rp, const Parameters material_data)
 
     for (size_t i = 0; i < runs; i++)
     {
-        auto msh = disk::load_netgen_2d_mesh<T>(paths[i].c_str());
+        disk::simplicial_mesh<T, 2> msh;
+        disk::load_mesh_netgen<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -293,7 +295,8 @@ test_hexagons(const run_params& rp, const Parameters material_data)
 
     for (size_t i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -316,7 +319,8 @@ test_kershaws(const run_params& rp, const Parameters material_data)
 
     for (size_t i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -339,7 +343,8 @@ test_quads_fvca5(const run_params& rp, const Parameters material_data)
 
     for (size_t i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -362,7 +367,9 @@ test_quads_diskpp(const run_params& rp, const Parameters material_data)
 
     for (size_t i = 0; i < runs; i++)
     {
-        auto msh = disk::load_cartesian_2d_mesh<T>(paths[i].c_str());
+        disk::cartesian_mesh<T, 2> msh;
+        disk::load_mesh_diskpp_cartesian<T>(paths[i].c_str(), msh);
+
         error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -385,7 +392,8 @@ test_hexahedra_diskpp(const run_params& rp, const Parameters material_data)
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_cartesian_3d_mesh<T>(paths[i].c_str());
+        disk::cartesian_mesh<T, 3> msh;
+        disk::load_mesh_diskpp_cartesian<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -408,7 +416,9 @@ test_hexahedra_fvca6(const run_params& rp, const Parameters material_data)
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T,3> msh;
+        disk::load_mesh_fvca6_3d<T>(paths[i].c_str(), msh);
+
         error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -431,7 +441,8 @@ test_tetrahedra_netgen(const run_params& rp, const Parameters material_data)
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_netgen_3d_mesh<T>(paths[i].c_str());
+        disk::simplicial_mesh<T, 3> msh;
+        disk::load_mesh_netgen<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -453,7 +464,8 @@ test_polyhedra_fvca6(const run_params& rp, const Parameters material_data)
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T,3> msh;
+        disk::load_mesh_fvca6_3d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -476,7 +488,8 @@ test_tetrahedra_fvca6(const run_params& rp, const Parameters material_data)
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T,3> msh;
+        disk::load_mesh_fvca6_3d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_vector_laplacian_solver(msh, rp, material_data));
     }
     printResults(error_sumup);

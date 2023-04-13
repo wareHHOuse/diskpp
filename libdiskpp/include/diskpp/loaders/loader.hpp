@@ -1776,6 +1776,7 @@ class medit_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
    }
 
  public:
+   static const char constexpr *expected_extension = "medit2d";
    medit_mesh_loader() = default;
 
    bool
@@ -2077,6 +2078,7 @@ class medit_mesh_loader<T, 3> : public mesh_loader<generic_mesh<T, 3>>
    }
 
  public:
+   static const char constexpr *expected_extension = "medit3d";
    medit_mesh_loader() = default;
 
    bool
@@ -2446,7 +2448,8 @@ class poly_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
         std::vector<size_t> conv_table;
         /* Sort the edges in lexicographical order, remember their original
          * position to convert the pointers in the faces */
-        auto comp_edges = [](const std::pair<size_t, edge_type>& e1, const std::pair<size_t, edge_type>& e2) {
+        auto comp_edges = [](const std::pair<size_t, edge_type>& e1, const std::pair<size_t, edge_type>& e2)
+        {
             return e1.second < e2.second;
         };
         std::sort(m_edges.begin(), m_edges.end(), comp_edges);
@@ -2480,7 +2483,8 @@ class poly_mesh_loader<T, 2> : public mesh_loader<generic_mesh<T, 2>>
 
         /* Sort in lexicographical order and remember original position */
         auto comp_vecs = [](const std::pair<size_t, std::vector<size_t>>& e1,
-                            const std::pair<size_t, std::vector<size_t>>& e2) { return e1.second < e2.second; };
+                            const std::pair<size_t, std::vector<size_t>>& e2)
+                            { return e1.second < e2.second; };
         std::sort(faces_to_edges.begin(), faces_to_edges.end(), comp_vecs);
 
         std::vector<surface_type> faces;
@@ -2722,7 +2726,8 @@ class poly_mesh_loader<T, 3> : public mesh_loader<generic_mesh<T, 3>>
         std::vector<size_t> conv_table;
         /* Sort the edges in lexicographical order, remember their original
          * position to convert the pointers in the faces */
-        auto comp_edges = [](const std::pair<size_t, edge_type>& e1, const std::pair<size_t, edge_type>& e2) {
+        auto comp_edges = [](const std::pair<size_t, edge_type>& e1, const std::pair<size_t, edge_type>& e2)
+        {
             return e1.second < e2.second;
         };
         std::sort(m_edges.begin(), m_edges.end(), comp_edges);
@@ -2745,7 +2750,8 @@ class poly_mesh_loader<T, 3> : public mesh_loader<generic_mesh<T, 3>>
 
         /* Sort in lexicographical order and remember original position */
         auto comp_vecs = [](const std::pair<size_t, std::vector<size_t>>& e1,
-                            const std::pair<size_t, std::vector<size_t>>& e2) { return e1.second < e2.second; };
+                            const std::pair<size_t, std::vector<size_t>>& e2)
+                            { return e1.second < e2.second; };
         std::sort(faces_to_edges.begin(), faces_to_edges.end(), comp_vecs);
 
         std::vector<surface_type> faces;
@@ -2804,6 +2810,7 @@ class poly_mesh_loader<T, 3> : public mesh_loader<generic_mesh<T, 3>>
     }
 };
 
+#if 0
 /* Helper to load uniform 1D meshes. */
 template<typename T>
 [[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
@@ -2818,6 +2825,7 @@ load_uniform_1d_mesh(T min, T max, size_t cells)
 
     return msh;
 }
+
 
 /* Helper to load 2D meshes in FVCA5 format */
 template<typename T>
@@ -2916,6 +2924,7 @@ load_cartesian_3d_mesh(const char *filename)
     return msh;
 }
 
+
 /* Helper to load 2D meshes in Medit format */
 template<typename T>
 [[deprecated("DiSk++ deprecation: The load_mesh_*() functions should be preferred")]]
@@ -2947,7 +2956,7 @@ load_medit_3d_mesh(const char* filename)
 
    return msh;
 }
-
+#endif
 /**************************************************************************/
 // New mesh loader helpers
 namespace priv {
@@ -3047,6 +3056,23 @@ load_mesh_poly3d(const char* filename, disk::generic_mesh<T, 3>& msh, bool verbo
     return priv::load_mesh(filename, loader, msh);
 }
 
+
+template<typename T>
+bool
+load_mesh_medit(const char *filename, disk::generic_mesh<T, 2>& msh)
+{
+    disk::medit_mesh_loader<T, 2> loader;
+    return priv::load_mesh(filename, loader, msh);
+}
+
+template<typename T>
+bool
+load_mesh_medit(const char *filename, disk::generic_mesh<T, 3>& msh)
+{
+    disk::medit_mesh_loader<T, 3> loader;
+    return priv::load_mesh(filename, loader, msh);
+}
+
 } // namespace disk
 
 
@@ -3061,21 +3087,21 @@ namespace disk {
 /**
  * @brief Deduce mesh type from filename extension, create appropriate mesh object
  *        and dispatch a function on it
- * 
+ *
  * If you have the function `process_mesh(msh, p1, p2, ..., pn)` you can
- * 
+ *
  *  ```
  *  disk::dispatch_all_meshes(mesh_filename,
  *        [](auto ...args) { process_mesh(args...); },
  *        p1, p2, ..., pn);
  *  ```
- * 
- * @tparam Function 
- * @tparam Args 
+ *
+ * @tparam Function
+ * @tparam Args
  * @param mesh_filename Name of the file containing the mesh.
  * @param func Function to dispatch. The mesh object is passed as first parameter.
  * @param args Arguments to the function to dispatch.
- * @return int 
+ * @return int
  */
 
 template<typename Function, typename... Args>
@@ -3191,4 +3217,3 @@ dispatch_all_meshes(const char *mesh_filename, Function func, Args && ...args)
 }
 
 } // namespace disk
-

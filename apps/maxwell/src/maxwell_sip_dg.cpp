@@ -1,11 +1,11 @@
 /*
  * DISK++, a template library for DIscontinuous SKeletal methods.
- *  
+ *
  * Matteo Cicuttin (C) 2020
  * matteo.cicuttin@uliege.be
  *
  * University of Liège - Montefiore Institute
- * Applied and Computational Electromagnetics group  
+ * Applied and Computational Electromagnetics group
  */
 
 #include <iostream>
@@ -215,7 +215,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
 
         auto tbasis = disk::make_vector_monomial_basis(msh, tcl, degree);
         auto qps = disk::integrate(msh, tcl, 2*degree);
-        
+
         matrix_type M = matrix_type::Zero(tbasis.size(), tbasis.size());
         matrix_type K = matrix_type::Zero(tbasis.size(), tbasis.size());
         vector_type loc_rhs = vector_type::Zero(tbasis.size());
@@ -223,7 +223,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
         {
             auto phi = tbasis.eval_functions(qp.point());
             auto cphi = tbasis.eval_curls2(qp.point());
-            
+
             M += qp.weight() * phi * phi.transpose();
             K += qp.weight() * cphi * cphi.transpose();
             //loc_rhs += qp.weight() * phi * f(qp.point());
@@ -240,12 +240,12 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
 
             matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
             matrix_type Atn = matrix_type::Zero(tbasis.size(), tbasis.size());
-            
+
             auto nv = cvf.neighbour_via(msh, tcl, fc);
             auto ncl = nv.first;
             auto nbasis = disk::make_vector_monomial_basis(msh, ncl, degree);
             assert(tbasis.size() == nbasis.size());
-            
+
             auto n     = normal(msh, tcl, fc);
             auto eta_l = eta / diameter(msh, fc);
             auto f_qps = disk::integrate(msh, fc, 2*degree);
@@ -256,7 +256,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
                 auto tcphi      = tbasis.eval_curls2(fqp.point());
                 auto n_x_tphi   = disk::vcross(n, tphi);
                 auto n_x_tphi_x_n = disk::vcross(n_x_tphi, n);
-                
+
                 if (nv.second)
                 {   /* NOT on a boundary */
                     Att += + fqp.weight() * eta_l * n_x_tphi * n_x_tphi.transpose();
@@ -273,7 +273,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
                         Att += - fqp.weight() * n_x_tphi * tcphi.transpose();
                     }
 
-                    
+
                     //loc_rhs -= fqp.weight() * tcphi_x_n;
                     //loc_rhs += fqp.weight() * eta_l * tphi;
 
@@ -285,16 +285,16 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
 
                     continue;
                 }
-                
+
                 auto nphi       = nbasis.eval_functions(fqp.point());
                 auto ncphi      = nbasis.eval_curls2(fqp.point());
                 auto n_x_nphi   = disk::vcross(n, nphi);
-                
+
                 Atn += - fqp.weight() * eta_l * n_x_tphi * n_x_nphi.transpose();
                 Atn += - fqp.weight() * 0.5 * n_x_tphi * ncphi.transpose();
                 Atn += + fqp.weight() * 0.5 * tcphi * n_x_nphi.transpose();
             }
-            
+
             assm.assemble(msh, tcl, tcl, Att);
             if (nv.second)
                 assm.assemble(msh, tcl, ncl, Atn);
@@ -418,14 +418,14 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
 
                 auto cb = make_vector_monomial_basis(msh, cl, degree);
                 Matrix<scalar_type, Dynamic, 1> lsol = sol.segment(cell_i*cb.size(), cb.size());
-            
+
                 auto phi = cb.eval_functions(pt);
                 auto ls = phi.transpose()*lsol;
 
                 voltage += ls(0)*eval_increment.x() +
                            ls(1)*eval_increment.y() +
                            ls(2)*eval_increment.z();
-            
+
                 continue;
             }
             cell_i++;
@@ -445,7 +445,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
 
     std::vector<scalar_type> nodal_ex( data_ex.size() );
     std::transform(data_ex.begin(), data_ex.end(), nodal_ex.begin(), tran);
-    
+
     std::vector<scalar_type> nodal_ey( data_ey.size() );
     std::transform(data_ey.begin(), data_ey.end(), nodal_ey.begin(), tran);
 
@@ -491,12 +491,12 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
 template<typename Mesh>
 void
 run_maxwell_eigenvalue_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_type eta)
-{   
+{
     auto cvf = connectivity_via_faces(msh);
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
     typedef Matrix<T, Dynamic, 1>       vector_type;
-    
+
     auto f = make_rhs_function(msh);
 
     auto cbs = disk::vector_basis_size(degree, Mesh::dimension, Mesh::dimension);
@@ -506,7 +506,7 @@ run_maxwell_eigenvalue_solver(Mesh& msh, size_t degree, const typename Mesh::coo
     {
         auto tbasis = disk::make_vector_monomial_basis(msh, tcl, degree);
         auto qps = disk::integrate(msh, tcl, 2*degree);
-        
+
         matrix_type M = matrix_type::Zero(tbasis.size(), tbasis.size());
         matrix_type K = matrix_type::Zero(tbasis.size(), tbasis.size());
         vector_type loc_rhs = vector_type::Zero(tbasis.size());
@@ -514,7 +514,7 @@ run_maxwell_eigenvalue_solver(Mesh& msh, size_t degree, const typename Mesh::coo
         {
             auto phi = tbasis.eval_functions(qp.point());
             auto cphi = tbasis.eval_curls2(qp.point());
-            
+
             M += qp.weight() * phi * phi.transpose();
             K += qp.weight() * cphi * cphi.transpose();
         }
@@ -527,22 +527,22 @@ run_maxwell_eigenvalue_solver(Mesh& msh, size_t degree, const typename Mesh::coo
         {
             matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
             matrix_type Atn = matrix_type::Zero(tbasis.size(), tbasis.size());
-            
+
             auto nv = cvf.neighbour_via(msh, tcl, fc);
             auto ncl = nv.first;
             auto nbasis = disk::make_vector_monomial_basis(msh, ncl, degree);
             assert(tbasis.size() == nbasis.size());
-            
+
             auto n     = normal(msh, tcl, fc);
             auto eta_l = eta / diameter(msh, fc);
             auto f_qps = disk::integrate(msh, fc, 2*degree);
-            
+
             for (auto& fqp : f_qps)
             {
                 auto tphi       = tbasis.eval_functions(fqp.point());
                 auto tcphi      = tbasis.eval_curls2(fqp.point());
                 auto n_x_tphi   = disk::vcross(n, tphi);
-                
+
                 if (nv.second)
                 {   /* NOT on a boundary */
                     Att += + fqp.weight() * eta_l * n_x_tphi * n_x_tphi.transpose();
@@ -556,21 +556,21 @@ run_maxwell_eigenvalue_solver(Mesh& msh, size_t degree, const typename Mesh::coo
                     Att += - fqp.weight() * tcphi * n_x_tphi.transpose();
                     continue;
                 }
-                
+
                 auto nphi       = nbasis.eval_functions(fqp.point());
                 auto ncphi      = nbasis.eval_curls2(fqp.point());
                 auto n_x_nphi   = disk::vcross(n, nphi);
-                
+
                 Atn += - fqp.weight() * eta_l * n_x_tphi * n_x_nphi.transpose();
                 Atn += - fqp.weight() * 0.5 * n_x_tphi * ncphi.transpose();
                 Atn += + fqp.weight() * 0.5 * tcphi * n_x_nphi.transpose();
             }
-            
+
             assm.assemble(msh, tcl, tcl, Att);
             if (nv.second)
                 assm.assemble(msh, tcl, ncl, Atn);
         }
-        
+
     }
 
     assm.finalize();
@@ -632,7 +632,7 @@ run_maxwell_eigenvalue_solver(Mesh& msh, size_t degree, const typename Mesh::coo
 
         disk::silo_zonal_variable<T> uz("uz", data_uz);
         silo_db.add_variable("mesh", uz);
-    
+
         silo_db.add_expression("u", "{ux, uy, uz}", DB_VARTYPE_VECTOR);
         silo_db.add_expression("mag_u", "magnitude(u)", DB_VARTYPE_SCALAR);
     }
@@ -650,7 +650,7 @@ run_maxwell_eigenvalue_solver(Mesh& msh, size_t degree, const typename Mesh::coo
 void autotest_convergence(size_t order_min, size_t order_max)
 {
     using T = double;
-    
+
     using Mesh = disk::simplicial_mesh<T,3>;
 
     std::ofstream ofs( "dg_convergence_convt.txt" );
@@ -728,7 +728,9 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$") ))
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-        auto msh = disk::load_netgen_3d_mesh<T>(mesh_filename);
+        disk::simplicial_mesh<T, 3> msh;
+        disk::load_mesh_netgen<T>(mesh_filename, msh);
+
         run_maxwell_solver(msh, degree, stab_param, param_filename);
         return 0;
     }
@@ -740,7 +742,7 @@ int main(int argc, char **argv)
         using Mesh = disk::simplicial_mesh<T,3>;
         Mesh msh;
         disk::gmsh_geometry_loader< Mesh > loader;
-        
+
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
@@ -756,4 +758,3 @@ int main(int argc, char **argv)
         return 0;
     }
 }
-

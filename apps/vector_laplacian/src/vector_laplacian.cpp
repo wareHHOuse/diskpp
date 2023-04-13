@@ -259,7 +259,8 @@ main(int argc, char** argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$")))
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
-        auto msh = disk::load_fvca5_2d_mesh<RealType>(mesh_filename);
+        disk::generic_mesh<RealType,2> msh;
+        disk::load_mesh_fvca5_2d<RealType>(mesh_filename, msh);
         run_vector_laplacian_solver(msh, rp, material_data);
         return 0;
     }
@@ -268,7 +269,8 @@ main(int argc, char** argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.medit2d$")))
     {
         std::cout << "Guessed mesh format: Medit format" << std::endl;
-        auto msh = disk::load_medit_2d_mesh<RealType>(mesh_filename);
+        disk::generic_mesh<RealType, 2> msh;
+        disk::load_mesh_medit<RealType>(mesh_filename, msh);
         run_vector_laplacian_solver(msh, rp, material_data);
         return 0;
     }
@@ -277,7 +279,8 @@ main(int argc, char** argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$")))
     {
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
-        auto msh = disk::load_netgen_2d_mesh<RealType>(mesh_filename);
+        disk::simplicial_mesh<RealType, 2> msh;
+        disk::load_mesh_netgen<RealType>(mesh_filename, msh);
         run_vector_laplacian_solver(msh, rp, material_data);
         return 0;
     }
@@ -286,7 +289,8 @@ main(int argc, char** argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.quad$")))
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
-        auto msh = disk::load_cartesian_2d_mesh<RealType>(mesh_filename);
+        disk::cartesian_mesh<RealType, 2> msh;
+        disk::load_mesh_diskpp_cartesian<RealType>(mesh_filename, msh);
         run_vector_laplacian_solver(msh, rp, material_data);
         return 0;
     }
@@ -295,7 +299,8 @@ main(int argc, char** argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$")))
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-        auto msh = disk::load_netgen_3d_mesh<RealType>(mesh_filename);
+        disk::simplicial_mesh<RealType, 3> msh;
+        disk::load_mesh_netgen<RealType>(mesh_filename, msh);
         run_vector_laplacian_solver(msh, rp, material_data);
         return 0;
     }
@@ -304,7 +309,8 @@ main(int argc, char** argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.hex$")))
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
-        auto msh = disk::load_cartesian_3d_mesh<RealType>(mesh_filename);
+        disk::cartesian_mesh<RealType, 3> msh;
+        disk::load_mesh_diskpp_cartesian<RealType>(mesh_filename, msh);
         run_vector_laplacian_solver(msh, rp, material_data);
         return 0;
     }
