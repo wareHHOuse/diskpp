@@ -440,8 +440,6 @@ test_quads_diskpp(const run_params& rp, const ElasticityParameters material_data
     {
         disk::cartesian_mesh<T, 2> msh;
         disk::load_mesh_diskpp_cartesian<T>(paths[i].c_str(), msh);
-
-
         error_sumup.push_back(run_linear_elasticity_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -490,7 +488,6 @@ test_hexahedra_fvca6(const run_params& rp, const ElasticityParameters material_d
     {
         disk::generic_mesh<T,3> msh;
         disk::load_mesh_fvca6_3d<T>(paths[i].c_str(), msh);
-
         error_sumup.push_back(run_linear_elasticity_solver(msh, rp, material_data));
     }
     printResults(error_sumup);

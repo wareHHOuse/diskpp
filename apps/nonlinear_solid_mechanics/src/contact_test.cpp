@@ -365,7 +365,8 @@ test_triangles_fvca5(const NewtonSolverParameter<T>& rp, const disk::MaterialDat
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -388,7 +389,8 @@ test_triangles_netgen(const NewtonSolverParameter<T>& rp, const disk::MaterialDa
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_netgen_2d_mesh<T>(paths[i].c_str());
+        disk::simplicial_mesh<T, 2> msh;
+        disk::load_mesh_netgen<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -411,7 +413,8 @@ test_hexagons(const NewtonSolverParameter<T>& rp, const disk::MaterialData<T>& m
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -434,7 +437,8 @@ test_kershaws(const NewtonSolverParameter<T>& rp, const disk::MaterialData<T>& m
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -457,7 +461,8 @@ test_quads_fvca5(const NewtonSolverParameter<T>& rp, const disk::MaterialData<T>
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -480,7 +485,8 @@ test_quads_diskpp(const NewtonSolverParameter<T>& rp, const disk::MaterialData<T
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_cartesian_2d_mesh<T>(paths[i].c_str());
+        disk::cartesian_mesh<T, 2> msh;
+        disk::load_mesh_diskpp_cartesian<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -503,7 +509,8 @@ test_hexahedra_diskpp(const NewtonSolverParameter<T>& rp, const disk::MaterialDa
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_cartesian_3d_mesh<T>(paths[i].c_str());
+        disk::cartesian_mesh<T, 3> msh;
+        disk::load_mesh_diskpp_cartesian<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -526,7 +533,8 @@ test_hexahedra_fvca6(const NewtonSolverParameter<T>& rp, const disk::MaterialDat
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T,3> msh;
+        disk::load_mesh_fvca6_3d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -549,7 +557,8 @@ test_tetrahedra_netgen(const NewtonSolverParameter<T>& rp, const disk::MaterialD
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_netgen_3d_mesh<T>(paths[i].c_str());
+        disk::simplicial_mesh<T, 3> msh;
+        disk::load_mesh_netgen<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -571,7 +580,8 @@ test_polyhedra_fvca6(const NewtonSolverParameter<T>& rp, const disk::MaterialDat
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T,3> msh;
+        disk::load_mesh_fvca6_3d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -594,7 +604,8 @@ test_tetrahedra_fvca6(const NewtonSolverParameter<T>& rp, const disk::MaterialDa
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T,3> msh;
+        disk::load_mesh_fvca6_3d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -610,7 +621,9 @@ test_triangles_fvca5_robust(const NewtonSolverParameter<T>& rp, disk::MaterialDa
     for (int i = 0; i < 5; i++)
     {
         material_data.setLambda(std::pow(10.0, i));
-        auto msh = disk::load_fvca5_2d_mesh<T>("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_3.typ1");
+        std::string filename = "../../../diskpp/meshes/2D_triangles/fvca5/mesh1_3.typ1";
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(filename.c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
         error_sumup[i].h = material_data.getLambda();
     }
@@ -627,7 +640,9 @@ test_quads_diskpp_robust(const NewtonSolverParameter<T>& rp, disk::MaterialData<
     for (int i = 0; i < 5; i++)
     {
         material_data.setLambda(std::pow(10.0, i));
-        auto msh = disk::load_cartesian_2d_mesh<T>("../../../diskpp/meshes/2D_quads/diskpp/testmesh-16-16.quad");
+        std::string filename  = "../../../diskpp/meshes/2D_quads/diskpp/testmesh-16-16.quad";
+        disk::cartesian_mesh<T, 2> msh;
+        disk::load_mesh_diskpp_cartesian<T>(filename.c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
         error_sumup[i].h = material_data.getLambda();
     }
@@ -644,7 +659,9 @@ test_hexagons_robust(const NewtonSolverParameter<T>& rp, disk::MaterialData<T>& 
     for (int i = 0; i < 5; i++)
     {
         material_data.setLambda(std::pow(10.0, i));
-        auto msh = disk::load_fvca5_2d_mesh<T>("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_4.typ1");
+        std::string filename = "../../../diskpp/meshes/2D_hex/fvca5/hexagonal_4.typ1";
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(filename.c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
         error_sumup[i].h = material_data.getLambda();
     }
@@ -661,7 +678,9 @@ test_kershaws_robust(const NewtonSolverParameter<T>& rp, disk::MaterialData<T>& 
     for (int i = 0; i < 5; i++)
     {
         material_data.setLambda(std::pow(10.0, i));
-        auto msh = disk::load_fvca5_2d_mesh<T>("../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_3.typ1");
+        std::string filename = "../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_3.typ1";
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(filename.c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
         error_sumup[i].h = material_data.getLambda();
     }
@@ -678,7 +697,9 @@ test_tetrahedra_fvca6_robust(const NewtonSolverParameter<T>& rp, disk::MaterialD
     for (int i = 0; i < 5; i++)
     {
         material_data.setLambda(std::pow(10.0, i));
-        auto msh = disk::load_fvca6_3d_mesh<T>("../../../diskpp/meshes/3D_tetras/fvca6/tet.2.msh");
+        std::string filename = "../../../diskpp/meshes/3D_tetras/fvca6/tet.2.msh";
+        disk::generic_mesh<T,3> msh;
+        disk::load_mesh_fvca6_3d<T>(filename.c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
         error_sumup[i].h = material_data.getLambda();
     }
@@ -695,7 +716,9 @@ test_hexahedra_fvca6_robust(const NewtonSolverParameter<T>& rp, disk::MaterialDa
     for (int i = 0; i < 5; i++)
     {
         material_data.setLambda(std::pow(10.0, i));
-        auto msh = disk::load_fvca6_3d_mesh<T>("../../../diskpp/meshes/3D_hexa/fvca6/hexa_8x8x8.msh");
+        std::string filename ="../../../diskpp/meshes/3D_hexa/fvca6/hexa_8x8x8.msh";
+        disk::generic_mesh<T,3> msh;
+        disk::load_mesh_fvca6_3d<T>(filename.c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
         error_sumup[i].h = material_data.getLambda();
     }
@@ -712,7 +735,9 @@ test_polyhedra_fvca6_robust(const NewtonSolverParameter<T>& rp, disk::MaterialDa
     for (int i = 0; i < 5; i++)
     {
         material_data.setLambda(std::pow(10.0, i));
-        auto msh = disk::load_fvca6_3d_mesh<T>("../../../diskpp/meshes/3D_general/fvca6/dbls_20.msh");
+        std::string filename = "../../../diskpp/meshes/3D_general/fvca6/dbls_20.msh";
+        disk::generic_mesh<T,3> msh;
+        disk::load_mesh_fvca6_3d<T>(filename.c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
         error_sumup[i].h = material_data.getLambda();
     }
