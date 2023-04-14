@@ -1,11 +1,11 @@
 /*
  * DISK++, a template library for DIscontinuous SKeletal methods.
- *  
+ *
  * Matteo Cicuttin (C) 2020,2021
  * matteo.cicuttin@uliege.be
  *
  * University of Liège - Montefiore Institute
- * Applied and Computational Electromagnetics group  
+ * Applied and Computational Electromagnetics group
  */
 
 #include <iostream>
@@ -45,7 +45,7 @@ class maxwell_assembler
     std::vector<size_t>     expand_table;
 
 public:
-    
+
     SparseMatrix<T>         LHS;
     Matrix<T, Dynamic, 1>   RHS;
 
@@ -212,7 +212,7 @@ public:
         LHS.setFromTriplets(triplets.begin(), triplets.end());
         triplets.clear();
         std::cout << "Solving for " << syssz << " DOFs. ";
-        std::cout << "Matrix has " << LHS.nonZeros() << " nonzeros." << std::endl; 
+        std::cout << "Matrix has " << LHS.nonZeros() << " nonzeros." << std::endl;
     }
 };
 
@@ -264,7 +264,7 @@ class maxwell_assembler_condensed
     }
 
 public:
-    
+
     SparseMatrix<ScalT>         LHS;
     Matrix<ScalT, Dynamic, 1>   RHS;
 
@@ -333,7 +333,7 @@ public:
                 auto lofsi = fi*fbs;
                 auto lofsj = fj*fbs;
 
-                if ( not is_in_system(msh, fcs[fj]) ) 
+                if ( not is_in_system(msh, fcs[fj]) )
                 {
                     RHS.segment(cofsi, fbs) += -lhsc.block(lofsi, lofsj, fbs, fbs)*dirichlet_data.segment(lofsj, fbs);
                     continue;
@@ -354,7 +354,7 @@ public:
         LHS.setFromTriplets(triplets.begin(), triplets.end());
         triplets.clear();
         std::cout << "Solving for " << syssz << " DOFs. ";
-        std::cout << "Matrix has " << LHS.nonZeros() << " nonzeros." << std::endl; 
+        std::cout << "Matrix has " << LHS.nonZeros() << " nonzeros." << std::endl;
     }
 
     disk::dynamic_vector<ScalT>
@@ -517,7 +517,7 @@ public:
             {
                 if ( msh.is_boundary(fcs[fj]) )
                     continue;
-            
+
                 auto dofsi = cbs*msh.cells_size() + fbs * compress_table.at( offset(msh, fcs[fi]) );
                 auto dofsj = cbs*msh.cells_size() + fbs * compress_table.at( offset(msh, fcs[fj]) );
 
@@ -526,7 +526,7 @@ public:
                         trpK.push_back( Triplet<T>(dofsi+i, dofsj+j, K(cbs+fi*fbs+i, cbs+fj*fbs+j)) );
 
             }
-        }  
+        }
     }
 
     void finalize(void)
@@ -538,7 +538,7 @@ public:
 
         std::cout << "Solving for " << syssz << " DOFs. ";
         std::cout << "K has " << gK.nonZeros() << " nonzeros, M has ";
-        std::cout << gM.nonZeros() << " nonzeros." << std::endl; 
+        std::cout << gM.nonZeros() << " nonzeros." << std::endl;
     }
 };
 
@@ -556,7 +556,7 @@ vector_wave_solver(Mesh<T,2,Storage>& msh, size_t order,
     typedef Mesh<T,2,Storage>                   mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type      point_type;
-    
+
     disk::hho_degree_info chdi( { .rd = (size_t) order,
                                   .cd = (size_t) order,
                                   .fd = (size_t) order } );
@@ -632,7 +632,7 @@ vector_wave_solver(Mesh<T,2,Storage>& msh, size_t order,
 #ifdef USE_STATIC_CONDENSATION
         auto CR = disk::curl_reconstruction(msh, cl, chdi);
         auto ST = disk::curl_hdg_stabilization(msh, cl, chdi);
-        
+
         Matrix<T, Dynamic, Dynamic> MM = Matrix<T, Dynamic, Dynamic>::Zero(ST.rows(), ST.cols());
         MM.block(0,0,cb.size(),cb.size()) = make_mass_matrix(msh, cl, cb);
 
@@ -648,7 +648,7 @@ vector_wave_solver(Mesh<T,2,Storage>& msh, size_t order,
         Matrix<T, Dynamic, 1> prj = project_tangent(msh, cl, chdi, sol_fun);
 
         Matrix<T, Dynamic, 1> hsol = Matrix<T, Dynamic, 1>::Zero(rb.size());
-        
+
         hsol.segment(1, rb.size()-1) = CR.first * esol;
 
         energy_err += (prj-esol).dot(lhs*(prj-esol));
@@ -664,7 +664,7 @@ vector_wave_solver(Mesh<T,2,Storage>& msh, size_t order,
         for (auto& qp : qps)
         {
             Matrix<T, Dynamic, 2> hphi  = rb.eval_curls2(qp.point());
-            Matrix<T, Dynamic, 2> hphi2 = hphi.block(0,0,cb.size(),2); 
+            Matrix<T, Dynamic, 2> hphi2 = hphi.block(0,0,cb.size(),2);
             Matrix<T, Dynamic, 1> ephi  = cb.eval_functions(qp.point());
             //Matrix<T, Dynamic, 3> rphi = rb.eval_functions(qp.point());
 
@@ -715,7 +715,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
     typedef Mesh<T,3,Storage>                   mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type      point_type;
-    
+
     disk::hho_degree_info chdi( { .rd = (size_t) order,
                                   .cd = (size_t) order+1,
                                   .fd = (size_t) order } );
@@ -797,7 +797,7 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
         auto CR = disk::curl_reconstruction_pk(msh, cl, chdi);
 
         Matrix<T, Dynamic, Dynamic> ST = disk::curl_hdg_stabilization(msh, cl, chdi);
-        
+
         auto MM = make_vector_mass_oper(msh, cl, chdi);
         Matrix<T, Dynamic, Dynamic> lhs = CR.second + omega*(ST - omega*MM);
         Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(lhs.rows());
@@ -899,7 +899,7 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, parameter_loader<Mesh<Co
     auto jw = scalar_type(0,omega);
     auto jwmu0 = scalar_type(0,omega*mu0);
     auto ksq = (eps0*omega)*(mu0*omega);
-    
+
     auto& lua = pl.state();
 
     double wgz = lua["wgz"];
@@ -994,7 +994,7 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, parameter_loader<Mesh<Co
         {
             disk::dynamic_vector<scalar_type> tfsf =
                         disk::dynamic_vector<scalar_type>::Zero(lhs.rows());
-            
+
             auto qps = disk::integrate(msh, cl, 2*chdi.cell_degree());
             for (const auto& qp : qps)
             {
@@ -1021,7 +1021,7 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, parameter_loader<Mesh<Co
                 if (di.tag() == 14 and bi.tag() == 1188)
                 //if (di.tag() == 5)
                 {
-                    const auto fb = disk::make_vector_monomial_tangential_basis<mesh_type, face_type, scalar_type>(msh, fc, chdi.face_degree()); 
+                    const auto fb = disk::make_vector_monomial_tangential_basis<mesh_type, face_type, scalar_type>(msh, fc, chdi.face_degree());
 
                     disk::dynamic_matrix<scalar_type> tfsf_mass =
                         disk::dynamic_matrix<scalar_type>::Zero(fbs, fbs);
@@ -1042,11 +1042,11 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, parameter_loader<Mesh<Co
                     }
                     //if (bi.tag() == 7)
                     {
-                        disk::dynamic_vector<scalar_type> s = disk::dynamic_vector<scalar_type>::Zero(lhs.rows()); 
+                        disk::dynamic_vector<scalar_type> s = disk::dynamic_vector<scalar_type>::Zero(lhs.rows());
                         s.segment(cbs+i*fbs, fbs) = tfsf_mass.ldlt().solve(tfsf_rhs);
                         rhs += lhst*s;
                         //auto Y = disk::make_impedance_term(msh, fc, chdi.face_degree());
-                        rhs.segment(cbs+i*fbs, fbs) -= (jwmu0/wgz)*tfsf_rhs; //Y*tfsf_mass.ldlt().solve(tfsf_rhs); 
+                        rhs.segment(cbs+i*fbs, fbs) -= (jwmu0/wgz)*tfsf_rhs; //Y*tfsf_mass.ldlt().solve(tfsf_rhs);
                         //rhs.segment(cbs+i*fbs, fbs) += (omega*mu0/wgz)*tfsf_rhs;
                     }
 
@@ -1272,7 +1272,7 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, parameter_loader<Mesh<Co
 
     std::vector<scalar_type> nodal_ex( data_ex.size() );
     std::transform(data_ex.begin(), data_ex.end(), nodal_ex.begin(), tran);
-    
+
     std::vector<scalar_type> nodal_ey( data_ey.size() );
     std::transform(data_ey.begin(), data_ey.end(), nodal_ey.begin(), tran);
 
@@ -1420,7 +1420,7 @@ void maxwell_eigenvalue_solver(Mesh& msh, size_t order, const typename Mesh::coo
 
         disk::silo_zonal_variable<T> uz("uz", data_uz);
         silo_db.add_variable("mesh", uz);
-    
+
         silo_db.add_expression("u", "{ux, uy, uz}", DB_VARTYPE_VECTOR);
         silo_db.add_expression("mag_u", "magnitude(u)", DB_VARTYPE_SCALAR);
     }
@@ -1430,7 +1430,7 @@ void maxwell_eigenvalue_solver(Mesh& msh, size_t order, const typename Mesh::coo
         std::cout << std::setprecision(8) << hho_eigvals(i) << " -> ";
         std::cout << std::sqrt( hho_eigvals(i) ) << std::endl;
     }
-    
+
 }
 #endif
 
@@ -1438,7 +1438,7 @@ void maxwell_eigenvalue_solver(Mesh& msh, size_t order, const typename Mesh::coo
 void autotest_alpha(size_t order)
 {
     using T = double;
-    
+
     using Mesh = disk::simplicial_mesh<T,3>;
 
     std::stringstream ssl2;
@@ -1454,7 +1454,7 @@ void autotest_alpha(size_t order)
     {
         ofs_l2  << sp << " ";
         ofs_nrg << sp << " ";
-        
+
         for (size_t i = 1; i < 5; i++)
         {
             Mesh msh;
@@ -1465,7 +1465,7 @@ void autotest_alpha(size_t order)
 
             auto diam = disk::average_diameter(msh);
 
-            auto ci = vector_wave_solver(msh, order, sp, M_PI, false);  
+            auto ci = vector_wave_solver(msh, order, sp, M_PI, false);
             ofs_l2  << ci.l2_error_e << " " << ci.l2_error_h << " ";
             ofs_nrg << ci.nrg_error << " ";
         }
@@ -1480,7 +1480,7 @@ void autotest_alpha(size_t order)
 void autotest_convergence(size_t order_min, size_t order_max)
 {
     using T = double;
-    
+
     using Mesh = disk::simplicial_mesh<T,3>;
 
     std::ofstream ofs( "hho_convergence_convt.txt" );
@@ -1626,7 +1626,8 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$") ))
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-        auto msh = disk::load_netgen_3d_mesh<coord_T>(mesh_filename);
+        disk::simplicial_mesh<coord_T, 3> msh;
+        disk::load_mesh_netgen<coord_T>(mesh_filename, msh);
 
         //if (solve_eigvals)
         //    maxwell_eigenvalue_solver(msh, degree, stab_param);
@@ -1645,7 +1646,7 @@ int main(int argc, char **argv)
         //disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
         disk::generic_mesh<T,3> msh;
         disk::gmsh_geometry_loader< disk::generic_mesh<T,3> > loader;
-        
+
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
@@ -1662,7 +1663,7 @@ int main(int argc, char **argv)
         disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
         //disk::generic_mesh<T,3> msh;
         //disk::gmsh_geometry_loader< disk::generic_mesh<T,3> > loader;
-        
+
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
@@ -1676,14 +1677,15 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.hex$") ))
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
-        auto msh = disk::load_cartesian_3d_mesh<coord_T>(mesh_filename);
-        
+        disk::cartesian_mesh<coord_T, 3> msh;
+        disk::load_mesh_diskpp_cartesian<coord_T>(mesh_filename, msh);
+
         if (solve_eigvals)
             maxwell_eigenvalue_solver(msh, degree, stab_param);
         else
             //vector_wave_solver(msh, degree, stab_param, omega);
             vector_wave_solver_complex(msh, degree);
-        
+
         return 0;
     }
 
@@ -1692,19 +1694,18 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
         disk::generic_mesh<coord_T,3> msh;
-        
+
         disk::load_mesh_fvca6_3d<coord_T>(mesh_filename, msh);
-        
+
         if (solve_eigvals)
             maxwell_eigenvalue_solver(msh, degree, stab_param);
         else
             //vector_wave_solver(msh, degree, stab_param, omega);
             vector_wave_solver_complex(msh, degree);
-        
+
         return 0;
     }
 #endif
 
     return 0;
 }
-

@@ -104,7 +104,7 @@ void rectest(Mesh& msh, size_t order)
         //std::cout << " v'Sv = " << vSv << " " << std::sqrt(vSv) << std::endl;
 
         JacobiSVD<MatrixXd> svd(GR.second + ST);
-        double cond = svd.singularValues()(0) 
+        double cond = svd.singularValues()(0)
             / svd.singularValues()(svd.singularValues().size()-1);
 
         //std::cout << cond << std::endl;
@@ -116,7 +116,7 @@ void rectest(Mesh& msh, size_t order)
         auto CR = disk::curl_reconstruction(msh, cl, chdi);
 
         Matrix<T, Dynamic, 1> pfun = disk::project_tangent(msh, cl, chdi, fun, 1);
-        
+
         Matrix<T, Dynamic, 1> rfun = Matrix<T, Dynamic, 1>::Zero(rb.size());
         rfun.segment(3, rb.size()-3) = CR.first * pfun;
 
@@ -176,7 +176,7 @@ int main(int argc, char **argv)
             case 'k':
                 degree = std::stoi(optarg);
                 break;
-            
+
             case '?':
             default:
                 std::cout << "Invalid option" << std::endl;
@@ -188,7 +188,8 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$") ))
     {
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
-        auto msh = disk::load_netgen_2d_mesh<T>(mesh_filename);
+        disk::simplicial_mesh<T, 2> msh;
+        disk::load_mesh_netgen<T>(mesh_filename, msh);
 
         rectest(msh, degree);
 
@@ -199,10 +200,11 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.quad$") ))
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
-        auto msh = disk::load_cartesian_2d_mesh<T>(mesh_filename);
-        
+        disk::cartesian_mesh<T, 2> msh;
+        disk::load_mesh_diskpp_cartesian<T>(mesh_filename, msh);
+
         rectest(msh, degree);
-        
+
         return 0;
     }
 
@@ -210,7 +212,8 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
-        auto msh = disk::load_fvca5_2d_mesh<T>(mesh_filename);
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(mesh_filename, msh);
 
         rectest(msh, degree);
 
@@ -221,7 +224,8 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$") ))
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-        auto msh = disk::load_netgen_3d_mesh<T>(mesh_filename);
+        disk::simplicial_mesh<T, 3> msh;
+        disk::load_mesh_netgen<T>(mesh_filename, msh);
 
         rectest(msh, degree);
 
@@ -232,10 +236,11 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.hex$") ))
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
-        auto msh = disk::load_cartesian_3d_mesh<T>(mesh_filename);
-        
+        disk::cartesian_mesh<T, 3> msh;
+        disk::load_mesh_diskpp_cartesian<T>(mesh_filename, msh);
+
         rectest(msh, degree);
-        
+
         return 0;
     }
 
@@ -243,9 +248,11 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.msh$") ))
     {
         std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
-        auto msh = disk::load_fvca6_3d_mesh<T>(mesh_filename);
+        disk::generic_mesh<T,3> msh;
+        disk::load_mesh_fvca6_3d<T>(mesh_filename, msh);
+
         rectest(msh, degree);
-        
+
         return 0;
     }
 }

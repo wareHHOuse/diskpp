@@ -515,11 +515,11 @@ make_scalar_dg_stabilization(const Mesh&                     msh,
  */
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
-make_scalar_hho_stabilization(const Mesh&                                           msh,
-                              const typename Mesh::cell_type&                       cl,
-                              const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
-                              const CellDegreeInfo<Mesh>&                           cell_infos,
-                              bool                                                  hF = true)
+make_scalar_hho_stabilization(const Mesh&                     msh,
+        const typename Mesh::cell_type&                       cl,
+        const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
+        const CellDegreeInfo<Mesh>&                           cell_infos,
+        bool                                                  hF = true)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -625,11 +625,11 @@ make_scalar_hho_stabilization(const Mesh&                                       
  */
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
-make_scalar_hho_stabilization(const Mesh&                                           msh,
-                              const typename Mesh::cell_type&                       cl,
-                              const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
-                              const MeshDegreeInfo<Mesh>&                           msh_infos,
-                              bool                                                  hF = true)
+make_scalar_hho_stabilization(const Mesh&                     msh,
+        const typename Mesh::cell_type&                       cl,
+        const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
+        const MeshDegreeInfo<Mesh>&                           msh_infos,
+        bool                                                  hF = true)
 {
     return make_scalar_hho_stabilization(msh, cl, reconstruction, msh_infos.cellDegreeInfo(msh, cl), hF);
 }
@@ -649,11 +649,11 @@ make_scalar_hho_stabilization(const Mesh&                                       
  */
 template<typename Mesh, typename ScalarReconstructionBasis>
 dynamic_matrix<typename Mesh::coordinate_type>
-make_scalar_hho_stabilization(const Mesh&                                           msh,
-                              const typename Mesh::cell_type&                       cl,
-                              const ScalarReconstructionBasis&                      rb,
-                              const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
-                              const hho_degree_info&                                hdi)
+make_scalar_hho_stabilization(const Mesh&                 msh,
+    const typename Mesh::cell_type&                       cl,
+    const ScalarReconstructionBasis&                      rb,
+    const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
+    const hho_degree_info&                                hdi)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -682,7 +682,7 @@ make_scalar_hho_stabilization(const Mesh&                                       
         auto test = cb.eval_functions( qp.point() );
         M2 += qp.weight() * test * trial.transpose();
     }
-    
+
     matrix_type       proj1 = -M1.ldlt().solve(M2 * reconstruction);
 
     assert(M2.cols() == reconstruction.rows());
@@ -744,10 +744,11 @@ make_scalar_hho_stabilization(const Mesh&                                       
 
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
-make_scalar_hho_stabilization(const Mesh&                                           msh,
-                              const typename Mesh::cell_type&                       cl,
-                              const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
-                              const hho_degree_info&                                hdi)
+make_scalar_hho_stabilization(const Mesh&                     msh,
+        const typename Mesh::cell_type&                       cl,
+        const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
+        const hho_degree_info&                                hdi,
+        bool x = false)
 {
     auto rb = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
     return make_scalar_hho_stabilization(msh, cl, rb, reconstruction, hdi);
@@ -768,11 +769,11 @@ make_scalar_hho_stabilization(const Mesh&                                       
  */
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
-make_scalar_hho_stabilization_fluxes(const Mesh&                                           msh,
-                                     const typename Mesh::cell_type&                       cl,
-                                     const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
-                                     const CellDegreeInfo<Mesh>&                           cell_infos,
-                                     bool                                                  hF = true)
+make_scalar_hho_stabilization_fluxes(const Mesh&              msh,
+        const typename Mesh::cell_type&                       cl,
+        const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
+        const CellDegreeInfo<Mesh>&                           cell_infos,
+        bool                                                  hF = true)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -853,11 +854,11 @@ make_scalar_hho_stabilization_fluxes(const Mesh&                                
  */
 template<typename Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
-make_scalar_hho_stabilization_fluxes(const Mesh&                                           msh,
-                                     const typename Mesh::cell_type&                       cl,
-                                     const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
-                                     const hho_degree_info&                                di,
-                                     bool                                                  hF = true)
+make_scalar_hho_stabilization_fluxes(const Mesh&              msh,
+        const typename Mesh::cell_type&                       cl,
+        const dynamic_matrix<typename Mesh::coordinate_type>& reconstruction,
+        const hho_degree_info&                                di,
+        bool                                                  hF = true)
 {
     const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 

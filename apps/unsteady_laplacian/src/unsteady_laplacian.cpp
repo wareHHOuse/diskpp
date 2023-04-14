@@ -243,7 +243,6 @@ unsteady_laplacian_solver(const Mesh& msh, size_t degree, typename Mesh::coordin
 int main(int argc, char **argv)
 {
     using T = double;
-    disk::cartesian_mesh<T, 2> msh;
 
     T           dt = 0.01;
     size_t      degree = 1;
@@ -251,7 +250,7 @@ int main(int argc, char **argv)
     int ch;
     while ( (ch = getopt(argc, argv, "k:m:t:")) != -1 )
     {
-	switch(ch)
+	    switch(ch)
         {
             case 'k':
                 degree = std::stoi(optarg);
@@ -268,10 +267,11 @@ int main(int argc, char **argv)
             default:
                 std::cout << "Invalid option" << std::endl;
                 return 1;
-	}
+	    }
     }
 
-    msh = load_cartesian_2d_mesh<T>(mesh_filename);
+    disk::cartesian_mesh<T, 2> msh;
+    disk::load_mesh_diskpp_cartesian<T>(mesh_filename, msh);
 
     std::cout << "Mesh loaded ..." << std::endl;
     unsteady_laplacian_solver(msh, degree, dt, 1.0);

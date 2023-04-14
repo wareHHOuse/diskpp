@@ -66,9 +66,9 @@ int main(int argc, char **argv)
                 tmpdeg = std::stoi(optarg);
                 if (not lflag)
                     hdi.cell_degree(tmpdeg);
-                
+
                 hdi.face_degree(tmpdeg);
-                
+
                 if (not rflag)
                     hdi.reconstruction_degree(tmpdeg+1);
                 break;
@@ -105,9 +105,7 @@ int main(int argc, char **argv)
     {
         std::cout << "Mesh format: 1D uniform" << std::endl;
 
-        typedef disk::generic_mesh<T, 1>  mesh_type;
-
-        mesh_type msh;
+        disk::generic_mesh<T, 1>  msh;
         disk::uniform_mesh_loader<T, 1> loader(0, 1, num_elems);
         loader.populate_mesh(msh);
 
@@ -121,7 +119,8 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
-        auto msh = disk::load_fvca5_2d_mesh<T>(mesh_filename);
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(mesh_filename, msh);
         run_hho_diffusion_solver(msh, hdi, stat_cond, stab_diam_F);
         return 0;
     }
@@ -130,10 +129,9 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$") ))
     {
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
-        auto msh = disk::load_netgen_2d_mesh<T>(mesh_filename);
-
+        disk::simplicial_mesh<T, 2> msh;
+        disk::load_mesh_netgen<T>(mesh_filename, msh);
         std::cout << msh.faces_size() << std::endl;
-
         run_hho_diffusion_solver(msh, hdi, stat_cond, stab_diam_F);
         return 0;
     }
@@ -142,17 +140,18 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.quad$") ))
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
-        auto msh = disk::load_cartesian_2d_mesh<T>(mesh_filename);
+        disk::cartesian_mesh<T, 2> msh;
+        disk::load_mesh_diskpp_cartesian<T>(mesh_filename, msh);
         run_hho_diffusion_solver(msh, hdi, stat_cond, stab_diam_F);
         return 0;
     }
-
 
     /* Netgen 3D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$") ))
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-        auto msh = disk::load_netgen_3d_mesh<T>(mesh_filename);
+        disk::simplicial_mesh<T, 3> msh;
+        disk::load_mesh_netgen<T>(mesh_filename, msh);
         run_hho_diffusion_solver(msh, hdi, stat_cond, stab_diam_F);
         return 0;
     }
@@ -161,7 +160,8 @@ int main(int argc, char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.hex$") ))
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
-        auto msh = disk::load_cartesian_3d_mesh<T>(mesh_filename);
+        disk::cartesian_mesh<T, 3> msh;
+        disk::load_mesh_diskpp_cartesian<T>(mesh_filename, msh);
         run_hho_diffusion_solver(msh, hdi, stat_cond, stab_diam_F);
         return 0;
     }
@@ -171,11 +171,8 @@ int main(int argc, char **argv)
     {
         std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
         disk::generic_mesh<T,3> msh;
-
         disk::load_mesh_fvca6_3d<T>(mesh_filename, msh);
-
         run_hho_diffusion_solver(msh, hdi, stat_cond, stab_diam_F);
-
         return 0;
     }
 }

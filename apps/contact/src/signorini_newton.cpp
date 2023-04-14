@@ -107,17 +107,9 @@ int main(int argc, char **argv)
     /* Netgen 2d*/
     if (std::regex_match(filename, std::regex(".*\\.mesh2d$") ))
     {
-        typedef disk::simplicial_mesh<T, 2>  mesh_type;
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
-        mesh_type msh;
-        disk::netgen_mesh_loader<T, 2> loader;
-        if (!loader.read_mesh(filename))
-        {
-            std::cout << "Problem loading mesh." << std::endl;
-            return 1;
-        }
-        loader.populate_mesh(msh);
-
+        disk::simplicial_mesh<T, 2> msh;
+        disk::load_mesh_netgen<T>(filename, msh);
         run_signorini(msh, ap, run_exact);
         return 0;
     }
@@ -126,7 +118,8 @@ int main(int argc, char **argv)
     if (std::regex_match(filename, std::regex(".*\\.typ1$") ))
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
-        auto msh = disk::load_fvca5_2d_mesh<T>(filename);
+        disk::generic_mesh<T,2> msh;
+        disk::load_mesh_fvca5_2d<T>(filename, msh);
         run_signorini(msh, ap, run_exact);
         return 0;
     }
@@ -135,22 +128,11 @@ int main(int argc, char **argv)
     if (std::regex_match(filename, std::regex(".*\\.quad$") ))
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
-        auto msh = disk::load_cartesian_2d_mesh<T>(filename);
+        disk::cartesian_mesh<T, 2> msh;
+        disk::load_mesh_diskpp_cartesian<T>(filename, msh);
         run_signorini(msh, ap, run_exact);
         return 0;
     }
-
-
-    #if 0
-    /* Medit 2d*/
-    if (std::regex_match(filename, std::regex(".*\\.medit2d$")))
-    {
-        std::cout << "Guessed mesh format: Medit format" << std::endl;
-        typedef disk::generic_mesh<T, 2>  mesh_type;
-        mesh_type msh = disk::load_medit_2d_mesh<T>(filename);
-        run_signorini(msh, ap);
-    }
-    #endif
 
     return 0;
 }

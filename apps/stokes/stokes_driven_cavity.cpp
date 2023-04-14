@@ -376,7 +376,7 @@ auto run_stokes(const Mesh &msh, size_t degree, bool use_sym_grad = true) {
 
 // #if 0
 int main(int argc, char **argv) {
-  using RealType = double;
+  using T = double;
   bool use_sym_grad = false;
 
   char *filename = nullptr;
@@ -409,42 +409,23 @@ int main(int argc, char **argv) {
 
   if (std::regex_match(filename, std::regex(".*\\.typ1$"))) {
     std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
-
-    typedef disk::generic_mesh<RealType, 2> mesh_type;
-
-    mesh_type msh;
-    disk::fvca5_mesh_loader<RealType, 2> loader;
-    if (!loader.read_mesh(filename)) {
-      std::cout << "Problem loading mesh." << std::endl;
-      return 1;
-    }
-    loader.populate_mesh(msh);
-
+    disk::generic_mesh<T, 2> msh;
+    disk::load_mesh_fvca5_2d<T>(filename, msh);
     run_stokes(msh, degree, use_sym_grad);
-    std::cout << "fini" << std::endl;
   }
 
   if (std::regex_match(filename, std::regex(".*\\.mesh2d$"))) {
     std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
-
-    typedef disk::simplicial_mesh<RealType, 2> mesh_type;
-
-    mesh_type msh;
-    disk::netgen_mesh_loader<RealType, 2> loader;
-    if (!loader.read_mesh(filename)) {
-      std::cout << "Problem loading mesh." << std::endl;
-      return 1;
-    }
-    loader.populate_mesh(msh);
-
+    disk::simplicial_mesh<T, 2> msh;
+    disk::load_mesh_netgen<T>(filename, msh);
     run_stokes(msh, degree, use_sym_grad);
   }
 
   /* Medit 2d*/
   if (std::regex_match(filename, std::regex(".*\\.medit2d$"))) {
     std::cout << "Guessed mesh format: Medit format" << std::endl;
-    typedef disk::generic_mesh<RealType, 2> mesh_type;
-    mesh_type msh = disk::load_medit_2d_mesh<RealType>(filename);
+    disk::generic_mesh<T, 2> msh;
+    disk::load_mesh_medit<T>(filename, msh);
     run_stokes(msh, degree, use_sym_grad);
   }
 

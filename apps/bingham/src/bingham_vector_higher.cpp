@@ -181,7 +181,9 @@ int main(int argc, char **argv)
     if (std::regex_match(input_mesh, std::regex(".*\\.medit2d$")))
     {
         std::cout << "Guessed mesh format: Medit format" << std::endl;
-        auto msh = disk::load_medit_2d_mesh<T>(input_mesh.c_str());
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_medit<T>(input_mesh.c_str(), msh);
+
         if(!run_bingham(msh, hdi, vp))
             std::cout << "No convergence" << std::endl;
 
@@ -192,7 +194,9 @@ int main(int argc, char **argv)
     if (std::regex_match(input_mesh, std::regex(".*\\.mesh2d$") ))
     {
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
-        auto msh = disk::load_netgen_2d_mesh<T>(input_mesh.c_str());
+        disk::simplicial_mesh<T, 2> msh;
+        disk::load_mesh_netgen<T>(input_mesh.c_str(), msh);
+
         if(!run_bingham(msh, hdi, vp))
             std::cout << "No convergence" << std::endl;
 
@@ -203,7 +207,9 @@ int main(int argc, char **argv)
     if (std::regex_match(input_mesh, std::regex(".*\\.quad$") ))
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
-        auto msh = disk::load_cartesian_2d_mesh<T>(input_mesh.c_str());
+        disk::cartesian_mesh<T, 2> msh;
+        disk::load_mesh_diskpp_cartesian<T>(input_mesh.c_str(), msh);
+
         if(!run_bingham(msh, hdi, vp))
             std::cout << "No convergence" << std::endl;
 

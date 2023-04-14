@@ -75,11 +75,15 @@ int main(int argc, const char **argv)
     const char *mesh_filename = argv[1];
 
     using T = double;
+
     /* FVCA5 2D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
     {
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
-        auto msh = disk::load_fvca5_2d_mesh<T>(mesh_filename);
+        disk::generic_mesh<T, 2> msh;
+        auto success = disk::load_mesh_fvca5_2d<T>(mesh_filename, msh);
+        if (!success)
+            return 1;
         run(msh);
         return 0;
     }
@@ -88,7 +92,10 @@ int main(int argc, const char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh2d$") ))
     {
         std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
-        auto msh = disk::load_netgen_2d_mesh<T>(mesh_filename);
+        disk::simplicial_mesh<T, 2> msh;
+        auto success = disk::load_mesh_netgen<T>(mesh_filename, msh);
+        if (!success)
+            return 1;
         run(msh);
         return 0;
     }
@@ -97,17 +104,22 @@ int main(int argc, const char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.quad$") ))
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 2D" << std::endl;
-        auto msh = disk::load_cartesian_2d_mesh<T>(mesh_filename);
+        disk::cartesian_mesh<T, 2> msh;
+        auto success = disk::load_mesh_diskpp_cartesian<T>(mesh_filename, msh);
+        if (!success)
+            return 1;
         run(msh);
         return 0;
     }
-
 
     /* Netgen 3D */
     if (std::regex_match(mesh_filename, std::regex(".*\\.mesh$") ))
     {
         std::cout << "Guessed mesh format: Netgen 3D" << std::endl;
-        auto msh = disk::load_netgen_3d_mesh<T>(mesh_filename);
+        disk::simplicial_mesh<T, 3> msh;
+        auto success = disk::load_mesh_netgen<T>(mesh_filename, msh);
+        if (!success)
+            return 1;
         run(msh);
         return 0;
     }
@@ -116,7 +128,10 @@ int main(int argc, const char **argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.hex$") ))
     {
         std::cout << "Guessed mesh format: DiSk++ Cartesian 3D" << std::endl;
-        auto msh = disk::load_cartesian_3d_mesh<T>(mesh_filename);
+        disk::cartesian_mesh<T, 3> msh;
+        auto success = disk::load_mesh_diskpp_cartesian<T>(mesh_filename, msh);
+        if (!success)
+            return 1;
         run(msh);
         return 0;
     }
@@ -126,13 +141,14 @@ int main(int argc, const char **argv)
     {
         std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
         disk::generic_mesh<T,3> msh;
-        disk::load_mesh_fvca6_3d<T>(mesh_filename, msh);
+        auto success = disk::load_mesh_fvca6_3d<T>(mesh_filename, msh);
+        if (!success)
+            return 1;
         run(msh);
         return 0;
     }
 
 
     return 0;
+
 }
-
-
