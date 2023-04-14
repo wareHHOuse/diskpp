@@ -97,7 +97,7 @@ static dunavant_point dunavant_rule_12[] = {
     { 6, { 0.022838332222257, 0.281325580989940, 0.695836086787803 },  0.022356773202303 },
     { 6, { 0.025734050548330, 0.116251915907597, 0.858014033544073 },  0.017316231108659 }
 };
-    
+
 static dunavant_point dunavant_rule_13[] = {
     { 1, { 0.333333333333333, 0.333333333333333, 0.333333333333333 },  0.052520923400802 },
     { 3, { 0.009903630120591, 0.495048184939705, 0.495048184939705 },  0.011280145209330 },
@@ -210,8 +210,8 @@ static dunavant_point dunavant_rule_19[] = {
     { 6, { 0.223861424097916, 0.075050596975911, 0.701087978926173 },  0.018242840118951 },
     { 6, { 0.034647074816760, 0.142421601113383, 0.822931324069857 },  0.010258563736199 },
     { 6, { 0.010161119296278, 0.065494628082938, 0.924344252620784 },  0.003799928855302 }
-}; 
-     
+};
+
 static dunavant_point dunavant_rule_20[] = {
     { 1, { 0.333333333333333, 0.333333333333333, 0.333333333333333 }, 0.033057055541624 },
     { 3, {-0.001900928704400, 0.500950464352200, 0.500950464352200 }, 0.000867019185663 },
@@ -232,7 +232,7 @@ static dunavant_point dunavant_rule_20[] = {
     { 6, {-0.008368153208227, 0.146965436053239, 0.861402717154987 }, 0.000704404677908 },
     { 6, { 0.026686063258714, 0.137726978828923, 0.835586957912363 }, 0.010112684927462 },
     { 6, { 0.010547719294141, 0.059696109149007, 0.929756171556853 }, 0.003573909385950 }
-};   
+};
 
 struct dunavant_rule {
     size_t          num_entries;
@@ -277,9 +277,7 @@ dunavant(size_t degree, const point<T,DIM>& p0, const point<T,DIM>& p1, const po
     size_t rule_num = (degree == 0) ? 0 : degree - 1;
     assert(rule_num < max_degree-1);
 
-    auto v0 = p1 - p0;
-    auto v1 = p2 - p0;
-    auto area = std::abs( (v0.x() * v1.y() - v0.y() * v1.x())/2.0 );
+    auto area = area_triangle_kahan(p0, p1, p2);
 
     auto num_entries = priv::dunavant_rules[rule_num].num_entries;
     auto num_points = priv::dunavant_rules[rule_num].num_points;
@@ -290,24 +288,24 @@ dunavant(size_t degree, const point<T,DIM>& p0, const point<T,DIM>& p1, const po
     for (size_t i = 0; i < num_entries; i++)
     {
         auto& dp = priv::dunavant_rules[rule_num].points[i];
-        
+
         auto l0 = dp.coords[0];
         auto l1 = dp.coords[1];
         auto l2 = dp.coords[2];
         auto w = dp.weight;
-        
+
         switch (dp.perms)
         {
             case 1:
                 ret.push_back({p0*l0 + p1*l1 + p2*l2, w*area});
                 break;
-                
+
             case 3:
                 ret.push_back({p0*l0 + p1*l1 + p2*l2, w*area});
                 ret.push_back({p0*l1 + p1*l2 + p2*l0, w*area});
                 ret.push_back({p0*l1 + p1*l0 + p2*l2, w*area});
                 break;
-            
+
             case 6:
                 ret.push_back({p0*l0 + p1*l1 + p2*l2, w*area});
                 ret.push_back({p0*l0 + p1*l2 + p2*l1, w*area});
@@ -330,4 +328,3 @@ dunavant(size_t degree, const std::array<point<T,DIM>, 3>& pts)
 }
 
 } // namespace disk::quadrature
-
