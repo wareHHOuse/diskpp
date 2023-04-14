@@ -13,7 +13,7 @@ using pqrst = point<T,DIM>;
 template<typename T, size_t DIM>
 class quadrature_point
 {
-    point<T, DIM>   quad_point;
+    pqrst<T, DIM>   quad_point;
     T               quad_weight;
 
 public:
