@@ -47,6 +47,10 @@ struct degree_range<T, max_tag>
 using degree_range_from_to = degree_range<size_t, size_t>;
 using degree_range_from_to_max = degree_range<size_t, max_tag>;
 
+template<typename T>
+concept deg_range = std::is_same<T, degree_range_from_to>::value or
+    std::is_same<T, degree_range_from_to_max>::value;
+
 auto degs(size_t min, size_t max) {
     return degree_range_from_to(min, max);
 }
