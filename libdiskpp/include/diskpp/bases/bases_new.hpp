@@ -15,6 +15,48 @@
 #include "diskpp/quadratures/quadrature_point.hpp"
 namespace disk::basis {
 
+/***************************************/
+
+struct max_tag {};
+static max_tag _;
+
+template<typename Min, typename Max>
+struct degree_range;
+
+template<typename T>
+struct degree_range<T, T>
+{
+    T  min;
+    T  max;
+
+    degree_range(const T& pmin, const T& pmax)
+        : min(pmin), max(pmax)
+    {}
+};
+
+template<typename T>
+struct degree_range<T, max_tag>
+{
+    T min;
+
+    degree_range(const T& pmin)
+        : min(pmin)
+    {}
+};
+
+using degree_range_from_to = degree_range<size_t, size_t>;
+using degree_range_from_to_max = degree_range<size_t, max_tag>;
+
+auto degs(size_t min, size_t max) {
+    return degree_range_from_to(min, max);
+}
+
+auto degs(size_t min, max_tag tag) {
+    return degree_range_from_to_max(min);
+}
+
+/***************************************/
+
 template<typename Mesh, typename Element, typename ScalT>
 class scalar_monomial;
 
@@ -53,6 +95,14 @@ private:
         return point_type( bv.dot(dv)/(nbv*nbv) );
     }
 
+    std::pair<size_t, size_t>
+    deg_range(size_t deg_min, size_t deg_max) {
+        auto from = (deg_min == 0) ? 0 : size_of_degree(deg_min-1);
+        auto to = size_of_degree(deg_max);
+        assert(from < size() and to <= size());
+        return std::make_pair(from, to);
+    }
+
 public:
     scalar_monomial(const mesh_type& msh, const cell_type& cl, size_t degree)
         : degree_(degree), size_( size_of_degree(degree) )
@@ -76,6 +126,18 @@ public:
         return ret;
     }
 
+    value_array_type operator()(const point_type& pt, const degree_range_from_to& dr) const {
+        auto [from, to] = deg_range(dr.min, dr.max);
+        auto size = to-from;
+        return operator()(pt).segment(from, size);
+    }
+
+    value_array_type operator()(const point_type& pt, const degree_range_from_to_max& dr) const {
+        auto [from, to] = deg_range(dr.min, degree());
+        auto size = to-from;
+        return operator()(pt).tail(size);
+    }
+
     gradient_array_type grad(const point_type& pt) const {
         gradient_array_type ret = gradient_array_type::Zero(size_);
         auto ep = phys2ref(pt);
@@ -86,6 +148,18 @@ public:
             ret(k) = ret(k-1)*k*ep.x()/(k-1);
 
         return ret;
+    }
+
+    gradient_array_type grad(const point_type& pt, const degree_range_from_to& dr) const {
+        auto [from, to] = deg_range(dr.min, dr.max);
+        auto size = to-from;
+        return grad(pt).segment(from, size);
+    }
+
+    gradient_array_type grad(const point_type& pt, const degree_range_from_to_max& dr) const {
+        auto [from, to] = deg_range(dr.min, degree());
+        auto size = to-from;
+        return grad(pt).tail(size);
     }
 
     size_t size() const {
@@ -208,6 +282,14 @@ private:
     point_type phys2ref(const point_type& pt) const {
         Eigen::Matrix<coordinate_type,2,1> v = tr_*(pt - bar_).to_vector();
         return point_type(v(0), v(1));
+    }
+
+    std::pair<size_t, size_t>
+    deg_range(size_t deg_min, size_t deg_max) {
+        auto from = (deg_min == 0) ? 0 : size_of_degree(deg_min-1);
+        auto to = size_of_degree(deg_max);
+        assert(from < size() and to <= size());
+        return std::make_pair(from, to);
     }
 
 public:
@@ -726,7 +808,7 @@ public:
     L2_projector(const mesh_type& msh, const element_type& elem, const Basis& pb)
         : basis_(pb)
     {
-        auto degree = basis_.integration_degree()*2+1;
+        auto degree = basis_.integration_degree()*2;
         mass_ = matrix_type::Zero(basis_.size(), basis_.size());
         qps_ = integrate(msh, elem, degree);
         for (auto& qp : qps_) {
@@ -769,6 +851,7 @@ public:
     }
 };
 
+/* Integrate a function `f(point_type) -> scalar_type` on `elem` */
 template<typename Mesh, typename Element, typename IntegrandFunction>
 auto integrate(const Mesh& msh, const Element& elem, size_t degree, IntegrandFunction f)
 {
@@ -779,6 +862,44 @@ auto integrate(const Mesh& msh, const Element& elem, size_t degree, IntegrandFun
     auto qps = integrate(msh, elem, degree);
     for (auto& qp : qps) {
         ret += qp.weight() * f(qp.point());
+    };
+
+    return ret;
+}
+
+/* Integrate a term of the type (f,v)_E, tipically a RHS */
+template<basis Test>
+using fun = std::function<typename Test::value_type(typename Test::point_type)>;
+
+template<typename Mesh, typename Element, basis Test>
+auto integrate(const Mesh& msh, const Element& elem, const fun<Test>& f, const Test& basis)
+{
+    using ST = Test::scalar_type;
+    Eigen::Matrix<ST, Eigen::Dynamic, 1> ret = Eigen::Matrix<ST, Eigen::Dynamic, 1>::Zero(basis.size());
+
+    auto qps = integrate(msh, elem, 2*basis.integration_degree()+1);
+    for (auto& qp : qps) {
+        ret += qp.weight() * ( basis(qp.point()) * f(qp.point()) );
+    };
+
+    return ret;
+}
+
+/* Integrate a term of the type (u,v)_E, tipically a LHS */
+template<typename Mesh, typename Element, basis Trial, basis Test>
+auto integrate(const Mesh& msh, const Element& elem, const Trial& trial, const Test& test)
+{
+    static_assert(can_take_scalar_product<Trial, Test>::value, "Invalid scalar product requested");
+    using trial_ST = typename Trial::scalar_type;
+    using test_ST = typename Test::scalar_type;
+    using ST = decltype( trial_ST{} * test_ST{} );
+    Eigen::Matrix<ST, Eigen::Dynamic, Eigen::Dynamic> ret
+        = Eigen::Matrix<ST, Eigen::Dynamic, Eigen::Dynamic>::Zero(test.size(), trial.size());
+
+    auto ideg = trial.integration_degree() + test.integration_degree();
+    auto qps = integrate(msh, elem, ideg);
+    for (auto& qp : qps) {
+        ret += qp.weight() * ( test(qp.point()) * trial(qp.point()).transpose() );
     };
 
     return ret;

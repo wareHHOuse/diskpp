@@ -34,6 +34,12 @@ struct dot_evaluator
         return eval_dot(pt, basis_category);
     }
 
+    template<typename Range>
+    auto operator()(const point_type& pt, const Range& dr) const {
+        typename basis_traits<Basis>::category basis_category;
+        return eval_dot(pt, dr, basis_category);
+    }
+
     size_t size() const {
         return basis.size();
     }
@@ -48,7 +54,12 @@ struct dot_evaluator
 
 private:
     auto eval_dot(const point_type& pt, vector_basis_tag) {
-        return basis(pt)*n;
+        return (basis(pt)*n).eval();
+    }
+
+    template<typename Range>
+    auto eval_dot(const point_type& pt, const Range& dr, vector_basis_tag) {
+        return (basis(pt, dr)*n).eval();
     }
 
     //auto eval_dot(const point_type& pt, matrix_basis_tag) {
@@ -80,6 +91,11 @@ struct grad_evaluator
 
     auto operator()(const point_type& pt) const {
         return basis.grad(pt);
+    }
+
+    template<typename Range>
+    auto operator()(const point_type& pt, const Range& dr) const {
+        return basis.grad(pt, dr);
     }
 
     auto dot(const normal_type& n) const {
@@ -117,7 +133,6 @@ struct div_evaluator
     static const size_t tensor_order = Basis::tensor_order-1;
     using value_type = typename tensor<scalar_type, basis_dimension, tensor_order>::value_type;
     using sum_type = Eigen::Matrix<coordinate_type, immersion_dimension, 1>;
-    sum_type sum = sum_type::Ones();
 
     div_evaluator() = delete;
     div_evaluator(const div_evaluator&) = delete;
@@ -129,6 +144,12 @@ struct div_evaluator
     auto operator()(const point_type& pt) const {
         typename basis_traits<Basis>::category basis_category;
         return eval_div(pt, basis_category);
+    }
+
+    template<typename Range>
+    auto operator()(const point_type& pt, const Range& dr) {
+        typename basis_traits<Basis>::category basis_category;
+        return eval_div(pt, dr, basis_category);
     }
 
     size_t size() const {
@@ -145,7 +166,14 @@ struct div_evaluator
 
 private:
     auto eval_div(const point_type& pt, vector_basis_tag) {
-        return basis(pt)*sum;
+        sum_type sum = sum_type::Ones();
+        return (basis(pt)*sum).eval();
+    }
+
+    template<typename Range>
+    auto eval_div(const point_type& pt, const Range& dr, vector_basis_tag) {
+        sum_type sum = sum_type::Ones();
+        return (basis(pt, dr)*sum).eval();
     }
 
     //auto eval_div(const point_type& pt, matrix_basis_tag) {
@@ -175,6 +203,7 @@ eval(const typename Basis::point_type& pt,
      const Basis& basis,
      scalar_basis_tag)
 {
+    assert(dofs.rows() == basis.size());
     auto phi = basis(pt);
     return phi.transpose()*dofs;
 }
@@ -186,6 +215,7 @@ eval(const typename Basis::point_type& pt,
      const Basis& basis,
      vector_basis_tag)
 {
+    assert(dofs.rows() == basis.size());
     auto phi = basis(pt);
     return phi.transpose()*dofs;
 }

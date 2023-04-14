@@ -124,31 +124,41 @@ int test_basis_functions(const Mesh& msh)
 
     auto basis = scaled_monomial_basis(msh, cl, degree);
 
-    L2_projector π(msh, cl, basis);
-    auto dofs_f = π(f);
+    //L2_projector π(msh, cl, basis);
+    //auto dofs_f = π(f);
+
+    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> proj_mass =
+        integrate(msh, cl, basis, basis);
+    
+    Eigen::Matrix<T, Eigen::Dynamic, 1> proj_rhs =
+        integrate(msh, cl, f, basis);
+
+    Eigen::Matrix<T, Eigen::Dynamic, 1> dofs_f = proj_mass.ldlt().solve(proj_rhs);
+
+    auto ideg = 2*basis.integration_degree()+1;
 
     /* Error on the projected function */
     auto errf = [&](const point_type& pt) {
         T s = f(pt) - eval(pt, dofs_f, basis);
         return s*s;
     };
-    auto fun_error = integrate(msh, cl, 2*degree+1, errf); 
+    auto fun_error = integrate(msh, cl, ideg, errf); 
 
     /* Norm of the projected function */
     auto normf = [&](const point_type& pt) {
         T s = f(pt);
         return s*s;
     };
-    auto fun_norm = integrate(msh, cl, 2*degree+1, normf);
+    auto fun_norm = integrate(msh, cl, ideg, normf);
 
     /* Error on the gradient of the projected function */
-    auto grad_error = integrate(msh, cl, 2*degree+1, [&](const point_type& pt) {
+    auto grad_error = integrate(msh, cl, ideg, [&](const point_type& pt) {
         Eigen::Matrix<T,2,1> s = grad_f(pt) - eval(pt, dofs_f, grad(basis));
         return s.dot(s);
     });
 
     /* Norm of the gradient of the projected function */
-    auto grad_norm = integrate(msh, cl, 2*degree+1, [&](const point_type& pt) {
+    auto grad_norm = integrate(msh, cl, ideg, [&](const point_type& pt) {
         auto s = grad_f(pt);
         return s.dot(s);
     });

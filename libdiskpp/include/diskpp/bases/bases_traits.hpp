@@ -1,11 +1,20 @@
 #pragma once
-
 namespace disk::basis {
 
-template<typename Trial, typename Test>
-struct can_take_scalar_product {
-    static const bool value = (Trial::tensor_order == Test::tensor_order);
+template<typename T>
+concept basis = requires {
+    T::immersion_dimension;
+    T::basis_dimension;
+    T::tensor_order;
 };
+
+template<typename Trial, typename Test>
+struct can_take_scalar_product
+{};
+
+template<basis Trial, basis Test>
+struct can_take_scalar_product<Trial, Test>
+    : std::bool_constant<Trial::tensor_order == Test::tensor_order> { };
 
 template<size_t order>
 struct basis_category_tag
