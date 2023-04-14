@@ -296,7 +296,8 @@ main(int argc, char** argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.medit2d$")))
     {
         std::cout << "Guessed mesh format: Medit format" << std::endl;
-        auto msh = disk::load_medit_2d_mesh<RealType>(mesh_filename);
+        disk::generic_mesh<RealType,2> msh;
+        disk::load_mesh_medit<RealType>(mesh_filename, msh);
         run_nl_solid_mechanics_solver(msh, rp, material_data);
         return 0;
     }
@@ -305,7 +306,8 @@ main(int argc, char** argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.medit3d$")))
     {
         std::cout << "Guessed mesh format: Medit format" << std::endl;
-        auto msh = disk::load_medit_3d_mesh<RealType>(mesh_filename);
+        disk::generic_mesh<RealType,3> msh;
+        disk::load_mesh_medit<RealType>(mesh_filename, msh);
         run_nl_solid_mechanics_solver(msh, rp, material_data);
         return 0;
     }
