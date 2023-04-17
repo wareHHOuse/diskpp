@@ -249,6 +249,12 @@ set(LINK_LIBS ${LINK_LIBS} npaster_gmshtools)
 add_subdirectory(libdiskpp)
 add_subdirectory(apps)
 
+option(BUILD_DISKPP_UNIT_TESTS "Build DiSk++ unitary tests" ON)
+if (BUILD_DISKPP_UNIT_TESTS)
+    add_subdirectory(unit_tests)
+endif()
+
+
 ##
 ## Packaging
 ##
