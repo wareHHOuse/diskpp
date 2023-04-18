@@ -44,6 +44,7 @@
 #include "diskpp/bases/bases_utils.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/output/silo.hpp"
+#include "diskpp/common/timecounter.hpp"
 
 #define KXX 0.1
 #define KXY 0.0
@@ -96,7 +97,6 @@ struct rhs_functor< Mesh<T, 2, Storage> >
         diff_tens = dt;
     }
 
-    /*
     scalar_type operator()(const point_type& pt) const
     {
         auto k00 = diff_tens(0,0);
@@ -110,8 +110,8 @@ struct rhs_functor< Mesh<T, 2, Storage> >
 
         return - M_PI * M_PI * ( (k01+k10) * cos_px * cos_py - (k00+k11) * sin_px * sin_py );
     }
-    */
 
+   /*
    scalar_type operator()(const point_type& pt) const
    {
         auto A = 0.01;
@@ -127,6 +127,7 @@ struct rhs_functor< Mesh<T, 2, Storage> >
             - 2*A*y*(-y + 1)*(exp(20*x) - 1));
         return -ret;
    }
+   */
 };
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
@@ -193,14 +194,14 @@ struct solution_functor< Mesh<T, 2, Storage> >
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::point_type  point_type;
 
-    /*
+    
     scalar_type operator()(const point_type& pt) const
     {
         auto sin_px = std::sin(M_PI * pt.x());
         auto sin_py = std::sin(M_PI * pt.y());
         return sin_px * sin_py;
     }
-    */
+    /*
     scalar_type operator()(const point_type& pt) const
     {
         auto A = 0.01;
@@ -210,6 +211,7 @@ struct solution_functor< Mesh<T, 2, Storage> >
         auto ret = A*x*y*(1-x)*(1-y)*(exp(20*x)-1);
         return ret;
     }
+    */
 };
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
@@ -255,7 +257,6 @@ struct solution_gradient_functor< Mesh<T, 2, Storage> >
     typedef typename Eigen::Matrix<T,2,1>       gradient_type;
     typedef typename mesh_type::point_type      point_type;
 
-    /*
     gradient_type operator()(const point_type& pt) const
     {
         auto sin_px = std::sin(M_PI * pt.x());
@@ -268,8 +269,8 @@ struct solution_gradient_functor< Mesh<T, 2, Storage> >
         ret(1) = M_PI * sin_px * cos_py;
         return ret;
     }
-    */
 
+    /*
     gradient_type operator()(const point_type& pt) const
     {
         auto A = 0.01;
@@ -284,6 +285,7 @@ struct solution_gradient_functor< Mesh<T, 2, Storage> >
             + A*x*(-x + 1)*(-y + 1)*(exp(20*x) - 1);
         return ret;
     }
+    */
 };
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
@@ -354,12 +356,15 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
     std::cout << "Stabilization-free: " << std::boolalpha << stabfree << std::endl;
     std::cout << "Use projection in reconstruction: " << std::boolalpha << use_proj << std::endl;
 
+    timecounter tc;
+    tc.tic();
     for (auto& cl : msh)
     {
         auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
 
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A;
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> GR;
+        /*
         if (use_proj) {
             auto oper = make_shlp(msh, cl, hdi, diff_tens);
             A = oper.second;
@@ -378,6 +383,12 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
             else
                 A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
         }
+        */
+
+        auto oper = make_sfl(msh, cl, hdi, diff_tens);
+        A = oper.second;
+        GR = oper.first;
+        //A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
 
         Eigen::Matrix<T, Eigen::Dynamic, 1> rhs = make_rhs(msh, cl, cb, rhs_fun);
         auto sc = make_scalar_static_condensation(msh, cl, hdi, A, rhs);
@@ -385,6 +396,9 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
     }
 
     assembler.finalize();
+    tc.toc();
+
+    std::cout << "Assembly time: " << tc << std::endl;
 
     size_t systsz = assembler.LHS.rows();
     size_t nnz = assembler.LHS.nonZeros();
@@ -411,15 +425,17 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
     for (auto& cl : msh)
     {
         auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-        auto rb = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
-        //rb.maximum_polynomial_degree(hdi.face_degree()+1);
+        //auto rb = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+        auto rb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
+        rb.maximum_polynomial_degree(hdi.face_degree()+2);
 
         auto rbs = rb.size();
 
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A;
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> GR;
+        /*
         if (use_proj) {
-            auto oper = make_shlp(msh, cl, hdi, diff_tens);
+            auto oper = make_shlph(msh, cl, hdi, diff_tens);
             A = oper.second;
             GR = oper.first;
         }
@@ -436,6 +452,12 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
             else
                 A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
         }
+        */
+        auto oper = make_sfl(msh, cl, hdi, diff_tens);
+        A = oper.second;
+        GR = oper.first;
+        //A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
+
 
         auto rhs = make_rhs(msh, cl, cb, rhs_fun);
 
@@ -488,7 +510,7 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
         Merr += diffT.dot(MM*diffT);
     }
 
-    /*
+    
     std::stringstream ss;
     ss << "stabfree_" << hdi.cell_degree() << "_" << hdi.face_degree() << "_" << hdi.reconstruction_degree();
     ss << ".silo";
@@ -504,7 +526,7 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
     db.add_variable("mesh", silo_u_var);
     db.add_variable("mesh", silo_f_var);
     db.close();
-    */
+    
     
 
     error_info<T> ei;
