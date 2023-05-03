@@ -304,7 +304,7 @@ public:
                 auto ea_ofs = fvca5::offset(hm, pa, false);
                 surface_nodes.push_back(ea_ofs);
             }
-            
+
             auto domain_id = 0;
             auto surface = surface_type(surface_edges);
             surface.set_point_ids(surface_nodes.begin(), surface_nodes.end()); /* XXX: crap */
@@ -368,7 +368,7 @@ void make_single_element_mesh(generic_mesh<T,1>& msh, const T& a, const T& b)
     storage->boundary_info.resize(num_nodes);
     boundary_descriptor bi(0, true);
     storage->boundary_info.at(0) = bi;
-    storage->boundary_info.at(1) = bi;    
+    storage->boundary_info.at(1) = bi;
 }
 
 template<typename T>
@@ -404,6 +404,55 @@ void make_single_element_mesh(simplicial_mesh<T,2>& msh, const point<T,2>& a, co
 }
 
 template<typename T>
+void make_single_element_mesh(simplicial_mesh<T,3>& msh,
+    const point<T,3>& a,
+    const point<T,3>& b,
+    const point<T,3>& c,
+    const point<T,3>& d)
+{
+    using mesh_type = simplicial_mesh<T,3>;
+    using point_type = typename mesh_type::point_type;
+    using node_type = typename mesh_type::node_type;
+    using edge_type = typename mesh_type::edge_type;
+    using nodeid_type = typename node_type::id_type;
+
+    auto storage = msh.backend_storage();
+
+    storage->points.push_back( a );
+    storage->points.push_back( b );
+    storage->points.push_back( c );
+    storage->points.push_back( d );
+
+    auto p0 = point_identifier<3>(0);
+    auto p1 = point_identifier<3>(1);
+    auto p2 = point_identifier<3>(2);
+    auto p3 = point_identifier<3>(3);
+
+    // Base face
+    storage->edges.push_back( {p0, p1} );
+    storage->edges.push_back( {p0, p2} );
+    storage->edges.push_back( {p1, p2} );
+    storage->surfaces.push_back( {p0, p1, p2} );
+
+    // Front face
+    storage->edges.push_back( {p0, p3} );
+    storage->edges.push_back( {p1, p3} );
+    storage->surfaces.push_back( {p0, p1, p3} );
+
+    // Lateral face
+    storage->edges.push_back( {p2, p3} );
+    storage->surfaces.push_back( {p1, p2, p3} );
+
+    // Back face
+    storage->surfaces.push_back( {p0, p2, p3} );
+
+    storage->volumes.push_back( {p0, p1, p2, p3} );
+
+    storage->subdomain_info.resize( 1 );
+
+}
+
+template<typename T>
 void make_single_element_mesh(cartesian_mesh<T,2>& msh, const point<T,2>& base, const T& hx, const T& hy)
 {
     using mesh_type = cartesian_mesh<T,2>;
@@ -418,7 +467,7 @@ void make_single_element_mesh(cartesian_mesh<T,2>& msh, const point<T,2>& base, 
     storage->points.push_back( point_type( base.x()+hx,    base.y() ) );
     storage->points.push_back( point_type(    base.x(), base.y()+hy ) );
     storage->points.push_back( point_type( base.x()+hx, base.y()+hy ) );
-    
+
 
     auto p0 = point_identifier<2>(0);
     auto p1 = point_identifier<2>(1);
@@ -438,5 +487,74 @@ void make_single_element_mesh(cartesian_mesh<T,2>& msh, const point<T,2>& base, 
     storage->surfaces.push_back( {p0, p1, p2, p3} );
     storage->subdomain_info.resize( 1 );
 }
+
+
+template<typename T>
+void make_single_element_mesh(cartesian_mesh<T,3>& msh, const point<T,3>& base, const T& hx, const T& hy, const T& hz)
+{
+    using mesh_type = cartesian_mesh<T,3>;
+    using point_type = typename mesh_type::point_type;
+    using node_type = typename mesh_type::node_type;
+    using edge_type = typename mesh_type::edge_type;
+    using nodeid_type = typename node_type::id_type;
+
+    auto storage = msh.backend_storage();
+
+    storage->points.push_back(point_type( base.x(),    base.y(), base.z()));
+    storage->points.push_back(point_type( base.x()+hx, base.y(), base.z()));
+    storage->points.push_back(point_type( base.x()   , base.y()+hy, base.z()));
+    storage->points.push_back(point_type( base.x()+hx, base.y()+hy, base.z()));
+    storage->points.push_back(point_type( base.x()   , base.y(), base.z()+hz));
+    storage->points.push_back(point_type( base.x()+hx, base.y(), base.z()+hz));
+    storage->points.push_back(point_type( base.x()   , base.y()+hy, base.z()+hz));
+    storage->points.push_back(point_type( base.x()+hx, base.y()+hy, base.z()+hz));
+
+    auto p0 = point_identifier<3>(0);
+    auto p1 = point_identifier<3>(1);
+    auto p2 = point_identifier<3>(2);
+    auto p3 = point_identifier<3>(3);
+    auto p4 = point_identifier<3>(4);
+    auto p5 = point_identifier<3>(5);
+    auto p6 = point_identifier<3>(6);
+    auto p7 = point_identifier<3>(7);
+
+    storage->nodes.push_back( { p0 } );
+    storage->nodes.push_back( { p1 } );
+    storage->nodes.push_back( { p2 } );
+    storage->nodes.push_back( { p3 } );
+    storage->nodes.push_back( { p4 } );
+    storage->nodes.push_back( { p5 } );
+    storage->nodes.push_back( { p6 } );
+    storage->nodes.push_back( { p7 } );
+
+    storage->edges.push_back( {p0, p1} );
+    storage->edges.push_back( {p0, p2} );
+    storage->edges.push_back( {p1, p3} );
+    storage->edges.push_back( {p2, p3} );
+    storage->edges.push_back( {p0, p4} );
+    storage->edges.push_back( {p1, p5} );
+    storage->edges.push_back( {p3, p7} );
+    storage->edges.push_back( {p2, p6} );
+    storage->edges.push_back( {p4, p6} );
+    storage->edges.push_back( {p6, p7} );
+    storage->edges.push_back( {p4, p5} );
+    storage->edges.push_back( {p5, p7} );
+    std::sort(storage->edges.begin(), storage->edges.end());
+
+    storage->surfaces.push_back({ p0, p1, p3, p2 });
+    storage->surfaces.push_back( {p4, p5, p7, p6} );
+    storage->surfaces.push_back( {p0, p2, p6, p4} );
+    storage->surfaces.push_back( {p1, p3, p7, p5} );
+    storage->surfaces.push_back( {p0, p1, p5, p4} );
+    storage->surfaces.push_back({ p2, p3, p7, p6 });
+    std::sort(storage->surfaces.begin(), storage->surfaces.end());
+
+    storage->volumes.push_back( {p0, p1, p2, p3, p4, p5, p6, p7} );
+
+    storage->subdomain_info.resize( 1 );
+}
+
+
+
 
 } //namespace disk
