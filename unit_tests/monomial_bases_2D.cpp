@@ -204,7 +204,7 @@ int main(void)
     using T = double;
 
     simplicial_mesh<T,2> msh_simp;
-    make_single_element_mesh(msh_simp, {0,0}, {1,0}, {0,1});
+    make_single_element_mesh(msh_simp, {0,0}, {0.01,0}, {0.0005, 0.01});
     test_basis_functions(msh_simp);
 
     cartesian_mesh<T,2> msh_cart;

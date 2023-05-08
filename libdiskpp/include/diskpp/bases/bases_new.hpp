@@ -15,6 +15,14 @@
 #include "diskpp/quadratures/quadrature_point.hpp"
 namespace disk::basis {
 
+enum class rescaling_strategy
+{
+    unspecified,
+    none,
+    gram_schmidt,
+    inertial
+};
+
 /***************************************/
 
 struct max_tag {};
@@ -271,16 +279,32 @@ private:
     vec_type        v0_, v1_;
 
     void
-    compute_reference_frame(const mesh_type& msh, const cell_type& cl)
+    compute_reference_frame(const mesh_type& msh, const cell_type& cl, rescaling_strategy rs)
     {
-        auto pts = points(msh, cl);
-        assert(pts.size() >= 3);
-        v0_ = (pts[1] - pts[0]).to_vector();
-        v1_ = (pts[2] - pts[0]).to_vector();
-        v1_ = v1_ - v1_.dot(v0_)*v0_/(v0_.dot(v0_)); // Gram-Schmidt
-        tr_.col(0) = v0_;
-        tr_.col(1) = v1_;
-        tr_ = tr_.inverse().eval();
+        tr_ = tr_mat_type::Identity();
+
+        switch(rs)
+        {
+            case rescaling_strategy::gram_schmidt: {
+                auto pts = points(msh, cl);
+                assert(pts.size() >= 3);
+                v0_ = (pts[1] - pts[0]).to_vector();
+                v1_ = (pts[2] - pts[0]).to_vector();
+                v1_ = v1_ - v1_.dot(v0_)*v0_/(v0_.dot(v0_)); // Gram-Schmidt
+                tr_.col(0) = v0_;
+                tr_.col(1) = v1_;
+                tr_ = tr_.inverse().eval();
+            } break;
+
+            case rescaling_strategy::inertial: {
+                tr_ = scaled_inertia_axes(msh, cl);
+                tr_ = tr_.transpose().eval();
+            } break;
+        
+            case rescaling_strategy::none:
+            case rescaling_strategy::unspecified:
+                break;
+        }
     }
 
     point_type phys2ref(const point_type& pt) const {
@@ -301,7 +325,7 @@ public:
         : degree_(degree), size_( size_of_degree(degree) )
     {
         bar_ = barycenter(msh, cl);
-        compute_reference_frame(msh, cl);
+        compute_reference_frame(msh, cl, rescaling_strategy::inertial);
     }
 
     value_array_type operator()(const point_type& pt) const {
@@ -374,6 +398,10 @@ public:
 
     size_t integration_degree() const {
         return degree_;
+    }
+
+    tr_mat_type element_coordinate_transform() const {
+        return tr_;
     }
 };
 
