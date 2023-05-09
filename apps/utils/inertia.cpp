@@ -37,6 +37,17 @@ barycenter(const std::vector<disk::point<T,DIM>>& points)
     return ret * 1./T(points.size());
 }
 
+template<typename T, size_t DIM>
+T diameter(const std::vector<disk::point<T,DIM>>& points)
+{
+    T diam = 0.0;
+    for (size_t i = 0; i < points.size(); i++)
+        for (size_t j = i; j < points.size(); j++)
+            diam = std::max( diam, distance(points[i], points[j]) );
+    
+    return diam;
+}
+
 
 
 class postscript_plotter
@@ -64,16 +75,7 @@ class postscript_plotter
         return points*25.4/72.;
     }
 
-    template<typename T, size_t DIM>
-    T diameter(const std::vector<disk::point<T,DIM>>& points)
-    {
-        T diam = 0.0;
-        for (size_t i = 0; i < points.size(); i++)
-            for (size_t j = i; j < points.size(); j++)
-                diam = std::max( diam, distance(points[i], points[j]) );
-        
-        return diam;
-    }
+    
 
     template<typename T>
     std::pair<disk::point<T,2>, disk::point<T,2>>
@@ -98,33 +100,35 @@ class postscript_plotter
         return std::make_pair(c1, c2);
     }
 
-    void make_grid(void)
+    void linewidth(double lw)
     {
-        ps_ofs << "0.2 setlinewidth" << std::endl;
+        ps_ofs << lw << " setlinewidth" << std::endl;
+    }
 
-        for (size_t row = 0; row < rows+1; row++)
-        {
-            double line_start_x = mm_to_points(margin_x);
-            double line_start_y = mm_to_points(margin_y + row*box_height);
+    void line(double sx, double sy, double ex, double ey)
+    {
+        ps_ofs << sx << " " << sy << " moveto" << std::endl;
+        ps_ofs << ex << " " << ey << " lineto" << std::endl;
+    }
 
-            double line_end_x = mm_to_points(margin_x + cols*box_width);
-            double line_end_y = mm_to_points(margin_y + row*box_height);
+    void moveto(double x, double y)
+    {
+        ps_ofs << x << " " << y << " moveto" << std::endl;
+    }
 
-            ps_ofs << line_start_x << " " << line_start_y << " moveto" << std::endl;
-            ps_ofs << line_end_x << " " << line_end_y << " lineto" << std::endl;
-        }
+    void rlineto(double x, double y)
+    {
+        ps_ofs << x << " " << y << " rlineto" << std::endl;
+    }
 
-        for (size_t col = 0; col < cols+1; col++)
-        {
-            double line_start_x = mm_to_points(margin_x + col*box_width);
-            double line_start_y = mm_to_points(margin_y);
+    void setrgbcolor(double r, double g, double b)
+    {
+        ps_ofs << r << " " << g << " " << b << " setrgbcolor" << std::endl;
+    }
 
-            double line_end_x = mm_to_points(margin_x + col*box_width);
-            double line_end_y = mm_to_points(margin_y + rows*box_height);
-
-            ps_ofs << line_start_x << " " << line_start_y << " moveto" << std::endl;
-            ps_ofs << line_end_x << " " << line_end_y << " lineto" << std::endl;
-        }
+    void closepath(void)
+    {
+        ps_ofs << "closepath" << std::endl;
     }
 
     void stroke(void)
@@ -135,6 +139,42 @@ class postscript_plotter
     void show_page(void)
     {
         ps_ofs << "showpage" << std::endl;
+    }
+
+    template<typename T>
+    void write(const T& t)
+    {
+        ps_ofs << "(" << t << ") show" << std::endl;
+    }
+
+    void make_grid(void)
+    {
+        setrgbcolor(0.,0.,0.);
+        linewidth(0.2);
+
+        for (size_t row = 0; row < rows+1; row++)
+        {
+            double line_sx = mm_to_points(margin_x);
+            double line_sy = mm_to_points(margin_y + row*box_height);
+
+            double line_ex = mm_to_points(margin_x + cols*box_width);
+            double line_ey = mm_to_points(margin_y + row*box_height);
+
+            line(line_sx, line_sy, line_ex, line_ey);
+        }
+
+        for (size_t col = 0; col < cols+1; col++)
+        {
+            double line_sx = mm_to_points(margin_x + col*box_width);
+            double line_sy = mm_to_points(margin_y);
+
+            double line_ex = mm_to_points(margin_x + col*box_width);
+            double line_ey = mm_to_points(margin_y + rows*box_height);
+
+            line(line_sx, line_sy, line_ex, line_ey);
+        }
+
+        stroke();
     }
     
 public:
@@ -152,51 +192,76 @@ public:
     }
 
     template<typename T>
-    void add_poly(const std::vector<disk::point<T,3>>& points, const std::vector<disk::point<T,3>>&)
+    void add_poly(const std::vector<disk::point<T,3>>& points, const Eigen::Matrix<T,3,3>& m)
     {}
 
     template<typename T>
     void add_poly(const std::vector<disk::point<T,2>>& points,
-        const std::vector<disk::point<T,2>>& points_tr)
+        const Eigen::Matrix<T,2,2>& m)
     {
+        auto tr = [&](const disk::point<T,2>& pt) {
+            Eigen::Matrix<T, 2, 1> trp = m.transpose()*pt.to_vector();
+            disk::point<T,2> ret;
+            ret.x() = trp(0);
+            ret.y() = trp(1);
+            return ret;
+        };
+
+        std::vector<disk::point<T,2>> points_tr(points.size());
+        std::transform(points.begin(), points.end(), points_tr.begin(), tr);
+
         if (curr_index == 0) {
             make_grid();
-            stroke();
-            ps_ofs << "1 setlinewidth" << std::endl;
         }
         
+        setrgbcolor(0.,0.,0.);
+        linewidth(0.6);
         auto [c1, c2] = centers<T>(curr_index);
         
         auto sf_orig = scaling_factor(points);
         auto bar_orig = barycenter(points);
         auto p0 = c1 + (points[0] - bar_orig)/sf_orig;
-        ps_ofs << mm_to_points(p0.x()) << " " << mm_to_points(p0.y()) << " moveto" << std::endl;
+        moveto( mm_to_points(p0.x()), mm_to_points(p0.y()) );
         for (size_t i = 1; i < points.size(); i++) {
             auto v = (points[i] - points[i-1])/sf_orig;
-            ps_ofs << mm_to_points(v.x()) << " " << mm_to_points(v.y()) << " rlineto" << std::endl;
+            rlineto( mm_to_points(v.x()), mm_to_points(v.y()) );
         }
-        ps_ofs << "closepath" << std::endl;
-        ps_ofs << mm_to_points(c1.x()-10.0) << " " << mm_to_points(c1.y()-10.0) << " moveto" << std::endl;
-        ps_ofs << "(" << diameter(points) << ") show" << std::endl;
+        closepath();
+
+        moveto( mm_to_points(c1.x()-8.0), mm_to_points(c1.y()-11.0) );
+        write( diameter(points) );
 
         auto sf_tr = scaling_factor(points_tr);
         auto bar_tr = barycenter(points_tr);
         auto p0_tr = c2 + (points_tr[0] - bar_tr)/sf_tr;
-        ps_ofs << mm_to_points(p0_tr.x()) << " " << mm_to_points(p0_tr.y()) << " moveto" << std::endl;
+        moveto( mm_to_points(p0_tr.x()), mm_to_points(p0_tr.y()) );
         for (size_t i = 1; i < points_tr.size(); i++) {
             auto v = (points_tr[i] - points_tr[i-1])/sf_tr;
-            ps_ofs << mm_to_points(v.x()) << " " << mm_to_points(v.y()) << " rlineto" << std::endl;
+            rlineto( mm_to_points(v.x()), mm_to_points(v.y()) );
         }
-        ps_ofs << "closepath" << std::endl;
-        ps_ofs << "stroke" << std::endl;
-        ps_ofs << mm_to_points(c2.x()-10.0) << " " << mm_to_points(c2.y()-10.0) << " moveto" << std::endl;
-        ps_ofs << "(" << diameter(points_tr) << ") show" << std::endl;
+        closepath();
+
+        moveto( mm_to_points(c2.x()-8.0), mm_to_points(c2.y()-11.0) );
+        write( diameter(points_tr) );
+        stroke();
+
+        setrgbcolor(1.,0.,0.);
+        linewidth(0.2);
+        auto scale = std::max(m.col(0).norm(), m.col(1).norm());
+        auto v0 = 8.0*m.col(0)/scale;
+        auto v1 = 8.0*m.col(1)/scale;
+        moveto( mm_to_points(c1.x()), mm_to_points(c1.y()) );
+        rlineto( mm_to_points(v0(0)), mm_to_points(v0(1)) );
+        closepath();
+        moveto( mm_to_points(c1.x()), mm_to_points(c1.y()) );
+        rlineto( mm_to_points(v1(0)), mm_to_points(v1(1)) );
+        closepath();
+        stroke();
 
         curr_index++;
 
         if (curr_index >= rows*cols) {
             curr_index = 0;
-            stroke();
             show_page();
         }
     }
@@ -210,37 +275,6 @@ public:
     }
 };
 
-
-
-
-template<typename T>
-void
-plot_ps(const std::vector<T>& points, const T& bar, const std::string& filename)
-{
-    std::ofstream ofs(filename);
-
-    double pt_scale = 2.54/72.;
-
-    ofs << "newpath" << std::endl;
-    ofs << "144 144 moveto" << std::endl;
-
-    auto p0 = points[0] - bar;
-
-    ofs << int(10.*p0.x()/pt_scale) << " " << int(10.*p0.y()/pt_scale) << " rmoveto" << std::endl;
-
-    for (size_t i = 1; i < points.size(); i++) {
-        const auto& pt = (points[i] - points[i-1]);
-        int x = 10.*pt.x()/pt_scale;
-        int y = 10.*pt.y()/pt_scale;
-        ofs << x << " " << y << " rlineto" << std::endl;
-    }
-    ofs << "closepath" << std::endl;
-    //ofs << "8 setlinewidth" << std::endl;
-    ofs << "stroke" << std::endl;
-    ofs << "showpage" << std::endl;
-}
-
-
 template<typename Mesh>
 int
 plot_inertia(Mesh& msh)
@@ -249,59 +283,20 @@ plot_inertia(Mesh& msh)
     static const size_t DIM = Mesh::dimension;
     using point_type = typename Mesh::point_type;
 
-    std::vector<double> axis1_x, axis1_y, axis2_x, axis2_y;
-    std::vector<double> elem_nums;
-
-    postscript_plotter psplot("test.ps");
+    postscript_plotter psplot("inertia_transformations.ps");
 
     int elem_num = 0;
     for (auto& cl : msh)
     {
         Eigen::Matrix<T,DIM,DIM> m = scaled_inertia_axes(msh, cl);
-        axis1_x.push_back( m(0,0) );
-        axis1_y.push_back( m(1,0) );
-        axis2_x.push_back( m(0,1) );
-        axis2_y.push_back( m(1,1) );
-        elem_nums.push_back( elem_num++ );
         auto pts = points(msh, cl);
-
-        auto bar = barycenter(msh, cl);
-
         std::vector<point_type> pp(pts.begin(), pts.end());
-        //plot_ps(pp, bar, "elem_" + std::to_string(elem_num) + ".ps" );
-
-        auto tr = [&](const point_type& pt) {
-            Eigen::Matrix<T, DIM, 1> trp = m.transpose()*pt.to_vector();
-            point_type ret;
-            ret.x() = trp(0);
-            ret.y() = trp(1);
-            return ret;
-        };
-
-        std::vector<point_type> pt(pp.size());
-        std::transform(pp.begin(), pp.end(), pt.begin(), tr);
-        psplot.add_poly(pp, pt);
+        psplot.add_poly(pp, m);
     }
 
     disk::silo_database db;
-    db.create("inertia.silo");
-
+    db.create("inertia_starting_mesh.silo");
     db.add_mesh(msh, "mesh");
-
-    disk::silo_zonal_variable<double> a1x("a1x", axis1_x);
-    disk::silo_zonal_variable<double> a1y("a1y", axis1_y);
-    disk::silo_zonal_variable<double> a2x("a2x", axis2_x);
-    disk::silo_zonal_variable<double> a2y("a2y", axis2_y);
-    disk::silo_zonal_variable<double> elnum("elnum", elem_nums);
-
-    db.add_variable("mesh", a1x);
-    db.add_variable("mesh", a1y);
-    db.add_variable("mesh", a2x);
-    db.add_variable("mesh", a2y);
-    db.add_variable("mesh", elnum);
-
-    db.add_expression("a1", "{a1x, a1y}", DB_VARTYPE_VECTOR);
-    db.add_expression("a2", "{a2x, a2y}", DB_VARTYPE_VECTOR);
 
     return 0;
 }
