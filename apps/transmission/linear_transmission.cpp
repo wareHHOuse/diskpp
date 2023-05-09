@@ -848,6 +848,37 @@ void lt_solver(Mesh& msh, size_t degree, const std::string& pbdefs_fn)
     if ( pd.compensate_average2() )
         pd.avgcomp2( omega2_integral/volume2 );
 
+    double omega1_integral_aftercomp = 0.0;
+    double omega2_integral_aftercomp = 0.0;
+
+    for (auto& cl : msh) {
+        auto qps = integrate(msh, cl, 10);
+
+        auto di = msh.domain_info(cl);
+        if ( di.tag() == internal_tag ) {
+            for (auto& qp : qps) {
+                omega1_integral_aftercomp += qp.weight() * pd.u1(msh, qp.point());
+            }
+        }
+        else {
+            for (auto& qp : qps) {
+                omega2_integral_aftercomp += qp.weight() * pd.u2(msh, qp.point());
+            }
+        }
+    }
+
+    if ( pd.compensate_average1() ) {
+        std::cout << "mean of u₁ on Ω₁: " << std::setprecision(15);
+        std::cout << omega1_integral_aftercomp/volume1 << " (after compensation)";
+        std::cout << std::endl;
+    }
+
+    if ( pd.compensate_average2() ) {
+        std::cout << "mean of u₂ on Ω₂: " << std::setprecision(15);
+        std::cout << omega2_integral_aftercomp/volume2 << " (after compensation)";
+        std::cout << std::endl;
+    }
+
     /* Assembly loop */
     for (auto& cl : msh)
     {
