@@ -272,19 +272,24 @@ private:
     using tr_mat_type = Eigen::Matrix<coordinate_type, immersion_dimension, immersion_dimension>;
     using vec_type = Eigen::Matrix<coordinate_type, immersion_dimension, 1>;
 
-    point_type      bar_;
-    size_t          degree_;
-    size_t          size_;
-    tr_mat_type     tr_;
-    vec_type        v0_, v1_;
+    point_type          bar_;
+    size_t              degree_;
+    size_t              size_;
+    tr_mat_type         tr_;
+    vec_type            v0_, v1_;
+    rescaling_strategy  rescs_
 
     void
-    compute_reference_frame(const mesh_type& msh, const cell_type& cl, rescaling_strategy rs)
+    compute_reference_frame(const mesh_type& msh, const cell_type& cl)
     {
         tr_ = tr_mat_type::Identity();
 
-        switch(rs)
+        switch(rescs_)
         {
+            case rescaling_strategy::none:
+            case rescaling_strategy::unspecified:
+                break;
+
             case rescaling_strategy::gram_schmidt: {
                 auto pts = points(msh, cl);
                 assert(pts.size() >= 3);
@@ -300,10 +305,6 @@ private:
                 tr_ = scaled_inertia_axes(msh, cl);
                 tr_ = tr_.transpose().eval();
             } break;
-        
-            case rescaling_strategy::none:
-            case rescaling_strategy::unspecified:
-                break;
         }
     }
 
@@ -322,10 +323,19 @@ private:
 
 public:
     scalar_monomial(const mesh_type& msh, const cell_type& cl, size_t degree)
-        : degree_(degree), size_( size_of_degree(degree) )
+        : degree_(degree), size_( size_of_degree(degree) ), rescs_(rescaling_strategy::gram_schmidt)
     {
         bar_ = barycenter(msh, cl);
-        compute_reference_frame(msh, cl, rescaling_strategy::inertial);
+        compute_reference_frame(msh, cl);
+    }
+
+    void rescaling(rescaling_strategy rs) {
+        rescs_ = rs;
+        compute_reference_frame();
+    }
+
+    rescaling_strategy rescaling(void) const {
+        return rescs_;
     }
 
     value_array_type operator()(const point_type& pt) const {
