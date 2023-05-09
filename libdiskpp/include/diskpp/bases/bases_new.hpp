@@ -277,20 +277,21 @@ private:
     size_t              size_;
     tr_mat_type         tr_;
     vec_type            v0_, v1_;
-    rescaling_strategy  rescs_
 
     void
-    compute_reference_frame(const mesh_type& msh, const cell_type& cl)
+    compute_reference_frame(const mesh_type& msh, const cell_type& cl, rescaling_strategy rs)
     {
-        tr_ = tr_mat_type::Identity();
+        auto inv_diam = 1./diameter(msh, cl);
+        tr_ = 2.*tr_mat_type::Identity()*inv_diam;
 
-        switch(rescs_)
+        switch(rs)
         {
             case rescaling_strategy::none:
             case rescaling_strategy::unspecified:
                 break;
 
             case rescaling_strategy::gram_schmidt: {
+                /*
                 auto pts = points(msh, cl);
                 assert(pts.size() >= 3);
                 v0_ = (pts[1] - pts[0]).to_vector();
@@ -298,6 +299,8 @@ private:
                 v1_ = v1_ - v1_.dot(v0_)*v0_/(v0_.dot(v0_)); // Gram-Schmidt
                 tr_.col(0) = v0_;
                 tr_.col(1) = v1_;
+                */
+                tr_ = element_local_axes(msh, cl);
                 tr_ = tr_.inverse().eval();
             } break;
 
@@ -322,20 +325,12 @@ private:
     }
 
 public:
-    scalar_monomial(const mesh_type& msh, const cell_type& cl, size_t degree)
-        : degree_(degree), size_( size_of_degree(degree) ), rescs_(rescaling_strategy::gram_schmidt)
+    scalar_monomial(const mesh_type& msh, const cell_type& cl, size_t degree, 
+        rescaling_strategy rs = rescaling_strategy::gram_schmidt)
+        : degree_(degree), size_( size_of_degree(degree) )
     {
         bar_ = barycenter(msh, cl);
-        compute_reference_frame(msh, cl);
-    }
-
-    void rescaling(rescaling_strategy rs) {
-        rescs_ = rs;
-        compute_reference_frame();
-    }
-
-    rescaling_strategy rescaling(void) const {
-        return rescs_;
+        compute_reference_frame(msh, cl, rs);
     }
 
     value_array_type operator()(const point_type& pt) const {
@@ -497,10 +492,6 @@ public:
         return degree_;
     }
 };
-
-
-
-
 
 /******************************************************************************
 Cells, 3D
@@ -819,11 +810,16 @@ public:
 };
 
 
-
 template<typename Mesh, typename Element, typename ScalT = typename Mesh::coordinate_type>
 auto scaled_monomial_basis(const Mesh& msh, const Element& elem, size_t degree)
 {
     return scalar_monomial<Mesh, Element, ScalT>(msh, elem, degree);
+}
+
+template<typename Mesh, typename Element, typename ScalT = typename Mesh::coordinate_type>
+auto scaled_monomial_basis(const Mesh& msh, const Element& elem, size_t degree, rescaling_strategy rs)
+{
+    return scalar_monomial<Mesh, Element, ScalT>(msh, elem, degree, rs);
 }
 
 template<typename Basis>

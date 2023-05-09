@@ -1,8 +1,20 @@
+/*
+ * DISK++, a template library for DIscontinuous SKeletal methods.
+ *
+ * Matteo Cicuttin (C) 2023
+ * matteo.cicuttin@polito.it
+ *
+ * Politecnico di Torino - DISMA
+ * Dipartimento di Matematica
+ */
+
+/* Make a postscript file with the drawings of the trasformation applied to
+ * each element during the evaluation of the monomial basis functions */
+
 #include <fstream>
 #include "diskpp/quadratures/quadratures.hpp"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/output/silo.hpp"
-
 
 template<typename T, size_t DIM>
 T scaling_factor(const std::vector<disk::point<T,DIM>>& points)
@@ -218,6 +230,7 @@ public:
         linewidth(0.6);
         auto [c1, c2] = centers<T>(curr_index);
         
+        /* Draw original element */
         auto sf_orig = scaling_factor(points);
         auto bar_orig = barycenter(points);
         auto p0 = c1 + (points[0] - bar_orig)/sf_orig;
@@ -228,9 +241,11 @@ public:
         }
         closepath();
 
+        /* Write diameter of the original element */
         moveto( mm_to_points(c1.x()-8.0), mm_to_points(c1.y()-11.0) );
         write( diameter(points) );
 
+        /* Draw transformed element */
         auto sf_tr = scaling_factor(points_tr);
         auto bar_tr = barycenter(points_tr);
         auto p0_tr = c2 + (points_tr[0] - bar_tr)/sf_tr;
@@ -241,18 +256,25 @@ public:
         }
         closepath();
 
+        /* Write diameter of the original element */
         moveto( mm_to_points(c2.x()-8.0), mm_to_points(c2.y()-11.0) );
         write( diameter(points_tr) );
         stroke();
 
-        setrgbcolor(1.,0.,0.);
-        linewidth(0.2);
         auto scale = std::max(m.col(0).norm(), m.col(1).norm());
         auto v0 = 8.0*m.col(0)/scale;
         auto v1 = 8.0*m.col(1)/scale;
+        linewidth(0.2);
+
+        /* First inertia axis */
+        setrgbcolor(1.,0.,0.);
         moveto( mm_to_points(c1.x()), mm_to_points(c1.y()) );
         rlineto( mm_to_points(v0(0)), mm_to_points(v0(1)) );
         closepath();
+        stroke();
+
+        /* Second inertia axis */
+        setrgbcolor(0.28, 0.71, 0.36);
         moveto( mm_to_points(c1.x()), mm_to_points(c1.y()) );
         rlineto( mm_to_points(v1(0)), mm_to_points(v1(1)) );
         closepath();
@@ -276,19 +298,23 @@ public:
 };
 
 template<typename Mesh>
-int
-plot_inertia(Mesh& msh)
+int plot_inertia(const Mesh& msh)
 {
-    using T = typename Mesh::coordinate_type;
-    static const size_t DIM = Mesh::dimension;
-    using point_type = typename Mesh::point_type;
+    return 1;
+}
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+int plot_inertia(const Mesh<T,2,Storage>& msh)
+{
+    using mesh_type = Mesh<T,2,Storage>;
+    using point_type = typename mesh_type::point_type;
 
     postscript_plotter psplot("inertia_transformations.ps");
 
     int elem_num = 0;
     for (auto& cl : msh)
     {
-        Eigen::Matrix<T,DIM,DIM> m = scaled_inertia_axes(msh, cl);
+        Eigen::Matrix<T,2,2> m = scaled_inertia_axes(msh, cl);
         auto pts = points(msh, cl);
         std::vector<point_type> pp(pts.begin(), pts.end());
         psplot.add_poly(pp, m);

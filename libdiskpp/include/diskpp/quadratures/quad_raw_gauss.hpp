@@ -175,10 +175,10 @@ gauss_legendre(size_t degree, const point<T,DIM>& a, const point<T,DIM>& b)
     return qps;
 }
 
-
 template<typename T>
 std::vector<quadrature_point<T,2>>
-tensorized_gauss_legendre(size_t degree, const std::array<point<T,2>, 4>& pts)
+tensorized_gauss_legendre(size_t degree, const point<T,2>& p0,
+    const point<T,2>& p1, const point<T,2>& p2, const point<T,2>& p3)
 {
     const auto num_rules = sizeof(priv::gauss_rules)/sizeof(priv::gauss_rule) - 1;
     const auto rule_num = degree/2;
@@ -202,31 +202,31 @@ tensorized_gauss_legendre(size_t degree, const std::array<point<T,2>, 4>& pts)
 
     /* points in pts must be in _counterclockwise_ order */
     auto X = [&](T xi, T eta) -> T {
-        return 0.25 * pts[0].x() * (1 - xi) * (1 - eta) +
-               0.25 * pts[1].x() * (1 + xi) * (1 - eta) +
-               0.25 * pts[2].x() * (1 + xi) * (1 + eta) +
-               0.25 * pts[3].x() * (1 - xi) * (1 + eta);
+        return 0.25 * p0.x() * (1 - xi) * (1 - eta) +
+               0.25 * p1.x() * (1 + xi) * (1 - eta) +
+               0.25 * p2.x() * (1 + xi) * (1 + eta) +
+               0.25 * p3.x() * (1 - xi) * (1 + eta);
     };
 
     auto Y = [&](T xi, T eta) -> T {
-        return 0.25 * pts[0].y() * (1 - xi) * (1 - eta) +
-               0.25 * pts[1].y() * (1 + xi) * (1 - eta) +
-               0.25 * pts[2].y() * (1 + xi) * (1 + eta) +
-               0.25 * pts[3].y() * (1 - xi) * (1 + eta);
+        return 0.25 * p0.y() * (1 - xi) * (1 - eta) +
+               0.25 * p1.y() * (1 + xi) * (1 - eta) +
+               0.25 * p2.y() * (1 + xi) * (1 + eta) +
+               0.25 * p3.y() * (1 - xi) * (1 + eta);
     };
 
     auto J = [&](T xi, T eta) -> T {
-        auto j11 = 0.25 * ( (pts[1].x() - pts[0].x()) * (1 - eta) +
-                            (pts[2].x() - pts[3].x()) * (1 + eta) );
+        auto j11 = 0.25 * ( (p1.x() - p0.x()) * (1 - eta) +
+                            (p2.x() - p3.x()) * (1 + eta) );
 
-        auto j12 = 0.25 * ( (pts[1].y() - pts[0].y()) * (1 - eta) +
-                            (pts[2].y() - pts[3].y()) * (1 + eta) );
+        auto j12 = 0.25 * ( (p1.y() - p0.y()) * (1 - eta) +
+                            (p2.y() - p3.y()) * (1 + eta) );
 
-        auto j21 = 0.25 * ( (pts[3].x() - pts[0].x()) * (1 - xi) +
-                            (pts[2].x() - pts[1].x()) * (1 + xi) );
+        auto j21 = 0.25 * ( (p3.x() - p0.x()) * (1 - xi) +
+                            (p2.x() - p1.x()) * (1 + xi) );
 
-        auto j22 = 0.25 * ( (pts[3].y() - pts[0].y()) * (1 - xi) +
-                            (pts[2].y() - pts[1].y()) * (1 + xi) );
+        auto j22 = 0.25 * ( (p3.y() - p0.y()) * (1 - xi) +
+                            (p2.y() - p1.y()) * (1 + xi) );
 
         return std::abs(j11 * j22 - j12 * j21);
     };
@@ -243,6 +243,13 @@ tensorized_gauss_legendre(size_t degree, const std::array<point<T,2>, 4>& pts)
     }
 
     return qps;
+}
+
+template<typename T>
+std::vector<quadrature_point<T,2>>
+tensorized_gauss_legendre(size_t degree, const std::array<point<T,2>, 4>& pts)
+{
+    return tensorized_gauss_legendre(degree, pts[0], pts[1], pts[2], pts[3]);
 }
 
 } // namespace disk::quadrature

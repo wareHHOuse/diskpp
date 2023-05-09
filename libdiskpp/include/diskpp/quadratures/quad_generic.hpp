@@ -32,6 +32,8 @@
 #define _QUAD_GENERIC_HPP_
 
 #include "raw_simplices.hpp"
+#include "diskpp/quadratures/quad_raw_dunavant.hpp"
+#include "diskpp/quadratures/quad_raw_gauss.hpp"
 
 namespace disk {
 
@@ -186,7 +188,7 @@ integrate_nonconvex_polygon(const Mesh<T, 2, Storage>&                msh,
 
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
-integrate(const disk::generic_mesh<T, 2>& msh, const typename disk::generic_mesh<T, 2>::cell& cl, const size_t degree)
+integrate(const disk::generic_mesh<T, 2>& msh, const typename disk::generic_mesh<T, 2>::cell& cl, size_t degree)
 {
     if (degree == 0)
     {
@@ -194,22 +196,19 @@ integrate(const disk::generic_mesh<T, 2>& msh, const typename disk::generic_mesh
     }
 
     const auto pts = points(msh, cl);
-    switch (pts.size())
-    {
-        case 0:
-        case 1:
-        case 2:
-            throw std::invalid_argument("A 2D cell cannot have less than three points. "
-                                        "This looks like a nice bug.");
 
-        case 3:
-            return disk::quadrature::dunavant(degree, pts[0], pts[1], pts[2]);
+    assert( (pts.size() > 2) && "Insufficient points for a 2D cell" );
 
-        // case 4: return priv::integrate_quadrangle_tens(degree, pts);
-
-        default: return priv::integrate_nonconvex_polygon(msh, cl, degree);
-        // default: return priv::integrate_convex_polygon(degree, pts);
+    if (pts.size() == 3) {
+        return disk::quadrature::dunavant(degree, pts[0], pts[1], pts[2]);
     }
+    
+    if (pts.size() == 4) {
+        return disk::quadrature::tensorized_gauss_legendre(degree, pts[0], pts[1], pts[2], pts[3]);
+    }
+
+    //return priv::integrate_nonconvex_polygon(msh, cl, degree);
+    return priv::integrate_convex_polygon(degree, pts);
 }
 
 template<typename T>
