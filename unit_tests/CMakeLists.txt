@@ -5,3 +5,6 @@ target_link_libraries(monomial_bases_1D ${LINK_LIBS})
 
 add_executable(monomial_bases_2D monomial_bases_2D.cpp)
 target_link_libraries(monomial_bases_2D ${LINK_LIBS})
+
+add_executable(quadratures quadratures.cpp)
+target_link_libraries(quadratures ${LINK_LIBS})
