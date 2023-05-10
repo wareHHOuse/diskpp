@@ -138,7 +138,7 @@ gauss_legendre(size_t degree, const T& a, const T& b)
     const auto rule_num = degree/2;
     if (rule_num >= num_rules)
         throw std::invalid_argument("gauss_legendre: order too high");
-    
+
     auto npts = priv::gauss_rules[rule_num].num_entries;
     std::vector<quadrature_point<T,1>> qps;
     qps.reserve(npts);
@@ -160,15 +160,15 @@ gauss_legendre(size_t degree, const point<T,DIM>& a, const point<T,DIM>& b)
     const auto rule_num = degree/2;
     if (rule_num >= num_rules)
         throw std::invalid_argument("gauss_legendre: order too high");
-    
+
     const auto& qrule = priv::gauss_rules[rule_num];
     auto npts = qrule.num_entries;
     std::vector<quadrature_point<T,DIM>> qps;
     qps.reserve(npts);
     for (size_t i = 0; i < npts; i++) {
         const auto &qp = qrule.points[i];
-        auto tr_qp = 0.5*(a+b) + 0.5*(b-a)*qp.point;
-        auto tr_qw = distance(a,b)*qp.weight;
+        auto tr_qp = 0.5 * (a + b) + 0.5 * (b - a) * qp.point;
+        auto tr_qw = 0.5 * distance(a,b) * qp.weight;
         qps.push_back({tr_qp, tr_qw});
     }
 
