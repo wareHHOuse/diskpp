@@ -25,6 +25,7 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/output/silo.hpp"
+#include "diskpp/common/timecounter.hpp"
 
 #include "sol/sol.hpp"
 #include "mumps.hpp"
@@ -879,6 +880,11 @@ void lt_solver(Mesh& msh, size_t degree, const std::string& pbdefs_fn)
         std::cout << std::endl;
     }
 
+    std::cout << "Assembling " << msh.cells_size() << " elements" << std::endl;
+
+    timecounter tc;
+    tc.tic();
+
     /* Assembly loop */
     for (auto& cl : msh)
     {
@@ -949,12 +955,16 @@ void lt_solver(Mesh& msh, size_t degree, const std::string& pbdefs_fn)
     std::cout << "Triplets: " << triplets.size() << std::endl;
     triplets.clear();
 
+    std::cout << "Assembly time: " << tc.toc() << " seconds" << std::endl;
+
     std::cout << LHS.nonZeros() << " " << LHS.rows() << " " << LHS.cols() << std::endl;
 
     /* Run solver */
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(LHS.rows());
 
     std::string solver_name = pd.solver();
+
+    tc.tic();
 
     if (solver_name == "pardiso")
     {
@@ -985,6 +995,10 @@ void lt_solver(Mesh& msh, size_t degree, const std::string& pbdefs_fn)
         solver.factorize(LHS);
         sol = solver.solve(RHS); 
     }
+
+    std::cout << "Solver time: " << tc.toc() << " seconds" << std::endl;
+
+    tc.tic();
 
     /* Postprocess */
     T l2_error_sq = 0.0;
@@ -1114,6 +1128,8 @@ void lt_solver(Mesh& msh, size_t degree, const std::string& pbdefs_fn)
         l2_error_mm_sq += diffC.dot(massC*diffC);
         l2_reconstruction_error_mm_sq += diffR.dot(massR*diffR);
     }
+
+    std::cout << "Postpro time: " << tc.toc() << " seconds" << std::endl;
 
     std::cout << "h = " << disk::average_diameter(msh) << std::endl;
     std::cout << "L2 error: " << std::sqrt(l2_error_sq) << std::endl;
