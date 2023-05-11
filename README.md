@@ -24,9 +24,6 @@ make sure to do a recursive clone by using
 git clone --recursive https://github.com/wareHHOuse/diskpp
 ```
 
-After cloning, be sure to checkout the branch `devel` if you want all the
-latest stuff. The branch master usually lags much behind `devel`.
-
 ## Installation
 The library runs on Unix systems only. Windows is explicitly NOT supported.
 The development is focused on Linux and Mac OS X in particular. DiSk++ is

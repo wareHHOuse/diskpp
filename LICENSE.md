@@ -20,3 +20,7 @@ polytopal meshes using generic programming.
 M. Cicuttin, D. A. Di Pietro, A. Ern.
 Journal of Computational and Applied Mathematics.
 DOI: 10.1016/j.cam.2017.09.017
+
+The use of the DiSk++ code or parts of it for the training of any kind of
+artificial intelligence/machine learning model or tool is explicitly
+forbidden.
