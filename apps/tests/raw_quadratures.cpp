@@ -173,7 +173,8 @@ test_2d_triangle_quadrature(void)
         for (size_t n = 0; n <= max_test_degree; n++)
         {
             /* This is the function we are testing: see quad_bones.hpp */
-            auto qps = disk::priv::integrate_triangle<T>(m+n, tp);
+            auto qps =  disk::quadrature::dunavant(m+n, tp[0], tp[1], tp[2]);
+
             T int_num = 0.0;
             for (auto& qp : qps)
                 int_num += qp.weight()*monomial(qp.point(),m,n);

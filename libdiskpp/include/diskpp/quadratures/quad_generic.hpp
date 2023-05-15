@@ -202,7 +202,8 @@ integrate(const disk::generic_mesh<T, 2>& msh, const typename disk::generic_mesh
             throw std::invalid_argument("A 2D cell cannot have less than three points. "
                                         "This looks like a nice bug.");
 
-        case 3: return priv::integrate_triangle<T>(degree, pts);
+        case 3:
+            return disk::quadrature::dunavant(degree, pts[0], pts[1], pts[2]);
 
         // case 4: return priv::integrate_quadrangle_tens(degree, pts);
 

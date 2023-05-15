@@ -411,41 +411,6 @@ triangle_quadrature_low_order(const point<T,2>& p0,
     return ret;
 }
 */
-/* Get quadrature points for a triangle specified as a list of points. The
- * list of points is contained in a STL random-access containter (PtA) */
-template<typename T, typename PtA>
-[[deprecated("please use disk::quadrature::dunavant()")]]
-std::vector<disk::quadrature_point<T, 2>>
-integrate_triangle(size_t degree, const PtA& pts)
-{
-    assert(pts.size() == 3);
-    static_assert(std::is_same<typename PtA::value_type, point<T, 2>>::value, "This function is for 2D points");
-
-    using quadpoint_type = disk::quadrature_point<T, 2>;
-
-    const auto qps = disk::triangle_quadrature(degree);
-
-    std::vector<quadpoint_type> ret;
-
-    ret.resize(qps.size());
-
-    // Compute the integration basis
-    const auto [p0, v0, v1] = integration_basis(pts[0], pts[1], pts[2]);
-
-    /* Compute the area of the triangle */
-    const auto tm = area_triangle_kahan(pts[0], pts[1], pts[2]);
-
-    auto tr = [ p0 = p0, v0 = v0, v1 = v1, tm ](const std::pair<point<T, 2>, T>& qd) -> auto
-    {
-        const auto point  = p0 + v0 * qd.first.x() + v1 * qd.first.y();
-        const auto weight = qd.second * tm;
-        return disk::make_qp(point, weight);
-    };
-
-    std::transform(qps.begin(), qps.end(), ret.begin(), tr);
-
-    return ret;
-}
 
 /**
  * @brief Integrate using tensorized Gauss points on any quadrangle (not only
