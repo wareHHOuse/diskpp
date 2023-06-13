@@ -72,14 +72,14 @@ public:
         ret(0) = 1.0;
         for (size_t k = 1; k <= degree_; k++)
             ret(k) = ret(k-1)*ep.x();
-        
+
         return ret;
     }
 
     gradient_array_type grad(const point_type& pt) const {
         gradient_array_type ret = gradient_array_type::Zero(size_);
         auto ep = phys2ref(pt);
-        
+
         ret(0) = 0.;
         ret(1) = 2./h_;
         for (size_t k = 2; k <= degree_; k++)
@@ -245,7 +245,6 @@ public:
         value_array_type powy = value_array_type::Zero(size_);
 
         auto ep = phys2ref(pt);
-        
         powx(0) = 1.0;
         powy(0) = 1.0;
         for (size_t k = 1; k <= degree_; k++) {
@@ -322,9 +321,11 @@ private:
     size_t      size_;
 
     coordinate_type phys2ref(const point_type& pt) const {
+        //-1.0 + 2.0 * distance(pt, pa_) / h_;
+        // Using Gram-Schmidt
         auto bv = (pb_ - bar_).to_vector();
         auto dv = (pt - bar_).to_vector();
-        auto nbv = h_;
+        auto nbv = h_*0.5;
         return bv.dot(dv)/(nbv*nbv);
     }
 
@@ -338,16 +339,15 @@ public:
         pb_ = pts[1];
         bar_ = (pa_ + pb_)/2.;
         h_ = distance(pa_, pb_);
+
     }
 
     value_array_type operator()(const point_type& pt) const {
         value_array_type ret = value_array_type::Zero(size_);
         auto ep = phys2ref(pt);
-
         ret(0) = 1.0;
         for (size_t k = 1; k <= degree_; k++)
-            ret(k) = ret(k-1)*ep;
-        
+            ret(k) = ret(k-1) * ep;
         return ret;
     }
 
@@ -392,7 +392,7 @@ class L2_projector
     using scalar_type = typename Basis::scalar_type;
     using rhs_func_type = std::function<typename Basis::value_type(typename Basis::point_type)>;
     static const size_t immersion_dimension = Basis::immersion_dimension;
-    
+
     const Basis& basis_;
 
     using matrix_type = Eigen::Matrix<scalar_type, Eigen::Dynamic, Eigen::Dynamic>;
@@ -454,7 +454,7 @@ template<typename Mesh, typename Element, typename IntegrandFunction>
 auto integrate(const Mesh& msh, const Element& elem, size_t degree, IntegrandFunction f)
 {
     using return_type = decltype( f(typename Mesh::point_type{}) );
-    
+
     return_type ret{};
 
     auto qps = integrate(msh, elem, degree);
@@ -474,7 +474,7 @@ class L2_scalar_product
     using coordinate_type = typename Test::coordinate_type;
     static const size_t immersion_dimension = Test::immersion_dimension;
     using scalar_type = decltype(typename Trial::scalar_value{} * typename Test::scalar_value{});
-    
+
     std::vector<quadrature_point<coordinate_type, immersion_dimension>> qps_;
 
     const Trial& trial_;
@@ -499,6 +499,7 @@ class L2_scalar_product
         }
     }
 };
+
 
 
 } // namespace disk::basis
