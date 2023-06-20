@@ -4,9 +4,6 @@ set(LINK_LIBS diskpp)
 add_executable(bases_new bases_new.cpp)
 target_link_libraries(bases_new ${LINK_LIBS})
 
-add_executable(quad_raw quad_raw.cpp)
-target_link_libraries(quad_raw ${LINK_LIBS})
-
 add_executable(basis_function_plot basis_function_plot.cpp)
 target_link_libraries(basis_function_plot ${LINK_LIBS})
 

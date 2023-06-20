@@ -8,3 +8,9 @@ target_link_libraries(monomial_bases_2D ${LINK_LIBS})
 
 add_executable(quadratures quadratures.cpp)
 target_link_libraries(quadratures ${LINK_LIBS})
+
+add_executable(quad_raw_triangle_gauss quad_raw_triangle_gauss.cpp)
+target_link_libraries(quad_raw_triangle_gauss ${LINK_LIBS})
+
+add_executable(quad_raw_dunavant quad_raw_dunavant.cpp)
+target_link_libraries(quad_raw_dunavant ${LINK_LIBS})
