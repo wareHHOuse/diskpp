@@ -243,6 +243,7 @@ set(npaster_gmshtools_sources "contrib/gmsh_tools/gmshData.cpp"
                               "contrib/gmsh_tools/gmshElement.cpp"
                               "contrib/gmsh_tools/gmshMesh.cpp")
 add_library(npaster_gmshtools STATIC ${npaster_gmshtools_sources})
+set_property(TARGET npaster_gmshtools PROPERTY POSITION_INDEPENDENT_CODE ON)
 set(LINK_LIBS ${LINK_LIBS} npaster_gmshtools)
 
 
