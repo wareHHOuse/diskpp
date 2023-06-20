@@ -475,6 +475,45 @@ inertia_axes(const Mesh& msh, const Elem& elem)
     return es.eigenvectors();
 }
 
+template<typename Mesh, typename Elem>
+static_matrix<typename Mesh::coordinate_type, Mesh::dimension, Mesh::dimension>
+scaled_inertia_axes(const Mesh& msh, const Elem& elem)
+{
+    typedef static_matrix<typename Mesh::coordinate_type, Mesh::dimension, Mesh::dimension> matrix_type;
+
+    using T = typename Mesh::coordinate_type;
+    static const size_t DIM = Mesh::dimension;
+
+    const auto bar = barycenter(msh, elem);
+
+    matrix_type mass = matrix_type::Zero();
+    matrix_type Id = matrix_type::Identity();
+
+    const auto qps = integrate(msh, elem, 2);
+    for (auto& qp : qps)
+    {
+        const auto r = (bar - qp.point()).to_vector();
+        mass += qp.weight() * ( (r * r.transpose()) );
+    }
+
+    Eigen::SelfAdjointEigenSolver<matrix_type> es(mass);
+
+    Eigen::Matrix<T, DIM, DIM> eigvecs = es.eigenvectors();
+    Eigen::Matrix<T, DIM, 1> eigvals = es.eigenvalues();
+
+    /* Find the max eigenvalue */
+    T emax = eigvals(0);
+    for (size_t i = 1; i < eigvals.size(); i++)
+        emax = std::max(emax, eigvals(i));
+
+    /* Rescale */
+    const auto inv_diam = 2./diameter(msh,elem);
+    for (size_t i = 0; i < eigvals.size(); i++)
+        eigvecs.col(i) *= inv_diam*std::sqrt(emax/eigvals(i));
+
+    return eigvecs;
+}
+
 } // namespace disk
 
 #endif /* _GEOMETRY_ALL_HPP_ */

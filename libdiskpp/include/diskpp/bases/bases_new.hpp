@@ -72,14 +72,14 @@ public:
         ret(0) = 1.0;
         for (size_t k = 1; k <= degree_; k++)
             ret(k) = ret(k-1)*ep.x();
-        
+
         return ret;
     }
 
     gradient_array_type grad(const point_type& pt) const {
         gradient_array_type ret = gradient_array_type::Zero(size_);
         auto ep = phys2ref(pt);
-        
+
         ret(0) = 0.;
         ret(1) = 2./h_;
         for (size_t k = 2; k <= degree_; k++)
@@ -245,7 +245,6 @@ public:
         value_array_type powy = value_array_type::Zero(size_);
 
         auto ep = phys2ref(pt);
-        
         powx(0) = 1.0;
         powy(0) = 1.0;
         for (size_t k = 1; k <= degree_; k++) {
@@ -322,9 +321,11 @@ private:
     size_t      size_;
 
     coordinate_type phys2ref(const point_type& pt) const {
+        //-1.0 + 2.0 * distance(pt, pa_) / h_;
+        // Using Gram-Schmidt
         auto bv = (pb_ - bar_).to_vector();
         auto dv = (pt - bar_).to_vector();
-        auto nbv = h_;
+        auto nbv = h_*0.5;
         return bv.dot(dv)/(nbv*nbv);
     }
 
@@ -338,16 +339,15 @@ public:
         pb_ = pts[1];
         bar_ = (pa_ + pb_)/2.;
         h_ = distance(pa_, pb_);
+
     }
 
     value_array_type operator()(const point_type& pt) const {
         value_array_type ret = value_array_type::Zero(size_);
         auto ep = phys2ref(pt);
-
         ret(0) = 1.0;
         for (size_t k = 1; k <= degree_; k++)
-            ret(k) = ret(k-1)*ep;
-        
+            ret(k) = ret(k-1) * ep;
         return ret;
     }
 
@@ -377,6 +377,325 @@ public:
 
 
 
+
+/******************************************************************************
+Cells, 3D
+******************************************************************************/
+
+template<template<typename, size_t, typename> class Mesh,
+    typename CoordT, typename Storage, typename ScalT>
+class scalar_monomial<Mesh<CoordT, 3, Storage>, typename Mesh<CoordT, 3, Storage>::cell_type, ScalT>
+{
+    public:
+    using mesh_type = Mesh<CoordT, 3, Storage>;
+    using cell_type = typename mesh_type::cell_type;
+    using element_type = cell_type;
+    using coordinate_type = typename mesh_type::coordinate_type;
+    using scalar_type = ScalT;
+    using point_type = typename mesh_type::point_type;
+    static const size_t immersion_dimension = mesh_type::dimension;
+    static const size_t basis_dimension = mesh_type::dimension;
+    static const size_t tensor_order = 0; /* scalar */
+    using value_type = typename tensor<scalar_type, basis_dimension, tensor_order>::value_type;
+    using value_array_type = typename tensor<scalar_type, basis_dimension, tensor_order>::array_type;
+    using gradient_array_type = typename tensor<scalar_type, basis_dimension, tensor_order + 1>::array_type;
+
+private:
+    using tr_mat_type = Eigen::Matrix<coordinate_type, immersion_dimension, immersion_dimension>;
+    using vec_type = Eigen::Matrix<coordinate_type, immersion_dimension, 1>;
+
+    point_type      bar_;
+    size_t          degree_;
+    size_t          size_;
+    tr_mat_type     tr_;
+    vec_type        v0_, v1_, v2_;
+
+    void
+    compute_reference_frame(const mesh_type& msh, const cell_type& cl)
+    {
+        auto pts = points(msh, cl);
+        assert(pts.size() >= 4);
+        vec_type u0 = (pts[1] - pts[0]).to_vector();
+        vec_type u1 = (pts[2] - pts[0]).to_vector();
+        vec_type u2 = (pts[3] - pts[0]).to_vector();
+
+#if 0
+        // Gram-Schmidt
+        v0_ = u0;
+        v1_ = u1 - u1.dot(v0_)*v0_/v0_.dot(v0_);
+        v2_ = u2 - u2.dot(v0_)*v0_/v0_.dot(v0_)-u2.dot(v1_)*v1_/ v1_.dot(v1_);
+
+        tr_.col(0) = v0_;
+        tr_.col(1) = v1_;
+        tr_.col(2) = v2_;
+        tr_ = tr_.inverse().eval();
+#endif
+
+        tr_ = scaled_inertia_axes(msh, cl);
+        tr_.transpose().eval();
+    }
+
+    point_type phys2ref(const point_type& pt) const {
+        Eigen::Matrix<coordinate_type,3,1> v = tr_*(pt - bar_).to_vector();
+        return point_type(v(0), v(1), v(2));
+    }
+
+
+    public:
+    scalar_monomial(const mesh_type& msh, const cell_type& cl, size_t degree)
+        : degree_(degree), size_( size_of_degree(degree) )
+    {
+        bar_ = barycenter(msh, cl);
+        compute_reference_frame(msh, cl);
+    }
+
+    value_array_type operator()(const point_type& pt) const {
+        value_array_type powx = value_array_type::Zero(size_);
+        value_array_type powy = value_array_type::Zero(size_);
+        value_array_type powz = value_array_type::Zero(size_);
+        auto ep = phys2ref(pt);
+
+        powx(0) = 1.0;
+        powy(0) = 1.0;
+        powz(0) = 1.0;
+
+        for (size_t k = 1; k <= degree_; k++)
+        {
+            powx(k) = powx(k-1) * ep.x();
+            powy(k) = powy(k-1) * ep.y();
+            powz(k) = powz(k-1) * ep.z();
+        }
+
+        size_t pos = 0;
+        value_array_type ret = value_array_type::Zero(size_);
+        for (size_t kd = 0; kd <= degree_; kd++)
+            for (size_t i = 0; i <= kd; i++)
+                for (size_t j = 0; j <= kd - i; j++)
+                    ret(pos++) = powx(i) * powy(j) * powz(kd -i -j);
+
+        assert(pos == size_);
+
+        return ret;
+    }
+
+    gradient_array_type grad(const point_type& pt) const {
+        value_array_type powx = value_array_type::Zero(size_);
+        value_array_type powy = value_array_type::Zero(size_);
+        value_array_type powz = value_array_type::Zero(size_);
+
+        auto ep = phys2ref(pt);
+
+        powx(0) = 1.0;
+        powy(0) = 1.0;
+        powz(0) = 1.0;
+
+        for (size_t k = 1; k <= degree_; k++)
+        {
+            powx(k) = powx(k-1) * ep.x();
+            powy(k) = powy(k-1) * ep.y();
+            powz(k) = powz(k-1) * ep.z();
+        }
+
+        gradient_array_type ret = gradient_array_type::Zero(size_, immersion_dimension);
+        size_t pos = 0;
+        for (size_t k = 0; k <= degree_; k++)
+        {
+            for (size_t i = 0; i <= k; i++)
+            {
+                for (size_t j = 0; j <= k - i; j++)
+                {
+                    const auto ex = i;
+                    const auto ey = j;
+                    const auto ez = k - i - j;
+
+                    const auto px = powx(ex);
+                    const auto py = powy(ey);
+                    const auto pz = powz(ez);
+
+                    const auto dx = (ex == 0) ? 0 : ex * powx(ex - 1);
+                    const auto dy = (ey == 0) ? 0 : ey * powy(ey - 1);
+                    const auto dz = (ez == 0) ? 0 : ez * powz(ez - 1);
+
+                    vec_type tmp_grad;
+                    tmp_grad(0) = dx * py * pz;
+                    tmp_grad(1) = dy * px * pz;
+                    tmp_grad(2) = dz * px * py;
+
+                    ret.block(pos, 0, 1, immersion_dimension) = tmp_grad.transpose() * tr_;
+                    pos++;
+                }
+            }
+        }
+        assert(pos == size_);
+
+        return ret;
+    }
+
+    size_t size() const {
+        return size_;
+    }
+
+    static size_t size_of_degree(size_t k) {
+        return ((k+3)*(k+2)*(k+1))/6.0;
+    }
+
+    size_t degree() const {
+        return degree_;
+    }
+
+    size_t integration_degree() const {
+        return degree_;
+    }
+};
+
+
+
+/******************************************************************************
+    Faces, 3D
+******************************************************************************/
+template<template<typename, size_t, typename> class Mesh,
+    typename CoordT, typename Storage, typename ScalT>
+class scalar_monomial<Mesh<CoordT, 3, Storage>, typename Mesh<CoordT, 3, Storage>::face_type, ScalT>
+{
+    public:
+    using mesh_type = Mesh<CoordT, 3, Storage>;
+    using face_type = typename mesh_type::face_type;
+    using element_type = face_type;
+    using coordinate_type = typename mesh_type::coordinate_type;
+    using scalar_type = ScalT;
+    using point_type = typename mesh_type::point_type;
+    static const size_t immersion_dimension = mesh_type::dimension;
+    static const size_t basis_dimension = mesh_type::dimension - 1;
+    static const size_t tensor_order = 0; /* scalar */
+    using value_type = typename tensor<scalar_type, basis_dimension, tensor_order>::value_type;
+    using value_array_type = typename tensor<scalar_type, basis_dimension, tensor_order>::array_type;
+    using gradient_array_type = typename tensor<scalar_type, basis_dimension, tensor_order + 1>::array_type;
+
+private:
+    using tr_mat_type = Eigen::Matrix<coordinate_type, immersion_dimension, immersion_dimension>;
+    using vec_type = Eigen::Matrix<coordinate_type, immersion_dimension, 1>;
+
+    size_t          degree_;
+    size_t          size_;
+    point_type      bar_;
+    tr_mat_type     tr_;
+    vec_type        v0_, v1_, v2_;
+
+
+    void
+    compute_reference_frame(const mesh_type& msh, const face_type& fc)
+    {
+        auto pts = points(msh, fc);
+        assert(pts.size() >= 3);
+        vec_type u0 = (pts[1] - pts[0]).to_vector();
+        vec_type u1 = (pts[2] - pts[0]).to_vector();
+
+        #if 0
+        v0_ = u0;
+        v1_ = u1 - u1.dot(v0_)*v0_/v0_.dot(v0_);
+        v2_ = v0_.cross(v1_);
+
+        tr_.col(0) = v0_;
+        tr_.col(1) = v1_;
+        tr_.col(2) = v2_;
+        tr_ = tr_.inverse().eval();
+        #endif
+
+        tr_ = scaled_inertia_axes(msh, fc);
+        tr_.transpose().eval();
+    }
+
+
+    point_type phys2ref(const point_type& pt) const {
+        Eigen::Matrix<coordinate_type,3,1> v = tr_*(pt - bar_).to_vector();
+        return point_type(v(0), v(1), v(2));
+    }
+
+public:
+    scalar_monomial(const mesh_type& msh, const face_type& fc, size_t degree)
+        : degree_(degree), size_( size_of_degree(degree) )
+    {
+        bar_ = barycenter(msh, fc);
+        compute_reference_frame(msh, fc);
+    }
+
+    value_array_type operator()(const point_type& pt) const {
+        value_array_type powx = value_array_type::Zero(size_);
+        value_array_type powy = value_array_type::Zero(size_);
+        auto ep = phys2ref(pt);
+
+
+        powx(0) = 1.0;
+        powy(0) = 1.0;
+        for (size_t k = 1; k <= degree_; k++) {
+            powx(k) = powx(k-1) * ep.x();
+            powy(k) = powy(k-1) * ep.y();
+        }
+
+        size_t pos = 0;
+        value_array_type ret = value_array_type::Zero(size_);
+        for (size_t k = 0; k <= degree_; k++)
+            for (size_t i = 0; i <= k; i++)
+                ret(pos++) = powx(k-i) * powy(i);
+        assert(pos == size_);
+
+        return ret;
+    }
+
+    gradient_array_type grad(const point_type& pt) const {
+        value_array_type powx = value_array_type::Zero(size_);
+        value_array_type powy = value_array_type::Zero(size_);
+
+        auto ep = phys2ref(pt);
+
+        powx(0) = 1.0;
+        powy(0) = 1.0;
+        for (size_t k = 1; k <= degree_; k++) {
+            powx(k) = powx(k-1) * ep.x();
+            powy(k) = powy(k-1) * ep.y();
+        }
+
+        gradient_array_type ret = gradient_array_type::Zero(size_, immersion_dimension);
+        size_t pos = 0;
+        for (size_t k = 0; k <= degree_; k++) {
+            for (size_t i = 0; i <= k; i++) {
+                const auto ex = k-i;
+                const auto ey = i;
+                const auto px = powx(ex);
+                const auto py = powy(ey);
+                const auto dx = (ex == 0) ? 0 : ex * powx(ex-1);
+                const auto dy = (ey == 0) ? 0 : ey * powy(ey-1);
+                vec_type tmp_grad;
+                tmp_grad(0) = dx*py;
+                tmp_grad(1) = px*dy;
+                ret.block(pos, 0, 1, immersion_dimension) = tmp_grad.transpose()*tr_;
+                pos++;
+            }
+        }
+        assert(pos == size_);
+
+        return ret;
+    }
+
+    size_t size() const {
+        return size_;
+    }
+
+    static size_t size_of_degree(size_t k) {
+        return ((k+2)*(k+1))/2;
+    }
+
+    size_t degree() const {
+        return degree_;
+    }
+
+    size_t integration_degree() const {
+        return degree_;
+    }
+};
+
+
+
 template<typename Mesh, typename Element, typename ScalT = typename Mesh::coordinate_type>
 auto scaled_monomial_basis(const Mesh& msh, const Element& elem, size_t degree)
 {
@@ -392,7 +711,7 @@ class L2_projector
     using scalar_type = typename Basis::scalar_type;
     using rhs_func_type = std::function<typename Basis::value_type(typename Basis::point_type)>;
     static const size_t immersion_dimension = Basis::immersion_dimension;
-    
+
     const Basis& basis_;
 
     using matrix_type = Eigen::Matrix<scalar_type, Eigen::Dynamic, Eigen::Dynamic>;
@@ -454,7 +773,7 @@ template<typename Mesh, typename Element, typename IntegrandFunction>
 auto integrate(const Mesh& msh, const Element& elem, size_t degree, IntegrandFunction f)
 {
     using return_type = decltype( f(typename Mesh::point_type{}) );
-    
+
     return_type ret{};
 
     auto qps = integrate(msh, elem, degree);
@@ -474,7 +793,7 @@ class L2_scalar_product
     using coordinate_type = typename Test::coordinate_type;
     static const size_t immersion_dimension = Test::immersion_dimension;
     using scalar_type = decltype(typename Trial::scalar_value{} * typename Test::scalar_value{});
-    
+
     std::vector<quadrature_point<coordinate_type, immersion_dimension>> qps_;
 
     const Trial& trial_;
@@ -499,6 +818,7 @@ class L2_scalar_product
         }
     }
 };
+
 
 
 } // namespace disk::basis
