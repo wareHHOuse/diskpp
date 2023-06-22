@@ -418,13 +418,14 @@ test_stabfree_hho(Mesh& msh, convergence_database_new<typename Mesh::coordinate_
             cdb.all_A_errors.add_hdi(hdi);
 
             try {
-                auto error = run_hho_diffusion_solver(msh, hdi, true, true, diff_tens, tc.use_projection);
+                auto error = run_hho_diffusion_solver_stabfree(msh, hdi, true, true, diff_tens, tc.use_projection);
                 //cdb.add(hdi.face_degree(), make_display_name(tc.variant_name, hdi), error);
                 L2errs.push_back(error.L2err);
                 H1errs.push_back(error.H1err);
                 Aerrs.push_back(error.Aerr);
             }
-            catch (...) {
+            catch (std::invalid_argument e) {
+                std::cout << e.what() << std::endl;
                 L2errs.push_back(-1.0);
                 H1errs.push_back(-1.0);
                 Aerrs.push_back(-1.0);
@@ -499,6 +500,7 @@ int main(int argc, char **argv)
 
     test_configuration plain_hho(default_test_config);
     plain_hho.variant_name = "HHO-E";
+    plain_hho.mixed_order = false;
 
     test_configuration mixed_hho(default_test_config);
     mixed_hho.variant_name = "HHO-M";
@@ -520,9 +522,9 @@ int main(int argc, char **argv)
 
         for (size_t i = 0; i < max_refinements; i++)
         {
-            //test_stabfree_hho(msh, cdb_plain, plain_hho);
+            test_stabfree_hho(msh, cdb_plain, plain_hho);
             //test_stabfree_hho(msh, cdb_mixed, mixed_hho);
-            test_stabfree_hho(msh, cdb_mixed_proj, mixed_proj_hho);
+            //test_stabfree_hho(msh, cdb_mixed_proj, mixed_proj_hho);
             mesher.refine();
         }
     }
@@ -537,8 +539,8 @@ int main(int argc, char **argv)
             mesher.make_level(i+offset);
             std::cout << disk::average_diameter(msh) << std::endl;
             test_stabfree_hho(msh, cdb_plain, plain_hho);
-            test_stabfree_hho(msh, cdb_mixed, mixed_hho);
-            test_stabfree_hho(msh, cdb_mixed_proj, mixed_proj_hho);
+            //test_stabfree_hho(msh, cdb_mixed, mixed_hho);
+            //test_stabfree_hho(msh, cdb_mixed_proj, mixed_proj_hho);
         }
     }
 

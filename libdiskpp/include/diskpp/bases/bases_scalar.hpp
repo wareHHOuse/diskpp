@@ -1157,7 +1157,7 @@ harmonic_basis_size(size_t k, size_t d)
     return 2*k+1;
 }
 
-
+#if 0
 /* Generic template for bases. */
 template<typename MeshType, typename Element, typename ScalarType>
 struct scaled_harmonic_scalar_basis
@@ -1256,6 +1256,7 @@ make_scalar_harmonic_basis(const Mesh& msh, const ElemType& elem,size_t degree)
 {
     return scaled_harmonic_scalar_basis<Mesh, ElemType, ScalarType>(msh, elem, degree);
 }
+#endif
 
 
 
@@ -1291,6 +1292,8 @@ private:
     size_t full_basis_degree, full_basis_size;
     size_t polynomial_max_degree, polynomial_part_size;
     size_t harmonic_min_degree, harmonic_max_degree, harmonic_part_size;
+    point_type bar;
+    T diam;
 
     function_type
     eval_harmonic(const point_type& bp) const
@@ -1321,9 +1324,9 @@ private:
         gradient_type ret = gradient_type::Zero(hbs, 2);
         ret(0,0) = 0.0; ret(0,1) = 0.0;
 
-        const auto p = this->passage_new2old();
-        auto sx = p(0,0)/2.0;
-        auto sy = p(1,1)/2.0;
+        //const auto p = this->passage_new2old();
+        auto sx = 1.0;//p(0,0);
+        auto sy = 1.0;//p(1,1);
 
         if ( full_basis_degree > 0 ) {
             ret(1,0) = sx; ret(1,1) = 0.0;
@@ -1355,6 +1358,8 @@ public:
         polynomial_part_size    = full_basis_size;
         harmonic_min_degree     = full_basis_degree+1;
         harmonic_part_size      = 0;
+        bar                     = barycenter(msh, cl);
+        diam                    = diameter(msh, cl);
     }
 
     void
@@ -1399,7 +1404,8 @@ public:
         assert(pos == polynomial_part_size);
         if (harmonic_part_size > 0) {
             assert(polynomial_max_degree < full_basis_degree);
-            function_type hp = eval_harmonic(bp);
+            auto hep = 2.0*(pt-bar)/diam; /* beware of scaling: must be the same in all dirs */
+            function_type hp = eval_harmonic(hep);
             ret.tail(harmonic_part_size) = hp.tail(harmonic_part_size);
         }
         return ret;
@@ -1431,7 +1437,8 @@ public:
         assert(pos == polynomial_part_size);
         if (harmonic_part_size > 0) {
             assert(polynomial_max_degree < full_basis_degree);
-            gradient_type hg = eval_harmonic_gradients(bp);
+            auto hep = 2.0*(pt-bar)/diam; /* beware of scaling: must be the same in all dirs */
+            gradient_type hg = eval_harmonic_gradients(hep);
             ret.block(ret.rows()-harmonic_part_size, 0, harmonic_part_size, 2) =
                 hg.block(hg.rows()-harmonic_part_size, 0, harmonic_part_size, 2);
         }

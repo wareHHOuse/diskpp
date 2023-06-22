@@ -238,6 +238,8 @@ make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, c
 
 } //namespace priv
 
+
+
 template<typename Mesh>
 std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
 make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
@@ -258,7 +260,7 @@ make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, c
 
 template<typename Mesh>
 std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
-make_shlp(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
+make_shl_face_proj(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
 {
     auto rb = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
     diffusion_tensor<Mesh> diff_tens = diffusion_tensor<Mesh>::Zero();
@@ -267,12 +269,182 @@ make_shlp(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_
 
 template<typename Mesh>
 std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
-make_shlp(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi,
+make_shl_face_proj(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi,
     const diffusion_tensor<Mesh>& diff_tens)
 {
     auto rb = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
     return priv::make_scalar_hho_laplacian<true, true>(msh, cl, hdi, rb, diff_tens);
 }
+
+template<typename Mesh>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+make_shl_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
+{
+    auto hb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
+    hb.maximum_polynomial_degree(hdi.face_degree()+1);
+    diffusion_tensor<Mesh> diff_tens = diffusion_tensor<Mesh>::Zero();
+    return priv::make_scalar_hho_laplacian<false, false>(msh, cl, hdi, hb, diff_tens);
+}
+
+template<typename Mesh>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+make_shl_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi,
+    const diffusion_tensor<Mesh>& diff_tens)
+{
+    auto hb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
+    hb.maximum_polynomial_degree(hdi.face_degree()+1);
+    return priv::make_scalar_hho_laplacian<true, false>(msh, cl, hdi, hb, diff_tens);
+}
+
+template<typename Mesh>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+make_shl_face_proj_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
+{
+    auto hb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
+    hb.maximum_polynomial_degree(hdi.face_degree()+2);
+    diffusion_tensor<Mesh> diff_tens = diffusion_tensor<Mesh>::Zero();
+    return priv::make_scalar_hho_laplacian<false, true>(msh, cl, hdi, hb, diff_tens);
+}
+
+template<typename Mesh>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+make_shl_face_proj_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi,
+    const diffusion_tensor<Mesh>& diff_tens)
+{
+    auto hb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
+    hb.maximum_polynomial_degree(hdi.face_degree()+2);
+    return priv::make_scalar_hho_laplacian<true, true>(msh, cl, hdi, hb, diff_tens);
+}
+
+
+template<typename Mesh>
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+make_sfl(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi,
+    const diffusion_tensor<Mesh>& diff_tens)
+{
+    using T = typename Mesh::coordinate_type;
+    const size_t DIM = Mesh::dimension;
+    
+    const auto cd = hdi.cell_degree();
+    const auto fd = hdi.face_degree();
+    const auto rd_inner = hdi.face_degree()+1;
+    const auto rd_outer = hdi.reconstruction_degree();
+
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+    typedef Matrix<T, Dynamic, 1>       vector_type;
+    typedef Matrix<T, Dynamic, DIM>     gradient_type;
+
+    const auto cb = make_scalar_monomial_basis(msh, cl, cd);
+    const auto rb_inner = make_scalar_monomial_basis(msh, cl, rd_inner);
+    auto rb_outer = make_scalar_harmonic_top_basis(msh, cl, rd_outer);
+    rb_outer.maximum_polynomial_degree(cd+2);
+    //const auto rb_outer = make_scalar_monomial_basis(msh, cl, rd_outer);
+
+    const auto cbs = cb.size();
+    const auto fbs = scalar_basis_size(fd, Mesh::dimension-1);
+    const auto rbs_inner = rb_inner.size();
+    const auto rbs_outer = rb_outer.size();
+
+    const auto fcs = faces(msh, cl);
+
+    const auto num_faces_dofs = fbs * fcs.size();
+    const auto num_total_dofs = cbs + num_faces_dofs;
+
+    matrix_type Ko = matrix_type::Zero(rbs_outer, rbs_outer);
+    auto qps_outer = disk::integrate(msh, cl, 2*(rd_outer-1));
+    for (auto& qp : qps_outer) {
+        auto r_dphi = rb_outer.eval_gradients(qp.point());
+        Ko += qp.weight() * (r_dphi * diff_tens.transpose()) * r_dphi.transpose();
+    }
+
+    matrix_type Ki = Ko.block(1, 1, rbs_inner-1, rbs_inner-1);
+    matrix_type gr_rhs_inner = matrix_type::Zero(rbs_inner-1, num_total_dofs);
+    gr_rhs_inner.block(0,0,rbs_inner-1,cbs) = Ko.block(1,0,rbs_inner-1,cbs);
+    
+    /* Now the faces, inner operator */
+    size_t offset = cbs;
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto& fc  = fcs[i];
+        const auto  n   = normal(msh, cl, fc);
+        const auto  fb  = make_scalar_monomial_basis(msh, fc, fd);
+        const auto  fbs = fb.size();
+
+        auto qps_f = integrate(msh, fc, rd_inner + std::max(cd, fd) );
+        for (auto& qp : qps_f)
+        {
+            gradient_type r_dphi_tmp = rb_inner.eval_gradients(qp.point()) * diff_tens.transpose();
+            gradient_type r_dphi = r_dphi_tmp.block(1,0,rbs_inner-1, DIM);
+            /* {u_F, grad(v.n)}_F */
+            vector_type f_phi = fb.eval_functions(qp.point());
+            gr_rhs_inner.block(0, offset, rbs_inner-1, fbs) += qp.weight() * (r_dphi * n) * f_phi.transpose();
+
+            /* {-u_T, grad(v.n)}_F */
+            vector_type c_phi = cb.eval_functions(qp.point());
+            gr_rhs_inner.block(0, 0, rbs_inner-1, cbs) -= qp.weight() * (r_dphi * n) * c_phi.transpose();
+        }
+
+        offset += fbs;
+    }
+
+    /* This is the inner reconstruction operator */
+    matrix_type Ri = Ki.ldlt().solve(gr_rhs_inner);
+
+    /* Build the outer operator */
+    matrix_type Ro_rhs = matrix_type::Zero(rbs_outer - 1, num_total_dofs);
+    Ro_rhs.block(0,0,rbs_outer-1,cbs) = Ko.block(1,0,rbs_outer-1,cbs);
+    
+    offset = cbs;
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto& fc  = fcs[i];
+        const auto  n   = normal(msh, cl, fc);
+        const auto  fb  = make_scalar_monomial_basis(msh, fc, fd);
+        const auto  fbs = fb.size();
+
+        matrix_type T = matrix_type::Zero(rbs_outer - 1, cbs);
+        matrix_type A = matrix_type::Zero(rbs_outer - 1, fbs);
+        matrix_type Q = matrix_type::Zero(rbs_outer - 1, rbs_inner-1);
+        matrix_type Mf = matrix_type::Zero(fbs, fbs);
+        matrix_type Tr = matrix_type::Zero(fbs, rbs_inner-1);
+
+        auto qps_f = integrate(msh, fc, rd_outer + std::max(cd, fd) );
+        for (auto& qp : qps_f)
+        {
+            gradient_type grad_v_tmp = rb_outer.eval_gradients(qp.point());
+            gradient_type grad_v = grad_v_tmp.block(1, 0, rbs_outer-1, DIM)  * diff_tens.transpose();
+
+            vector_type f_phi = fb.eval_functions(qp.point());
+            A += qp.weight() * (grad_v * n) * f_phi.transpose();
+
+            vector_type c_phi = cb.eval_functions(qp.point());
+            T += qp.weight() * (grad_v * n) * c_phi.transpose();
+
+            vector_type r_phi_tmp = rb_inner.eval_functions(qp.point());
+            vector_type r_phi = r_phi_tmp.tail(rbs_inner-1);
+            Q += qp.weight() * (grad_v * n) * r_phi.transpose();
+
+            Mf += qp.weight() * f_phi * f_phi.transpose();
+            Tr += qp.weight() * f_phi * r_phi.transpose();
+        }
+
+        Ro_rhs += Q*Ri;
+        Ro_rhs -= A*Mf.ldlt().solve(Tr*Ri);
+        Ro_rhs.block(0, 0, rbs_outer-1, cbs) -= T;
+        Ro_rhs.block(0, offset, rbs_outer-1, fbs) += A;
+
+        offset += fbs;
+    }
+
+    matrix_type oper = Ko.block(1,1,rbs_outer-1,rbs_outer-1).ldlt().solve(Ro_rhs);
+    matrix_type data = Ro_rhs.transpose() * oper;
+
+    return std::make_pair(oper, data);
+}
+
+
+
+
 
 
 

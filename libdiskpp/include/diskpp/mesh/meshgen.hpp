@@ -30,6 +30,9 @@
  */
 #pragma once
 
+#include <random>
+#include <regex>
+
 #include "diskpp/mesh/mesh.hpp"
 #include "diskpp/geometry/geometry.hpp"
 
@@ -555,6 +558,128 @@ void make_single_element_mesh(cartesian_mesh<T,3>& msh, const point<T,3>& base, 
 }
 
 
+template<typename T>
+void make_single_element_mesh(generic_mesh<T,2>& msh, const T& radius, const size_t& faces)
+{
+    using mesh_type = generic_mesh<T,2>;
+    using point_type = typename mesh_type::point_type;
+    using node_type = typename mesh_type::node_type;
+    using edge_type = typename mesh_type::edge_type;
+    using surface_type = typename mesh_type::surface_type;
+    using nodeid_type = typename node_type::id_type;
+
+    if (faces < 3) {
+        std::cout << "Can't make a polygon with less than three faces" << std::endl;
+        return;
+    }
+
+    auto storage = msh.backend_storage();
+
+    //std::random_device rd;  // Will be used to obtain a seed for the random number engine
+    //std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+    //std::uniform_real_distribution<> dis(-0.1, 1.0);
+
+    for (size_t k = 0; k < faces; k++) {
+        auto x = radius*std::cos(2*k*M_PI/faces);// + dis(gen);
+        auto y = radius*std::sin(2*k*M_PI/faces);// + dis(gen);
+        storage->points.push_back( point_type{x,y} );
+        
+        auto p = point_identifier<2>(k);
+        storage->nodes.push_back( node_type(p) );
+    }
+
+    std::vector<typename node_type::id_type> surface_nodes;
+    std::vector<typename edge_type::id_type> surface_edges;
+    auto num_nodes = storage->nodes.size();
+    for (size_t i = 0; i < num_nodes; i++) {
+        auto n0 = nodeid_type(i);
+        auto n1 = nodeid_type( (i+1)%num_nodes );
+        storage->edges.push_back( {n0, n1} );
+        surface_nodes.push_back( typename node_type::id_type(i) );
+        surface_edges.push_back( typename edge_type::id_type(i) );
+    }
+
+    storage->boundary_info.resize( storage->edges.size() );
+    for (auto& bi : storage->boundary_info)
+        bi = boundary_descriptor(0, true);
+
+    auto surface = surface_type(surface_edges);
+    surface.set_point_ids(surface_nodes.begin(), surface_nodes.end()); /* XXX: crap */
+
+    storage->surfaces.push_back(surface);
+
+    storage->subdomain_info.resize( 1 );
+}
+
+template<typename T>
+bool load_single_element_csv(generic_mesh<T,2>& msh, const std::string& filename)
+{
+    using mesh_type = generic_mesh<T,2>;
+    using point_type = typename mesh_type::point_type;
+    using node_type = typename mesh_type::node_type;
+    using edge_type = typename mesh_type::edge_type;
+    using surface_type = typename mesh_type::surface_type;
+    using nodeid_type = typename node_type::id_type;
+
+    auto storage = msh.backend_storage();
+
+
+    std::ifstream ifs(filename);
+    if (not ifs.is_open()) {
+        std::cout << "Can't open " << filename << std::endl;
+        return false;
+    }
+
+    std::string line;
+    getline(ifs, line);
+
+    size_t ptnum = 0;
+    while( not ifs.eof() ) {
+        getline(ifs, line);
+        if (line == "")
+            break;
+
+        std::regex re(";");
+        std::sregex_token_iterator iter(line.begin(), line.end(), re, -1);
+        std::vector<std::string> tokens{ iter, {} };
+        std::cout << ptnum << std::endl;
+        if (tokens.size() < 2) {
+            std::cout << "Error parsing CSV input: " << tokens.size() << std::endl;
+            return false;
+        }
+        auto x = std::stod(tokens[0]);
+        auto y = std::stod(tokens[1]);
+
+        storage->points.push_back( point_type{x,y} );
+        auto p = point_identifier<2>(ptnum++);
+        storage->nodes.push_back( node_type(p) );
+    }
+
+    std::vector<typename node_type::id_type> surface_nodes;
+    std::vector<typename edge_type::id_type> surface_edges;
+    auto num_nodes = storage->nodes.size();
+    for (size_t i = 0; i < num_nodes; i++) {
+        auto n0 = nodeid_type(i);
+        auto n1 = nodeid_type( (i+1)%num_nodes );
+        storage->edges.push_back( {n0, n1} );
+        surface_nodes.push_back( typename node_type::id_type(i) );
+        surface_edges.push_back( typename edge_type::id_type(i) );
+    }
+
+    storage->boundary_info.resize( storage->edges.size() );
+    for (auto& bi : storage->boundary_info)
+        bi = boundary_descriptor(0, true);
+
+    auto surface = surface_type(surface_edges);
+    surface.set_point_ids(surface_nodes.begin(), surface_nodes.end()); /* XXX: crap */
+
+    storage->surfaces.push_back(surface);
+
+    storage->subdomain_info.resize( 1 );
+
+    return true;
+}
 
 
 } //namespace disk
+

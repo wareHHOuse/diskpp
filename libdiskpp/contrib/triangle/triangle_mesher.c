@@ -210,11 +210,11 @@
 
 /* #define SINGLE */
 
-#ifdef SINGLE
-#define REAL float
-#else /* not SINGLE */
-#define REAL double
-#endif /* not SINGLE */
+//#ifdef SINGLE
+//#define REAL float
+//#else /* not SINGLE */
+//#define REAL double
+//#endif /* not SINGLE */
 
 /* If yours is not a Unix system, define the NO_TIMER compiler switch to     */
 /*   remove the Unix-specific timing code.                                   */
@@ -312,7 +312,7 @@
 /*   compiler is smarter, feel free to replace the "int" with "void".        */
 /*   Not that it matters.                                                    */
 
-#define VOID int
+//#define VOID int
 
 /* Two constants for algorithms based on random sampling.  Both constants    */
 /*   have been chosen empirically to optimize their respective algorithms.   */
@@ -3284,7 +3284,7 @@ void internalerror()
 /*****************************************************************************/
 
 #ifdef ANSI_DECLARATORS
-void parsecommandline(int argc, char **argv, struct behavior *b)
+void parsecommandline(int argc, const char **argv, struct behavior *b)
 #else /* not ANSI_DECLARATORS */
 void parsecommandline(argc, argv, b)
 int argc;
@@ -15670,7 +15670,7 @@ struct behavior *b;
 #ifdef TRILIBRARY
 
 #ifdef ANSI_DECLARATORS
-void triangulate(char *triswitches, struct triangulateio *in,
+void triangulate(const char *triswitches, struct triangulateio *in,
                  struct triangulateio *out, struct triangulateio *vorout)
 #else /* not ANSI_DECLARATORS */
 void triangulate(triswitches, in, out, vorout)

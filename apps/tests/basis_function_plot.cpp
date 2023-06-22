@@ -16,7 +16,7 @@ make_test_points(const disk::cartesian_mesh<T,2>& msh,
 
     auto pts = points(msh, cl);
     auto hx = (pts[1] - pts[0]).to_vector().norm()/(N+1);
-    auto hy = (pts[3] - pts[0]).to_vector().norm()/(N+1);
+    auto hy = (pts[2] - pts[0]).to_vector().norm()/(N+1);
 
     for (size_t i = 0; i < N; i++) {
         for (size_t j = 0; j < N; j++) {
@@ -35,11 +35,11 @@ int main(void)
     using mesh_type = disk::cartesian_mesh<T,2>;
 
     mesh_type msh;
-    disk::make_single_element_mesh(msh, {0.5, 0.5}, 1.0, M_PI);
+    disk::make_single_element_mesh(msh, {0.0, 0.0}, 1.0, 2.0);
 
     auto cl = *msh.cells_begin();
 
-    auto cb = disk::make_scalar_harmonic_top_basis(msh, cl, 3);
+    auto cb = disk::make_scalar_harmonic_top_basis(msh, cl, 4);
     cb.maximum_polynomial_degree(1);
     
     std::cout << cb.size() << std::endl;
