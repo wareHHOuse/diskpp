@@ -365,15 +365,13 @@ integrate(const disk::generic_mesh<T, 2>& msh, const typename disk::generic_mesh
 }
 
 template<typename T>
-std::vector<disk::quadrature_point<T, 2>>
-integrate(const disk::generic_mesh<T, 2>& msh, const typename disk::generic_mesh<T, 2>::face& fc, const size_t degree)
+auto
+integrate(const disk::generic_mesh<T, 2>& msh,
+    const typename disk::generic_mesh<T, 2>::face& fc, size_t degree)
 {
-    if (degree == 0)
-    {
-        return priv::integrate_degree0(msh, fc);
-    }
-
-    return priv::integrate_2D_face(msh, fc, degree);
+    auto pts = points(msh, fc);
+    assert(pts.size() == 2);
+    return disk::quadrature::gauss_legendre(degree, pts[0], pts[1]);
 }
 
 

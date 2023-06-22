@@ -54,6 +54,7 @@ integrate(const disk::simplicial_mesh<T, 2>&                msh,
           const size_t                                      degree)
 {
     const auto pts = points(msh, cl);
+    assert(pts.size() == 3);
     return disk::quadrature::dunavant(degree, pts);
 }
 
