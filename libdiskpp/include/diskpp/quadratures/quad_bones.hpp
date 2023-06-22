@@ -411,44 +411,6 @@ integrate_quadrangle_tens(size_t degree, const std::vector<point<T, 2>>& pts)
     return ret;
 }
 
-/**
- * @brief Generate a quadratue if the physical space of the 2D-face
- *
- * @tparam Mesh type of the mesh
- * @tparam T scalar type
- * @tparam Storage storage type
- * @param msh mesh
- * @param fc face
- * @param degree order of the quadrature
- * @return std::vector<disk::quadrature_point<T, 2>> quadrature
- */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-std::vector<disk::quadrature_point<T, 2>>
-integrate_2D_face(const Mesh<T, 2, Storage>& msh, const typename Mesh<T, 2, Storage>::face& fc, size_t degree)
-{
-    const auto qps = disk::edge_quadrature<T>(degree);
-    const auto pts = points(msh, fc);
-
-    const auto scale = (pts[1] - pts[0]);
-    const auto meas  = scale.to_vector().norm();
-
-    std::vector<disk::quadrature_point<T, 2>> ret;
-    ret.reserve(qps.size());
-
-    for (auto itor = qps.begin(); itor != qps.end(); itor++)
-    {
-        const auto qp = *itor;
-        const auto t  = qp.first.x();
-        const auto p  = 0.5 * (1 - t) * pts[0] + 0.5 * (1 + t) * pts[1];
-        const auto w  = qp.second * meas * 0.5;
-
-        ret.push_back(disk::make_qp(p, w));
-    }
-
-    return ret;
-}
-
-
 template<typename MeshType, typename Element>
 std::vector<disk::quadrature_point<typename MeshType::coordinate_type, MeshType::dimension>>
 integrate_degree0(const MeshType& msh, const Element& elem)
