@@ -35,7 +35,150 @@
 #include "diskpp/quadratures/quad_raw_dunavant.hpp"
 #include "diskpp/quadratures/quad_raw_gauss.hpp"
 
+#include "triangle_mesher.h"
+
 namespace disk {
+
+namespace quadrature {
+
+namespace priv {
+
+struct triangle {
+    point<double, 2>    p0;
+    point<double, 2>    p1;
+    point<double, 2>    p2;
+};
+
+/* Call J. R. Shewchuk's Triangle to triangulate a mesh element */
+std::vector<triangle>
+triangulate_using_triangle(const disk::generic_mesh<double,2>& msh,
+    const typename disk::generic_mesh<double,2>::cell_type& cl)
+{
+    auto pts = points(msh, cl);
+    std::vector<double> tri_pts;
+    //tri_pts.reserve(2*pts.size());
+    for (auto& pt : pts) {
+        tri_pts.push_back(pt.x());
+        tri_pts.push_back(pt.y());
+    }
+
+    struct triangulateio tio_in;
+    memset(&tio_in, '\0', sizeof(struct triangulateio));
+    tio_in.pointlist = tri_pts.data();
+    tio_in.numberofpoints = pts.size();
+
+    struct triangulateio tio_out;
+    memset(&tio_out, '\0', sizeof(struct triangulateio));
+
+    triangulate("zQ", &tio_in, &tio_out, nullptr);
+
+    std::vector<triangle> ret;
+    for (int i = 0; i < tio_out.numberoftriangles; i++)
+    {
+        int nbase = 3*i;
+        int p0base = tio_out.trianglelist[nbase+0];
+        assert(p0base < tio_out.numberofpoints);
+        assert(2*p0base+1 < 2*tio_out.numberofpoints);
+        int p1base = tio_out.trianglelist[nbase+1];
+        assert(p1base < tio_out.numberofpoints);
+        assert(2*p1base+1 < 2*tio_out.numberofpoints);
+        int p2base = tio_out.trianglelist[nbase+2];
+        assert(p2base < tio_out.numberofpoints);
+        assert(2*p2base+1 < 2*tio_out.numberofpoints);
+        triangle t;
+        t.p0 = point<double,2>( tio_out.pointlist[2*p0base+0], tio_out.pointlist[2*p0base+1] );
+        t.p1 = point<double,2>( tio_out.pointlist[2*p1base+0], tio_out.pointlist[2*p1base+1] );
+        t.p2 = point<double,2>( tio_out.pointlist[2*p2base+0], tio_out.pointlist[2*p2base+1] );
+        
+        ret.push_back(t);
+    }
+
+    if (tio_out.pointlist) trifree(tio_out.pointlist);
+    if (tio_out.pointattributelist) trifree(tio_out.pointattributelist);
+    if (tio_out.pointmarkerlist) trifree(tio_out.pointmarkerlist);
+    if (tio_out.trianglelist) trifree(tio_out.trianglelist);
+    if (tio_out.triangleattributelist) trifree(tio_out.triangleattributelist);
+    if (tio_out.trianglearealist) trifree(tio_out.trianglearealist);
+    if (tio_out.neighborlist) trifree(tio_out.neighborlist);
+
+    return ret;
+}
+
+/* Determine if a mesh element is convex. The idea is to turn CCW and for each
+ * pair of consecutive edges check the cross product. If it is positive, you're
+ * turning left. If you have a right turn, then the polygon is not convex. */
+template<typename T>
+bool
+is_convex(const disk::generic_mesh<T,2>& msh,
+    const typename disk::generic_mesh<T,2>::cell_type& cl)
+{
+    auto pts = points(msh, cl);
+    assert(pts.size() > 2);
+    if (pts.size() == 3)
+        return true;
+
+    for (size_t i = 0; i < pts.size(); i++)
+    {
+        auto p0 = pts[i];
+        auto p1 = pts[(i+1)%pts.size()];
+        auto p2 = pts[(i+2)%pts.size()];
+        auto v0 = p1 - p0;
+        auto v1 = p2 - p1;
+        auto cross = v0.x()*v1.y() - v0.y()*v1.x();
+        if (cross < 0)
+            return false;
+    }
+
+    return true;
+}
+
+/* Integrate a convex element: determine a rough center and build triangles
+ * between it and all the edges. Then use a triangle quadrature. */
+template<typename T>
+auto
+integrate_convex(const disk::generic_mesh<T,2>& msh,
+    const typename disk::generic_mesh<T,2>::cell_type& cl, size_t degree)
+{
+    auto pts = points(msh, cl);
+    assert(pts.size() > 2);
+    auto center = std::accumulate(pts.begin(), pts.end(), point<T,2>(0,0));
+    center = center/T(pts.size());
+
+    std::vector<quadrature_point<T,2>> ret;
+
+    for (size_t i = 0; i < pts.size(); i++)
+    {
+        auto p0 = pts[i];
+        auto p1 = pts[(i+1)%pts.size()];
+        auto qps = dunavant(degree, center, p0, p1);
+        ret.insert( ret.end(), qps.begin(), qps.end() );
+    }
+
+    return ret;
+}
+
+/* Integrate a non-convex element: triangulate by calling a mesh generator.
+ * Then use a triangle quadrature. */
+template<typename T>
+auto
+integrate_nonconvex(const disk::generic_mesh<T,2>& msh,
+    const typename disk::generic_mesh<T,2>::cell_type& cl, size_t degree)
+{
+    auto tris = triangulate_using_triangle(msh, cl);
+
+    std::vector<quadrature_point<T,2>> ret;
+    for (auto& tri : tris)
+    {
+        auto qps = dunavant(degree, tri.p0, tri.p1, tri.p2);
+        ret.insert( ret.end(), qps.begin(), qps.end() );
+    }
+
+    return ret;
+}
+
+} // namespace priv
+
+} // namespace quadrature
 
 namespace priv {
 
@@ -73,6 +216,7 @@ barycenter(Iterator begin, Iterator end)
  * if and how this can affect computations, so I leave it turned off.
  */
 template<typename T>
+[[deprecated("please use disk::quadrature::priv::integrate_convex()")]]
 std::vector<disk::quadrature_point<T, 2>>
 integrate_convex_polygon(const size_t degree, const std::vector<point<T, 2>>& pts)
 {
@@ -146,6 +290,7 @@ integrate_convex_polygon(const size_t degree, const std::vector<point<T, 2>>& pt
  * due to spliting
  */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
+[[deprecated("please use disk::quadrature::priv::integrate_nonconvex()")]]
 std::vector<disk::quadrature_point<T, 2>>
 integrate_nonconvex_polygon(const Mesh<T, 2, Storage>&                msh,
                             const typename Mesh<T, 2, Storage>::cell& cl,
@@ -184,17 +329,12 @@ integrate_nonconvex_polygon(const Mesh<T, 2, Storage>&                msh,
     return ret;
 }
 
-}
+} //namespace priv
 
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
 integrate(const disk::generic_mesh<T, 2>& msh, const typename disk::generic_mesh<T, 2>::cell& cl, size_t degree)
 {
-    if (degree == 0)
-    {
-        return priv::integrate_degree0(msh, cl);
-    }
-
     const auto pts = points(msh, cl);
 
     assert( (pts.size() > 2) && "Insufficient points for a 2D cell" );
@@ -202,13 +342,18 @@ integrate(const disk::generic_mesh<T, 2>& msh, const typename disk::generic_mesh
     if (pts.size() == 3) {
         return disk::quadrature::dunavant(degree, pts[0], pts[1], pts[2]);
     }
+
+    bool convex = quadrature::priv::is_convex(msh, cl);
     
-    if (pts.size() == 4) {
+    if (pts.size() == 4 and convex) {
         return disk::quadrature::tensorized_gauss_legendre(degree, pts[0], pts[1], pts[2], pts[3]);
     }
 
-    //return priv::integrate_nonconvex_polygon(msh, cl, degree);
-    return priv::integrate_convex_polygon(degree, pts);
+    if (convex) {
+        return quadrature::priv::integrate_convex(msh, cl, degree);
+    }
+
+    return quadrature::priv::integrate_nonconvex(msh, cl, degree);
 }
 
 template<typename T>
