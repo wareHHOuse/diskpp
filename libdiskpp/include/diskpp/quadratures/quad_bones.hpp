@@ -348,70 +348,6 @@ quadrangle_quadrature(const size_t degree)
 /* Private stuff to support quadratures. User should not rely on this stuff. */
 namespace priv {
 
-/* See Ern & Guermond - Theory and practice of FEM, pag 360. */
-/*
-template<typename T>
-std::vector<quadrature_point<T,2>>
-triangle_quadrature_low_order(const point<T,2>& p0,
-                              const point<T,2>& p1,
-                              const point<T,2>& p2, size_t deg)
-{
-    std::vector<quadrature_point<T,2>>   ret;
-    auto v0 = p1 - p0;
-    auto v1 = p2 - p0;
-    auto area = std::abs( (v0.x() * v1.y() - v0.y() * v1.x())/2.0 );
-    point<T,2>      qp;
-    T               qw;
-    T               a1 = (6. - std::sqrt(15.)) / 21;
-    T               a2 = (6. + std::sqrt(15.)) / 21;
-    T               w1 = (155. - std::sqrt(15.)) / 1200;
-    T               w2 = (155. + std::sqrt(15.)) / 1200;
-    switch(deg)
-    {
-        case 0:
-        case 1:
-            qw = area;
-            qp = (p0 + p1 + p2)/3;      ret.push_back( make_qp(qp, qw) );
-            return ret;
-        case 2:
-            qw = area/3;
-            qp = p0/6 + p1/6 + 2*p2/3;  ret.push_back( make_qp(qp, qw) );
-            qp = p0/6 + 2*p1/3 + p2/6;  ret.push_back( make_qp(qp, qw) );
-            qp = 2*p0/3 + p1/6 + p2/6;  ret.push_back( make_qp(qp, qw) );
-            return ret;
-        case 3:
-            qw = 9*area/20;
-            qp = (p0 + p1 + p2)/3;      ret.push_back( make_qp(qp, qw) );
-            qw = 2*area/15;
-            qp = (p0 + p1)/2;           ret.push_back( make_qp(qp, qw) );
-            qp = (p0 + p2)/2;           ret.push_back( make_qp(qp, qw) );
-            qp = (p1 + p2)/2;           ret.push_back( make_qp(qp, qw) );
-            qw = area/20;
-            qp = p0;                    ret.push_back( make_qp(qp, qw) );
-            qp = p1;                    ret.push_back( make_qp(qp, qw) );
-            qp = p2;                    ret.push_back( make_qp(qp, qw) );
-            return ret;
-        case 4:
-        case 5:
-            qw = 9*area/40;
-            qp = (p0 + p1 + p2)/3;      ret.push_back( make_qp(qp, qw) );
-            qw = w1 * area;
-            qp = a1*p0 + a1*p1 + (1-2*a1)*p2;   ret.push_back( make_qp(qp, qw) );
-            qp = a1*p0 + (1-2*a1)*p1 + a1*p2;   ret.push_back( make_qp(qp, qw) );
-            qp = (1-2*a1)*p0 + a1*p1 + a1*p2;   ret.push_back( make_qp(qp, qw) );
-            qw = w2 * area;
-            qp = a2*p0 + a2*p1 + (1-2*a2)*p2;   ret.push_back( make_qp(qp, qw) );
-            qp = a2*p0 + (1-2*a2)*p1 + a2*p2;   ret.push_back( make_qp(qp, qw) );
-            qp = (1-2*a2)*p0 + a2*p1 + a2*p2;   ret.push_back( make_qp(qp, qw) );
-            return ret;
-
-        default:
-            throw std::invalid_argument("Triangle quadrature: requested order too high");
-    }
-    return ret;
-}
-*/
-
 /**
  * @brief Integrate using tensorized Gauss points on any quadrangle (not only
  * cartesian quadrangles)
@@ -511,6 +447,7 @@ integrate_2D_face(const Mesh<T, 2, Storage>& msh, const typename Mesh<T, 2, Stor
 
     return ret;
 }
+
 
 template<typename MeshType, typename Element>
 std::vector<disk::quadrature_point<typename MeshType::coordinate_type, MeshType::dimension>>

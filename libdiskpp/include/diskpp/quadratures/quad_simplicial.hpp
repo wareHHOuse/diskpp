@@ -32,6 +32,7 @@
 #define _QUAD_SIMPLICIAL_HPP_
 
 #include "diskpp/common/simplicial_formula.hpp"
+#include "diskpp/quadratures/quad_raw_gauss.hpp"
 #include "diskpp/quadratures/quad_raw_dunavant.hpp"
 
 namespace disk
@@ -71,12 +72,9 @@ integrate(const disk::simplicial_mesh<T, 2>&                msh,
           const typename disk::simplicial_mesh<T, 2>::face& fc,
           const size_t                                      degree)
 {
-    if (degree == 0)
-    {
-        return priv::integrate_degree0(msh, fc);
-    }
-
-    return priv::integrate_2D_face(msh, fc, degree);
+    auto pts = points(msh, fc);
+    assert(pts.size() == 2);
+    return disk::quadrature::gauss_legendre(degree, pts[0], pts[1]);
 }
 
 namespace priv
