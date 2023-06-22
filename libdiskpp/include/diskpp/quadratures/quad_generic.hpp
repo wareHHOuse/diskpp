@@ -182,6 +182,7 @@ integrate_nonconvex(const disk::generic_mesh<T,2>& msh,
 
 namespace priv {
 
+#if 0
 template<typename Iterator>
 auto
 barycenter(Iterator begin, Iterator end)
@@ -206,7 +207,9 @@ barycenter(Iterator begin, Iterator end)
 
     return p0 + ret / (den * 3);
 }
+#endif
 
+#if 0
 //#define OPTIMAL_TRIANGLE_NUMBER
 
 /* The 'optimal triangle number' version gives almost the same results
@@ -285,6 +288,9 @@ integrate_convex_polygon(const size_t degree, const std::vector<point<T, 2>>& pt
 #endif
     return ret;
 }
+#endif
+
+#if 0
 
 /* Integrate non-convex polygon. More costly than convex polygon
  * due to spliting
@@ -328,8 +334,10 @@ integrate_nonconvex_polygon(const Mesh<T, 2, Storage>&                msh,
 
     return ret;
 }
+#endif
 
 } //namespace priv
+
 
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>

@@ -418,7 +418,7 @@ test_stabfree_hho(Mesh& msh, convergence_database_new<typename Mesh::coordinate_
             cdb.all_A_errors.add_hdi(hdi);
 
             try {
-                auto error = run_hho_diffusion_solver(msh, hdi, true, true, diff_tens, tc.use_projection);
+                auto error = run_hho_diffusion_solver_stabfree(msh, hdi, true, true, diff_tens, tc.use_projection);
                 //cdb.add(hdi.face_degree(), make_display_name(tc.variant_name, hdi), error);
                 L2errs.push_back(error.L2err);
                 H1errs.push_back(error.H1err);
