@@ -1,4 +1,13 @@
 /*
+ * DISK++, a template library for DIscontinuous SKeletal methods.
+ *
+ * Matteo Cicuttin (C) 2023
+ * matteo.cicuttin@polito.it
+ *
+ * Politecnico di Torino - DISMA
+ * Dipartimento di Matematica
+ */
+/*
  *       /\         DISK++, a template library for DIscontinuous SKeletal
  *      /__\        methods.
  *     /_\/_\
@@ -26,7 +35,6 @@
 
 #pragma once
 
-#define _QUADRATURES_HPP_WAS_INCLUDED_
 
 #include "diskpp/geometry/geometry.hpp"
 #include "quad_bones.hpp"
@@ -55,8 +63,7 @@ integrate(const MeshType& msh, const Element& elem, const size_t degree)
 
 } // namespace disk
 
-#include "quad_simplicial.hpp"
+#include "bits/quad_phys_simplicial.hpp"
 #include "quad_hexahedral.hpp"
-#include "quad_generic.hpp"
+#include "bits/quad_phys_generic.hpp"
 
-#undef _QUADRATURES_HPP_WAS_INCLUDED_

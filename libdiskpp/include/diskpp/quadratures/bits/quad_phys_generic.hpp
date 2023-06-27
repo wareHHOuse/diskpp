@@ -24,16 +24,11 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-#ifndef _QUADRATURES_HPP_WAS_INCLUDED_
-    #error "You must NOT include this file. Include quadratures.hpp"
-#endif
-
-#ifndef _QUAD_GENERIC_HPP_
-#define _QUAD_GENERIC_HPP_
+#pragma once
 
 #include "raw_simplices.hpp"
-#include "diskpp/quadratures/quad_raw_dunavant.hpp"
-#include "diskpp/quadratures/quad_raw_gauss.hpp"
+#include "quad_raw_dunavant.hpp"
+#include "quad_raw_gauss.hpp"
 
 #include "triangle_mesher.h"
 
@@ -180,164 +175,6 @@ integrate_nonconvex(const disk::generic_mesh<T,2>& msh,
 
 } // namespace quadrature
 
-namespace priv {
-
-#if 0
-template<typename Iterator>
-auto
-barycenter(Iterator begin, Iterator end)
-{
-    typedef typename std::iterator_traits<Iterator>::value_type point_type;
-    typedef typename point_type::value_type                     T;
-
-    point_type ret;
-    T          den = 0.0;
-
-    auto numpts = std::distance(begin, end);
-    auto p0     = *begin;
-
-    for (size_t i = 2; i < numpts; i++)
-    {
-        auto pprev = *std::next(begin, i - 1) - p0;
-        auto pcur  = *std::next(begin, i) - p0;
-        auto d     = det(pprev, pcur) / 2.0;
-        ret        = ret + (pprev + pcur) * d;
-        den += d;
-    }
-
-    return p0 + ret / (den * 3);
-}
-#endif
-
-#if 0
-//#define OPTIMAL_TRIANGLE_NUMBER
-
-/* The 'optimal triangle number' version gives almost the same results
- * of the other version. In bigger meshes there are some advantages in
- * assembly time. The problem with this version is that it could generate
- * triangles with a very bad aspect ratio and at the moment I don't know
- * if and how this can affect computations, so I leave it turned off.
- */
-template<typename T>
-[[deprecated("please use disk::quadrature::priv::integrate_convex()")]]
-std::vector<disk::quadrature_point<T, 2>>
-integrate_convex_polygon(const size_t degree, const std::vector<point<T, 2>>& pts)
-{
-    using quadpoint_type = disk::quadrature_point<T, 2>;
-
-    const auto qps = disk::triangle_quadrature(degree);
-
-    std::vector<quadpoint_type> ret;
-
-#ifdef OPTIMAL_TRIANGLE_NUMBER
-    /* Break the cell in triangles, compute the transformation matrix and
-     * map quadrature data in the physical space. Edges of the triangle as
-     * column vectors in the transformation matrix. */
-    ret.resize(qps.size() * pts.size() - 2);
-    for (size_t i = 1; i < pts.size() - 1; i++)
-    {
-        const auto pt1  = pts[i];
-        const auto pt2  = pts[i + 1];
-        // Compute the integration basis
-        const auto [p0, v0, v1] = integration_basis(pts[0], pt1, pt2);
-
-        /* Compute the area of the sub-triangle */
-        const auto tm = area_triangle_kahan(pts[0], pt1, pt2);
-
-        auto tr = [ p0 = p0, v0 = v0, v1 = v1, tm ](const std::pair<point<T, 2>, T>& qd) -> auto
-        {
-            const auto point  = p0 + v0 * qd.first.x() + v1 * qd.first.y();
-            const auto weight = qd.second * tm;
-            return make_qp(point, weight);
-        };
-
-        auto retbegin = ret.begin();
-        std::advance(retbegin, qps.size() * (i - 1));
-
-        std::transform(qps.begin(), qps.end(), retbegin, tr);
-    }
-#else
-    const auto c_center = priv::barycenter(pts.begin(), pts.end());
-
-    /* Break the cell in triangles, compute the transformation matrix and
-     * map quadrature data in the physical space. Edges of the triangle as
-     * column vectors in the transformation matrix. */
-    ret.resize(qps.size() * pts.size());
-    for (size_t i = 0; i < pts.size(); i++)
-    {
-        const auto pt1  = pts[i];
-        const auto pt2  = pts[(i + 1) % pts.size()];
-        // Compute the integration basis
-        const auto [p0, v0, v1] = integration_basis(c_center, pt1, pt2);
-
-        /* Compute the area of the sub-triangle */
-        const auto tm = area_triangle_kahan(c_center, pt1, pt2);
-
-        auto tr = [ p0 = p0, v0 = v0, v1 = v1, tm ](const std::pair<point<T, 2>, T>& qd) -> auto
-        {
-            const auto point  = p0 + v0 * qd.first.x() + v1 * qd.first.y();
-            const auto weight = qd.second * tm;
-            return make_qp(point, weight);
-        };
-
-        auto retbegin = ret.begin();
-        std::advance(retbegin, qps.size() * i);
-
-        std::transform(qps.begin(), qps.end(), retbegin, tr);
-    }
-#endif
-    return ret;
-}
-#endif
-
-#if 0
-
-/* Integrate non-convex polygon. More costly than convex polygon
- * due to spliting
- */
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-[[deprecated("please use disk::quadrature::priv::integrate_nonconvex()")]]
-std::vector<disk::quadrature_point<T, 2>>
-integrate_nonconvex_polygon(const Mesh<T, 2, Storage>&                msh,
-                            const typename Mesh<T, 2, Storage>::cell& cl,
-                            const size_t                              degree)
-{
-    using quadpoint_type = disk::quadrature_point<T, 2>;
-
-    const auto qps = disk::triangle_quadrature(degree);
-
-    /* Break the cell in triangles, compute the transformation matrix and
-     * map quadrature data in the physical space. Edges of the triangle as
-     * column vectors in the transformation matrix. */
-
-    const auto rss = split_in_raw_triangles(msh, cl);
-
-    std::vector<quadpoint_type> ret;
-    ret.reserve(qps.size() * rss.size());
-
-    for (auto& rs : rss)
-    {
-        const auto pts = rs.points();
-        assert(pts.size() == 3);
-        const auto meas = area_triangle_kahan(pts[0], pts[1], pts[2]);
-
-        // Compute the integration basis
-        const auto [p0, v0, v1] = integration_basis(pts[0], pts[1], pts[2]);
-
-        for (auto& qd : qps)
-        {
-            const auto point  = p0 + v0 * qd.first.x() + v1 * qd.first.y();
-            const auto weight = qd.second * meas;
-            ret.push_back(disk::make_qp(point, weight));
-        }
-    }
-
-    return ret;
-}
-#endif
-
-} //namespace priv
-
 
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
@@ -409,7 +246,7 @@ integrate_polyhedron(const disk::generic_mesh<T, 3>&                msh,
     }
 
     return ret;
-}
+} 
 
 template<typename T>
 std::vector<disk::quadrature_point<T, 3>>
@@ -537,4 +374,3 @@ integrate(const disk::generic_mesh<T, 1>& msh, const typename generic_mesh<T, 1>
 
 } // namespace disk
 
-#endif /* _QUAD_GENERIC_HPP_ */

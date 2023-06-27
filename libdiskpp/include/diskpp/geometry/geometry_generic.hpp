@@ -32,7 +32,7 @@
 #define _GEOMETRY_GENERIC_HPP_
 
 #include "diskpp/geometry/element_generic.hpp"
-#include "diskpp/quadratures/raw_simplices.hpp"
+#include "diskpp/quadratures/bits/raw_simplices.hpp"
 #include "diskpp/common/simplicial_formula.hpp"
 
 namespace disk {

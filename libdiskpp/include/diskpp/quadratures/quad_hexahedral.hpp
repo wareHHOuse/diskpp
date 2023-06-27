@@ -1,4 +1,14 @@
 /*
+ * DISK++, a template library for DIscontinuous SKeletal methods.
+ *
+ * Matteo Cicuttin (C) 2023
+ * matteo.cicuttin@polito.it
+ *
+ * Politecnico di Torino - DISMA
+ * Dipartimento di Matematica
+ */
+
+/*
  *       /\         DISK++, a template library for DIscontinuous SKeletal
  *      /__\        methods.
  *     /_\/_\
@@ -24,32 +34,28 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-#ifndef _QUADRATURES_HPP_WAS_INCLUDED_
-    #error "You must NOT include this file. Include quadratures.hpp"
-#endif
+#pragma once
 
-#ifndef _QUAD_HEXAHEDRAL_HPP_
-#define _QUAD_HEXAHEDRAL_HPP_
-
-#include "diskpp/quadratures/quad_raw_gauss.hpp"
+#include "bits/quad_raw_gauss.hpp"
 namespace disk {
 
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
-integrate(const disk::cartesian_mesh<T, 2>& msh, const typename disk::cartesian_mesh<T, 2>::cell& cl, const size_t degree)
+integrate(const disk::cartesian_mesh<T, 2>& msh,
+    const typename disk::cartesian_mesh<T, 2>::cell_type& cl,
+    const size_t degree)
 {
     const auto pts = points(msh, cl);
-    std::array<point<T,2>, 4> pp;
-    pp[0] = pts[0];
-    pp[1] = pts[1];
-    pp[2] = pts[3]; // in cartesian_mesh<T,2> the nodes are
-    pp[3] = pts[2]; // *not* stored in ccw order (see issue #46)
-    return disk::quadrature::tensorized_gauss_legendre(degree, pp);
+    assert(pts.size() == 4);
+    /* Yes, the correct ordering is 0,1,3,2. See geometry_hexahedral.hpp. */
+    return disk::quadrature::tensorized_gauss_legendre(degree, pts[0], pts[1], pts[3], pts[2]);
 }
 
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
-integrate(const disk::cartesian_mesh<T, 2>& msh, const typename disk::cartesian_mesh<T, 2>::face& fc, const size_t degree)
+integrate(const disk::cartesian_mesh<T, 2>& msh,
+    const typename disk::cartesian_mesh<T, 2>::face_type& fc,
+    const size_t degree)
 {
     const auto pts = points(msh, fc);
     assert(pts.size() == 2);
@@ -228,5 +234,3 @@ integrate(const disk::cartesian_mesh<T, 3>& msh, const typename disk::cartesian_
 
 } // namespace disk
 
-
-#endif /* _QUAD_GENERIC_HPP_ */

@@ -1,14 +1,14 @@
 #include <iostream>
 #include <iomanip>
 
-#include "diskpp/quadratures/quad_raw_dunavant.hpp"
+#include "diskpp/quadratures/quadratures_raw.hpp"
 #include "sgr.hpp"
 
 using namespace disk;
 using namespace disk::quadrature;
 using namespace sgr;
 
-#define THRESH 1e-11
+#define THRESH 1e-15
 
 int main(void)
 {
@@ -56,12 +56,12 @@ int main(void)
                 int_num += qp.weight() * ifun(qp.point(), m, n);
             
             auto int_ana = int_ana_fun(m,n);
-            auto relerr = 100*std::abs(int_num - int_ana)/std::abs(int_ana);
-            if (relerr > THRESH) {
+            auto err = std::abs(int_num - int_ana);
+            if (err > THRESH) {
                 std::cout << redfg << "[FAIL] ";
                 std::cout << std::setw(3) << m << " ";
                 std::cout << std::setw(3) << n << "  ";
-                std::cout << std::setw(15) << relerr << "%    ";
+                std::cout << std::setw(15) << err << "     ";
                 std::cout << std::setw(10) << int_num << "    ";
                 std::cout << std::setw(10) << int_ana << nofg << std::endl;
                 fail = true;

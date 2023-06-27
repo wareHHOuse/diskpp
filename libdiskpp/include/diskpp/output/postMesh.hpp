@@ -34,7 +34,7 @@
 #include "diskpp/mesh/mesh.hpp"
 #include "diskpp/mesh/point.hpp"
 
-#include "diskpp/quadratures/raw_simplices.hpp"
+#include "diskpp/quadratures/bits/raw_simplices.hpp"
 
 namespace disk {
 

@@ -318,12 +318,12 @@ size_t ipow(size_t base, size_t exp)
 
 void make_hexmesh(hexmesh& hm, size_t l)
 {
-    std::cout << "Meshing" << std::endl;
+    //std::cout << "Meshing" << std::endl;
     hm.coord_max = ipow(2,l+2);
-    std::cout << "coord_max: " << hm.coord_max << std::endl;
+    //std::cout << "coord_max: " << hm.coord_max << std::endl;
     hexmesh_work(hm, 0, hm.coord_max, 0, hm.coord_max);
 
-    std::cout << "Sorting" << std::endl;
+    //std::cout << "Sorting" << std::endl;
     std::sort(hm.points.begin(), hm.points.end());
     hm.points.erase(
         std::unique(hm.points.begin(), hm.points.end()), hm.points.end() );
@@ -358,11 +358,11 @@ void make_hexmesh(hexmesh& hm, size_t l)
         }
     }
 
-    std::cout << "Points: " << hm.points.size() << ", Edges: ";
-    std::cout << hm.edges.size() << ", Polygons: " << hm.polygons.size();
-    std::cout << std::endl;
-    for (auto& [boundary,edges] : hm.boundary_edges)
-        std::cout << "Boundary: " << edges.size() << std::endl;
+    //std::cout << "Points: " << hm.points.size() << ", Edges: ";
+    //std::cout << hm.edges.size() << ", Polygons: " << hm.polygons.size();
+    //std::cout << std::endl;
+    //for (auto& [boundary,edges] : hm.boundary_edges)
+    //    std::cout << "Boundary: " << edges.size() << std::endl;
 }
 
 size_t

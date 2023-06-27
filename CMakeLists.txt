@@ -252,6 +252,7 @@ add_subdirectory(apps)
 
 option(BUILD_DISKPP_UNIT_TESTS "Build DiSk++ unitary tests" ON)
 if (BUILD_DISKPP_UNIT_TESTS)
+    include(CTest)
     add_subdirectory(unit_tests)
 endif()
 

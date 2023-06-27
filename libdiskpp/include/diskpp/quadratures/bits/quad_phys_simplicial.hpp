@@ -1,4 +1,14 @@
 /*
+ * DISK++, a template library for DIscontinuous SKeletal methods.
+ *
+ * Matteo Cicuttin (C) 2023
+ * matteo.cicuttin@polito.it
+ *
+ * Politecnico di Torino - DISMA
+ * Dipartimento di Matematica
+ */
+ 
+/*
  *       /\         DISK++, a template library for DIscontinuous SKeletal
  *      /__\        methods.
  *     /_\/_\
@@ -24,28 +34,22 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
-#ifndef _QUADRATURES_HPP_WAS_INCLUDED_
-#error "You must NOT include this file. Include quadratures.hpp"
-#endif
-
-#ifndef _QUAD_SIMPLICIAL_HPP_
-#define _QUAD_SIMPLICIAL_HPP_
+#pragma once
 
 #include "diskpp/common/simplicial_formula.hpp"
-#include "diskpp/quadratures/quad_raw_gauss.hpp"
-#include "diskpp/quadratures/quad_raw_dunavant.hpp"
+#include "quad_raw_gauss.hpp"
+#include "quad_raw_dunavant.hpp"
 
 namespace disk
 {
 
 /**
- * @brief Compute a quadrature of order "degree" in the physical space of the specified 2D-cell (triangle)
+ * @brief Return quadrature points on the interior of a physical 2D triangle
  *
- * @tparam T scalar type
- * @param msh (simplicial) mesh
- * @param cl specified 2D-cell (triangle)
- * @param degree order of the quadrature
- * @return std::vector<disk::quadrature_point<T, 2>> quadrature
+ * @param msh Reference to the mesh
+ * @param cl Refererence to the cell
+ * @param degree Order of the quadrature
+ * @return Quadrature points
  */
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
@@ -59,13 +63,12 @@ integrate(const disk::simplicial_mesh<T, 2>&                msh,
 }
 
 /**
- * @brief Compute a quadrature of order "degree" in the physical space of the specified 2D-face (edge)
+ * @brief Return quadrature points on a face of a physical 2D triangle
  *
- * @tparam T scalar type
- * @param msh (simplicial) mesh
- * @param fc specified 2D-face (edge)
- * @param degree order of the quadrature
- * @return std::vector<disk::quadrature_point<T, 2>> quadrature
+ * @param msh Reference to the mesh
+ * @param fc Refererence to the face
+ * @param degree Order of the quadrature
+ * @return Quadrature points
  */
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
@@ -140,31 +143,9 @@ template<typename T>
 std::vector<disk::quadrature_point<T, 3>>
 integrate(const disk::simplicial_mesh<T, 3>& msh, const typename disk::simplicial_mesh<T, 3>::face& fc, size_t degree)
 {
-    if (degree == 0)
-    {
-        return priv::integrate_degree0(msh, fc);
-    }
-
-    const auto m_quadrature_data = disk::triangle_quadrature(degree);
-
-    const auto pts = points(msh, fc);
+    auto pts = points(msh, fc);
     assert(pts.size() == 3);
-    const auto meas = measure(msh, fc);
-
-    // Compute the integration basis
-    const auto [p0, v0, v1] = integration_basis(pts[0], pts[1], pts[2]);
-
-    auto tr = [p0=p0, v0=v0, v1=v1, meas](const std::pair<point<T, 2>, T>& qd) -> auto
-    {
-        const auto point  = p0 + v0 * qd.first.x() + v1 * qd.first.y();
-        const auto weight = qd.second * meas;
-        return disk::make_qp(point, weight);
-    };
-
-    std::vector<disk::quadrature_point<T, 3>> ret(m_quadrature_data.size());
-    std::transform(m_quadrature_data.begin(), m_quadrature_data.end(), ret.begin(), tr);
-
-    return ret;
+    return disk::quadrature::dunavant(degree, pts[0], pts[1], pts[2]);
 }
 
 /**
@@ -209,4 +190,3 @@ integrate(const disk::simplicial_mesh<T, 3>& msh, const typename disk::simplicia
 
 } // namespace disk
 
-#endif /* _QUAD_SIMPLICIAL_HPP_ */

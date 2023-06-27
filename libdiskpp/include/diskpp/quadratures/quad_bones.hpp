@@ -1,4 +1,14 @@
 /*
+ * DISK++, a template library for DIscontinuous SKeletal methods.
+ *
+ * Matteo Cicuttin (C) 2023
+ * matteo.cicuttin@polito.it
+ *
+ * Politecnico di Torino - DISMA
+ * Dipartimento di Matematica
+ */
+ 
+/*
  *       /\         DISK++, a template library for DIscontinuous SKeletal
  *      /__\        methods.
  *     /_\/_\
@@ -110,6 +120,7 @@ golub_welsch(const size_t degree)
  * @return template<typename T> gauss_legendre quadrature of gauss legendre
  */
 template<typename T>
+[[deprecated("old")]]
 std::vector<std::pair<point<T, 1>, T>>
 gauss_legendre(size_t degree)
 {
@@ -198,6 +209,7 @@ gauss_legendre(size_t degree)
 /* The client code should call this when a quadrature on the reference edge
  * is required. In our case the reference edge is [-1,1]. */
 template<typename T>
+[[deprecated("old")]]
 std::vector<std::pair<point<T, 1>, T>>
 edge_quadrature(const size_t doe)
 {
@@ -284,6 +296,7 @@ tetrahedron_quadrature(size_t degree)
 
 /* Triangle quadrature. This is just a driver to call Dunavant
  * quadrature rule in the jburkardt's code. */
+[[deprecated("old")]]
 std::vector<std::pair<point<double,2>, double>>
 triangle_quadrature(size_t degree)
 {
@@ -317,6 +330,7 @@ triangle_quadrature(size_t degree)
 
 /* Quadrature for cartesian quadrangles, it is just tensorized Gauss points. */
 template<typename T>
+[[deprecated("old")]]
 std::vector<std::pair<point<T, 2>, T>>
 quadrangle_quadrature(const size_t degree)
 {
