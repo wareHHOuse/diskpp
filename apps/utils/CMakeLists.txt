@@ -19,3 +19,7 @@ install(TARGETS inertia_eval_conditioning RUNTIME DESTINATION bin)
 add_executable(mkgauss mkgauss.cpp)
 target_link_libraries(mkgauss ${LINK_LIBS})
 install(TARGETS mkgauss RUNTIME DESTINATION bin)
+
+add_executable(check_triangle_output check_triangle_output.cpp)
+target_link_libraries(check_triangle_output ${LINK_LIBS})
+install(TARGETS check_triangle_output RUNTIME DESTINATION bin)

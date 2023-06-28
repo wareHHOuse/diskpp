@@ -104,6 +104,12 @@ public:
         return *this;
     }
 
+    void set_all(const T& val)
+    {
+        for (auto& c : m_coords)
+            c = val;
+    }
+
     point   operator-() const {
         auto ret = -1.0 * (*this);
         return ret;

@@ -205,6 +205,91 @@ public:
     }
 };
 
+template<typename T>
+class simple_mesher<tetrahedral_mesh<T>>
+{
+    typedef tetrahedral_mesh<T>                         mesh_type;
+    static const size_t DIM = 3;
+    typedef typename tetrahedral_mesh<T>::storage_type  storage_type;
+    typedef point<T,DIM>                                point_type;
+
+    typedef typename tetrahedral_mesh<T>::node_type     node_type;
+    typedef typename tetrahedral_mesh<T>::edge_type     edge_type;
+    typedef typename tetrahedral_mesh<T>::surface_type  surface_type;
+    typedef typename tetrahedral_mesh<T>::volume_type   volume_type;
+
+    std::shared_ptr<storage_type>   storage;
+
+    using ptid = point_identifier<3>;
+    void make_tetra(const ptid& pi0, const ptid& pi1,
+        const ptid& pi2, const ptid& pi3)
+    {
+        storage->edges.push_back( edge_type({pi0, pi1}) );
+        storage->edges.push_back( edge_type({pi0, pi2}) );
+        storage->edges.push_back( edge_type({pi0, pi3}) );
+        storage->edges.push_back( edge_type({pi1, pi2}) );
+        storage->edges.push_back( edge_type({pi1, pi2}) );
+        storage->edges.push_back( edge_type({pi2, pi3}) );
+
+        storage->surfaces.push_back( surface_type({pi0, pi1, pi2}) );
+        storage->surfaces.push_back( surface_type({pi0, pi1, pi3}) );
+        storage->surfaces.push_back( surface_type({pi0, pi2, pi3}) );
+        storage->surfaces.push_back( surface_type({pi1, pi2, pi3}) );
+
+        storage->volumes.push_back( volume_type( {pi0, pi1, pi2, pi3} ) );
+    }
+
+public:
+
+    simple_mesher(mesh_type& msh)
+        : storage( msh.backend_storage() )
+    {
+        /* Init the first level of the mesh */
+        storage->points.push_back( point_type(0.0, 0.0, 0.0) );
+        auto pi0 = ptid(0);
+        storage->nodes.push_back( node_type( {pi0} ) );
+
+        storage->points.push_back( point_type(1.0, 0.0, 0.0) );
+        auto pi1 = ptid(1);
+        storage->nodes.push_back( node_type( {pi1} ) );
+
+        storage->points.push_back( point_type(1.0, 1.0, 0.0) );
+        auto pi2 = ptid(2);
+        storage->nodes.push_back( node_type( {pi2} ) );
+
+        storage->points.push_back( point_type(0.0, 1.0, 0.0) );
+        auto pi3 = ptid(3);
+        storage->nodes.push_back( node_type( {pi3} ) );
+
+        storage->points.push_back( point_type(0.0, 0.0, 1.0) );
+        auto pi4 = ptid(4);
+        storage->nodes.push_back( node_type( {pi4} ) );
+
+        storage->points.push_back( point_type(1.0, 0.0, 1.0) );
+        auto pi5 = ptid(5);
+        storage->nodes.push_back( node_type( {pi5} ) );
+
+        storage->points.push_back( point_type(1.0, 1.0, 1.0) );
+        auto pi6 = ptid(6);
+        storage->nodes.push_back( node_type( {pi6} ) );
+
+        storage->points.push_back( point_type(0.0, 1.0, 1.0) );
+        auto pi7 = ptid(7);
+        storage->nodes.push_back( node_type( {pi7} ) );
+
+        make_tetra(pi0, pi1, pi3, pi7);
+        make_tetra(pi0, pi1, pi4, pi7);
+        make_tetra(pi1, pi2, pi3, pi7);
+        make_tetra(pi1, pi2, pi6, pi7);
+        make_tetra(pi1, pi4, pi5, pi7);
+        make_tetra(pi1, pi5, pi6, pi7);
+
+        std::sort(storage->edges.begin(), storage->edges.end());
+        std::sort(storage->surfaces.begin(), storage->surfaces.end());
+
+    }
+};
+
 template<typename Mesh>
 auto make_simple_mesher(Mesh& msh)
 {
@@ -642,7 +727,6 @@ bool load_single_element_csv(generic_mesh<T,2>& msh, const std::string& filename
         std::regex re(";");
         std::sregex_token_iterator iter(line.begin(), line.end(), re, -1);
         std::vector<std::string> tokens{ iter, {} };
-        std::cout << ptnum << std::endl;
         if (tokens.size() < 2) {
             std::cout << "Error parsing CSV input: " << tokens.size() << std::endl;
             return false;

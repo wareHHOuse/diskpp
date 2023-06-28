@@ -35,6 +35,7 @@
 #include "diskpp/quadratures/bits/raw_simplices.hpp"
 #include "diskpp/common/simplicial_formula.hpp"
 
+
 namespace disk {
 
 template<size_t DIM>
@@ -66,32 +67,17 @@ struct generic_storage_class<3> {
         typedef generic_element<3,3>    node_type;
 };
 
-/**
- * @brief speciliaziton for the storage class of a generic mesh (including polytopal meshes)
- *
- * @tparam T scalar type
- * @tparam DIM dimension of the mesh, i.e, 1D, 2D or 3D
- */
 template<typename T, size_t DIM>
 using generic_mesh_storage = mesh_storage<T, DIM, generic_storage_class<DIM>>;
 
-/**
- * @brief speciliaziton for  generic mesh (including polytopal meshes)
- *
- * @tparam T scalar type
- * @tparam DIM dimension of the mesh, i.e, 1D, 2D or 3D
- */
 template<typename T, size_t DIM>
 using generic_mesh = mesh<T, DIM, generic_mesh_storage<T, DIM>>;
 
-/**
-  * \brief Return the number of faces of the specified cell
-  *
-  * \param msh a mesh
-  * \param cl a  cell
-  * \return Return the number of faces of the specified cell
-  *
-  */
+} // namespace disk
+
+#include "geometry_generic_triangulations.hpp"
+
+namespace disk {
 
 template<typename T, size_t DIM>
 size_t
@@ -101,14 +87,6 @@ howmany_faces(const generic_mesh<T,DIM>& msh,
     return cl.subelement_size();
 }
 
-/**
-  * \brief Return the actual faces of the specified cell
-  *
-  * \param msh a mesh
-  * \param cl a  cell
-  * \return Return the actual faces of the specified cell
-  *
-  */
 
 template<typename T, size_t DIM>
 std::vector<typename generic_mesh<T, DIM>::face>
@@ -129,15 +107,6 @@ faces(const generic_mesh<T, DIM>& msh,
     return ret;
 }
 
-/**
- * \brief Return the actual faces id of the specified cell
- *
- * \param msh a mesh
- * \param cl a  cell
- * \return Return the actual faces id of the specified cell
- *
- */
-
 template<typename T, size_t DIM>
 std::vector<typename generic_mesh<T, DIM>::face::id_type>
 faces_id(const generic_mesh<T, DIM>& msh, const typename generic_mesh<T, DIM>::cell& cl)
@@ -153,6 +122,35 @@ faces_id(const generic_mesh<T, 1>& msh, const typename generic_mesh<T, 1>::cell&
     auto face_ids = cl.faces_ids();
     return std::vector<typename generic_mesh<T, 1>::face::id_type>(face_ids.begin(), face_ids.end());
 }
+
+/* Determine if a mesh element is convex. The idea is to turn CCW and for each
+ * pair of consecutive edges check the cross product. If it is positive, you're
+ * turning left. If you have a right turn, then the polygon is not convex. */
+template<typename T>
+bool
+is_convex(const disk::generic_mesh<T,2>& msh,
+    const typename disk::generic_mesh<T,2>::cell_type& cl)
+{
+    auto pts = points(msh, cl);
+    assert(pts.size() > 2);
+    if (pts.size() == 3)
+        return true;
+
+    for (size_t i = 0; i < pts.size(); i++)
+    {
+        auto p0 = pts[i];
+        auto p1 = pts[(i+1)%pts.size()];
+        auto p2 = pts[(i+2)%pts.size()];
+        auto v0 = p1 - p0;
+        auto v1 = p2 - p1;
+        auto cross = v0.x()*v1.y() - v0.y()*v1.x();
+        if (cross < 0)
+            return false;
+    }
+
+    return true;
+}
+
 
 /**
   * \brief Return the volume of the specified 3D cell
@@ -200,36 +198,64 @@ measure(const generic_mesh<T,3>& msh, const typename generic_mesh<T,3>::face& fc
 }
 
 /**
-  * \brief Return the area of the specified 2D cell
-  *
-  * \param msh a mesh
-  * \param cl a 2D cell
-  * \return Return the area of the specified 2D cell
-  *
-  */
+ * \brief Return the area of the specified 2D cell
+ *
+ * \param msh Reference to the mesh
+ * \param cl Reference to a cell
+ * \return Return the area of the specified 2D cell
+ */
 template<typename T>
 T
-measure(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::cell& cl)
+measure(const generic_mesh<T,2>& msh,
+    const typename generic_mesh<T,2>::cell& cl)
 {
-    auto rss = split_in_raw_triangles(msh, cl);
-
-    T area = 0.0;
-    for (auto& rs : rss)
-    {
-        area += measure(rs);
+    /* Uses the divergence theorem: this way works on
+     * nonconvex elements without subtriangulating. */
+    T tot_meas = 0.0;
+    auto fcs = faces(msh, cl);
+    for (auto& fc : fcs) {
+        auto bar = barycenter(msh, fc);
+        auto meas = measure(msh, fc);
+        auto n = normal(msh, cl, fc);
+        tot_meas += meas * (bar.x()*n[0]/2. + bar.y()*n[1]/2.);
     }
-
-    return area;
+    return tot_meas;
 }
 
+template<typename T>
+point<T,2>
+barycenter(const generic_mesh<T,2>& msh,
+    const typename generic_mesh<T,2>::cell& cl)
+{
+    T Cx = 0.0;
+    T Cy = 0.0;
+    T A = 0.0;
+
+    auto pts = points(msh, cl);
+    for (size_t i = 0; i < pts.size(); i++)
+    {
+        auto& p0 = pts[i];
+        auto& p1 = pts[(i+1)%pts.size()];
+        auto d = (p0.x()*p1.y() - p1.x()*p0.y());
+        Cx += (p0.x() + p1.x())*d;
+        Cy += (p0.y() + p1.y())*d;
+        A += 0.5*d;
+    }
+
+    Cx /= 6*A;
+    Cy /= 6*A;
+
+    return point<T,2>(Cx, Cy);
+}
+
+
 /**
-  * \brief Return the length of the specified 2D face
-  *
-  * \param msh a mesh
-  * \param fc a 2D face
-  * \return Return the length of the specified 2D face
-  *
-  */
+ * \brief Return the length of the specified 2D face
+ *
+ * \param msh a mesh
+ * \param fc a 2D face
+ * \return Return the length of the specified 2D face
+ */
 
 template<typename T>
 T

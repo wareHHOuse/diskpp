@@ -1,6 +1,15 @@
 /*
  * DISK++, a template library for DIscontinuous SKeletal methods.
  *
+ * Matteo Cicuttin (C) 2023
+ * matteo.cicuttin@polito.it
+ *
+ * Politecnico di Torino - DISMA
+ * Dipartimento di Matematica
+ */
+/*
+ * DISK++, a template library for DIscontinuous SKeletal methods.
+ *
  * Matteo Cicuttin (C) 2020, 2021
  * matteo.cicuttin@uliege.be
  *

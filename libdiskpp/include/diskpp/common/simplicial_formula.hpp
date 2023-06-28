@@ -35,10 +35,9 @@ namespace disk
 {
 
 /**
- * @brief Compute the area of a triangle by using the Kahan formula which minimize the round-off error
+ * @brief Compute the area of a triangle by using the Kahan formula,
+ * which minimize the round-off error
  *
- * @tparam T scalar type
- * @tparam N dimension
  * @param p0 first point of the triangle
  * @param p1 second point of the triangle
  * @param p2 third point of the triangle

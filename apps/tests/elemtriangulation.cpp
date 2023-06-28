@@ -20,7 +20,7 @@ int main(void)
             double int_val = 0.0;
             for (auto& cl : msh)
             {
-                auto tris = disk::quadrature::priv::triangulate_using_triangle(msh, cl);
+                auto tris = disk::triangulate_nonconvex_polygon(msh, cl);
                 for (auto &tri : tris)
                 {
                     auto qps = disk::quadrature::dunavant(m+n, tri.p0, tri.p1, tri.p2);
