@@ -26,8 +26,7 @@
 
 #pragma once
 
-#include "quad_raw_dunavant.hpp"
-#include "quad_raw_gauss.hpp"
+#include "quad_raw_triangle.hpp"
 
 
 namespace disk {

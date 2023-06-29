@@ -38,7 +38,7 @@
 
 #include "diskpp/common/simplicial_formula.hpp"
 #include "quad_raw_gauss.hpp"
-#include "quad_raw_dunavant.hpp"
+#include "quad_raw_triangle.hpp"
 #include "quad_raw_tetra.hpp"
 
 namespace disk

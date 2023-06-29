@@ -11,5 +11,5 @@
 #pragma once
 
 #include "bits/quad_raw_gauss.hpp"
-#include "bits/quad_raw_dunavant.hpp"
-#include "bits/quad_raw_triangle_gauss.hpp"
+#include "bits/quad_raw_triangle.hpp"
+#include "bits/quad_raw_tetra.hpp"
