@@ -12,6 +12,10 @@ add_executable(quad_raw_dunavant quad_raw_dunavant.cpp)
 target_link_libraries(quad_raw_dunavant ${LINK_LIBS})
 add_test(NAME quad_raw_dunavant COMMAND quad_raw_dunavant)
 
+add_executable(quad_raw_gm_triangles quad_raw_gm_triangles.cpp)
+target_link_libraries(quad_raw_gm_triangles ${LINK_LIBS})
+add_test(NAME quad_raw_gm_triangles COMMAND quad_raw_gm_triangles)
+
 add_executable(quad_raw_tensorized_gl quad_raw_tensorized_gl.cpp)
 target_link_libraries(quad_raw_tensorized_gl ${LINK_LIBS})
 add_test(NAME quad_raw_tensorized_gl COMMAND quad_raw_tensorized_gl)

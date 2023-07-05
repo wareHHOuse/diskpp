@@ -16,10 +16,11 @@ test_consistency(Mesh& msh, size_t degree, size_t increment)
     using T = typename Mesh::coordinate_type;
 
     hho_degree_info hdi;
-    hdi.cell_degree(degree+1);
+    hdi.cell_degree(degree-1);
     hdi.face_degree(degree);
 
     auto delta = (hdi.cell_degree() > hdi.face_degree()) ? 1 : 2;
+    std::cout << delta << std::endl;
 
     hdi.reconstruction_degree(hdi.cell_degree()+delta+increment);
 
@@ -27,8 +28,10 @@ test_consistency(Mesh& msh, size_t degree, size_t increment)
     {
         auto cd = hdi.cell_degree();
         auto fd = hdi.face_degree();
-        auto rd = (delta == 1) ? hdi.reconstruction_degree() : cd+1;
+        auto rd = (delta == 1) ? hdi.reconstruction_degree() : cd+2;
         auto hd = (delta == 1) ? 0 : increment;
+
+        std::cout << cd << " " << fd << " " << rd << " " << hd << std::endl;
 
         auto dofsT = ((cd+2)*(cd+1))/2;
         auto dofsF = fd+1;
@@ -38,6 +41,8 @@ test_consistency(Mesh& msh, size_t degree, size_t increment)
 
         auto totfrom = dofsT + n*dofsF;
         auto totto = dofsR + dofsH;
+
+        std::cout << dofsR << " " << dofsH << std::endl;
 
         std::cout << Bon << "HHO(" << cd << "," << fd << ") -> (" << rd << "," << hd;
         std::cout << ")" << reset << std::endl; 
@@ -148,9 +153,21 @@ int main(int argc, char **argv)
     if (argc > 2)
         increment = std::stoi(argv[2]);
 
-    disk::generic_mesh<T,2> msh_gen;
-    load_single_element_csv(msh_gen, argv[3]);
-    test_consistency(msh_gen, degree, increment);
+    if (argc == 4)
+    {
+        disk::generic_mesh<T,2> msh_gen;
+        load_single_element_csv(msh_gen, argv[3]);
+        test_consistency(msh_gen, degree, increment);
+    }
+    else
+    {
+        for (size_t i = 3; i < 15; i++) {
+            std::cout << Yellowfg << " **** Faces = " << i << " ****" << nofg << std::endl;
+            disk::generic_mesh<T,2> msh_gen;
+            disk::make_single_element_mesh(msh_gen, 1.0, i);
+            test_consistency(msh_gen, degree, increment);
+        }
+    }
 
     /*
     triangular_mesh<T> msh;
@@ -192,13 +209,9 @@ int main(int argc, char **argv)
     */
 
     /*
-    for (size_t i = 3; i < 10; i++) {
-        std::cout << Yellowfg << " **** Faces = " << i << " ****" << nofg << std::endl;
-        disk::generic_mesh<T,2> msh_gen;
-        disk::make_single_element_mesh(msh_gen, 1.0, i);
-        test_consistency(msh_gen, degree, increment);
-    }
+
     */
+    
 
 
     return 0;

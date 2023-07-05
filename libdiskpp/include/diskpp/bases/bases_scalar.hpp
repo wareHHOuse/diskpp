@@ -1449,6 +1449,14 @@ public:
         return full_basis_size;
     }
 
+    size_t poly_size() const {
+        return polynomial_part_size;
+    }
+
+    size_t harmonic_size() const {
+        return harmonic_part_size;
+    }
+
     size_t degree() const {
         return full_basis_degree;
     }
