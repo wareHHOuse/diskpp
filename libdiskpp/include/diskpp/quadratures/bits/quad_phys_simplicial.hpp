@@ -60,7 +60,7 @@ integrate(const disk::simplicial_mesh<T, 2>&                msh,
 {
     const auto pts = points(msh, cl);
     assert(pts.size() == 3);
-    return disk::quadrature::dunavant(degree, pts);
+    return disk::quadrature::triangle_gauss(degree, pts);
 }
 
 /**
@@ -96,7 +96,7 @@ integrate(const disk::simplicial_mesh<T, 3>& msh, const typename disk::simplicia
 {
     auto pts = points(msh, fc);
     assert(pts.size() == 3);
-    return disk::quadrature::dunavant(degree, pts[0], pts[1], pts[2]);
+    return disk::quadrature::triangle_gauss(degree, pts[0], pts[1], pts[2]);
 }
 
 /**

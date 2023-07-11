@@ -7,6 +7,10 @@ add_executable(consistency src/consistency.cpp)
 target_link_libraries(consistency ${LINK_LIBS})
 install(TARGETS consistency RUNTIME DESTINATION bin)
 
+add_executable(new_hho src/new_hho.cpp)
+target_link_libraries(new_hho ${LINK_LIBS})
+install(TARGETS new_hho RUNTIME DESTINATION bin)
+
 add_executable(diffusion_hho src/diffusion_hho.cpp)
 target_link_libraries(diffusion_hho ${LINK_LIBS})
 install(TARGETS diffusion_hho RUNTIME DESTINATION bin)

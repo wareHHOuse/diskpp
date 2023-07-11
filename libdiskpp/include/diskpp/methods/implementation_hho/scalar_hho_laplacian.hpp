@@ -127,7 +127,7 @@ using diffusion_tensor = static_matrix<typename Mesh::coordinate_type, Mesh::dim
 namespace priv {
 
 template<bool use_diffusion_tensor, bool use_face_projection, typename Mesh, typename ScalarReconstructionBasis>
-std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+auto
 make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi,
     const ScalarReconstructionBasis& rb, const diffusion_tensor<Mesh>& diff_tens)
 {
@@ -196,13 +196,13 @@ make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, c
             vector_type f_phi = fb.eval_functions(qp.point());
             gr_rhs.block(0, offset, rbs - 1, fbs) += qp.weight() * (r_dphi * n) * f_phi.transpose();
 
-            if (not use_face_projection) {
+            if constexpr (not use_face_projection) {
                 vector_type c_phi = cb.eval_functions(qp.point());
                 gr_rhs.block(0, 0, rbs - 1, cbs) -= qp.weight() * (r_dphi * n) * c_phi.transpose();
             }
         }
 
-        if (use_face_projection)
+        if constexpr (use_face_projection)
         {
             matrix_type MF = matrix_type::Zero(fbs, fbs);
             matrix_type TF = matrix_type::Zero(fbs, cbs);
@@ -211,7 +211,7 @@ make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, c
             {
                 gradient_type r_dphi_tmp = rb.eval_gradients(qp.point());
                 gradient_type r_dphi;
-                if (use_diffusion_tensor)
+                if constexpr (use_diffusion_tensor)
                     r_dphi = r_dphi_tmp.block(1, 0, rbs - 1, DIM) * diff_tens.transpose();
                 else
                     r_dphi = r_dphi_tmp.block(1, 0, rbs - 1, DIM);
@@ -233,7 +233,7 @@ make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, c
     matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type data = gr_rhs.transpose() * oper;
 
-    return std::make_pair(oper, data);
+    return std::pair(oper, data);
 }
 
 } //namespace priv
@@ -241,7 +241,7 @@ make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, c
 
 
 template<typename Mesh>
-std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+auto
 make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
 {
     auto rb = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
@@ -250,7 +250,7 @@ make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, c
 }
 
 template<typename Mesh>
-std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+auto
 make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi,
     const diffusion_tensor<Mesh>& diff_tens)
 {
@@ -259,7 +259,7 @@ make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, c
 }
 
 template<typename Mesh>
-std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+auto
 make_shl_face_proj(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
 {
     auto rb = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
@@ -268,7 +268,7 @@ make_shl_face_proj(const Mesh& msh, const typename Mesh::cell_type& cl, const hh
 }
 
 template<typename Mesh>
-std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+auto
 make_shl_face_proj(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi,
     const diffusion_tensor<Mesh>& diff_tens)
 {
@@ -277,7 +277,7 @@ make_shl_face_proj(const Mesh& msh, const typename Mesh::cell_type& cl, const hh
 }
 
 template<typename Mesh>
-std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+auto
 make_shl_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
 {
     auto hb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
@@ -287,7 +287,7 @@ make_shl_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl, const hho
 }
 
 template<typename Mesh>
-std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+auto
 make_shl_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi,
     const diffusion_tensor<Mesh>& diff_tens)
 {
@@ -297,7 +297,7 @@ make_shl_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl, const hho
 }
 
 template<typename Mesh>
-std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+auto
 make_shl_face_proj_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
 {
     auto hb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
@@ -307,7 +307,7 @@ make_shl_face_proj_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl,
 }
 
 template<typename Mesh>
-std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+auto
 make_shl_face_proj_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi,
     const diffusion_tensor<Mesh>& diff_tens)
 {
@@ -318,7 +318,7 @@ make_shl_face_proj_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl,
 
 
 template<typename Mesh>
-std::pair<dynamic_matrix<typename Mesh::coordinate_type>, dynamic_matrix<typename Mesh::coordinate_type>>
+auto
 make_sfl(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi,
     const diffusion_tensor<Mesh>& diff_tens)
 {
@@ -439,7 +439,7 @@ make_sfl(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_i
     matrix_type oper = Ko.block(1,1,rbs_outer-1,rbs_outer-1).ldlt().solve(Ro_rhs);
     matrix_type data = Ro_rhs.transpose() * oper;
 
-    return std::make_pair(oper, data);
+    return std::pair(oper, data);
 }
 
 

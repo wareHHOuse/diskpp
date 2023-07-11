@@ -2,10 +2,18 @@
 namespace disk::basis {
 
 template<typename T>
-concept basis = requires {
+concept basis = requires(T t) {
     T::immersion_dimension;
     T::basis_dimension;
     T::tensor_order;
+    t.size();
+    t.degree();
+    t.integration_degree();
+};
+
+template<typename T>
+concept vector_basis = basis<T> && requires {
+    requires T::tensor_order == 1;
 };
 
 template<typename Trial, typename Test>

@@ -4,6 +4,15 @@
 
 namespace disk::basis {
 
+template<typename Basis>
+using piecewise_material_tensor =
+    Eigen::Matrix<typename Basis::scalar_type, Basis::immersion_dimension,
+        Basis::immersion_dimension>;
+
+template<typename Basis>
+using variable_material_tensor =
+    std::function<piecewise_material_tensor<Basis>(typename Basis::point_type)>;
+
 namespace priv {
 template<typename Basis>
 struct dot_evaluator
@@ -53,12 +62,12 @@ struct dot_evaluator
     }
 
 private:
-    auto eval_dot(const point_type& pt, vector_basis_tag) {
+    auto eval_dot(const point_type& pt, vector_basis_tag) const {
         return (basis(pt)*n).eval();
     }
 
     template<typename Range>
-    auto eval_dot(const point_type& pt, const Range& dr, vector_basis_tag) {
+    auto eval_dot(const point_type& pt, const Range& dr, vector_basis_tag) const {
         return (basis(pt, dr)*n).eval();
     }
 
@@ -180,6 +189,60 @@ private:
     //}
 };
 
+template<typename Basis, typename MatTens>
+struct material_prod_evaluator
+{
+    const Basis&    basis;
+    const MatTens&  mt;
+
+    using mesh_type = typename Basis::mesh_type;
+    using coordinate_type = typename mesh_type::coordinate_type;
+    using scalar_type = typename Basis::scalar_type;
+    using point_type = typename mesh_type::point_type;
+    static const size_t immersion_dimension = Basis::immersion_dimension;
+    static const size_t basis_dimension = Basis::basis_dimension;
+
+    static_assert(Basis::tensor_order == 1);
+    static const size_t tensor_order = Basis::tensor_order;
+    using value_type = typename tensor<scalar_type, immersion_dimension, tensor_order>::value_type;
+    using normal_type = Eigen::Matrix<coordinate_type, immersion_dimension, 1>;
+
+    material_prod_evaluator() = delete;
+    material_prod_evaluator(const material_prod_evaluator&) = delete;
+
+    material_prod_evaluator(const Basis& pb, const MatTens& pmt)
+        : basis(pb), mt(pmt)
+    {}
+
+    auto operator()(const point_type& pt) const {
+        return eval(pt, mt);
+    }
+
+    auto dot(const normal_type& n) const {
+        return dot_evaluator(*this, n);
+    }
+
+    size_t size() const {
+        return basis.size();
+    }
+
+    size_t degree() const {
+        return basis.degree();
+    }
+
+    size_t integration_degree() const {
+        return basis.degree();
+    }
+
+private:
+    auto eval(const point_type& pt, const variable_material_tensor<Basis>& pmt) const {
+        return (basis(pt)*pmt(pt)).eval();
+    }
+
+    auto eval(const point_type& pt, const piecewise_material_tensor<Basis>& pmt) const {
+        return (basis(pt)*pmt).eval();
+    }
+};
 
 } //namespace priv
 
@@ -193,6 +256,19 @@ auto div(const Basis& basis) {
     return priv::div_evaluator(basis);
 }
 
+template<vector_basis Basis>
+auto
+operator*(const variable_material_tensor<Basis>& mt, const Basis& basis)
+{
+    return priv::material_prod_evaluator(basis, mt);
+}
+
+template<vector_basis Basis>
+auto
+operator*(piecewise_material_tensor<Basis>& mt, const Basis& basis)
+{
+    return priv::material_prod_evaluator(basis, mt);
+}
 
 
 namespace priv {

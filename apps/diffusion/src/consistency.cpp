@@ -16,7 +16,7 @@ test_consistency(Mesh& msh, size_t degree, size_t increment)
     using T = typename Mesh::coordinate_type;
 
     hho_degree_info hdi;
-    hdi.cell_degree(degree-1);
+    hdi.cell_degree(degree+1);
     hdi.face_degree(degree);
 
     auto delta = (hdi.cell_degree() > hdi.face_degree()) ? 1 : 2;
@@ -31,7 +31,8 @@ test_consistency(Mesh& msh, size_t degree, size_t increment)
         auto rd = (delta == 1) ? hdi.reconstruction_degree() : cd+2;
         auto hd = (delta == 1) ? 0 : increment;
 
-        std::cout << cd << " " << fd << " " << rd << " " << hd << std::endl;
+        std::cout << "C: " << cd << " F: " << fd << " R: ";
+        std::cout << rd << " H: " << hd << std::endl;
 
         auto dofsT = ((cd+2)*(cd+1))/2;
         auto dofsF = fd+1;
@@ -75,10 +76,10 @@ test_consistency(Mesh& msh, size_t degree, size_t increment)
         Eigen::Matrix<T, Eigen::Dynamic, 1> poly_k1 =
             disk::project_function(msh, cl, cb, poly);
 
-        auto hb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
-        hb.maximum_polynomial_degree(hdi.cell_degree()+2);
+        //auto hb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
+        //hb.maximum_polynomial_degree(hdi.cell_degree()+2);
 
-        //auto hb = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+        auto hb = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
         
         Eigen::Matrix<T, Eigen::Dynamic, 1> poly_h =
             disk::project_function(msh, cl, hb, poly);
@@ -120,7 +121,14 @@ test_consistency(Mesh& msh, size_t degree, size_t increment)
 
         int zero_eigs = 0;
         T tol = 1e-10;
-        T min_eig = std::max(eigsa[0], tol);
+        T min_eig = eigsa[0];
+        T max_eig = eigsa[0];
+        for (size_t i = 1; i < eigsa.rows(); i++) {
+            min_eig = std::min(min_eig, eigsa[i]);
+            max_eig = std::max(max_eig, eigsa[i]);
+        }
+
+        T min2_eig = max_eig;
         for (size_t i = 0; i < eigsa.rows(); i++)
         {
             if ( eigsa[i] < tol ) {
@@ -128,13 +136,15 @@ test_consistency(Mesh& msh, size_t degree, size_t increment)
                 std::cout << Bcyanfg << eigsa[i] << " " << reset;
             }
             else {
-                min_eig = std::min(min_eig, eigsa[i]);
                 std::cout << eigsa[i] << " ";
             }
+
+            if (eigsa[i] > min_eig)
+                min2_eig = std::min(eigsa[i], min2_eig);
         }
 
         std::cout << Bcyanfg << "[" << zero_eigs << " null eigs]" << reset << std::endl;
-        std::cout << "Smallest nonzero eig: " << min_eig << std::endl;
+        std::cout << "Smallest nonzero eig: " << min2_eig << std::endl;
 
     }
 }
@@ -161,7 +171,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        for (size_t i = 3; i < 15; i++) {
+        for (size_t i = 3; i < 11; i++) {
             std::cout << Yellowfg << " **** Faces = " << i << " ****" << nofg << std::endl;
             disk::generic_mesh<T,2> msh_gen;
             disk::make_single_element_mesh(msh_gen, 1.0, i);

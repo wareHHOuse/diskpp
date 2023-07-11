@@ -52,7 +52,7 @@ integrate_convex(const disk::generic_mesh<T,2>& msh,
     {
         auto p0 = pts[i];
         auto p1 = pts[(i+1)%pts.size()];
-        auto qps = dunavant(degree, center, p0, p1);
+        auto qps = triangle_gauss(degree, center, p0, p1);
         ret.insert( ret.end(), qps.begin(), qps.end() );
     }
 
@@ -71,7 +71,7 @@ integrate_nonconvex(const disk::generic_mesh<T,2>& msh,
     std::vector<quadrature_point<T,2>> ret;
     for (auto& tri : tris)
     {
-        auto qps = dunavant(degree, tri.p0, tri.p1, tri.p2);
+        auto qps = triangle_gauss(degree, tri.p0, tri.p1, tri.p2);
         ret.insert( ret.end(), qps.begin(), qps.end() );
     }
 
@@ -92,7 +92,7 @@ integrate(const disk::generic_mesh<T, 2>& msh, const typename disk::generic_mesh
     assert( (pts.size() > 2) && "Insufficient points for a 2D cell" );
 
     if (pts.size() == 3) {
-        return disk::quadrature::dunavant(degree, pts[0], pts[1], pts[2]);
+        return disk::quadrature::triangle_gauss(degree, pts[0], pts[1], pts[2]);
     }
 
     bool convex = is_convex(msh, cl);
