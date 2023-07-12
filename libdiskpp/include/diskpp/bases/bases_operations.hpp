@@ -1,3 +1,13 @@
+/*
+ * DISK++, a template library for DIscontinuous SKeletal methods.
+ *
+ * Matteo Cicuttin (C) 2023
+ * matteo.cicuttin@polito.it
+ *
+ * Politecnico di Torino - DISMA
+ * Dipartimento di Matematica
+ */
+
 #pragma once
 
 #include "diskpp/bases/bases_traits.hpp"
@@ -307,6 +317,19 @@ eval(const typename Basis::point_type& pt,
 {
     typename basis_traits<Basis>::category basis_category;
     return priv::eval(pt, dofs, basis, basis_category);
+}
+
+template<basis Test>
+using fun = std::function<typename Test::value_type(typename Test::point_type)>;
+
+template<basis Basis, typename Mesh, typename Element>
+auto
+L2_project(const Mesh& msh, const Element& elem,
+    const fun<Basis>& f, const Basis& basis)
+{
+    auto mass = integrate(msh, elem, basis, basis);
+    auto rhs = integrate(msh, elem, f, basis);
+    return mass.ldlt().solve(rhs).eval();
 }
 
 } //namespace disk::basis
