@@ -7,8 +7,9 @@
  * Politecnico di Torino - DISMA
  * Dipartimento di Matematica
  */
-/*
- *       /\        Matteo Cicuttin (C) 2016, 2017, 2018, 2019
+//* Karol Cascavita (C) 2023
+ /*
+  *       /\        Matteo Cicuttin (C) 2016, 2017, 2018, 2019
  *      /__\       matteo.cicuttin@enpc.fr
  *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
  *    /\    /\
@@ -209,16 +210,16 @@ public:
 template<typename T>
 class simple_mesher<tetrahedral_mesh<T>>
 {
-    typedef tetrahedral_mesh<T>                         mesh_type;
+    typedef tetrahedral_mesh<T>                             mesh_type;
     static const size_t DIM = 3;
-    typedef typename tetrahedral_mesh<T>::storage_type  storage_type;
-    typedef point<T, DIM>                               point_type;
+    typedef typename tetrahedral_mesh<T>::storage_type      storage_type;
+    typedef point<T, DIM>                                   point_type;
 
-    typedef typename tetrahedral_mesh<T>::node_type     node_type;
-    typedef typename tetrahedral_mesh<T>::edge_type     edge_type;
-    typedef typename tetrahedral_mesh<T>::surface_type  surface_type;
-    typedef typename tetrahedral_mesh<T>::volume_type   volume_type;
-    typedef std::pair<surface_type, boundary_descriptor> ns_pair;
+    typedef typename tetrahedral_mesh<T>::node_type         node_type;
+    typedef typename tetrahedral_mesh<T>::edge_type         edge_type;
+    typedef typename tetrahedral_mesh<T>::surface_type      surface_type;
+    typedef typename tetrahedral_mesh<T>::volume_type       volume_type;
+    typedef std::pair<surface_type, boundary_descriptor>    ns_pair;
 
     std::shared_ptr<storage_type>   storage;
     std::vector<ns_pair> new_surfaces;
@@ -234,7 +235,7 @@ class simple_mesher<tetrahedral_mesh<T>>
         storage->edges.push_back( edge_type({pi0, pi2}) );
         storage->edges.push_back( edge_type({pi0, pi3}) );
         storage->edges.push_back( edge_type({pi1, pi2}) );
-        storage->edges.push_back( edge_type({pi1, pi2}) );
+        storage->edges.push_back( edge_type({pi1, pi3}) );
         storage->edges.push_back( edge_type({pi2, pi3}) );
 
         new_surfaces.push_back({surface_type({pi0, pi1, pi2}), bi0});
@@ -326,71 +327,144 @@ class simple_mesher<tetrahedral_mesh<T>>
             storage->boundary_info.push_back(ns.second);
         }
 
+        new_surfaces.clear();
         assert(storage->surfaces.size() == 18);
         assert(storage->volumes.size() == 6);
-#if 0
-        // -----------------------------------------------------------------------
-        size_t num_surfaces = 18;
-        storage->surfaces.resize(num_edges);
-
-        storage->surfaces.push_back(surface_type({ pi0, pi1, pi3 })); //0 b0
-        storage->surfaces.push_back(surface_type({ pi0, pi1, pi4 })); //1 b1
-        storage->surfaces.push_back(surface_type({ pi0, pi1, pi7 }));
-        storage->surfaces.push_back(surface_type({ pi0, pi3, pi7 })); //3 b2
-        storage->surfaces.push_back(surface_type({ pi0, pi4, pi7 })); //4 b2
-        storage->surfaces.push_back(surface_type({ pi1, pi2, pi3 })); //5 b0
-        storage->surfaces.push_back(surface_type({ pi1, pi2, pi6 })); //6 b5
-        storage->surfaces.push_back(surface_type({ pi1, pi2, pi7 }));
-        storage->surfaces.push_back(surface_type({ pi1, pi3, pi7 }));
-        storage->surfaces.push_back(surface_type({ pi1, pi4, pi5 })); //9 b1
-        storage->surfaces.push_back(surface_type({ pi1, pi4, pi7 }));
-        storage->surfaces.push_back(surface_type({ pi1, pi5, pi6 })); //11 b5
-        storage->surfaces.push_back(surface_type({ pi1, pi5, pi7 }));
-        storage->surfaces.push_back(surface_type({ pi1, pi6, pi7 }));
-        storage->surfaces.push_back(surface_type({ pi2, pi3, pi7 })); //14 b4
-        storage->surfaces.push_back(surface_type({ pi2, pi6, pi7 })); //15 b4
-        storage->surfaces.push_back(surface_type({ pi4, pi5, pi7 })); //16 b3
-        storage->surfaces.push_back(surface_type({ pi5, pi6, pi7 })); //17 b3
-
-        storage->boundary_info.resize(num_surfaces);
-
-        storage->boundary_info[0] = boundary_descriptor(0, true);
-        storage->boundary_info[5] = boundary_descriptor(0, true);
-        storage->boundary_info[1] = boundary_descriptor(1, true);
-        storage->boundary_info[9] = boundary_descriptor(1, true);
-        storage->boundary_info[3] = boundary_descriptor(2, true);
-        storage->boundary_info[4] = boundary_descriptor(2, true);
-        storage->boundary_info[16] = boundary_descriptor(3, true);
-        storage->boundary_info[17] = boundary_descriptor(3, true);
-        storage->boundary_info[14] = boundary_descriptor(4, true);
-        storage->boundary_info[15] = boundary_descriptor(4, true);
-        storage->boundary_info[6] = boundary_descriptor(5, true);
-        storage->boundary_info[11] = boundary_descriptor(5, true);
-
-        storage->volumes.push_back(volume_type({ pi0, pi1, pi2, pi3 }));
-        storage->volumes.push_back(volume_type({ pi0, pi1, pi3, pi7 }));
-        storage->volumes.push_back(volume_type({ pi0, pi1, pi4, pi7 }));
-        storage->volumes.push_back(volume_type({ pi1, pi2, pi3, pi7 }));
-        storage->volumes.push_back(volume_type({ pi1, pi2, pi6, pi7 }));
-        storage->volumes.push_back(volume_type({ pi1, pi4, pi5, pi7 }));
-        storage->volumes.push_back(volume_type({ pi1, pi5, pi6, pi7 }));
-#endif
+        assert(storage->nodes.size() == 8);
     }
 
-    #if 0
+
     void refine(void)
     {
-        make_tetra(pi0, pi4, pi6, pi7);
-        make_tetra(pi4, pi1, pi5, pi9);
-        make_tetra(pi6, pi5, pi2, pi8);
-        make_tetra(pi7, pi9, pi8, pi3);
-        make_tetra(pi4, pi6, pi7, pi9);
-        make_tetra(pi4, pi9, pi5, pi6);
-        make_tetra(pi6, pi7, pi9, pi8);
-        make_tetra(pi6, pi8, pi9, pi5);
+        size_t node_offset = storage->nodes.size();
+        size_t edge_offset = storage->edges.size();
+        size_t surface_offset = storage->surfaces.size();
+        size_t volume_offset = storage->volumes.size();
 
+        auto count_bnd_fcs = [](const boundary_descriptor& bi) -> bool {
+            return bi.is_boundary();
+        };
+
+        size_t boundary_offset = std::count_if(storage->boundary_info.begin(),
+            storage->boundary_info.end(),
+            count_bnd_fcs);
+
+
+        new_surfaces.clear();
+        new_surfaces.reserve(storage->surfaces.size() * 4 + storage->volumes.size() * 4 );
+
+        for (auto& e : storage->edges)
+        {
+            auto ptids = e.point_ids();
+
+            assert(ptids.size() == 2);
+            assert(ptids[0] < storage->points.size());
+            assert(ptids[1] < storage->points.size());
+
+            auto p0 = storage->points[ ptids[0] ];
+            auto p1 = storage->points[ ptids[1] ];
+            auto pm = (p0 + p1)/2.;
+
+            storage->points.push_back(pm);
+            auto pmi = point_identifier<3>(storage->nodes.size());
+            storage->nodes.push_back(node_type({ pmi }));
+
+            assert(ptids[0] < pmi);
+            assert( ptids[1] < pmi );
+        }
+
+        for (auto& s : storage->volumes)
+        {
+            auto ptids = s.point_ids();
+
+
+            auto eofs = [&](const edge_type& e) -> auto {
+                //std::cout << "Searching for edge " << e << std::endl;
+                auto be = begin(storage->edges);
+                auto ee = begin(storage->edges) + edge_offset;
+                auto ei = std::lower_bound(be, ee, e);
+
+                if (ei == ee or e != *ei)
+                    throw std::logic_error("Edge not found. This is a bug.");
+                return point_identifier<3>(std::distance(be, ei) + node_offset);
+                };
+
+
+            auto ssearch = [&](const surface_type& s) -> auto {
+                auto bs = begin(storage->surfaces);
+                auto es = end(storage->surfaces);
+                auto si = std::lower_bound(bs, es, s);
+                if (si == es or s != *si)
+                    throw std::logic_error("Surface not found. This is a bug.");
+                return std::distance(bs, si);
+            };
+
+            auto s0 = surface_type({ ptids[0], ptids[1], ptids[2]});
+            auto s1 = surface_type({ ptids[0], ptids[1], ptids[3]});
+            auto s2 = surface_type({ ptids[0], ptids[2], ptids[3]});
+            auto s3 = surface_type({ ptids[1], ptids[2], ptids[3]});
+
+            auto bn = boundary_descriptor(0, false);
+            auto b0 = storage->boundary_info[ssearch(s0)];
+            auto b1 = storage->boundary_info[ssearch(s1)];
+            auto b2 = storage->boundary_info[ssearch(s2)];
+            auto b3 = storage->boundary_info[ssearch(s3)];
+
+            auto pi4 = eofs(edge_type({ptids[0], ptids[1]}) );
+            auto pi5 = eofs(edge_type({ptids[1], ptids[2]}));
+            auto pi6 = eofs(edge_type({ptids[0], ptids[2]}));
+            auto pi7 = eofs(edge_type({ptids[0], ptids[3]}));
+            auto pi8 = eofs(edge_type({ptids[2], ptids[3]}));
+            auto pi9 = eofs(edge_type({ptids[1], ptids[3]}));
+
+
+            make_tetra(ptids[0], pi4, pi6, pi7, b0, b1, b2, bn);
+            make_tetra(pi4, ptids[1], pi5, pi9, b0, b1, bn, b3);
+            make_tetra(pi6, pi5, ptids[2], pi8, b0, bn, b2, b3);
+            make_tetra(pi7, pi9, pi8, ptids[3], bn, b1, b2, b3);
+            make_tetra(pi4, pi6, pi7, pi9, bn, bn, b1, bn);
+            make_tetra(pi4, pi9, pi5, pi6, bn, bn, b0, bn);
+            make_tetra(pi6, pi7, pi9, pi8, bn, b2, bn, bn);
+            make_tetra(pi6, pi8, pi9, pi5, bn, bn, bn, b3);
+
+        }
+
+        auto comp_sort = [](const ns_pair& nsp1, const ns_pair& nsp2) -> bool {
+            return nsp1.first < nsp2.first;
+        };
+        auto comp_uniq = [](const ns_pair& nsp1, const ns_pair& nsp2) -> bool {
+            return nsp1.first == nsp2.first;
+        };
+
+        auto n_itor = storage->edges.begin() + node_offset;
+        storage->edges.erase(storage->edges.begin(), n_itor);
+        std::sort(storage->edges.begin(), storage->edges.end());
+        auto elast = std::unique(storage->edges.begin(), storage->edges.end());
+        storage->edges.erase(elast, storage->edges.end());
+
+        auto v_itor = storage->volumes.begin() + volume_offset;
+        storage->volumes.erase(storage->volumes.begin(), v_itor);
+
+        std::sort(new_surfaces.begin(), new_surfaces.end(), comp_sort);
+        auto slast = std::unique(new_surfaces.begin(), new_surfaces.end(),comp_uniq);
+        new_surfaces.erase(slast, new_surfaces.end());
+
+        storage->surfaces.clear();
+        storage->surfaces.reserve(new_surfaces.size());
+        storage->boundary_info.clear();
+        storage->boundary_info.reserve(new_surfaces.size());
+        for (auto& ns : new_surfaces)
+        {
+            storage->surfaces.push_back(ns.first);
+            storage->boundary_info.push_back(ns.second);
+        }
+        new_surfaces.clear();
+
+        // expected surfaces = (init volumes * 8 tetras * 4 faces - init bnd fcs * 4 faces) /2 + init bnd fcs * 4 faces.
+        size_t expected_surfaces = 16 * volume_offset + 2 * boundary_offset;
+        assert(storage->volumes.size() == volume_offset * 8);
+        assert(storage->surfaces.size() == expected_surfaces);
     }
-    #endif
 };
 
 template<typename Mesh>
