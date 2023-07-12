@@ -39,3 +39,7 @@ add_test(NAME monomial_bases_1D COMMAND monomial_bases_1D)
 add_executable(monomial_bases_2D monomial_bases_2D.cpp)
 target_link_libraries(monomial_bases_2D ${LINK_LIBS})
 add_test(NAME monomial_bases_2D COMMAND monomial_bases_2D)
+
+add_executable(simple_mesher_3D simple_mesher_3D.cpp)
+target_link_libraries(simple_mesher_3D ${LINK_LIBS})
+add_test(NAME simple_mesher_3D COMMAND simple_mesher_3D)
