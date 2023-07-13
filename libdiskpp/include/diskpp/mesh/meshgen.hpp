@@ -418,6 +418,12 @@ class simple_mesher<tetrahedral_mesh<T>>
             auto pi9 = eofs(edge_type({ptids[1], ptids[3]}));
 
 
+            /* This is based on "Simplicial grid refinement: on Freudenthal's
+             * algorithm and the optimal number of congruence classes" by
+             * Jürgen Bey. Numerische Mathematik volume 85, pages 1–29 (2000).
+             * See also https://gitlab.onelab.info/gmsh/gmsh/-/blob/master/src/mesh/meshRefine.cpp#L192
+             */
+
             make_tetra(ptids[0], pi4, pi6, pi7, b0, b1, b2, bn);
             make_tetra(pi4, ptids[1], pi5, pi9, b0, b1, bn, b3);
             make_tetra(pi6, pi5, ptids[2], pi8, b0, bn, b2, b3);
