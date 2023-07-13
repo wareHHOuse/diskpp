@@ -10,6 +10,11 @@
 
 #pragma once
 
+#include "diskpp/bases/bases_new.hpp"
+#include "diskpp/bases/bases_operations.hpp"
+#include "diskpp/bases/bases_traits.hpp"
+#include "hho_assemblers.hpp"
+
 namespace disk {
 namespace hho {
 namespace slapl {
@@ -118,7 +123,7 @@ local_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     auto phiT = typename Space::cell_basis_type(msh, cl, di.cell);
     
-    auto scale = diameter(msh, cl);
+    auto scale = 1./diameter(msh, cl);
 
     size_t offset = szT;
     for (const auto& fc : fcs)
@@ -164,6 +169,21 @@ local_reduction(const Mesh& msh, const typename Mesh::cell_type& cl,
     return ret;
 }
 
+template<typename Mesh, typename Space = hho_space<Mesh>>
+auto
+make_assembler(const Mesh& msh, const degree_info& di)
+{
+    using fbt = typename Space::face_basis_type;
+    return basic_condensed_assembler<Mesh, fbt>(msh, di.face);
+}
+
+template<typename Mesh, typename Space = hho_space<Mesh>>
+auto
+basis_size(const Mesh& msh, const typename Mesh::cell_type& cl, const degree_info& di)
+{
+    using cbt = typename Space::cell_basis_type;
+    return cbt::size_of_degree(di.cell);
+}
 
 } // namespace slapl
 } // namespace hho

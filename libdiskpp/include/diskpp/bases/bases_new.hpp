@@ -912,7 +912,7 @@ using fun = std::function<typename Test::value_type(typename Test::point_type)>;
 template<typename Mesh, typename Element, basis Test>
 auto integrate(const Mesh& msh, const Element& elem, const fun<Test>& f, const Test& basis)
 {
-    using ST = Test::scalar_type;
+    using ST = typename Test::scalar_type;
     Eigen::Matrix<ST, Eigen::Dynamic, 1> ret = Eigen::Matrix<ST, Eigen::Dynamic, 1>::Zero(basis.size());
 
     auto qps = integrate(msh, elem, 2*basis.integration_degree()+1);

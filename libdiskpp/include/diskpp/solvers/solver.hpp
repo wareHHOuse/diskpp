@@ -116,7 +116,9 @@ conjugated_gradient(const conjugated_gradient_params<T>& cgp,
     if (cgp.save_iteration_history)
         iter_hist_ofs.open(cgp.history_filename);
 
-    while ( nr/nr0 > cgp.rr_tol && iter < cgp.max_iter && nr/nr0 < cgp.rr_max )
+    auto max_iter = cgp.max_iter == 0 ? 2*N : cgp.max_iter;
+
+    while ( nr/nr0 > cgp.rr_tol && iter < max_iter && nr/nr0 < cgp.rr_max )
     {
         if (cgp.verbose)
         {

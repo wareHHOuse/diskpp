@@ -843,10 +843,10 @@ public:
 template<typename Mesh>
 class faces_iterproxy
 {
-    Mesh& m_msh;
+    const Mesh& m_msh;
 
 public:
-    faces_iterproxy(Mesh& msh)
+    faces_iterproxy(const Mesh& msh)
         : m_msh(msh)
     {}
 
@@ -893,7 +893,7 @@ auto cells(mesh<T, DIM, Storage>& msh)
  */
 
 template<typename T, size_t DIM, typename Storage>
-auto faces(mesh<T, DIM, Storage>& msh)
+auto faces(const mesh<T, DIM, Storage>& msh)
 {
     using Mesh = mesh<T, DIM, Storage>;
     return priv::faces_iterproxy<Mesh>(msh);
