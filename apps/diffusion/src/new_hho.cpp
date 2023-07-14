@@ -113,6 +113,14 @@ diffusion_solver(const Mesh& msh)
         auto S = local_stabilization(msh, cl, di, R);
         disk::dynamic_matrix<T> lhs = A+S;
 
+        auto OS = disk::make_scalar_hdg_stabilization(msh, cl, hdi);
+
+        std::cout << "newS" << std::endl;
+        std::cout << S << std::endl;
+
+        std::cout << "oldS" << std::endl;
+        std::cout << OS << std::endl;
+
         auto phiT = typename hho_space<mesh_type>::cell_basis_type(msh, cl, di.cell);
         disk::dynamic_vector<T> rhs = integrate(msh, cl, f, phiT);
     

@@ -134,7 +134,7 @@ local_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl,
         dynamic_matrix<T> rhs = dynamic_matrix<T>::Zero(szF, sz_total);
         rhs.block(0,0,szF,szT) = -MF.ldlt().solve(MTF);
         rhs.block(0,offset,szF, szF) = dynamic_matrix<T>::Identity(szF, szF);
-        S += scale * rhs.transpose() * MF * rhs;
+        S += rhs.transpose() * MF * rhs / diameter(msh, fc);
         offset += szF;
     }
 
