@@ -326,7 +326,7 @@ private:
 
 public:
     scalar_monomial(const mesh_type& msh, const cell_type& cl, size_t degree, 
-        rescaling_strategy rs = rescaling_strategy::gram_schmidt)
+        rescaling_strategy rs = rescaling_strategy::inertial)
         : degree_(degree), size_( size_of_degree(degree) )
     {
         bar_ = barycenter(msh, cl);
@@ -545,9 +545,10 @@ private:
         tr_.col(2) = v2_;
         tr_ = tr_.inverse().eval();
 #endif
-
+//#if 0
         tr_ = scaled_inertia_axes(msh, cl);
         tr_.transpose().eval();
+//#endif
     }
 
     point_type phys2ref(const point_type& pt) const {
@@ -705,7 +706,7 @@ private:
         vec_type u0 = (pts[1] - pts[0]).to_vector();
         vec_type u1 = (pts[2] - pts[0]).to_vector();
 
-        #if 0
+        //#if 0
         v0_ = u0;
         v1_ = u1 - u1.dot(v0_)*v0_/v0_.dot(v0_);
         v2_ = v0_.cross(v1_);
@@ -714,10 +715,11 @@ private:
         tr_.col(1) = v1_;
         tr_.col(2) = v2_;
         tr_ = tr_.inverse().eval();
-        #endif
-
+        //#endif
+        #if 0
         tr_ = scaled_inertia_axes(msh, fc);
         tr_.transpose().eval();
+        #endif
     }
 
 

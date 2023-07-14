@@ -12,10 +12,13 @@
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/methods/hho_slapl.hpp"
 #include "diskpp/mesh/mesh.hpp"
+#include "diskpp/loaders/loader.hpp"
 #include "diskpp/solvers/solver.hpp"
 #include "diskpp/output/silo.hpp"
 
 #include "diskpp/methods/hho"
+
+#include "mumps.hpp"
 
 namespace disk {
 
@@ -59,7 +62,12 @@ diffusion_solver(const Mesh& msh)
     using mesh_type = Mesh;
     using T = typename hho_space<Mesh>::scalar_type;
 
-    degree_info di(1);
+    degree_info di(2);
+
+    disk::hho_degree_info hdi;
+    hdi.cell_degree(di.cell);
+    hdi.face_degree(di.face);
+    hdi.reconstruction_degree(di.reco);
 
     disk::source f;
 
@@ -69,6 +77,10 @@ diffusion_solver(const Mesh& msh)
     {
         auto [R, A] = local_operator(msh, cl, di);
         auto S = local_stabilization(msh, cl, di, R);
+
+        auto [OR, OA] = disk::make_scalar_hho_laplacian(msh, cl, hdi);
+        auto OS = disk::make_scalar_hdg_stabilization(msh, cl, hdi);        
+
         disk::dynamic_matrix<T> lhs = A+S;
     
         auto phiT = typename hho_space<mesh_type>::cell_basis_type(msh, cl, di.cell);
@@ -89,37 +101,20 @@ diffusion_solver(const Mesh& msh)
     cgp.verbose = true;
     cgp.max_iter = 0;
     cgp.rr_tol = 1e-10;
-    disk::solvers::conjugated_gradient(cgp, assm.LHS, assm.RHS, sol);
+    //disk::solvers::conjugated_gradient(cgp, assm.LHS, assm.RHS, sol);
 
+    sol = mumps_lu(assm.LHS, assm.RHS);
     std::vector<T> p;
-
-
-    disk::hho_degree_info hdi;
-    hdi.cell_degree(di.cell);
-    hdi.face_degree(di.face);
-    hdi.reconstruction_degree(di.reco);
 
     for (auto& cl : msh)
     {
         auto [R, A] = local_operator(msh, cl, di);
-
-        std::cout << "new" << std::endl;
-        std::cout << R << std::endl;
+        auto S = local_stabilization(msh, cl, di, R);
 
         auto [OR, OA] = disk::make_scalar_hho_laplacian(msh, cl, hdi);
-        std::cout << "old" << std::endl;
-        std::cout << OR << std::endl;
+        auto OS = disk::make_scalar_hdg_stabilization(msh, cl, hdi);        
 
-        auto S = local_stabilization(msh, cl, di, R);
         disk::dynamic_matrix<T> lhs = A+S;
-
-        auto OS = disk::make_scalar_hdg_stabilization(msh, cl, hdi);
-
-        std::cout << "newS" << std::endl;
-        std::cout << S << std::endl;
-
-        std::cout << "oldS" << std::endl;
-        std::cout << OS << std::endl;
 
         auto phiT = typename hho_space<mesh_type>::cell_basis_type(msh, cl, di.cell);
         disk::dynamic_vector<T> rhs = integrate(msh, cl, f, phiT);
@@ -146,23 +141,27 @@ int main(void)
 {
     using T = double;
 
-    
     using mesh_type = disk::simplicial_mesh<T,2>;
     mesh_type msh;
     using point_type = typename mesh_type::point_type;
     auto mesher = disk::make_simple_mesher(msh);
-    //mesher.refine();
-    //mesher.refine();
-    //mesher.refine();
-    //mesher.refine();
+    mesher.refine();
+    mesher.refine();
+    mesher.refine();
+    mesher.refine();
     //mesher.refine();
     
-
     /*
     using mesh_type = disk::generic_mesh<T,2>;
     mesh_type msh;
     auto mesher = disk::make_fvca5_hex_mesher(msh);
     mesher.make_level(5);
+    */
+
+    /*
+    const char *mesh_filename = ".././../../refactor_old_diskpp_code/meshes/3D_tetras/netgen/cube3.mesh";
+    disk::simplicial_mesh<T, 3> msh;
+    disk::load_mesh_netgen<T>(mesh_filename, msh);
     */
     diffusion_solver(msh);
 
