@@ -32,19 +32,19 @@ struct hho_space
 };
 
 struct degree_info {
-    int cell;
-    int face;
-    int reco;
+    size_t cell;
+    size_t face;
+    size_t reco;
 
     degree_info()
         : cell(0), face(0), reco(1)
     {}
 
-    degree_info(int deg)
+    degree_info(size_t deg)
         : cell(deg), face(deg), reco(deg+1)
     {}
 
-    degree_info(int cdeg, int fdeg)
+    degree_info(size_t cdeg, size_t fdeg)
         : cell(cdeg), face(fdeg), reco(fdeg+1)
     {}
 };
@@ -53,7 +53,6 @@ template<typename Space>
 auto
 space_dimensions(const degree_info& di)
 {
-
     auto szT = Space::cell_basis_type::size_of_degree(di.cell);
     auto szF = Space::face_basis_type::size_of_degree(di.face);
     auto szR = Space::cell_basis_type::size_of_degree(di.reco);
@@ -134,7 +133,7 @@ local_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl,
         dynamic_matrix<T> rhs = dynamic_matrix<T>::Zero(szF, sz_total);
         rhs.block(0,0,szF,szT) = -MF.ldlt().solve(MTF);
         rhs.block(0,offset,szF, szF) = dynamic_matrix<T>::Identity(szF, szF);
-        S += rhs.transpose() * MF * rhs / diameter(msh, fc);
+        S += scale * rhs.transpose() * MF * rhs;
         offset += szF;
     }
 
@@ -175,14 +174,6 @@ make_assembler(const Mesh& msh, const degree_info& di)
 {
     using fbt = typename Space::face_basis_type;
     return basic_condensed_assembler<Mesh, fbt>(msh, di.face);
-}
-
-template<typename Mesh, typename Space = hho_space<Mesh>>
-auto
-basis_size(const Mesh& msh, const typename Mesh::cell_type& cl, const degree_info& di)
-{
-    using cbt = typename Space::cell_basis_type;
-    return cbt::size_of_degree(di.cell);
 }
 
 } // namespace slapl

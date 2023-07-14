@@ -634,24 +634,24 @@ public:
 
 template<typename Mesh>
 concept mesh_1D = requires {
-    Mesh::cell_type;
-    Mesh::face_type;
+    typename Mesh::cell_type;
+    typename Mesh::face_type;
     Mesh::dimension;
     requires Mesh::dimension == 1;
 };
 
 template<typename Mesh>
 concept mesh_2D = requires {
-    Mesh::cell_type;
-    Mesh::face_type;
+    typename Mesh::cell_type;
+    typename Mesh::face_type;
     Mesh::dimension;
     requires Mesh::dimension == 2;
 };
 
 template<typename Mesh>
 concept mesh_3D = requires {
-    Mesh::cell_type;
-    Mesh::face_type;
+    typename Mesh::cell_type;
+    typename Mesh::face_type;
     Mesh::dimension;
     requires Mesh::dimension == 3;
 };
