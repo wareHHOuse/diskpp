@@ -126,6 +126,7 @@ diffusion_solver(const Mesh& msh, size_t degree)
 
     T error = 0.0;
     disk::solution<Mesh> u_sol;
+    tc.tic();
     for (auto& cl : msh)
     {
         auto [R, A] = local_operator(msh, cl, di);
@@ -146,8 +147,9 @@ diffusion_solver(const Mesh& msh, size_t degree)
         disk::dynamic_vector<T> diff = locsol - sol_ana;
         error += diff.dot(lhs*diff);
     }
+    std::cout << "Postpro time: " << tc.toc() << std::endl;
 
-    std::cout << std::sqrt(error) << std::endl;
+    std::cout << "A-norm error: " << std::sqrt(error) << std::endl;
 
     disk::silo_database silo_db;
     silo_db.create("diffusion.silo");
@@ -157,11 +159,11 @@ diffusion_solver(const Mesh& msh, size_t degree)
     silo_db.add_variable("mesh", u);
 }
 
-int main(int argc, const char **argv)
+int main(int argc, char **argv)
 {
     using T = double;
 
-    using mesh_type = disk::simplicial_mesh<T,2>;
+    using mesh_type = disk::simplicial_mesh<T,3>;
     mesh_type msh;
     using point_type = typename mesh_type::point_type;
     auto mesher = disk::make_simple_mesher(msh);

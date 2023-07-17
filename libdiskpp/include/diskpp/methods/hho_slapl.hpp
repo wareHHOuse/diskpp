@@ -126,18 +126,30 @@ local_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl,
     auto scale = 1./diameter(msh, cl);
 
     
-    dynamic_matrix<T> MT = integrate(phiT, phiT, msh, cl);
-    dynamic_matrix<T> R2T = integrate(phiT, phiR, msh, cl);
+    dynamic_matrix<T> MT = integrate(msh, cl, phiT, phiT);
+    dynamic_matrix<T> R2T =
+        integrate(msh, cl, phiR, phiT).block(0,1,phiT.size(), phiR.size()-1);
+    dynamic_matrix<T> P1 = -MT.ldlt().solve(R2T*R);
+    P1.block(0, 0, phiT.size(), phiT.size()) +=
+        dynamic_matrix<T>::Identity(phiT.size(), phiT.size());
 
     size_t offset = szT;
     for (const auto& fc : fcs)
     {
         auto phiF = typename Space::face_basis_type(msh, fc, di.face);
         dynamic_matrix<T> MF = integrate(msh, fc, phiF, phiF);
-        dynamic_matrix<T> MTF = integrate(msh, fc, phiT, phiF);
-        dynamic_matrix<T> rhs = dynamic_matrix<T>::Zero(szF, sz_total);
-        rhs.block(0,0,szF,szT) = -MF.ldlt().solve(MTF);
-        rhs.block(0,offset,szF, szF) = dynamic_matrix<T>::Identity(szF, szF);
+        Eigen::LDLT<dynamic_matrix<T>> MF_llt(MF);
+        dynamic_matrix<T> T2F = integrate(msh, fc, phiT, phiF);
+        dynamic_matrix<T> P2 = MF_llt.solve(T2F*P1);
+
+        dynamic_matrix<T> R2F =
+            integrate(msh, fc, phiR, phiF).block(0, 1, phiF.size(), phiR.size()-1);
+        dynamic_matrix<T> P3 = MF_llt.solve(R2F*R);
+        P3.block(0,offset,phiF.size(), phiF.size()) -=
+            dynamic_matrix<T>::Identity(phiF.size(), phiF.size());
+
+        dynamic_matrix<T> rhs = P2+P3;
+
         S += scale * rhs.transpose() * MF * rhs;
         offset += szF;
     }

@@ -373,8 +373,9 @@ class simple_mesher<tetrahedral_mesh<T>>
             assert( ptids[1] < pmi );
         }
 
-        for (auto& s : storage->volumes)
+        for (auto s : storage->volumes)
         {
+            std::cout << s << std::endl;
             auto ptids = s.point_ids();
 
 
