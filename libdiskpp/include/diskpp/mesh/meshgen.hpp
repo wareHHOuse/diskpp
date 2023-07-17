@@ -222,7 +222,8 @@ class simple_mesher<tetrahedral_mesh<T>>
     typedef std::pair<surface_type, boundary_descriptor>    ns_pair;
 
     std::shared_ptr<storage_type>   storage;
-    std::vector<ns_pair> new_surfaces;
+    std::vector<ns_pair>            new_surfaces;
+    std::vector<volume_type>        new_volumes;
 
     using ptid = point_identifier<3>;
 
@@ -243,7 +244,7 @@ class simple_mesher<tetrahedral_mesh<T>>
         new_surfaces.push_back({surface_type({pi0, pi2, pi3}), bi2});
         new_surfaces.push_back({surface_type({pi1, pi2, pi3}), bi3});
 
-        storage->volumes.push_back(volume_type({ pi0, pi1, pi2, pi3 }));
+        new_volumes.push_back(volume_type({ pi0, pi1, pi2, pi3 }));
     }
 
     public:
@@ -328,6 +329,8 @@ class simple_mesher<tetrahedral_mesh<T>>
         }
 
         new_surfaces.clear();
+        std::swap(storage->volumes, new_volumes);
+        new_volumes.clear();
         assert(storage->surfaces.size() == 18);
         assert(storage->volumes.size() == 6);
         assert(storage->nodes.size() == 8);
@@ -353,7 +356,7 @@ class simple_mesher<tetrahedral_mesh<T>>
         new_surfaces.clear();
         new_surfaces.reserve(storage->surfaces.size() * 4 + storage->volumes.size() * 4 );
 
-        for (auto& e : storage->edges)
+        for (const auto& e : storage->edges)
         {
             auto ptids = e.point_ids();
 
@@ -373,14 +376,11 @@ class simple_mesher<tetrahedral_mesh<T>>
             assert( ptids[1] < pmi );
         }
 
-        for (auto s : storage->volumes)
+        for (const auto& s : storage->volumes)
         {
-            std::cout << s << std::endl;
             auto ptids = s.point_ids();
 
-
             auto eofs = [&](const edge_type& e) -> auto {
-                //std::cout << "Searching for edge " << e << std::endl;
                 auto be = begin(storage->edges);
                 auto ee = begin(storage->edges) + edge_offset;
                 auto ei = std::lower_bound(be, ee, e);
@@ -389,7 +389,6 @@ class simple_mesher<tetrahedral_mesh<T>>
                     throw std::logic_error("Edge not found. This is a bug.");
                 return point_identifier<3>(std::distance(be, ei) + node_offset);
                 };
-
 
             auto ssearch = [&](const surface_type& s) -> auto {
                 auto bs = begin(storage->surfaces);
@@ -449,8 +448,11 @@ class simple_mesher<tetrahedral_mesh<T>>
         auto elast = std::unique(storage->edges.begin(), storage->edges.end());
         storage->edges.erase(elast, storage->edges.end());
 
-        auto v_itor = storage->volumes.begin() + volume_offset;
-        storage->volumes.erase(storage->volumes.begin(), v_itor);
+        //auto v_itor = storage->volumes.begin() + volume_offset;
+        //storage->volumes.erase(storage->volumes.begin(), v_itor);
+        std::sort(new_volumes.begin(), new_volumes.end());
+        std::swap(storage->volumes, new_volumes);
+        new_volumes.clear();
 
         std::sort(new_surfaces.begin(), new_surfaces.end(), comp_sort);
         auto slast = std::unique(new_surfaces.begin(), new_surfaces.end(),comp_uniq);
