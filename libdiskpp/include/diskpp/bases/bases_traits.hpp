@@ -23,8 +23,27 @@ concept basis = requires(T t) {
 };
 
 template<typename T>
+concept scalar_basis = basis<T> && requires {
+    requires T::tensor_order == 1;
+};
+
+template<typename T>
 concept vector_basis = basis<T> && requires {
     requires T::tensor_order == 1;
+};
+
+template<typename T>
+concept scalar_basis_2D = basis<T> && requires {
+    requires T::tensor_order == 0;
+    requires T::immersion_dimension == 2;
+    requires T::basis_dimension == 2;
+};
+
+template<typename T>
+concept vector_basis_2D = basis<T> && requires {
+    requires T::tensor_order == 1;
+    requires T::immersion_dimension == 2;
+    requires T::basis_dimension == 2;
 };
 
 template<typename Trial, typename Test>

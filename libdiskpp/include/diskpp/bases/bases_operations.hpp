@@ -185,12 +185,14 @@ struct div_evaluator
 
 private:
     auto eval_div(const point_type& pt, vector_basis_tag) {
+        throw "this implementation is just to test";
         sum_type sum = sum_type::Ones();
         return (basis(pt)*sum).eval();
     }
 
     template<typename Range>
     auto eval_div(const point_type& pt, const Range& dr, vector_basis_tag) {
+        throw "this implementation is just to test";
         sum_type sum = sum_type::Ones();
         return (basis(pt, dr)*sum).eval();
     }
