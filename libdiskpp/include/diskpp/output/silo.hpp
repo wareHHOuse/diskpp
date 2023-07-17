@@ -677,11 +677,46 @@ public:
         return true;
     }
 
-        /* Scalar variable, REAL case */
+    /* Scalar variable, REAL case */
     template<typename T>
     bool add_variable(const std::string& mesh_name,
                       const std::string& var_name,
                       const Eigen::Matrix<T, Eigen::Dynamic, 1>& var,
+                      variable_centering_t centering)
+    {
+        static_assert(std::is_same<T, double>::value, "Sorry, only double for now");
+
+        if (!m_siloDb)
+        {
+            std::cout << "Silo database not opened" << std::endl;
+            return false;
+        }
+
+        if (centering == zonal_variable_t)
+        {
+            DBPutUcdvar1(m_siloDb, var_name.c_str(), mesh_name.c_str(),
+                         var.data(),
+                         var.size(), NULL, 0, DB_DOUBLE,
+                         DB_ZONECENT, NULL);
+        }
+        else if (centering == nodal_variable_t)
+        {
+            DBPutUcdvar1(m_siloDb, var_name.c_str(), mesh_name.c_str(),
+                         var.data(),
+                         var.size(), NULL, 0, DB_DOUBLE,
+                         DB_NODECENT, NULL);
+        }
+        else
+            return false;
+
+        return true;
+    }
+
+    /* Scalar variable, REAL case */
+    template<typename T>
+    bool add_variable(const std::string& mesh_name,
+                      const std::string& var_name,
+                      const std::vector<T>& var,
                       variable_centering_t centering)
     {
         static_assert(std::is_same<T, double>::value, "Sorry, only double for now");

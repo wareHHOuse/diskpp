@@ -9,6 +9,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <limits>
 
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/geometry/geometry.hpp"
@@ -37,6 +38,8 @@ int export_mesh_to_silo(Mesh& msh, const char* silo_filename, const std::vector<
 template<typename Mesh>
 bool test(Mesh& msh,  size_t num_ref)
 {
+    using T = typename Mesh::coordinate_type;
+
     size_t num_tetras = 6 * std::pow(8, num_ref);
     size_t num_fcs_per_boundary = 2 * std::pow(4, num_ref);
 
@@ -44,9 +47,12 @@ bool test(Mesh& msh,  size_t num_ref)
         return false;
 
     // Volume verification
-    for (auto& cl : msh)
-        if (measure(msh, cl) != (1.0 /num_tetras))
+    for (auto& cl : msh) {
+        auto expected_vol = (1.0 /num_tetras);
+        auto delta_vol = measure(msh, cl) - expected_vol;
+        if ( delta_vol > std::numeric_limits<T>::epsilon() )
             return false;
+    }
 
     // Number of boundary faces
     std::array<size_t, 6> counter{};
@@ -68,7 +74,7 @@ int main(void)
 {
     using T = double;
 
-    size_t num_ref = 2;
+    size_t num_ref = 4;
 
 
     std::cout << "Simplicial 3D" << std::endl;
@@ -84,5 +90,5 @@ int main(void)
         elemnum.push_back(n++);
     export_mesh_to_silo(msh, "tetras.silo", elemnum);
     */
-    return test(msh, num_ref);
+    return test(msh, num_ref) == false;
 }

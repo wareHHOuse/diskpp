@@ -155,8 +155,7 @@ diffusion_solver(const Mesh& msh, size_t degree)
     silo_db.create("diffusion.silo");
     silo_db.add_mesh(msh, "mesh");
 
-    disk::silo_zonal_variable<double> u("u", u_data);
-    silo_db.add_variable("mesh", u);
+    silo_db.add_variable("mesh", "u", u_data, disk::zonal_variable_t);
 }
 
 int main(int argc, char **argv)
@@ -200,8 +199,11 @@ int main(int argc, char **argv)
         }
     }
 
+    timecounter tc;
+    tc.tic();
     for (auto r = 0; r < num_refs; r++)
         mesher.refine();
+    std::cout << "Meshgen: " << tc.toc() << " (" << msh.cells_size() << " cells)" << std::endl;
 
     /*
     using mesh_type = disk::generic_mesh<T,2>;
