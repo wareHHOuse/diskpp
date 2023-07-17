@@ -121,8 +121,13 @@ local_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl,
     dynamic_matrix<T> S = dynamic_matrix<T>::Zero(sz_total, sz_total);
 
     auto phiT = typename Space::cell_basis_type(msh, cl, di.cell);
+    auto phiR = typename Space::reco_basis_type(msh, cl, di.reco);
     
     auto scale = 1./diameter(msh, cl);
+
+    
+    dynamic_matrix<T> MT = integrate(phiT, phiT, msh, cl);
+    dynamic_matrix<T> R2T = integrate(phiT, phiR, msh, cl);
 
     size_t offset = szT;
     for (const auto& fc : fcs)
