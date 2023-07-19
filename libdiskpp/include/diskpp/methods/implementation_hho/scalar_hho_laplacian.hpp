@@ -1,4 +1,13 @@
 /*
+ * DISK++, a template library for DIscontinuous SKeletal methods.
+ *
+ * Matteo Cicuttin (C) 2023
+ * matteo.cicuttin@polito.it
+ *
+ * Politecnico di Torino - DISMA
+ * Dipartimento di Matematica
+ */
+/*
  *       /\         DISK++, a template library for DIscontinuous SKeletal
  *      /__\        methods.
  *     /_\/_\
@@ -230,6 +239,15 @@ make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, c
         offset += fbs;
     }
 
+#ifdef PRINT_RANKS_AND_OTHER_STUFF
+    std::cout << "Matrix dim: " << gr_rhs.rows() << " " << gr_rhs.cols() << std::endl;
+
+    Eigen::ColPivHouseholderQR<matrix_type> decomp(gr_rhs);
+    std::cout << "Rank (QR):  " << decomp.rank() << std::endl;
+
+    Eigen::JacobiSVD<matrix_type> svd(gr_rhs);
+    std::cout << "Rank (SVD): " << svd.rank() << std::endl;
+#endif
     matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type data = gr_rhs.transpose() * oper;
 
@@ -281,7 +299,7 @@ auto
 make_shl_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
 {
     auto hb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
-    hb.maximum_polynomial_degree(hdi.face_degree()+1);
+    hb.maximum_polynomial_degree(hdi.cell_degree()+2);
     diffusion_tensor<Mesh> diff_tens = diffusion_tensor<Mesh>::Zero();
     return priv::make_scalar_hho_laplacian<false, false>(msh, cl, hdi, hb, diff_tens);
 }
@@ -292,7 +310,7 @@ make_shl_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl, const hho
     const diffusion_tensor<Mesh>& diff_tens)
 {
     auto hb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
-    hb.maximum_polynomial_degree(hdi.face_degree()+1);
+    hb.maximum_polynomial_degree(hdi.cell_degree()+2);
     return priv::make_scalar_hho_laplacian<true, false>(msh, cl, hdi, hb, diff_tens);
 }
 
@@ -301,7 +319,7 @@ auto
 make_shl_face_proj_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& hdi)
 {
     auto hb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
-    hb.maximum_polynomial_degree(hdi.face_degree()+2);
+    hb.maximum_polynomial_degree(hdi.cell_degree()+2);
     diffusion_tensor<Mesh> diff_tens = diffusion_tensor<Mesh>::Zero();
     return priv::make_scalar_hho_laplacian<false, true>(msh, cl, hdi, hb, diff_tens);
 }
@@ -312,7 +330,7 @@ make_shl_face_proj_harmonic(const Mesh& msh, const typename Mesh::cell_type& cl,
     const diffusion_tensor<Mesh>& diff_tens)
 {
     auto hb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
-    hb.maximum_polynomial_degree(hdi.face_degree()+2);
+    hb.maximum_polynomial_degree(hdi.cell_degree()+2);
     return priv::make_scalar_hho_laplacian<true, true>(msh, cl, hdi, hb, diff_tens);
 }
 
@@ -327,6 +345,10 @@ make_sfl(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_i
     
     const auto cd = hdi.cell_degree();
     const auto fd = hdi.face_degree();
+
+    /* The inner reconstruction is the standard HHO one, therefore it
+     * reconstructs in P(face_degree+1). The outer reconstruction OTOH
+     * maps in P(cell_degree+2+l) */
     const auto rd_inner = hdi.face_degree()+1;
     const auto rd_outer = hdi.reconstruction_degree();
 
@@ -337,9 +359,10 @@ make_sfl(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_i
     const auto cb = make_scalar_monomial_basis(msh, cl, cd);
     const auto rb_inner = make_scalar_monomial_basis(msh, cl, rd_inner);
     auto rb_outer = make_scalar_harmonic_top_basis(msh, cl, rd_outer);
+    /* Set split point between full poly and harmonic poly */
     rb_outer.maximum_polynomial_degree(cd+2);
-    //const auto rb_outer = make_scalar_monomial_basis(msh, cl, rd_outer);
 
+    /* The sizes of the various spaces */
     const auto cbs = cb.size();
     const auto fbs = scalar_basis_size(fd, Mesh::dimension-1);
     const auto rbs_inner = rb_inner.size();
@@ -350,6 +373,7 @@ make_sfl(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_i
     const auto num_faces_dofs = fbs * fcs.size();
     const auto num_total_dofs = cbs + num_faces_dofs;
 
+    /* Outer grad-grad matrix */
     matrix_type Ko = matrix_type::Zero(rbs_outer, rbs_outer);
     auto qps_outer = disk::integrate(msh, cl, 2*(rd_outer-1));
     for (auto& qp : qps_outer) {
@@ -357,11 +381,12 @@ make_sfl(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_i
         Ko += qp.weight() * (r_dphi * diff_tens.transpose()) * r_dphi.transpose();
     }
 
+    /* Inner grad-grad matrix and cell-based RHS term for inner reconstruction */
     matrix_type Ki = Ko.block(1, 1, rbs_inner-1, rbs_inner-1);
     matrix_type gr_rhs_inner = matrix_type::Zero(rbs_inner-1, num_total_dofs);
     gr_rhs_inner.block(0,0,rbs_inner-1,cbs) = Ko.block(1,0,rbs_inner-1,cbs);
     
-    /* Now the faces, inner operator */
+    /* Face-based terms for the inner reconstruction */
     size_t offset = cbs;
     for (size_t i = 0; i < fcs.size(); i++)
     {
@@ -387,7 +412,7 @@ make_sfl(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_i
         offset += fbs;
     }
 
-    /* This is the inner reconstruction operator */
+    /* Now Ri is the inner reconstruction operator */
     matrix_type Ri = Ki.ldlt().solve(gr_rhs_inner);
 
     /* Build the outer operator */
@@ -414,16 +439,20 @@ make_sfl(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_i
             gradient_type grad_v_tmp = rb_outer.eval_gradients(qp.point());
             gradient_type grad_v = grad_v_tmp.block(1, 0, rbs_outer-1, DIM)  * diff_tens.transpose();
 
+            /* {u_F, grad(v.n)}_F */
             vector_type f_phi = fb.eval_functions(qp.point());
             A += qp.weight() * (grad_v * n) * f_phi.transpose();
 
+            /* {u_T, grad(v.n)}_F */
             vector_type c_phi = cb.eval_functions(qp.point());
             T += qp.weight() * (grad_v * n) * c_phi.transpose();
 
+            /* {R(u), grad(v.n)}_F */
             vector_type r_phi_tmp = rb_inner.eval_functions(qp.point());
             vector_type r_phi = r_phi_tmp.tail(rbs_inner-1);
             Q += qp.weight() * (grad_v * n) * r_phi.transpose();
 
+            /* This is needed after for {π_F(R(u)), grad(v.n)}_F */
             Mf += qp.weight() * f_phi * f_phi.transpose();
             Tr += qp.weight() * f_phi * r_phi.transpose();
         }
