@@ -173,8 +173,8 @@ int main(int argc, char **argv)
 {
     using T = double;
 
-    int degree;
-    int increment;
+    int degree = 0;
+    int increment = 0;
     hho_variant variant = hho_variant::equal_order;
     std::string mesh_filename;
 
