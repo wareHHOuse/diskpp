@@ -68,7 +68,7 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
         std::cout << "dofsT = " << dofsT << ", dofsF = " << dofsF;
         std::cout << ", total = " << totfrom << ", ";
         if (totto >= totfrom)
-            std::cout << greenfg << "rec dofs = " << totto;
+            std::cout << Greenfg << "rec dofs = " << totto;
         else
             std::cout << redfg << "rec dofs = " << totto;
 
@@ -77,16 +77,11 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
 
         /* This is the polynomial with all the monomials up to some degree */
         auto poly = [&](const point<T,2>& pt) {
-            auto x = pt.x();
-            auto y = pt.y();
-
             auto ret = 0.0;
-
             auto deg = degree+1;
-
             for (size_t k = 0; k <= deg; k++)
                 for (size_t i = 0; i <= k; i++)
-                    ret += std::pow(x,k-i)*std::pow(y,i);
+                    ret += std::pow(pt.x(), k-i)*std::pow(pt.y(), i);
 
             return ret;
         };
@@ -129,7 +124,8 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
         Eigen::Matrix<T, Eigen::Dynamic, 1> diff =
             poly_rec.head( cb.size()-1 ) - poly_k1.tail( cb.size()-1 );
 
-        std::cout << Greenfg << "DIFFERENCE NORM: " << diff.norm() << nofg << std::endl;
+        if (diff.norm() > 1e-12) std::cout << BRedfg; else std::cout << Greenfg;
+        std::cout << "DIFFERENCE NORM: " << diff.norm() << nofg << std::endl;
         std::cout << Bwhitefg << "Reconstructed: " << reset << poly_rec.transpose() << std::endl;
         std::cout << Bwhitefg << "Expected:      " << reset << poly_h.tail(poly_h.rows()-1).transpose() << std::endl;
 
@@ -152,7 +148,7 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
         {
             if ( eigsa[i] < tol ) {
                 zero_eigs++;
-                std::cout << Bcyanfg << eigsa[i] << " " << reset;
+                std::cout << Cyanfg << eigsa[i] << " " << reset;
             }
             else {
                 std::cout << eigsa[i] << " ";
@@ -163,8 +159,10 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
         }
 
         std::cout << Cyanfg << "[" << zero_eigs << " null eigs]" << reset << std::endl;
-        std::cout << "Smallest nonzero eig: " << Magentafg << min2_eig << reset << std::endl;
+        if (zero_eigs == 1)
+            std::cout << "Smallest nonzero eig: " << BMagentafg << min2_eig << reset << std::endl;
 
+        break;
     }
 }
 
@@ -220,6 +218,7 @@ int main(int argc, char **argv)
         disk::generic_mesh<T,2> msh_gen;
         load_single_element_csv(msh_gen, mesh_filename);
         test_consistency(msh_gen, degree, increment, variant);
+        std::cout << std::endl;
         return 0;
     }
 
@@ -229,6 +228,7 @@ int main(int argc, char **argv)
         disk::generic_mesh<T,2> msh_gen;
         disk::make_single_element_mesh(msh_gen, 1.0, i);
         test_consistency(msh_gen, degree, increment, variant);
+        std::cout << std::endl;
     }    
 
     return 0;

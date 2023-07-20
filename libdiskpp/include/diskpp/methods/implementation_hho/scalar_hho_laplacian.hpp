@@ -240,13 +240,15 @@ make_scalar_hho_laplacian(const Mesh& msh, const typename Mesh::cell_type& cl, c
     }
 
 #ifdef PRINT_RANKS_AND_OTHER_STUFF
-    std::cout << "Matrix dim: " << gr_rhs.rows() << " " << gr_rhs.cols() << std::endl;
+    std::cout << "Operator RHS info:" << std::endl;
+    std::cout << "  Matrix dim: " << gr_rhs.rows() << " rows, ";
+    std::cout << gr_rhs.cols() << " cols" << std::endl;
 
     Eigen::ColPivHouseholderQR<matrix_type> decomp(gr_rhs);
-    std::cout << "Rank (QR):  " << decomp.rank() << std::endl;
+    std::cout << "  Rank (QR):  " << decomp.rank() << std::endl;
 
     Eigen::JacobiSVD<matrix_type> svd(gr_rhs);
-    std::cout << "Rank (SVD): " << svd.rank() << std::endl;
+    std::cout << "  Rank (SVD): " << svd.rank() << std::endl;
 #endif
     matrix_type oper = gr_lhs.ldlt().solve(gr_rhs);
     matrix_type data = gr_rhs.transpose() * oper;
