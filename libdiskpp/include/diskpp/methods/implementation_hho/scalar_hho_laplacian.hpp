@@ -459,17 +459,35 @@ make_sfl(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_i
             Tr += qp.weight() * f_phi * r_phi.transpose();
         }
 
+        Ro_rhs.block(0, 0, rbs_outer-1, cbs) -= T;
+
+#ifndef TEST_HARMONIC_BASIS
         Ro_rhs += Q*Ri;
         Ro_rhs -= A*Mf.ldlt().solve(Tr*Ri);
-        Ro_rhs.block(0, 0, rbs_outer-1, cbs) -= T;
         Ro_rhs.block(0, offset, rbs_outer-1, fbs) += A;
-
+#endif
         offset += fbs;
     }
+
+#ifdef PRINT_RANKS_AND_OTHER_STUFF
+    std::cout << "Operator RHS info:" << std::endl;
+    std::cout << "  Matrix dim: " << Ro_rhs.rows() << " rows, ";
+    std::cout << Ro_rhs.cols() << " cols" << std::endl;
+
+    Eigen::ColPivHouseholderQR<matrix_type> decomp(Ro_rhs);
+    std::cout << "  Rank (QR):  " << decomp.rank() << std::endl;
+
+    Eigen::JacobiSVD<matrix_type> svd(Ro_rhs);
+    std::cout << "  Rank (SVD): " << svd.rank() << std::endl;
+#endif
 
     matrix_type oper = Ko.block(1,1,rbs_outer-1,rbs_outer-1).ldlt().solve(Ro_rhs);
     matrix_type data = Ro_rhs.transpose() * oper;
 
+#ifdef TEST_HARMONIC_BASIS
+    /* If all ok, the harmonic part of this matrix must be zero */
+    std::cout << Ro_rhs.block(0, 0, rbs_outer-1, cbs) << std::endl;
+#endif
     return std::pair(oper, data);
 }
 
