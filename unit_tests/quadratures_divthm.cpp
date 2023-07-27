@@ -113,12 +113,25 @@ bool test_generic_2D(void)
     return test_divergence_theorem(msh);
 }
 
+/*
+bool test_simplicial_3D(void)
+{
+    std::cout << "Simplicial 3D" << std::endl;
+    using T = double;
+    disk::simplicial_mesh<T,3> msh;
+    auto mesher = make_simple_mesher(msh);
+    mesher.refine();
+    return test_divergence_theorem(msh);
+}
+*/
+
 int main(void)
 {
     bool success = true;
 
     success &= test_simplicial_2D();
     success &= test_generic_2D();
-    
+    //success &= test_simplicial_3D();
+
     return success ? 0 : 1;
 }
