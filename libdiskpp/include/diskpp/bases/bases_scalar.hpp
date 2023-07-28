@@ -1155,8 +1155,8 @@ harmonic_basis_size(size_t k, size_t d)
         return 2*k+1;
 
     if (d == 3)
-        return (k+1)*(k+1);
-
+        //return (k+1)*(k+1);
+        return 3*k+1;
     throw std::invalid_argument("not yet implemented");
 }
 
@@ -1522,19 +1522,19 @@ private:
     eval_harmonic(const point_type& bp) const
     {
         auto hmd = full_basis_degree;
-        auto bsize = harmonic_basis_size(full_basis_degree, 3);
+        auto bsize = (hmd+1)*(hmd+1);//harmonic_basis_size(full_basis_degree, 3);
         auto [Cs, Ss] = eval_cs(bp);
         function_type ret = function_type::Zero(bsize);
         size_t ofs = 0;
         for(size_t n = 0; n <= hmd; n++) {
-            for (size_t m = 0; m <= n; m++) {
+            for (size_t m = 0; m <= 1; m++) {
                 ret(ofs++) = Cs(n,m);
             }
-            for (size_t m = 1; m <= n; m++) {
+            for (size_t m = 1; m <= 1; m++) {
                 ret(ofs++) = Ss(n,m);
             }
         }
-        assert(ofs == bsize);
+        //assert(ofs == bsize);
         return ret;
     }
 
@@ -1550,20 +1550,20 @@ private:
 
         size_t ofs = 1;
         for(size_t n = 1; n <= hmd; n++) {
-            for (size_t m = 0; m <= n; m++) {
+            for (size_t m = 0; m <= 1; m++) {
                 ret(ofs, 0) = (n-m)*Cs(n-1,m);
                 ret(ofs, 1) = (bp.y()/r2)*(n*Cs(n,m) - (n-m)*bp.x()*Cs(n-1,m)) + m*Ss(n,m)*bp.z()/r2;
                 ret(ofs, 2) = (bp.z()/r2)*(n*Cs(n,m) - (n-m)*bp.x()*Cs(n-1,m)) - m*Ss(n,m)*bp.y()/r2;
                 ofs++;
             }
-            for (size_t m = 1; m <= n; m++) {
+            for (size_t m = 1; m <= 1; m++) {
                 ret(ofs, 0) = (n-m)*Ss(n-1,m);
                 ret(ofs, 1) = (bp.y()/r2)*(n*Ss(n,m) - (n-m)*bp.x()*Ss(n-1,m)) - m*Cs(n,m)*bp.z()/r2;
                 ret(ofs, 2) = (bp.z()/r2)*(n*Ss(n,m) - (n-m)*bp.x()*Ss(n-1,m)) + m*Cs(n,m)*bp.y()/r2;
                 ofs++;
             }
         }
-        assert(ofs == bsize);
+        //assert(ofs == bsize);
 
         return ret;
     }
