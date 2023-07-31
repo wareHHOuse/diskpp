@@ -10,6 +10,7 @@
 
 #define PRINT_RANKS_AND_OTHER_STUFF
 #include "diskpp/loaders/loader.hpp"
+#include "diskpp/loaders/loader_utils.hpp"
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/bases/bases_utils.hpp"
@@ -32,6 +33,7 @@ auto
 test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
 {
     using T = typename Mesh::coordinate_type;
+    using point_type = typename Mesh::point_type;
 
     hho_degree_info hdi;
     if (hv == hho_variant::mixed_order_low)
@@ -48,10 +50,10 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
     auto rd = hdi.cell_degree()+2;
     auto hd = increment;
 
-    auto dofsT = ((cd+2)*(cd+1))/2;
-    auto dofsF = fd+1;
-    auto dofsR = ((rd+2)*(rd+1))/2;
-    auto dofsH = 2*hd;
+    auto dofsT = scalar_basis_size(cd, Mesh::dimension);
+    auto dofsF = scalar_basis_size(fd, Mesh::dimension-1);
+    auto dofsR = scalar_basis_size(rd, Mesh::dimension);
+    auto dofsH = harmonic_basis_size(hd+rd, Mesh::dimension) - harmonic_basis_size(rd, Mesh::dimension);
 
     std::cout << Bwhitefg << "HHO(" << cd << "," << fd << "). Reconstruction: ";
     std::cout << rd+increment << " (poly: " << cd+2 << ", harmonic increment: ";
@@ -76,7 +78,7 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
         std::cout << reset << std::endl;
 
         /* This is the polynomial with all the monomials up to some degree */
-        auto poly = [&](const point<T,2>& pt) {
+        auto poly = [&](const point_type& pt) {
             auto ret = 0.0;
             auto deg = degree+1;
             for (size_t k = 0; k <= deg; k++)
@@ -103,7 +105,8 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A;
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> GR;
 
-        Eigen::Matrix<T,2,2> Id = Eigen::Matrix<T,2,2>::Identity();
+        Eigen::Matrix<T,Mesh::dimension,Mesh::dimension> Id =
+            Eigen::Matrix<T,Mesh::dimension,Mesh::dimension>::Identity();
         if (hv == hho_variant::mixed_order_high) {
             /* Build the standard reconstruction + projection on the cells */
             auto oper = make_shl_face_proj_harmonic(msh, cl, hdi, Id);
@@ -215,11 +218,26 @@ int main(int argc, char **argv)
 
     if ( mesh_filename.length() > 0 )
     {
-        disk::generic_mesh<T,2> msh_gen;
-        load_single_element_csv(msh_gen, mesh_filename);
-        test_consistency(msh_gen, degree, increment, variant);
-        std::cout << std::endl;
-        return 0;
+        /* Single element CSV 2D */
+        if (std::regex_match(mesh_filename, std::regex(".*\\.csv$") ))
+        {
+            std::cout << "Guessed mesh format: CSV 2D" << std::endl;
+            disk::generic_mesh<T,2> msh_gen;
+            load_single_element_csv(msh_gen, mesh_filename);
+            test_consistency(msh_gen, degree, increment, variant);
+            std::cout << std::endl;
+            return 0;
+        }
+
+        /* FVCA6 3D */
+        if (std::regex_match(mesh_filename, std::regex(".*\\.msh$") ))
+        {
+            std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
+            disk::generic_mesh<T,3> msh;
+            disk::load_mesh_fvca6_3d<T>(mesh_filename.c_str(), msh);
+            test_consistency(msh, degree, increment, variant);
+            return 0;
+        }
     }
 
 

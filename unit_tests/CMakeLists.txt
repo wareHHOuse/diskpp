@@ -43,3 +43,7 @@ add_test(NAME monomial_bases_2D COMMAND monomial_bases_2D)
 add_executable(simple_mesher_3D simple_mesher_3D.cpp)
 target_link_libraries(simple_mesher_3D ${LINK_LIBS})
 add_test(NAME simple_mesher_3D COMMAND simple_mesher_3D)
+
+add_executable(harmonic harmonic.cpp)
+target_link_libraries(harmonic ${LINK_LIBS})
+add_test(NAME harmonic COMMAND harmonic)

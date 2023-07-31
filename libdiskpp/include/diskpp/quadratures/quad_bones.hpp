@@ -44,7 +44,7 @@
 
 #include "triangle_dunavant_rule.hpp"
 
-#define USE_ARBQ
+//#define USE_ARBQ
 
 #ifdef USE_ARBQ
     #include "tetrahedron_arbq_rule.hpp"
