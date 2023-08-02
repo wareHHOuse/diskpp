@@ -1522,14 +1522,17 @@ private:
     eval_harmonic(const point_type& bp) const
     {
         auto hmd = full_basis_degree;
-        auto bsize = (hmd+1)*(hmd+1);//harmonic_basis_size(full_basis_degree, 3);
+        auto bsize = harmonic_basis_size(full_basis_degree, 3);
         auto [Cs, Ss] = eval_cs(bp);
         function_type ret = function_type::Zero(bsize);
-        size_t ofs = 0;
-        for(size_t n = 0; n <= hmd; n++) {
+        assert(bsize>0);
+        ret(0) = 1.0;
+        size_t ofs = 1;
+        for(size_t n = 1; n <= hmd; n++) {
             for (size_t m = 0; m <= 1; m++) {
                 ret(ofs++) = Cs(n,m);
             }
+            
             for (size_t m = 1; m <= 1; m++) {
                 ret(ofs++) = Ss(n,m);
             }
@@ -1556,6 +1559,7 @@ private:
                 ret(ofs, 2) = (bp.z()/r2)*(n*Cs(n,m) - (n-m)*bp.x()*Cs(n-1,m)) - m*Ss(n,m)*bp.y()/r2;
                 ofs++;
             }
+
             for (size_t m = 1; m <= 1; m++) {
                 ret(ofs, 0) = (n-m)*Ss(n-1,m);
                 ret(ofs, 1) = (bp.y()/r2)*(n*Ss(n,m) - (n-m)*bp.x()*Ss(n-1,m)) - m*Cs(n,m)*bp.z()/r2;

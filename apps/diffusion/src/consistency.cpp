@@ -176,11 +176,12 @@ int main(int argc, char **argv)
 
     int degree = 0;
     int increment = 0;
+    double radius = 1.0;
     hho_variant variant = hho_variant::equal_order;
     std::string mesh_filename;
 
     int ch;
-    while ( (ch = getopt(argc, argv, "k:i:v:m:")) != -1 )
+    while ( (ch = getopt(argc, argv, "k:i:v:m:r:")) != -1 )
     {
         switch(ch)
         {
@@ -207,6 +208,12 @@ int main(int argc, char **argv)
 
             case 'm':
                 mesh_filename = optarg;
+                break;
+
+            case 'r':
+                radius = std::stod(optarg);
+                if (radius <= 0)
+                    radius = 1.0;
                 break;
 
             case '?':
@@ -244,7 +251,7 @@ int main(int argc, char **argv)
     for (size_t i = 3; i < 11; i++) {
         std::cout << BYellowfg << " **** Faces = " << i << " ****" << reset << std::endl;
         disk::generic_mesh<T,2> msh_gen;
-        disk::make_single_element_mesh(msh_gen, 1.0, i);
+        disk::make_single_element_mesh(msh_gen, radius, i);
         test_consistency(msh_gen, degree, increment, variant);
         std::cout << std::endl;
     }    
