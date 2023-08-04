@@ -111,6 +111,8 @@ public:
         storage->surfaces.push_back( surface_type({pi0, pi3, pi4}) );
         storage->surfaces.push_back( surface_type({pi1, pi2, pi4}) );
         storage->surfaces.push_back( surface_type({pi2, pi3, pi4}) );
+
+        storage->subdomain_info.resize( storage->surfaces.size() );
     }
 
     void refine(void)
@@ -204,6 +206,7 @@ public:
 
         std::sort(new_surfaces.begin(), new_surfaces.end());
         std::swap(storage->surfaces, new_surfaces);
+        storage->subdomain_info.resize( storage->surfaces.size() );
     }
 };
 

@@ -7,10 +7,6 @@ add_executable(consistency src/consistency.cpp)
 target_link_libraries(consistency ${LINK_LIBS})
 install(TARGETS consistency RUNTIME DESTINATION bin)
 
-add_executable(poisson_solver src/poisson_solver.cpp)
-target_link_libraries(poisson_solver ${LINK_LIBS})
-install(TARGETS poisson_solver RUNTIME DESTINATION bin)
-
 add_executable(new_hho src/new_hho.cpp)
 target_link_libraries(new_hho ${LINK_LIBS})
 install(TARGETS new_hho RUNTIME DESTINATION bin)
