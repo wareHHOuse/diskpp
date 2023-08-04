@@ -73,6 +73,15 @@ lua_get_mesh_parameters(sol::state& lua)
         } 
     }
 
+    ret.level = 0;
+    auto ml = lua[NODE_NAME_MESH][MESH_FIELD_LEVEL];
+    if (ml.valid()) {
+        int mli = ml;
+        if (mli < 0)
+            mli = 0;
+        ret.level = mli;
+    }
+
     return ret;
 }
 

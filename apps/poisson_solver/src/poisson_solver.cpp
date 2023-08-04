@@ -20,10 +20,255 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
 #include "mumps.hpp"
+#include "diskpp/output/silo.hpp"
+
+#include "diskpp/methods/implementation_hho/curl.hpp"
 
 #include "lua_interface.h"
 
 #include "sgr.hpp"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+template<typename Mesh>
+class hho_assembler
+{
+    using coordinate_type = typename Mesh::coordinate_type;
+    using scalar_type = coordinate_type;
+    using mesh_type = Mesh;
+    using face_type = typename Mesh::face_type;
+    using cell_type = typename Mesh::cell_type;
+
+    //Mesh                                msh;
+    disk::hho_degree_info               hdi;
+
+    std::vector<Triplet<scalar_type>>   triplets;
+    std::vector<bool>                   is_dirichlet;
+
+    std::vector<size_t>                 compress_table;
+    std::vector<size_t>                 expand_table;
+
+    const size_t INVALID_OFFSET = (size_t) ~0;
+
+    size_t face_basis_size(void) const {
+        return disk::scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
+    }
+
+    /* Get the offset of a face in the linear system */
+    size_t get_system_offset(const Mesh& msh,
+        const typename Mesh::face_type& fc)
+    {
+        auto face_num = offset(msh, fc);
+        assert(face_num < msh.faces_size());
+        assert(compress_table.size() == msh.faces_size());
+        auto cnum = compress_table[face_num];
+        assert(cnum != INVALID_OFFSET);
+        auto fbs = face_basis_size();
+        return cnum*fbs;
+    }
+
+    /* Determine if a face should be assembled */
+    bool is_in_system(const Mesh& msh,
+        const typename Mesh::face_type& fc)
+    {
+        auto bi = msh.boundary_info(fc);
+        auto face_num = offset(msh, fc);
+        assert(face_num < msh.faces_size());
+        assert(is_dirichlet.size() == msh.faces_size());
+        return not (bi.is_boundary() and is_dirichlet[face_num]);
+    }
+
+    void make_tables(mesh_type& msh)
+    {
+        compress_table.resize( msh.faces_size(), INVALID_OFFSET);
+        expand_table.resize( sysfcs );
+
+        size_t face_i = 0;
+        size_t compressed_ofs = 0;
+        for (auto& fc : faces(msh))
+        {
+            assert(compressed_ofs <= face_i);
+            if ( is_in_system(msh, fc) )
+            {
+                assert(face_i < compress_table.size());
+                compress_table[face_i] = compressed_ofs;
+                assert(compressed_ofs < expand_table.size());
+                expand_table[compressed_ofs] = face_i;
+                compressed_ofs++;
+            }
+
+            face_i++;
+        }
+
+        assert(face_i == msh.faces_size());
+    }
+
+public:
+    
+    SparseMatrix<scalar_type>           LHS;
+    Matrix<scalar_type, Dynamic, 1>     RHS;
+
+    size_t                              syssz;
+    size_t                              sysfcs;
+
+
+    hho_assembler()
+    {}
+
+    hho_assembler(Mesh& msh, const disk::hho_degree_info& hdi,
+                  const std::vector<bool>& is_dirichlet)
+    {
+        initialize(msh, hdi, is_dirichlet);
+    }
+
+    void clear()
+    {
+        triplets.clear();
+        is_dirichlet.clear();
+        compress_table.clear();
+        expand_table.clear();
+        syssz = 0;
+        sysfcs = 0;
+    }
+
+    void initialize(Mesh& msh, const disk::hho_degree_info& p_hdi,
+                    const std::vector<bool>& p_is_dirichlet)
+    {
+        clear();
+
+        is_dirichlet = p_is_dirichlet;
+        hdi = p_hdi;
+
+        auto fbs = face_basis_size();
+
+        auto in_system = [&](const face_type& fc) -> bool {
+            auto ofs = offset(msh, fc);
+            assert(ofs < is_dirichlet.size());
+            return not (msh.is_boundary(fc) and is_dirichlet[ofs]);
+        };
+
+        sysfcs = std::count_if(msh.faces_begin(), msh.faces_end(), in_system);
+        syssz = fbs*sysfcs;
+
+        make_tables(msh);
+
+        LHS = SparseMatrix<scalar_type>(syssz, syssz);
+        RHS = Matrix<scalar_type, Dynamic, 1>::Zero(syssz);
+
+        std::cout << "Assembler initialized: " << sysfcs << " faces in system, ";
+        std::cout << syssz << " DoFs" << std::endl;
+    }
+
+    void
+    assemble(const Mesh& msh, const typename Mesh::cell_type& cl,
+             const Matrix<scalar_type, Dynamic, Dynamic>& lhsc,
+             const Matrix<scalar_type, Dynamic, 1>& rhs,
+             const Matrix<scalar_type, Dynamic, 1>& dirichlet_data)
+    {
+        auto fbs = face_basis_size();
+
+        auto fcs = faces(msh, cl);
+        for (size_t fi = 0; fi < fcs.size(); fi++)
+        {
+            if ( not is_in_system(msh, fcs[fi]) )
+                continue;
+
+            auto cofsi = get_system_offset(msh, fcs[fi]);
+            for (size_t fj = 0; fj < fcs.size(); fj++)
+            {
+                auto lofsi = fi*fbs;
+                auto lofsj = fj*fbs;
+
+                if ( not is_in_system(msh, fcs[fj]) ) 
+                {
+                    RHS.segment(cofsi, fbs) += -lhsc.block(lofsi, lofsj, fbs, fbs)*dirichlet_data.segment(lofsj, fbs);
+                    continue;
+                }
+
+                auto cofsj = get_system_offset(msh, fcs[fj]);
+                for (size_t i = 0; i < fbs; i++)
+                    for(size_t j = 0; j < fbs; j++)
+                        triplets.push_back( Triplet<scalar_type>(cofsi+i, cofsj+j, lhsc(lofsi+i, lofsj+j)) );
+            }
+
+            RHS.segment(cofsi, fbs) += rhs.segment(fi*fbs, fbs);
+        }
+    }
+
+    void finalize(void)
+    {
+        LHS.setFromTriplets(triplets.begin(), triplets.end());
+        triplets.clear();
+        std::cout << "Matrix has " << LHS.nonZeros() << " nonzeros." << std::endl; 
+    }
+
+    disk::dynamic_vector<scalar_type>
+    get_expanded_solution(const Mesh& msh, disk::dynamic_vector<scalar_type>& sol)
+    {
+        auto fbs = face_basis_size();
+
+        disk::dynamic_vector<scalar_type> ret = 
+            disk::dynamic_vector<scalar_type>::Zero( fbs*msh.faces_size() );
+
+        for (size_t i = 0; i < sysfcs; i++)
+        {
+            auto in_offset = i*fbs;
+            auto out_offset = expand_table.at(i)*fbs;
+            ret.segment(out_offset, fbs) = sol.segment(in_offset, fbs);
+        }
+
+        return ret;
+    }
+
+    disk::dynamic_vector<scalar_type>
+    get_element_dofs(const Mesh& msh, const typename Mesh::cell& cl, disk::dynamic_vector<scalar_type>& sol)
+    {
+        auto fbs = face_basis_size();
+        auto fcs = faces(msh, cl);
+        disk::dynamic_vector<scalar_type> ret = 
+            disk::dynamic_vector<scalar_type>::Zero( fbs*fcs.size() );
+
+        for (size_t i = 0; i < fcs.size(); i++)
+        {
+            auto& fc = fcs[i];
+            if ( not is_in_system(msh, fc) )
+                continue;
+
+            auto ofs = get_system_offset(msh, fc);
+            ret.segment(i*fbs, fbs) = sol.segment(ofs, fbs);
+        }
+
+        return ret;
+    }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -86,7 +331,7 @@ struct hho_poisson_solver_state
     using cell_type = typename Mesh::cell_type;
     using face_type = typename Mesh::face_type;
     using scalar_type = typename Mesh::coordinate_type;
-    using assembler_type = disk::diffusion_condensed_assembler<Mesh>;
+    using assembler_type = hho_assembler<Mesh>;
     using vector_type = disk::dynamic_vector<scalar_type>;
 
     mesh_type               msh;
@@ -182,13 +427,19 @@ compute_element_contribution_standard(hho_poisson_solver_state<Mesh>& state,
         return pd.right_hand_side(domain_num, pt);
     };
 
+    auto num_faces = faces(msh, cl).size();
+    auto fbs = disk::scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
+    Eigen::Matrix<T, Eigen::Dynamic, 1> dirichlet_data =
+        Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(num_faces*fbs);
+
     auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
     Eigen::Matrix<T, Eigen::Dynamic, 1> rhs = make_rhs(msh, cl, cb, rhs_data);
-    //auto sc = make_scalar_static_condensation(msh, cl, hdi, A, rhs);
-    //assm.assemble(msh, cl, sc.first, sc.second, sol_fun);
+    
+    Eigen::Matrix<T, Eigen::Dynamic, 1> true_rhs =
+        Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(A.rows());
+    true_rhs.head(cb.size()) = rhs;
 
-    return std::pair(GR, A);
-    //return std::tuple(lhs, rhs, dirichlet_data);
+    return std::tuple(A, true_rhs, dirichlet_data);
 }
 
 template<typename Mesh, typename ProblemData>
@@ -220,11 +471,18 @@ assemble_standard(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
 
     auto& msh = state.msh;
     auto& hdi = state.hdi;
+    auto& assm = state.assm;
+
+    auto dirichlet = [](const point_type&) { return 0.; };
 
     for (auto& cl : msh)
     {
-        auto [GR, A] = compute_element_contribution_standard(state, cl, pd);
+        auto cbs = disk::scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+        auto [lhs, rhs, dd] = compute_element_contribution_standard(state, cl, pd);
+        auto [lhsC, rhsC] = disk::static_condensation(lhs, rhs, cbs);
+        assm.assemble(msh, cl, lhsC, rhsC, dd);
     }
+    assm.finalize();
 
     return 0;
 }
@@ -256,13 +514,92 @@ assemble(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
 
     assm.initialize(state.msh, state.hdi, is_dirichlet);
 
-    std::cout << "Assembler initialized: " << assm.LHS.rows() << " DOFs" << std::endl;
-    
     if (state.use_stabfree)
         assemble_stabfree(state, pd);
     else
         assemble_standard(state, pd);
 }
+
+template<typename Mesh>
+void
+export_to_visit(hho_poisson_solver_state<Mesh>& state)
+{
+    auto& msh = state.msh;
+    auto& sol = state.sol_full;
+    auto& hdi = state.hdi;
+
+    auto cbs = disk::scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+
+    std::vector<double> u;
+    size_t cell_i = 0;
+    for (auto& cl : msh)
+    {
+        u.push_back( sol(cbs*cell_i) );
+        cell_i++;
+    }
+
+    disk::silo_database db;
+    db.create("poisson.silo");
+    db.add_mesh(msh, "mesh");
+    db.add_variable("mesh", "u", u, disk::zonal_variable_t);
+}
+
+template<typename Mesh, typename ProblemData>
+void
+solve(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
+{
+    using mesh_type = Mesh;
+    using cell_type = typename Mesh::cell_type;
+    using face_type = typename Mesh::face_type;
+    using scalar_type = typename Mesh::coordinate_type;
+
+    auto& msh = state.msh;
+    auto& assm = state.assm;
+    auto& sol = state.sol;
+    auto& hdi = state.hdi;
+
+    sol = disk::dynamic_vector<scalar_type>::Zero(assm.syssz);
+    std::cout << "Running MUMPS" << std::endl;
+    sol = mumps_lu(assm.LHS, assm.RHS);
+
+    std::cout << "Expanding solution" << std::endl;
+    auto cd = hdi.cell_degree();
+    auto fd = hdi.face_degree();
+    auto cbs = disk::scalar_basis_size(cd, Mesh::dimension);
+    auto fbs = disk::scalar_basis_size(fd, Mesh::dimension-1);
+    auto fullsz = cbs*msh.cells_size() + fbs*msh.faces_size();
+
+    state.sol_full = disk::dynamic_vector<scalar_type>::Zero(fullsz);
+
+    size_t cell_i = 0;
+    for (auto& cl : msh)
+    {
+        auto [lhs, rhs, dd] = compute_element_contribution_standard(state, cl, pd);
+        auto cb = disk::make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+
+        auto edofs = assm.get_element_dofs(msh, cl, sol);
+        edofs += dd;
+
+        Matrix<scalar_type, Dynamic, 1> esol = disk::static_decondensation(lhs, rhs, edofs);
+    
+        state.sol_full.segment(cbs*cell_i, cbs) = esol.head(cbs);
+
+        auto fcs = faces(msh, cl);
+        for (size_t iF = 0; iF < fcs.size(); iF++)
+        {
+            auto& fc = fcs[iF];
+            auto lofs = cbs + fbs*iF;
+            auto gofs = cbs*msh.cells_size() + fbs*offset(msh, fc);
+            state.sol_full.segment(gofs, fbs) = esol.segment(lofs, fbs);
+        }
+        cell_i++;
+    }
+    std::cout << "Done" << std::endl;
+
+    export_to_visit(state);
+}
+
+
 
 template<typename Mesh>
 void
@@ -317,11 +654,16 @@ setup_and_run(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
         return assemble(state, lpd);
     };
 
+    lua["solve"] = [&]() {
+        return solve(state, lpd);
+    };
+
     /* Call user code */
     int err = lua_call_user_code(lua);
     
     /* Unbind everything to avoid unsafe calls */
     lua["assemble"] = nullptr;
+    lua["solve"] = nullptr;
 
     return err;
 }
@@ -336,11 +678,13 @@ init_solver_state(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
     if (order < 0 and variant != hho_variant::mixed_order_low) {
         std::cout << "Invalid HHO order " << order << ", reverting ";
         std::cout << "to order 0" << std::endl;
+        order = 0;
     }
 
     if (order < 1 and variant == hho_variant::mixed_order_low) {
         std::cout << "Invalid HHO order " << order << ", reverting ";
         std::cout << "to order 1" << std::endl;
+        order = 1;
     }
 
     /* Reconstruction degree will be changed if stabfree is used. */
@@ -384,6 +728,8 @@ int run(sol::state& lua)
             hho_poisson_solver_state<mesh_type> state;
             init_solver_state(lua, state);
             auto mesher = disk::make_simple_mesher(state.msh);
+            for (size_t i = 0; i < mps.level; i++)
+                mesher.refine();
             return setup_and_run(lua, state);
         }
 
@@ -393,7 +739,7 @@ int run(sol::state& lua)
             hho_poisson_solver_state<mesh_type> state;
             init_solver_state(lua, state);
             auto mesher = disk::make_fvca5_hex_mesher(state.msh);
-            //mesher.make_level(5);
+            mesher.make_level(mps.level);
             return setup_and_run(lua, state);
         }
 
@@ -403,6 +749,8 @@ int run(sol::state& lua)
             hho_poisson_solver_state<mesh_type> state;
             init_solver_state(lua, state);
             auto mesher = disk::make_simple_mesher(state.msh);
+            for (size_t i = 0; i < mps.level; i++)
+                mesher.refine();
             return setup_and_run(lua, state);
         }
     }
