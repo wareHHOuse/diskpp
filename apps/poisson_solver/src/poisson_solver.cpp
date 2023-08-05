@@ -453,9 +453,12 @@ assemble_stabfree(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
 
     auto& msh = state.msh;
     auto& hdi = state.hdi;
+    auto& assm = state.assm;
 
     for (auto& cl : msh)
-    {}
+    {
+    }
+    assm.finalize();
 
     return 0;
 }
@@ -472,8 +475,6 @@ assemble_standard(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
     auto& msh = state.msh;
     auto& hdi = state.hdi;
     auto& assm = state.assm;
-
-    auto dirichlet = [](const point_type&) { return 0.; };
 
     for (auto& cl : msh)
     {
@@ -518,30 +519,6 @@ assemble(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
         assemble_stabfree(state, pd);
     else
         assemble_standard(state, pd);
-}
-
-template<typename Mesh>
-void
-export_to_visit(hho_poisson_solver_state<Mesh>& state)
-{
-    auto& msh = state.msh;
-    auto& sol = state.sol_full;
-    auto& hdi = state.hdi;
-
-    auto cbs = disk::scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
-
-    std::vector<double> u;
-    size_t cell_i = 0;
-    for (auto& cl : msh)
-    {
-        u.push_back( sol(cbs*cell_i) );
-        cell_i++;
-    }
-
-    disk::silo_database db;
-    db.create("poisson.silo");
-    db.add_mesh(msh, "mesh");
-    db.add_variable("mesh", "u", u, disk::zonal_variable_t);
 }
 
 template<typename Mesh, typename ProblemData>
@@ -595,11 +572,31 @@ solve(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
         cell_i++;
     }
     std::cout << "Done" << std::endl;
-
-    export_to_visit(state);
 }
 
+template<typename Mesh>
+void
+export_to_visit(hho_poisson_solver_state<Mesh>& state)
+{
+    auto& msh = state.msh;
+    auto& sol = state.sol_full;
+    auto& hdi = state.hdi;
 
+    auto cbs = disk::scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+
+    std::vector<double> u;
+    size_t cell_i = 0;
+    for (auto& cl : msh)
+    {
+        u.push_back( sol(cbs*cell_i) );
+        cell_i++;
+    }
+
+    disk::silo_database db;
+    db.create("poisson.silo");
+    db.add_mesh(msh, "mesh");
+    db.add_variable("mesh", "u", u, disk::zonal_variable_t);
+}
 
 template<typename Mesh>
 void
@@ -638,7 +635,7 @@ template<typename Mesh>
 int
 setup_and_run(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
 {
-    //lua[NODE_NAME_SIM]["dimension"] = Mesh::dimension;
+    lua[NODE_NAME_SIM]["dimension"] = Mesh::dimension;
 
     collect_boundary_info(lua, state);
     lua_problem_data lpd(lua);
@@ -658,12 +655,17 @@ setup_and_run(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
         return solve(state, lpd);
     };
 
+    lua["export_to_visit"] = [&]() {
+        return export_to_visit(state);
+    };
+
     /* Call user code */
     int err = lua_call_user_code(lua);
     
     /* Unbind everything to avoid unsafe calls */
     lua["assemble"] = nullptr;
     lua["solve"] = nullptr;
+    lua["export_to_visit"] = nullptr;
 
     return err;
 }
@@ -702,7 +704,7 @@ init_solver_state(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
             break;
     }
 
-    state.use_stabfree = false;
+    state.use_stabfree = lua_use_stabfree_hho(lua);
 
     return 0;
 }

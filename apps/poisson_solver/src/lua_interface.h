@@ -98,6 +98,7 @@ bool lua_load_script(sol::state&, const std::string&);
 mesh_parameters lua_get_mesh_parameters(sol::state&);
 int lua_get_hho_order(sol::state&);
 hho_variant lua_get_hho_variant(sol::state&);
+bool lua_use_stabfree_hho(sol::state&);
 boundary_type lua_get_boundary_type(sol::state&, size_t);
 int lua_call_user_code(sol::state&);
 

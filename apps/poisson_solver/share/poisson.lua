@@ -1,7 +1,7 @@
 mesh.source = "internal";
 mesh.type = "triangles";
 
-hho.variant = "equal_order";
+hho.variant = "mixed_order_high";
 hho.use_stabfree = false;
 
 boundary[0] = "dirichlet";
@@ -18,10 +18,14 @@ function neumann_data(bnd_num, x, y)
     return 0;
 end
 
-function right_hand_side(domain_num, x, y)
+function right_hand_side(domain_num, x, y, z)
     local sx = math.sin(math.pi*x);
     local sy = math.sin(math.pi*y);
-    return 2.0*math.pi*math.pi*sx*sy;
+    local sz = 1.0;
+    if sim.dimension == 3 then
+        sz = math.sin(math.pi*z);
+    end
+    return sim.dimension*math.pi*math.pi*sx*sy*sz;
 end
 
 function diffusion_coefficient(domain_num, x, y)
@@ -29,8 +33,10 @@ function diffusion_coefficient(domain_num, x, y)
 end
 
 function solution_process()
+    print(sim.dimension);
     assemble();
     solve();
+    export_to_visit();
     return 0;
 end
 
@@ -41,7 +47,7 @@ end
 --print(dp)
 
 
-        mesh.refinement_level = 4;
-        hho.order = 1;
-        run()
+mesh.refinement_level = 4;
+hho.order = 1;
+run()
 

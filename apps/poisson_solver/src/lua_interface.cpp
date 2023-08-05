@@ -24,6 +24,7 @@ lua_init_environment(sol::state& lua)
     lua[NODE_NAME_BOUNDARY] = lua.create_table();
     lua[NODE_NAME_SILO] = lua.create_table();
     lua[NODE_NAME_HHO] = lua.create_table();
+    lua[NODE_NAME_HHO][HHO_FIELD_STABFREE] = false;
 }
 
 bool
@@ -32,7 +33,6 @@ lua_load_script(sol::state& lua, const std::string& fn)
     auto sf = lua.script_file(fn);
     return sf.valid();
 }
-
 
 mesh_parameters
 lua_get_mesh_parameters(sol::state& lua)
@@ -113,6 +113,16 @@ lua_get_hho_variant(sol::state& lua)
     return ret;
 }
 
+bool
+lua_use_stabfree_hho(sol::state& lua)
+{
+    auto hs = lua[NODE_NAME_HHO][HHO_FIELD_STABFREE];
+    if (!hs.valid())
+        return false;
+
+    return bool(hs);
+}
+
 boundary_type
 lua_get_boundary_type(sol::state& lua, size_t bnd)
 {
@@ -130,7 +140,6 @@ lua_get_boundary_type(sol::state& lua, size_t bnd)
         return boundary_type::undefined;
     }
 }
-
 
 int
 lua_call_user_code(sol::state& lua)

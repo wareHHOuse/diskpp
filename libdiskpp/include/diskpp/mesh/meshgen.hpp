@@ -337,6 +337,7 @@ class simple_mesher<tetrahedral_mesh<T>>
         assert(storage->surfaces.size() == 18);
         assert(storage->volumes.size() == 6);
         assert(storage->nodes.size() == 8);
+        storage->subdomain_info.resize( storage->volumes.size() );
     }
 
 
@@ -476,6 +477,7 @@ class simple_mesher<tetrahedral_mesh<T>>
         size_t expected_surfaces = 16 * volume_offset + 2 * boundary_offset;
         assert(storage->volumes.size() == volume_offset * 8);
         assert(storage->surfaces.size() == expected_surfaces);
+        storage->subdomain_info.resize( storage->volumes.size() );
     }
 };
 
