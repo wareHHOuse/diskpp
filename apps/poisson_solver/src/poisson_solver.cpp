@@ -24,6 +24,8 @@
 
 #include "diskpp/methods/implementation_hho/curl.hpp"
 
+#include "diskpp/common/timecounter.hpp"
+
 #include "lua_interface.h"
 
 #include "sgr.hpp"
@@ -378,6 +380,7 @@ compute_element_contribution_stabfree(hho_poisson_solver_state<Mesh>& state,
     typename Mesh::cell_type& cl, const ProblemData& pd)
 {
     using mesh_type = Mesh;
+    using T = typename mesh_type::coordinate_type;
     using cell_type = typename Mesh::cell_type;
     using face_type = typename Mesh::face_type;
     using point_type = typename Mesh::point_type;
@@ -386,6 +389,64 @@ compute_element_contribution_stabfree(hho_poisson_solver_state<Mesh>& state,
     auto& hdi = state.hdi;
 
     adjust_stabfree_recdeg(msh, cl, hdi);
+
+    auto bar = barycenter(msh, cl);
+    auto domain_num = msh.domain_info(cl).tag(); 
+
+    bool is_mixed_high = (hdi.cell_degree() > hdi.face_degree());
+
+    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A;
+    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> GR;
+    
+    Eigen::Matrix<T, Mesh::dimension, Mesh::dimension> diff_tens =
+        Eigen::Matrix<T, Mesh::dimension, Mesh::dimension>::Identity();
+
+    if (is_mixed_high) {
+        auto oper = make_shl_face_proj_harmonic(msh, cl, hdi, diff_tens);
+        A = oper.second;
+        GR = oper.first;
+    }
+    else {
+        auto oper = make_sfl(msh, cl, hdi, diff_tens);
+        A = oper.second;
+        GR = oper.first;
+    }
+
+    auto fcs = faces(msh, cl);
+    auto num_faces = fcs.size();
+    auto fbs = disk::scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
+    Eigen::Matrix<T, Eigen::Dynamic, 1> dirichlet_data =
+        Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(num_faces*fbs);
+
+    size_t fnum = 0;
+    for (auto& fc : fcs)
+    {
+        auto bnd_num = msh.boundary_info(fc).tag();
+        auto dirichlet_fun = [&](const point_type& pt) {
+            return pd.dirichlet_data(bnd_num, pt);
+        };
+
+        auto fb = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
+        Eigen::Matrix<T, Eigen::Dynamic, 1> dd =
+            disk::project_function(msh, fc, fb, dirichlet_fun);
+        
+        dirichlet_data.segment(fnum*fb.size(), fb.size()) = dd; 
+
+        fnum++;
+    }
+
+    auto rhs_fun = [&](const point_type& pt) {
+        return pd.right_hand_side(domain_num, pt);
+    };
+
+    auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+    Eigen::Matrix<T, Eigen::Dynamic, 1> rhs = make_rhs(msh, cl, cb, rhs_fun);
+    
+    Eigen::Matrix<T, Eigen::Dynamic, 1> true_rhs =
+        Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(A.rows());
+    true_rhs.head(cb.size()) = rhs;
+
+    return std::tuple(A, true_rhs, dirichlet_data);
 }
 
 template<typename Mesh, typename ProblemData>
@@ -423,17 +484,37 @@ compute_element_contribution_standard(hho_poisson_solver_state<Mesh>& state,
     else
         A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
     
-    auto rhs_data = [&](const point_type& pt) {
-        return pd.right_hand_side(domain_num, pt);
-    };
 
-    auto num_faces = faces(msh, cl).size();
+
+    auto fcs = faces(msh, cl);
+    auto num_faces = fcs.size();
     auto fbs = disk::scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
     Eigen::Matrix<T, Eigen::Dynamic, 1> dirichlet_data =
         Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(num_faces*fbs);
 
+    size_t fnum = 0;
+    for (auto& fc : fcs)
+    {
+        auto bnd_num = msh.boundary_info(fc).tag();
+        auto dirichlet_fun = [&](const point_type& pt) {
+            return pd.dirichlet_data(bnd_num, pt);
+        };
+
+        auto fb = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
+        Eigen::Matrix<T, Eigen::Dynamic, 1> dd =
+            disk::project_function(msh, fc, fb, dirichlet_fun);
+        
+        dirichlet_data.segment(fnum*fb.size(), fb.size()) = dd; 
+
+        fnum++;
+    }
+
+    auto rhs_fun = [&](const point_type& pt) {
+        return pd.right_hand_side(domain_num, pt);
+    };
+
     auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-    Eigen::Matrix<T, Eigen::Dynamic, 1> rhs = make_rhs(msh, cl, cb, rhs_data);
+    Eigen::Matrix<T, Eigen::Dynamic, 1> rhs = make_rhs(msh, cl, cb, rhs_fun);
     
     Eigen::Matrix<T, Eigen::Dynamic, 1> true_rhs =
         Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(A.rows());
@@ -457,6 +538,10 @@ assemble_stabfree(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
 
     for (auto& cl : msh)
     {
+        auto cbs = disk::scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
+        auto [lhs, rhs, dd] = compute_element_contribution_stabfree(state, cl, pd);
+        auto [lhsC, rhsC] = disk::static_condensation(lhs, rhs, cbs);
+        assm.assemble(msh, cl, lhsC, rhsC, dd);
     }
     assm.finalize();
 
@@ -515,10 +600,14 @@ assemble(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
 
     assm.initialize(state.msh, state.hdi, is_dirichlet);
 
-    if (state.use_stabfree)
+    if (state.use_stabfree) {
+        std::cout << "Assembling stabilization-free problem" << std::endl;
         assemble_stabfree(state, pd);
-    else
+    }
+    else {
+        std::cout << "Assembling standard HHO problem" << std::endl;
         assemble_standard(state, pd);
+    }
 }
 
 template<typename Mesh, typename ProblemData>
@@ -735,7 +824,7 @@ int run(sol::state& lua)
             return setup_and_run(lua, state);
         }
 
-        if (mps.type == internal_mesh_type::hexahedra)
+        if (mps.type == internal_mesh_type::hexagons)
         {
             using mesh_type = disk::generic_mesh<T,2>;
             hho_poisson_solver_state<mesh_type> state;
@@ -744,7 +833,7 @@ int run(sol::state& lua)
             mesher.make_level(mps.level);
             return setup_and_run(lua, state);
         }
-
+        /*
         if (mps.type == internal_mesh_type::tetrahedra)
         {
             using mesh_type = disk::simplicial_mesh<T,3>;
@@ -755,6 +844,7 @@ int run(sol::state& lua)
                 mesher.refine();
             return setup_and_run(lua, state);
         }
+        */
     }
 
     if (mps.source == mesh_source::file)
@@ -797,6 +887,13 @@ int main(int argc, char **argv)
             sol::resolve<void(int, int, T)>(&dp3d::entry),
             sol::resolve<T(int, int) const>(&dp3d::entry)
         )
+    );
+
+    lua.new_usertype<timecounter>("timecounter",
+		sol::constructors<timecounter()>(),
+        "tic", &timecounter::tic,
+        "toc", &timecounter::toc,
+        "elapsed", &timecounter::elapsed
     );
 
     /* The code is going to be a bit spaghetti in the initial part.

@@ -11,6 +11,10 @@ boundary[3] = "dirichlet";
 
 
 function dirichlet_data(bnd_num, x, y)
+--    if bnd_num == 2 then
+--        return 1;
+--    end
+    
     return 0;
 end
 
@@ -33,8 +37,13 @@ function diffusion_coefficient(domain_num, x, y)
 end
 
 function solution_process()
+    local tc = timecounter:new();
+
     print(sim.dimension);
+    tc:tic();
     assemble();
+    tc:toc();
+    print(tc)
     solve();
     export_to_visit();
     return 0;
@@ -47,7 +56,7 @@ end
 --print(dp)
 
 
-mesh.refinement_level = 4;
-hho.order = 1;
+mesh.refinement_level = 3;
+hho.order = 3;
 run()
 

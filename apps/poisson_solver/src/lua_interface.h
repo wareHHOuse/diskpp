@@ -39,7 +39,7 @@
 /**/
 #define MESH_FIELD_TYPE         "type"
 #define MESH_TYPE_TRIANGLES     "triangles"
-#define MESH_TYPE_HEXAHEDRA     "hexahedra"
+#define MESH_TYPE_HEXAGONS      "hexagons"
 #define MESH_TYPE_TETRAHEDRA    "tetrahedra"
 /**/
 #define MESH_FIELD_LEVEL        "refinement_level"
@@ -57,7 +57,7 @@ enum class mesh_source {
 
 enum class internal_mesh_type {
     triangles,
-    hexahedra,
+    hexagons,
     tetrahedra,
     invalid,
 };

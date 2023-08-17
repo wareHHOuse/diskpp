@@ -41,7 +41,8 @@ class timecounter
     bool running;
 
 public:
-    timecounter() : running(false)
+    timecounter()
+        : running(false)
     {}
 
     void tic()

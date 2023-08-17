@@ -64,7 +64,7 @@ lua_get_mesh_parameters(sol::state& lua)
     if (mt.valid()) {
         std::string mts = mt;
         if (mts == MESH_TYPE_TRIANGLES) ret.type = internal_mesh_type::triangles;
-        else if (mts == MESH_TYPE_HEXAHEDRA) ret.type = internal_mesh_type::hexahedra; 
+        else if (mts == MESH_TYPE_HEXAGONS) ret.type = internal_mesh_type::hexagons; 
         else if (mts == MESH_TYPE_TETRAHEDRA) ret.type = internal_mesh_type::tetrahedra;
         else {
             std::cout << "Invalid value '" << mts << "' for " << NODE_NAME_MESH;
