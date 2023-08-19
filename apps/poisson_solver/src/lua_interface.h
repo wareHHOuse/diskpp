@@ -148,3 +148,40 @@ struct lua_problem_data
         return lua["right_hand_side"](domain_num, pt.x(), pt.y(), pt.z());
     }
 };
+
+struct lua_solution_data
+{
+    sol::state& lua;
+
+    lua_solution_data(sol::state& plua)
+        : lua(plua)
+    {}
+
+    template<typename T>
+    T sol(size_t domain_num, const disk::point<T,2>& pt) const
+    {
+        return lua["solution"](domain_num, pt.x(), pt.y());
+    }
+
+    template<typename T>
+    T sol(size_t domain_num, const disk::point<T,3>& pt) const
+    {
+        return lua["solution"](domain_num, pt.x(), pt.y(), pt.z());
+    }
+
+    template<typename T>
+    Eigen::Matrix<T,2,1>
+    grad(size_t domain_num, const disk::point<T,2>& pt) const
+    {
+        Eigen::Matrix<T,2,1> ret;
+        return lua["grad_solution"](domain_num, pt.x(), pt.y());
+    }
+
+    template<typename T>
+    Eigen::Matrix<T,3,1>
+    grad(size_t domain_num, const disk::point<T,3>& pt) const
+    {
+        Eigen::Matrix<T,3,1> ret;
+        return lua["grad_solution"](domain_num, pt.x(), pt.y(), pt.z());
+    }
+};

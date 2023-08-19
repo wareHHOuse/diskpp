@@ -556,7 +556,7 @@ public:
                 if (position.first == false)
                     throw std::logic_error("edge not found, this is a bug.");
 
-                boundary_descriptor bi(0, true);
+                boundary_descriptor bi(size_t(boundary), true);
                 storage->boundary_info.at(position.second) = bi;
             }
         }

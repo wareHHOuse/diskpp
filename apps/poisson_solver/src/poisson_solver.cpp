@@ -346,6 +346,8 @@ struct hho_poisson_solver_state
     disk::hho_degree_info   hdi;
     hho_variant             variant;
     bool                    use_stabfree;
+
+    std::vector<double>     recdegs;
 };
 
 template<disk::mesh_2D Mesh>
@@ -376,7 +378,7 @@ adjust_stabfree_recdeg(const Mesh& msh, const typename Mesh::cell_type& cl,
 
 template<typename Mesh, typename ProblemData>
 auto
-compute_element_contribution_stabfree(hho_poisson_solver_state<Mesh>& state,
+compute_element_contribution(hho_poisson_solver_state<Mesh>& state,
     typename Mesh::cell_type& cl, const ProblemData& pd)
 {
     using mesh_type = Mesh;
@@ -388,7 +390,8 @@ compute_element_contribution_stabfree(hho_poisson_solver_state<Mesh>& state,
     auto& msh = state.msh;
     auto& hdi = state.hdi;
 
-    adjust_stabfree_recdeg(msh, cl, hdi);
+    if (state.use_stabfree)
+        adjust_stabfree_recdeg(msh, cl, hdi);
 
     auto bar = barycenter(msh, cl);
     auto domain_num = msh.domain_info(cl).tag(); 
@@ -401,16 +404,29 @@ compute_element_contribution_stabfree(hho_poisson_solver_state<Mesh>& state,
     Eigen::Matrix<T, Mesh::dimension, Mesh::dimension> diff_tens =
         Eigen::Matrix<T, Mesh::dimension, Mesh::dimension>::Identity();
 
-    if (is_mixed_high) {
-        auto oper = make_shl_face_proj_harmonic(msh, cl, hdi, diff_tens);
+    if (state.use_stabfree)
+    {
+        if (is_mixed_high) {
+            auto oper = make_shl_face_proj_harmonic(msh, cl, hdi, diff_tens);
+            A = oper.second;
+            GR = oper.first;
+        }
+        else {
+            auto oper = make_sfl(msh, cl, hdi, diff_tens);
+            A = oper.second;
+            GR = oper.first;
+        }
+    } else {
+        auto oper = make_scalar_hho_laplacian(msh, cl, hdi, diff_tens);
         A = oper.second;
         GR = oper.first;
+    
+        if (is_mixed_high)
+            A = A + make_scalar_hdg_stabilization(msh, cl, hdi);
+        else
+            A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
     }
-    else {
-        auto oper = make_sfl(msh, cl, hdi, diff_tens);
-        A = oper.second;
-        GR = oper.first;
-    }
+
 
     auto fcs = faces(msh, cl);
     auto num_faces = fcs.size();
@@ -421,6 +437,11 @@ compute_element_contribution_stabfree(hho_poisson_solver_state<Mesh>& state,
     size_t fnum = 0;
     for (auto& fc : fcs)
     {
+        if (not msh.is_boundary(fc)) {
+            fnum++;
+            continue;
+        }
+
         auto bnd_num = msh.boundary_info(fc).tag();
         auto dirichlet_fun = [&](const point_type& pt) {
             return pd.dirichlet_data(bnd_num, pt);
@@ -449,79 +470,6 @@ compute_element_contribution_stabfree(hho_poisson_solver_state<Mesh>& state,
     return std::tuple(A, true_rhs, dirichlet_data);
 }
 
-template<typename Mesh, typename ProblemData>
-auto
-compute_element_contribution_standard(hho_poisson_solver_state<Mesh>& state,
-    typename Mesh::cell_type& cl, const ProblemData& pd)
-{
-    using mesh_type = Mesh;
-    using T = typename mesh_type::coordinate_type;
-    using cell_type = typename Mesh::cell_type;
-    using face_type = typename Mesh::face_type;
-    using point_type = typename Mesh::point_type;
-
-    auto& msh = state.msh;
-    auto& hdi = state.hdi;
-
-    auto bar = barycenter(msh, cl);
-    auto domain_num = msh.domain_info(cl).tag();
-    //auto diff_tens = 
-
-    bool is_mixed_high = (hdi.cell_degree() > hdi.face_degree());
-
-    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A;
-    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> GR;
-    
-    Eigen::Matrix<T, Mesh::dimension, Mesh::dimension> diff_tens =
-        Eigen::Matrix<T, Mesh::dimension, Mesh::dimension>::Identity();
-
-    auto oper = make_scalar_hho_laplacian(msh, cl, hdi, diff_tens);
-    A = oper.second;
-    GR = oper.first;
-
-    if (is_mixed_high)
-        A = A + make_scalar_hdg_stabilization(msh, cl, hdi);
-    else
-        A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
-    
-
-
-    auto fcs = faces(msh, cl);
-    auto num_faces = fcs.size();
-    auto fbs = disk::scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
-    Eigen::Matrix<T, Eigen::Dynamic, 1> dirichlet_data =
-        Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(num_faces*fbs);
-
-    size_t fnum = 0;
-    for (auto& fc : fcs)
-    {
-        auto bnd_num = msh.boundary_info(fc).tag();
-        auto dirichlet_fun = [&](const point_type& pt) {
-            return pd.dirichlet_data(bnd_num, pt);
-        };
-
-        auto fb = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
-        Eigen::Matrix<T, Eigen::Dynamic, 1> dd =
-            disk::project_function(msh, fc, fb, dirichlet_fun);
-        
-        dirichlet_data.segment(fnum*fb.size(), fb.size()) = dd; 
-
-        fnum++;
-    }
-
-    auto rhs_fun = [&](const point_type& pt) {
-        return pd.right_hand_side(domain_num, pt);
-    };
-
-    auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-    Eigen::Matrix<T, Eigen::Dynamic, 1> rhs = make_rhs(msh, cl, cb, rhs_fun);
-    
-    Eigen::Matrix<T, Eigen::Dynamic, 1> true_rhs =
-        Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(A.rows());
-    true_rhs.head(cb.size()) = rhs;
-
-    return std::tuple(A, true_rhs, dirichlet_data);
-}
 
 template<typename Mesh, typename ProblemData>
 int
@@ -536,12 +484,17 @@ assemble_stabfree(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
     auto& hdi = state.hdi;
     auto& assm = state.assm;
 
+    state.recdegs.resize(msh.cells_size());
+
+    size_t cell_i = 0;
     for (auto& cl : msh)
     {
         auto cbs = disk::scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
-        auto [lhs, rhs, dd] = compute_element_contribution_stabfree(state, cl, pd);
+        auto [lhs, rhs, dd] = compute_element_contribution(state, cl, pd);
         auto [lhsC, rhsC] = disk::static_condensation(lhs, rhs, cbs);
         assm.assemble(msh, cl, lhsC, rhsC, dd);
+        state.recdegs[cell_i] = hdi.reconstruction_degree();
+        cell_i++;
     }
     assm.finalize();
 
@@ -561,10 +514,12 @@ assemble_standard(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
     auto& hdi = state.hdi;
     auto& assm = state.assm;
 
+    state.recdegs.resize(msh.cells_size(), hdi.reconstruction_degree());
+
     for (auto& cl : msh)
     {
         auto cbs = disk::scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
-        auto [lhs, rhs, dd] = compute_element_contribution_standard(state, cl, pd);
+        auto [lhs, rhs, dd] = compute_element_contribution(state, cl, pd);
         auto [lhsC, rhsC] = disk::static_condensation(lhs, rhs, cbs);
         assm.assemble(msh, cl, lhsC, rhsC, dd);
     }
@@ -640,7 +595,7 @@ solve(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
     size_t cell_i = 0;
     for (auto& cl : msh)
     {
-        auto [lhs, rhs, dd] = compute_element_contribution_standard(state, cl, pd);
+        auto [lhs, rhs, dd] = compute_element_contribution(state, cl, pd);
         auto cb = disk::make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
 
         auto edofs = assm.get_element_dofs(msh, cl, sol);
@@ -657,10 +612,64 @@ solve(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
             auto lofs = cbs + fbs*iF;
             auto gofs = cbs*msh.cells_size() + fbs*offset(msh, fc);
             state.sol_full.segment(gofs, fbs) = esol.segment(lofs, fbs);
+            /* XXX: adjust dirichlet bcs */
         }
         cell_i++;
     }
     std::cout << "Done" << std::endl;
+}
+
+template<typename Mesh, typename SolutionData>
+void
+check(hho_poisson_solver_state<Mesh>& state, const SolutionData& sd)
+{
+    using mesh_type = Mesh;
+    using point_type = typename mesh_type::point_type;
+    using cell_type = typename Mesh::cell_type;
+    using face_type = typename Mesh::face_type;
+    using scalar_type = typename Mesh::coordinate_type;
+
+    auto& msh = state.msh;
+    auto& assm = state.assm;
+    auto& sol = state.sol;
+    auto& hdi = state.hdi;
+
+    auto cd = hdi.cell_degree();
+    auto fd = hdi.face_degree();
+    auto cbs = disk::scalar_basis_size(cd, Mesh::dimension);
+    auto fbs = disk::scalar_basis_size(fd, Mesh::dimension-1);
+    auto fullsz = cbs*msh.cells_size() + fbs*msh.faces_size();
+
+    scalar_type L2errsq = 0.0;
+
+    size_t cell_i = 0;
+    for (auto& cl : msh)
+    {
+        auto domain_num = msh.domain_info(cl).tag();
+        auto cb = disk::make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+
+        auto sol_fun = [&](const point_type& pt) {
+            return sd.sol(domain_num, pt);
+        };
+
+        disk::dynamic_vector<scalar_type> ana_loc_sol =
+            disk::project_function(msh, cl, cb, sol_fun, 2);
+
+        disk::dynamic_vector<scalar_type> ana_num_sol =
+            state.sol_full.segment(cb.size()*cell_i, cb.size());
+
+        disk::dynamic_vector<scalar_type> diff =
+            ana_loc_sol - ana_num_sol;
+
+        disk::dynamic_matrix<scalar_type> MM = 
+            disk::make_mass_matrix(msh, cl, cb);
+
+        L2errsq += diff.dot(MM*diff);
+
+        cell_i++;
+    }
+
+    std::cout << "Error: " << std::sqrt(L2errsq) << std::endl;
 }
 
 template<typename Mesh>
@@ -685,6 +694,7 @@ export_to_visit(hho_poisson_solver_state<Mesh>& state)
     db.create("poisson.silo");
     db.add_mesh(msh, "mesh");
     db.add_variable("mesh", "u", u, disk::zonal_variable_t);
+    db.add_variable("mesh", "rd", state.recdegs, disk::zonal_variable_t);
 }
 
 template<typename Mesh>
@@ -728,6 +738,8 @@ setup_and_run(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
 
     collect_boundary_info(lua, state);
     lua_problem_data lpd(lua);
+    lua_solution_data lsd(lua);
+
 
     /* Ok, here the assumption is that state and lua are alive during the
      * execution of setup_and_run, so all the following lambdas are safe.
@@ -746,6 +758,10 @@ setup_and_run(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
 
     lua["export_to_visit"] = [&]() {
         return export_to_visit(state);
+    };
+
+    lua["check"] = [&]() {
+        return check(state, lsd);
     };
 
     /* Call user code */

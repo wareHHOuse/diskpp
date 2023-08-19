@@ -1,7 +1,7 @@
 mesh.source = "internal";
 mesh.type = "triangles";
 
-hho.variant = "mixed_order_high";
+hho.variant = "equal_order";
 hho.use_stabfree = false;
 
 boundary[0] = "dirichlet";
@@ -11,15 +11,18 @@ boundary[3] = "dirichlet";
 
 
 function dirichlet_data(bnd_num, x, y)
---    if bnd_num == 2 then
---        return 1;
---    end
-    
+   
     return 0;
 end
 
 function neumann_data(bnd_num, x, y)
     return 0;
+end
+
+function solution(domain_num, x, y)
+    local sx = math.sin(math.pi*x);
+    local sy = math.sin(math.pi*y);
+    return sx*sy;
 end
 
 function right_hand_side(domain_num, x, y, z)
@@ -39,13 +42,18 @@ end
 function solution_process()
     local tc = timecounter:new();
 
-    print(sim.dimension);
+    --print(sim.dimension);
+    
     tc:tic();
     assemble();
     tc:toc();
-    print(tc)
+    print(tc);
+
     solve();
+
     export_to_visit();
+
+    check();
     return 0;
 end
 
@@ -56,7 +64,11 @@ end
 --print(dp)
 
 
-mesh.refinement_level = 3;
-hho.order = 3;
-run()
+mesh.refinement_level = 5;
+hho.order = 0;
+
+for i = 2,5 do
+    mesh.refinement_level = i;
+    run()
+end
 
