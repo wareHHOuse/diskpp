@@ -378,31 +378,23 @@ adjust_stabfree_recdeg(const Mesh& msh, const typename Mesh::cell_type& cl,
 
 template<typename Mesh, typename ProblemData>
 auto
-compute_element_contribution(hho_poisson_solver_state<Mesh>& state,
+compute_laplacian_operator(hho_poisson_solver_state<Mesh>& state,
     typename Mesh::cell_type& cl, const ProblemData& pd)
 {
     using mesh_type = Mesh;
     using T = typename mesh_type::coordinate_type;
-    using cell_type = typename Mesh::cell_type;
-    using face_type = typename Mesh::face_type;
-    using point_type = typename Mesh::point_type;
 
     auto& msh = state.msh;
     auto& hdi = state.hdi;
 
-    if (state.use_stabfree)
-        adjust_stabfree_recdeg(msh, cl, hdi);
-
-    auto bar = barycenter(msh, cl);
-    auto domain_num = msh.domain_info(cl).tag(); 
-
     bool is_mixed_high = (hdi.cell_degree() > hdi.face_degree());
 
-    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A;
-    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> GR;
-    
-    Eigen::Matrix<T, Mesh::dimension, Mesh::dimension> diff_tens =
-        Eigen::Matrix<T, Mesh::dimension, Mesh::dimension>::Identity();
+    disk::dynamic_matrix<T> A;
+    disk::dynamic_matrix<T> GR;
+
+    constexpr size_t DIM = Mesh::dimension;
+    disk::static_matrix<T, DIM, DIM> diff_tens
+        = disk::static_matrix<T, DIM, DIM>::Identity();
 
     if (state.use_stabfree)
     {
@@ -427,6 +419,30 @@ compute_element_contribution(hho_poisson_solver_state<Mesh>& state,
             A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
     }
 
+    return std::pair(GR, A);
+}
+
+template<typename Mesh, typename ProblemData>
+auto
+compute_element_contribution(hho_poisson_solver_state<Mesh>& state,
+    typename Mesh::cell_type& cl, const ProblemData& pd)
+{
+    using mesh_type = Mesh;
+    using T = typename mesh_type::coordinate_type;
+    using cell_type = typename Mesh::cell_type;
+    using face_type = typename Mesh::face_type;
+    using point_type = typename Mesh::point_type;
+
+    auto& msh = state.msh;
+    auto& hdi = state.hdi;
+
+    if (state.use_stabfree)
+        adjust_stabfree_recdeg(msh, cl, hdi);
+
+    auto bar = barycenter(msh, cl);
+    auto domain_num = msh.domain_info(cl).tag(); 
+
+    auto [GR, A] = compute_laplacian_operator(state, cl, pd);
 
     auto fcs = faces(msh, cl);
     auto num_faces = fcs.size();
@@ -619,9 +635,10 @@ solve(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
     std::cout << "Done" << std::endl;
 }
 
-template<typename Mesh, typename SolutionData>
-void
-check(hho_poisson_solver_state<Mesh>& state, const SolutionData& sd)
+template<typename Mesh, typename ProblemData, typename SolutionData>
+auto
+check(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd,
+    const SolutionData& sd)
 {
     using mesh_type = Mesh;
     using point_type = typename mesh_type::point_type;
@@ -641,6 +658,7 @@ check(hho_poisson_solver_state<Mesh>& state, const SolutionData& sd)
     auto fullsz = cbs*msh.cells_size() + fbs*msh.faces_size();
 
     scalar_type L2errsq = 0.0;
+    scalar_type Aerrsq = 0.0;
 
     size_t cell_i = 0;
     for (auto& cl : msh)
@@ -652,24 +670,35 @@ check(hho_poisson_solver_state<Mesh>& state, const SolutionData& sd)
             return sd.sol(domain_num, pt);
         };
 
+        auto fcs = faces(msh, cl);
+        size_t num_dofs = cbs + fbs*fcs.size();
+        disk::dynamic_vector<scalar_type> num_loc_sol =
+            disk::dynamic_vector<scalar_type>::Zero(num_dofs);
+
+        num_loc_sol.head(cbs) = state.sol_full.segment(cbs*cell_i, cbs);
+        num_loc_sol.tail(fbs*fcs.size()) =
+            state.assm.get_element_dofs(msh, cl, state.sol);
+
         disk::dynamic_vector<scalar_type> ana_loc_sol =
-            disk::project_function(msh, cl, cb, sol_fun, 2);
-
-        disk::dynamic_vector<scalar_type> ana_num_sol =
-            state.sol_full.segment(cb.size()*cell_i, cb.size());
-
+            disk::project_function(msh, cl, hdi, sol_fun, 2);
+            
         disk::dynamic_vector<scalar_type> diff =
-            ana_loc_sol - ana_num_sol;
+            ana_loc_sol - num_loc_sol;
+
+        disk::dynamic_vector<scalar_type> diff_uT = diff.head(cbs);
 
         disk::dynamic_matrix<scalar_type> MM = 
             disk::make_mass_matrix(msh, cl, cb);
 
-        L2errsq += diff.dot(MM*diff);
+        L2errsq += diff_uT.dot(MM*diff_uT);
+
+        auto [GR, A] = compute_laplacian_operator(state, cl, pd);
+        Aerrsq += diff.dot(A*diff);
 
         cell_i++;
     }
 
-    std::cout << "Error: " << std::sqrt(L2errsq) << std::endl;
+    return std::pair(sqrt(L2errsq), sqrt(Aerrsq));
 }
 
 template<typename Mesh>
@@ -734,7 +763,8 @@ template<typename Mesh>
 int
 setup_and_run(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
 {
-    lua[NODE_NAME_SIM]["dimension"] = Mesh::dimension;
+    constexpr size_t DIM = Mesh::dimension;
+    lua[NODE_NAME_SIM]["dimension"] = DIM;
 
     collect_boundary_info(lua, state);
     lua_problem_data lpd(lua);
@@ -761,7 +791,11 @@ setup_and_run(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
     };
 
     lua["check"] = [&]() {
-        return check(state, lsd);
+        return check(state, lpd, lsd);
+    };
+
+    lua["mesh_h"] = [&]() {
+        return disk::average_diameter(state.msh);
     };
 
     /* Call user code */
@@ -771,7 +805,9 @@ setup_and_run(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
     lua["assemble"] = nullptr;
     lua["solve"] = nullptr;
     lua["export_to_visit"] = nullptr;
-
+    lua["check"] = nullptr;
+    lua["mesh_h"] = nullptr;
+    
     return err;
 }
 
