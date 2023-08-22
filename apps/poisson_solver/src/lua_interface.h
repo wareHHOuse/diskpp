@@ -116,6 +116,62 @@ lua_eval_rhs(sol::state& lua, size_t domain_num, const disk::point<T,3>& pt)
     return lua["right_hand_side"](domain_num, pt.x(), pt.y(), pt.z());
 }
 
+
+
+template<typename T, size_t DIM>
+class diffusion_parameter
+{
+    using tens_type = Eigen::Matrix<T, DIM, DIM>;
+    tens_type diff_tens;
+
+public:
+    diffusion_parameter()
+    {
+        diff_tens = tens_type::Identity();
+    }
+
+    diffusion_parameter(T value)
+    {
+        diff_tens = tens_type::Identity() * value;
+    }
+    
+    void entry(int row, int col, T data) {
+        bool row_ok = row >= 0 and row <= DIM;
+        bool col_ok = col >= 0 and col <= DIM;
+        if (row_ok and col_ok)
+            diff_tens(row, col) = data;
+    }
+
+    T entry(int row, int col) const {
+        bool row_ok = row >= 0 and row <= DIM;
+        bool col_ok = col >= 0 and col <= DIM;
+        if (not row_ok or not col_ok)
+            throw std::invalid_argument("tensor access out of bounds");
+        return diff_tens(row, col);
+    }
+
+    tens_type tensor(void) const {
+        return diff_tens;
+    }
+};
+
+template<typename T, size_t DIM>
+std::ostream&
+operator<<(std::ostream& os, const diffusion_parameter<T, DIM>& dp)
+{
+    os << dp.tensor();
+    return os;
+}
+
+template<typename T>
+using diffusion_parameter_2D = diffusion_parameter<T,2>;
+
+template<typename T>
+using diffusion_parameter_3D = diffusion_parameter<T,3>;
+
+
+
+
 struct lua_problem_data
 {
     sol::state& lua;
@@ -146,6 +202,13 @@ struct lua_problem_data
     T right_hand_side(size_t domain_num, const disk::point<T,3>& pt) const
     {
         return lua["right_hand_side"](domain_num, pt.x(), pt.y(), pt.z());
+    }
+
+    template<typename T>
+    diffusion_parameter<T,2>
+    diffusion_coefficient(size_t domain_num, const disk::point<T,2>& pt) const
+    {
+        return lua["diffusion_coefficient"](domain_num, pt.x(), pt.y());
     }
 };
 

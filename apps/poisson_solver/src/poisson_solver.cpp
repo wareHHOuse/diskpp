@@ -275,56 +275,7 @@ public:
 
 
 
-template<typename T, size_t DIM>
-class diffusion_parameter
-{
-    using tens_type = Eigen::Matrix<T, DIM, DIM>;
-    tens_type diff_tens;
 
-public:
-    diffusion_parameter()
-    {
-        diff_tens = tens_type::Identity();
-    }
-
-    diffusion_parameter(T value)
-    {
-        diff_tens = tens_type::Identity() * value;
-    }
-    
-    void entry(int row, int col, T data) {
-        bool row_ok = row >= 0 and row <= DIM;
-        bool col_ok = col >= 0 and col <= DIM;
-        if (row_ok and col_ok)
-            diff_tens(row, col) = data;
-    }
-
-    T entry(int row, int col) const {
-        bool row_ok = row >= 0 and row <= DIM;
-        bool col_ok = col >= 0 and col <= DIM;
-        if (not row_ok or not col_ok)
-            throw std::invalid_argument("tensor access out of bounds");
-        return diff_tens(row, col);
-    }
-
-    tens_type tensor(void) const {
-        return diff_tens;
-    }
-};
-
-template<typename T, size_t DIM>
-std::ostream&
-operator<<(std::ostream& os, const diffusion_parameter<T, DIM>& dp)
-{
-    os << dp.tensor();
-    return os;
-}
-
-template<typename T>
-using diffusion_parameter_2D = diffusion_parameter<T,2>;
-
-template<typename T>
-using diffusion_parameter_3D = diffusion_parameter<T,3>;
 
 template<typename Mesh>
 struct hho_poisson_solver_state
@@ -394,7 +345,8 @@ compute_laplacian_operator(hho_poisson_solver_state<Mesh>& state,
 
     constexpr size_t DIM = Mesh::dimension;
     disk::static_matrix<T, DIM, DIM> diff_tens
-        = disk::static_matrix<T, DIM, DIM>::Identity();
+        //= disk::static_matrix<T, DIM, DIM>::Identity();
+        = pd.diffusion_coefficient(1, barycenter(msh, cl)).tensor();
 
     if (state.use_stabfree)
     {
@@ -596,10 +548,11 @@ solve(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
     auto& hdi = state.hdi;
 
     sol = disk::dynamic_vector<scalar_type>::Zero(assm.syssz);
-    std::cout << "Running MUMPS" << std::endl;
+    std::cout << "Running MUMPS..." << std::flush;
     sol = mumps_lu(assm.LHS, assm.RHS);
+    std::cout << "done" << std::endl;
 
-    std::cout << "Expanding solution" << std::endl;
+    std::cout << "Expanding solution..." << std::flush;
     auto cd = hdi.cell_degree();
     auto fd = hdi.face_degree();
     auto cbs = disk::scalar_basis_size(cd, Mesh::dimension);
@@ -632,7 +585,7 @@ solve(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
         }
         cell_i++;
     }
-    std::cout << "Done" << std::endl;
+    std::cout << "done" << std::endl;
 }
 
 template<typename Mesh, typename ProblemData, typename SolutionData>
@@ -701,9 +654,10 @@ check(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd,
     return std::pair(sqrt(L2errsq), sqrt(Aerrsq));
 }
 
-template<typename Mesh>
+template<typename Mesh, typename ProblemData>
 void
-export_to_visit(hho_poisson_solver_state<Mesh>& state)
+export_to_visit(hho_poisson_solver_state<Mesh>& state,
+    const ProblemData& pd)
 {
     auto& msh = state.msh;
     auto& sol = state.sol_full;
@@ -712,10 +666,12 @@ export_to_visit(hho_poisson_solver_state<Mesh>& state)
     auto cbs = disk::scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
 
     std::vector<double> u;
+    std::vector<double> rhs;
     size_t cell_i = 0;
     for (auto& cl : msh)
     {
         u.push_back( sol(cbs*cell_i) );
+        rhs.push_back( pd.right_hand_side(1, barycenter(msh, cl)) );
         cell_i++;
     }
 
@@ -723,6 +679,7 @@ export_to_visit(hho_poisson_solver_state<Mesh>& state)
     db.create("poisson.silo");
     db.add_mesh(msh, "mesh");
     db.add_variable("mesh", "u", u, disk::zonal_variable_t);
+    db.add_variable("mesh", "rhs", rhs, disk::zonal_variable_t);
     db.add_variable("mesh", "rd", state.recdegs, disk::zonal_variable_t);
 }
 
@@ -787,7 +744,7 @@ setup_and_run(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
     };
 
     lua["export_to_visit"] = [&]() {
-        return export_to_visit(state);
+        return export_to_visit(state, lpd);
     };
 
     lua["check"] = [&]() {
@@ -873,6 +830,17 @@ int run(sol::state& lua)
             auto mesher = disk::make_simple_mesher(state.msh);
             for (size_t i = 0; i < mps.level; i++)
                 mesher.refine();
+
+            std::random_device rd; 
+            std::mt19937 gen(rd());
+            auto h = disk::average_diameter(state.msh);
+            std::uniform_real_distribution<> dis(-0.1*h, 0.1*h);
+
+            auto tr = [&](const disk::point<T,2>& pt) {
+                return disk::point<T,2>(pt.x()+dis(gen), pt.y()+dis(gen));
+            };
+            state.msh.transform(tr);
+
             return setup_and_run(lua, state);
         }
 
@@ -923,7 +891,7 @@ int main(int argc, char **argv)
     using dp2d = diffusion_parameter<T,2>;
     using dp3d = diffusion_parameter<T,3>;
 
-    lua.new_usertype<dp2d>("diffusion_parameter_2D",
+    lua.new_usertype<dp2d>("tensor_2D",
 		sol::constructors<dp2d(), dp2d(T)>(),
         "entry",
         sol::overload(
@@ -932,7 +900,7 @@ int main(int argc, char **argv)
         )
     );
 
-    lua.new_usertype<dp3d>("diffusion_parameter_3D",
+    lua.new_usertype<dp3d>("tensor_3D",
 		sol::constructors<dp3d(), dp3d(T)>(),
         "entry",
         sol::overload(

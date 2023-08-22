@@ -1,8 +1,8 @@
 mesh.source = "internal";
 mesh.type = "hexagons";
 
-hho.variant = "mixed_order_high";
-hho.use_stabfree = true;
+hho.variant = "equal_order";
+hho.use_stabfree = false;
 
 boundary[0] = "dirichlet";
 boundary[1] = "dirichlet";
@@ -20,18 +20,22 @@ function solution(domain_num, x, y)
     return sx*sy;
 end
 
-function right_hand_side(domain_num, x, y, z)
+hho.order = 2;
+local k00 = 1.0;
+local k11 = 0.0001;
+
+function right_hand_side(domain_num, x, y)
     local sx = math.sin(math.pi*x);
     local sy = math.sin(math.pi*y);
-    local sz = 1.0;
-    if sim.dimension == 3 then
-        sz = math.sin(math.pi*z);
-    end
-    return sim.dimension*math.pi*math.pi*sx*sy*sz;
+    return (k00+k11)*math.pi*math.pi*sx*sy;
 end
 
+local dp = tensor_2D:new()
+dp:entry(0, 0, k00)
+dp:entry(1, 1, k11)
+
 function diffusion_coefficient(domain_num, x, y)
-    return 1;
+    return dp;
 end
 
 sol_infos = {}
@@ -59,21 +63,40 @@ function solution_process()
         sol_info.L2err .. ", A error: " ..
         sol_info.Aerr);
 
+    table.insert(sol_infos, sol_info)
+
     return 0;
 end
-
---local dp = diffusion_parameter_2D:new(7)
---print(dp)
---dp:entry(1,1,4.2);
---print(dp:entry(1,1));
---print(dp)
-
-
-mesh.refinement_level = 5;
-hho.order = 0;
 
 for i = 2,4 do
     mesh.refinement_level = i;
     run()
 end
 
+print(" *** L2 error report *** ")
+
+for i,si in ipairs(sol_infos) do
+    io.write(i .. " " .. si.h .. " " .. si.L2err)
+    if i > 1 then
+        local num = math.log(prev_err/si.L2err);
+        local den = math.log(prev_h/si.h)
+        io.write(" " .. (num/den))
+    end
+    io.write("\n");
+    prev_h = si.h;
+    prev_err = si.L2err;
+end
+
+print(" *** Energy error report *** ")
+
+for i,si in ipairs(sol_infos) do
+    io.write(i .. " " .. si.h .. " " .. si.Aerr)
+    if i > 1 then
+        local num = math.log(prev_err/si.Aerr);
+        local den = math.log(prev_h/si.h)
+        io.write(" " .. (num/den))
+    end
+    io.write("\n");
+    prev_h = si.h;
+    prev_err = si.Aerr;
+end
