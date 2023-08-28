@@ -1,8 +1,11 @@
 mesh.source = "internal";
-mesh.type = "hexagons";
+--mesh.source = "file";
+mesh.type = "triangles";
+--mesh.type = "quadrangles";
+--mesh.type = "hexagons";
 
-hho.variant = "equal_order";
-hho.use_stabfree = false;
+hho.variant = "mixed_order_low";
+hho.use_stabfree = true;
 
 boundary[0] = "dirichlet";
 boundary[1] = "dirichlet";
@@ -22,7 +25,7 @@ end
 
 hho.order = 2;
 local k00 = 1.0;
-local k11 = 0.0001;
+local k11 = 0.0000001;
 
 function right_hand_side(domain_num, x, y)
     local sx = math.sin(math.pi*x);
@@ -69,7 +72,7 @@ function solution_process()
 end
 
 for i = 2,4 do
-    mesh.refinement_level = i;
+    mesh.refinement_level = 2;
     run()
 end
 

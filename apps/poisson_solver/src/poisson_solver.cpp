@@ -830,7 +830,7 @@ int run(sol::state& lua)
             auto mesher = disk::make_simple_mesher(state.msh);
             for (size_t i = 0; i < mps.level; i++)
                 mesher.refine();
-
+            /*
             std::random_device rd; 
             std::mt19937 gen(rd());
             auto h = disk::average_diameter(state.msh);
@@ -840,7 +840,18 @@ int run(sol::state& lua)
                 return disk::point<T,2>(pt.x()+dis(gen), pt.y()+dis(gen));
             };
             state.msh.transform(tr);
+            */
+            return setup_and_run(lua, state);
+        }
 
+        if (mps.type == internal_mesh_type::quadrangles)
+        {
+            using mesh_type = disk::cartesian_mesh<T,2>;
+            hho_poisson_solver_state<mesh_type> state;
+            init_solver_state(lua, state);
+            auto mesher = disk::make_simple_mesher(state.msh);
+            for (size_t i = 0; i < mps.level; i++)
+                mesher.refine();
             return setup_and_run(lua, state);
         }
 
@@ -870,6 +881,18 @@ int run(sol::state& lua)
     if (mps.source == mesh_source::file)
     {
         std::cout << "file" << std::endl;
+        
+        const char *mesh_filename = "../../../refactor_old_diskpp_code/meshes/2D_triangles/fvca5/mesh1_4.typ1";
+        using mesh_type = disk::generic_mesh<T, 2>;
+        hho_poisson_solver_state<mesh_type> state;
+        disk::load_mesh_fvca5_2d<T>(mesh_filename, state.msh);
+        
+        //const char *mesh_filename = "../../../refactor_old_diskpp_code/meshes/2D_triangles/netgen/tri03.mesh2d";
+        //using mesh_type = disk::simplicial_mesh<T, 2>;
+        //hho_poisson_solver_state<mesh_type> state;
+        //disk::load_mesh_netgen<T>(mesh_filename, state.msh);
+        
+        return setup_and_run(lua, state);
     }
 
     return 1;
