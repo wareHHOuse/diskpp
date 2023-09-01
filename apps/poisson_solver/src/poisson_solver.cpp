@@ -297,6 +297,7 @@ struct hho_poisson_solver_state
     disk::hho_degree_info   hdi;
     hho_variant             variant;
     bool                    use_stabfree;
+    bool                    use_dt_stab;
 
     std::vector<double>     recdegs;
 };
@@ -365,10 +366,15 @@ compute_laplacian_operator(hho_poisson_solver_state<Mesh>& state,
         A = oper.second;
         GR = oper.first;
     
-        if (is_mixed_high)
+        if (is_mixed_high) {
             A = A + make_scalar_hdg_stabilization(msh, cl, hdi);
-        else
-            A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
+        }
+        else {
+            if (state.use_dt_stab)
+                A = A + make_scalar_hho_stabilization2(msh, cl, GR, hdi, diff_tens);
+            else
+                A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
+        }
     }
 
     return std::pair(GR, A);
@@ -647,7 +653,6 @@ check(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd,
 
         auto [GR, A] = compute_laplacian_operator(state, cl, pd);
         Aerrsq += diff.dot(A*diff);
-
         cell_i++;
     }
 
@@ -803,6 +808,7 @@ init_solver_state(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
     }
 
     state.use_stabfree = lua_use_stabfree_hho(lua);
+    state.use_dt_stab = lua_use_diffusion_tensor_in_stab(lua);
 
     return 0;
 }

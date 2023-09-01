@@ -124,6 +124,16 @@ lua_use_stabfree_hho(sol::state& lua)
     return bool(hs);
 }
 
+bool
+lua_use_diffusion_tensor_in_stab(sol::state& lua)
+{
+    auto dts = lua[NODE_NAME_HHO]["dt_in_stab"];
+    if (!dts.valid())
+        return false;
+
+    return bool(dts);
+}
+
 boundary_type
 lua_get_boundary_type(sol::state& lua, size_t bnd)
 {

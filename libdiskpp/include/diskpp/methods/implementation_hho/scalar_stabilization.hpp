@@ -610,6 +610,96 @@ make_scalar_hho_stabilization(const Mesh&                     msh,
     return data;
 }
 
+
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+make_scalar_hho_stabilization2(const Mesh&                      msh,
+        const typename Mesh::cell_type&                         cl,
+        const dynamic_matrix<typename Mesh::coordinate_type>&   reconstruction,
+        const hho_degree_info&                                  hdi,
+        const static_matrix<typename Mesh::coordinate_type, Mesh::dimension, Mesh::dimension>& kappaT)
+{
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+
+    const auto celdeg = hdi.cell_degree();
+    const auto recdeg = hdi.reconstruction_degree();
+
+    const auto cb = make_scalar_monomial_basis(msh, cl, celdeg);
+    const auto rb = make_scalar_monomial_basis(msh, cl, recdeg);
+    
+    const auto cbs = cb.size();
+    const auto rbs = rb.size();
+
+    const matrix_type mass_mat = make_mass_matrix(msh, cl, rb);
+
+    // Build \pi_F^k (v_F - P_T^K v) equations (21) and (22)
+
+    // Step 1: compute \pi_T^k p_T^k v (third term).
+    const matrix_type M1    = mass_mat.block(0, 0, cbs, cbs);
+    const matrix_type M2    = mass_mat.block(0, 1, cbs, rbs - 1);
+    matrix_type       proj1 = -M1.ldlt().solve(M2 * reconstruction);
+
+    assert(M2.cols() == reconstruction.rows());
+
+    // Step 2: v_T - \pi_T^k p_T^k v (first term minus third term)
+    proj1.block(0, 0, cbs, cbs) += matrix_type::Identity(cbs, cbs);
+
+    const auto fcs = faces(msh, cl);
+    const auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
+    const auto num_faces_dofs = fbs*fcs.size();
+
+    matrix_type data = matrix_type::Zero(cbs + num_faces_dofs, cbs + num_faces_dofs);
+
+    T h = diameter(msh, cl);
+
+    // Step 3: project on faces (eqn. 21)
+    size_t offset = cbs;
+    for (size_t face_i = 0; face_i < fcs.size(); face_i++)
+    {
+        const auto fc = fcs[face_i];
+
+        const auto facdeg = hdi.face_degree();
+        const auto fb     = make_scalar_monomial_basis(msh, fc, facdeg);
+        const auto fbs    = fb.size();
+
+        matrix_type face_mass_matrix  = matrix_type::Zero(fbs, fbs);
+        matrix_type face_trace_matrix = matrix_type::Zero(fbs, rbs);
+
+        const auto face_quadpoints = integrate(msh, fc, recdeg + facdeg);
+        for (auto& qp : face_quadpoints)
+        {
+            const auto f_phi = fb.eval_functions(qp.point());
+            const auto r_phi = rb.eval_functions(qp.point());
+            face_mass_matrix += qp.weight() * f_phi * f_phi.transpose(); 
+            face_trace_matrix += qp.weight() * f_phi * r_phi.transpose();
+        }
+
+        LLT<matrix_type> piKF;
+        piKF.compute(face_mass_matrix);
+
+        // Step 3a: \pi_F^k( v_F - p_T^k v )
+        const matrix_type MR1 = face_trace_matrix.block(0, 1, fbs, rbs - 1);
+
+        matrix_type proj2 = piKF.solve(MR1 * reconstruction);
+        proj2.block(0, offset, fbs, fbs) -= matrix_type::Identity(fbs, fbs);
+
+        // Step 3b: \pi_F^k( v_T - \pi_T^k p_T^k v )
+        const matrix_type MR2   = face_trace_matrix.block(0, 0, fbs, cbs);
+        const matrix_type proj3 = piKF.solve(MR2 * proj1);
+        const matrix_type BRF   = proj2 + proj3;
+
+        auto n = normal(msh, cl, fc);
+        T stabparam = n.dot(kappaT*n)/h;
+
+        data += stabparam * BRF.transpose() * face_mass_matrix * BRF;
+
+        offset += fbs;
+    }
+
+    return data;
+}
+
 /**
  * @brief compute the stabilization term \f$\sum_{F \in F_T} 1/h_F(u_F - u_T + \Pi^k_T R^{k+1}_T(\hat{u}_T) -
  * R^{k+1}_T(\hat{u}_T), v_F - v_T + \Pi^k_T R^{k+1}_T(\hat{v}_T) - R^{k+1}_T(\hat{v}_T))_F \f$ for scalar HHO
