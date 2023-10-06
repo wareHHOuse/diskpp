@@ -202,6 +202,12 @@ struct lua_problem_data
     }
 
     template<typename T>
+    T right_hand_side(size_t domain_num, const disk::point<T,2>& pt, const disk::point<T,2>& bar) const
+    {
+        return lua["right_hand_side"](domain_num, pt.x(), pt.y(), bar.x(), bar.y());
+    }
+
+    template<typename T>
     T right_hand_side(size_t domain_num, const disk::point<T,3>& pt) const
     {
         return lua["right_hand_side"](domain_num, pt.x(), pt.y(), pt.z());
@@ -240,7 +246,11 @@ struct lua_solution_data
     grad(size_t domain_num, const disk::point<T,2>& pt) const
     {
         Eigen::Matrix<T,2,1> ret;
-        return lua["grad_solution"](domain_num, pt.x(), pt.y());
+        T gx, gy;
+        sol::tie(gx, gy) = lua["solution_gradient"](domain_num, pt.x(), pt.y());
+        ret(0) = gx;
+        ret(1) = gy;
+        return ret;
     }
 
     template<typename T>
@@ -248,6 +258,11 @@ struct lua_solution_data
     grad(size_t domain_num, const disk::point<T,3>& pt) const
     {
         Eigen::Matrix<T,3,1> ret;
-        return lua["grad_solution"](domain_num, pt.x(), pt.y(), pt.z());
+        T gx, gy, gz;
+        sol::tie(gx, gy, gz) = lua["solution_gradient"](domain_num, pt.x(), pt.y(), pt.z());
+        ret(0) = gx;
+        ret(1) = gy;
+        ret(2) = gz;
+        return ret;
     }
 };

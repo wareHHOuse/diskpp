@@ -220,6 +220,74 @@ make_scalar_hdg_stabilization(const Mesh&                     msh,
     return data;
 }
 
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+make_scalar_hdg_stabilization2(const Mesh&                      msh,
+    const typename Mesh::cell_type&                         cl,
+    const hho_degree_info&                                  hdi,
+    const static_matrix<typename Mesh::coordinate_type, Mesh::dimension, Mesh::dimension>& kappaT)
+{
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+
+    const auto celdeg = hdi.cell_degree();
+    const auto cb = make_scalar_monomial_basis(msh, cl, celdeg);
+    const auto cbs = cb.size();
+
+    const auto fcs = faces(msh, cl);
+    const auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
+    const auto num_faces_dofs = fbs*fcs.size();
+    const auto total_dofs     = cbs + num_faces_dofs;
+
+    matrix_type data = matrix_type::Zero(total_dofs, total_dofs);
+
+    T h = diameter(msh, cl);
+
+    size_t offset   = cbs;
+
+    for (size_t i = 0; i < fcs.size(); i++)
+    {
+        const auto fc = fcs[i];
+        const auto facdeg = hdi.face_degree();
+        const auto fb  = make_scalar_monomial_basis(msh, fc, facdeg);
+        const auto fbs = scalar_basis_size(facdeg, Mesh::dimension - 1);
+
+        const matrix_type If    = matrix_type::Identity(fbs, fbs);
+        matrix_type       oper  = matrix_type::Zero(fbs, total_dofs);
+        matrix_type       tr    = matrix_type::Zero(fbs, total_dofs);
+        matrix_type       mass  = make_mass_matrix(msh, fc, fb);
+        matrix_type       trace = matrix_type::Zero(fbs, cbs);
+
+        oper.block(0, offset, fbs, fbs) = -If;
+
+        const auto qps = integrate(msh, fc, facdeg + celdeg);
+        for (auto& qp : qps)
+        {
+            const auto c_phi = cb.eval_functions(qp.point());
+            const auto f_phi = fb.eval_functions(qp.point());
+
+            assert(c_phi.rows() == cbs);
+            assert(f_phi.rows() == fbs);
+            assert(c_phi.cols() == f_phi.cols());
+
+            trace += priv::outer_product(priv::inner_product(qp.weight(), f_phi), c_phi);
+        }
+
+        tr.block(0, offset, fbs, fbs) = -mass;
+        tr.block(0, 0, fbs, cbs)      = trace;
+
+        auto n = normal(msh, cl, fc);
+        T stabparam = n.dot(kappaT*n)/h;
+        oper.block(0, 0, fbs, cbs) = mass.ldlt().solve(trace);
+        data += oper.transpose() * tr * stabparam;
+
+        offset += fbs;
+
+    }
+
+    return data;
+}
+
 /**
  * @brief compute the stabilization term \f$ \sum_{F \in F_T} 1/h_F(u_F-\Pi^k_F(u_T), v_F-\Pi^k_F(v_T))_F \f$
  * for scalar HHO unknowns

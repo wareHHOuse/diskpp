@@ -1,8 +1,8 @@
 mesh.source = "internal";
 --mesh.source = "file";
---mesh.type = "triangles";
+mesh.type = "triangles";
 --mesh.type = "quadrangles";
-mesh.type = "hexagons";
+--mesh.type = "hexagons";
 
 hho.variant = "mixed_order_high";
 hho.use_stabfree = true;
@@ -167,16 +167,4 @@ end
 
 --test_anisotropy();
 
-hho.use_stabfree = false;
-for order = 0,3 do
-    sol_infos = {}
-    hho.order = order;
-    test_mesh_refinement();
-end
-
-hho.use_stabfree = true;
-for order = 0,3 do
-    sol_infos = {}
-    hho.order = order;
-    test_mesh_refinement();
-end
+test_mesh_refinement();

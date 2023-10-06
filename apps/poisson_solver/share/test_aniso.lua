@@ -25,19 +25,71 @@ function solution(domain_num, x, y)
     return sx*sy;
 end
 
-local dp = tensor_2D:new()
+local inv_aniso_ratio = 1;
+local K = tensor_2D:new()
 
 function right_hand_side(domain_num, x, y)
     local sx = math.sin(math.pi*x);
     local sy = math.sin(math.pi*y);
-    local k00 = dp:entry(0, 0);
-    local k11 = dp:entry(1, 1);
-    return (k00+k11)*math.pi*math.pi*sx*sy;
+    local cx = math.cos(math.pi*x);
+    local cy = math.cos(math.pi*y);
+    local k00 = K:entry(0, 0);
+    local k01 = K:entry(0, 1);
+    local k10 = K:entry(1, 0);
+    local k11 = K:entry(1, 1);
+    local pi2 = math.pi*math.pi;
+    return (k00+k11)*pi2*sx*sy - (k01+k10)*pi2*cx*cy;
 end
 
 function diffusion_coefficient(domain_num, x, y)
-    return dp;
+    return K;
 end
+
+--[[
+function right_hand_side(domain_num, x, y)
+    local sx = math.sin(math.pi*x);
+    local sy = math.sin(math.pi*y);
+    local cx = math.cos(math.pi*x);
+    local cy = math.cos(math.pi*y);
+    local s3x = math.sin(3*math.pi*x);
+    local sx3 = sx*sx*sx;
+    local cx2 = cx*cx;
+    local pi = math.pi;
+    local pi2 = pi*pi;
+
+    local k00 = K:entry(0, 0);
+    local k11 = K:entry(1, 1);
+    
+    local a = -3*k00*pi2*cx2*sx*sy;
+    local b = pi2*(k11*sy/2 + (k11-k00)*cy/2)*(3*s3x - sx);
+    local c = pi2*(k11-k00)*cx2*sx*cy;
+    local d = -pi2*k00*sx3*sy;
+    local e = -pi2*k11*sx*cx2*sy;
+    return -(a+b+c+d+e);
+end
+
+function diffusion_coefficient(domain_num, x, y)
+    local k00 = K:entry(0, 0);
+    local k11 = K:entry(1, 1);
+
+    local sx = math.sin(math.pi*x);
+    local cx = math.cos(math.pi*x);
+    local sx2 = sx*sx;
+    local cx2 = cx*cx;
+
+    local rK00 = k00*cx2 + k11*sx2;
+    local rK01 = (k11-k00)*sx*cx;
+    local rK10 = rK01;
+    local rK11 = k00*sx2 + k11*cx2;
+
+    local rK = tensor_2D:new();
+    rK:entry(0, 0, rK00);
+    rK:entry(0, 1, rK01);
+    rK:entry(1, 0, rK10);
+    rK:entry(1, 1, rK11);
+    return rK;
+end
+]]--
 
 sol_infos = {}
 
@@ -54,7 +106,7 @@ function solution_process()
 
     export_to_visit();
 
-    sol_info.k11 = dp:entry(1,1);
+    sol_info.k11 = inv_aniso_ratio;
     sol_info.h = mesh_h();
     sol_info.L2err, sol_info.Aerr = check();
     
@@ -81,17 +133,20 @@ function shorten_variant_name(long_vname)
     return vname;
 end
 
+local rot = math.pi/8;
+local r_c = math.cos(rot);
+local r_s = math.sin(rot);
+
 function test_mesh_refinement()
-    for i = 1,6 do
+    for i = 1,5 do
         mesh.refinement_level = i
         run()
     end
 
     local vname = shorten_variant_name(hho.variant);
     
-    local k11 = dp:entry(1, 1);
-    local filename = "aniso/data/aniso_".. k11 .. "_conv_" ..
-        mesh.type .. "_" .. vname .. "_" ..
+    local filename = "aniso/data/aniso_".. inv_aniso_ratio ..
+        "_conv_" .. mesh.type .. "_" .. vname .. "_" ..
         hho.order .. ".txt";
 
     file = io.open(filename, "w");
@@ -101,64 +156,15 @@ function test_mesh_refinement()
     file:close();
 end
 
-function test_anisotropy()
-    mesh.refinement_level = 4;
-    local k11 = 1.0;
-    dp:entry(1, 1, k11);
-    
-    for i = 1,12 do
-        run()
-        k11 = k11/10.0;
-        dp:entry(1, 1, k11);
-    end
-
-
-    print(" *** L2 error report *** ")
-
-    for i,si in ipairs(sol_infos) do
-        io.write(i .. " " .. si.k11 .. " " .. si.L2err)
-        if i > 1 then
-            local num = math.log(prev_err/si.L2err);
-            local den = math.log(prev_k11/si.k11)
-            io.write(" " .. (num/den))
-        end
-        io.write("\n");
-        prev_k11 = si.k11;
-        prev_err = si.L2err;
-    end
-
-    print(" *** Energy error report *** ")
-
-    for i,si in ipairs(sol_infos) do
-        io.write(i .. " " .. si.k11 .. " " .. si.Aerr)
-        if i > 1 then
-            local num = math.log(prev_err/si.Aerr);
-            local den = math.log(prev_k11/si.k11)
-            io.write(" " .. (num/den))
-        end
-        io.write("\n");
-        prev_k11 = si.k11;
-        prev_err = si.Aerr;
-    end
-
---[[
-    local vname = short_variant_name();
-    
-    local filename = "aniso/data/aniso_kyy_" .. mesh.type .. "_" .. vname .. "_" .. hho.order .. ".txt";
-
-    file = io.open(filename, "w");
-    for i,si in ipairs(sol_infos) do
-        file:write(si.k11 .. " " .. si.L2err .. " " .. si.Aerr .. "\n");
-    end
-    file:close();
---]]
-end
-
---test_anisotropy();
 
 local mesh_types = {"triangles", "quadrangles", "hexagons"}
 local hho_vars = {"mixed_order_low", "equal_order", "mixed_order_high"}
 local k11_vals = {1.0, 0.1, 0.01, 0.001, 0.0001, 0.00001}
+
+--local mesh_types = {"quadrangles"}
+--local hho_vars = {"equal_order"}
+--local k11_vals = {0.1}
+
 
 for key0,mt in pairs(mesh_types) do
     mesh.type = mt;
@@ -172,7 +178,13 @@ for key0,mt in pairs(mesh_types) do
         end
 
         for key2,k11 in pairs(k11_vals) do
-            dp:entry(1,1,k11);
+            inv_aniso_ratio = k11;
+            local dx = 1;
+            local dy = inv_aniso_ratio;
+            K:entry(0,0, r_c * dx * r_c + r_s * dy * r_s);
+            K:entry(0,1, r_s * dy * r_c - r_c * dx * r_s);
+            K:entry(1,0, r_s * dy * r_c - r_c * dx * r_s);
+            K:entry(1,1, r_s * dx * r_s + r_c * dy * r_c);
             for order = order_min,order_max do
                 sol_infos = {}
                 hho.order = order;

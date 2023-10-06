@@ -300,6 +300,9 @@ struct hho_poisson_solver_state
     bool                    use_dt_stab;
 
     std::vector<double>     recdegs;
+
+    double                  A_norm;
+    double                  AS_norm;
 };
 
 template<disk::mesh_2D Mesh>
@@ -309,22 +312,24 @@ adjust_stabfree_recdeg(const Mesh& msh, const typename Mesh::cell_type& cl,
 {
     size_t cd = hdi.cell_degree();
     size_t fd = hdi.face_degree();
-    size_t n = faces(msh, cl).size();
+    bool is_mixed_high = (hdi.cell_degree() > hdi.face_degree());
+    size_t n = faces(msh, cl).size();   
+    size_t rpd = cd+2;
 
     /* HHO space dofs */
     size_t from = ((cd+2)*(cd+1))/2 + n*(fd+1);
-    /* Reconstruction dofs, polynomial part (degree is cd+2) */
-    size_t to = ((cd+4)*(cd+3))/2;
+    /* Reconstruction dofs */
+    size_t to = ((rpd+2)*(rpd+1))/2;
 
     if (from <= to) {
-        hdi.reconstruction_degree(cd+2);
+        hdi.reconstruction_degree(rpd);
     }
     else {
         /* Every harmonic degree provides 2 additional dofs, therefore
          * we need an increment that it is sufficient to accomodate
          * (from-to) dofs => ((from - to) + (2-1))/2 */
         size_t incr = (from - to + 1)/2;
-        hdi.reconstruction_degree(cd+2+incr);
+        hdi.reconstruction_degree(rpd+incr);
     }
 }
 
@@ -346,7 +351,6 @@ compute_laplacian_operator(hho_poisson_solver_state<Mesh>& state,
 
     constexpr size_t DIM = Mesh::dimension;
     disk::static_matrix<T, DIM, DIM> diff_tens
-        //= disk::static_matrix<T, DIM, DIM>::Identity();
         = pd.diffusion_coefficient(1, barycenter(msh, cl)).tensor();
 
     if (state.use_stabfree)
@@ -361,13 +365,17 @@ compute_laplacian_operator(hho_poisson_solver_state<Mesh>& state,
             A = oper.second;
             GR = oper.first;
         }
+        state.A_norm += A.norm();
     } else {
         auto oper = make_scalar_hho_laplacian(msh, cl, hdi, diff_tens);
         A = oper.second;
         GR = oper.first;
-    
+        state.A_norm += A.norm();
         if (is_mixed_high) {
-            A = A + make_scalar_hdg_stabilization(msh, cl, hdi);
+            if (state.use_dt_stab)
+                A = A + make_scalar_hdg_stabilization2(msh, cl, hdi, diff_tens);
+            else
+                A = A + make_scalar_hdg_stabilization(msh, cl, hdi);
         }
         else {
             if (state.use_dt_stab)
@@ -375,6 +383,7 @@ compute_laplacian_operator(hho_poisson_solver_state<Mesh>& state,
             else
                 A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
         }
+        state.AS_norm += A.norm();
     }
 
     return std::pair(GR, A);
@@ -431,7 +440,7 @@ compute_element_contribution(hho_poisson_solver_state<Mesh>& state,
     }
 
     auto rhs_fun = [&](const point_type& pt) {
-        return pd.right_hand_side(domain_num, pt);
+        return pd.right_hand_side(domain_num, pt, bar);
     };
 
     auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
@@ -510,6 +519,9 @@ assemble(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
     auto& hdi = state.hdi;
     auto& assm = state.assm;
 
+    state.A_norm = 0.0;
+    state.AS_norm = 0.0;
+
     std::vector<bool> is_dirichlet;
     is_dirichlet.resize( msh.faces_size() );
 
@@ -537,6 +549,11 @@ assemble(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
         std::cout << "Assembling standard HHO problem" << std::endl;
         assemble_standard(state, pd);
     }
+
+    double S_norm = state.AS_norm - state.A_norm;
+    std::cout << "A norm  = " << state.A_norm << std::endl;
+    std::cout << "S norm  = " << S_norm << " (" << 100.0*S_norm/state.A_norm << "%)" << std::endl;
+    std::cout << "AS norm = " << state.AS_norm << std::endl;
 }
 
 template<typename Mesh, typename ProblemData>
@@ -581,13 +598,11 @@ solve(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
         state.sol_full.segment(cbs*cell_i, cbs) = esol.head(cbs);
 
         auto fcs = faces(msh, cl);
-        for (size_t iF = 0; iF < fcs.size(); iF++)
-        {
+        for (size_t iF = 0; iF < fcs.size(); iF++) {
             auto& fc = fcs[iF];
             auto lofs = cbs + fbs*iF;
             auto gofs = cbs*msh.cells_size() + fbs*offset(msh, fc);
             state.sol_full.segment(gofs, fbs) = esol.segment(lofs, fbs);
-            /* XXX: adjust dirichlet bcs */
         }
         cell_i++;
     }
@@ -604,6 +619,8 @@ check(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd,
     using cell_type = typename Mesh::cell_type;
     using face_type = typename Mesh::face_type;
     using scalar_type = typename Mesh::coordinate_type;
+    using dv = disk::dynamic_vector<scalar_type>;
+    using dm = disk::dynamic_matrix<scalar_type>;
 
     auto& msh = state.msh;
     auto& assm = state.assm;
@@ -616,8 +633,14 @@ check(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd,
     auto fbs = disk::scalar_basis_size(fd, Mesh::dimension-1);
     auto fullsz = cbs*msh.cells_size() + fbs*msh.faces_size();
 
+    scalar_type L2normsq = 0.0;
     scalar_type L2errsq = 0.0;
+    scalar_type H1normsq = 0.0;
+    scalar_type H1errsq = 0.0;
     scalar_type Aerrsq = 0.0;
+    scalar_type Anormsq = 0.0;
+
+    
 
     size_t cell_i = 0;
     for (auto& cl : msh)
@@ -629,34 +652,69 @@ check(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd,
             return sd.sol(domain_num, pt);
         };
 
+        auto sol_grad = [&](const point_type& pt) {
+            return sd.grad(domain_num, pt);
+        };
+
         auto fcs = faces(msh, cl);
         size_t num_dofs = cbs + fbs*fcs.size();
-        disk::dynamic_vector<scalar_type> num_loc_sol =
-            disk::dynamic_vector<scalar_type>::Zero(num_dofs);
+        
+        dv num_loc_sol = dv::Zero(num_dofs);
 
         num_loc_sol.head(cbs) = state.sol_full.segment(cbs*cell_i, cbs);
-        num_loc_sol.tail(fbs*fcs.size()) =
-            state.assm.get_element_dofs(msh, cl, state.sol);
+        for (size_t iF = 0; iF < fcs.size(); iF++) {
+            auto& fc = fcs[iF];
+            auto lofs = cbs + fbs*iF;
+            auto gofs = cbs*msh.cells_size() + fbs*offset(msh, fc);
+            num_loc_sol.segment(lofs, fbs) = state.sol_full.segment(gofs, fbs);
+        }
 
-        disk::dynamic_vector<scalar_type> ana_loc_sol =
-            disk::project_function(msh, cl, hdi, sol_fun, 2);
-            
-        disk::dynamic_vector<scalar_type> diff =
-            ana_loc_sol - num_loc_sol;
+        dv ana_loc_sol = disk::project_function(msh, cl, hdi, sol_fun, 2);
+        dv err_loc_sol = ana_loc_sol - num_loc_sol;
 
-        disk::dynamic_vector<scalar_type> diff_uT = diff.head(cbs);
+        dv ana_uT = ana_loc_sol.head(cbs);
+        dv err_uT = err_loc_sol.head(cbs);
 
-        disk::dynamic_matrix<scalar_type> MM = 
-            disk::make_mass_matrix(msh, cl, cb);
+        dm MM = disk::make_mass_matrix(msh, cl, cb);
 
-        L2errsq += diff_uT.dot(MM*diff_uT);
+        L2errsq  += err_uT.dot(MM*err_uT);
+        L2normsq += ana_uT.dot(MM*ana_uT);
 
         auto [GR, A] = compute_laplacian_operator(state, cl, pd);
-        Aerrsq += diff.dot(A*diff);
+        Aerrsq  += err_loc_sol.dot(A*err_loc_sol);
+        Anormsq += ana_loc_sol.dot(A*ana_loc_sol);
+
+        dm uR = GR*num_loc_sol;
+        
+        auto rb = disk::make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
+
+        constexpr size_t DIM = Mesh::dimension;
+        disk::static_matrix<scalar_type, DIM, DIM> diff_tens
+            = pd.diffusion_coefficient(1, barycenter(msh, cl)).tensor();
+
+        auto qps = disk::integrate(msh, cl, 2*hdi.reconstruction_degree());
+        for (auto& qp : qps) {
+            disk::static_vector<scalar_type,DIM> ana_grad = sol_grad(qp.point());
+
+            auto dphi = rb.eval_gradients(qp.point());
+            disk::static_vector<scalar_type,DIM> num_grad =
+                dphi.block(1,0,rb.size()-1,DIM).transpose()*uR;
+
+            disk::static_vector<scalar_type,DIM> diff_grad = num_grad - ana_grad;
+
+            H1normsq += qp.weight() * ana_grad.dot(diff_tens*ana_grad);
+            H1errsq += qp.weight() * diff_grad.dot(diff_tens*diff_grad);
+        }
+
         cell_i++;
     }
 
-    return std::pair(sqrt(L2errsq), sqrt(Aerrsq));
+    std::cout << "Norm: " << std::sqrt(L2normsq) << std::endl;
+
+    return std::tuple(std::sqrt(L2errsq/L2normsq),
+        std::sqrt(H1errsq/H1normsq),
+        std::sqrt(Aerrsq/Anormsq)
+    );
 }
 
 template<typename Mesh, typename ProblemData>
@@ -675,8 +733,9 @@ export_to_visit(hho_poisson_solver_state<Mesh>& state,
     size_t cell_i = 0;
     for (auto& cl : msh)
     {
+        auto bar = barycenter(msh, cl);
         u.push_back( sol(cbs*cell_i) );
-        rhs.push_back( pd.right_hand_side(1, barycenter(msh, cl)) );
+        rhs.push_back( pd.right_hand_side(1, bar, bar) );
         cell_i++;
     }
 

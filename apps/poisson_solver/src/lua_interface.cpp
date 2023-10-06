@@ -30,7 +30,7 @@ lua_init_environment(sol::state& lua)
 bool
 lua_load_script(sol::state& lua, const std::string& fn)
 {
-    auto sf = lua.script_file(fn);
+    auto sf = lua.safe_script_file(fn);
     return sf.valid();
 }
 

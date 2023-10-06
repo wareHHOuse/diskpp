@@ -499,12 +499,13 @@ public:
     simple_mesher(mesh_type& msh)
         : storage( msh.backend_storage() )
     {
+        auto rot = 0.4;
         /* Init the first level of the mesh */
         storage->points.push_back( point_type(0.0, 0.0) );
         auto pi0 = point_identifier<2>(0);
         storage->nodes.push_back( node_type( {pi0} ) );
 
-        storage->points.push_back( point_type(0.5, 0.0) );
+        storage->points.push_back( point_type(0.5-rot, 0.0) );
         auto pi1 = point_identifier<2>(1);
         storage->nodes.push_back( node_type( {pi1} ) );
 
@@ -512,7 +513,7 @@ public:
         auto pi2 = point_identifier<2>(2);
         storage->nodes.push_back( node_type( {pi2} ) );
 
-        storage->points.push_back( point_type(0.0, 0.5) );
+        storage->points.push_back( point_type(0.0, 0.5+rot) );
         auto pi3 = point_identifier<2>(3);
         storage->nodes.push_back( node_type( {pi3} ) );
 
@@ -520,7 +521,7 @@ public:
         auto pi4 = point_identifier<2>(4);
         storage->nodes.push_back( node_type( {pi4} ) );
 
-        storage->points.push_back( point_type(1.0, 0.5) );
+        storage->points.push_back( point_type(1.0, 0.5-rot) );
         auto pi5 = point_identifier<2>(5);
         storage->nodes.push_back( node_type( {pi5} ) );
 
@@ -528,7 +529,7 @@ public:
         auto pi6 = point_identifier<2>(6);
         storage->nodes.push_back( node_type( {pi6} ) );
 
-        storage->points.push_back( point_type(0.5, 1.0) );
+        storage->points.push_back( point_type(0.5+rot, 1.0) );
         auto pi7 = point_identifier<2>(7);
         storage->nodes.push_back( node_type( {pi7} ) );
 
