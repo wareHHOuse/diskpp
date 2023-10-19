@@ -27,283 +27,11 @@
 #include "diskpp/common/timecounter.hpp"
 
 #include "lua_interface.h"
+#include "poisson_solver.h"
 
 #include "sgr.hpp"
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-template<typename Mesh>
-class hho_assembler
-{
-    using coordinate_type = typename Mesh::coordinate_type;
-    using scalar_type = coordinate_type;
-    using mesh_type = Mesh;
-    using face_type = typename Mesh::face_type;
-    using cell_type = typename Mesh::cell_type;
-
-    //Mesh                                msh;
-    disk::hho_degree_info               hdi;
-
-    std::vector<Triplet<scalar_type>>   triplets;
-    std::vector<bool>                   is_dirichlet;
-
-    std::vector<size_t>                 compress_table;
-    std::vector<size_t>                 expand_table;
-
-    const size_t INVALID_OFFSET = (size_t) ~0;
-
-    size_t face_basis_size(void) const {
-        return disk::scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
-    }
-
-    /* Get the offset of a face in the linear system */
-    size_t get_system_offset(const Mesh& msh,
-        const typename Mesh::face_type& fc)
-    {
-        auto face_num = offset(msh, fc);
-        assert(face_num < msh.faces_size());
-        assert(compress_table.size() == msh.faces_size());
-        auto cnum = compress_table[face_num];
-        assert(cnum != INVALID_OFFSET);
-        auto fbs = face_basis_size();
-        return cnum*fbs;
-    }
-
-    /* Determine if a face should be assembled */
-    bool is_in_system(const Mesh& msh,
-        const typename Mesh::face_type& fc)
-    {
-        auto bi = msh.boundary_info(fc);
-        auto face_num = offset(msh, fc);
-        assert(face_num < msh.faces_size());
-        assert(is_dirichlet.size() == msh.faces_size());
-        return not (bi.is_boundary() and is_dirichlet[face_num]);
-    }
-
-    void make_tables(mesh_type& msh)
-    {
-        compress_table.resize( msh.faces_size(), INVALID_OFFSET);
-        expand_table.resize( sysfcs );
-
-        size_t face_i = 0;
-        size_t compressed_ofs = 0;
-        for (auto& fc : faces(msh))
-        {
-            assert(compressed_ofs <= face_i);
-            if ( is_in_system(msh, fc) )
-            {
-                assert(face_i < compress_table.size());
-                compress_table[face_i] = compressed_ofs;
-                assert(compressed_ofs < expand_table.size());
-                expand_table[compressed_ofs] = face_i;
-                compressed_ofs++;
-            }
-
-            face_i++;
-        }
-
-        assert(face_i == msh.faces_size());
-    }
-
-public:
-    
-    SparseMatrix<scalar_type>           LHS;
-    Matrix<scalar_type, Dynamic, 1>     RHS;
-
-    size_t                              syssz;
-    size_t                              sysfcs;
-
-
-    hho_assembler()
-    {}
-
-    hho_assembler(Mesh& msh, const disk::hho_degree_info& hdi,
-                  const std::vector<bool>& is_dirichlet)
-    {
-        initialize(msh, hdi, is_dirichlet);
-    }
-
-    void clear()
-    {
-        triplets.clear();
-        is_dirichlet.clear();
-        compress_table.clear();
-        expand_table.clear();
-        syssz = 0;
-        sysfcs = 0;
-    }
-
-    void initialize(Mesh& msh, const disk::hho_degree_info& p_hdi,
-                    const std::vector<bool>& p_is_dirichlet)
-    {
-        clear();
-
-        is_dirichlet = p_is_dirichlet;
-        hdi = p_hdi;
-
-        auto fbs = face_basis_size();
-
-        auto in_system = [&](const face_type& fc) -> bool {
-            auto ofs = offset(msh, fc);
-            assert(ofs < is_dirichlet.size());
-            return not (msh.is_boundary(fc) and is_dirichlet[ofs]);
-        };
-
-        sysfcs = std::count_if(msh.faces_begin(), msh.faces_end(), in_system);
-        syssz = fbs*sysfcs;
-
-        make_tables(msh);
-
-        LHS = SparseMatrix<scalar_type>(syssz, syssz);
-        RHS = Matrix<scalar_type, Dynamic, 1>::Zero(syssz);
-
-        std::cout << "Assembler initialized: " << sysfcs << " faces in system, ";
-        std::cout << syssz << " DoFs" << std::endl;
-    }
-
-    void
-    assemble(const Mesh& msh, const typename Mesh::cell_type& cl,
-             const Matrix<scalar_type, Dynamic, Dynamic>& lhsc,
-             const Matrix<scalar_type, Dynamic, 1>& rhs,
-             const Matrix<scalar_type, Dynamic, 1>& dirichlet_data)
-    {
-        auto fbs = face_basis_size();
-
-        auto fcs = faces(msh, cl);
-        for (size_t fi = 0; fi < fcs.size(); fi++)
-        {
-            if ( not is_in_system(msh, fcs[fi]) )
-                continue;
-
-            auto cofsi = get_system_offset(msh, fcs[fi]);
-            for (size_t fj = 0; fj < fcs.size(); fj++)
-            {
-                auto lofsi = fi*fbs;
-                auto lofsj = fj*fbs;
-
-                if ( not is_in_system(msh, fcs[fj]) ) 
-                {
-                    RHS.segment(cofsi, fbs) += -lhsc.block(lofsi, lofsj, fbs, fbs)*dirichlet_data.segment(lofsj, fbs);
-                    continue;
-                }
-
-                auto cofsj = get_system_offset(msh, fcs[fj]);
-                for (size_t i = 0; i < fbs; i++)
-                    for(size_t j = 0; j < fbs; j++)
-                        triplets.push_back( Triplet<scalar_type>(cofsi+i, cofsj+j, lhsc(lofsi+i, lofsj+j)) );
-            }
-
-            RHS.segment(cofsi, fbs) += rhs.segment(fi*fbs, fbs);
-        }
-    }
-
-    void finalize(void)
-    {
-        LHS.setFromTriplets(triplets.begin(), triplets.end());
-        triplets.clear();
-        std::cout << "Matrix has " << LHS.nonZeros() << " nonzeros." << std::endl; 
-    }
-
-    disk::dynamic_vector<scalar_type>
-    get_expanded_solution(const Mesh& msh, disk::dynamic_vector<scalar_type>& sol)
-    {
-        auto fbs = face_basis_size();
-
-        disk::dynamic_vector<scalar_type> ret = 
-            disk::dynamic_vector<scalar_type>::Zero( fbs*msh.faces_size() );
-
-        for (size_t i = 0; i < sysfcs; i++)
-        {
-            auto in_offset = i*fbs;
-            auto out_offset = expand_table.at(i)*fbs;
-            ret.segment(out_offset, fbs) = sol.segment(in_offset, fbs);
-        }
-
-        return ret;
-    }
-
-    disk::dynamic_vector<scalar_type>
-    get_element_dofs(const Mesh& msh, const typename Mesh::cell& cl, disk::dynamic_vector<scalar_type>& sol)
-    {
-        auto fbs = face_basis_size();
-        auto fcs = faces(msh, cl);
-        disk::dynamic_vector<scalar_type> ret = 
-            disk::dynamic_vector<scalar_type>::Zero( fbs*fcs.size() );
-
-        for (size_t i = 0; i < fcs.size(); i++)
-        {
-            auto& fc = fcs[i];
-            if ( not is_in_system(msh, fc) )
-                continue;
-
-            auto ofs = get_system_offset(msh, fc);
-            ret.segment(i*fbs, fbs) = sol.segment(ofs, fbs);
-        }
-
-        return ret;
-    }
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-template<typename Mesh>
-struct hho_poisson_solver_state
-{
-    using mesh_type = Mesh;
-    using cell_type = typename Mesh::cell_type;
-    using face_type = typename Mesh::face_type;
-    using scalar_type = typename Mesh::coordinate_type;
-    using assembler_type = hho_assembler<Mesh>;
-    using vector_type = disk::dynamic_vector<scalar_type>;
-
-    mesh_type               msh;
-    assembler_type          assm;
-    vector_type             sol;
-    vector_type             sol_full;
-
-    std::vector<boundary>   boundary_info;
-
-    disk::hho_degree_info   hdi;
-    hho_variant             variant;
-    bool                    use_stabfree;
-    bool                    use_dt_stab;
-
-    std::vector<double>     recdegs;
-
-    double                  A_norm;
-    double                  AS_norm;
-};
 
 template<disk::mesh_2D Mesh>
 void
@@ -349,9 +77,10 @@ compute_laplacian_operator(hho_poisson_solver_state<Mesh>& state,
     disk::dynamic_matrix<T> A;
     disk::dynamic_matrix<T> GR;
 
+    auto subdomain_id = msh.domain_info(cl).tag(); 
     constexpr size_t DIM = Mesh::dimension;
     disk::static_matrix<T, DIM, DIM> diff_tens
-        = pd.diffusion_coefficient(1, barycenter(msh, cl)).tensor();
+        = pd.diffusion_coefficient(subdomain_id, barycenter(msh, cl)).tensor();
 
     if (state.use_stabfree)
     {
@@ -385,7 +114,7 @@ compute_laplacian_operator(hho_poisson_solver_state<Mesh>& state,
         }
         state.AS_norm += A.norm();
     }
-
+    
     return std::pair(GR, A);
 }
 
@@ -407,50 +136,87 @@ compute_element_contribution(hho_poisson_solver_state<Mesh>& state,
         adjust_stabfree_recdeg(msh, cl, hdi);
 
     auto bar = barycenter(msh, cl);
-    auto domain_num = msh.domain_info(cl).tag(); 
+    auto subdomain_id = msh.domain_info(cl).tag();
+    constexpr size_t DIM = Mesh::dimension;
+    disk::static_matrix<T, DIM, DIM> diff_tens
+        = pd.diffusion_coefficient(subdomain_id, barycenter(msh, cl)).tensor();
 
-    auto [GR, A] = compute_laplacian_operator(state, cl, pd);
+    auto [GR, lhs] = compute_laplacian_operator(state, cl, pd);
 
     auto fcs = faces(msh, cl);
     auto num_faces = fcs.size();
+    auto cbs = disk::scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
     auto fbs = disk::scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
-    Eigen::Matrix<T, Eigen::Dynamic, 1> dirichlet_data =
+    Eigen::Matrix<T, Eigen::Dynamic, 1> strong_data =
         Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(num_faces*fbs);
+
+    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> robin_lhs =
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>::Zero(cbs + num_faces*fbs, cbs + num_faces*fbs);
+
+    Eigen::Matrix<T, Eigen::Dynamic, 1> weak_data =
+        Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(cbs + num_faces*fbs);
+
+    Eigen::Matrix<T, Eigen::Dynamic, 1> wddofs =
+        Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(cbs + num_faces*fbs);
 
     size_t fnum = 0;
     for (auto& fc : fcs)
     {
-        if (not msh.is_boundary(fc)) {
-            fnum++;
-            continue;
-        }
+        auto n = normal(msh, cl, fc);
+        auto gfnum = offset(msh, fc);
+        auto b = state.boundary_info[gfnum];
+        auto fb = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
 
-        auto bnd_num = msh.boundary_info(fc).tag();
         auto dirichlet_fun = [&](const point_type& pt) {
-            return pd.dirichlet_data(bnd_num, pt);
+            return pd.dirichlet_data(b.number, pt);
         };
 
-        auto fb = make_scalar_monomial_basis(msh, fc, hdi.face_degree());
-        Eigen::Matrix<T, Eigen::Dynamic, 1> dd =
-            disk::project_function(msh, fc, fb, dirichlet_fun);
-        
-        dirichlet_data.segment(fnum*fb.size(), fb.size()) = dd; 
+        auto neumann_fun = [&](const point_type& pt) {
+            return pd.neumann_data(b.number, pt, disk::point<T,DIM>(n));
+        };
+
+        if (b.type == boundary_type::dirichlet)
+        {
+            strong_data.segment(fnum*fb.size(), fb.size()) = 
+                disk::project_function(msh, fc, fb, dirichlet_fun);
+        }
+
+        if (b.type == boundary_type::neumann) {
+            weak_data.segment(cbs + fnum*fb.size(), fb.size()) =
+                disk::make_rhs(msh, fc, fb, neumann_fun); 
+        }
+
+        if (b.type == boundary_type::robin) {
+            auto fofs = cbs + fnum*fb.size();
+            T bnd_val = b.value.value_or(n.dot(diff_tens*n));
+            robin_lhs.block(fofs, fofs, fb.size(), fb.size()) +=
+                bnd_val * disk::make_mass_matrix(msh, fc, fb);
+        }
+
+        if (b.type == boundary_type::jump /* and cell is jump source */) {
+            wddofs.segment(cbs + fnum*fb.size(), fb.size()) +=
+                disk::project_function(msh, fc, fb, dirichlet_fun);
+            weak_data.segment(cbs + fnum*fb.size(), fb.size()) +=
+                disk::make_rhs(msh, fc, fb, neumann_fun);
+        }
 
         fnum++;
     }
 
+    lhs = lhs + robin_lhs;
+
     auto rhs_fun = [&](const point_type& pt) {
-        return pd.right_hand_side(domain_num, pt, bar);
+        return pd.right_hand_side(subdomain_id, pt);
     };
 
     auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-    Eigen::Matrix<T, Eigen::Dynamic, 1> rhs = make_rhs(msh, cl, cb, rhs_fun);
-    
-    Eigen::Matrix<T, Eigen::Dynamic, 1> true_rhs =
-        Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(A.rows());
-    true_rhs.head(cb.size()) = rhs;
+    Eigen::Matrix<T, Eigen::Dynamic, 1> rhs =
+        Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(lhs.rows());
+    rhs.head(cb.size()) = make_rhs(msh, cl, cb, rhs_fun);
 
-    return std::tuple(A, true_rhs, dirichlet_data);
+    rhs += -lhs*wddofs + weak_data;
+
+    return std::tuple(lhs, rhs, strong_data);
 }
 
 
@@ -532,10 +298,7 @@ assemble(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
         if (b.type == boundary_type::dirichlet)
             is_dirichlet[i] = true;
 
-        if (b.type == boundary_type::dirichlet_zero)
-            is_dirichlet[i] = true;
-
-        if (b.type == boundary_type::undefined)
+        if (b.type == boundary_type::undefined and not b.internal)
             is_dirichlet[i] = true;
     }
 
@@ -688,9 +451,10 @@ check(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd,
         
         auto rb = disk::make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
 
+        auto subdomain_id = msh.domain_info(cl).tag();
         constexpr size_t DIM = Mesh::dimension;
         disk::static_matrix<scalar_type, DIM, DIM> diff_tens
-            = pd.diffusion_coefficient(1, barycenter(msh, cl)).tensor();
+            = pd.diffusion_coefficient(subdomain_id, barycenter(msh, cl)).tensor();
 
         auto qps = disk::integrate(msh, cl, 2*hdi.reconstruction_degree());
         for (auto& qp : qps) {
@@ -735,7 +499,7 @@ export_to_visit(hho_poisson_solver_state<Mesh>& state,
     {
         auto bar = barycenter(msh, cl);
         u.push_back( sol(cbs*cell_i) );
-        rhs.push_back( pd.right_hand_side(1, bar, bar) );
+        rhs.push_back( pd.right_hand_side(1, bar) );
         cell_i++;
     }
 
@@ -757,28 +521,24 @@ collect_boundary_info(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
 
     for (auto& fc : faces(msh))
     {
-        boundary b;
-        b.type = boundary_type::none;
-        b.internal = false;
-        b.number = 0;
-
         auto bi = msh.boundary_info(fc);
 
+        using T = typename hho_poisson_solver_state<Mesh>::scalar_type;
+        boundary_condition_descriptor<T> bcd;
+        bcd.type = boundary_type::not_a_boundary;
+        bcd.internal = false;
+        bcd.number = 0;
+
         if (bi.is_boundary()) {
-            b.type = lua_get_boundary_type(lua, bi.tag());
-            b.internal = false;
-            b.number = bi.tag();
+            bcd = lua_get_boundary_condition<T>(lua, bi.tag());
+            bcd.internal = bi.is_internal();
         }
 
-        if (bi.is_internal()) {
-            b.type = boundary_type::none;
-            b.internal = true;
-            b.number = bi.tag();
-        }
-
-        boundary_info.push_back(b);
+        boundary_info.push_back(bcd);
     }
 }
+
+#include "diskpp/mesh/point_lua_binding.hpp"
 
 template<typename Mesh>
 int
@@ -791,6 +551,7 @@ setup_and_run(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
     lua_problem_data lpd(lua);
     lua_solution_data lsd(lua);
 
+    register_point_usertype(lua, typename Mesh::point_type{});
 
     /* Ok, here the assumption is that state and lua are alive during the
      * execution of setup_and_run, so all the following lambdas are safe.
@@ -945,19 +706,27 @@ int run(sol::state& lua)
 
     if (mps.source == mesh_source::file)
     {
-        std::cout << "file" << std::endl;
+        std::cout << "file" << std::endl;        
+        auto mesh_filename = lua_mesh_filename(lua);
         
-        const char *mesh_filename = "../../../refactor_old_diskpp_code/meshes/2D_triangles/fvca5/mesh1_4.typ1";
-        using mesh_type = disk::generic_mesh<T, 2>;
-        hho_poisson_solver_state<mesh_type> state;
-        disk::load_mesh_fvca5_2d<T>(mesh_filename, state.msh);
+#ifdef HAVE_GMSH
+        /* GMSH 2D simplicials */
+        if (std::regex_match(mesh_filename, std::regex(".*\\.geo2s$") ))
+        {
+            using mesh_type = disk::simplicial_mesh<T,2>;
+            hho_poisson_solver_state<mesh_type> state;
+            init_solver_state(lua, state);
+            std::cout << "Guessed mesh format: GMSH 2D simplicials" << std::endl;
+            disk::gmsh_geometry_loader<mesh_type> loader;
         
-        //const char *mesh_filename = "../../../refactor_old_diskpp_code/meshes/2D_triangles/netgen/tri03.mesh2d";
-        //using mesh_type = disk::simplicial_mesh<T, 2>;
-        //hho_poisson_solver_state<mesh_type> state;
-        //disk::load_mesh_netgen<T>(mesh_filename, state.msh);
-        
-        return setup_and_run(lua, state);
+            loader.read_mesh(mesh_filename);
+            loader.populate_mesh(state.msh);
+            return setup_and_run(lua, state);
+        }
+#else
+        std::cout << "GMSH support not compiled. Exiting." << std::endl;
+        return 1;
+#endif
     }
 
     return 1;

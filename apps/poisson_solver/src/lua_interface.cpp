@@ -117,40 +117,33 @@ lua_get_hho_variant(sol::state& lua)
 bool
 lua_use_stabfree_hho(sol::state& lua)
 {
-    auto hs = lua[NODE_NAME_HHO][HHO_FIELD_STABFREE];
-    if (!hs.valid())
-        return false;
+    sol::optional<bool> use_stabfree_opt = lua[NODE_NAME_HHO][HHO_FIELD_STABFREE];
+    if (use_stabfree_opt)
+        return use_stabfree_opt.value();
 
-    return bool(hs);
+    return false;
 }
 
 bool
 lua_use_diffusion_tensor_in_stab(sol::state& lua)
 {
-    auto dts = lua[NODE_NAME_HHO]["dt_in_stab"];
-    if (!dts.valid())
-        return false;
+    sol::optional<bool> dts = lua[NODE_NAME_HHO]["dt_in_stab"];
+    if (dts)
+        return dts.value();
 
-    return bool(dts);
+    return false;
 }
 
-boundary_type
-lua_get_boundary_type(sol::state& lua, size_t bnd)
+std::string
+lua_mesh_filename(sol::state& lua)
 {
-    auto bndnode = lua[NODE_NAME_BOUNDARY][bnd];
-    if (not bndnode.valid())
-        return boundary_type::undefined;
-    
-    std::string k = bndnode;
-    if (k == "dirichlet") return boundary_type::dirichlet;
-    else if (k == "dirichlet_zero") return boundary_type::dirichlet_zero;
-    else if (k == "neumann_zero") return boundary_type::neumann_zero;
-    else {
-        std::cout << "Boundary " << bnd << ": invalid kind '" << k;
-        std::cout << "'" << std::endl;
-        return boundary_type::undefined;
-    }
+    std::optional<std::string> mesh_filename_opt = lua[NODE_NAME_MESH]["filename"];
+    if (mesh_filename_opt)
+        return mesh_filename_opt.value();
+
+    return "";
 }
+
 
 int
 lua_call_user_code(sol::state& lua)

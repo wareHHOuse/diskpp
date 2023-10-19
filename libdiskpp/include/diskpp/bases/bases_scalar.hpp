@@ -39,7 +39,7 @@ namespace disk
 {
 
 /* Compute the size of a scalar basis of degree k in dimension d. */
-size_t
+inline size_t
 scalar_basis_size(size_t k, size_t d)
 {
     size_t num = 1;
@@ -1148,7 +1148,7 @@ compute_averages(const Mesh& msh, const Element& elem, const Basis& basis)
 
 
 
-size_t
+inline size_t
 harmonic_basis_size(size_t k, size_t d)
 {
     if (d == 2)

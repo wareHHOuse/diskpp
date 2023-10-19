@@ -11,6 +11,7 @@
 #pragma once
 
 #include "diskpp/mesh/point.hpp"
+#include "poisson_solver.h"
 
 #define SOL_ALL_SAFETIES_ON 1
 #include "sol/sol.hpp"
@@ -50,49 +51,7 @@
 #define NODE_NAME_DOMAIN        "domain"
 #define NODE_NAME_BOUNDARY      "boundary"
 
-enum class mesh_source {
-    internal,
-    file,
-    invalid,
-};
 
-enum class internal_mesh_type {
-    triangles,
-    quadrangles,
-    hexagons,
-    tetrahedra,
-    invalid,
-};
-
-enum class hho_variant {
-    mixed_order_low,
-    equal_order,
-    mixed_order_high,
-};
-
-enum class boundary_type {
-    undefined,
-    none,
-    internal_interface,
-    dirichlet,
-    dirichlet_zero,
-    neumann,
-    neumann_zero,
-};
-
-struct boundary
-{
-    boundary_type       type;
-    bool                internal;
-    size_t              number;
-};
-
-struct mesh_parameters {
-    mesh_source         source;
-    internal_mesh_type  type;
-    std::string         filename;
-    size_t              level;
-};
 
 
 void lua_init_environment(sol::state&);
@@ -102,7 +61,7 @@ int lua_get_hho_order(sol::state&);
 hho_variant lua_get_hho_variant(sol::state&);
 bool lua_use_stabfree_hho(sol::state&);
 bool lua_use_diffusion_tensor_in_stab(sol::state&);
-boundary_type lua_get_boundary_type(sol::state&, size_t);
+std::string lua_mesh_filename(sol::state&);
 int lua_call_user_code(sol::state&);
 
 template<typename T>
@@ -118,6 +77,52 @@ lua_eval_rhs(sol::state& lua, size_t domain_num, const disk::point<T,3>& pt)
 {
     return lua["right_hand_side"](domain_num, pt.x(), pt.y(), pt.z());
 }
+
+
+
+
+
+
+
+template<typename T>
+boundary_condition_descriptor<T>
+lua_get_boundary_condition(sol::state& lua, size_t bnd)
+{
+    boundary_condition_descriptor<T> ret;
+    ret.type = boundary_type::undefined;
+    ret.number = bnd;
+
+    sol::optional<std::string> bnd_type_opt = lua[NODE_NAME_BOUNDARY][bnd]["type"];
+    if (bnd_type_opt)
+    {
+        ret.type = boundary_type::invalid;
+        std::string bnd_type_name = bnd_type_opt.value();
+        if (bnd_type_name == "dirichlet")   ret.type = boundary_type::dirichlet;
+        if (bnd_type_name == "neumann")     ret.type = boundary_type::neumann;
+        if (bnd_type_name == "robin")       ret.type = boundary_type::robin;
+        if (bnd_type_name == "jump")        ret.type = boundary_type::jump;
+
+        if (ret.type == boundary_type::invalid) {
+            std::cout << "Invalid type '" << bnd_type_name;
+            std::cout << "' set on boundary " << bnd << std::endl;
+        }
+    }
+
+    if (ret.type == boundary_type::robin) {
+        sol::optional<T> bnd_value_opt = lua[NODE_NAME_BOUNDARY][bnd]["value"];
+        if (bnd_value_opt)
+            ret.value = bnd_value_opt.value();
+        else
+            std::cout << "Warning: value not set on Robin boundary " << bnd << std::endl;
+    }
+
+    return ret;
+}
+
+
+
+
+
 
 
 
@@ -181,43 +186,74 @@ struct lua_problem_data
 
     lua_problem_data(sol::state& plua)
         : lua(plua)
-    {}
-
-    template<typename T>
-    T dirichlet_data(size_t boundary_num, const disk::point<T,2>& pt) const
     {
-        return lua["dirichlet_data"](boundary_num, pt.x(), pt.y());
+        auto dd_fun = lua["dirichlet_data"];
+        if (not dd_fun.valid()) {
+            std::cout << "dirichlet_data() undefined, defaulting to zero" << std::endl;
+        }
+
+        auto nd_fun = lua["neumann_data"];
+        if (not nd_fun.valid()) {
+            std::cout << "neumann_data() undefined, defaulting to zero" << std::endl;
+        }
+
+        auto rhs_fun = lua["right_hand_side"];
+        if (not rhs_fun.valid()) {
+            std::cout << "right_hand_side() undefined, defaulting to zero" << std::endl;
+        }
     }
 
-    template<typename T>
-    T dirichlet_data(size_t boundary_num, const disk::point<T,3>& pt) const
+    template<typename T, size_t N>
+    T dirichlet_data(size_t boundary_num, const disk::point<T,N>& pt) const
     {
-        return lua["dirichlet_data"](boundary_num, pt.x(), pt.y(), pt.z());
+        auto dd_fun = lua["dirichlet_data"];
+        if (not dd_fun.valid())
+            return 0.0;
+
+        return dd_fun(boundary_num, pt);
     }
 
-    template<typename T>
-    T right_hand_side(size_t domain_num, const disk::point<T,2>& pt) const
+    template<typename T, size_t N>
+    T neumann_data(size_t boundary_num, const disk::point<T,N>& pt,
+        const disk::point<T,N>& normal) const
     {
-        return lua["right_hand_side"](domain_num, pt.x(), pt.y());
+        auto nd_fun = lua["neumann_data"];
+        if (not nd_fun.valid())
+            return 0.0;
+
+        return nd_fun(boundary_num, pt, normal);
     }
 
-    template<typename T>
-    T right_hand_side(size_t domain_num, const disk::point<T,2>& pt, const disk::point<T,2>& bar) const
+    template<typename T, size_t N>
+    T right_hand_side(size_t domain_num, const disk::point<T,N>& pt) const
     {
-        return lua["right_hand_side"](domain_num, pt.x(), pt.y(), bar.x(), bar.y());
-    }
+        auto rhs_fun = lua["right_hand_side"];
+        if (not rhs_fun.valid())
+            return 0.0;
 
-    template<typename T>
-    T right_hand_side(size_t domain_num, const disk::point<T,3>& pt) const
-    {
-        return lua["right_hand_side"](domain_num, pt.x(), pt.y(), pt.z());
+        return rhs_fun(domain_num, pt);
     }
 
     template<typename T>
     diffusion_parameter<T,2>
     diffusion_coefficient(size_t domain_num, const disk::point<T,2>& pt) const
     {
-        return lua["diffusion_coefficient"](domain_num, pt.x(), pt.y());
+        auto dc = lua["diffusion_coefficient"](domain_num, pt.x(), pt.y());
+
+        sol::optional<double> dc_dbl = dc;
+        if (dc_dbl) {
+            diffusion_parameter<T,2> ret;
+            ret.entry(0, 0, dc_dbl.value());
+            ret.entry(1, 1, dc_dbl.value());
+            return ret;
+        }
+
+        sol::optional<diffusion_parameter<T,2>> dc_tens = dc;
+        if (dc_tens) {
+            return dc_tens.value();
+        }
+
+        throw std::invalid_argument("Can't convert diffusion coefficient to a valid type.");
     }
 };
 

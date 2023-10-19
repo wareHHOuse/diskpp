@@ -26,10 +26,14 @@ template<disk::mesh_2D Mesh>
 struct source<Mesh> {
     using point_type = typename Mesh::point_type;
     auto operator()(const point_type& pt) const {
-        if (pt.x() < 0.7)
-            return (5.0*M_PI*M_PI/4.0)*std::sin(M_PI*pt.x()*0.5)*std::sin(M_PI*pt.y());
-        else
-            return (10.0*M_PI*M_PI/4.0)*std::sin(M_PI*pt.x()*0.5)*std::sin(M_PI*pt.y());;
+        //if (pt.x() < 0.7)
+        //    return (5.0*M_PI*M_PI/4.0)*std::sin(M_PI*pt.x()*0.5)*std::sin(M_PI*pt.y());
+        //else
+        //    return (10.0*M_PI*M_PI/4.0)*std::sin(M_PI*pt.x()*0.5)*std::sin(M_PI*pt.y());;
+        
+        if (pt.x() >= 1.0 and pt.x() <= 2.0 and pt.y() >= 1.0 and pt.y() <= 2.0)
+            return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+        return 0.0;
     }
 };
 
@@ -50,7 +54,7 @@ template<disk::mesh_2D Mesh>
 struct dirichlet_jump<Mesh> {
     using point_type = typename Mesh::point_type;
     auto operator()(const point_type& pt) const {
-        return std::sin(0.5*M_PI*pt.x())*std::sin(M_PI*pt.y());
+        return 0.0;
     }
 };
 
@@ -59,7 +63,7 @@ template<disk::mesh_3D Mesh>
 struct dirichlet_jump<Mesh> {
     using point_type = typename Mesh::point_type;
     auto operator()(const point_type& pt) const {
-        return std::sin(M_PI*pt.y());
+        return 0.0;
     }
 };
 
@@ -71,7 +75,7 @@ struct neumann_jump<Mesh> {
     using point_type = typename Mesh::point_type;
     //using normal_type = static_vector<typename Mesh::coordinate_type, 2>;
     auto operator()(const point_type& pt) const {
-        return 0.5*M_PI*std::cos(0.5*M_PI*pt.x())*std::sin(M_PI*pt.y());
+        return 0.0;
     }
 };
 
@@ -121,7 +125,14 @@ void lt_solver(Mesh& msh, size_t degree)
         auto [R, A] = local_operator(msh, cl, di);
         auto S = local_stabilization(msh, cl, di, R);   
 
-        disk::dynamic_matrix<T> lhs = A+S;
+        auto subdomain_id = msh.domain_info(cl).tag();
+
+        auto dc = 1.0;
+
+        if (subdomain_id == 2)
+            dc = 10;
+
+        disk::dynamic_matrix<T> lhs = dc*(A+S);
     
         auto phiT = cbt(msh, cl, di.cell);
 
@@ -135,13 +146,11 @@ void lt_solver(Mesh& msh, size_t degree)
         disk::dynamic_vector<T> gD_rhs = disk::dynamic_vector<T>::Zero(total_dofs);
         disk::dynamic_vector<T> gN_rhs = disk::dynamic_vector<T>::Zero(total_dofs);
 
-        auto subdomain_id = msh.domain_info(cl).tag();
-
         for (auto& fc : fcs) {
 
             auto boundary_id = msh.boundary_info(fc).tag();
 
-            if (subdomain_id == 2 and boundary_id == 2) {
+            if (subdomain_id == 2 and (boundary_id == 8)) {
                 auto phiF = fbt(msh, fc, di.face);
                 gD_rhs.segment(ofs, szF) += L2_project(msh, fc, gD, phiF);
                 gN_rhs.segment(ofs, szF) += integrate(msh, fc, gN, phiF);

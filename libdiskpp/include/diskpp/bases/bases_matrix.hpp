@@ -37,7 +37,7 @@ namespace disk
 {
 
 /* Compute the size of a matrix basis of degree k in dimension d. */
-size_t
+inline size_t
 matrix_basis_size(size_t k, size_t sd, size_t md)
 {
     size_t num = 1;
@@ -227,7 +227,7 @@ class scaled_monomial_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 
 
 /* Compute the size of a matrix basis of degree k in dimension d. */
-size_t
+inline size_t
 sym_matrix_basis_size(size_t k, size_t sd, size_t vd)
 {
     size_t md = 0;
@@ -446,7 +446,7 @@ class scaled_monomial_sym_matrix_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, 
 ///////////////////////////////////////////////////
 
 /* Compute the size of a vector basis of degree k in dimension d. */
-size_t
+inline size_t
 matrix_basis_size_RT(size_t k, size_t sd, size_t md)
 {
     if (k <= 0)
@@ -662,7 +662,7 @@ class scaled_monomial_matrix_basis_RT<Mesh<T, 2, Storage>, typename Mesh<T, 2, S
 ///////////////////////////////////////////////////
 
 /* Compute the size of a vector basis of degree k in dimension d. */
-size_t
+inline size_t
 sym_matrix_basis_size_RT(size_t k, size_t sd, size_t md)
 {
     if (k <= 0)

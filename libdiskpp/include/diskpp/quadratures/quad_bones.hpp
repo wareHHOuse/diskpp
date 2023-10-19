@@ -218,6 +218,7 @@ edge_quadrature(const size_t doe)
 
 /* Tetrahedron quadrature. This is just a driver to call either ABRQ or GM
  * quadrature rules in the jburkardt's code. */
+inline
 std::vector<std::pair<point<double,3>, double>>
 tetrahedron_quadrature(size_t degree)
 {
@@ -296,8 +297,9 @@ tetrahedron_quadrature(size_t degree)
 
 /* Triangle quadrature. This is just a driver to call Dunavant
  * quadrature rule in the jburkardt's code. */
+
 [[deprecated("old")]]
-std::vector<std::pair<point<double,2>, double>>
+inline std::vector<std::pair<point<double,2>, double>>
 triangle_quadrature(size_t degree)
 {
     std::vector<std::pair<point<double,2>, double>> ret;

@@ -40,7 +40,7 @@ namespace disk
 
 namespace priv
 {
-size_t
+inline size_t
 nb_lag(const size_t dim)
 {
     size_t lag = 1;
