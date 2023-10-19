@@ -484,7 +484,7 @@ check(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd,
 template<typename Mesh, typename ProblemData>
 void
 export_to_visit(hho_poisson_solver_state<Mesh>& state,
-    const ProblemData& pd)
+    const ProblemData& pd, const char *filename)
 {
     auto& msh = state.msh;
     auto& sol = state.sol_full;
@@ -504,7 +504,7 @@ export_to_visit(hho_poisson_solver_state<Mesh>& state,
     }
 
     disk::silo_database db;
-    db.create("poisson.silo");
+    db.create(filename);
     db.add_mesh(msh, "mesh");
     db.add_variable("mesh", "u", u, disk::zonal_variable_t);
     db.add_variable("mesh", "rhs", rhs, disk::zonal_variable_t);
@@ -568,8 +568,8 @@ setup_and_run(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
         return solve(state, lpd);
     };
 
-    lua["export_to_visit"] = [&]() {
-        return export_to_visit(state, lpd);
+    lua["export_to_visit"] = [&](const char *fn) {
+        return export_to_visit(state, lpd, fn);
     };
 
     lua["check"] = [&]() {
