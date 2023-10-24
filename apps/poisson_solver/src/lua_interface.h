@@ -177,26 +177,54 @@ using diffusion_parameter_2D = diffusion_parameter<T,2>;
 template<typename T>
 using diffusion_parameter_3D = diffusion_parameter<T,3>;
 
+struct scope_limited_binding {
 
+    sol::state& lua;
+    std::string fun_name;
+
+    template<typename Function>
+    scope_limited_binding(sol::state& plua,
+        const std::string& pfun_name, Function fun)
+            : lua(plua), fun_name(pfun_name)
+    {
+        lua[fun_name] = fun;
+    }
+
+    ~scope_limited_binding()
+    {
+        lua[fun_name] = nullptr;
+    }
+};
 
 
 struct lua_problem_data
 {
+private:
     sol::state& lua;
+
+    template<typename T>
+    sol::optional<T>
+    get_bc_value(size_t bnd_num, std::string bnd_type) const
+    {
+        sol::optional<std::string> bnd_type_opt =
+            lua[NODE_NAME_BOUNDARY][bnd_num]["type"];
+        
+        if (bnd_type_opt and bnd_type_opt.value() == bnd_type)
+        {
+            sol::optional<T> bnd_val_opt =
+                lua[NODE_NAME_BOUNDARY][bnd_num]["value"];
+            if (bnd_val_opt)
+                return bnd_val_opt.value();
+        }
+
+        return {};
+    }
+
+public:
 
     lua_problem_data(sol::state& plua)
         : lua(plua)
     {
-        auto dd_fun = lua["dirichlet_data"];
-        if (not dd_fun.valid()) {
-            std::cout << "dirichlet_data() undefined, defaulting to zero" << std::endl;
-        }
-
-        auto nd_fun = lua["neumann_data"];
-        if (not nd_fun.valid()) {
-            std::cout << "neumann_data() undefined, defaulting to zero" << std::endl;
-        }
-
         auto rhs_fun = lua["right_hand_side"];
         if (not rhs_fun.valid()) {
             std::cout << "right_hand_side() undefined, defaulting to zero" << std::endl;
@@ -204,24 +232,32 @@ struct lua_problem_data
     }
 
     template<typename T, size_t N>
-    T dirichlet_data(size_t boundary_num, const disk::point<T,N>& pt) const
+    T dirichlet_data(size_t bnd_num, const disk::point<T,N>& pt) const
     {
-        auto dd_fun = lua["dirichlet_data"];
-        if (not dd_fun.valid())
-            return 0.0;
+        auto dd_val = get_bc_value<T>(bnd_num, "dirichlet");
+        if (dd_val)
+            return dd_val.value();
 
-        return dd_fun(boundary_num, pt);
+        auto dd_fun = lua["dirichlet_data"];
+        if (dd_fun.valid())
+            return dd_fun(bnd_num, pt);
+
+        return 0.0;
     }
 
     template<typename T, size_t N>
-    T neumann_data(size_t boundary_num, const disk::point<T,N>& pt,
+    T neumann_data(size_t bnd_num, const disk::point<T,N>& pt,
         const disk::point<T,N>& normal) const
     {
+        auto nd_val = get_bc_value<T>(bnd_num, "neumann");
+        if (nd_val)
+            return nd_val.value();
+
         auto nd_fun = lua["neumann_data"];
         if (not nd_fun.valid())
             return 0.0;
 
-        return nd_fun(boundary_num, pt, normal);
+        return nd_fun(bnd_num, pt, normal);
     }
 
     template<typename T, size_t N>
@@ -265,16 +301,10 @@ struct lua_solution_data
         : lua(plua)
     {}
 
-    template<typename T>
-    T sol(size_t domain_num, const disk::point<T,2>& pt) const
+    template<typename T, size_t N>
+    T sol(size_t domain_num, const disk::point<T,N>& pt) const
     {
-        return lua["solution"](domain_num, pt.x(), pt.y());
-    }
-
-    template<typename T>
-    T sol(size_t domain_num, const disk::point<T,3>& pt) const
-    {
-        return lua["solution"](domain_num, pt.x(), pt.y(), pt.z());
+        return lua["solution"](domain_num, pt);
     }
 
     template<typename T>
@@ -283,7 +313,7 @@ struct lua_solution_data
     {
         Eigen::Matrix<T,2,1> ret;
         T gx, gy;
-        sol::tie(gx, gy) = lua["solution_gradient"](domain_num, pt.x(), pt.y());
+        sol::tie(gx, gy) = lua["solution_gradient"](domain_num, pt);
         ret(0) = gx;
         ret(1) = gy;
         return ret;
@@ -295,7 +325,7 @@ struct lua_solution_data
     {
         Eigen::Matrix<T,3,1> ret;
         T gx, gy, gz;
-        sol::tie(gx, gy, gz) = lua["solution_gradient"](domain_num, pt.x(), pt.y(), pt.z());
+        sol::tie(gx, gy, gz) = lua["solution_gradient"](domain_num, pt);
         ret(0) = gx;
         ret(1) = gy;
         ret(2) = gz;

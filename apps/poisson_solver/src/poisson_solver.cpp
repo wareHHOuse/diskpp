@@ -403,8 +403,6 @@ check(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd,
     scalar_type Aerrsq = 0.0;
     scalar_type Anormsq = 0.0;
 
-    
-
     size_t cell_i = 0;
     for (auto& cl : msh)
     {
@@ -511,87 +509,139 @@ export_to_visit(hho_poisson_solver_state<Mesh>& state,
     db.add_variable("mesh", "rd", state.recdegs, disk::zonal_variable_t);
 }
 
-template<typename Mesh>
-void
-collect_boundary_info(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
+template<typename Mesh, typename ProblemData>
+struct silo_io
 {
-    auto& msh = state.msh;
-    auto& boundary_info = state.boundary_info;
-    boundary_info.reserve( msh.faces_size() );
+    const hho_poisson_solver_state<Mesh>& state;
+    const ProblemData& data;
 
-    for (auto& fc : faces(msh))
+    std::string mesh_name;
+    std::string sol_name;
+    std::string grad_name;
+    std::string flux_name;
+    std::string rhs_name;
+
+    disk::silo_database db;
+
+    silo_io(const hho_poisson_solver_state<Mesh>& pstate, const ProblemData& pdata)
+        : state(pstate), data(pdata), mesh_name("mesh")
     {
-        auto bi = msh.boundary_info(fc);
+    }
 
-        using T = typename hho_poisson_solver_state<Mesh>::scalar_type;
-        boundary_condition_descriptor<T> bcd;
-        bcd.type = boundary_type::not_a_boundary;
-        bcd.internal = false;
-        bcd.number = 0;
+    void
+    create(const std::string& filename)
+    {
+        db.create(filename);
+        db.add_mesh(state.msh, mesh_name);
+    }
 
-        if (bi.is_boundary()) {
-            bcd = lua_get_boundary_condition<T>(lua, bi.tag());
-            bcd.internal = bi.is_internal();
+    template<disk::mesh_2D MeshP>
+    void
+    export_solution_aux(const MeshP& msh)
+    {
+        using T = typename MeshP::coordinate_type;
+        auto& sol = state.sol_full;
+        auto& hdi = state.hdi;
+
+        std::vector<double> u_data;
+        std::vector<double> gx_data, gy_data;
+        std::vector<double> fx_data, fy_data;
+        std::vector<double> rhs;
+
+        std::string gx_name = grad_name + "_x";
+        std::string gy_name = grad_name + "_y";
+        std::string fx_name = flux_name + "_x";
+        std::string fy_name = flux_name + "_y";
+
+        size_t cell_i = 0;
+        for (auto& cl : msh)
+        {
+            auto subdomain_id = msh.domain_info(cl).tag();
+            auto cb = disk::make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+            auto cbs = cb.size();
+            auto bar = barycenter(msh, cl);
+            auto cl_dof_ofs = cbs*cell_i;
+
+            Eigen::Matrix<T, Eigen::Dynamic, 1> loc_sol = sol.segment(cl_dof_ofs, cbs);
+
+            auto phi = cb.eval_functions(bar);
+            auto u = disk::eval(loc_sol, phi);
+            
+            if (sol_name != "") {
+                u_data.push_back(u);
+            }
+
+            Eigen::Matrix<T,Eigen::Dynamic,2> dphi = cb.eval_gradients(bar);
+            Eigen::Matrix<T,2,1> grad_u = disk::eval(loc_sol, dphi);
+            auto flux_u = data.diffusion_coefficient(subdomain_id, bar).tensor()*grad_u;
+
+            if (grad_name != "") {
+                gx_data.push_back( grad_u(0) );
+                gy_data.push_back( grad_u(1) );
+            }
+
+            if (flux_name != "") {
+                fx_data.push_back( flux_u(0) );
+                fy_data.push_back( flux_u(1) );
+            }
+
+            cell_i++;
         }
 
-        boundary_info.push_back(bcd);
+        if (sol_name != "") {
+            db.add_variable(mesh_name, sol_name, u_data, disk::zonal_variable_t);
+        }
+
+        if (grad_name != "") {
+            db.add_variable(mesh_name, gx_name, gx_data, disk::zonal_variable_t);
+            db.add_variable(mesh_name, gy_name, gy_data, disk::zonal_variable_t);
+            db.add_expression( grad_name, "{" + gx_name + "," + gy_name + "}", DB_VARTYPE_VECTOR );
+        }
+
+        if (flux_name != "") {
+            db.add_variable(mesh_name, fx_name, fx_data, disk::zonal_variable_t);
+            db.add_variable(mesh_name, fy_name, fy_data, disk::zonal_variable_t);
+            db.add_expression( flux_name, "{" + fx_name + "," + fy_name + "}", DB_VARTYPE_VECTOR );
+        }
     }
+
+    void export_solution()
+    {
+        export_solution_aux(state.msh);
+    }
+
+    void close()
+    {
+        db.close();
+    }
+
+    //disk::silo_database db;
+    //db.create(filename);
+    //db.add_mesh(msh, "mesh");
+    //db.add_variable("mesh", "u", u, disk::zonal_variable_t);
+    //db.add_variable("mesh", "rhs", rhs, disk::zonal_variable_t);
+    //db.add_variable("mesh", "rd", state.recdegs, disk::zonal_variable_t);
+};
+
+template<typename Mesh, typename ProblemData>
+void
+lua_register_silo_io(sol::state& lua, silo_io<Mesh, ProblemData>& sio)
+{
+    using sio_type = silo_io<Mesh, ProblemData>;
+    lua.new_usertype<sio_type>("silo_io",
+        "create",       &sio_type::create,
+        "export",       &sio_type::export_solution,
+        "close",        &sio_type::close,
+        "mesh_name",    &sio_type::mesh_name,
+        "sol_name",     &sio_type::sol_name,
+        "grad_name",    &sio_type::grad_name,
+        "flux_name",    &sio_type::flux_name
+    );
+
+    lua["silo_db"] = sio;
 }
 
 #include "diskpp/mesh/point_lua_binding.hpp"
-
-template<typename Mesh>
-int
-setup_and_run(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
-{
-    constexpr size_t DIM = Mesh::dimension;
-    lua[NODE_NAME_SIM]["dimension"] = DIM;
-
-    collect_boundary_info(lua, state);
-    lua_problem_data lpd(lua);
-    lua_solution_data lsd(lua);
-
-    register_point_usertype(lua, typename Mesh::point_type{});
-
-    /* Ok, here the assumption is that state and lua are alive during the
-     * execution of setup_and_run, so all the following lambdas are safe.
-     * For extra caution, we unregister all the functions after calling
-     * the user code, so they don't get called after a call to run() on
-     * the Lua side. */
-
-    /* Bind functions */
-    lua["assemble"] = [&]() {
-        return assemble(state, lpd);
-    };
-
-    lua["solve"] = [&]() {
-        return solve(state, lpd);
-    };
-
-    lua["export_to_visit"] = [&](const char *fn) {
-        return export_to_visit(state, lpd, fn);
-    };
-
-    lua["check"] = [&]() {
-        return check(state, lpd, lsd);
-    };
-
-    lua["mesh_h"] = [&]() {
-        return disk::average_diameter(state.msh);
-    };
-
-    /* Call user code */
-    int err = lua_call_user_code(lua);
-    
-    /* Unbind everything to avoid unsafe calls */
-    lua["assemble"] = nullptr;
-    lua["solve"] = nullptr;
-    lua["export_to_visit"] = nullptr;
-    lua["check"] = nullptr;
-    lua["mesh_h"] = nullptr;
-    
-    return err;
-}
 
 template<typename Mesh>
 int
@@ -633,6 +683,87 @@ init_solver_state(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
     return 0;
 }
 
+template<typename Mesh>
+void
+collect_boundary_info(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
+{
+    auto& msh = state.msh;
+    auto& boundary_info = state.boundary_info;
+    boundary_info.reserve( msh.faces_size() );
+
+    for (auto& fc : faces(msh))
+    {
+        auto bi = msh.boundary_info(fc);
+
+        using T = typename hho_poisson_solver_state<Mesh>::scalar_type;
+        boundary_condition_descriptor<T> bcd;
+        bcd.type = boundary_type::not_a_boundary;
+        bcd.internal = false;
+        bcd.number = 0;
+
+        if (bi.is_boundary()) {
+            bcd = lua_get_boundary_condition<T>(lua, bi.tag());
+            bcd.internal = bi.is_internal();
+        }
+
+        boundary_info.push_back(bcd);
+    }
+}
+
+template<typename Mesh>
+int
+setup_and_run(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
+{
+    constexpr size_t DIM = Mesh::dimension;
+    lua[NODE_NAME_SIM]["dimension"] = DIM;
+
+    lua_problem_data lpd(lua);
+    lua_solution_data lsd(lua);
+
+    silo_io sio(state, lpd);
+    lua_register_silo_io(lua, sio);
+    register_point_usertype(lua, typename Mesh::point_type{});
+
+    /* Ok, here the assumption is that state and lua are alive during the
+     * execution of setup_and_run, so all the following lambdas are safe.
+     * For extra caution, we unregister all the functions after calling
+     * the user code, so they don't get called after a call to run() on
+     * the Lua side. */
+
+    /* Bind functions */
+    scope_limited_binding assemble_b(lua,
+        "assemble", [&]() {
+            init_solver_state(lua, state);
+            collect_boundary_info(lua, state);
+            return assemble(state, lpd);
+        });
+
+    scope_limited_binding solve_b(lua,
+        "solve", [&]() {
+            return solve(state, lpd);
+        });
+
+    scope_limited_binding export_to_visit_b(lua,
+        "export_to_visit", [&](const char *fn) {
+            return export_to_visit(state, lpd, fn);
+        });
+
+    scope_limited_binding check_b(lua,
+        "check", [&]() {
+            return check(state, lpd, lsd);
+        });
+
+    scope_limited_binding mesh_h_b(lua,
+        "mesh_h", [&]() {
+            return disk::average_diameter(state.msh);
+        });
+
+    /* Call user code */
+    return lua_call_user_code(lua);
+}
+
+
+
 template<typename T>
 int run(sol::state& lua)
 {
@@ -652,7 +783,6 @@ int run(sol::state& lua)
         {
             using mesh_type = disk::simplicial_mesh<T,2>;
             hho_poisson_solver_state<mesh_type> state;
-            init_solver_state(lua, state);
             auto mesher = disk::make_simple_mesher(state.msh);
             for (size_t i = 0; i < mps.level; i++)
                 mesher.refine();
@@ -674,7 +804,6 @@ int run(sol::state& lua)
         {
             using mesh_type = disk::cartesian_mesh<T,2>;
             hho_poisson_solver_state<mesh_type> state;
-            init_solver_state(lua, state);
             auto mesher = disk::make_simple_mesher(state.msh);
             for (size_t i = 0; i < mps.level; i++)
                 mesher.refine();
@@ -685,7 +814,6 @@ int run(sol::state& lua)
         {
             using mesh_type = disk::generic_mesh<T,2>;
             hho_poisson_solver_state<mesh_type> state;
-            init_solver_state(lua, state);
             auto mesher = disk::make_fvca5_hex_mesher(state.msh);
             mesher.make_level(mps.level);
             return setup_and_run(lua, state);
@@ -715,7 +843,6 @@ int run(sol::state& lua)
         {
             using mesh_type = disk::simplicial_mesh<T,2>;
             hho_poisson_solver_state<mesh_type> state;
-            init_solver_state(lua, state);
             std::cout << "Guessed mesh format: GMSH 2D simplicials" << std::endl;
             disk::gmsh_geometry_loader<mesh_type> loader;
         

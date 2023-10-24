@@ -60,18 +60,21 @@ lua_get_mesh_parameters(sol::state& lua)
         } 
     }
 
-    auto mt = lua[NODE_NAME_MESH][MESH_FIELD_TYPE];
-    if (mt.valid()) {
-        std::string mts = mt;
-        if (mts == MESH_TYPE_TRIANGLES) ret.type = internal_mesh_type::triangles;
-        else if (mts == MESH_TYPE_QUADRANGLES) ret.type = internal_mesh_type::quadrangles; 
-        else if (mts == MESH_TYPE_HEXAGONS) ret.type = internal_mesh_type::hexagons; 
-        else if (mts == MESH_TYPE_TETRAHEDRA) ret.type = internal_mesh_type::tetrahedra;
+    sol::optional<std::string> element_type_opt = lua[NODE_NAME_MESH][MESH_FIELD_TYPE];
+    if (element_type_opt) {
+        std::string et = element_type_opt.value();
+        if (et == MESH_TYPE_TRIANGLES) ret.type = internal_mesh_type::triangles;
+        else if (et == MESH_TYPE_QUADRANGLES) ret.type = internal_mesh_type::quadrangles; 
+        else if (et == MESH_TYPE_HEXAGONS) ret.type = internal_mesh_type::hexagons; 
+        else if (et == MESH_TYPE_TETRAHEDRA) ret.type = internal_mesh_type::tetrahedra;
         else {
-            std::cout << "Invalid value '" << mts << "' for " << NODE_NAME_MESH;
+            std::cout << "Invalid value '" << et << "' for " << NODE_NAME_MESH;
             std::cout << "." << MESH_FIELD_TYPE << std::endl;
             ret.type = internal_mesh_type::invalid;
         } 
+    }
+    else {
+        std::cout << "Internal mesh: element type not specified" << std::endl;
     }
 
     ret.level = 0;

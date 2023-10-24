@@ -123,6 +123,10 @@ public:
         sysfcs = std::count_if(msh.faces_begin(), msh.faces_end(), in_system);
         syssz = fbs*sysfcs;
 
+        if (sysfcs == msh.faces_size()) {
+            std::cout << "Pure Neumann problem" << std::endl;
+        }
+
         make_tables(msh);
 
         LHS = SparseMatrix<scalar_type>(syssz, syssz);
