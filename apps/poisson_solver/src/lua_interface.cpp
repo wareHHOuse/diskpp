@@ -15,7 +15,7 @@
 void
 lua_init_environment(sol::state& lua)
 {
-    lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::table);
+    lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::table, sol::lib::string);
     lua[NODE_NAME_SIM] = lua.create_table();
     lua[NODE_NAME_MESH] = lua.create_table();
     lua[NODE_NAME_MESH][MESH_FIELD_SOURCE] = MESH_SOURCE_INTERNAL;

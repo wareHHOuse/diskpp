@@ -459,8 +459,8 @@ check(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd,
             disk::static_vector<scalar_type,DIM> ana_grad = sol_grad(qp.point());
 
             auto dphi = rb.eval_gradients(qp.point());
-            disk::static_vector<scalar_type,DIM> num_grad =
-                dphi.block(1,0,rb.size()-1,DIM).transpose()*uR;
+            disk::static_vector<scalar_type,DIM> num_grad;// =
+                //dphi.block(1,0,rb.size()-1,DIM).transpose()*uR;
 
             disk::static_vector<scalar_type,DIM> diff_grad = num_grad - ana_grad;
 

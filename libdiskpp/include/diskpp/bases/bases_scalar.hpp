@@ -1329,7 +1329,7 @@ private:
 
         //const auto p = this->passage_new2old();
         auto sx = 1.0;//p(0,0);
-        auto sy = 1e5;//1.0;//p(1,1);
+        auto sy = 1.0;//p(1,1);
 
         if ( full_basis_degree > 0 ) {
             ret(1,0) = sx; ret(1,1) = 0.0;
