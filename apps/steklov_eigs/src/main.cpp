@@ -252,12 +252,83 @@ public:
     }
 };
 
+enum class boundary_type {
+    internal,
+    dirichlet,
+    neumann,
+    robin,
+    steklov
+};
 
+boundary_type
+lua_get_boundary_type(sol::state& lua, size_t bndid)
+{
+    sol::optional<std::string> bndtype_opt = lua["boundary"][bndid];
+    if (not bndtype_opt)
+        return boundary_type::dirichlet;
 
+    std::string bndtype = bndtype_opt.value();
+    if (bndtype == "dirichlet")
+        return boundary_type::dirichlet;
+    if (bndtype == "neumann")
+        return boundary_type::neumann;
+    if (bndtype == "robin")
+        return boundary_type::robin;
+    if (bndtype == "steklov")
+        return boundary_type::steklov;
+
+    return boundary_type::dirichlet;
+}
+
+template<typename T>
+void
+lua_get_feast_params(sol::state& lua, disk::feast_eigensolver_params<T>& fep)
+{
+    sol::optional<int> tolerance_opt = lua["feast"]["tolerance"];
+    if (tolerance_opt)
+        fep.tolerance = tolerance_opt.value();
+
+    sol::optional<int> subspace_size_opt = lua["feast"]["subspace_size"];
+    if (subspace_size_opt)
+        fep.subspace_size = subspace_size_opt.value();
+
+    sol::optional<T> eigval_min_opt = lua["feast"]["eigval_min"];
+    if (eigval_min_opt)
+        fep.min_eigval = eigval_min_opt.value();
+
+    sol::optional<T> eigval_max_opt = lua["feast"]["eigval_max"];
+    if (eigval_max_opt)
+        fep.max_eigval = eigval_max_opt.value();
+}
 
 template<typename Mesh>
 void
-steklov_solver(Mesh& msh)
+detect_boundaries(sol::state& lua, Mesh& msh, std::vector<boundary_type>& bndtypes)
+{
+    bndtypes.reserve( msh.faces_size() );
+    for (auto& fc : faces(msh))
+    {
+        auto bi = msh.boundary_info(fc);
+        if (not bi.is_boundary()) {
+            bndtypes.push_back(boundary_type::internal);
+            continue;
+        }
+
+        if (bi.is_internal()) {
+            bndtypes.push_back(boundary_type::internal);
+            continue;
+        }
+
+        auto type = lua_get_boundary_type(lua, bi.tag());
+        bndtypes.push_back(type);
+    }
+
+    assert(bndtypes.size() == msh.faces_size());
+}
+
+template<typename Mesh>
+void
+steklov_solver(sol::state& lua, Mesh& msh)
 {
     using T = typename Mesh::coordinate_type;
 
@@ -276,8 +347,14 @@ steklov_solver(Mesh& msh)
     auto fbs = disk::scalar_basis_size(fd, Mesh::dimension-1);
     auto rbs = disk::scalar_basis_size(rd, Mesh::dimension);
 
-    std::vector<bool> is_dirichlet;
-    is_dirichlet.resize( msh.faces_size() );
+    std::vector<bool> is_dirichlet( msh.faces_size(), false );
+    std::vector<boundary_type> bndtypes;
+    detect_boundaries(lua, msh, bndtypes);
+    assert(bndtypes.size() == is_dirichlet.size());
+    for (size_t i = 0; i < bndtypes.size(); i++)
+        if (bndtypes[i] == boundary_type::dirichlet)
+            is_dirichlet[i] = true;
+
     assm.initialize(msh, hdi, is_dirichlet);
 
     for (auto& cl : msh)
@@ -285,7 +362,6 @@ steklov_solver(Mesh& msh)
         auto [GR, A] = make_scalar_hho_laplacian(msh, cl, hdi);
         disk::dynamic_matrix<T> S = make_scalar_hho_stabilization(msh, cl, GR, hdi);
         disk::dynamic_matrix<T> L = A+S;
-        disk::dynamic_matrix<T> LC = disk::static_condensation(L, cbs);
 
         auto fcs = faces(msh, cl);
 
@@ -307,6 +383,7 @@ steklov_solver(Mesh& msh)
                 disk::make_mass_matrix(msh, fc, fb);
         }
 
+        disk::dynamic_matrix<T> LC = disk::static_condensation(L, cbs);
         assm.assemble(msh, cl, LC, BFF);
     }
 
@@ -321,6 +398,8 @@ steklov_solver(Mesh& msh)
     fep.min_eigval = 1;
     fep.max_eigval = 6;
     fep.subspace_size = 30;
+    lua_get_feast_params(lua, fep);
+
     disk::generalized_eigenvalue_solver(fep, assm.LHS, assm.RHS, eigvecs, eigvals);
     std::cout << "Found eigs: " << fep.eigvals_found << std::endl;
     std::cout << eigvals.transpose() << std::endl;
@@ -362,6 +441,17 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    sol::state lua;
+
+    lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::table, sol::lib::string);
+    lua["boundary"] = lua.create_table();
+    auto sf = lua.safe_script_file("steklov.lua");
+    if (not sf.valid())
+    {
+        std::cout << "Problem in Lua config" << std::endl;
+        return 1;
+    }
+
     using T = double;
 
     std::string mesh_filename = argv[1];
@@ -378,7 +468,7 @@ int main(int argc, char **argv)
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        steklov_solver(msh);
+        steklov_solver(lua, msh);
     }
 
     /* GMSH 3D simplicials */
@@ -392,7 +482,7 @@ int main(int argc, char **argv)
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        steklov_solver(msh);
+        steklov_solver(lua, msh);
     }
 #else
     std::cout << "GMSH support not compiled. Exiting." << std::endl;
