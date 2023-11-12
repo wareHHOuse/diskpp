@@ -3,6 +3,11 @@ if (BUILD_DISKPP_TUTORIALS)
     add_subdirectory(diskpp_tutorials)
 endif()
 
+option(BUILD_APP_STEKLOV_EIGS "Build Steklov eigsolver" ON)
+if (BUILD_APP_STEKLOV_EIGS)
+    add_subdirectory(steklov_eigs)
+endif()
+
 option(BUILD_APP_DIFFUSION "Build Diffusion applications" ON)
 if (BUILD_APP_DIFFUSION)
     add_subdirectory(diffusion)
