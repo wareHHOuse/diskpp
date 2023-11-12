@@ -318,8 +318,8 @@ steklov_solver(Mesh& msh)
     disk::feast_eigensolver_params<T> fep;
     fep.verbose = true;
     fep.tolerance = 8;
-    fep.min_eigval = 10;
-    fep.max_eigval = 60;
+    fep.min_eigval = 1;
+    fep.max_eigval = 6;
     fep.subspace_size = 30;
     disk::generalized_eigenvalue_solver(fep, assm.LHS, assm.RHS, eigvecs, eigvals);
     std::cout << "Found eigs: " << fep.eigvals_found << std::endl;
