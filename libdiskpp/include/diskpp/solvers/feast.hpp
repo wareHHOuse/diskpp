@@ -156,9 +156,6 @@ generalized_eigenvalue_solver(feast_eigensolver_params<double>& params,
 
     std::array<int, FEASTPARM_LEN>    fpm;
     feastinit(fpm.data());
-    
-    //fpm[63] = 1;
-    //fpm[59+64] = 2;
 
     auto Lc = eigen_sparse_raw<double>(L, true);
     auto Rc = eigen_sparse_raw<double>(R, true);
@@ -199,6 +196,8 @@ generalized_eigenvalue_solver(feast_eigensolver_params<double>& params,
                        params.eigvals_found,
                        res.data(),
                        params.feast_info);
+
+    std::cout << "FEAST info: " << params.feast_info << std::endl;
 
     return true;
 }

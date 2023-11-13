@@ -31,6 +31,8 @@
 
 #include "sgr.hpp"
 
+#include <Eigen/Eigenvalues>
+
 template<typename Mesh>
 class hho_assembler_steklov
 {
@@ -301,6 +303,14 @@ lua_get_feast_params(sol::state& lua, disk::feast_eigensolver_params<T>& fep)
         fep.max_eigval = eigval_max_opt.value();
 }
 
+void
+lua_get_hho_params(sol::state& lua, size_t& order)
+{
+    sol::optional<size_t> order_opt = lua["hho"]["order"];
+    if (order_opt)
+        order = order_opt.value();
+}
+
 template<typename Mesh>
 void
 detect_boundaries(sol::state& lua, Mesh& msh, std::vector<boundary_type>& bndtypes)
@@ -334,7 +344,8 @@ steklov_solver(sol::state& lua, Mesh& msh)
 
     hho_assembler_steklov<Mesh> assm;
 
-    const size_t degree = 0;
+    size_t degree = 0;
+    lua_get_hho_params(lua, degree);
     auto cd = degree;
     auto fd = degree;
     auto rd = degree+1;
@@ -392,6 +403,10 @@ steklov_solver(sol::state& lua, Mesh& msh)
 
     disk::dynamic_matrix<T> eigvecs;
     disk::dynamic_vector<T> eigvals;
+
+#define USE_FEAST
+
+#ifdef USE_FEAST
     disk::feast_eigensolver_params<T> fep;
     fep.verbose = true;
     fep.tolerance = 8;
@@ -402,6 +417,14 @@ steklov_solver(sol::state& lua, Mesh& msh)
 
     disk::generalized_eigenvalue_solver(fep, assm.LHS, assm.RHS, eigvecs, eigvals);
     std::cout << "Found eigs: " << fep.eigvals_found << std::endl;
+    auto found_eigs = fep.eigvals_found;
+#else /* USE_FEAST */
+    GeneralizedEigenSolver<disk::dynamic_matrix<T>> ges;
+    ges.compute(assm.LHS, assm.RHS);
+    eigvecs = ges.eigenvectors().real();
+    eigvals = ges.eigenvalues().real();
+    auto found_eigs = eigenvalues.size();
+#endif
     std::cout << eigvals.transpose() << std::endl;
 
 
@@ -409,7 +432,7 @@ steklov_solver(sol::state& lua, Mesh& msh)
     db.create("steklov.silo");
     db.add_mesh(msh, "mesh");
 
-    disk::dynamic_matrix<T> es = disk::dynamic_matrix<T>::Zero(msh.cells_size(), fep.eigvals_found);
+    disk::dynamic_matrix<T> es = disk::dynamic_matrix<T>::Zero(msh.cells_size(), found_eigs);
 
     size_t cl_i = 0;
     for (auto& cl : msh)
@@ -424,7 +447,7 @@ steklov_solver(sol::state& lua, Mesh& msh)
         cl_i++;
     }
 
-    for (size_t i = 0; i < fep.eigvals_found; i++)
+    for (size_t i = 0; i < found_eigs; i++)
     {
         std::string vname = "eig_" + std::to_string(i);
         disk::dynamic_vector<T> e = es.col(i);
@@ -445,6 +468,8 @@ int main(int argc, char **argv)
 
     lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::table, sol::lib::string);
     lua["boundary"] = lua.create_table();
+    lua["feast"] = lua.create_table();
+    lua["hho"] = lua.create_table();
     auto sf = lua.safe_script_file("steklov.lua");
     if (not sf.valid())
     {
