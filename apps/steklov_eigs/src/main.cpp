@@ -205,6 +205,12 @@ public:
 
     void finalize(void)
     {
+        //tripletsL.clear();
+        //tripletsR.clear();
+        //for (size_t i = 0; i < syssz; i++) {
+        //    tripletsR.push_back( Triplet<scalar_type>(i,i,200.0) );
+        //    tripletsL.push_back( Triplet<scalar_type>(i,i,200.0) );
+        //}
         LHS.setFromTriplets(tripletsL.begin(), tripletsL.end());
         RHS.setFromTriplets(tripletsR.begin(), tripletsR.end());
         tripletsL.clear();
@@ -382,16 +388,31 @@ steklov_solver(sol::state& lua, Mesh& msh)
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             const auto& fc = fcs[face_i];
-            auto bi = msh.boundary_info(fc);
-            if (not bi.is_boundary())
-                continue;
+            auto gfnum = offset(msh, fc);
+            auto bndtype = bndtypes.at(gfnum);
 
-            auto boundary_id = bi.tag();
+            switch (bndtype) {
+                case boundary_type::dirichlet:
+                case boundary_type::neumann:
+                    continue;
+                    break;
 
-            auto fb = disk::make_scalar_monomial_basis(msh, fc, fd);
-            auto idx = fbs*face_i;
-            BFF.block(idx, idx, fbs, fbs) =
-                disk::make_mass_matrix(msh, fc, fb);
+                case boundary_type::robin: {
+                    auto fb = disk::make_scalar_monomial_basis(msh, fc, fd);
+                    auto idx = cbs+fbs*face_i;
+                    L.block(idx, idx, fbs, fbs) +=
+                        disk::make_mass_matrix(msh, fc, fb);
+                } break;
+
+                case boundary_type::steklov: {
+                    auto fb = disk::make_scalar_monomial_basis(msh, fc, fd);
+                    auto idx = fbs*face_i;
+                    //L.block(idx, idx, fbs, fbs) +=
+                    //    disk::make_mass_matrix(msh, fc, fb);
+                    BFF.block(idx, idx, fbs, fbs) =
+                        disk::make_mass_matrix(msh, fc, fb);
+                } break;
+            }
         }
 
         disk::dynamic_matrix<T> LC = disk::static_condensation(L, cbs);
@@ -415,7 +436,15 @@ steklov_solver(sol::state& lua, Mesh& msh)
     fep.subspace_size = 30;
     lua_get_feast_params(lua, fep);
 
-    disk::generalized_eigenvalue_solver(fep, assm.LHS, assm.RHS, eigvecs, eigvals);
+    //bool s = false;
+    //size_t iters = 0;
+    //do {
+    //    int ret = disk::generalized_eigenvalue_solver(fep, assm.LHS, assm.RHS, eigvecs, eigvals);
+    //    s = ret != -2;
+    //} while (!s && iters++ < 20);
+
+    disk::feast(fep, assm.LHS, assm.RHS, eigvecs, eigvals);
+
     std::cout << "Found eigs: " << fep.eigvals_found << std::endl;
     auto found_eigs = fep.eigvals_found;
 #else /* USE_FEAST */
@@ -423,10 +452,12 @@ steklov_solver(sol::state& lua, Mesh& msh)
     ges.compute(assm.LHS, assm.RHS);
     eigvecs = ges.eigenvectors().real();
     eigvals = ges.eigenvalues().real();
-    auto found_eigs = eigenvalues.size();
+    auto found_eigs = eigvals.size();
 #endif
-    std::cout << eigvals.transpose() << std::endl;
+    std::cout << eigvals.segment(0,found_eigs).transpose() << std::endl;
 
+    if (found_eigs == 0)
+        return;
 
     disk::silo_database db;
     db.create("steklov.silo");

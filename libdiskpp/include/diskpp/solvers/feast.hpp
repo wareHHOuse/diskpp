@@ -140,8 +140,129 @@ struct feast_eigensolver_params
     int     feast_info;
 };
 
+int feast(feast_eigensolver_params<double>& params,
+    const Eigen::SparseMatrix<double>& A,
+    const Eigen::SparseMatrix<double>& B,
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& eigvecs,
+    Eigen::Matrix<double, Eigen::Dynamic, 1>& eigvals)
+{
+    std::array<double, 8> xs;
+    xs[0] =  0.183434642495649;
+    xs[0] = -0.183434642495649;
+    xs[2] =  0.525532409916328;
+    xs[2] = -0.525532409916328;
+    xs[4] =  0.796666477413626;
+    xs[4] = -0.796666477413626;
+    xs[6] =  0.960289856497536;
+    xs[6] = -0.960289856497536;
+
+    std::array<double, 8> omegas;
+    omegas[0] = 0.362683783378361;
+    omegas[1] = 0.362683783378361;
+    omegas[2] = 0.313706645877887;
+    omegas[3] = 0.313706645877887;
+    omegas[4] = 0.222381034453374;
+    omegas[5] = 0.222381034453374;
+    omegas[6] = 0.101228536290376;
+    omegas[7] = 0.101228536290376;
+
+
+    if ( A.rows() != B.rows() && A.cols() != B.cols() && A.rows() == A.cols() )
+    {
+        std::cout << "Two square matrices of the same size are needed." << std::endl;
+        return false;
+    }
+
+    auto N = A.rows();
+    auto M0 = params.subspace_size;
+    auto r = (params.max_eigval - params.min_eigval)/2.0;
+
+    using rdv = Eigen::Matrix<double, Eigen::Dynamic, 1>;
+    using rdm = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
+    using cdm = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>;
+    using csm = Eigen::SparseMatrix<std::complex<double>>;
+
+    rdm Y = rdm::Random(N, M0);
+
+    for (size_t iter = 0; iter < 20; iter++)
+    {
+        std::cout << "FEAST iteration " << iter+1 << "/20" << std::endl; 
+        cdm Yc = Y;
+        rdm Q = rdm::Zero(N, M0);
+        
+        for (size_t e = 0; e < 8; e++)
+        {
+            std::cout << " - Contour integration: step " << e+1 << "/8\r" << std::flush;
+            auto x_e = xs[e];
+            auto theta_e = -(M_PI/2.)*(x_e-1.);
+            auto mid = (params.max_eigval + params.min_eigval)/2.0;
+            auto Z_e = mid + r*std::exp( std::complex<double>(0.0, theta_e) );
+            csm lhs = Z_e*B - std::complex<double>(1.0, 0.0)*A;
+            
+            Eigen::SparseLU<csm> solver;
+            solver.compute(lhs);
+            if(solver.info() != Eigen::Success) {
+                std::cout << "SparseLU failed" << std::endl;
+                return -1;
+            }
+            cdm Qe = solver.solve(Yc);
+            
+            cdm T = r * std::exp(std::complex<double>(0.0, theta_e)) * Qe;
+            auto omega_e = omegas[e];
+            Q = Q - (omega_e/2.0)*T.real();
+        }
+        std::cout << std::endl;
+
+        rdm Aq = Q.transpose() * A * Q;
+        rdm Bq = Q.transpose() * B * Q;
+
+        std::cout << " - Solving reduced problem" << std::endl;
+        Eigen::GeneralizedSelfAdjointEigenSolver<rdm> es(Aq,Bq);
+
+        rdv tmp_ev = es.eigenvalues();
+
+        rdm X = Q * es.eigenvectors();
+        Y = B * X;
+
+        size_t found_eigs = 0;
+        for (size_t i = 0; i < tmp_ev.size(); i++)
+            if (tmp_ev(i) >= params.min_eigval and tmp_ev(i) <= params.max_eigval)
+                found_eigs++;
+
+        std::cout << found_eigs << std::endl;
+
+        rdm X_m = rdm::Zero(X.rows(), found_eigs);
+        rdv lambda_m = rdv::Zero(found_eigs);
+
+        size_t curr_ptr =0;
+        for (size_t i = 0; i < tmp_ev.size(); i++) {
+            if (tmp_ev(i) >= params.min_eigval and tmp_ev(i) <= params.max_eigval) {
+                X_m.col(curr_ptr) = X.col(i);
+                lambda_m(curr_ptr) = tmp_ev(i);
+                curr_ptr++;
+            }
+        }
+
+        std::cout << lambda_m.transpose() << std::endl;
+
+        
+
+        double tol = (A * X_m - B * X_m * lambda_m.asDiagonal()).norm();
+        std::cout << tol << std::endl;
+
+        if (tol < 1e-6) {
+            eigvals = lambda_m;
+            eigvecs = X_m;
+            params.eigvals_found =  eigvals.size();
+            return 0;
+        }
+    }
+
+    return 0;
+}
+
 template<int _Options, typename _Index>
-bool
+int
 generalized_eigenvalue_solver(feast_eigensolver_params<double>& params,
                               Eigen::SparseMatrix<double, _Options, _Index>& L,
                               Eigen::SparseMatrix<double, _Options, _Index>& R,
@@ -157,8 +278,8 @@ generalized_eigenvalue_solver(feast_eigensolver_params<double>& params,
     std::array<int, FEASTPARM_LEN>    fpm;
     feastinit(fpm.data());
 
-    auto Lc = eigen_sparse_raw<double>(L, true);
-    auto Rc = eigen_sparse_raw<double>(R, true);
+    auto Lc = eigen_sparse_raw(L, true);
+    auto Rc = eigen_sparse_raw(R, true);
     int N = Lc.n;
 
     if (params.verbose)
@@ -197,9 +318,7 @@ generalized_eigenvalue_solver(feast_eigensolver_params<double>& params,
                        res.data(),
                        params.feast_info);
 
-    std::cout << "FEAST info: " << params.feast_info << std::endl;
-
-    return true;
+    return params.feast_info;
 }
 
 template<typename T>
