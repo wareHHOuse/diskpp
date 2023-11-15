@@ -155,10 +155,6 @@ public:
         sysfcs = std::count_if(msh.faces_begin(), msh.faces_end(), in_system);
         syssz = fbs*sysfcs;
 
-        if (sysfcs == msh.faces_size()) {
-            std::cout << "Pure Neumann problem" << std::endl;
-        }
-
         make_tables(msh);
 
         LHS = SparseMatrix<scalar_type>(syssz, syssz);
@@ -307,6 +303,19 @@ lua_get_feast_params(sol::state& lua, disk::feast_eigensolver_params<T>& fep)
     sol::optional<T> eigval_max_opt = lua["feast"]["eigval_max"];
     if (eigval_max_opt)
         fep.max_eigval = eigval_max_opt.value();
+
+    sol::optional<bool> verbose_opt = lua["feast"]["verbose"];
+    if (verbose_opt)
+        fep.verbose = verbose_opt.value();
+
+    sol::optional<std::string> inner_solver_opt = lua["feast"]["inner_solver"];
+    if (inner_solver_opt) {
+        std::string inner_solver = inner_solver_opt.value();
+        if (inner_solver == "eigen_sparselu")
+            fep.fis = disk::feast_inner_solver::eigen_sparselu;
+        if (inner_solver == "mumps")
+            fep.fis = disk::feast_inner_solver::mumps;
+    }
 }
 
 void
@@ -425,35 +434,34 @@ steklov_solver(sol::state& lua, Mesh& msh)
     disk::dynamic_matrix<T> eigvecs;
     disk::dynamic_vector<T> eigvals;
 
-#define USE_FEAST
 
-#ifdef USE_FEAST
     disk::feast_eigensolver_params<T> fep;
     fep.verbose = true;
     fep.tolerance = 8;
     fep.min_eigval = 1;
     fep.max_eigval = 6;
     fep.subspace_size = 30;
+    fep.fis = disk::feast_inner_solver::eigen_sparselu;
     lua_get_feast_params(lua, fep);
 
-    //bool s = false;
-    //size_t iters = 0;
-    //do {
-    //    int ret = disk::generalized_eigenvalue_solver(fep, assm.LHS, assm.RHS, eigvecs, eigvals);
-    //    s = ret != -2;
-    //} while (!s && iters++ < 20);
+    int retries = lua["feast"]["retries"].get_or(20);
+    bool use_mkl_feast = lua["feast"]["use_mkl"].get_or(false);
 
-    disk::feast(fep, assm.LHS, assm.RHS, eigvecs, eigvals);
+    if (use_mkl_feast) {
+        bool s = false;
+        size_t retry = 0;
+        do {
+            int ret = disk::generalized_eigenvalue_solver(fep, assm.LHS, assm.RHS, eigvecs, eigvals);
+            s = ret != -2;
+        } while (!s && retry++ < retries);
+    }
+    else {
+        disk::feast(fep, assm.LHS, assm.RHS, eigvecs, eigvals);
+    }
 
     std::cout << "Found eigs: " << fep.eigvals_found << std::endl;
     auto found_eigs = fep.eigvals_found;
-#else /* USE_FEAST */
-    GeneralizedEigenSolver<disk::dynamic_matrix<T>> ges;
-    ges.compute(assm.LHS, assm.RHS);
-    eigvecs = ges.eigenvectors().real();
-    eigvals = ges.eigenvalues().real();
-    auto found_eigs = eigvals.size();
-#endif
+
     std::cout << eigvals.segment(0,found_eigs).transpose() << std::endl;
 
     if (found_eigs == 0)

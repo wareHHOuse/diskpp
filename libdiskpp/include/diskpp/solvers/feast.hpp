@@ -129,6 +129,18 @@ void zfeast_hcsrgv(const char& uplo, const int& n,
 
 namespace disk{
 
+enum class feast_inner_solver {
+    eigen_sparselu,
+    mumps
+};
+
+enum class feast_status {
+    success,
+    did_not_converge,
+    invalid_input,
+    inner_solver_problem
+};
+
 template<typename T>
 struct feast_eigensolver_params
 {
@@ -138,9 +150,10 @@ struct feast_eigensolver_params
     int     subspace_size;
     int     eigvals_found;
     int     feast_info;
+    feast_inner_solver fis;
 };
 
-int feast(feast_eigensolver_params<double>& params,
+feast_status feast(feast_eigensolver_params<double>& params,
     const Eigen::SparseMatrix<double>& A,
     const Eigen::SparseMatrix<double>& B,
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& eigvecs,
@@ -169,8 +182,8 @@ int feast(feast_eigensolver_params<double>& params,
 
     if ( A.rows() != B.rows() && A.cols() != B.cols() && A.rows() == A.cols() )
     {
-        std::cout << "Two square matrices of the same size are needed." << std::endl;
-        return false;
+        std::cout << "FEAST: Two square matrices of the same size are needed." << std::endl;
+        return feast_status::invalid_input;
     }
 
     auto N = A.rows();
@@ -184,81 +197,110 @@ int feast(feast_eigensolver_params<double>& params,
 
     rdm Y = rdm::Random(N, M0);
 
+    double trace_prev = 0.0;
+
     for (size_t iter = 0; iter < 20; iter++)
     {
-        std::cout << "FEAST iteration " << iter+1 << "/20" << std::endl; 
+        if (params.verbose)
+            std::cout << "FEAST iteration " << iter+1 << "/20" << std::endl; 
+        
         cdm Yc = Y;
         rdm Q = rdm::Zero(N, M0);
         
         for (size_t e = 0; e < 8; e++)
         {
-            std::cout << " - Contour integration: step " << e+1 << "/8\r" << std::flush;
+            if (params.verbose)
+                std::cout << " - Contour integration: step " << e+1 << "/8\r" << std::flush;
             auto x_e = xs[e];
             auto theta_e = -(M_PI/2.)*(x_e-1.);
             auto mid = (params.max_eigval + params.min_eigval)/2.0;
             auto Z_e = mid + r*std::exp( std::complex<double>(0.0, theta_e) );
             csm lhs = Z_e*B - std::complex<double>(1.0, 0.0)*A;
             
-            Eigen::SparseLU<csm> solver;
-            solver.compute(lhs);
-            if(solver.info() != Eigen::Success) {
-                std::cout << "SparseLU failed" << std::endl;
-                return -1;
+            cdm Qe;
+
+            switch(params.fis) {
+                case feast_inner_solver::eigen_sparselu: {
+                    Eigen::SparseLU<csm> solver;
+                    solver.compute(lhs);
+                    if(solver.info() != Eigen::Success) {
+                        std::cout << "FEAST: SparseLU failed" << std::endl;
+                        return feast_status::inner_solver_problem;
+                    }
+                    Qe = solver.solve(Yc);
+                } break;
+
+                case feast_inner_solver::mumps: {
+                    Qe = mumps_lu(lhs, Yc);
+                }
             }
-            cdm Qe = solver.solve(Yc);
-            
+
             cdm T = r * std::exp(std::complex<double>(0.0, theta_e)) * Qe;
             auto omega_e = omegas[e];
             Q = Q - (omega_e/2.0)*T.real();
         }
-        std::cout << std::endl;
+        if (params.verbose)
+            std::cout << std::endl;
 
         rdm Aq = Q.transpose() * A * Q;
         rdm Bq = Q.transpose() * B * Q;
 
-        std::cout << " - Solving reduced problem" << std::endl;
+        if (params.verbose)
+            std::cout << " - Solving reduced problem" << std::endl;
+        
         Eigen::GeneralizedSelfAdjointEigenSolver<rdm> es(Aq,Bq);
 
-        rdv tmp_ev = es.eigenvalues();
+        rdv epsilon = es.eigenvalues();
+        rdm Phi = es.eigenvectors();
 
-        rdm X = Q * es.eigenvectors();
-        Y = B * X;
+        rdm X = Q * Phi;
 
         size_t found_eigs = 0;
-        for (size_t i = 0; i < tmp_ev.size(); i++)
-            if (tmp_ev(i) >= params.min_eigval and tmp_ev(i) <= params.max_eigval)
+        for (size_t m = 0; m < epsilon.size(); m++)
+            if (epsilon(m) >= params.min_eigval and epsilon(m) <= params.max_eigval)
                 found_eigs++;
 
-        std::cout << found_eigs << std::endl;
+        eigvecs = rdm::Zero(X.rows(), found_eigs);
+        eigvals = rdv::Zero(found_eigs);
 
-        rdm X_m = rdm::Zero(X.rows(), found_eigs);
-        rdv lambda_m = rdv::Zero(found_eigs);
-
-        size_t curr_ptr =0;
-        for (size_t i = 0; i < tmp_ev.size(); i++) {
-            if (tmp_ev(i) >= params.min_eigval and tmp_ev(i) <= params.max_eigval) {
-                X_m.col(curr_ptr) = X.col(i);
-                lambda_m(curr_ptr) = tmp_ev(i);
-                curr_ptr++;
+        size_t m_out = 0;
+        for (size_t m = 0; m < epsilon.size(); m++) {
+            if (epsilon(m) >= params.min_eigval and epsilon(m) <= params.max_eigval) {
+                eigvecs.col(m_out) = X.col(m);
+                eigvals(m_out) = epsilon(m);
+                m_out++;
             }
         }
-
-        std::cout << lambda_m.transpose() << std::endl;
-
         
-
-        double tol = (A * X_m - B * X_m * lambda_m.asDiagonal()).norm();
-        std::cout << tol << std::endl;
-
-        if (tol < 1e-6) {
-            eigvals = lambda_m;
-            eigvecs = X_m;
-            params.eigvals_found =  eigvals.size();
-            return 0;
+        auto rmax = std::abs(std::max(params.min_eigval, params.max_eigval));
+        rdm BX = B * eigvecs;
+        rdm residual = A * eigvecs - BX * eigvals.asDiagonal();
+        
+        double maxres = 0.0;
+        for (size_t i = 0; i < residual.cols(); i++) {
+            auto num = residual.col(i).norm();
+            auto den = rmax*BX.col(i).norm();
+            maxres = std::max(maxres, num/den);
         }
+
+        double trace = eigvals.sum();
+        double trerr = std::abs(trace - trace_prev)/rmax;
+        trace_prev = trace;
+        if (params.verbose) {
+            std::cout << "  Eigvals found: " << found_eigs << ", ";
+            std::cout << "Trace: " << trace << ", Trace error: " << trerr;
+            std::cout << ", maximum residual: " << maxres << std::endl;
+        }
+        if (maxres < std::pow(10,-params.tolerance)) {
+            params.eigvals_found =  eigvals.size();
+            return feast_status::success;
+        }
+
+        Y = B * X;
     }
 
-    return 0;
+    std::cout << "FEAST did not converge" << std::endl;
+    return feast_status::did_not_converge;
 }
 
 template<int _Options, typename _Index>
