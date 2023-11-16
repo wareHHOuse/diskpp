@@ -201,12 +201,6 @@ public:
 
     void finalize(void)
     {
-        //tripletsL.clear();
-        //tripletsR.clear();
-        //for (size_t i = 0; i < syssz; i++) {
-        //    tripletsR.push_back( Triplet<scalar_type>(i,i,200.0) );
-        //    tripletsL.push_back( Triplet<scalar_type>(i,i,200.0) );
-        //}
         LHS.setFromTriplets(tripletsL.begin(), tripletsL.end());
         RHS.setFromTriplets(tripletsR.begin(), tripletsR.end());
         tripletsL.clear();
@@ -416,11 +410,17 @@ steklov_solver(sol::state& lua, Mesh& msh)
                 case boundary_type::steklov: {
                     auto fb = disk::make_scalar_monomial_basis(msh, fc, fd);
                     auto idx = fbs*face_i;
-                    //L.block(idx, idx, fbs, fbs) +=
-                    //    disk::make_mass_matrix(msh, fc, fb);
+                    L.block(cbs+idx, cbs+idx, fbs, fbs) +=
+                        disk::make_mass_matrix(msh, fc, fb);
                     BFF.block(idx, idx, fbs, fbs) =
                         disk::make_mass_matrix(msh, fc, fb);
                 } break;
+
+                case boundary_type::internal :
+                    break;
+
+                default:
+                    break;
             }
         }
 
@@ -441,6 +441,7 @@ steklov_solver(sol::state& lua, Mesh& msh)
     fep.min_eigval = 1;
     fep.max_eigval = 6;
     fep.subspace_size = 30;
+    fep.max_iter = 10;
     fep.fis = disk::feast_inner_solver::eigen_sparselu;
     lua_get_feast_params(lua, fep);
 
@@ -456,13 +457,16 @@ steklov_solver(sol::state& lua, Mesh& msh)
         } while (!s && retry++ < retries);
     }
     else {
-        disk::feast(fep, assm.LHS, assm.RHS, eigvecs, eigvals);
+        auto ret = disk::feast(fep, assm.LHS, assm.RHS, eigvecs, eigvals);
+        std::cout << ret << std::endl;
     }
 
     std::cout << "Found eigs: " << fep.eigvals_found << std::endl;
     auto found_eigs = fep.eigvals_found;
 
-    std::cout << eigvals.segment(0,found_eigs).transpose() << std::endl;
+    disk::dynamic_vector<T> ones = disk::dynamic_vector<T>::Ones(found_eigs);
+
+    std::cout << (eigvals.segment(0,found_eigs)-ones).transpose() << std::endl;
 
     if (found_eigs == 0)
         return;
