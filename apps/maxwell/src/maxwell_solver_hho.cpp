@@ -149,6 +149,7 @@ public:
         lua[NODE_NAME_CONST]["mu0"] = MU_0;
         lua[NODE_NAME_DOMAIN] = lua.create_table();
         lua[NODE_NAME_BOUNDARY] = lua.create_table();
+        lua["hho"] = lua.create_table();
     }
     sol::state& lua_state() { return lua; }
 
@@ -399,6 +400,15 @@ public:
         ret(1) = src.y;
         ret(2) = src.z;
         return ret;
+    }
+
+    bool use_classical_stabparam(void) const
+    {
+        std::optional<bool> hho_sp_opt = lua["hho"]["classical_stabparam"];
+        if (not hho_sp_opt)
+            return false;
+
+        return hho_sp_opt.value();
     }
 };
 
@@ -683,8 +693,9 @@ compute_element_contribution(hho_maxwell_solver_state<Mesh>& state,
     auto ST = disk::curl_hdg_stabilization(msh, cl, hdi);
     auto MM = disk::make_vector_mass_oper(msh, cl, hdi);
 
-    auto stabparam = omega*std::sqrt(real(epsr*eps0)/real(mur));
-    //auto stabparam = omega*std::sqrt(epsr*eps0/mur);
+    auto stabparam = omega*mu0*std::sqrt(real(epsr*eps0)/real(mur*mu0));
+    if ( cfg.use_classical_stabparam() )
+        stabparam = 1.0/(real(mur)*diameter(msh, cl));
 
     Matrix<scalar_type, Dynamic, Dynamic> lhst =
         (1./mur) * CR.second + stabparam*ST;
@@ -1106,15 +1117,11 @@ compute_error(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
             auto phi = cb.eval_functions(qp.point());
             MM += qp.weight() * phi * phi.transpose();
             rhs += qp.weight() * phi * ref_fun( qp.point() );
-
-            Matrix<scalar_type, 3, 1> ls = phi.transpose()*num_sol;
-            Matrix<scalar_type, 3, 1> vdiff = ls - ref_fun(qp.point());
-            err += qp.weight() * vdiff.dot(vdiff);
         }
         
-        //Matrix<scalar_type, Dynamic, 1> ref_sol = MM.ldlt().solve(rhs);
-        //Matrix<scalar_type, Dynamic, 1> diff = ref_sol - num_sol;
-        //err += diff.dot(MM*diff);
+        Matrix<scalar_type, Dynamic, 1> ref_sol = MM.ldlt().solve(rhs);
+        Matrix<scalar_type, Dynamic, 1> diff = ref_sol - num_sol;
+        err += diff.dot(MM*diff);
         cell_i++;
     }
 
@@ -1234,6 +1241,11 @@ run_maxwell_solver(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cf
     rusage_monitor rm;
 
     size_t order = cfg.order();
+    if (order < 1) {
+        std::cout << "Method order must be >= 1" << std::endl;
+        return;
+    }
+
     disk::hho_degree_info chdi( disk::priv::hdi_named_args{
                                   .rd = (size_t) order,
                                   .cd = (size_t) order,
