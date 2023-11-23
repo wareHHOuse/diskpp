@@ -245,7 +245,7 @@ feast(feast_eigensolver_params<double>& params,
     using csm = Eigen::SparseMatrix<std::complex<double>>;
     using eigsolver = Eigen::SelfAdjointEigenSolver<rdm>;
     using generalized_eigsolver = Eigen::GeneralizedSelfAdjointEigenSolver<rdm>;
-
+    params.eigvals_found = 0;
     const double *xs = quadrature_xs;
     const double *omegas = quadrature_ws;
 

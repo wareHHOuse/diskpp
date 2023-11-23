@@ -465,8 +465,30 @@ steklov_solver(sol::state& lua, Mesh& msh)
     auto found_eigs = fep.eigvals_found;
 
     disk::dynamic_vector<T> ones = disk::dynamic_vector<T>::Ones(found_eigs);
+    disk::dynamic_vector<T> num_eigs = eigvals.segment(0,found_eigs)-ones;
+    disk::dynamic_vector<T> ana_eigs = disk::dynamic_vector<T>::Zero(found_eigs);
+    //for (size_t i = 0; i < found_eigs; i++)
+    //    ana_eigs(i) = i * M_PI * std::tanh(i*M_PI);
 
-    std::cout << (eigvals.segment(0,found_eigs)-ones).transpose() << std::endl;
+    const size_t tmp_eigs = 5;
+    const size_t tmp_len = ((tmp_eigs+2)*(tmp_eigs+1))/2;
+    disk::dynamic_vector<T> ana_eigs_tmp = disk::dynamic_vector<T>::Zero(tmp_len);
+    size_t pos = 0;
+    for (size_t im = 0; im <= tmp_eigs; im++) {
+        for (size_t n = 0; n <= im; n++) {
+            auto m = im - n;
+            auto l = std::sqrt(m*m+n*n);
+            ana_eigs_tmp(pos++) = l * M_PI * std::tanh(l*M_PI);
+        }
+    }
+
+    std::sort(ana_eigs_tmp.begin(), ana_eigs_tmp.end());
+    ana_eigs = ana_eigs_tmp.head(found_eigs);
+    
+    std::cout << "Mesh h = " << disk::average_diameter(msh) << std::endl;
+    std::cout << "Num: " << num_eigs.transpose() << std::endl;
+    std::cout << "Ana: " <<  ana_eigs.transpose() << std::endl;
+    std::cout << "Err: " <<  (num_eigs - ana_eigs).transpose().cwiseAbs() << std::endl;
 
     if (found_eigs == 0)
         return;
