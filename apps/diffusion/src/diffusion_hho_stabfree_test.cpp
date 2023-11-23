@@ -375,6 +375,33 @@ struct test_configuration
     }
 };
 
+template<mesh_2D Mesh>
+void
+adjust_stabfree_recdeg(const Mesh& msh, const typename Mesh::cell_type& cl,
+    hho_degree_info& hdi)
+{
+    size_t cd = hdi.cell_degree();
+    size_t fd = hdi.face_degree();
+    size_t n = faces(msh, cl).size();
+
+    /* HHO space dofs */
+    size_t from = ((cd+2)*(cd+1))/2 + n*(fd+1);
+    /* Reconstruction dofs, polynomial part (degree is cd+2) */
+    size_t to = ((cd+4)*(cd+3))/2;
+
+    if (from <= to) {
+        hdi.reconstruction_degree(cd+2);
+    }
+    else {
+        /* Every harmonic degree provides 2 additional dofs, therefore
+         * we need an increment that it is sufficient to accomodate
+         * (from-to) dofs => ((from - to) + (2-1))/2 */
+        size_t incr = (from - to + 1)/2;
+        hdi.reconstruction_degree(cd+2+incr);
+    }
+}
+
+
 template<typename Mesh>
 void
 test_stabfree_hho(Mesh& msh, convergence_database_new<typename Mesh::coordinate_type>& cdb,
@@ -418,11 +445,9 @@ test_stabfree_hho(Mesh& msh, convergence_database_new<typename Mesh::coordinate_
             cdb.all_A_errors.add_hdi(hdi);
 
             try {
-                auto error = run_hho_diffusion_solver_stabfree(msh, hdi, true, true, diff_tens, tc.use_projection);
+                run_hho_diffusion_solver_stabfree(msh, hdi, true, true, diff_tens, tc.use_projection);
                 //cdb.add(hdi.face_degree(), make_display_name(tc.variant_name, hdi), error);
-                L2errs.push_back(error.L2err);
-                H1errs.push_back(error.H1err);
-                Aerrs.push_back(error.Aerr);
+
             }
             catch (std::invalid_argument e) {
                 std::cout << e.what() << std::endl;

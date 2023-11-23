@@ -518,8 +518,51 @@ run_hho_diffusion_solver(Mesh& msh, const hho_degree_info& hdi, const bool statc
     return ei;
 }
 
+
 template<typename Mesh>
-auto
+auto hho_lapl(const Mesh& msh, const typename Mesh::cell_type& cl,
+    const hho_degree_info& hdi, const diffusion_tensor<Mesh>& diff_tens)
+{
+    using T = typename Mesh::coordinate_type;
+
+    auto fd = hdi.face_degree();
+    auto cd = hdi.cell_degree();
+    auto rd = hdi.reconstruction_degree();
+
+    bool is_standard_hho = (rd == fd+1) and (cd == fd or cd == fd+1 or (fd > 0 and cd == fd-1));
+    bool is_mixed_high = (cd == fd+1);
+
+    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A;
+    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> GR;
+
+    if (is_standard_hho) {
+        auto oper = make_scalar_hho_laplacian(msh, cl, hdi, diff_tens);
+        A = oper.second;
+        GR = oper.first;
+
+        if (is_mixed_high)
+            A = A + make_scalar_hdg_stabilization(msh, cl, hdi);
+        else
+            A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
+    }    
+    else {
+        if (is_mixed_high) {
+            auto oper = make_shl_face_proj_harmonic(msh, cl, hdi, diff_tens);
+            A = oper.second;
+            GR = oper.first;    
+        }
+        else {
+            auto oper = make_sfl(msh, cl, hdi, diff_tens);
+            A = oper.second;
+            GR = oper.first;
+        }
+    }
+
+    return std::pair(GR, A);
+}
+
+template<typename Mesh>
+void
 run_hho_diffusion_solver_stabfree(Mesh& msh, const hho_degree_info& hdi, const bool statcond,
     const bool stab_diam_F, const diffusion_tensor<Mesh>& diff_tens, const bool use_proj = false)
 {
@@ -545,35 +588,7 @@ run_hho_diffusion_solver_stabfree(Mesh& msh, const hho_degree_info& hdi, const b
     for (auto& cl : msh)
     {
         auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A;
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> GR;
-        /*
-        if (use_proj) {
-            auto oper = make_shlp(msh, cl, hdi, diff_tens);
-            A = oper.second;
-            GR = oper.first;
-        }
-        else {
-            auto oper = make_scalar_hho_laplacian(msh, cl, hdi, diff_tens);
-            A = oper.second;
-            GR = oper.first;
-        }
-
-        if (not stabfree)
-        {   
-            if (hdgstab)
-                A = A + make_scalar_hdg_stabilization(msh, cl, hdi);
-            else
-                A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
-        }
-        */
-
-        auto oper = make_sfl(msh, cl, hdi, diff_tens);
-        A = oper.second;
-        GR = oper.first;
-        //A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
-
+        auto [GR, A] = hho_lapl(msh, cl, hdi, diff_tens);
         Eigen::Matrix<T, Eigen::Dynamic, 1> rhs = make_rhs(msh, cl, cb, rhs_fun);
         auto sc = make_scalar_static_condensation(msh, cl, hdi, A, rhs);
         assembler.assemble(msh, cl, sc.first, sc.second, sol_fun);
@@ -610,37 +625,12 @@ run_hho_diffusion_solver_stabfree(Mesh& msh, const hho_degree_info& hdi, const b
     {
         auto cb = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
         //auto rb = make_scalar_monomial_basis(msh, cl, hdi.reconstruction_degree());
-        auto rb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
-        rb.maximum_polynomial_degree(hdi.face_degree()+2);
+        //auto rb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
+        //rb.maximum_polynomial_degree(hdi.face_degree()+2);
 
-        auto rbs = rb.size();
+        //auto rbs = rb.size();
 
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> A;
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> GR;
-        /*
-        if (use_proj) {
-            auto oper = make_shlph(msh, cl, hdi, diff_tens);
-            A = oper.second;
-            GR = oper.first;
-        }
-        else {
-            auto oper = make_scalar_hho_laplacian(msh, cl, hdi, diff_tens);
-            A = oper.second;
-            GR = oper.first;
-        }
-
-        if (not stabfree)
-        {   
-            if (hdgstab)
-                A = A + make_scalar_hdg_stabilization(msh, cl, hdi);
-            else
-                A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
-        }
-        */
-        auto oper = make_sfl(msh, cl, hdi, diff_tens);
-        A = oper.second;
-        GR = oper.first;
-        //A = A + make_scalar_hho_stabilization(msh, cl, GR, hdi);
+        auto [GR, A] = hho_lapl(msh, cl, hdi, diff_tens);
 
 
         auto rhs = make_rhs(msh, cl, cb, rhs_fun);
@@ -666,7 +656,7 @@ run_hho_diffusion_solver_stabfree(Mesh& msh, const hho_degree_info& hdi, const b
             silo_f.push_back(f);
         }
 
-        Matrix<T, Dynamic, 1> Rsol = GR*fullsol;
+        //Matrix<T, Dynamic, 1> Rsol = GR*fullsol;
 
         auto qps = disk::integrate(msh, cl, 2*hdi.cell_degree()+2);
         for (auto& qp : qps)
@@ -678,20 +668,20 @@ run_hho_diffusion_solver_stabfree(Mesh& msh, const hho_degree_info& hdi, const b
             //auto uh = disk::eval(dofs, phi);
             L2norm += qp.weight() * u * u;
 
-            auto grad_u = sol_grad( qp.point() );
-            auto dphi_tmp = rb.eval_gradients( qp.point() );
-            Matrix<T, Dynamic, Mesh::dimension> dphi = dphi_tmp.block(1, 0, rbs-1, Mesh::dimension);
-            auto grad_Ruh = disk::eval(Rsol, dphi);
-            H1err += qp.weight() * (grad_u - grad_Ruh).dot( diff_tens*(grad_u - grad_Ruh) );
-            H1norm += qp.weight() * grad_u.dot(diff_tens*grad_u);
+            //auto grad_u = sol_grad( qp.point() );
+            //auto dphi_tmp = rb.eval_gradients( qp.point() );
+            //Matrix<T, Dynamic, Mesh::dimension> dphi = dphi_tmp.block(1, 0, rbs-1, Mesh::dimension);
+            //auto grad_Ruh = disk::eval(Rsol, dphi);
+            //H1err += qp.weight() * (grad_u - grad_Ruh).dot( diff_tens*(grad_u - grad_Ruh) );
+            //H1norm += qp.weight() * grad_u.dot(diff_tens*grad_u);
         }
 
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> MM = disk::make_mass_matrix(msh, cl, cb);
         auto diff = realsol - fullsol;
-        Aerr += diff.dot(A*diff);
-        Anorm += realsol.dot(A*realsol);
-        auto diffT = diff.head(cb.size());
-        Merr += diffT.dot(MM*diffT);
+        //Aerr += diff.dot(A*diff);
+        //Anorm += realsol.dot(A*realsol);
+        //auto diffT = diff.head(cb.size());
+        //Merr += diffT.dot(MM*diffT);
     }
 
     
@@ -711,15 +701,8 @@ run_hho_diffusion_solver_stabfree(Mesh& msh, const hho_degree_info& hdi, const b
     db.add_variable("mesh", silo_f_var);
     db.close();
     
-    
-
-    error_info<T> ei;
-    ei.h = disk::average_diameter(msh); 
-    ei.L2err = std::sqrt(Merr)/std::sqrt(L2norm);
-    ei.H1err = std::sqrt(H1err)/std::sqrt(H1norm);
-    ei.Aerr = std::sqrt(Aerr)/std::sqrt(Anorm);
-
-    return ei;
+    std::cout << "h = " << disk::average_diameter(msh) << " "; 
+    std::cout << "L2 err = " << std::sqrt(L2norm) << std::endl;
 }
 
 template<typename Mesh>

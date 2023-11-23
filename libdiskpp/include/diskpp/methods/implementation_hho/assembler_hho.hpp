@@ -66,9 +66,15 @@ class diffusion_condensed_assembler
     SparseMatrix<T> LHS;
     vector_type     RHS;
 
-    diffusion_condensed_assembler(const Mesh& msh, hho_degree_info hdi) : di(hdi), use_bnd(false)
+    diffusion_condensed_assembler()
+    {}
+
+    diffusion_condensed_assembler(const Mesh& msh, hho_degree_info hdi)
+        : di(hdi), use_bnd(false)
     {
-        auto is_dirichlet = [&](const typename Mesh::face_type& fc) -> bool { return msh.is_boundary(fc); };
+        auto is_dirichlet = [&](const typename Mesh::face_type& fc) -> bool {
+            return msh.is_boundary(fc);
+        };
 
         num_all_faces       = msh.faces_size();
         num_dirichlet_faces = std::count_if(msh.faces_begin(), msh.faces_end(), is_dirichlet);
@@ -96,8 +102,8 @@ class diffusion_condensed_assembler
         RHS = vector_type::Zero(system_size);
     }
 
-    diffusion_condensed_assembler(const Mesh& msh, hho_degree_info hdi, const boundary_type& bnd) :
-      di(hdi), use_bnd(true)
+    diffusion_condensed_assembler(const Mesh& msh, hho_degree_info hdi, const boundary_type& bnd)
+        : di(hdi), use_bnd(true)
     {
         auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
             const auto fc_id = msh.lookup(fc);
@@ -116,6 +122,34 @@ class diffusion_condensed_assembler
         {
             const auto fc = *std::next(msh.faces_begin(), i);
             if (!is_dirichlet(fc))
+            {
+                compress_table.at(i)               = compressed_offset;
+                expand_table.at(compressed_offset) = i;
+                compressed_offset++;
+            }
+        }
+
+        const auto fbs = scalar_basis_size(hdi.face_degree(), Mesh::dimension - 1);
+        system_size    = fbs * num_other_faces;
+
+        LHS = SparseMatrix<T>(system_size, system_size);
+        RHS = vector_type::Zero(system_size);
+    }
+
+    void
+    initialize(const Mesh& msh, hho_degree_info hdi, const std::vector<bool>& is_dirichlet)
+    {
+        num_all_faces       = msh.faces_size();
+        num_dirichlet_faces = std::count(is_dirichlet.begin(), is_dirichlet.end(), true);
+        num_other_faces     = num_all_faces - num_dirichlet_faces;
+
+        compress_table.resize(num_all_faces);
+        expand_table.resize(num_other_faces);
+
+        size_t compressed_offset = 0;
+        for (size_t i = 0; i < num_all_faces; i++)
+        {
+            if (!is_dirichlet.at(i))
             {
                 compress_table.at(i)               = compressed_offset;
                 expand_table.at(compressed_offset) = i;

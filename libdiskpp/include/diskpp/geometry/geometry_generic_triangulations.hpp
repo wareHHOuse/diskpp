@@ -28,6 +28,7 @@ measure(const triangle<T,DIM>& t)
 }
 
 /* Call J. R. Shewchuk's Triangle to triangulate a mesh element */
+inline
 std::vector<triangle<double,2>>
 triangulate_nonconvex_polygon(const generic_mesh<double,2>& msh,
     const typename generic_mesh<double,2>::cell_type& cl)

@@ -111,6 +111,8 @@ public:
         storage->surfaces.push_back( surface_type({pi0, pi3, pi4}) );
         storage->surfaces.push_back( surface_type({pi1, pi2, pi4}) );
         storage->surfaces.push_back( surface_type({pi2, pi3, pi4}) );
+
+        storage->subdomain_info.resize( storage->surfaces.size() );
     }
 
     void refine(void)
@@ -204,6 +206,7 @@ public:
 
         std::sort(new_surfaces.begin(), new_surfaces.end());
         std::swap(storage->surfaces, new_surfaces);
+        storage->subdomain_info.resize( storage->surfaces.size() );
     }
 };
 
@@ -334,6 +337,7 @@ class simple_mesher<tetrahedral_mesh<T>>
         assert(storage->surfaces.size() == 18);
         assert(storage->volumes.size() == 6);
         assert(storage->nodes.size() == 8);
+        storage->subdomain_info.resize( storage->volumes.size() );
     }
 
 
@@ -473,8 +477,215 @@ class simple_mesher<tetrahedral_mesh<T>>
         size_t expected_surfaces = 16 * volume_offset + 2 * boundary_offset;
         assert(storage->volumes.size() == volume_offset * 8);
         assert(storage->surfaces.size() == expected_surfaces);
+        storage->subdomain_info.resize( storage->volumes.size() );
     }
 };
+
+template<typename T>
+class simple_mesher<cartesian_mesh<T,2>>
+{
+    typedef cartesian_mesh<T,2>                         mesh_type;
+    static const size_t DIM = 2;
+    typedef typename cartesian_mesh<T,2>::storage_type    storage_type;
+    typedef point<T,DIM>                                point_type;
+
+    typedef typename mesh_type::node_type       node_type;
+    typedef typename mesh_type::edge_type       edge_type;
+    typedef typename mesh_type::surface_type    surface_type;
+
+    std::shared_ptr<storage_type>   storage;
+
+public:
+    simple_mesher(mesh_type& msh)
+        : storage( msh.backend_storage() )
+    {
+        auto rot = 0.4;
+        /* Init the first level of the mesh */
+        storage->points.push_back( point_type(0.0, 0.0) );
+        auto pi0 = point_identifier<2>(0);
+        storage->nodes.push_back( node_type( {pi0} ) );
+
+        storage->points.push_back( point_type(0.5-rot, 0.0) );
+        auto pi1 = point_identifier<2>(1);
+        storage->nodes.push_back( node_type( {pi1} ) );
+
+        storage->points.push_back( point_type(1.0, 0.0) );
+        auto pi2 = point_identifier<2>(2);
+        storage->nodes.push_back( node_type( {pi2} ) );
+
+        storage->points.push_back( point_type(0.0, 0.5+rot) );
+        auto pi3 = point_identifier<2>(3);
+        storage->nodes.push_back( node_type( {pi3} ) );
+
+        storage->points.push_back( point_type(0.5, 0.5) );
+        auto pi4 = point_identifier<2>(4);
+        storage->nodes.push_back( node_type( {pi4} ) );
+
+        storage->points.push_back( point_type(1.0, 0.5-rot) );
+        auto pi5 = point_identifier<2>(5);
+        storage->nodes.push_back( node_type( {pi5} ) );
+
+        storage->points.push_back( point_type(0.0, 1.0) );
+        auto pi6 = point_identifier<2>(6);
+        storage->nodes.push_back( node_type( {pi6} ) );
+
+        storage->points.push_back( point_type(0.5+rot, 1.0) );
+        auto pi7 = point_identifier<2>(7);
+        storage->nodes.push_back( node_type( {pi7} ) );
+
+        storage->points.push_back( point_type(1.0, 1.0) );
+        auto pi8 = point_identifier<2>(8);
+        storage->nodes.push_back( node_type( {pi8} ) );
+
+        storage->edges.push_back( edge_type({pi0, pi1}) ); //0 b0
+        storage->edges.push_back( edge_type({pi0, pi3}) ); //1 b3
+        storage->edges.push_back( edge_type({pi1, pi2}) ); //2 b0
+        storage->edges.push_back( edge_type({pi1, pi4}) ); //3
+        storage->edges.push_back( edge_type({pi2, pi5}) ); //4 b1
+        storage->edges.push_back( edge_type({pi3, pi4}) ); //5
+        storage->edges.push_back( edge_type({pi3, pi6}) ); //6 b3
+        storage->edges.push_back( edge_type({pi4, pi5}) ); //7
+        storage->edges.push_back( edge_type({pi4, pi7}) ); //8
+        storage->edges.push_back( edge_type({pi5, pi8}) ); //9 b1
+        storage->edges.push_back( edge_type({pi6, pi7}) ); //10 b2
+        storage->edges.push_back( edge_type({pi7, pi8}) ); //11 b2
+
+        storage->boundary_info.resize( storage->edges.size() );
+        storage->boundary_info[0] = boundary_descriptor(0, true);
+        storage->boundary_info[1] = boundary_descriptor(3, true);
+        storage->boundary_info[2] = boundary_descriptor(0, true);
+        storage->boundary_info[4] = boundary_descriptor(1, true);
+        storage->boundary_info[6] = boundary_descriptor(3, true);
+        storage->boundary_info[9] = boundary_descriptor(1, true);
+        storage->boundary_info[10] = boundary_descriptor(2, true);
+        storage->boundary_info[11] = boundary_descriptor(2, true);
+
+        storage->surfaces.push_back( surface_type({pi0, pi1, pi3, pi4}) );
+        storage->surfaces.push_back( surface_type({pi1, pi2, pi4, pi5}) );
+        storage->surfaces.push_back( surface_type({pi3, pi4, pi6, pi7}) );
+        storage->surfaces.push_back( surface_type({pi4, pi5, pi7, pi8}) );
+
+        storage->subdomain_info.resize( storage->surfaces.size() );
+    }
+
+
+    void refine(void)
+    {
+        size_t node_offset = storage->nodes.size();
+
+        typedef std::pair<edge_type, boundary_descriptor> ne_pair;
+
+        std::vector<ne_pair> new_edges;
+        new_edges.reserve( storage->edges.size()*2 );
+
+        std::vector<surface_type> new_surfaces;
+        new_surfaces.reserve( storage->surfaces.size()*4 );
+
+        size_t edge_offset = 0;
+        for (auto& e : storage->edges)
+        {
+            auto ptids = e.point_ids();
+
+            assert(ptids.size() == 2);
+            assert(ptids[0] < storage->points.size());
+            assert(ptids[1] < storage->points.size());
+
+            auto p0 = storage->points[ ptids[0] ];
+            auto p1 = storage->points[ ptids[1] ];
+            auto pm = (p0 + p1)/2.;
+
+            storage->points.push_back(pm);
+            auto pmi = point_identifier<2>( storage->nodes.size() );
+            storage->nodes.push_back( node_type({pmi}) );
+
+            assert( ptids[0] < pmi );
+            assert( ptids[1] < pmi );
+
+            assert(edge_offset < storage->boundary_info.size());
+            auto ep1 = std::make_pair(edge_type({ptids[0], pmi}), storage->boundary_info[edge_offset]);
+            auto ep2 = std::make_pair(edge_type({ptids[1], pmi}), storage->boundary_info[edge_offset]);
+            new_edges.push_back( ep1 );
+            new_edges.push_back( ep2 );
+
+            edge_offset++;
+        }
+
+        for (auto& s : storage->surfaces)
+        {
+            auto ptids = s.point_ids();
+            assert(ptids.size() == 4);
+            assert(ptids[0] < storage->points.size());
+            assert(ptids[1] < storage->points.size());
+            assert(ptids[2] < storage->points.size());
+            assert(ptids[3] < storage->points.size());
+
+            auto p0 = storage->points[ ptids[0] ];
+            auto p1 = storage->points[ ptids[1] ];
+            auto p2 = storage->points[ ptids[2] ];
+            auto p3 = storage->points[ ptids[3] ];
+            auto pm = (p0 + p1 + p2 + p3) / 4.0;
+
+            storage->points.push_back(pm);
+            point_identifier<2> pmi(storage->nodes.size());
+            storage->nodes.push_back( node_type({pmi}) );
+
+            assert(ptids[0] < pmi);
+            assert(ptids[1] < pmi);
+            assert(ptids[2] < pmi);
+            assert(ptids[3] < pmi);
+
+            auto eofs = [&](const edge_type& e) -> auto {
+                auto be = begin(storage->edges);
+                auto ee = end(storage->edges);
+                auto ei = std::lower_bound(be, ee, e);
+                if (ei == ee or e != *ei) {
+                    std::cout << s << std::endl;
+                    std::cout << e << std::endl;
+                    for (auto& ee : storage->edges)
+                        std::cout << "  " << ee << std::endl;
+                    throw std::logic_error("Edge not found. This is a bug.");
+                }
+                return point_identifier<2>(std::distance(be, ei) + node_offset);
+            };
+
+            auto p_e0 = eofs( edge_type({ptids[0], ptids[1]}) );
+            auto p_e1 = eofs( edge_type({ptids[0], ptids[2]}) );
+            auto p_e2 = eofs( edge_type({ptids[1], ptids[3]}) );
+            auto p_e3 = eofs( edge_type({ptids[2], ptids[3]}) );
+
+            /* Those are going to be internal edges */
+            
+            new_edges.push_back( std::make_pair(edge_type({p_e0, pmi}), boundary_descriptor()) );
+            new_edges.push_back( std::make_pair(edge_type({p_e1, pmi}), boundary_descriptor()) );
+            new_edges.push_back( std::make_pair(edge_type({p_e2, pmi}), boundary_descriptor()) );
+            new_edges.push_back( std::make_pair(edge_type({p_e3, pmi}), boundary_descriptor()) );
+
+            new_surfaces.push_back( surface_type( {ptids[0], p_e0, p_e1, pmi} ) );
+            new_surfaces.push_back( surface_type( {ptids[1], p_e2, p_e0, pmi} ) );
+            new_surfaces.push_back( surface_type( {ptids[2], p_e1, p_e3, pmi} ) );
+            new_surfaces.push_back( surface_type( {ptids[3], p_e3, p_e2, pmi} ) );
+        }
+
+        auto comp = [](const ne_pair& nep1, const ne_pair& nep2) -> bool {
+            return nep1.first < nep2.first;
+        };
+        std::sort(new_edges.begin(), new_edges.end(), comp);
+
+        storage->edges.clear(); storage->edges.reserve( new_edges.size() );
+        storage->boundary_info.clear();
+        storage->boundary_info.reserve(new_edges.size());
+        for (auto& ne : new_edges)
+        {
+            storage->edges.push_back(ne.first);
+            storage->boundary_info.push_back(ne.second);
+        }
+
+        std::sort(new_surfaces.begin(), new_surfaces.end());
+        std::swap(storage->surfaces, new_surfaces);
+        storage->subdomain_info.resize( storage->surfaces.size() );
+    }
+};
+
 
 template<typename Mesh>
 auto make_simple_mesher(Mesh& msh)
@@ -551,7 +762,7 @@ public:
                 if (position.first == false)
                     throw std::logic_error("edge not found, this is a bug.");
 
-                boundary_descriptor bi(0, true);
+                boundary_descriptor bi(size_t(boundary), true);
                 storage->boundary_info.at(position.second) = bi;
             }
         }

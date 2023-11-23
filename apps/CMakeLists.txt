@@ -8,6 +8,11 @@ if (BUILD_APP_DIFFUSION)
     add_subdirectory(diffusion)
 endif()
 
+option(BUILD_APP_POISSON "Build Poisson equation solver" ON)
+if (BUILD_APP_POISSON)
+    add_subdirectory(poisson_solver)
+endif()
+
 option(BUILD_APP_DISKPP_TESTS "Build DiSk++ tests" ON)
 if (BUILD_APP_DISKPP_TESTS)
     add_subdirectory(tests)

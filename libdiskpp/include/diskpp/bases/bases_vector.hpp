@@ -37,7 +37,7 @@ namespace disk
 {
 
 /* Compute the size of a vector basis of degree k in dimension d. */
-size_t
+inline size_t
 vector_basis_size(size_t k, size_t sd, size_t vd)
 {
     size_t num = 1;
@@ -449,7 +449,7 @@ make_vector_monomial_tangential_basis(const MeshType& msh, const ElementType& el
 template<typename MeshType, typename ElementType, typename ScalarType>
 class scaled_monomial_nedelec_tangential_basis;
 
-size_t
+inline size_t
 nedelec_tangential_basis_size(size_t degree)
 {
     size_t basis_size   = vector_basis_size(degree-1, 2, 2);
@@ -803,7 +803,7 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 ///////////////////////////////////////////////////
 
 /* Compute the size of a vector basis of degree k in dimension d. */
-size_t
+inline size_t
 vector_basis_size_RT(const size_t k, const size_t sd, const size_t vd)
 {
     if (k == 0)

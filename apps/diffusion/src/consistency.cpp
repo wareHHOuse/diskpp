@@ -35,6 +35,8 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
     using T = typename Mesh::coordinate_type;
     using point_type = typename Mesh::point_type;
 
+    const size_t cr_delta = 2;
+
     hho_degree_info hdi;
     if (hv == hho_variant::mixed_order_low)
         hdi.cell_degree(degree-1);
@@ -43,11 +45,11 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
     if (hv == hho_variant::mixed_order_high)
         hdi.cell_degree(degree+1);
     hdi.face_degree(degree);
-    hdi.reconstruction_degree(hdi.cell_degree()+2+increment);
+    hdi.reconstruction_degree(hdi.cell_degree()+cr_delta+increment);
 
     auto cd = hdi.cell_degree();
     auto fd = hdi.face_degree();
-    auto rd = hdi.cell_degree()+2;
+    auto rd = hdi.cell_degree()+cr_delta;
     auto hd = increment;
 
     auto dofsT = scalar_basis_size(cd, Mesh::dimension);
@@ -56,7 +58,7 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
     auto dofsH = harmonic_basis_size(hd+rd, Mesh::dimension) - harmonic_basis_size(rd, Mesh::dimension);
 
     std::cout << Bwhitefg << "HHO(" << cd << "," << fd << "). Reconstruction: ";
-    std::cout << rd+increment << " (poly: " << cd+2 << ", harmonic increment: ";
+    std::cout << rd+increment << " (poly: " << rd << ", harmonic increment: ";
     std::cout << increment << ")" << reset << std::endl;
 
     for (auto& cl : msh)
@@ -93,7 +95,7 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
             disk::project_function(msh, cl, cb, poly);
 
         auto hb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
-        hb.maximum_polynomial_degree(hdi.cell_degree()+2);
+        hb.maximum_polynomial_degree(rd);
         
         /* Polynomial of degree k+1 to check consistency */
         Eigen::Matrix<T, Eigen::Dynamic, 1> poly_h = disk::project_function(msh, cl, hb, poly);

@@ -787,6 +787,8 @@ public:
 
         boundary_edges.clear();
 
+        storage->subdomain_info.resize(storage->surfaces.size());
+
         return true;
     }
 };

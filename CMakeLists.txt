@@ -199,7 +199,7 @@ if (OPT_VECTORIZER_REMARKS)
 endif()
 
 ######################################################################
-## Compiler reporting: disable deprecation wa
+## Compiler reporting: disable deprecation warnings
 option(OPT_DISABLE_DEPRECATION_WARNINGS "Disable deprecation warnings" OFF)
 if(OPT_DISABLE_DEPRECATION_WARNINGS)
     if (COMPILER_IS_GNU OR COMPILER_IS_CLANG)
