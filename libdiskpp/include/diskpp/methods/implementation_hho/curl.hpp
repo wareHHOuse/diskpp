@@ -580,6 +580,28 @@ static_condensation(const dynamic_matrix<T>& lhs, const dynamic_vector<T>& rhs,
 }
 
 template<typename T>
+dynamic_matrix<T>
+static_condensation(const dynamic_matrix<T>& lhs,
+                    const size_t tf_bnd)
+{
+    auto t_size = tf_bnd;
+    auto f_size = lhs.rows() - tf_bnd;
+
+    dynamic_matrix<T> LTT = lhs.block(     0,      0, t_size, t_size);
+    dynamic_matrix<T> LTF = lhs.block(     0, tf_bnd, t_size, f_size);
+    dynamic_matrix<T> LFT = lhs.block(tf_bnd,      0, f_size, t_size);
+    dynamic_matrix<T> LFF = lhs.block(tf_bnd, tf_bnd, f_size, f_size);
+
+    LDLT<dynamic_matrix<T>> ldlt_LTT(LTT);
+    if (ldlt_LTT.info() != Eigen::Success)
+        throw std::invalid_argument("Can't factorize matrix for static condensation");
+
+    dynamic_matrix<T> LC = LFF - LFT*ldlt_LTT.solve(LTF);
+
+    return LC;
+}
+
+template<typename T>
 dynamic_vector<T>
 static_decondensation(const dynamic_matrix<T>& lhs, const dynamic_vector<T>& rhs,
                       const dynamic_vector<T>& uF)
@@ -600,6 +622,29 @@ static_decondensation(const dynamic_matrix<T>& lhs, const dynamic_vector<T>& rhs
 
     ret.segment(     0, t_size) = ldlt_LTT.solve(bT - LTF*uF);
     ret.segment(tf_bnd, f_size) = uF;
+
+    return ret;
+}
+
+template<typename T>
+dynamic_matrix<T>
+static_decondensation(const dynamic_matrix<T>& lhs,
+                      const dynamic_matrix<T>& uF)
+{
+    auto t_size = lhs.rows() - uF.rows();
+    auto tf_bnd = t_size;
+    auto f_size = uF.rows();
+
+    dynamic_matrix<T> LTT = lhs.block(0,      0, t_size, t_size);
+    dynamic_matrix<T> LTF = lhs.block(0, tf_bnd, t_size, f_size);
+
+    dynamic_matrix<T> ret = dynamic_matrix<T>::Zero(lhs.rows(), uF.cols());
+    LDLT<dynamic_matrix<T>> ldlt_LTT(LTT);
+    if (ldlt_LTT.info() != Eigen::Success)
+        throw std::invalid_argument("Can't factorize matrix for static condensation");
+
+    ret.block(0, 0, t_size, uF.cols()) = ldlt_LTT.solve(-LTF*uF);
+    ret.block(tf_bnd, 0, f_size, uF.cols()) = uF;
 
     return ret;
 }
