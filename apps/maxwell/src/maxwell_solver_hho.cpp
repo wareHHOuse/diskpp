@@ -652,6 +652,8 @@ struct hho_maxwell_solver_state
     disk::dynamic_vector<scalar_type>               sol;
     disk::dynamic_vector<scalar_type>               sol_full;
     disk::dynamic_vector<scalar_type>               reco;
+
+    std::vector<double> local_errors;
 };
 
 
@@ -693,6 +695,7 @@ compute_element_contribution(hho_maxwell_solver_state<Mesh>& state,
     auto ST = disk::curl_hdg_stabilization(msh, cl, hdi);
     auto MM = disk::make_vector_mass_oper(msh, cl, hdi);
 
+    //auto stabparam = omega*std::sqrt(real(epsr*eps0)/real(mur)); //not dimensionally correct but very good
     auto stabparam = omega*mu0*std::sqrt(real(epsr*eps0)/real(mur*mu0));
     if ( cfg.use_classical_stabparam() )
         stabparam = 1.0/(real(mur)*diameter(msh, cl));
@@ -984,6 +987,9 @@ save_to_silo(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
 
     disk::silo_zonal_variable<double> mag_e("mag_e", data_mag_e);
     silo_db.add_variable("mesh", mag_e);
+
+    disk::silo_zonal_variable<double> locerr("locerr", state.local_errors);
+    silo_db.add_variable("mesh", locerr);
 }
 
 template<typename Mesh, typename clT>
@@ -1082,6 +1088,9 @@ compute_error(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
     auto& lua = cfg.lua_state();
     sol::function lua_ref_fun = lua["reference_solution"];
 
+    std::vector<double> local_errors;
+    local_errors.reserve(msh.cells_size());
+
     size_t cell_i = 0;
     scalar_type err = 0.0;
     for (auto& cl : msh)
@@ -1121,10 +1130,13 @@ compute_error(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
         
         Matrix<scalar_type, Dynamic, 1> ref_sol = MM.ldlt().solve(rhs);
         Matrix<scalar_type, Dynamic, 1> diff = ref_sol - num_sol;
-        err += diff.dot(MM*diff);
+        scalar_type lerr = diff.dot(MM*diff);
+        local_errors.push_back(std::sqrt(real(lerr)));
+        err += lerr;
         cell_i++;
     }
 
+    state.local_errors = std::move(local_errors);
     return std::sqrt( real(err) );
 }
 

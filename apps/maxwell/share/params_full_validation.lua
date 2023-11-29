@@ -5,9 +5,11 @@ sim.order = 1
 
 silo.filename = "output.silo"
 
+epsr = 4;
+
 materials.epsilon = function (tag, x, y, z)
     if tag == 2 then
-        return 1.44, 0
+        return epsr, 0
     end
     return 1, 0;
 end
@@ -119,25 +121,40 @@ domain[3] = {}
 domain[3].scattered_field = true;
 
 frequencies_MHz = {100, 150, 200, 250, 300};
+--frequencies_MHz = {300};
 
+function fif(condition, if_true, if_false)
+  if condition then return if_true else return if_false end
+end
 
 function xxx()
-    local fh = io.open("validation.txt", "w");
+    local fn = "validation_" .. epsr .. ".txt"
+    local fh = io.open(fn, "w");
+    
     for i,v in ipairs(frequencies_MHz) do
+       --silo.filename = "validation_" .. v .. ".silo";
+       --save_to_silo();
+
        sim.frequency = v*1e6;
+
+       hho.classical_stabparam = true
        assemble();
        solve();
-       silo.filename = "validation_" .. v .. ".silo";
+       local rl_csp = compute_return_loss(5);
+       local err_csp = compute_error();
+       print("Error (csp): ", err_csp);
+       silo.filename = "csp_" .. v .. ".silo";
        save_to_silo();
-       local rl = compute_return_loss(5);
 
-       --gamma = (377 - z)/(377 + z);
-       --local rl = 20*math.log10(gamma);
-       --print("Expected RL: " .. rl)
-       local err = compute_error();
-       print("Error: ", err);
-
-        fh:write(v .. " " .. rl .. " " .. err .. "\n")
+       hho.classical_stabparam = false;
+       assemble();
+       solve();
+       local rl_wsp = compute_return_loss(5);
+       local err_wsp = compute_error();
+       print("Error (wsp): ", err_wsp);
+       silo.filename = "wsp_" .. v .. ".silo";
+       save_to_silo();
+        fh:write(v .. " " .. rl_csp .. " " .. err_csp .. " " .. rl_wsp .. " " .. err_wsp .. "\n")
     end
     fh:close();
 end
