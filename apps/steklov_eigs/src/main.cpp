@@ -467,23 +467,26 @@ steklov_solver(sol::state& lua, Mesh& msh)
     disk::dynamic_vector<T> ones = disk::dynamic_vector<T>::Ones(found_eigs);
     disk::dynamic_vector<T> num_eigs = eigvals.segment(0,found_eigs)-ones;
     disk::dynamic_vector<T> ana_eigs = disk::dynamic_vector<T>::Zero(found_eigs);
-    //for (size_t i = 0; i < found_eigs; i++)
-    //    ana_eigs(i) = i * M_PI * std::tanh(i*M_PI);
 
-    const size_t tmp_eigs = 5;
-    const size_t tmp_len = ((tmp_eigs+2)*(tmp_eigs+1))/2;
-    disk::dynamic_vector<T> ana_eigs_tmp = disk::dynamic_vector<T>::Zero(tmp_len);
-    size_t pos = 0;
-    for (size_t im = 0; im <= tmp_eigs; im++) {
-        for (size_t n = 0; n <= im; n++) {
-            auto m = im - n;
-            auto l = std::sqrt(m*m+n*n);
-            ana_eigs_tmp(pos++) = l * M_PI * std::tanh(l*M_PI);
-        }
+    if constexpr (Mesh::dimension == 2) {
+        for (size_t i = 0; i < found_eigs; i++)
+            ana_eigs(i) = i * M_PI * std::tanh(i*M_PI);
     }
-
-    std::sort(ana_eigs_tmp.begin(), ana_eigs_tmp.end());
-    ana_eigs = ana_eigs_tmp.head(found_eigs);
+    else {
+        const size_t tmp_eigs = 5;
+        const size_t tmp_len = ((tmp_eigs+2)*(tmp_eigs+1))/2;
+        disk::dynamic_vector<T> ana_eigs_tmp = disk::dynamic_vector<T>::Zero(tmp_len);
+        size_t pos = 0;
+        for (size_t im = 0; im <= tmp_eigs; im++) {
+            for (size_t n = 0; n <= im; n++) {
+                auto m = im - n;
+                auto l = std::sqrt(m*m+n*n);
+                ana_eigs_tmp(pos++) = l * M_PI * std::tanh(l*M_PI);
+            }
+        }
+        std::sort(ana_eigs_tmp.begin(), ana_eigs_tmp.end());
+        ana_eigs = ana_eigs_tmp.head(found_eigs);
+    }
     
     std::cout << "Mesh h = " << disk::average_diameter(msh) << std::endl;
     std::cout << "Num: " << num_eigs.transpose() << std::endl;
@@ -523,11 +526,11 @@ steklov_solver(sol::state& lua, Mesh& msh)
 
 int main(int argc, char **argv)
 {
-    if (argc < 2)
-    {
-        std::cout << "Usage: " << argv[0] << " <mesh filename>" << std::endl;
-        return 1;
-    }
+    //if (argc < 2)
+    //{
+    //    std::cout << "Usage: " << argv[0] << " <mesh filename>" << std::endl;
+    //    return 1;
+    //}
 
     sol::state lua;
 
@@ -544,7 +547,18 @@ int main(int argc, char **argv)
 
     using T = double;
 
-    std::string mesh_filename = argv[1];
+    std::string mesh_filename;
+    if (argc > 1)
+        mesh_filename = argv[1];
+
+    if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(mesh_filename.c_str(), msh);
+        steklov_solver(lua, msh);
+        return 0;
+    }
         
 #ifdef HAVE_GMSH
     /* GMSH 2D simplicials */
@@ -574,11 +588,15 @@ int main(int argc, char **argv)
 
         steklov_solver(lua, msh);
     }
-#else
-    std::cout << "GMSH support not compiled. Exiting." << std::endl;
-    return 1;
 #endif
 
+    size_t level = lua["mesh_level"].get_or(2);
+
+    using mesh_type = disk::generic_mesh<T,2>;
+    mesh_type msh;
+    auto mesher = disk::make_fvca5_hex_mesher(msh);
+    mesher.make_level(level);
+    steklov_solver(lua, msh);
 
     return 0;
 }

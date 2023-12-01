@@ -1,11 +1,11 @@
 
 sim.mesh_filename = "full_validation.geo3s"
 sim.frequency = 270e6
-sim.order = 1
+sim.order = 2
 
 silo.filename = "output.silo"
 
-epsr = 4;
+epsr = 64;
 
 materials.epsilon = function (tag, x, y, z)
     if tag == 2 then
