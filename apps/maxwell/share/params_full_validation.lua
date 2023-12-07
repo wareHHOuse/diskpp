@@ -1,7 +1,7 @@
 
 sim.mesh_filename = "full_validation.geo3s"
 sim.frequency = 270e6
-sim.order = 2
+sim.order = 1
 
 silo.filename = "output.silo"
 

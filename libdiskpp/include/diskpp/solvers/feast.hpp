@@ -183,7 +183,8 @@ struct feast_eigensolver_params
 {
     bool    verbose;
     int     tolerance;
-    T       min_eigval, max_eigval;
+    T       min_eigval;
+    T       max_eigval;
     int     subspace_size;
     int     eigvals_found;
     int     feast_info;
