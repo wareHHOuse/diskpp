@@ -566,12 +566,14 @@ check_error(sol::state& lua, const Config& config, State& state)
     else {
         const size_t tmp_eigs = 5;
         const size_t tmp_len = ((tmp_eigs+2)*(tmp_eigs+1))/2;
-        dv ana_eigs_tmp = dv::Zero(tmp_len);
+        dv ana_eigs_tmp = dv::Zero(tmp_len-1);
         size_t pos = 0;
         for (size_t im = 0; im <= tmp_eigs; im++) {
             for (size_t n = 0; n <= im; n++) {
                 auto m = im - n;
                 auto l = std::sqrt(m*m+n*n);
+                if (im == 0 and n == 0)
+                    continue;
                 ana_eigs_tmp(pos++) = l * M_PI * std::tanh(l*M_PI);
             }
         }
