@@ -499,7 +499,7 @@ public:
     simple_mesher(mesh_type& msh)
         : storage( msh.backend_storage() )
     {
-        auto rot = 0.4;
+        auto rot = 0.0;
         /* Init the first level of the mesh */
         storage->points.push_back( point_type(0.0, 0.0) );
         auto pi0 = point_identifier<2>(0);
