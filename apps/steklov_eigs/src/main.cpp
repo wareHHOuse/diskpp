@@ -448,6 +448,8 @@ solve(const Config& config, State& state)
 
     if (disk::feast_status::success != ret) {
         std::cout << "FEAST algorithm did not converge: "<< ret << std::endl;
+        state.eigvecs = dm::Zero(0,0);
+        state.eigvals = dv::Zero(0);
         return -1;
     }
 
