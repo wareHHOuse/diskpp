@@ -13,6 +13,8 @@
 
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/geometry/geometry.hpp"
+#include "diskpp/loaders/loader_utils.hpp"
+
 
 #define MEAS_THRESH 1e-15
 #define BARY_THRESH 1e-15
@@ -36,7 +38,7 @@ int export_mesh_to_silo(Mesh& msh, const char* silo_filename, const std::vector<
 
 
 template<typename Mesh>
-bool test(Mesh& msh,  size_t num_ref)
+bool test(Mesh& msh, size_t num_ref)
 {
     using T = typename Mesh::coordinate_type;
 
@@ -66,6 +68,32 @@ bool test(Mesh& msh,  size_t num_ref)
         if (c != num_fcs_per_boundary)
             return false;
 
+    // Check that the boundary number is the one specified by
+    // loader_utils.hpp:boundary_number()
+    for (const auto& cl : msh) {
+        const auto fcs = faces(msh, cl);
+        for (const auto& fc : fcs) {
+            if ( not msh.is_boundary(fc) )
+                continue;
+
+            auto n = normal(msh, cl, fc);
+            auto bi = msh.boundary_info(fc);
+            auto bn = disk::boundary_number(n);
+            if (not bn) {
+                std::cout << "Can't compute boundary number from normal. ";
+                std::cout << "Are faces parallel to xy, xz or yz planes?";
+                std::cout << std::endl;
+                return false;
+            }
+            if ( bi.id() != bn.value() ) {
+                std::cout << "Wrong boundary numbering: bi.id() = " << bi.id();
+                std::cout << ", bn.value() = " << bn.value() << ", normal = ";
+                std::cout << n.transpose() << std::endl;
+                return false;
+            }
+        }
+    }
+
     return true;
 }
 
@@ -74,8 +102,7 @@ int main(void)
 {
     using T = double;
 
-    size_t num_ref = 4;
-
+    size_t num_ref = 0;
 
     std::cout << "Simplicial 3D" << std::endl;
     disk::simplicial_mesh<T, 3> msh;

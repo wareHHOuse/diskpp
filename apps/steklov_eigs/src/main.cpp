@@ -33,6 +33,60 @@
 
 #include <Eigen/Eigenvalues>
 
+
+#include "lua/mesh.hpp"
+#include "lua/hho.hpp"
+#include "lua/feast.hpp"
+
+
+template<typename T>
+struct steklov_solver_configuration {
+    disk::lua::mesh_parameters          mesh;
+    disk::lua::hho_parameters           hho;
+    disk::feast_eigensolver_params<T>   feast;
+};
+
+
+
+
+template<typename T>
+void register_my_usertypes(sol::state& lua, steklov_solver_configuration<T>& config)
+{
+    disk::lua::register_mesh_usertypes(lua);
+    disk::lua::register_hho_usertypes(lua);
+    disk::lua::register_feast_usertypes<T>(lua);
+
+    using ssc_t = steklov_solver_configuration<T>;
+    sol::usertype<ssc_t> ssct = lua.new_usertype<ssc_t>(
+        "steklov_solver_configuration",
+        sol::constructors<ssc_t()>()
+    );
+    ssct["mesh"] = &ssc_t::mesh;
+    ssct["hho"] = &ssc_t::hho;
+    ssct["feast"] = &ssc_t::feast;
+    lua["config"] = &config;
+    config.feast.fis = disk::feast_inner_solver::mumps;
+}
+
+template<typename T>
+bool
+lua_init_context(sol::state& lua, steklov_solver_configuration<T>& config)
+{
+    lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::table, sol::lib::string);
+
+    register_my_usertypes(lua, config);
+
+    lua["mesh"] = lua.create_table();
+    lua["hho"] = lua.create_table();
+    lua["feast"] = lua.create_table();
+    lua["boundary"] = lua.create_table();
+
+    auto sf = lua.safe_script_file("steklov.lua");
+
+    return sf.valid();
+}
+
+
 template<typename Mesh>
 class hho_assembler_steklov
 {
@@ -250,12 +304,35 @@ public:
     }
 };
 
+
 enum class boundary_type {
     internal,
     dirichlet,
     neumann,
     robin,
     steklov
+};
+
+template<typename Mesh>
+struct hho_steklov_solver_state
+{
+    using mesh_type = Mesh;
+    using cell_type = typename Mesh::cell_type;
+    using face_type = typename Mesh::face_type;
+    using scalar_type = typename Mesh::coordinate_type;
+    using assembler_type = hho_assembler_steklov<Mesh>;
+    using vector_type = disk::dynamic_vector<scalar_type>;
+
+    mesh_type                           msh;
+    assembler_type                      assm;
+    disk::dynamic_vector<scalar_type>   eigvals;
+    disk::dynamic_matrix<scalar_type>   eigvecs;
+    disk::dynamic_matrix<scalar_type>   eigvecs_full;
+
+    std::vector<boundary_type>          bndtype;
+    std::vector<bool>                   is_dirichlet;
+
+    disk::hho_degree_info               hdi;
 };
 
 boundary_type
@@ -278,50 +355,175 @@ lua_get_boundary_type(sol::state& lua, size_t bndid)
     return boundary_type::dirichlet;
 }
 
-template<typename T>
-void
-lua_get_feast_params(sol::state& lua, disk::feast_eigensolver_params<T>& fep)
+
+template<typename Config, typename State>
+static int
+assemble(const Config& config, State& state)
 {
-    sol::optional<int> tolerance_opt = lua["feast"]["tolerance"];
-    if (tolerance_opt)
-        fep.tolerance = tolerance_opt.value();
+    using mesh_type = typename State::mesh_type;
+    using scalar_type = typename State::scalar_type;
+    using dm = disk::dynamic_matrix<scalar_type>;
+    using dv = disk::dynamic_vector<scalar_type>;
 
-    sol::optional<int> subspace_size_opt = lua["feast"]["subspace_size"];
-    if (subspace_size_opt)
-        fep.subspace_size = subspace_size_opt.value();
+    auto cd = state.hdi.cell_degree();
+    auto fd = state.hdi.face_degree();
+    auto rd = state.hdi.reconstruction_degree();
+    auto cbs = disk::scalar_basis_size(cd, mesh_type::dimension);
+    auto fbs = disk::scalar_basis_size(fd, mesh_type::dimension-1);
+    auto rbs = disk::scalar_basis_size(rd, mesh_type::dimension);
 
-    sol::optional<T> eigval_min_opt = lua["feast"]["eigval_min"];
-    if (eigval_min_opt)
-        fep.min_eigval = eigval_min_opt.value();
+    state.assm.initialize(state.msh, state.hdi, state.is_dirichlet);
 
-    sol::optional<T> eigval_max_opt = lua["feast"]["eigval_max"];
-    if (eigval_max_opt)
-        fep.max_eigval = eigval_max_opt.value();
+    for (auto& cl : state.msh)
+    {
+        /* Make standard HHO Laplacian */
+        auto [GR, A] = make_scalar_hho_laplacian(state.msh, cl, state.hdi);
+        dm S = make_scalar_hho_stabilization(state.msh, cl, GR, state.hdi);
+        dm L = A+S;
 
-    sol::optional<bool> verbose_opt = lua["feast"]["verbose"];
-    if (verbose_opt)
-        fep.verbose = verbose_opt.value();
+        /* Make face mass matrices */
+        auto fcs = faces(state.msh, cl);
 
-    sol::optional<std::string> inner_solver_opt = lua["feast"]["inner_solver"];
-    if (inner_solver_opt) {
-        std::string inner_solver = inner_solver_opt.value();
-        if (inner_solver == "eigen_sparselu")
-            fep.fis = disk::feast_inner_solver::eigen_sparselu;
-        if (inner_solver == "mumps")
-            fep.fis = disk::feast_inner_solver::mumps;
+        dm BFF = dm::Zero(fcs.size()*fbs, fcs.size()*fbs);
+
+        for (size_t face_i = 0; face_i < fcs.size(); face_i++)
+        {
+            const auto& fc = fcs[face_i];
+            auto gfnum = offset(state.msh, fc);
+            assert(gfnum < state.bndtype.size());
+            auto bndtype = state.bndtype[gfnum];
+
+            switch (bndtype) {
+                case boundary_type::dirichlet:
+                case boundary_type::neumann:
+                    continue;
+                    break;
+
+                case boundary_type::robin: {
+                    auto fb = disk::make_scalar_monomial_basis(state.msh, fc, fd);
+                    auto idx = cbs+fbs*face_i;
+                    L.block(idx, idx, fbs, fbs) +=
+                        disk::make_mass_matrix(state.msh, fc, fb);
+                } break;
+
+                case boundary_type::steklov: {
+                    auto fb = disk::make_scalar_monomial_basis(state.msh, fc, fd);
+                    auto idx = fbs*face_i;
+                    L.block(cbs+idx, cbs+idx, fbs, fbs) +=
+                        disk::make_mass_matrix(state.msh, fc, fb);
+                    BFF.block(idx, idx, fbs, fbs) =
+                        disk::make_mass_matrix(state.msh, fc, fb);
+                } break;
+
+                case boundary_type::internal:
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        dm LC = disk::static_condensation(L, cbs);
+        state.assm.assemble(state.msh, cl, LC, BFF);
     }
+
+    state.assm.finalize();
+
+    return 0;
 }
 
-void
-lua_get_hho_params(sol::state& lua, size_t& order)
+template<typename Config, typename State>
+static int
+solve(const Config& config, State& state)
 {
-    sol::optional<size_t> order_opt = lua["hho"]["order"];
-    if (order_opt)
-        order = order_opt.value();
+    using mesh_type = typename State::mesh_type;
+    using scalar_type = typename State::scalar_type;
+    using dm = disk::dynamic_matrix<scalar_type>;
+    using dv = disk::dynamic_vector<scalar_type>;
+
+    auto cd = state.hdi.cell_degree();
+    auto cbs = disk::scalar_basis_size(cd, mesh_type::dimension);
+
+    auto ret = disk::feast(config.feast, state.assm.LHS, state.assm.RHS,
+        state.eigvecs, state.eigvals);
+
+    if (disk::feast_status::success != ret) {
+        std::cout << "FEAST algorithm did not converge: "<< ret << std::endl;
+        state.eigvecs = dm::Zero(0,0);
+        state.eigvals = dv::Zero(0);
+        return -1;
+    }
+
+    std::cout << "Eigenvalues found: " << state.eigvals.size() << std::endl;
+    auto found_eigs = state.eigvals.size();
+
+    if (found_eigs == 0)
+        return 0;
+
+    
+    state.eigvecs_full = dm::Zero(cbs*state.msh.cells_size(), found_eigs);
+    size_t cl_i = 0;
+    for (auto& cl : state.msh)
+    {
+        auto [GR, A] = make_scalar_hho_laplacian(state.msh, cl, state.hdi);
+        dm S = make_scalar_hho_stabilization(state.msh, cl, GR, state.hdi);
+        dm L = A+S;
+        dm leigs = state.assm.get_element_dofs(state.msh, cl, state.eigvecs);
+        dm leigs_full = disk::static_decondensation(L, leigs);
+
+        auto row = cl_i*cbs;
+        state.eigvecs_full.block(row, 0, cbs, found_eigs) =
+            leigs_full.block(0, 0, cbs, found_eigs);
+
+        cl_i++;
+    }
+
+    return 0;
+}
+
+template<typename Config, typename State>
+static int
+export_to_visit(const Config& config, State& state)
+{
+    using mesh_type = typename State::mesh_type;
+    using scalar_type = typename State::scalar_type;
+    using dm = disk::dynamic_matrix<scalar_type>;
+    using dv = disk::dynamic_vector<scalar_type>;
+
+    auto found_eigs = state.eigvals.size();
+
+    if (0 == found_eigs) {
+        std::cout << "Warning: No eigenvalues found, not exporting to Silo DB.";
+        std::cout << std::endl;
+        return 1; 
+    }
+
+    disk::silo_database db;
+    db.create("steklov.silo");
+    db.add_mesh(state.msh, "mesh");
+
+    auto cd = state.hdi.cell_degree();
+    auto cbs = disk::scalar_basis_size(cd, mesh_type::dimension);
+
+    dm plot_eigvecs = dm::Zero(state.msh.cells_size(), found_eigs);
+
+    size_t cl_i = 0;
+    for (auto& cl : state.msh) {
+        plot_eigvecs.row(cl_i) = state.eigvecs_full.row(cl_i*cbs);
+        cl_i++;
+    }
+
+    for (size_t i = 0; i < found_eigs; i++) {
+        std::string vname = "eig_" + std::to_string(i);
+        dv eigvec = plot_eigvecs.col(i);
+        db.add_variable("mesh", vname, eigvec, disk::zonal_variable_t);
+    }
+
+    return 0;
 }
 
 template<typename Mesh>
-void
+static void
 detect_boundaries(sol::state& lua, Mesh& msh, std::vector<boundary_type>& bndtypes)
 {
     bndtypes.reserve( msh.faces_size() );
@@ -345,142 +547,36 @@ detect_boundaries(sol::state& lua, Mesh& msh, std::vector<boundary_type>& bndtyp
     assert(bndtypes.size() == msh.faces_size());
 }
 
-template<typename Mesh>
-void
-steklov_solver(sol::state& lua, Mesh& msh)
+template<typename Config, typename State>
+static int
+check_error(sol::state& lua, const Config& config, State& state)
 {
-    using T = typename Mesh::coordinate_type;
+    using mesh_type = typename State::mesh_type;
+    using scalar_type = typename State::scalar_type;
+    using dm = disk::dynamic_matrix<scalar_type>;
+    using dv = disk::dynamic_vector<scalar_type>;
 
-    hho_assembler_steklov<Mesh> assm;
+    auto found_eigs = state.eigvals.size();
 
-    size_t degree = 0;
-    lua_get_hho_params(lua, degree);
-    auto cd = degree;
-    auto fd = degree;
-    auto rd = degree+1;
-    disk::hho_degree_info hdi;
-    hdi.cell_degree(cd);
-    hdi.face_degree(fd);
-    hdi.reconstruction_degree(rd);
-
-    auto cbs = disk::scalar_basis_size(cd, Mesh::dimension);
-    auto fbs = disk::scalar_basis_size(fd, Mesh::dimension-1);
-    auto rbs = disk::scalar_basis_size(rd, Mesh::dimension);
-
-    std::vector<bool> is_dirichlet( msh.faces_size(), false );
-    std::vector<boundary_type> bndtypes;
-    detect_boundaries(lua, msh, bndtypes);
-    assert(bndtypes.size() == is_dirichlet.size());
-    for (size_t i = 0; i < bndtypes.size(); i++)
-        if (bndtypes[i] == boundary_type::dirichlet)
-            is_dirichlet[i] = true;
-
-    assm.initialize(msh, hdi, is_dirichlet);
-
-    for (auto& cl : msh)
-    {
-        auto [GR, A] = make_scalar_hho_laplacian(msh, cl, hdi);
-        disk::dynamic_matrix<T> S = make_scalar_hho_stabilization(msh, cl, GR, hdi);
-        disk::dynamic_matrix<T> L = A+S;
-
-        auto fcs = faces(msh, cl);
-
-        disk::dynamic_matrix<T> BFF =
-            disk::dynamic_matrix<T>::Zero(fcs.size()*fbs, fcs.size()*fbs);
-
-        for (size_t face_i = 0; face_i < fcs.size(); face_i++)
-        {
-            const auto& fc = fcs[face_i];
-            auto gfnum = offset(msh, fc);
-            auto bndtype = bndtypes.at(gfnum);
-
-            switch (bndtype) {
-                case boundary_type::dirichlet:
-                case boundary_type::neumann:
-                    continue;
-                    break;
-
-                case boundary_type::robin: {
-                    auto fb = disk::make_scalar_monomial_basis(msh, fc, fd);
-                    auto idx = cbs+fbs*face_i;
-                    L.block(idx, idx, fbs, fbs) +=
-                        disk::make_mass_matrix(msh, fc, fb);
-                } break;
-
-                case boundary_type::steklov: {
-                    auto fb = disk::make_scalar_monomial_basis(msh, fc, fd);
-                    auto idx = fbs*face_i;
-                    L.block(cbs+idx, cbs+idx, fbs, fbs) +=
-                        disk::make_mass_matrix(msh, fc, fb);
-                    BFF.block(idx, idx, fbs, fbs) =
-                        disk::make_mass_matrix(msh, fc, fb);
-                } break;
-
-                case boundary_type::internal :
-                    break;
-
-                default:
-                    break;
-            }
-        }
-
-        disk::dynamic_matrix<T> LC = disk::static_condensation(L, cbs);
-        assm.assemble(msh, cl, LC, BFF);
-    }
-
-    assm.finalize();
-
-
-    disk::dynamic_matrix<T> eigvecs;
-    disk::dynamic_vector<T> eigvals;
-
-
-    disk::feast_eigensolver_params<T> fep;
-    fep.verbose = true;
-    fep.tolerance = 8;
-    fep.min_eigval = 1;
-    fep.max_eigval = 6;
-    fep.subspace_size = 30;
-    fep.max_iter = 10;
-    fep.fis = disk::feast_inner_solver::eigen_sparselu;
-    lua_get_feast_params(lua, fep);
-
-    int retries = lua["feast"]["retries"].get_or(20);
-    bool use_mkl_feast = lua["feast"]["use_mkl"].get_or(false);
-
-    if (use_mkl_feast) {
-        bool s = false;
-        size_t retry = 0;
-        do {
-            int ret = disk::generalized_eigenvalue_solver(fep, assm.LHS, assm.RHS, eigvecs, eigvals);
-            s = ret != -2;
-        } while (!s && retry++ < retries);
-    }
-    else {
-        auto ret = disk::feast(fep, assm.LHS, assm.RHS, eigvecs, eigvals);
-        std::cout << ret << std::endl;
-    }
-
-    std::cout << "Found eigs: " << fep.eigvals_found << std::endl;
-    auto found_eigs = fep.eigvals_found;
-
-    disk::dynamic_vector<T> ones = disk::dynamic_vector<T>::Ones(found_eigs);
-    disk::dynamic_vector<T> num_eigs = eigvals.segment(0,found_eigs)-ones;
-    disk::dynamic_vector<T> ana_eigs = disk::dynamic_vector<T>::Zero(found_eigs);
-
-    if constexpr (Mesh::dimension == 2) {
+    dv ones = dv::Ones(found_eigs);
+    dv num_eigs = state.eigvals.segment(0,found_eigs)-ones;
+    dv ana_eigs = dv::Zero(found_eigs);
+    
+    if constexpr (mesh_type::dimension == 2) {
         for (size_t i = 0; i < found_eigs; i++)
-            ana_eigs(i) = i * M_PI * std::tanh(i*M_PI);
+            ana_eigs(i) = (i+1) * M_PI * std::tanh((i+1)*M_PI);
     }
     else {
         const size_t tmp_eigs = 5;
         const size_t tmp_len = ((tmp_eigs+2)*(tmp_eigs+1))/2;
-        disk::dynamic_vector<T> ana_eigs_tmp = disk::dynamic_vector<T>::Zero(tmp_len);
+        dv ana_eigs_tmp = dv::Zero(tmp_len-1);
         size_t pos = 0;
         for (size_t im = 0; im <= tmp_eigs; im++) {
             for (size_t n = 0; n <= im; n++) {
                 auto m = im - n;
                 auto l = std::sqrt(m*m+n*n);
+                if (im == 0 and n == 0)
+                    continue;
                 ana_eigs_tmp(pos++) = l * M_PI * std::tanh(l*M_PI);
             }
         }
@@ -488,115 +584,193 @@ steklov_solver(sol::state& lua, Mesh& msh)
         ana_eigs = ana_eigs_tmp.head(found_eigs);
     }
     
-    std::cout << "Mesh h = " << disk::average_diameter(msh) << std::endl;
-    std::cout << "Num: " << num_eigs.transpose() << std::endl;
+    std::ios coutfmt(NULL);
+    coutfmt.copyfmt(std::cout);
+    std::cout << "Mesh h = " << disk::average_diameter(state.msh) << std::endl;
+    std::cout << "Num: " << std::setprecision(10) << num_eigs.transpose() << std::endl;
     std::cout << "Ana: " <<  ana_eigs.transpose() << std::endl;
-    std::cout << "Err: " <<  (num_eigs - ana_eigs).transpose().cwiseAbs() << std::endl;
+    dv errs = (num_eigs - ana_eigs).transpose().cwiseAbs();
+    std::cout << std::setprecision(4) << std::setw(7) << std::scientific;
+    for (size_t i = 0; i < errs.size(); i++)
+        std::cout << errs(i) << "\t";
+    std::cout << std::endl;
+    std::cout.copyfmt(coutfmt);
 
-    if (found_eigs == 0)
-        return;
+    return 0;
+}
 
-    disk::silo_database db;
-    db.create("steklov.silo");
-    db.add_mesh(msh, "mesh");
+template<typename Config, typename State>
+static int
+steklov_solver(sol::state& lua, const Config& config, State& state)
+{
+    auto cd = config.hho.order;
+    auto fd = config.hho.order;
+    auto rd = config.hho.order+1;
+    state.hdi.cell_degree(cd);
+    state.hdi.face_degree(fd);
+    state.hdi.reconstruction_degree(rd);
 
-    disk::dynamic_matrix<T> es = disk::dynamic_matrix<T>::Zero(msh.cells_size(), found_eigs);
+    state.is_dirichlet.resize( state.msh.faces_size(), false );
+    detect_boundaries(lua, state.msh, state.bndtype);
+    std::transform(state.bndtype.begin(), state.bndtype.end(), state.is_dirichlet.begin(),
+        [](const boundary_type& b) {
+            return boundary_type::dirichlet == b;
+        }
+    );
 
-    size_t cl_i = 0;
-    for (auto& cl : msh)
-    {
-        auto [GR, A] = make_scalar_hho_laplacian(msh, cl, hdi);
-        disk::dynamic_matrix<T> S = make_scalar_hho_stabilization(msh, cl, GR, hdi);
-        disk::dynamic_matrix<T> L = A+S;
-        disk::dynamic_matrix<T> leigs = assm.get_element_dofs(msh, cl, eigvecs);
-        disk::dynamic_matrix<T> leigs_full = disk::static_decondensation(L, leigs);
+    assemble(config, state);
+    solve(config, state);
+    export_to_visit(config, state);
+    check_error(lua, config, state);
 
-        es.row(cl_i) = leigs_full.row(0);
-        cl_i++;
+    return 0;
+}
+
+template<typename T>
+static int
+run_mesh_internal(sol::state& lua, const steklov_solver_configuration<T>& config)
+{
+    using namespace disk::lua;
+
+    switch (config.mesh.type) {
+
+        case internal_mesh_type::triangles: {
+            using mesh_type = disk::simplicial_mesh<T,2>;
+            hho_steklov_solver_state<mesh_type> state;
+            auto mesher = disk::make_simple_mesher(state.msh);
+            for (size_t i = 0; i < config.mesh.reflevel; i++)
+                mesher.refine();
+            return steklov_solver(lua, config, state);
+        } break;
+
+        case internal_mesh_type::quadrangles: {
+            using mesh_type = disk::cartesian_mesh<T,2>;
+            hho_steklov_solver_state<mesh_type> state;
+            auto mesher = disk::make_simple_mesher(state.msh);
+            for (size_t i = 0; i < config.mesh.reflevel; i++)
+                mesher.refine();
+            return steklov_solver(lua, config, state);
+        } break;
+
+        case internal_mesh_type::hexagons: {
+            using mesh_type = disk::generic_mesh<T,2>;
+            hho_steklov_solver_state<mesh_type> state;
+            auto mesher = disk::make_fvca5_hex_mesher(state.msh);
+            mesher.make_level(config.mesh.reflevel);
+            return steklov_solver(lua, config, state);
+        } break;
+
+        case internal_mesh_type::tetrahedra: {
+            using mesh_type = disk::simplicial_mesh<T,3>;
+            hho_steklov_solver_state<mesh_type> state;
+            auto mesher = disk::make_simple_mesher(state.msh);
+            for (size_t i = 0; i < config.mesh.reflevel; i++)
+                mesher.refine();
+            return steklov_solver(lua, config, state);
+        } break;
+
+        default:
+            std::cout << "config.mesh.type: invalid value" << std::endl;
+            return -1;
     }
 
-    for (size_t i = 0; i < found_eigs; i++)
+    return 0;
+}
+
+template<typename T>
+static int
+run_mesh_from_file(sol::state& lua, const steklov_solver_configuration<T>& config)
+{
+    auto& fname = config.mesh.filename;
+
+    if (std::regex_match(fname, std::regex(".*\\.typ1$") ))
     {
-        std::string vname = "eig_" + std::to_string(i);
-        disk::dynamic_vector<T> e = es.col(i);
-        db.add_variable("mesh", vname, e, disk::zonal_variable_t);
+        std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
+        using mesh_type = disk::generic_mesh<T, 2>;
+        hho_steklov_solver_state<mesh_type> state;
+        disk::load_mesh_fvca5_2d<T>(fname.c_str(), state.msh);
+        return steklov_solver(lua, config, state);
     }
 
+    if (std::regex_match(fname, std::regex(".*\\.msh$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
+        using mesh_type = disk::generic_mesh<T, 3>;
+        hho_steklov_solver_state<mesh_type> state;
+        disk::load_mesh_fvca6_3d<T>(fname.c_str(), state.msh);
+        return steklov_solver(lua, config, state);
+    }
+    
+#ifdef HAVE_GMSH
+    /* GMSH 2D simplicials */
+    if (std::regex_match(fname, std::regex(".*\\.geo2s$") ))
+    {
+        using mesh_type = disk::simplicial_mesh<T,2>;
+        hho_steklov_solver_state<mesh_type> state;
+        std::cout << "Guessed mesh format: GMSH 2D simplicials" << std::endl;
+        disk::gmsh_geometry_loader<mesh_type> loader;
+        loader.read_mesh(fname);
+        loader.populate_mesh(state.msh);
+        return steklov_solver(lua, config, state);
+    }
+
+    /* GMSH 3D simplicials */
+    if (std::regex_match(fname, std::regex(".*\\.geo3s$") ))
+    {
+        using mesh_type = disk::simplicial_mesh<T,3>;
+        hho_steklov_solver_state<mesh_type> state;
+        std::cout << "Guessed mesh format: GMSH 3D simplicials" << std::endl;
+        disk::gmsh_geometry_loader<mesh_type> loader;
+        loader.read_mesh(fname);
+        loader.populate_mesh(state.msh);
+        return steklov_solver(lua, config, state);
+    }
+#endif
+
+    return -1;
+}
+
+template<typename T>
+int
+run(sol::state& lua, const steklov_solver_configuration<T>& config)
+{
+    using namespace disk::lua;
+
+    int ret = 0;
+    switch (config.mesh.source)
+    {
+        case mesh_source::internal:
+            ret = run_mesh_internal(lua, config);
+            break;
+
+        case mesh_source::file:
+            ret = run_mesh_from_file(lua, config);
+            break;
+
+        case mesh_source::invalid:
+            std::cout << "Mesh was not specified." << std::endl;
+            return -1;
+    }
+
+    return ret;
 }
 
 int main(int argc, char **argv)
 {
-    //if (argc < 2)
-    //{
-    //    std::cout << "Usage: " << argv[0] << " <mesh filename>" << std::endl;
-    //    return 1;
-    //}
+    using T = double;
 
     sol::state lua;
+    steklov_solver_configuration<T> config;
 
-    lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::table, sol::lib::string);
-    lua["boundary"] = lua.create_table();
-    lua["feast"] = lua.create_table();
-    lua["hho"] = lua.create_table();
-    auto sf = lua.safe_script_file("steklov.lua");
-    if (not sf.valid())
+    if ( not lua_init_context(lua, config) )
     {
         std::cout << "Problem in Lua config" << std::endl;
         return 1;
     }
 
-    using T = double;
+    lua["run"] = [&](){ run(lua, config); };
 
-    std::string mesh_filename;
-    if (argc > 1)
-        mesh_filename = argv[1];
-
-    if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
-    {
-        std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
-        disk::generic_mesh<T, 2> msh;
-        disk::load_mesh_fvca5_2d<T>(mesh_filename.c_str(), msh);
-        steklov_solver(lua, msh);
-        return 0;
-    }
-        
-#ifdef HAVE_GMSH
-    /* GMSH 2D simplicials */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.geo2s$") ))
-    {
-        using mesh_type = disk::simplicial_mesh<T,2>;
-        mesh_type msh;
-        std::cout << "Guessed mesh format: GMSH 2D simplicials" << std::endl;
-        disk::gmsh_geometry_loader<mesh_type> loader;
-    
-        loader.read_mesh(mesh_filename);
-        loader.populate_mesh(msh);
-
-        steklov_solver(lua, msh);
-    }
-
-    /* GMSH 3D simplicials */
-    if (std::regex_match(mesh_filename, std::regex(".*\\.geo3s$") ))
-    {
-        using mesh_type = disk::simplicial_mesh<T,3>;
-        mesh_type msh;
-        std::cout << "Guessed mesh format: GMSH 3D simplicials" << std::endl;
-        disk::gmsh_geometry_loader<mesh_type> loader;
-    
-        loader.read_mesh(mesh_filename);
-        loader.populate_mesh(msh);
-
-        steklov_solver(lua, msh);
-    }
-#endif
-
-    size_t level = lua["mesh_level"].get_or(2);
-
-    using mesh_type = disk::generic_mesh<T,2>;
-    mesh_type msh;
-    auto mesher = disk::make_fvca5_hex_mesher(msh);
-    mesher.make_level(level);
-    steklov_solver(lua, msh);
+    lua["solution_process"]();
 
     return 0;
 }

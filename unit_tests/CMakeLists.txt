@@ -47,3 +47,7 @@ add_test(NAME simple_mesher_3D COMMAND simple_mesher_3D)
 add_executable(harmonic harmonic.cpp)
 target_link_libraries(harmonic ${LINK_LIBS})
 add_test(NAME harmonic COMMAND harmonic)
+
+add_executable(simple_meshers_2D_boundary_numbering simple_meshers_2D_boundary_numbering.cpp)
+target_link_libraries(simple_meshers_2D_boundary_numbering ${LINK_LIBS})
+add_test(NAME simple_meshers_2D_boundary_numbering COMMAND simple_meshers_2D_boundary_numbering)

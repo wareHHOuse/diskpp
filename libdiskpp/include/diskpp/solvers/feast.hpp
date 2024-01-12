@@ -183,7 +183,8 @@ struct feast_eigensolver_params
 {
     bool    verbose;
     int     tolerance;
-    T       min_eigval, max_eigval;
+    T       min_eigval;
+    T       max_eigval;
     int     subspace_size;
     int     eigvals_found;
     int     feast_info;
@@ -233,7 +234,7 @@ static double quadrature_ws[] = {
  */
 
 feast_status
-feast(feast_eigensolver_params<double>& params,
+feast(const feast_eigensolver_params<double>& params,
     const Eigen::SparseMatrix<double>& A,
     const Eigen::SparseMatrix<double>& B,
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& eigvecs,
@@ -245,7 +246,7 @@ feast(feast_eigensolver_params<double>& params,
     using csm = Eigen::SparseMatrix<std::complex<double>>;
     using eigsolver = Eigen::SelfAdjointEigenSolver<rdm>;
     using generalized_eigsolver = Eigen::GeneralizedSelfAdjointEigenSolver<rdm>;
-    params.eigvals_found = 0;
+    int eigvals_found = 0;
     const double *xs = quadrature_xs;
     const double *omegas = quadrature_ws;
 
@@ -366,7 +367,7 @@ feast(feast_eigensolver_params<double>& params,
         }
 
         if (maxres < std::pow(10,-params.tolerance)) {
-            params.eigvals_found =  eigvals.size();
+            eigvals_found = eigvals.size();
             return feast_status::success;
         }
 

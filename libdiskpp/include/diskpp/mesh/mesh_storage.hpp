@@ -77,6 +77,7 @@ public:
     void   tag(size_t tag) { b_tag = tag; }
 
     bool is_boundary() const { return is_b; }
+    void is_boundary(bool b) { is_b = b; }
 
     bool is_internal() const { return is_int; }
     void is_internal(bool i) { is_int = i; }
