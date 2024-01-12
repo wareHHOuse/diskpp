@@ -65,6 +65,7 @@ void register_my_usertypes(sol::state& lua, steklov_solver_configuration<T>& con
     ssct["hho"] = &ssc_t::hho;
     ssct["feast"] = &ssc_t::feast;
     lua["config"] = &config;
+    config.feast.fis = disk::feast_inner_solver::mumps;
 }
 
 template<typename T>
@@ -688,6 +689,15 @@ run_mesh_from_file(sol::state& lua, const steklov_solver_configuration<T>& confi
         using mesh_type = disk::generic_mesh<T, 2>;
         hho_steklov_solver_state<mesh_type> state;
         disk::load_mesh_fvca5_2d<T>(fname.c_str(), state.msh);
+        return steklov_solver(lua, config, state);
+    }
+
+    if (std::regex_match(fname, std::regex(".*\\.msh$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
+        using mesh_type = disk::generic_mesh<T, 3>;
+        hho_steklov_solver_state<mesh_type> state;
+        disk::load_mesh_fvca6_3d<T>(fname.c_str(), state.msh);
         return steklov_solver(lua, config, state);
     }
     

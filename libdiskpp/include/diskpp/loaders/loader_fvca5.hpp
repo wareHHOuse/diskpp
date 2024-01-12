@@ -1,7 +1,7 @@
 /*
  * DISK++, a template library for DIscontinuous SKeletal methods.
  *
- * Matteo Cicuttin (C) 2023
+ * Matteo Cicuttin (C) 2023, 2024
  * matteo.cicuttin@polito.it
  *
  * Politecnico di Torino - DISMA
@@ -495,8 +495,22 @@ public:
         storage->subdomain_info.resize( surfaces.size() );
         std::transform(surfaces.begin(), surfaces.end(), storage->subdomain_info.begin(), get_id);
 
-        
         mark_internal_faces(msh);
+
+        /* FVCA5 meshes do not provide boundary information. As usually they represent
+         * the unit square, we try to renumber according to the normals of the boundary
+         * surfaces. If it fails, everything is marked as boundary 0.
+         */
+
+        std::vector<boundary_descriptor> bds_save = storage->boundary_info;
+        auto renumbered = renumber_hypercube_boundaries(msh);
+        if (not renumbered) {
+            std::cout << "Warning: unable to renumber FVCA5 mesh boundaries, ";
+            std::cout << "defaulting everyting to 0.\nProbably one of the boundaries ";
+            std::cout << "is not parallel to the x or y axes.";
+            std::cout << std::endl;
+            std::swap(bds_save, storage->boundary_info);
+        }
 
         if (this->verbose())
         {

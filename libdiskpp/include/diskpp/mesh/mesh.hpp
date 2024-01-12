@@ -1,7 +1,7 @@
 /*
  * DISK++, a template library for DIscontinuous SKeletal methods.
  *
- * Matteo Cicuttin (C) 2023
+ * Matteo Cicuttin (C) 2023, 2024
  * matteo.cicuttin@polito.it
  *
  * Politecnico di Torino - DISMA
@@ -78,6 +78,7 @@
 #include <cassert>
 #include <iterator>
 #include <set>
+#include <optional>
 
 #include "ident.hpp"
 
@@ -676,6 +677,7 @@ void mark_internal_faces(Mesh& msh)
     {
         auto nc = neigh_count[i];
         assert( (nc == 0) or (nc == 1) or (nc == 2) );
+        assert(storage->boundary_info.size() == msh.faces_size());
         auto bi = storage->boundary_info.at(i);
         if ( bi.is_boundary() and (nc == 2) )
             bi.is_internal(true);
@@ -686,22 +688,17 @@ void mark_internal_faces(Mesh& msh)
 template<typename Mesh>
 class neighbour_connectivity
 {
-    typedef typename Mesh::cell_type                    cell_type;
-    typedef typename Mesh::face_type                    face_type;
-    typedef std::array<typename cell_type::id_type, 2>  face_owners_type;
-    std::vector<face_owners_type>                       face_owners;
-
-#define NO_OWNER (~0)
+    using cell_type = typename Mesh::cell_type;
+    using face_type = typename Mesh::face_type;
+    using cit = typename cell_type::id_type;
+    using cell_opt = std::optional<cit>;
+    using face_owners_type = std::array<cell_opt, 2>;
+    
+    std::vector<face_owners_type> face_owners;
 
     void compute_connectivity(const Mesh& msh)
     {
         face_owners.resize( msh.faces_size() );
-
-        for (auto& fo : face_owners)
-        {
-            fo[0] = typename cell_type::id_type(NO_OWNER);
-            fo[1] = typename cell_type::id_type(NO_OWNER);
-        }
 
         size_t cell_i = 0;
         for (auto& cl : msh)
@@ -719,11 +716,11 @@ class neighbour_connectivity
                 }
                 auto fc_id = offset(msh, fc);
 
-                auto&  fo = face_owners.at(fc_id);
-                if (fo[0] == NO_OWNER)
-                    fo[0] = typename cell_type::id_type(cell_i);
-                else if (fo[1] == NO_OWNER)
-                    fo[1] = typename cell_type::id_type(cell_i);
+                auto& fo = face_owners.at(fc_id);
+                if (not fo[0])
+                    fo[0] = cit(cell_i);
+                else if (not fo[1])
+                    fo[1] = cit(cell_i);
                 else
                     throw std::logic_error("BUG: a face has max 2 owners");
             }
@@ -749,15 +746,15 @@ public:
 
         auto fo = face_owners.at( fc_ofs );
 
-        if ( fo[0] != cl_ofs )
+        if ( fo[0] and (fo[0] != cl_ofs) )
             std::swap(fo[0], fo[1]);
 
-        assert(fo[0] == cl_ofs);
+        assert(fo[0].value() == cl_ofs);
 
-        if (fo[1] == NO_OWNER)
+        if (not fo[1])
             return std::make_pair(*msh.cells_begin(), false);
 
-        return std::make_pair( *std::next(msh.cells_begin(), fo[1]), true);
+        return std::make_pair( *std::next(msh.cells_begin(), fo[1].value()), true);
     }
 };
 
@@ -766,33 +763,6 @@ auto connectivity_via_faces(const Mesh& msh)
 {
     return neighbour_connectivity<Mesh>(msh);
 }
-
-/*
-template<typename Mesh>
-std::pair<typename Mesh::cell_type, bool>
-neighbour_via(const Mesh& msh,
-              const typename Mesh::cell_type& cl,
-              const typename Mesh::face_type& fc)
-{
-    if ( msh.face_owners.size() != msh.faces.size() )
-        throw std::logic_error("No neighbour information.");
-
-    auto cl_ofs = offset(msh, cl);
-    auto fc_ofs = offset(msh, fc);
-
-    auto fo = msh.face_owners.at( fc_ofs );
-
-    if ( fo[0] != cl_ofs )
-        std::swap(fo[0], fo[1]);
-
-    assert(fo[0] == cl_ofs);
-
-    if (fo[1] == NO_OWNER)
-        return std::make_pair(msh.cells[0], false);
-
-    return std::make_pair(msh.cells.at(fo[1]), true);
-}
- */
 
 template<typename T, size_t DIM, typename Storage>
 typename mesh<T, DIM, Storage>::cell_iterator
