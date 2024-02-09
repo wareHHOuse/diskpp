@@ -29,12 +29,12 @@
 #include <sstream>
 #include <unistd.h>
 
-#include "diskpp/common/colormanip.h"
+#include "colormanip.h"
 
-#include "diskpp/boundary_conditions/boundary_conditions.hpp"
-#include "diskpp/loaders/loader.hpp"
-#include "diskpp/mechanics/NewtonSolver/NewtonSolver.hpp"
-#include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "boundary_conditions/boundary_conditions.hpp"
+#include "loaders/loader.hpp"
+#include "mechanics/NewtonSolver/NewtonSolver.hpp"
+#include "mechanics/behaviors/laws/behaviorlaws.hpp"
 
 struct error_type
 {
@@ -72,7 +72,8 @@ run_hyperelasticity_solver(const Mesh<T, 2, Storage>&      msh,
 
     const T alpha = 0.1;
 
-    auto load = [material_data, alpha](const disk::point<T, 2>& p) -> result_type {
+    auto load = [material_data, alpha](const disk::point<T, 2>& p, const T& time) -> result_type
+    {
         const T lambda = material_data.getLambda();
         const T mu     = material_data.getMu();
 
@@ -82,7 +83,8 @@ run_hyperelasticity_solver(const Mesh<T, 2, Storage>&      msh,
         return result_type{fx, fy};
     };
 
-    auto solution = [material_data, alpha](const disk::point<T, 2>& p) -> result_type {
+    auto solution = [material_data, alpha](const disk::point<T, 2>& p) -> result_type
+    {
         T ux = (1.0 / material_data.getLambda() + alpha) * p.x();
         T uy =
           (1.0 / material_data.getLambda() - alpha / (1.0 + alpha)) * p.y() + 2 * alpha * (cos(2 * M_PI * p.x()) - 1.0);
@@ -139,7 +141,8 @@ run_hyperelasticity_solver(const Mesh<T, 3, Storage>&      msh,
     const T alpha = 0.1;
     const T gamma = 0.1;
 
-    auto load = [material_data, alpha, gamma](const disk::point<T, 3>& p) -> result_type {
+    auto load = [material_data, alpha, gamma](const disk::point<T, 3>& p, const T& time) -> result_type
+    {
         const T lambda = material_data.getLambda();
         const T mu     = material_data.getMu();
 
@@ -149,9 +152,12 @@ run_hyperelasticity_solver(const Mesh<T, 3, Storage>&      msh,
         return mu * M_PI * M_PI * result_type{fx, 0, fz};
     };
 
-    auto solution = [material_data, alpha, gamma](const disk::point<T, 3>& p) -> result_type {
+    auto solution = [material_data, alpha, gamma](const disk::point<T, 3>& p) -> result_type
+    {
         T ux = (1.0 / material_data.getLambda() + alpha) * p.x() + alpha * sin(M_PI * p.y());
-        T uy = -(1.0 / material_data.getLambda() + (alpha + gamma + alpha*gamma)/(1.0 + alpha + gamma + alpha*gamma)) * p.y();
+        T uy =
+          -(1.0 / material_data.getLambda() + (alpha + gamma + alpha * gamma) / (1.0 + alpha + gamma + alpha * gamma)) *
+          p.y();
         T uz = (1.0 / material_data.getLambda() + gamma) * p.z() + gamma * sin(M_PI * p.x());
 
         return result_type{ux, uy, uz};
@@ -573,35 +579,35 @@ main(int argc, char** argv)
         std::cout << "-Tetrahedras fvca6:" << std::endl;
         test_tetrahedra_fvca6<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Tetrahedras netgen:" << std::endl;
         test_tetrahedra_netgen<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Hexahedras fvca6:" << std::endl;
         test_hexahedra_fvca6<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Hexahedras diskpp:" << std::endl;
         test_hexahedra_diskpp<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Polyhedra:" << std::endl;
         test_polyhedra_fvca6<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
         std::cout << " " << std::endl;
     }
     else if (dim == 2)
@@ -611,42 +617,42 @@ main(int argc, char** argv)
         std::cout << "-Triangles fvca5:" << std::endl;
         test_triangles_fvca5<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Triangles netgen:" << std::endl;
         test_triangles_netgen<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Quadrangles fvca5:" << std::endl;
         test_quads_fvca5<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Quadrangles diskpp:" << std::endl;
         test_quads_diskpp<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Hexagons:" << std::endl;
         test_hexagons<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
         std::cout << " " << std::endl;
 
         tc.tic();
         std::cout << "-Kershaws:" << std::endl;
         test_kershaws<RealType>(rp, material_data);
         tc.toc();
-        std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
+        std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
         std::cout << " " << std::endl;
     }
 }
