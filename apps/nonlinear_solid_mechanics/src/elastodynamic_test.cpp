@@ -7,8 +7,7 @@
  *  /_\/_\/_\/_\   methods.
  *
  * This file is copyright of the following authors:
- * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
+ * Nicolas Pignet  (C) 2024                     nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -92,7 +91,18 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>&      msh,
         return -M_PI * M_PI / (lambda + 1) * result_type{fx, fy};
     };
 
-    auto solution = [material_data](const disk::point<T, 2>& p) -> result_type
+    auto displacement = [material_data](const disk::point<T, 2>& p) -> result_type
+    {
+        T time = 1.0;
+        T fx   = sin(2 * M_PI * p.y()) * (cos(2 * M_PI * p.x()) - 1) +
+               1.0 / (1 + material_data.getLambda()) * sin(M_PI * p.x()) * sin(M_PI * p.y());
+        T fy = -sin(2 * M_PI * p.x()) * (cos(2 * M_PI * p.y()) - 1) +
+               1.0 / (1 + material_data.getLambda()) * sin(M_PI * p.x()) * sin(M_PI * p.y());
+
+        return result_type{fx, fy};
+    };
+
+    auto velocity = [material_data](const disk::point<T, 2>& p) -> result_type
     {
         T fx = sin(2 * M_PI * p.y()) * (cos(2 * M_PI * p.x()) - 1) +
                1.0 / (1 + material_data.getLambda()) * sin(M_PI * p.x()) * sin(M_PI * p.y());
@@ -101,6 +111,8 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>&      msh,
 
         return result_type{fx, fy};
     };
+
+    auto acceleration = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0., 0.}; };
 
     auto sigma = [material_data](const disk::point<T, 2>& p) -> grad_type
     {
@@ -135,14 +147,14 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>&      msh,
     };
 
     Bnd_type bnd(msh);
-    bnd.addDirichletEverywhere(solution);
+    bnd.addDirichletEverywhere(displacement);
 
     disk::mechanics::NewtonSolver<mesh_type> nl(msh, bnd, rp);
 
     nl.addBehavior(disk::DeformationMeasure::SMALL_DEF, disk::LawType::ELASTIC);
     nl.addMaterialData(material_data);
 
-    nl.initial_guess(solution);
+    nl.initial_fields(displacement, velocity, acceleration);
 
     if (nl.verbose())
     {
@@ -160,8 +172,8 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>&      msh,
     error.h        = average_diameter(msh);
     error.degree   = rp.m_face_degree;
     error.nb_dof   = nl.numberOfDofs();
-    error.error_L2 = nl.compute_l2_displacement_error(solution);
-    error.error_H1 = nl.compute_H1_error(solution);
+    error.error_L2 = nl.compute_l2_displacement_error(displacement);
+    error.error_H1 = nl.compute_H1_error(displacement);
 
     return error;
 }
@@ -201,7 +213,7 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>&      msh,
         return -M_PI * M_PI / (lambda + 1) * result_type{fx, fy, 0};
     };
 
-    auto solution = [material_data](const disk::point<T, 3>& p) -> result_type
+    auto displacement = [material_data](const disk::point<T, 3>& p) -> result_type
     {
         T fx = sin(2 * M_PI * p.y()) * (cos(2 * M_PI * p.x()) - 1) +
                1.0 / (1 + material_data.getLambda()) * sin(M_PI * p.x()) * sin(M_PI * p.y());
@@ -244,14 +256,14 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>&      msh,
     };
 
     Bnd_type bnd(msh);
-    bnd.addDirichletEverywhere(solution);
+    bnd.addDirichletEverywhere(displacement);
 
     disk::mechanics::NewtonSolver<mesh_type> nl(msh, bnd, rp);
 
     nl.addBehavior(disk::DeformationMeasure::SMALL_DEF, disk::LawType::ELASTIC);
     nl.addMaterialData(material_data);
 
-    nl.initial_guess(solution);
+    nl.initial_guess(displacement);
 
     if (nl.verbose())
     {
@@ -269,8 +281,8 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>&      msh,
     error.h        = average_diameter(msh);
     error.degree   = rp.m_face_degree;
     error.nb_dof   = nl.numberOfDofs();
-    error.error_L2 = nl.compute_l2_displacement_error(solution);
-    error.error_H1 = nl.compute_H1_error(solution);
+    error.error_L2 = nl.compute_l2_displacement_error(displacement);
+    error.error_H1 = nl.compute_H1_error(displacement);
 
     return error;
 }
@@ -633,7 +645,7 @@ main(int argc, char** argv)
     // Elasticity Parameters
     disk::MaterialData<RealType> material_data;
     material_data.setMu(1.0);
-    material_data.setLambda(10E5);
+    material_data.setLambda(1.0);
 
     NewtonSolverParameter<RealType> rp;
     rp.setFaceDegree(degree);
@@ -642,6 +654,15 @@ main(int argc, char** argv)
     rp.setStabilizationParameter(2.0 * material_data.getMu());
     rp.setVerbose(verbose);
     rp.setPrecomputation(true);
+    rp.isUnsteady(true);
+
+    std::map<std::string, RealType> dyna_para;
+    dyna_para["rho"]   = 1.0;
+    dyna_para["beta"]  = 0.25;
+    dyna_para["gamma"] = 0.5;
+
+    rp.setUnsteadyParameters(dyna_para);
+    rp.setTimeStep(1.0, 10);
 
     argc -= optind;
     argv += optind;
