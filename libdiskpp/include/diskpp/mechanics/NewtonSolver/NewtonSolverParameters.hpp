@@ -40,6 +40,13 @@ enum StabilizationType : int
     DG  = 3
 };
 
+enum FrictionType : int
+{
+    NO_FRICTION = 0,
+    TRESCA = 1,
+    COULOMB  = 2,
+};
+
 template<typename T>
 class NewtonSolverParameter
 {
@@ -48,29 +55,38 @@ class NewtonSolverParameter
     int m_cell_degree; // cell_degree
     int m_grad_degree; // grad degree
 
-    std::vector<std::pair<T, int>> m_time_step; // number of time time_step
+    std::vector<std::pair<T, int>> m_time_step;         // number of time time_step
     bool                           m_has_user_end_time; // final time is given
-    T                              m_user_end_time; // final time of the simulation
-    int                            m_sublevel;  // number of sublevel if there are problems
-    int                            m_iter_max;  // maximun nexton iteration
-    T                              m_epsilon;   // stop criteria
+    T                              m_user_end_time;     // final time of the simulation
+    int                            m_sublevel;          // number of sublevel if there are problems
+    int                            m_iter_max;          // maximun nexton iteration
+    T                              m_epsilon;           // stop criteria
 
     bool m_verbose; // some printing
 
     bool m_precomputation; // to compute the gradient before (it's memory consuption)
 
-    int  m_stab_type; // type of stabilization
-    T    m_beta;      // stabilization parameter
-    bool m_stab;      // stabilization yes or no
+    int  m_stab_type;  // type of stabilization
+    T    m_beta;       // stabilization parameter
+    bool m_stab;       // stabilization yes or no
     bool m_adapt_stab; // adaptative stabilization
+
+    bool                     m_dynamic; // dynamic or static simulation
+    std::map<std::string, T> m_dyna_para; // list of parameters
 
     int          m_n_time_save; // number of saving
     std::list<T> m_time_save;   // list of time where we save result;
 
+    T    m_theta;     // theta-parameter for contact
+    T    m_gamma_0;   // parameter for Nitsche
+    T    m_threshold; // threshol for Tesca friction
+    int     m_frot_type; // Friction type ?
+
     NewtonSolverParameter() :
       m_face_degree(1), m_cell_degree(1), m_grad_degree(1), m_sublevel(5), m_iter_max(20), m_epsilon(T(1E-6)),
       m_verbose(false), m_precomputation(false), m_stab(true), m_beta(1), m_stab_type(HHO), m_n_time_save(0),
-      m_user_end_time(1.0), m_has_user_end_time(false), m_adapt_stab(false)
+      m_user_end_time(1.0), m_has_user_end_time(false), m_adapt_stab(false), m_dynamic(false), m_theta(1), m_gamma_0(1),
+      m_threshold(0), m_frot_type(NO_FRICTION)
     {
         m_time_step.push_back(std::make_pair(m_user_end_time, 1));
     }
@@ -91,6 +107,11 @@ class NewtonSolverParameter
         std::cout << " - IterMax: " << m_iter_max << std::endl;
         std::cout << " - Epsilon: " << m_epsilon << std::endl;
         std::cout << " - Precomputation: " << m_precomputation << std::endl;
+        std::cout << " - Dynamic: " << m_dynamic << std::endl;
+        std::cout << " - Friction ?: " << m_frot_type << std::endl;
+        std::cout << " - Threshold: " << m_threshold << std::endl;
+        std::cout << " - Gamma_0: " << m_gamma_0 << std::endl;
+        std::cout << " - Theta: " << m_theta << std::endl;
     }
 
     bool
@@ -247,6 +268,42 @@ class NewtonSolverParameter
                 else
                     m_precomputation = false;
             }
+            else if (keyword == "Theta")
+            {
+                ifs >> m_theta;
+                line++;
+            }
+            else if (keyword == "Gamma0")
+            {
+                ifs >> m_gamma_0;
+                line++;
+            }
+            else if (keyword == "Friction")
+            {
+                std::string type;
+                ifs >> type;
+                line++;
+                if (type == "NO")
+                    m_frot_type = NO_FRICTION;
+                else if (type == "TRESCA")
+                    m_frot_type = TRESCA;
+                else if (type == "COULOMB")
+                    m_frot_type = COULOMB;
+            }
+            else if (keyword == "Threshold")
+            {
+                ifs >> m_threshold;
+            }
+            else if (keyword == "Dynamic")
+            {
+                std::string logical;
+                ifs >> logical;
+                line++;
+                if (logical == "true" || logical == "True")
+                    m_dynamic = true;
+                else
+                    m_dynamic = false;
+            }
             else
             {
                 std::cout << "Error parsing Parameters file:" << keyword << " line: " << line << std::endl;
@@ -261,13 +318,14 @@ class NewtonSolverParameter
         return true;
     }
 
-    void setFaceDegree(const int face_degree)
+    void
+    setFaceDegree(const int face_degree)
     {
         m_face_degree = face_degree;
     }
 
     int
-    getFaceDegree( ) const
+    getFaceDegree() const
     {
         return m_face_degree;
     }
@@ -330,5 +388,36 @@ class NewtonSolverParameter
     getPrecomputation() const
     {
         return m_precomputation;
+    }
+
+    bool
+    isUnsteady() const
+    {
+        return m_dynamic;
+    }
+
+    void
+    isUnsteady(const bool dyna)
+    {
+        m_dynamic = dyna;
+    }
+
+    auto
+    getUnsteadyParameters() const
+    {
+        return m_dyna_para;
+    }
+
+    void
+    setUnsteadyParameters(const std::map<std::string, T> dyna_para)
+    {
+        m_dyna_para = dyna_para;
+    }
+
+    void
+    setTimeStep(const T end_time, const int n_time_step)
+    {
+        m_time_step.clear();
+        m_time_step.push_back(std::make_pair(end_time, n_time_step));
     }
 };

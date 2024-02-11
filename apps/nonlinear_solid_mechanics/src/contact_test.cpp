@@ -30,13 +30,13 @@
 #include <sstream>
 #include <unistd.h>
 
-#include "colormanip.h"
+#include "diskpp/common/colormanip.h"
 
-#include "boundary_conditions/boundary_conditions.hpp"
-#include "loaders/loader.hpp"
-#include "mechanics/NewtonSolver/NewtonSolver.hpp"
-#include "mechanics/behaviors/laws/behaviorlaws.hpp"
-#include "timecounter.h"
+#include "diskpp/boundary_conditions/boundary_conditions.hpp"
+#include "diskpp/common/timecounter.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/mechanics/NewtonSolver/NewtonSolver.hpp"
+#include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
 
 struct error_type
 {
@@ -447,7 +447,8 @@ test_triangles_fvca5(const NewtonSolverParameter<T>& rp, const disk::MaterialDat
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -470,7 +471,8 @@ test_triangles_netgen(const NewtonSolverParameter<T>& rp, const disk::MaterialDa
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_netgen_2d_mesh<T>(paths[i].c_str());
+        disk::simplicial_mesh<T, 2> msh;
+        disk::load_mesh_netgen(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -493,7 +495,8 @@ test_hexagons(const NewtonSolverParameter<T>& rp, const disk::MaterialData<T>& m
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -516,7 +519,8 @@ test_kershaws(const NewtonSolverParameter<T>& rp, const disk::MaterialData<T>& m
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -539,7 +543,8 @@ test_quads_fvca5(const NewtonSolverParameter<T>& rp, const disk::MaterialData<T>
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca5_2d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -564,7 +569,8 @@ test_quads_diskpp(const NewtonSolverParameter<T>& rp, const disk::MaterialData<T
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_cartesian_2d_mesh<T>(paths[i].c_str());
+        disk::cartesian_mesh<T, 2> msh;
+        disk::load_mesh_diskpp_cartesian(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -587,7 +593,8 @@ test_hexahedra_diskpp(const NewtonSolverParameter<T>& rp, const disk::MaterialDa
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_cartesian_3d_mesh<T>(paths[i].c_str());
+        disk::cartesian_mesh<T, 3> msh;
+        disk::load_mesh_diskpp_cartesian(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -610,7 +617,8 @@ test_hexahedra_fvca6(const NewtonSolverParameter<T>& rp, const disk::MaterialDat
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T, 3> msh;
+        disk::load_mesh_fvca6_3d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -633,7 +641,8 @@ test_tetrahedra_netgen(const NewtonSolverParameter<T>& rp, const disk::MaterialD
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_netgen_3d_mesh<T>(paths[i].c_str());
+        disk::simplicial_mesh<T, 3> msh;
+        disk::load_mesh_netgen(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -655,7 +664,8 @@ test_polyhedra_fvca6(const NewtonSolverParameter<T>& rp, const disk::MaterialDat
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T, 3> msh;
+        disk::load_mesh_fvca6_3d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -678,7 +688,8 @@ test_tetrahedra_fvca6(const NewtonSolverParameter<T>& rp, const disk::MaterialDa
 
     for (int i = 0; i < runs; i++)
     {
-        auto msh = disk::load_fvca6_3d_mesh<T>(paths[i].c_str());
+        disk::generic_mesh<T, 3> msh;
+        disk::load_mesh_fvca6_3d<T>(paths[i].c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
     }
     printResults(error_sumup);
@@ -694,7 +705,9 @@ test_triangles_fvca5_robust(const NewtonSolverParameter<T>& rp, disk::MaterialDa
     for (int i = 0; i < 5; i++)
     {
         material_data.setLambda(std::pow(10.0, i));
-        auto msh = disk::load_fvca5_2d_mesh<T>("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_3.typ1");
+        std::string              path = "../../../diskpp/meshes/2D_triangles/fvca5/mesh1_3.typ1";
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(path.c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
         error_sumup[i].h = material_data.getLambda();
     }
@@ -711,7 +724,9 @@ test_quads_diskpp_robust(const NewtonSolverParameter<T>& rp, disk::MaterialData<
     for (int i = 0; i < 5; i++)
     {
         material_data.setLambda(std::pow(10.0, i));
-        auto msh = disk::load_cartesian_2d_mesh<T>("../../../diskpp/meshes/2D_quads/diskpp/testmesh-16-16.quad");
+        std::string                path = "../../../diskpp/meshes/2D_quads/diskpp/testmesh-16-16.quad";
+        disk::cartesian_mesh<T, 2> msh;
+        disk::load_mesh_diskpp_cartesian(path.c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
         error_sumup[i].h = material_data.getLambda();
     }
@@ -728,7 +743,9 @@ test_hexagons_robust(const NewtonSolverParameter<T>& rp, disk::MaterialData<T>& 
     for (int i = 0; i < 5; i++)
     {
         material_data.setLambda(std::pow(10.0, i));
-        auto msh = disk::load_fvca5_2d_mesh<T>("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_4.typ1");
+        std::string              path = "../../../diskpp/meshes/2D_hex/fvca5/hexagonal_4.typ1";
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(path.c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
         error_sumup[i].h = material_data.getLambda();
     }
@@ -745,7 +762,9 @@ test_kershaws_robust(const NewtonSolverParameter<T>& rp, disk::MaterialData<T>& 
     for (int i = 0; i < 5; i++)
     {
         material_data.setLambda(std::pow(10.0, i));
-        auto msh = disk::load_fvca5_2d_mesh<T>("../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_3.typ1");
+        std::string              path = "../../../diskpp/meshes/2D_kershaw/fvca5/mesh4_1_3.typ1";
+        disk::generic_mesh<T, 2> msh;
+        disk::load_mesh_fvca5_2d<T>(path.c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
         error_sumup[i].h = material_data.getLambda();
     }
@@ -762,7 +781,9 @@ test_tetrahedra_fvca6_robust(const NewtonSolverParameter<T>& rp, disk::MaterialD
     for (int i = 0; i < 5; i++)
     {
         material_data.setLambda(std::pow(10.0, i));
-        auto msh = disk::load_fvca6_3d_mesh<T>("../../../diskpp/meshes/3D_tetras/fvca6/tet.2.msh");
+        std::string              path = "../../../diskpp/meshes/3D_tetras/fvca6/tet.2.msh";
+        disk::generic_mesh<T, 3> msh;
+        disk::load_mesh_fvca6_3d<T>(path.c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
         error_sumup[i].h = material_data.getLambda();
     }
@@ -779,7 +800,9 @@ test_hexahedra_fvca6_robust(const NewtonSolverParameter<T>& rp, disk::MaterialDa
     for (int i = 0; i < 5; i++)
     {
         material_data.setLambda(std::pow(10.0, i));
-        auto msh = disk::load_fvca6_3d_mesh<T>("../../../diskpp/meshes/3D_hexa/fvca6/hexa_8x8x8.msh");
+        std::string              path = "../../../diskpp/meshes/3D_hexa/fvca6/hexa_8x8x8.msh";
+        disk::generic_mesh<T, 3> msh;
+        disk::load_mesh_fvca6_3d<T>(path.c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
         error_sumup[i].h = material_data.getLambda();
     }
@@ -796,7 +819,9 @@ test_polyhedra_fvca6_robust(const NewtonSolverParameter<T>& rp, disk::MaterialDa
     for (int i = 0; i < 5; i++)
     {
         material_data.setLambda(std::pow(10.0, i));
-        auto msh = disk::load_fvca6_3d_mesh<T>("../../../diskpp/meshes/3D_general/fvca6/dbls_20.msh");
+        std::string              path = "../../../diskpp/meshes/3D_general/fvca6/dbls_20.msh";
+        disk::generic_mesh<T, 3> msh;
+        disk::load_mesh_fvca6_3d<T>(path.c_str(), msh);
         error_sumup.push_back(run_tresca_solver(msh, rp, material_data));
         error_sumup[i].h = material_data.getLambda();
     }
@@ -897,21 +922,21 @@ main(int argc, char** argv)
             std::cout << "-Tetrahedras fvca6:" << std::endl;
             test_tetrahedra_fvca6_robust<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test robustess: " << tc.to_double() << std::endl;
+            std::cout << "Time to test robustess: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
 
             tc.tic();
             std::cout << "-Hexahedras fvca6:" << std::endl;
             test_hexahedra_fvca6_robust<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test robustess: " << tc.to_double() << std::endl;
+            std::cout << "Time to test robustess: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
 
             tc.tic();
             std::cout << "-Polyhedra:" << std::endl;
             test_polyhedra_fvca6_robust<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test robustess: " << tc.to_double() << std::endl;
+            std::cout << "Time to test robustess: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
         }
         else
@@ -920,35 +945,35 @@ main(int argc, char** argv)
             std::cout << "-Tetrahedras fvca6:" << std::endl;
             test_tetrahedra_fvca6<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+            std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
 
             tc.tic();
             std::cout << "-Tetrahedras netgen:" << std::endl;
             test_tetrahedra_netgen<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+            std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
 
             tc.tic();
             std::cout << "-Hexahedras fvca6:" << std::endl;
             test_hexahedra_fvca6<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+            std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
 
             tc.tic();
             std::cout << "-Hexahedras diskpp:" << std::endl;
             test_hexahedra_diskpp<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+            std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
 
             tc.tic();
             std::cout << "-Polyhedra:" << std::endl;
             test_polyhedra_fvca6<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+            std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
         }
     }
@@ -960,28 +985,28 @@ main(int argc, char** argv)
             std::cout << "-Triangles fvca5:" << std::endl;
             test_triangles_fvca5_robust<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test robustess: " << tc.to_double() << std::endl;
+            std::cout << "Time to test robustess: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
 
             tc.tic();
             std::cout << "-Quadrangles diskpp:" << std::endl;
             test_quads_diskpp_robust<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test robustess: " << tc.to_double() << std::endl;
+            std::cout << "Time to test robustess: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
 
             tc.tic();
             std::cout << "-Hexagons:" << std::endl;
             test_hexagons_robust<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test robustess: " << tc.to_double() << std::endl;
+            std::cout << "Time to test robustess: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
 
             tc.tic();
             std::cout << "-Kershaws:" << std::endl;
             test_kershaws_robust<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test robustess: " << tc.to_double() << std::endl;
+            std::cout << "Time to test robustess: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
         }
         else
@@ -990,42 +1015,42 @@ main(int argc, char** argv)
             std::cout << "-Triangles fvca5:" << std::endl;
             test_triangles_fvca5<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+            std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
 
             tc.tic();
             std::cout << "-Triangles netgen:" << std::endl;
             test_triangles_netgen<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+            std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
 
             tc.tic();
             std::cout << "-Quadrangles fvca5:" << std::endl;
             test_quads_fvca5<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+            std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
 
             tc.tic();
             std::cout << "-Quadrangles diskpp:" << std::endl;
             test_quads_diskpp<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+            std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
 
             tc.tic();
             std::cout << "-Hexagons:" << std::endl;
             test_hexagons<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+            std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
 
             tc.tic();
             std::cout << "-Kershaws:" << std::endl;
             test_kershaws<RealType>(rp, material_data);
             tc.toc();
-            std::cout << "Time to test convergence rates: " << tc.to_double() << std::endl;
+            std::cout << "Time to test convergence rates: " << tc.elapsed() << std::endl;
             std::cout << " " << std::endl;
         }
     }
