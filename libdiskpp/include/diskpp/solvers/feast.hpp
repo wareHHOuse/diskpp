@@ -289,7 +289,11 @@ feast(const feast_eigensolver_params<double>& params,
                 } break;
 
                 case feast_inner_solver::mumps: {
+#ifdef HAVE_MUMPS
                     Qe = mumps_lu(lhs, Yc);
+#else
+                    throw std::runtime_error("Mumps is not installed");
+#endif /* HAVE_MUMPS */
                 }
             }
 

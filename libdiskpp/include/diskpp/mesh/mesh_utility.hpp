@@ -23,7 +23,7 @@
 #include <vector>
 
 #include "mesh/mesh.hpp"
-#include "common/eigen.hpp"
+#include "diskpp/common/eigen.hpp"
 #include "solvers/solver.hpp"
 
 

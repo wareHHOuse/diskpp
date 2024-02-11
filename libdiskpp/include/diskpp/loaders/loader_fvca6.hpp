@@ -38,6 +38,19 @@
  * DOI: 10.1016/j.cam.2017.09.017
  */
 
+#pragma once
+
+#include <tuple>
+#include <fstream>
+#include <vector>
+
+#include "diskpp/mesh/mesh.hpp"
+#include "diskpp/geometry/geometry.hpp"
+#include "diskpp/loaders/mesh_loader.hpp"
+
+namespace disk
+{
+
 std::vector<size_t>
 read_fvca6_line(std::ifstream& ifs)
 {
@@ -344,3 +357,4 @@ public:
     }
 };
 
+}
