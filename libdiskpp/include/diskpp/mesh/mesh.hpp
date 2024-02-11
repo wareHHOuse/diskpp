@@ -134,8 +134,8 @@ namespace priv {
             return it;
         }
 
-        bool operator==(const filter_iterator& other) { return (m_itor == other.m_itor); }
-        bool operator!=(const filter_iterator& other) { return (m_itor != other.m_itor); }
+        bool operator==(const filter_iterator& other) const { return (m_itor == other.m_itor); }
+        bool operator!=(const filter_iterator& other) const { return (m_itor != other.m_itor); }
     };
 
     template<typename mesh_type>
