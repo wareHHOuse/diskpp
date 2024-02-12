@@ -206,6 +206,12 @@ public:
 
         return ret;
     }
+
+    T
+    norm() const
+    {
+        return (this->to_vector()).norm();
+    }
 };
 
 template<typename T, size_t DIM>
