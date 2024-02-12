@@ -32,16 +32,15 @@
 #include <sstream>
 #include <vector>
 
-#include "NewtonIteration.hpp"
-#include "NewtonSolverInformations.hpp"
-#include "NewtonSolverParameters.hpp"
-#include "TimeManager.hpp"
-
-#include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "diskpp/adaptivity/adaptivity.hpp"
 #include "diskpp/boundary_conditions/boundary_conditions.hpp"
-#include "diskpp/methods/hho"
 #include "diskpp/common/timecounter.hpp"
+#include "diskpp/mechanics/NewtonSolver/NewtonIteration.hpp"
+#include "diskpp/mechanics/NewtonSolver/NewtonSolverInformations.hpp"
+#include "diskpp/mechanics/NewtonSolver/NewtonSolverParameters.hpp"
+#include "diskpp/mechanics/NewtonSolver/TimeManager.hpp"
+#include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
+#include "diskpp/methods/hho"
 
 namespace disk
 {
@@ -173,15 +172,8 @@ class NewtonStep
             AssemblyInfo assembly_info;
             try
             {
-                assembly_info = newton_iter.assemble(msh,
-                                                     bnd,
-                                                     rp,
-                                                     degree_infos,
-                                                     lf,
-                                                     gradient_precomputed,
-                                                     stab_precomputed,
-                                                     behavior,
-                                                     stab_manager);
+                assembly_info = newton_iter.assemble(
+                  msh, bnd, rp, degree_infos, lf, gradient_precomputed, stab_precomputed, behavior, stab_manager);
             }
             catch (const std::invalid_argument& ia)
             {

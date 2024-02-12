@@ -33,19 +33,18 @@
 #include <string>
 #include <vector>
 
-#include "NewtonSolverComput.hpp"
-#include "NewtonSolverInformations.hpp"
-#include "NewtonSolverParameters.hpp"
-#include "TimeManager.hpp"
-
-#include "diskpp/bases/bases.hpp"
 #include "diskpp/adaptivity/adaptivity.hpp"
+#include "diskpp/bases/bases.hpp"
 #include "diskpp/boundary_conditions/boundary_conditions.hpp"
+#include "diskpp/common/timecounter.hpp"
+#include "diskpp/mechanics/NewtonSolver/NewtonSolverComput.hpp"
+#include "diskpp/mechanics/NewtonSolver/NewtonSolverInformations.hpp"
+#include "diskpp/mechanics/NewtonSolver/NewtonSolverParameters.hpp"
 #include "diskpp/mechanics/NewtonSolver/StabilizationManager.hpp"
+#include "diskpp/mechanics/NewtonSolver/TimeManager.hpp"
 #include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/solvers/solver.hpp"
-#include "diskpp/common/timecounter.hpp"
 
 namespace disk
 {
@@ -378,8 +377,12 @@ class NewtonIteration
         tc.tic();
         m_system_displ = vector_type::Zero(m_assembler.LHS.rows());
 
+#ifdef HAVE_INTEL_MKL
         solvers::pardiso_params<scalar_type> pparams;
         mkl_pardiso(pparams, m_assembler.LHS, m_assembler.RHS, m_system_displ);
+#else
+        throw std::runtime_error("Pardiso is not installed");
+#endif
         tc.toc();
 
         // std::cout << "LHS" << m_assembler.LHS << std::endl;
