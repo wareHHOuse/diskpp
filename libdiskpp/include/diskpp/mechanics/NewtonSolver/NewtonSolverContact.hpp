@@ -7,7 +7,7 @@
  *  /_\/_\/_\/_\   methods.
  *
  * This file is copyright of the following authors:
- * Nicolas Pignet  (C) 2019                     nicolas.pignet@enpc.fr
+ * Nicolas Pignet  (C) 2024                     nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -28,14 +28,14 @@
 #include <cassert>
 
 #include "diskpp/bases/bases.hpp"
+#include "diskpp/boundary_conditions/boundary_conditions.hpp"
 #include "diskpp/common/eigen.hpp"
+#include "diskpp/common/timecounter.hpp"
+#include "diskpp/mechanics/NewtonSolver/NewtonSolverParameters.hpp"
+#include "diskpp/mechanics/behaviors/laws/materialData.hpp"
 #include "diskpp/mechanics/behaviors/maths_tensor.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/quadratures/quadratures.hpp"
-#include "diskpp/boundary_conditions/boundary_conditions.hpp"
-#include "diskpp/common/timecounter.hpp"
-
-#include "NewtonSolverParameters.hpp"
 
 namespace disk
 {

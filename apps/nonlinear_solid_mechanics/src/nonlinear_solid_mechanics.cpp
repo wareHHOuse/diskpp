@@ -7,7 +7,7 @@
  *  /_\/_\/_\/_\   methods.
  *
  * This file is copyright of the following authors:
- * Nicolas Pignet  (C) 2019                     nicolas.pignet@enpc.fr
+ * Nicolas Pignet  (C) 2019, 2024                nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this

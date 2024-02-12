@@ -7,7 +7,7 @@
  *  /_\/_\/_\/_\   methods.
  *
  * This file is copyright of the following authors:
- * Nicolas Pignet  (C) 2019                     nicolas.pignet@enpc.fr
+ * Nicolas Pignet  (C) 2019, 2024               nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -30,16 +30,14 @@
 
 #include "diskpp/bases/bases.hpp"
 #include "diskpp/common/eigen.hpp"
+#include "diskpp/common/timecounter.hpp"
+#include "diskpp/mechanics/NewtonSolver/NewtonSolverContact.hpp"
+#include "diskpp/mechanics/NewtonSolver/StabilizationManager.hpp"
+#include "diskpp/mechanics/NewtonSolver/TimeManager.hpp"
 #include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "diskpp/mechanics/deformation_tensors.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/quadratures/quadratures.hpp"
-
-#include "NewtonSolverContact.hpp"
-#include "TimeManager.hpp"
-#include "StabilizationManager.hpp"
-
-#include "diskpp/common/timecounter.hpp"
 
 namespace disk
 {

@@ -8,7 +8,7 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
+ * Nicolas Pignet  (C) 2018, 2024               nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -30,8 +30,8 @@
 #include <sstream>
 #include <unistd.h>
 
-#include "diskpp/common/colormanip.h"
 #include "diskpp/boundary_conditions/boundary_conditions.hpp"
+#include "diskpp/common/colormanip.h"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/mechanics/NewtonSolver/NewtonSolver.hpp"
 #include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"

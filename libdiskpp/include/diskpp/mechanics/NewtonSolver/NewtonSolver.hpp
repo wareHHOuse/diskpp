@@ -32,12 +32,11 @@
 #include <sstream>
 #include <vector>
 
-#include "NewtonSolverInformations.hpp"
-#include "NewtonSolverParameters.hpp"
-#include "NewtonStep.hpp"
-#include "TimeManager.hpp"
-
+#include "diskpp/mechanics/NewtonSolver/NewtonSolverInformations.hpp"
+#include "diskpp/mechanics/NewtonSolver/NewtonSolverParameters.hpp"
+#include "diskpp/mechanics/NewtonSolver/NewtonStep.hpp"
 #include "diskpp/mechanics/NewtonSolver/StabilizationManager.hpp"
+#include "diskpp/mechanics/NewtonSolver/TimeManager.hpp"
 #include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "diskpp/mechanics/behaviors/tensor_conversion.hpp"
 #include "diskpp/mechanics/stress_tensors.hpp"

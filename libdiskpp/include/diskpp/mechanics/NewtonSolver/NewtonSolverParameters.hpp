@@ -7,7 +7,7 @@
  *  /_\/_\/_\/_\   methods.
  *
  * This file is copyright of the following authors:
- * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
+ * Nicolas Pignet  (C) 2018, 2024               nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -43,8 +43,8 @@ enum StabilizationType : int
 enum FrictionType : int
 {
     NO_FRICTION = 0,
-    TRESCA = 1,
-    COULOMB  = 2,
+    TRESCA      = 1,
+    COULOMB     = 2,
 };
 
 template<typename T>
@@ -71,16 +71,16 @@ class NewtonSolverParameter
     bool m_stab;       // stabilization yes or no
     bool m_adapt_stab; // adaptative stabilization
 
-    bool                     m_dynamic; // dynamic or static simulation
+    bool                     m_dynamic;   // dynamic or static simulation
     std::map<std::string, T> m_dyna_para; // list of parameters
 
     int          m_n_time_save; // number of saving
     std::list<T> m_time_save;   // list of time where we save result;
 
-    T    m_theta;     // theta-parameter for contact
-    T    m_gamma_0;   // parameter for Nitsche
-    T    m_threshold; // threshol for Tesca friction
-    int     m_frot_type; // Friction type ?
+    T   m_theta;     // theta-parameter for contact
+    T   m_gamma_0;   // parameter for Nitsche
+    T   m_threshold; // threshol for Tesca friction
+    int m_frot_type; // Friction type ?
 
     NewtonSolverParameter() :
       m_face_degree(1), m_cell_degree(1), m_grad_degree(1), m_sublevel(5), m_iter_max(20), m_epsilon(T(1E-6)),

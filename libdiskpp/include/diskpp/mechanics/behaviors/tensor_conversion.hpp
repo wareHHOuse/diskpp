@@ -37,7 +37,6 @@ namespace disk
 // | A2111  A2112  A2211  A2212 |
 // | A2121  A2122  A2221  A2222 |
 
-
 template<typename T>
 static_matrix<T, 3, 3>
 convertMatrix3D(const static_matrix<T, 3, 3>& mat)
@@ -235,15 +234,15 @@ convertMatrixToMgis(const static_matrix<T, 3, 3>& mat, std::vector<T2>& mat_vec)
         }
         case 9:
         {
-            mat_vec[0]   = mat(0, 0);
-            mat_vec[1]   = mat(1, 1);
-            mat_vec[2]   = mat(2, 2);
-            mat_vec[3]   = mat(0, 1);
-            mat_vec[4]   = mat(1, 0);
-            mat_vec[5]   = mat(0, 2);
-            mat_vec[6]   = mat(2, 0);
-            mat_vec[7]   = mat(1, 2);
-            mat_vec[8]   = mat(2, 1);
+            mat_vec[0] = mat(0, 0);
+            mat_vec[1] = mat(1, 1);
+            mat_vec[2] = mat(2, 2);
+            mat_vec[3] = mat(0, 1);
+            mat_vec[4] = mat(1, 0);
+            mat_vec[5] = mat(0, 2);
+            mat_vec[6] = mat(2, 0);
+            mat_vec[7] = mat(1, 2);
+            mat_vec[8] = mat(2, 1);
             break;
         }
 
@@ -292,15 +291,15 @@ convertMatrixFromMgis(const std::vector<T2>& mat_vec, static_matrix<T, 3, 3>& ma
         }
         case 9:
         {
-            mat(0, 0)    = mat_vec[0];
-            mat(1, 1)    = mat_vec[1];
-            mat(2, 2)    = mat_vec[2];
-            mat(0, 1)    = mat_vec[3];
-            mat(1, 0)    = mat_vec[4];
-            mat(0, 2)    = mat_vec[5];
-            mat(2, 0)    = mat_vec[6];
-            mat(1, 2)    = mat_vec[7];
-            mat(2, 1)    = mat_vec[8];
+            mat(0, 0) = mat_vec[0];
+            mat(1, 1) = mat_vec[1];
+            mat(2, 2) = mat_vec[2];
+            mat(0, 1) = mat_vec[3];
+            mat(1, 0) = mat_vec[4];
+            mat(0, 2) = mat_vec[5];
+            mat(2, 0) = mat_vec[6];
+            mat(1, 2) = mat_vec[7];
+            mat(2, 1) = mat_vec[8];
             break;
         }
 
@@ -310,7 +309,7 @@ convertMatrixFromMgis(const std::vector<T2>& mat_vec, static_matrix<T, 3, 3>& ma
 
 template<typename T, typename T2>
 void
-convertTensorFromMgis(const std::vector<T2>& tens_vec, static_tensor<T, 3>& tens )
+convertTensorFromMgis(const std::vector<T2>& tens_vec, static_tensor<T, 3>& tens)
 {
     tens.setZero();
     // std::cout << "SIZE: " << tens_vec.size() << std::endl;

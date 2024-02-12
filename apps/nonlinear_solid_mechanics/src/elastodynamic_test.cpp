@@ -29,8 +29,8 @@
 #include <sstream>
 #include <unistd.h>
 
-#include "diskpp/common/colormanip.h"
 #include "diskpp/boundary_conditions/boundary_conditions.hpp"
+#include "diskpp/common/colormanip.h"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/mechanics/NewtonSolver/NewtonSolver.hpp"
 #include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
