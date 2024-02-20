@@ -444,11 +444,26 @@ solve(const Config& config, State& state)
     auto cd = state.hdi.cell_degree();
     auto cbs = disk::scalar_basis_size(cd, mesh_type::dimension);
 
-    auto ret = disk::feast(config.feast, state.assm.LHS, state.assm.RHS,
-        state.eigvecs, state.eigvals);
+    disk::feast_status fs;
+    
+    for (size_t retries = 1; retries <= 10; retries++)
+    {
+        auto fep = config.feast;
+    
+        fep.subspace_size = fep.subspace_size*retries;
 
-    if (disk::feast_status::success != ret) {
-        std::cout << "FEAST algorithm did not converge: "<< ret << std::endl;
+        fs = disk::feast(fep, state.assm.LHS, state.assm.RHS,
+            state.eigvecs, state.eigvals);
+
+        if (disk::feast_status::subspace_too_small != fs)
+            break;
+
+        std::cout << "Subspace too small, restarting FEAST (retry ";
+        std::cout << retries << ")" << std::endl;
+    }
+
+    if (disk::feast_status::success != fs) {
+        std::cout << "FEAST algorithm did not converge: "<< fs << std::endl;
         state.eigvecs = dm::Zero(0,0);
         state.eigvals = dv::Zero(0);
         return -1;
@@ -603,6 +618,7 @@ template<typename Config, typename State>
 static int
 steklov_solver(sol::state& lua, const Config& config, State& state)
 {
+    std::cout << "Mesh elements: " << state.msh.cells_size() << std::endl;
     auto cd = config.hho.order;
     auto fd = config.hho.order;
     auto rd = config.hho.order+1;
