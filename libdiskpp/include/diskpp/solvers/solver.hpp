@@ -30,7 +30,7 @@
 #endif
 
 #ifdef HAVE_INTEL_MKL
-    #include "feast.hpp"
+    //#include "feast.hpp"
 #endif
 
 namespace disk { namespace solvers {

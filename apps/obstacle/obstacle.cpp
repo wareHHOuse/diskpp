@@ -34,6 +34,8 @@
 #include "diskpp/methods/hho"
 #include "diskpp/output/silo.hpp"
 #include "diskpp/solvers/solver.hpp"
+#include "diskpp/common/colormanip.h"
+#include "diskpp/common/timecounter.hpp"
 
 using namespace disk;
 using namespace Eigen;
