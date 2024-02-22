@@ -128,7 +128,7 @@ renumber_hypercube_boundaries(Mesh& msh)
     return true;
 }
 
-bool
+inline bool
 expect(std::ifstream& ifs, const std::string& str)
 {
     std::string keyword;
