@@ -108,6 +108,10 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
     endif()
 endif()
 
+if (COMPILER_IS_CLANG)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ambiguous-reversed-operator")
+endif()
+
 ######################################################################
 ## Package: Threading support
 set(THREADS_PREFER_PTHREAD_FLAG ON)
