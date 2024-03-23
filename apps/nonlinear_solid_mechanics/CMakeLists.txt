@@ -12,6 +12,10 @@ add_executable(elasticity_test src/elasticity_test.cpp)
 target_link_libraries(elasticity_test ${LINK_LIBS})
 install(TARGETS elasticity_test RUNTIME DESTINATION bin)
 
+add_executable(elastodynamic_test src/elastodynamic_test.cpp)
+target_link_libraries(elastodynamic_test ${LINK_LIBS})
+install(TARGETS elastodynamic_test RUNTIME DESTINATION bin)
+
 add_executable(hyperelasticity_test src/hyperelasticity_test.cpp)
 target_link_libraries(hyperelasticity_test ${LINK_LIBS})
 install(TARGETS hyperelasticity_test RUNTIME DESTINATION bin)

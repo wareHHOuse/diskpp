@@ -230,9 +230,9 @@ class MaterialData
     {
         if (m_Rp_curve.size() > 0)
         {
-            std::sort(m_Rp_curve.begin(), m_Rp_curve.end(), [](const auto& lhs, const auto& rhs) {
-                return lhs.getP() < rhs.getP();
-            });
+            std::sort(m_Rp_curve.begin(),
+                      m_Rp_curve.end(),
+                      [](const auto& lhs, const auto& rhs) { return lhs.getP() < rhs.getP(); });
 
             for (size_t i = 0; i < m_Rp_curve.size() - 1; i++)
             {
@@ -252,7 +252,8 @@ class MaterialData
     }
 
     const std::vector<MfrontType>&
-    getMfrontParameters() const {
+    getMfrontParameters() const
+    {
         return m_mfront_param;
     }
 
@@ -262,7 +263,8 @@ class MaterialData
         return m_mfront_param;
     }
 
-    void print() const
+    void
+    print() const
     {
         std::cout << "Material parameters: " << std::endl;
         std::cout << "* E: " << getE() << std::endl;

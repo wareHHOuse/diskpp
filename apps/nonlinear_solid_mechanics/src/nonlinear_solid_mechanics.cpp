@@ -7,7 +7,7 @@
  *  /_\/_\/_\/_\   methods.
  *
  * This file is copyright of the following authors:
- * Nicolas Pignet  (C) 2019                     nicolas.pignet@enpc.fr
+ * Nicolas Pignet  (C) 2019, 2024                nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -49,7 +49,7 @@ run_nl_solid_mechanics_solver(const Mesh<T, 2, Storage>&      msh,
     typedef disk::static_matrix<T, 2, 2>                result_grad_type;
     typedef disk::vector_boundary_conditions<mesh_type> Bnd_type;
 
-    auto load = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0, 0}; };
+    auto load = [material_data](const disk::point<T, 2>& p, const T& time) -> result_type { return result_type{0, 0}; };
 
     auto solution = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0, 0}; };
 
@@ -67,7 +67,7 @@ run_nl_solid_mechanics_solver(const Mesh<T, 2, Storage>&      msh,
 
 #ifdef HAVE_MGIS
     // To use a law developped with Mfront
-    const auto hypo = mgis::behaviour::Hypothesis::PLANESTRAIN;
+    const auto        hypo     = mgis::behaviour::Hypothesis::PLANESTRAIN;
     const std::string filename = "src/libBehaviour.dylib";
     // nl.addBehavior(filename, "IsotropicLinearHardeningPlasticity", hypo);
     nl.addBehavior(filename, "LogarithmicStrainPlasticity", hypo);
@@ -111,13 +111,16 @@ run_nl_solid_mechanics_solver(const Mesh<T, 3, Storage>&      msh,
 
     Bnd_type bnd(msh);
 
-    auto load = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0, 0, 0}; };
+    auto load = [material_data](const disk::point<T, 3>& p, const T& time) -> result_type {
+        return result_type{0, 0, 0};
+    };
 
     auto solution = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0, 0, 0}; };
 
     auto zero = [material_data](const disk::point<T, 3>& p) -> result_type { return result_type{0.0, 0.0, 0.0}; };
 
-    auto pres = [material_data](const disk::point<T, 3>& p) -> result_type {
+    auto pres = [material_data](const disk::point<T, 3>& p) -> result_type
+    {
         result_type er = result_type::Zero();
 
         er(0) = p.x();
@@ -129,7 +132,8 @@ run_nl_solid_mechanics_solver(const Mesh<T, 3, Storage>&      msh,
         return 3 * er;
     };
 
-    auto deplr = [material_data](const disk::point<T, 3>& p) -> result_type {
+    auto deplr = [material_data](const disk::point<T, 3>& p) -> result_type
+    {
         result_type er = result_type::Zero();
 
         er(0) = p.x();
@@ -277,7 +281,7 @@ main(int argc, char** argv)
     {
         std::cout << "Guessed mesh format: Poly2D format" << std::endl;
         disk::generic_mesh<RealType, 2> msh;
-        disk::load_mesh_poly2d<RealType>(mesh_filename, msh);
+        disk::load_mesh_poly<RealType>(mesh_filename, msh);
         run_nl_solid_mechanics_solver(msh, rp, material_data);
         return 0;
     }
@@ -287,7 +291,7 @@ main(int argc, char** argv)
     {
         std::cout << "Guessed mesh format: Poly3D format" << std::endl;
         disk::generic_mesh<RealType, 3> msh;
-        disk::load_mesh_poly3d<RealType>(mesh_filename, msh);
+        disk::load_mesh_poly<RealType>(mesh_filename, msh);
         run_nl_solid_mechanics_solver(msh, rp, material_data);
         return 0;
     }
@@ -296,7 +300,7 @@ main(int argc, char** argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.medit2d$")))
     {
         std::cout << "Guessed mesh format: Medit format" << std::endl;
-        disk::generic_mesh<RealType,2> msh;
+        disk::generic_mesh<RealType, 2> msh;
         disk::load_mesh_medit<RealType>(mesh_filename, msh);
         run_nl_solid_mechanics_solver(msh, rp, material_data);
         return 0;
@@ -306,7 +310,7 @@ main(int argc, char** argv)
     if (std::regex_match(mesh_filename, std::regex(".*\\.medit3d$")))
     {
         std::cout << "Guessed mesh format: Medit format" << std::endl;
-        disk::generic_mesh<RealType,3> msh;
+        disk::generic_mesh<RealType, 3> msh;
         disk::load_mesh_medit<RealType>(mesh_filename, msh);
         run_nl_solid_mechanics_solver(msh, rp, material_data);
         return 0;

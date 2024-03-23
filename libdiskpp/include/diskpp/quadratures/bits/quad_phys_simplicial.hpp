@@ -7,7 +7,7 @@
  * Politecnico di Torino - DISMA
  * Dipartimento di Matematica
  */
- 
+
 /*
  *       /\         DISK++, a template library for DIscontinuous SKeletal
  *      /__\        methods.
@@ -38,8 +38,8 @@
 
 #include "diskpp/common/simplicial_formula.hpp"
 #include "quad_raw_gauss.hpp"
-#include "quad_raw_triangle.hpp"
 #include "quad_raw_tetra.hpp"
+#include "quad_raw_triangle.hpp"
 
 namespace disk
 {
@@ -109,9 +109,9 @@ integrate(const disk::simplicial_mesh<T, 3>& msh, const typename disk::simplicia
  */
 template<typename T>
 std::vector<disk::quadrature_point<T, 3>>
-integrate(const disk::simplicial_mesh<T, 3>& msh,
-    const typename disk::simplicial_mesh<T, 3>::cell_type& cl,
-    size_t degree)
+integrate(const disk::simplicial_mesh<T, 3>&                     msh,
+          const typename disk::simplicial_mesh<T, 3>::cell_type& cl,
+          size_t                                                 degree)
 {
     const auto pts = points(msh, cl);
     assert(pts.size() == 4);
@@ -119,4 +119,3 @@ integrate(const disk::simplicial_mesh<T, 3>& msh,
 }
 
 } // namespace disk
-

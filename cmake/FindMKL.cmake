@@ -30,12 +30,16 @@
 
 include(FindPackageHandleStandardArgs)
 
-#set(MKL_HINTS /usr /opt/intel /opt/intel/mkl /opt/intel/oneapi/mkl)
+set(MKL_HINTS /usr /opt/intel /opt/intel/mkl /opt/intel/oneapi/mkl /opt/intel/oneapi)
 
-find_path(MKL_INCLUDE_DIR
+find_path(MKL_INCLUDE_DIRS
     NAMES mkl.h
     HINTS ENV MKL_ROOT ${MKL_ROOT} ${MKL_HINTS}
-    PATH_SUFFIXES mkl mkl/include)
+    PATH_SUFFIXES mkl mkl/include include)
+
+if (MKL_INCLUDE_DIRS)
+    message(STATUS "MKL: found include")
+endif()
 
 ###########################################################
 ## iomp5
@@ -60,6 +64,19 @@ find_library(MKL_mkl_core_LIBRARY
 if (MKL_mkl_core_LIBRARY)
     message(STATUS "MKL: found mkl_core")
     list(APPEND MKL_LIBRARIES ${MKL_mkl_core_LIBRARY})
+endif()
+
+###########################################################
+## mkl_intel_lp64 
+find_library(MKL_mkl_intel_lp64_LIBRARY
+    NAMES   mkl_intel_lp64
+    HINTS ENV MKL_ROOT ${MKL_ROOT} ${MKL_HINTS}
+    PATH_SUFFIXES lib lib/intel64 lib/intel64_lin
+                  mkl/lib mkl/lib/intel64 mkl/lib/intel64_lin)
+
+if (MKL_mkl_intel_lp64_LIBRARY)
+    message(STATUS "MKL: found mkl_intel_lp64")
+    list(APPEND MKL_LIBRARIES ${MKL_mkl_intel_lp64_LIBRARY})
 endif()
 
 ###########################################################
@@ -97,12 +114,12 @@ if (MKL_runtime_LIBRARY)
 endif()
 
 
-find_package_handle_standard_args(MKL DEFAULT_MSG MKL_LIBRARIES MKL_INCLUDE_DIR)
+find_package_handle_standard_args(MKL DEFAULT_MSG MKL_LIBRARIES MKL_INCLUDE_DIRS)
 
 if (MKL_FOUND)
     add_library(MKL INTERFACE)
     target_link_libraries(MKL INTERFACE "${MKL_LIBRARIES}")
-    target_include_directories(MKL INTERFACE "${MKL_INCLUDE_DIR}")
+    target_include_directories(MKL INTERFACE "${MKL_INCLUDE_DIRS}")
     target_compile_definitions(MKL INTERFACE -DHAVE_INTEL_MKL)
     target_compile_definitions(MKL INTERFACE -DHAVE_PARDISO)
 endif()

@@ -136,6 +136,14 @@ inner_product(const T& a, const eigen_compatible_stdvector<Matrix<T, N, M>>& b)
     return ret;
 }
 
+// multiplication by a vector
+template<typename T, int N>
+Matrix<T, Dynamic, N>
+inner_product(const Matrix<T, Dynamic, 1>& a, const Matrix<T, N, 1>& b)
+{
+    return a * b.transpose();
+}
+
 // outer_product : equivalent to a scalar-product in L^p (.,.)_L^p or duality product <.,.>
 template<typename T, int N>
 Matrix<T, Dynamic, Dynamic>
@@ -451,6 +459,20 @@ eval(const dynamic_vector<T>&                                      tab_coeff,
     for (int i = 0; i < tab_coeff.size(); i++)
     {
         ret += tab_coeff(i) * basis[i + begin];
+    }
+
+    return ret;
+}
+
+template<typename T, int DIM>
+dynamic_vector<T>
+trace(const eigen_compatible_stdvector<static_matrix<T, DIM, DIM>>& base)
+{
+    dynamic_vector<T> ret = dynamic_vector<T>::Zero(base.size());
+
+    for (int i = 0; i < base.size(); i++)
+    {
+        ret(i) = base[i].trace();
     }
 
     return ret;

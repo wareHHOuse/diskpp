@@ -26,34 +26,38 @@
 
 #pragma once
 
+#include "quad_raw_tetra.hpp"
 #include "quad_raw_triangle.hpp"
 
+namespace disk
+{
+namespace quadrature
+{
 
-namespace disk {
-namespace quadrature {
-
-namespace priv {
+namespace priv
+{
 
 /* Integrate a convex element: determine a rough center and build triangles
  * between it and all the edges. Then use a triangle quadrature. */
 template<typename T>
 auto
-integrate_convex(const disk::generic_mesh<T,2>& msh,
-    const typename disk::generic_mesh<T,2>::cell_type& cl, size_t degree)
+integrate_convex(const disk::generic_mesh<T, 2>&                     msh,
+                 const typename disk::generic_mesh<T, 2>::cell_type& cl,
+                 size_t                                              degree)
 {
     auto pts = points(msh, cl);
     assert(pts.size() > 2);
-    auto center = std::accumulate(pts.begin(), pts.end(), point<T,2>(0,0));
-    center = center/T(pts.size());
+    auto center = std::accumulate(pts.begin(), pts.end(), point<T, 2>(0, 0));
+    center      = center / T(pts.size());
 
-    std::vector<quadrature_point<T,2>> ret;
+    std::vector<quadrature_point<T, 2>> ret;
 
     for (size_t i = 0; i < pts.size(); i++)
     {
-        auto p0 = pts[i];
-        auto p1 = pts[(i+1)%pts.size()];
+        auto p0  = pts[i];
+        auto p1  = pts[(i + 1) % pts.size()];
         auto qps = triangle_gauss(degree, center, p0, p1);
-        ret.insert( ret.end(), qps.begin(), qps.end() );
+        ret.insert(ret.end(), qps.begin(), qps.end());
     }
 
     return ret;
@@ -63,16 +67,17 @@ integrate_convex(const disk::generic_mesh<T,2>& msh,
  * Then use a triangle quadrature. */
 template<typename T>
 auto
-integrate_nonconvex(const disk::generic_mesh<T,2>& msh,
-    const typename disk::generic_mesh<T,2>::cell_type& cl, size_t degree)
+integrate_nonconvex(const disk::generic_mesh<T, 2>&                     msh,
+                    const typename disk::generic_mesh<T, 2>::cell_type& cl,
+                    size_t                                              degree)
 {
     auto tris = triangulate_nonconvex_polygon(msh, cl);
 
-    std::vector<quadrature_point<T,2>> ret;
+    std::vector<quadrature_point<T, 2>> ret;
     for (auto& tri : tris)
     {
         auto qps = triangle_gauss(degree, tri.p0, tri.p1, tri.p2);
-        ret.insert( ret.end(), qps.begin(), qps.end() );
+        ret.insert(ret.end(), qps.begin(), qps.end());
     }
 
     return ret;
@@ -82,26 +87,28 @@ integrate_nonconvex(const disk::generic_mesh<T,2>& msh,
 
 } // namespace quadrature
 
-
 template<typename T>
 std::vector<disk::quadrature_point<T, 2>>
 integrate(const disk::generic_mesh<T, 2>& msh, const typename disk::generic_mesh<T, 2>::cell& cl, size_t degree)
 {
     const auto pts = points(msh, cl);
 
-    assert( (pts.size() > 2) && "Insufficient points for a 2D cell" );
+    assert((pts.size() > 2) && "Insufficient points for a 2D cell");
 
-    if (pts.size() == 3) {
+    if (pts.size() == 3)
+    {
         return disk::quadrature::triangle_gauss(degree, pts[0], pts[1], pts[2]);
     }
 
     bool convex = is_convex(msh, cl);
-    
-    if (pts.size() == 4 and convex) {
+
+    if (pts.size() == 4 and convex)
+    {
         return disk::quadrature::tensorized_gauss_legendre(degree, pts[0], pts[1], pts[2], pts[3]);
     }
 
-    if (convex) {
+    if (convex)
+    {
         return quadrature::priv::integrate_convex(msh, cl, degree);
     }
 
@@ -110,16 +117,15 @@ integrate(const disk::generic_mesh<T, 2>& msh, const typename disk::generic_mesh
 
 template<typename T>
 auto
-integrate(const disk::generic_mesh<T, 2>& msh,
-    const typename disk::generic_mesh<T, 2>::face& fc, size_t degree)
+integrate(const disk::generic_mesh<T, 2>& msh, const typename disk::generic_mesh<T, 2>::face& fc, size_t degree)
 {
     auto pts = points(msh, fc);
     assert(pts.size() == 2);
     return disk::quadrature::gauss_legendre(degree, pts[0], pts[1]);
 }
 
-
-namespace priv {
+namespace priv
+{
 
 template<typename T>
 std::vector<disk::quadrature_point<T, 3>>
@@ -129,61 +135,40 @@ integrate_polyhedron(const disk::generic_mesh<T, 3>&                msh,
 {
     using quadpoint_type = disk::quadrature_point<T, 3>;
 
-    const auto m_quadrature_data = disk::tetrahedron_quadrature(degree);
-
     const auto rss = split_in_raw_tetrahedra(msh, cl);
 
     std::vector<quadpoint_type> ret;
-    ret.reserve(m_quadrature_data.size() * rss.size());
+    ret.reserve(10 * rss.size());
     for (auto& rs : rss)
     {
         const auto pts = rs.points();
         assert(pts.size() == 4);
-
-        const auto meas = measure(rs);
-        // Compute the integration basis
-        const auto [p0, v0, v1, v2] = integration_basis(pts[0], pts[1], pts[2], pts[3]);
-
-        for (auto& qd : m_quadrature_data)
-        {
-            auto point  = p0 + v0 * qd.first.x() + v1 * qd.first.y() + v2 * qd.first.z();
-            auto weight = qd.second * meas;
-            ret.push_back(make_qp(point, weight));
-        }
+        const auto quad_tet = disk::quadrature::arbq(degree, pts[0], pts[1], pts[2], pts[3]);
+        ret.insert(ret.end(), quad_tet.begin(), quad_tet.end());
     }
 
     return ret;
-} 
+}
 
 template<typename T>
 std::vector<disk::quadrature_point<T, 3>>
 integrate_polyhedron_face(const disk::generic_mesh<T, 3>&                msh,
                           const typename disk::generic_mesh<T, 3>::face& fc,
-                          const size_t                                         degree)
+                          const size_t                                   degree)
 {
     using quadpoint_type = disk::quadrature_point<T, 3>;
-
-    const auto m_quadrature_data = disk::triangle_quadrature(degree);
 
     const auto rss = split_in_raw_triangles(msh, fc);
 
     std::vector<quadpoint_type> ret;
-    ret.reserve(m_quadrature_data.size() * rss.size());
+    ret.reserve(5 * rss.size());
     for (auto& rs : rss)
     {
         const auto pts = rs.points();
         assert(pts.size() == 3);
-        const auto meas = measure(rs);
 
-        // Compute the integration basis
-        const auto [p0, v0, v1] = integration_basis(pts[0], pts[1], pts[2]);
-
-        for (auto& qd : m_quadrature_data)
-        {
-            const auto point  = p0 + v0 * qd.first.x() + v1 * qd.first.y();
-            const auto weight = qd.second * meas;
-            ret.push_back(disk::make_qp(point, weight));
-        }
+        const auto quad_tri = disk::quadrature::triangle_gauss(degree, pts[0], pts[1], pts[2]);
+        ret.insert(ret.end(), quad_tri.begin(), quad_tri.end());
     }
 
     return ret;
@@ -238,7 +223,7 @@ integrate(const disk::generic_mesh<T, 3>& msh, const typename disk::generic_mesh
 
 template<typename T>
 std::vector<disk::quadrature_point<T, 1>>
-integrate(const disk::generic_mesh<T,1>& msh, const typename generic_mesh<T, 1>::cell& cl, size_t degree)
+integrate(const disk::generic_mesh<T, 1>& msh, const typename generic_mesh<T, 1>::cell& cl, size_t degree)
 {
     const auto qps = disk::edge_quadrature<T>(degree);
     const auto pts = points(msh, cl);
@@ -280,4 +265,3 @@ integrate(const disk::generic_mesh<T, 1>& msh, const typename generic_mesh<T, 1>
 }
 
 } // namespace disk
-
