@@ -21,6 +21,7 @@
 #include "sgr.hpp"
 
 #include <unistd.h>
+#include <numeric>
 
 using namespace disk;
 using namespace sgr;
@@ -254,49 +255,50 @@ bool test_polygons_first_try(size_t degree, double radius,
                     const hho_variant& variant, 
                     polygon_type polygon)
 {
+    size_t max_increment = 40; //This can be changed.
     generated_by g;
-    size_t min_faces;
-    
+    std::vector<int> poly_faces(10);
+
     switch(polygon)
     {
         case(polygon_type::REGULAR):
         case(polygon_type::IRREGULAR):
         case(polygon_type::IRREGULAR_ALIGNED):
             g = generated_by::CSV;
-            min_faces = 3;
+            std::iota(poly_faces.begin(), poly_faces.end(), 3); 
             break;
         case(polygon_type::ALIGNED):    
             g = generated_by::CSV;
-            min_faces = 5;
+            std::iota(poly_faces.begin(), poly_faces.end(), 5); 
             break;
         case(polygon_type::CONCAVE):
             g = generated_by::CSV;
-            min_faces = 4;
+            poly_faces = std::vector<int>({4,5,6,7,9,11,13,15,17,19});
             break;
         case(polygon_type::SINGLE):
             g = generated_by::DISKPP;
-            min_faces = 3;
+            std::iota(poly_faces.begin(), poly_faces.end(), 3); 
             break;
         default:
             throw std::invalid_argument("POLYGON TYPE not found");        
     }
 
-    size_t max_faces = 10;
-    matrix_t mat = matrix_t::Zero(max_faces - min_faces + 1,3);
+    matrix_t mat = matrix_t::Zero(10,3);
 
-    for (size_t f = min_faces; f <= max_faces; f++) 
+    for (size_t f = 0; f < 10; f++) 
     {
-        std::cout << BYellowfg << " **** Faces = " << f << " ****" << reset << std::endl;
+        size_t num_faces = poly_faces[f];     
+        std::cout << BYellowfg << " **** Faces = " << num_faces << " ****" << reset << std::endl;
         disk::generic_mesh<double,2> msh_gen;
         switch(g)
         {
             case(generated_by::DISKPP):
-                disk::make_single_element_mesh(msh_gen, radius, f);
+                disk::make_single_element_mesh(msh_gen, radius, num_faces);
                 break;
             case(generated_by::CSV): 
             {
                 std::stringstream mesh_filename;
-                mesh_filename << dir << "Test"<< polygon << "/Csv/Domain_" << f << ".csv"; 
+                mesh_filename << dir << "Test"<< polygon << "/Csv/Domain_" << num_faces << ".csv"; 
                 std::cout << mesh_filename.str() << std::endl;
                 load_single_element_csv(msh_gen, mesh_filename.str());
                 break;
@@ -306,7 +308,7 @@ bool test_polygons_first_try(size_t degree, double radius,
         }
 
         size_t increment;
-        for( increment = 0; increment <= 11; increment++)   
+        for( increment = 0; increment <= max_increment; increment++)   
         {
             std::cout<<"------------------------------------------------------------"<<std::endl;
             std::cout<<"* Increment..."<< increment <<std::endl;
@@ -315,12 +317,12 @@ bool test_polygons_first_try(size_t degree, double radius,
             auto [pass, min2_eig] = test_consistency(msh_gen, degree, increment, variant);
             double val = (pass)? min2_eig : -1;
 
-            if(pass || increment == 11)
+            if(pass || increment == max_increment)
             {
                 std::cout << std::endl;
-                mat(f - min_faces, 0) = f;
-                mat(f - min_faces, 1) = val;
-                mat(f - min_faces, 2) = increment;
+                mat(f, 0) = num_faces;
+                mat(f, 1) = val;
+                mat(f, 2) = increment;
                 break;
             }
         }
@@ -335,9 +337,9 @@ bool test_polygons_first_try(size_t degree, double radius,
             
     for (int i = 0; i < mat.rows(); ++i)
     {
-        ofs << std::setprecision(0) << mat(i,0) << " ,"
+        ofs << std::setprecision(2) << mat(i,0) << " ,"
             << std::setprecision(4) << std::scientific << mat(i,1) << " ,"
-            << std::setprecision(0) << mat(i,2) << std::endl ;
+            << std::setprecision(3) << mat(i,2) << std::endl ;
     }
     ofs.close();            
     std::cout<<"======================================================="<<std::endl;
@@ -351,10 +353,8 @@ bool test_polygons( size_t degree, double radius,
                     const hho_variant& variant, 
                     polygon_type polygon)
 {
-
-
     generated_by g;
-    size_t min_faces;
+    std::vector<int> poly_faces(10);    
     
     switch(polygon)
     {
@@ -362,19 +362,19 @@ bool test_polygons( size_t degree, double radius,
         case(polygon_type::IRREGULAR):
         case(polygon_type::IRREGULAR_ALIGNED):
             g = generated_by::CSV;
-            min_faces = 3;
+            std::iota(poly_faces.begin(), poly_faces.end(), 3); 
             break;
         case(polygon_type::ALIGNED):    
             g = generated_by::CSV;
-            min_faces = 5;
+            std::iota(poly_faces.begin(), poly_faces.end(), 5); 
             break;
         case(polygon_type::CONCAVE):
             g = generated_by::CSV;
-            min_faces = 4;
+            poly_faces = std::vector<int>({4,5,6,7,9,11,13,15,17,19});
             break;
         case(polygon_type::SINGLE):
             g = generated_by::DISKPP;
-            min_faces = 3;
+            std::iota(poly_faces.begin(), poly_faces.end(), 3); 
             break;
         default:
             throw std::invalid_argument("POLYGON TYPE not found");        
@@ -383,27 +383,27 @@ bool test_polygons( size_t degree, double radius,
 
     std::vector<triplet_t> triplets;
 
-    size_t global_increment = 11;
-    for(size_t increment = 0; increment < 12; increment++)
+    size_t global_increment = 40;
+    for(size_t increment = 0; increment <=40 ; increment++)
     {
         bool pass_all = true;
         std::cout<<"------------------------------------------------------------"<<std::endl;
         std::cout<<"* Increment..."<< increment <<std::endl;
         std::cout<<"------------------------------------------------------------"<<std::endl;
 
-        for (size_t f = min_faces; f <= max_faces; f++) 
+        for (size_t f = 0; f < 10; f++) 
         {
-            std::cout << BYellowfg << " **** Faces = " << f << " ****" << reset << std::endl;
+            std::cout << BYellowfg << " **** Faces = " << poly_faces[f] << " ****" << reset << std::endl;
             disk::generic_mesh<double,2> msh_gen;
             switch(g)
             {
                 case(generated_by::DISKPP):
-                    disk::make_single_element_mesh(msh_gen, radius, f);
+                    disk::make_single_element_mesh(msh_gen, radius, poly_faces[f]);
                     break;
                 case(generated_by::CSV): 
                 {
                     std::stringstream mesh_filename;
-                    mesh_filename << dir << "Test"<< polygon << "/Csv/Domain_" << f << ".csv"; 
+                    mesh_filename << dir << "Test"<< polygon << "/Csv/Domain_" << poly_faces[f] << ".csv"; 
                     std::cout << mesh_filename.str() << std::endl;
                     load_single_element_csv(msh_gen, mesh_filename.str());
                     break;
@@ -416,7 +416,7 @@ bool test_polygons( size_t degree, double radius,
             double val = (pass)? min2_eig : -1;
             pass_all = pass_all && pass; 
 
-            triplets.push_back(triplet_t(f - min_faces, increment, val));
+            triplets.push_back(triplet_t(poly_faces[f], increment, val));
 
         }
 
@@ -429,7 +429,7 @@ bool test_polygons( size_t degree, double radius,
 
     }
 
-    sparse_matrix_t smat(max_faces-min_faces + 1, global_increment+1);    
+    sparse_matrix_t smat(11, global_increment+1);    
     smat.setFromTriplets(triplets.begin(), triplets.end()); 
 
     matrix_t mat = matrix_t(smat);
@@ -440,7 +440,7 @@ bool test_polygons( size_t degree, double radius,
            
     for (int i = 0; i < mat.rows(); ++i)
     {
-        ofs << i + min_faces<<",";
+        ofs << poly_faces[i]<<",";
         for (int j = 0; j < mat.cols(); ++j)
             ofs << std::setprecision(4) <<  mat(i,j) << ((j==(mat.cols()-1))? "": ",");
         ofs<< "" << std::endl ;
@@ -553,7 +553,7 @@ int main(int argc, char **argv)
             size_t start = (variant == hho_variant::mixed_order_low)? 1 : 0;  
             for(size_t degree = start; degree <= 2; degree++)
                 test_polygons_first_try(degree, radius, variant, polygon);
-            std::cout << "Running test with " << variant << " order and polygon "
+            std::cout << "Running resume test with " << variant << " order and polygon "
                 << polygon << std::endl;  
             return 0;
         }
