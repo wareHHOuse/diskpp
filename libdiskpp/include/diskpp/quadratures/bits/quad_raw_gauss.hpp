@@ -4,6 +4,8 @@
 
 #include "diskpp/quadratures/quadrature_point.hpp"
 
+/* See mkgauss.cpp in apps/utils */
+
 namespace disk::quadrature {
 
 namespace priv {
@@ -333,7 +335,7 @@ gauss_legendre(size_t degree, const T& a, const T& b)
     for (size_t i = 0; i < npts; i++) {
         const auto &qp = priv::gauss_rules[rule_num].points[i];
         auto tr_qp = 0.5*(a+b) + 0.5*(b-a)*qp.point;
-        auto tr_qw = (b-a)*qp.weight;
+        auto tr_qw = 0.5 * (b-a) * qp.weight;
         qps.push_back({tr_qp, tr_qw});
     }
 
