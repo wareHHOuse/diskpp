@@ -113,3 +113,8 @@ if (BUILD_APP_BARYTEST)
     add_subdirectory(barycenter_test)
 endif()
 
+option(BUILD_APP_VEM_2D "Build VEM 2d application" ON)
+if (BUILD_APP_VEM_2D)
+    add_subdirectory(vem2d)
+endif()
+
