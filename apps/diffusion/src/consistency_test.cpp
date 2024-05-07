@@ -252,12 +252,17 @@ enum class generated_by
 
 
 bool test_polygons_first_try(size_t degree, double radius,
-                    const hho_variant& variant, 
+                    const hho_variant& hv, 
                     polygon_type polygon)
 {
     size_t max_increment = 40; //This can be changed.
+
+    size_t cell_degree =  (hv == hho_variant::mixed_order_low)?  degree-1 : 
+                          (hv == hho_variant::mixed_order_high)? degree+1 : 
+                          (hv == hho_variant::equal_order)? degree : 0;
+
     generated_by g;
-    std::vector<int> poly_faces(10);
+    std::vector<int> poly_faces;
 
     switch(polygon)
     {
@@ -265,27 +270,31 @@ bool test_polygons_first_try(size_t degree, double radius,
         case(polygon_type::IRREGULAR):
         case(polygon_type::IRREGULAR_ALIGNED):
             g = generated_by::CSV;
+            poly_faces.resize(16);
             std::iota(poly_faces.begin(), poly_faces.end(), 3); 
             break;
         case(polygon_type::ALIGNED):    
             g = generated_by::CSV;
             std::iota(poly_faces.begin(), poly_faces.end(), 5); 
+            poly_faces = std::vector<int>({5,6,7,8,9,10,11,12,13,14,15,16});
             break;
         case(polygon_type::CONCAVE):
             g = generated_by::CSV;
-            poly_faces = std::vector<int>({4,5,6,7,9,11,13,15,17,19});
+            poly_faces.resize(16);
+            std::iota(poly_faces.begin(), poly_faces.end(), 4); 
             break;
         case(polygon_type::SINGLE):
             g = generated_by::DISKPP;
+            poly_faces.resize(16);
             std::iota(poly_faces.begin(), poly_faces.end(), 3); 
             break;
         default:
             throw std::invalid_argument("POLYGON TYPE not found");        
     }
 
-    matrix_t mat = matrix_t::Zero(10,3);
+    matrix_t mat = matrix_t::Zero(poly_faces.size(),4);
 
-    for (size_t f = 0; f < 10; f++) 
+    for (size_t f = 0; f < poly_faces.size(); f++) 
     {
         size_t num_faces = poly_faces[f];     
         std::cout << BYellowfg << " **** Faces = " << num_faces << " ****" << reset << std::endl;
@@ -314,15 +323,30 @@ bool test_polygons_first_try(size_t degree, double radius,
             std::cout<<"* Increment..."<< increment <<std::endl;
             std::cout<<"------------------------------------------------------------"<<std::endl;
 
-            auto [pass, min2_eig] = test_consistency(msh_gen, degree, increment, variant);
+            auto [pass, min2_eig] = test_consistency(msh_gen, degree, increment, hv);
             double val = (pass)? min2_eig : -1;
 
             if(pass || increment == max_increment)
             {
+                int res = int(num_faces * (degree + 1)) - int(2 * cell_degree)-5;
+                bool enough  = int(2 * increment) >= res; 
+                
+                /*
+                //int(num_faces * (degree + 1))-int((2 * cell_degree))-5;
+
+                std::cout << "Enough = "<< enough << " = (" << (2 * increment) << 
+                                     " >= "<< "(" << num_faces * (degree + 1) << " - " << (2 * cell_degree) << "- 5))" << std::endl;
+                std::cout << "Enough = "<< enough << " = ("<< (2 * increment) << 
+                                      " >= "<< "(" << int((num_faces * (degree + 1))  -2 * cell_degree -5)<< "))" << std::endl;
+                std::cout << "Enough = "<< enough << " = " << ((2 * increment) >= -5 + int(num_faces * (degree + 1))-(2. * cell_degree))  << std::endl;
+                exit(1);
+                */
+
                 std::cout << std::endl;
                 mat(f, 0) = num_faces;
                 mat(f, 1) = val;
                 mat(f, 2) = increment;
+                mat(f, 3) = enough;
                 break;
             }
         }
@@ -332,14 +356,15 @@ bool test_polygons_first_try(size_t degree, double radius,
     std::cout<<"======================================================="<<std::endl;
 
     std::stringstream name;
-    name << "matrix_resume_"<< polygon << "_" << variant << "_k_" << degree << ".txt";
+    name << "matrix_resume_"<< polygon << "_" << hv << "_k_" << degree << ".txt";
     std::ofstream ofs(name.str());               
             
     for (int i = 0; i < mat.rows(); ++i)
     {
         ofs << std::setprecision(2) << mat(i,0) << " ,"
             << std::setprecision(4) << std::scientific << mat(i,1) << " ,"
-            << std::setprecision(3) << mat(i,2) << std::endl ;
+            << std::setprecision(3) << mat(i,2) << " ,"
+            << std::setprecision(1) << mat(i,3) << std::endl ;
     }
     ofs.close();            
     std::cout<<"======================================================="<<std::endl;
