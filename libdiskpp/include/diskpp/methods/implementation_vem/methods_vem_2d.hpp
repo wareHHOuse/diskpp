@@ -14,6 +14,8 @@
 #pragma once
 
 #include "diskpp/bases/bases.hpp"
+#include "diskpp/quadratures/bits/quad_raw_gauss_lobatto.hpp"
+#include <cassert>
 
 namespace disk
 {
@@ -39,18 +41,16 @@ using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
 
 template<typename Mesh>
 matrix_type<typename Mesh::coordinate_type>
-stiffness_matrix_polk(const Mesh&    msh,
+matrix_G(const Mesh&    msh,
          const typename Mesh::cell_type&  cl,
          const size_t   degree)
 {
-    //Matrix G in papers
     using T = typename Mesh::coordinate_type;
     const auto num_faces = howmany_faces(msh, cl);
 
     const auto cbs = scalar_basis_size(degree, Mesh::dimension);
     matrix_type<T> stiffness = make_stiffness_matrix(msh, cl, cbs);
     
-
     const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
     const auto qps = integrate(msh, cl, 2 * (degree - 1));
     for (auto& qp : qps)
@@ -66,19 +66,46 @@ stiffness_matrix_polk(const Mesh&    msh,
 
 
 
-template<typename Mesh>
+template<disk::mesh_2D Mesh>
 matrix_type<typename Mesh::coordinate_type>
-
 matrix_BF(const Mesh&    msh,
          const typename Mesh::cell_type&  cl,
          const size_t   degree)
 {
+    assert(degree > 0);
+
     using T = typename Mesh::coordinate_type;
 
     const auto num_faces = howmany_faces(msh, cl);
-    const auto cbs = scalar_basis_size(degree, Mesh::dimension);
+    const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
+    const auto cbs = cb.size(); 
+    const auto num_dofs_bnd = num_faces * degree;
 
-    matrix_type<T> BF = matrix_type<T>::Zero(cbs, num_faces * degree);
+    matrix_type<T> BF = matrix_type<T>::Zero(cbs, num_dofs_bnd);
+
+    auto fcs = faces(msh, cl);
+
+    auto iface = 0;
+    for(const auto fc : fcs)
+    {
+        const auto n   = normal(msh, cl, fc);
+        const auto pts = points(msh, fc);
+
+        auto qps = disk::quadrature::gauss_lobatto(2 * degree -1, pts[0], pts[1]);
+
+        auto qcount = iface * degree; 
+
+        for (auto& qp : qps)
+        {       
+            const auto dphi   = cb.eval_gradients(qp.point());
+            const auto dphi_n = qp.weight() * (dphi * n);
+
+            size_t index_dof = qcount%(num_dofs_bnd); 
+            BF.block(0, index_dof, cbs, 1) += dphi_n;
+            qcount++;
+        }  
+        iface++;
+    }
 
     return BF;
 }
@@ -103,34 +130,39 @@ matrix_BT(const Mesh&    msh,
 
     matrix_type<T> BT = matrix_type<T>::Zero(cbs, lbs);
 
-    size_t ipol = 2;
+    int ipol = 2;
 
-    for (size_t k = 2; k <= degree; k++)
+    auto h = diameter(msh, cl); 
+    auto h_powk = h;
+
+    for (int k = 2; k <= degree; k++)
     {
-        for (size_t i = 0; i <= k; i++) 
+        h_powk *= h;
+
+        for (int i = 0; i <= k; i++) 
         {
             ipol++;
 
-            size_t powx = k-i;
-            size_t powy = i;
+            int powx = k-i;
+            int powy = i;
 
-            size_t dxx_row = k-2;
-            size_t dyy_row = dxx_row;
-            size_t dxx_col = i;
-            size_t dyy_col = i-2;
+            int dxx_row = k-2;
+            int dyy_row = dxx_row;
+            int dxx_col = i;
+            int dyy_col = i-2;
 
             if(dxx_row >= i && dxx_col >= 0)
             {
-                size_t ipolxx = 0.5 * (dxx_row + 1) * dxx_row + dxx_col;
-                size_t coeff_xx = powx * (powx - 1);
-                BT(ipol, ipolxx) = coeff_xx;
+                int ipolxx = 0.5 * (dxx_row + 1) * dxx_row + dxx_col;
+                int coeff_xx = powx * (powx - 1);
+                BT(ipol, ipolxx) = -coeff_xx / h_powk ;
             }
 
             if(dyy_row >= 0 && dyy_col >= 0)
             {
-                size_t ipolyy = 0.5 * (dyy_row + 1) * dyy_row + dyy_col;          
-                size_t coeff_yy = powy * (powy - 1);
-                BT(ipol, ipolyy) = coeff_yy;    
+                int ipolyy = 0.5 * (dyy_row + 1) * dyy_row + dyy_col;          
+                int coeff_yy = powy * (powy - 1);
+                BT(ipol, ipolyy) = -coeff_yy / h_powk;    
             }
         }
     }
