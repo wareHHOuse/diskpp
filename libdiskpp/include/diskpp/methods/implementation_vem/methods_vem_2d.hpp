@@ -146,22 +146,24 @@ matrix_BT(const Mesh&    msh,
             int powx = k-i;
             int powy = i;
 
-            int dxx_row = k-2;
-            int dyy_row = dxx_row;
-            int dxx_col = i;
-            int dyy_col = i-2;
+            int coeff_xx = powx * (powx - 1);
+            int coeff_yy = powy * (powy - 1);
 
-            if(dxx_row >= i && dxx_col >= 0)
+            if(coeff_xx > 0)
             {
+                int dxx_row = k-2;
+                int dxx_col = i;
+
                 int ipolxx = 0.5 * (dxx_row + 1) * dxx_row + dxx_col;
-                int coeff_xx = powx * (powx - 1);
                 BT(ipol, ipolxx) = -coeff_xx / h_powk ;
             }
 
-            if(dyy_row >= 0 && dyy_col >= 0)
+            if(coeff_yy > 0) 
             {
+                int dyy_row = k-2;
+                int dyy_col = i-2;
+
                 int ipolyy = 0.5 * (dyy_row + 1) * dyy_row + dyy_col;          
-                int coeff_yy = powy * (powy - 1);
                 BT(ipol, ipolyy) = -coeff_yy / h_powk;    
             }
         }
