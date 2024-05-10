@@ -39,7 +39,7 @@ using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
  * @return dynamic_matrix<typename Mesh::coordinate_type> stiffness matrix in \f$ \mathcal{P}^{k}(T)\f$ 
  */
 
-template<typename Mesh>
+template<disk::mesh_2D Mesh>
 matrix_type<typename Mesh::coordinate_type>
 matrix_G(const Mesh&    msh,
          const typename Mesh::cell_type&  cl,
@@ -49,9 +49,9 @@ matrix_G(const Mesh&    msh,
     const auto num_faces = howmany_faces(msh, cl);
 
     const auto cbs = scalar_basis_size(degree, Mesh::dimension);
-    matrix_type<T> stiffness = make_stiffness_matrix(msh, cl, cbs);
-    
     const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
+    matrix_type<T> stiffness = make_stiffness_matrix(msh, cl, cb);
+    
     const auto qps = integrate(msh, cl, 2 * (degree - 1));
     for (auto& qp : qps)
     {
@@ -111,7 +111,7 @@ matrix_BF(const Mesh&    msh,
 }
 
 
-template<typename Mesh>
+template<disk::mesh_2D Mesh>
 matrix_type<typename Mesh::coordinate_type>
 matrix_BT(const Mesh&    msh,
          const typename Mesh::cell_type&  cl,
@@ -170,9 +170,80 @@ matrix_BT(const Mesh&    msh,
     }
 
     BT *= measure(msh, cl); 
+
+    auto P0v = 1;
+    BT(0, 0) = P0v; 
+
     return BT;
 }
 
+
+template<disk::mesh_2D Mesh>
+matrix_type<typename Mesh::coordinate_type>
+matrix_B(const Mesh&    msh,
+         const typename Mesh::cell_type&  cl,
+         const size_t   degree)
+{
+    using T = typename Mesh::coordinate_type;
+
+    const auto cbs = scalar_basis_size(degree, Mesh::dimension);
+    const auto lbs = scalar_basis_size(degree-2, Mesh::dimension);
+
+    const auto num_faces = howmany_faces(msh, cl);
+    const auto num_dofs = num_faces * degree + lbs; 
+
+    matrix_type<T> B = matrix_type<T>::Zero(cbs, num_dofs);
+
+    B.block(0, 0, cbs, num_faces * degree)  = matrix_BF(msh, cl, degree);
+    B.block(0,num_faces * degree, cbs, lbs) = matrix_BT(msh, cl, degree);
+
+    return B;
+}
+
+
+template<disk::mesh_2D Mesh>
+matrix_type<typename Mesh::coordinate_type>
+matrix_D(const Mesh&    msh,
+         const typename Mesh::cell_type&  cl,
+         const size_t   degree)
+{
+    using T = typename Mesh::coordinate_type;
+
+    const auto cbs = scalar_basis_size(degree, Mesh::dimension);
+    const auto lbs = scalar_basis_size(degree-2, Mesh::dimension);
+
+    const auto num_faces = howmany_faces(msh, cl);
+    const auto num_dofs = num_faces * degree + lbs; 
+
+    matrix_type<T> D = matrix_type<T>::Zero(num_dofs, cbs);
+
+    //D.block(0, 0, cbs, num_faces * degree)  = matrix_BF(msh, cl, degree);
+    //B.block(0,num_faces * degree, cbs, lbs) = matrix_BT(msh, cl, degree);
+    const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
+
+    auto fcs = faces(msh, cl);
+
+    auto count = 0;
+    for(const auto fc : fcs)
+    {
+        const auto n   = normal(msh, cl, fc);
+        const auto pts = points(msh, fc);
+
+        auto qps = disk::quadrature::gauss_lobatto(2 * degree -1, pts[0], pts[1]);
+
+        for (size_t iq = 0; iq < qps.size() - 1;  iq++)
+        {  
+            auto qp = qps[iq];     
+            const auto phi   = cb.eval_functions(qp.point());
+
+            D.block(count, 0, 1,cbs) = phi.transpose();
+            count++;
+        }  
+    }
+
+
+    return D;
+}
 
 } // end namespace vem 2d
 }// end namespace diskpp
