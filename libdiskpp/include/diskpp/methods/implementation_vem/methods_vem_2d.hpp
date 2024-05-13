@@ -21,6 +21,24 @@ namespace disk
 {
 
 template<typename T>
+std::array< std::pair< typename cartesian_mesh<T,2>::face_type, bool >, 4>
+faces_ccw(const cartesian_mesh<T,2>& msh, const typename cartesian_mesh<T,2>::cell_type& cl)
+{
+    using face_type = typename cartesian_mesh<T,2>::face_type;
+    auto fcs = faces(msh, cl);
+    auto ptids = cl.point_ids();
+    std::array< std::pair<face_type, bool>, 4> reorder;
+
+    reorder[0] = { fcs[0], false };
+    reorder[1] = { fcs[2], false };
+    reorder[2] = { fcs[3], true };
+    reorder[3] = { fcs[1], true };
+
+    return reorder;
+}
+
+
+template<typename T>
 std::vector< std::pair< typename generic_mesh<T,2>::face_type, bool > >
 faces_ccw(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::cell_type& cl)
 {
@@ -48,11 +66,13 @@ faces_ccw(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::cell_t
         for (size_t j = 0; j < fcs.size(); j++) {
             auto fc_ptids = fcs[j].point_ids();
             assert(fc_ptids.size() == 2);
+            assert(fc_ptids[0] < fc_ptids[1]);
             if (fc_ptids[0] == n0 and fc_ptids[1] == n1)
                 reorder.push_back({fcs[j], flipped});
         }
     }
 
+    assert(fcs.size() == reorder.size());
     return reorder;
 }
 

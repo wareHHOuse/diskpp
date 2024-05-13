@@ -6,8 +6,9 @@
 #include "diskpp/geometry/geometry.hpp"
 #include "diskpp/methods/vem"
 
-#define TEST_MESH "../../../meshes/2D_hex/fvca5/hexagonal_1.typ1"
+#define TEST_MESH_POLY "../../../meshes/2D_hex/fvca5/hexagonal_1.typ1"
 
+#define TEST_MESH_QUAD "../../../meshes/2D_quads/diskpp/testmesh-2-2.quad"
 
 template<disk::mesh_2D Mesh>
 void run_vemasm(const Mesh& msh, size_t k)
@@ -82,7 +83,14 @@ void run_vemasm(const Mesh& msh, size_t k)
 int main(void)
 {
     using T = double;
-    disk::generic_mesh<T, 2> msh;
-    disk::load_mesh_fvca5_2d<T>(TEST_MESH, msh);
-    run_vemasm(msh, 3);
+    disk::generic_mesh<T, 2> msh_poly;
+    disk::load_mesh_fvca5_2d<T>(TEST_MESH_POLY, msh_poly);
+    run_vemasm(msh_poly, 3);
+
+    std::cout << " *** CARTESIAN ***" << std::endl;
+    disk::cartesian_mesh<T, 2> msh_quad;
+    disk::load_mesh_diskpp_cartesian(TEST_MESH_QUAD, msh_quad);
+    run_vemasm(msh_quad, 3);
+
+    return 0;
 }

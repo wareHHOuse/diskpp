@@ -36,6 +36,20 @@ int main(int argc, char **argv)
         disk::make_single_element_mesh(msh, radius, num_faces);
     }
 
+    std::cout << "LEX ordering" << std::endl;
+    for (auto& cl : msh) {
+        auto fcs = faces(msh, cl);
+        for (auto& fc : fcs)
+            std::cout << fc << std::endl;
+    }
+
+    std::cout << "CCW ordering" << std::endl;
+    for (auto& cl : msh) {
+        auto fcs_ccw = faces_ccw(msh, cl);
+        for (auto& [fc, flip] : fcs_ccw)
+            std::cout << fc << " " << flip << std::endl;
+    }
+
     for(const auto& cl : msh)
         std::cout<< "G matrix: \n"
             << disk::vem_2d::matrix_BT(msh, cl, degree) << "\n";

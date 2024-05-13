@@ -1119,6 +1119,8 @@ void make_single_element_mesh(generic_mesh<T,2>& msh, const T& radius, const siz
     for (size_t i = 0; i < num_nodes; i++) {
         auto n0 = nodeid_type(i);
         auto n1 = nodeid_type( (i+1)%num_nodes );
+        if (i+1 == num_nodes)
+            std::swap(n0, n1);
         storage->edges.push_back( {n0, n1} );
         surface_nodes.push_back( typename node_type::id_type(i) );
         surface_edges.push_back( typename edge_type::id_type(i) );
@@ -1186,6 +1188,8 @@ bool load_single_element_csv(generic_mesh<T,2>& msh, const std::string& filename
     for (size_t i = 0; i < num_nodes; i++) {
         auto n0 = nodeid_type(i);
         auto n1 = nodeid_type( (i+1)%num_nodes );
+        if (i+1 == num_nodes)
+            std::swap(n0, n1);
         storage->edges.push_back( {n0, n1} );
         surface_nodes.push_back( typename node_type::id_type(i) );
         surface_edges.push_back( typename edge_type::id_type(i) );
