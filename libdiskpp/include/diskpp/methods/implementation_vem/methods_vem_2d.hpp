@@ -405,5 +405,58 @@ matrix_D(const Mesh&    msh,
 
 
 
+template<disk::mesh_2D Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+projector_nabla(const Mesh&    msh,
+         const typename Mesh::cell_type&  cl,
+         const size_t   degree,
+         const dynamic_matrix<typename Mesh::coordinate_type>& G)
+{
+    using T = typename Mesh::coordinate_type;
+    using matrix_t = dynamic_matrix<typename Mesh::coordinate_type>;
+
+    matrix_t B = matrix_B(msh, cl, degree);
+
+    matrix_t PI_star = G.ldlt().solve(B);
+
+    return PI_star;
+}
+
+
+
+template<disk::mesh_2D Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+local_stiffness_matrix(const Mesh&    msh,
+                            const typename Mesh::cell_type&  cl,
+                            const size_t   degree)
+{
+    const auto cbs = scalar_basis_size(degree, Mesh::dimension);
+    const auto lbs = scalar_basis_size(degree-2, Mesh::dimension);
+
+    const auto num_faces = howmany_faces(msh, cl);
+    const auto num_dofs = num_faces * degree + lbs; 
+
+    using matrix_t = dynamic_matrix<typename Mesh::coordinate_type>;
+  
+    matrix_t I = matrix_t::Identity(num_dofs, num_dofs);
+
+    matrix_t G = matrix_G(msh, cl, degree);
+    matrix_t PI_star = projector_nabla(msh, cl, degree, G);
+
+    matrix_t D = matrix_D(msh, cl, degree);
+    matrix_t PI_stab = D * PI_star; 
+
+    G.row(0).setConstant(0);
+
+    matrix_t A =  PI_star.transpose() * G * PI_star;    
+    matrix_t S = (I - PI_stab).transpose() * (I - PI_stab); 
+
+    std::cout<< "A matrix: \n"<< A << "\n";
+    std::cout<< "S matrix: \n"<< S << "\n";
+
+    return A + S;    
+}
+
+
 } // end namespace vem 2d
 }// end namespace diskpp
