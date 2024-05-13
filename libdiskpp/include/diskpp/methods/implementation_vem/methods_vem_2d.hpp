@@ -21,6 +21,33 @@
 namespace disk
 {
 
+/* In DiSk++ 2D faces (= edges) are stored in lexicographically ordered
+ * pairs (n0, n1). Node n0 is always the one with the smallest number, n1
+ * the one with the highest number. This is true both globally (inside the
+ * Mesh data structure) and locally (the data returned by `faces(msh, cl)`).
+ * In addition, for compatibility with the DGA, only generic_mesh stores
+ * point ids clockwise.
+ * To simplify the implementation of 2D VEM, the following functions reorder
+ * the faces so that:
+ *  1) they appear CCW in the list returned by faces_ccw(msh, cl)
+ *  2) they have a flag attached that indicates whether they should be flipped
+ */
+template<typename T>
+std::array< std::pair< typename simplicial_mesh<T,2>::face_type, bool >, 3>
+faces_ccw(const simplicial_mesh<T,2>& msh, const typename simplicial_mesh<T,2>::cell_type& cl)
+{
+    using face_type = typename simplicial_mesh<T,2>::face_type;
+    auto fcs = faces(msh, cl);
+    auto ptids = cl.point_ids();
+    std::array< std::pair<face_type, bool>, 3> reorder;
+
+    reorder[0] = { fcs[0], false };
+    reorder[1] = { fcs[1], false };
+    reorder[2] = { fcs[2], true };
+
+    return reorder;
+}
+
 template<typename T>
 std::array< std::pair< typename cartesian_mesh<T,2>::face_type, bool >, 4>
 faces_ccw(const cartesian_mesh<T,2>& msh, const typename cartesian_mesh<T,2>::cell_type& cl)
@@ -62,8 +89,7 @@ faces_ccw(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::cell_t
             std::swap(n0, n1);
             flipped = true;
         }
-        /* This builds the lex-to-CCW table, it also stores if the
-            * edge is flipped. */
+        
         for (size_t j = 0; j < fcs.size(); j++) {
             auto fc_ptids = fcs[j].point_ids();
             assert(fc_ptids.size() == 2);
