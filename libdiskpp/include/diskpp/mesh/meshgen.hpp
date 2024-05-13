@@ -1130,6 +1130,7 @@ void make_single_element_mesh(generic_mesh<T,2>& msh, const T& radius, const siz
 
     auto surface = surface_type(surface_edges);
     surface.set_point_ids(surface_nodes.begin(), surface_nodes.end()); /* XXX: crap */
+    std::sort(storage->edges.begin(), storage->edges.end());
 
     storage->surfaces.push_back(surface);
 
@@ -1193,6 +1194,7 @@ bool load_single_element_csv(generic_mesh<T,2>& msh, const std::string& filename
     storage->boundary_info.resize( storage->edges.size() );
     for (auto& bi : storage->boundary_info)
         bi = boundary_descriptor(0, true);
+    std::sort(storage->edges.begin(), storage->edges.end());
 
     auto surface = surface_type(surface_edges);
     surface.set_point_ids(surface_nodes.begin(), surface_nodes.end()); /* XXX: crap */

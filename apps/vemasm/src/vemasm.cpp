@@ -47,28 +47,6 @@ void run_vemasm(const Mesh& msh, size_t k)
 
         auto fcs = faces(msh, cl);
 
-        /* faces() gives you the faces in lex order, but we need CCW.
-         * This sucks (it's n^2) but does the job. */
-        std::vector<std::pair<size_t,bool>> reorder;
-        for (size_t i = 0; i < ptids.size(); i++)
-        {
-            bool flipped = false;
-            auto n0 = ptids[i];
-            auto n1 = ptids[(i+1)%ptids.size()];
-            if (n0 > n1) {
-                std::swap(n0, n1);
-                flipped = true;
-            }
-            /* This builds the lex-to-CCW table, it also stores if the
-             * edge is flipped. */
-            for (size_t j = 0; j < fcs.size(); j++) {
-                auto fc_ptids = fcs[j].point_ids();
-                assert(fc_ptids.size() == 2);
-                if (fc_ptids[0] == n0 and fc_ptids[1] == n1)
-                    reorder.push_back({j,flipped});
-            }
-        }
-
         for (auto& fc : fcs) {
             std::cout << fc << std::endl;
         }
@@ -78,16 +56,9 @@ void run_vemasm(const Mesh& msh, size_t k)
             std::cout << fc << " " << std::boolalpha << flip << std::endl;
         }
 
-        assert(reorder.size() == fcs.size());
-        std::cout << "lex-to-CCW: ";
-        for (auto& r : reorder)
-            std::cout << "(" << r.first << " " << std::boolalpha << r.second << ") ";
-        std::cout << std::endl;
-
         /* OK, now we build the whole element l2g */
-        for (size_t i = 0; i < fcs.size(); i++) {
-            auto [ofs, flip] = reorder[i];
-            auto fc = fcs[ofs];
+        for (size_t i = 0; i < fcs_ccw.size(); i++) {
+            auto [fc, flip] = fcs_ccw[i];
             std::cout << "  " << fc << std::endl;
             std::cout << "    ";
             auto& l2g = all_l2g[ offset(msh, fc) ];
