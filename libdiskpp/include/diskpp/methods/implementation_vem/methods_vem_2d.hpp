@@ -103,6 +103,68 @@ faces_ccw(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::cell_t
     return reorder;
 }
 
+template<disk::mesh_2D Mesh>
+class dof_mapper {
+
+    std::vector<std::vector<size_t>>    l2g_byface;
+    std::vector<std::vector<size_t>>    l2g_bycell;
+
+public:
+    dof_mapper(const Mesh& msh, size_t k) {
+        recompute(msh, k);
+    }
+    
+    void recompute(const Mesh& msh, size_t k) {
+        if (k < 1)
+            throw std::invalid_argument("dof_mapper: degree must be > 0");
+
+        size_t pts_base = msh.points_size();
+
+        /* For each edge in the mesh (edges are ordered lexicographically)
+         * compute the offset of all its edge-based dofs */
+        for (auto& fc : faces(msh)) {
+            auto ptids = fc.point_ids();
+            std::vector<size_t> l2g(k+1);
+            l2g[0] = ptids[0];
+            for (size_t i = 1; i < k; i++)
+                l2g[i] = pts_base++;
+            l2g[k] = ptids[1];
+            l2g_byface.push_back( std::move(l2g) );
+        }
+
+        for (auto& cl : msh)
+        {
+            auto fcs_ccw = faces_ccw(msh, cl);
+
+            /* OK, now we build the whole element l2g */
+            std::vector<size_t> cl_l2g;
+            for (size_t i = 0; i < fcs_ccw.size(); i++) {
+                auto [fc, flip] = fcs_ccw[i];
+                auto& l2g = l2g_byface[ offset(msh, fc) ];
+                /* The last node of this segment is the first of
+                 * the next, so we discard it. */
+                if (flip) {
+                    cl_l2g.insert(cl_l2g.end(), l2g.rbegin(), l2g.rend()-1);
+                }
+                else {
+                    cl_l2g.insert(cl_l2g.end(), l2g.begin(), l2g.end()-1);
+                }
+            }
+            l2g_bycell.push_back( std::move(cl_l2g) );
+        }
+    }
+
+    auto face_to_global(size_t face_num) {
+        assert(face_num < l2g_byface.size());
+        return l2g_byface[face_num];
+    }
+
+    auto cell_to_global(size_t cell_num) {
+        assert(cell_num < l2g_bycell.size());
+        return l2g_bycell[cell_num];
+    }
+};
+
 
 namespace vem_2d
 {

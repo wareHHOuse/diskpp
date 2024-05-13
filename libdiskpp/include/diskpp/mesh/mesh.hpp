@@ -627,6 +627,11 @@ public:
         return fi.second;
     }
 
+    auto operator[](size_t cell_num) const {
+        assert(cell_num < this->cells_size());
+        return *std::next(this->cells_begin(), cell_num);
+    }
+
     void statistics(void) const
     {
         this->backend_storage()->statistics();
