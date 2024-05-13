@@ -20,6 +20,43 @@
 namespace disk
 {
 
+template<typename T>
+std::vector< std::pair< typename generic_mesh<T,2>::face_type, bool > >
+faces_ccw(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::cell_type& cl)
+{
+    /* This could be potentially expensive on polygons with
+     * many faces because it does n^2 comparisons. It could
+     * be improved taking into account the fact that faces()
+     * return value is ordered lexicographically. We'll address
+     * this when/if really needed.
+     */
+    using face_type = typename generic_mesh<T,2>::face_type;
+    auto fcs = faces(msh, cl);
+    auto ptids = cl.point_ids();
+    std::vector< std::pair<face_type, bool> > reorder;
+    for (size_t i = 0; i < ptids.size(); i++)
+    {
+        bool flipped = false;
+        auto n0 = ptids[i];
+        auto n1 = ptids[(i+1)%ptids.size()];
+        if (n0 > n1) {
+            std::swap(n0, n1);
+            flipped = true;
+        }
+        /* This builds the lex-to-CCW table, it also stores if the
+            * edge is flipped. */
+        for (size_t j = 0; j < fcs.size(); j++) {
+            auto fc_ptids = fcs[j].point_ids();
+            assert(fc_ptids.size() == 2);
+            if (fc_ptids[0] == n0 and fc_ptids[1] == n1)
+                reorder.push_back({fcs[j], flipped});
+        }
+    }
+
+    return reorder;
+}
+
+
 namespace vem_2d
 {
 

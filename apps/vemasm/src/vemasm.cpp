@@ -4,8 +4,10 @@
 
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/geometry/geometry.hpp"
+#include "diskpp/methods/vem"
 
 #define TEST_MESH "../../../meshes/2D_hex/fvca5/hexagonal_1.typ1"
+
 
 template<disk::mesh_2D Mesh>
 void run_vemasm(const Mesh& msh, size_t k)
@@ -65,6 +67,15 @@ void run_vemasm(const Mesh& msh, size_t k)
                 if (fc_ptids[0] == n0 and fc_ptids[1] == n1)
                     reorder.push_back({j,flipped});
             }
+        }
+
+        for (auto& fc : fcs) {
+            std::cout << fc << std::endl;
+        }
+
+        auto fcs_ccw = faces_ccw(msh, cl);
+        for (auto& [fc, flip] : fcs_ccw) {
+            std::cout << fc << " " << std::boolalpha << flip << std::endl;
         }
 
         assert(reorder.size() == fcs.size());
