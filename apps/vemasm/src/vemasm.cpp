@@ -32,6 +32,18 @@ void run_vemasm(const Mesh& msh, size_t k)
         for (auto& p : cl_l2g)
             std::cout << p << " ";
         std::cout << std::endl;
+
+        auto fcs = faces(msh, cl);
+        for (auto& fc : fcs) {
+            if (msh.is_boundary(fc)) {
+                std::cout << fc << " -> ";
+                auto fcnum = offset(msh, fc);
+                auto bds = dofmap.bnd_to_global(fcnum);
+                for (auto bd : bds)
+                    std::cout << bd << " ";
+                std::cout << std::endl;
+            }
+        }
     }
 }
 
@@ -39,20 +51,24 @@ int main(void)
 {
     using T = double;
 
+    /*
     std::cout << " *** POLYHEDRAL ***" << std::endl;
     disk::generic_mesh<T, 2> msh_poly;
     disk::load_mesh_fvca5_2d<T>(TEST_MESH_POLY, msh_poly);
     run_vemasm(msh_poly, 3);
+    */
 
     std::cout << " *** CARTESIAN ***" << std::endl;
     disk::cartesian_mesh<T, 2> msh_quad;
     disk::load_mesh_diskpp_cartesian(TEST_MESH_QUAD, msh_quad);
     run_vemasm(msh_quad, 3);
 
+    /*
     std::cout << " *** SIMPLICIAL ***" << std::endl;
     disk::simplicial_mesh<T, 2> msh_tri;
     disk::load_mesh_netgen(TEST_MESH_TRI, msh_tri);
     run_vemasm(msh_tri, 3);
+    */
 
     return 0;
 }

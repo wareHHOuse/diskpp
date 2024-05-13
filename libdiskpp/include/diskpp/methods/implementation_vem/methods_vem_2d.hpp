@@ -106,8 +106,9 @@ faces_ccw(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::cell_t
 template<disk::mesh_2D Mesh>
 class dof_mapper {
 
-    std::vector<std::vector<size_t>>    l2g_byface;
-    std::vector<std::vector<size_t>>    l2g_bycell;
+    std::vector<std::vector<size_t>>        l2g_byface;
+    std::vector<std::vector<size_t>>        l2g_bycell;
+    std::map<size_t, std::vector<size_t>>   bnd_face_dofs;
 
 public:
     dof_mapper(const Mesh& msh, size_t k) {
@@ -140,14 +141,21 @@ public:
             std::vector<size_t> cl_l2g;
             for (size_t i = 0; i < fcs_ccw.size(); i++) {
                 auto [fc, flip] = fcs_ccw[i];
-                auto& l2g = l2g_byface[ offset(msh, fc) ];
+                auto fcofs = offset(msh, fc);
+                auto& l2g = l2g_byface[fcofs];
                 /* The last node of this segment is the first of
                  * the next, so we discard it. */
-                if (flip) {
+                if (flip)
                     cl_l2g.insert(cl_l2g.end(), l2g.rbegin(), l2g.rend()-1);
-                }
-                else {
+                else
                     cl_l2g.insert(cl_l2g.end(), l2g.begin(), l2g.end()-1);
+
+                auto bi = msh.boundary_info(fc);
+                if (bi.is_boundary() && not bi.is_internal()) {
+                    if (flip)
+                        bnd_face_dofs[fcofs] = std::vector<size_t>{l2g.rbegin(), l2g.rend()};
+                    else 
+                        bnd_face_dofs[fcofs] = std::vector<size_t>{l2g.begin(), l2g.end()};
                 }
             }
             l2g_bycell.push_back( std::move(cl_l2g) );
@@ -163,8 +171,79 @@ public:
         assert(cell_num < l2g_bycell.size());
         return l2g_bycell[cell_num];
     }
+
+    std::vector<size_t> bnd_to_global(size_t face_num) {
+        auto fd = bnd_face_dofs.find(face_num);
+        if (fd != bnd_face_dofs.end())
+            return (*fd).second;
+        return {};
+    }
 };
 
+namespace vem {
+
+template<typename T>
+auto
+schur(const dynamic_matrix<T>& L, const dynamic_vector<T>& R, size_t n_bndunks)
+{
+    assert(L.cols() == L.rows());
+    assert(L.cols() == R.rows());
+
+    using cdm = const dynamic_matrix<T>;
+    using cdv = const dynamic_vector<T>;
+    auto fs = n_bndunks;
+    auto ts = L.cols() - n_bndunks;
+    
+    cdm MFF = L.topLeftCorner(fs, fs);
+    cdm MFT = L.topRightCorner(fs, ts);
+    cdm MTF = L.bottomLeftCorner(ts, fs);
+    cdm MTT = L.bottomRightCorner(ts, ts);
+
+    const auto MTT_ldlt = MTT.ldlt();
+    if (MTT_ldlt.info() != Eigen::Success)
+        throw std::invalid_argument("Schur: MTT is not positive definite");
+
+    cdv RT = R.tail(ts);
+    cdm A = MTT_ldlt.solve(MTF);
+    cdv B = MTT_ldlt.solve(RT);
+    cdv RF = R.head(fs);
+    cdm Lc = MFF - MFT*A;
+    cdv Rc = RF - MFT*B;
+
+    return std::pair(Lc, Rc);
+}
+
+template<typename Basis, typename T>
+auto
+deschur(const dynamic_matrix<T>& lhs, const dynamic_vector<T>& rhs,
+    const dynamic_vector<T>& solF, size_t n_bndunks)
+{
+    assert(lhs.cols() == lhs.rows());
+    assert(lhs.cols() == rhs.rows());
+
+    using cdm = const dynamic_matrix<T>;
+    using cdv = const dynamic_vector<T>;
+    using dv = dynamic_vector<T>;
+    auto ts = lhs.cols() - n_bndunks;
+    auto fs = n_bndunks;
+    cdm MTF = lhs.bottomLeftCorner(ts, fs);
+    cdm MTT = lhs.bottomRightCorner(ts, ts);
+
+    const auto MTT_ldlt = MTT.ldlt();
+    if (MTT_ldlt.info() != Eigen::Success)
+        throw std::invalid_argument("Schur: MTT is not positive definite");
+
+    cdv rhsT = rhs.tail(ts);
+    cdv solT = MTT.ldlt().solve(rhsT - MTF*solF);
+
+    dv ret = cdv::Zero(lhs.rows());
+    ret.head(fs) = solF;
+    ret.tail(ts) = solT;
+
+    return ret;
+}
+
+} // namespace vem
 
 namespace vem_2d
 {
