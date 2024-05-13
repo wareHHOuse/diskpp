@@ -17,7 +17,7 @@ int main(int argc, char **argv)
     disk::generic_mesh<T,2> msh;
 
     std::string mesh_filename;
-    if (argc > 1 && mesh_filename.length() > 0 )
+    if (argc > 1)
     {
         mesh_filename = argv[1];
 
@@ -31,8 +31,7 @@ int main(int argc, char **argv)
     else 
     {    
         double radius = 1.0;
-        size_t num_faces = 4;
-
+        size_t num_faces = 5;
         disk::make_single_element_mesh(msh, radius, num_faces);
     }
 
@@ -62,5 +61,6 @@ int main(int argc, char **argv)
         std::cout<< "D matrix: \n"
             << disk::vem_2d::matrix_D(msh, cl, degree) << "\n";
     
+
     return 0;
 }

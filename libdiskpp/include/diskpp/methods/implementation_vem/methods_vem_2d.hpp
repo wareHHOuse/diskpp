@@ -13,6 +13,7 @@
 
 #pragma once
 
+#include <Eigen/Dense>
 #include "diskpp/bases/bases.hpp"
 #include "diskpp/quadratures/bits/quad_raw_gauss_lobatto.hpp"
 #include <cassert>
@@ -142,13 +143,39 @@ matrix_BF(const Mesh&    msh,
 
     auto fcs = faces(msh, cl);
 
+    std::cout << "Original : " << std::endl;
+    for(const auto&  fc: fcs)
+    {
+        std::cout << " * face(" <<offset(msh,fc)<<") : [";
+        
+        for (auto pid : fc.point_ids())        
+            std::cout << pid << ", ";
+        std::cout <<"]" <<std::endl;
+    }
+
     auto iface = 0;
-    for(const auto fc : fcs)
+
+    auto fcs_ccw = faces_ccw(msh, cl);
+    std::cout << "CCW : "<< fcs_ccw.size() << std::endl;
+
+    for(const auto&  [fc, flip] : fcs_ccw)
+    {
+        std::cout << " * face(" <<offset(msh,fc)<<") : [";
+        
+        for (auto pid : fc.point_ids())        
+            std::cout << pid << ", ";
+        std::cout <<"]" <<std::endl;
+    }
+
+    for(const auto [fc, flip] : fcs_ccw)
     {
         const auto n   = normal(msh, cl, fc);
         const auto pts = points(msh, fc);
 
-        auto qps = disk::quadrature::gauss_lobatto(2 * degree -1, pts[0], pts[1]);
+        auto idx0 = flip? 1 : 0;        
+        auto idx1 = flip? 0 : 1;        
+
+        auto qps = disk::quadrature::gauss_lobatto(2 * degree -1, pts[idx0], pts[idx1]);
 
         auto qcount = iface * degree; 
 
@@ -274,8 +301,6 @@ matrix_D(const Mesh&    msh,
 
     matrix_type<T> D = matrix_type<T>::Zero(num_dofs, cbs);
 
-    //D.block(0, 0, cbs, num_faces * degree)  = matrix_BF(msh, cl, degree);
-    //B.block(0,num_faces * degree, cbs, lbs) = matrix_BT(msh, cl, degree);
     const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
 
     auto fcs = faces(msh, cl);
@@ -301,6 +326,8 @@ matrix_D(const Mesh&    msh,
 
     return D;
 }
+
+
 
 } // end namespace vem 2d
 }// end namespace diskpp
