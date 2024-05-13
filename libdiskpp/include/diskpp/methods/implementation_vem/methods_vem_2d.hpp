@@ -169,10 +169,6 @@ public:
 namespace vem_2d
 {
 
-template<typename T>
-using matrix_type = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-template<typename T>
-using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
 
 
 /**
@@ -186,7 +182,7 @@ using vector_type = Eigen::Matrix<T, Eigen::Dynamic, 1>;
  */
 
 template<disk::mesh_2D Mesh>
-matrix_type<typename Mesh::coordinate_type>
+dynamic_matrix<typename Mesh::coordinate_type>
 matrix_G(const Mesh&    msh,
          const typename Mesh::cell_type&  cl,
          const size_t   degree)
@@ -196,14 +192,13 @@ matrix_G(const Mesh&    msh,
 
     const auto cbs = scalar_basis_size(degree, Mesh::dimension);
     const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
-    matrix_type<T> stiffness = make_stiffness_matrix(msh, cl, cb);
+    dynamic_matrix<T> stiffness = make_stiffness_matrix(msh, cl, cb);
     
     const auto qps = integrate(msh, cl, 2 * (degree - 1));
     for (auto& qp : qps)
     {
         const auto phi    = cb.eval_functions(qp.point());
-        const auto qp_phi = priv::inner_product(qp.weight(), phi);
-        stiffness.row(0) += priv::outer_product(qp_phi, phi);
+        stiffness.row(0) += qp.weight() * phi.transpose();
     }
     stiffness.row(0) /= measure(msh, cl); 
 
@@ -213,7 +208,7 @@ matrix_G(const Mesh&    msh,
 
 
 template<disk::mesh_2D Mesh>
-matrix_type<typename Mesh::coordinate_type>
+dynamic_matrix<typename Mesh::coordinate_type>
 matrix_BF(const Mesh&    msh,
          const typename Mesh::cell_type&  cl,
          const size_t   degree)
@@ -227,37 +222,11 @@ matrix_BF(const Mesh&    msh,
     const auto cbs = cb.size(); 
     const auto num_dofs_bnd = num_faces * degree;
 
-    matrix_type<T> BF = matrix_type<T>::Zero(cbs, num_dofs_bnd);
+    dynamic_matrix<T> BF = dynamic_matrix<T>::Zero(cbs, num_dofs_bnd);
 
-    auto fcs_ccw = faces_ccw(msh, cl);
-
-/*
-    std::cout << "Original : " << std::endl;
-    for(const auto&  fc: fcs)
-    {
-        std::cout << " * face(" <<offset(msh,fc)<<") : [";
-        
-        for (auto pid : fc.point_ids())        
-            std::cout << pid << ", ";
-        std::cout <<"]" <<std::endl;
-    }
-
-    std::cout << "CCW : "<< fcs_ccw.size() << std::endl;
-
-    for(const auto&  [fc, flip] : fcs_ccw)
-    {
-        std::cout << " * face(" <<offset(msh,fc)<< "," << flip <<") : [";
-        
-        for (auto pid : fc.point_ids())        
-            std::cout << pid << ", ";
-        std::cout <<"]" <<std::endl;
-    }
-
-    std::cout << " ---------------------------------"<<std::endl;
-*/
 
     auto iface = 0;
-    for(const auto [fc, flip] : fcs_ccw)
+    for(const auto& [fc, flip] : faces_ccw(msh, cl))
     {
         const auto n   = normal(msh, cl, fc);
         const auto pts = points(msh, fc);
@@ -269,7 +238,6 @@ matrix_BF(const Mesh&    msh,
         auto qps = disk::quadrature::gauss_lobatto(2 * degree -1, pts[idx0], pts[idx1]);
 
         auto qcount = iface * degree; 
-        //std::cout << " * face(" <<offset(msh,fc)<<") :  with qcount = " << qcount << std::endl;
 
         for (auto& qp : qps)
         {       
@@ -278,8 +246,6 @@ matrix_BF(const Mesh&    msh,
 
             size_t index_dof = qcount%(num_dofs_bnd); 
             BF.block(0, index_dof, cbs, 1) += dphi_n;
-
-            //std::cout << "   - index_dof = " << index_dof << std::endl;
 
             qcount++;
         }  
@@ -291,7 +257,7 @@ matrix_BF(const Mesh&    msh,
 
 
 template<disk::mesh_2D Mesh>
-matrix_type<typename Mesh::coordinate_type>
+dynamic_matrix<typename Mesh::coordinate_type>
 matrix_BT(const Mesh&    msh,
          const typename Mesh::cell_type&  cl,
          const size_t   degree)
@@ -307,7 +273,7 @@ matrix_BT(const Mesh&    msh,
     const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
     const auto lcb = make_scalar_monomial_basis(msh, cl, degree-2);
 
-    matrix_type<T> BT = matrix_type<T>::Zero(cbs, lbs);
+    dynamic_matrix<T> BT = dynamic_matrix<T>::Zero(cbs, lbs);
 
     int ipol = 2;
 
@@ -358,7 +324,7 @@ matrix_BT(const Mesh&    msh,
 
 
 template<disk::mesh_2D Mesh>
-matrix_type<typename Mesh::coordinate_type>
+dynamic_matrix<typename Mesh::coordinate_type>
 matrix_B(const Mesh&    msh,
          const typename Mesh::cell_type&  cl,
          const size_t   degree)
@@ -371,7 +337,7 @@ matrix_B(const Mesh&    msh,
     const auto num_faces = howmany_faces(msh, cl);
     const auto num_dofs = num_faces * degree + lbs; 
 
-    matrix_type<T> B = matrix_type<T>::Zero(cbs, num_dofs);
+    dynamic_matrix<T> B = dynamic_matrix<T>::Zero(cbs, num_dofs);
 
     B.block(0, 0, cbs, num_faces * degree)  = matrix_BF(msh, cl, degree);
     B.block(0,num_faces * degree, cbs, lbs) = matrix_BT(msh, cl, degree);
@@ -381,7 +347,7 @@ matrix_B(const Mesh&    msh,
 
 
 template<disk::mesh_2D Mesh>
-matrix_type<typename Mesh::coordinate_type>
+dynamic_matrix<typename Mesh::coordinate_type>
 matrix_D(const Mesh&    msh,
          const typename Mesh::cell_type&  cl,
          const size_t   degree)
@@ -397,7 +363,7 @@ matrix_D(const Mesh&    msh,
     const auto num_faces = howmany_faces(msh, cl);
     const auto num_dofs = num_faces * degree + lbs; 
 
-    matrix_type<T> D = matrix_type<T>::Zero(num_dofs, cbs);
+    dynamic_matrix<T> D = dynamic_matrix<T>::Zero(num_dofs, cbs);
 
     auto count = 0;
     for(const auto& [fc, flip] : faces_ccw(msh, cl))
