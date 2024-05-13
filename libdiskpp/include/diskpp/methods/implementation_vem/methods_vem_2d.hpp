@@ -141,8 +141,9 @@ matrix_BF(const Mesh&    msh,
 
     matrix_type<T> BF = matrix_type<T>::Zero(cbs, num_dofs_bnd);
 
-    auto fcs = faces(msh, cl);
+    auto fcs_ccw = faces_ccw(msh, cl);
 
+/*
     std::cout << "Original : " << std::endl;
     for(const auto&  fc: fcs)
     {
@@ -153,31 +154,34 @@ matrix_BF(const Mesh&    msh,
         std::cout <<"]" <<std::endl;
     }
 
-    auto iface = 0;
-
-    auto fcs_ccw = faces_ccw(msh, cl);
     std::cout << "CCW : "<< fcs_ccw.size() << std::endl;
 
     for(const auto&  [fc, flip] : fcs_ccw)
     {
-        std::cout << " * face(" <<offset(msh,fc)<<") : [";
+        std::cout << " * face(" <<offset(msh,fc)<< "," << flip <<") : [";
         
         for (auto pid : fc.point_ids())        
             std::cout << pid << ", ";
         std::cout <<"]" <<std::endl;
     }
 
+    std::cout << " ---------------------------------"<<std::endl;
+*/
+
+    auto iface = 0;
     for(const auto [fc, flip] : fcs_ccw)
     {
         const auto n   = normal(msh, cl, fc);
         const auto pts = points(msh, fc);
 
-        auto idx0 = flip? 1 : 0;        
-        auto idx1 = flip? 0 : 1;        
+        size_t idx0(0), idx1(1); 
+        if(flip)
+            std::swap(idx0,idx1);
 
         auto qps = disk::quadrature::gauss_lobatto(2 * degree -1, pts[idx0], pts[idx1]);
 
         auto qcount = iface * degree; 
+        //std::cout << " * face(" <<offset(msh,fc)<<") :  with qcount = " << qcount << std::endl;
 
         for (auto& qp : qps)
         {       
@@ -186,6 +190,9 @@ matrix_BF(const Mesh&    msh,
 
             size_t index_dof = qcount%(num_dofs_bnd); 
             BF.block(0, index_dof, cbs, 1) += dphi_n;
+
+            //std::cout << "   - index_dof = " << index_dof << std::endl;
+
             qcount++;
         }  
         iface++;
@@ -303,15 +310,20 @@ matrix_D(const Mesh&    msh,
 
     const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
 
-    auto fcs = faces(msh, cl);
+    auto fcs_ccw = faces_ccw(msh, cl);
 
     auto count = 0;
-    for(const auto fc : fcs)
+
+    for(const auto [fc, flip] : fcs_ccw)
     {
         const auto n   = normal(msh, cl, fc);
         const auto pts = points(msh, fc);
 
-        auto qps = disk::quadrature::gauss_lobatto(2 * degree -1, pts[0], pts[1]);
+        size_t idx0(0), idx1(1); 
+        if(flip)
+            std::swap(idx0,idx1);
+
+        auto qps = disk::quadrature::gauss_lobatto(2 * degree -1, pts[idx0], pts[idx1]);
 
         for (size_t iq = 0; iq < qps.size() - 1;  iq++)
         {  

@@ -51,7 +51,7 @@ int main(int argc, char **argv)
 
     for(const auto& cl : msh)
         std::cout<< "G matrix: \n"
-            << disk::vem_2d::matrix_BT(msh, cl, degree) << "\n";
+            << disk::vem_2d::matrix_G(msh, cl, degree) << "\n";
 
     for(const auto& cl : msh)
         std::cout<< "B matrix: \n"
