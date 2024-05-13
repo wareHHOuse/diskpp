@@ -391,38 +391,48 @@ matrix_D(const Mesh&    msh,
     const auto cbs = scalar_basis_size(degree, Mesh::dimension);
     const auto lbs = scalar_basis_size(degree-2, Mesh::dimension);
 
+    const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
+    const auto lb  = make_scalar_monomial_basis(msh, cl, degree-2);
+
     const auto num_faces = howmany_faces(msh, cl);
     const auto num_dofs = num_faces * degree + lbs; 
 
     matrix_type<T> D = matrix_type<T>::Zero(num_dofs, cbs);
 
-    const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
-
-    auto fcs_ccw = faces_ccw(msh, cl);
-
     auto count = 0;
-
-    for(const auto [fc, flip] : fcs_ccw)
+    for(const auto& [fc, flip] : faces_ccw(msh, cl))
     {
-        const auto n   = normal(msh, cl, fc);
         const auto pts = points(msh, fc);
 
         size_t idx0(0), idx1(1); 
         if(flip)
             std::swap(idx0,idx1);
 
-        auto qps = disk::quadrature::gauss_lobatto(2 * degree -1, pts[idx0], pts[idx1]);
+        auto face_qps = disk::quadrature::gauss_lobatto(2 * degree -1, pts[idx0], pts[idx1]);
 
-        for (size_t iq = 0; iq < qps.size() - 1;  iq++)
+        for (size_t iq = 0; iq < face_qps.size() - 1;  iq++)
         {  
-            auto qp = qps[iq];     
+            auto qp = face_qps[iq];     
             const auto phi   = cb.eval_functions(qp.point());
 
-            D.block(count, 0, 1,cbs) = phi.transpose();
+            D.block(count, 0, 1, cbs) = phi.transpose();
             count++;
         }  
     }
 
+    auto area = measure(msh, cl);
+    const auto cell_qps = integrate(msh, cl, 2*degree-2);
+
+    auto offset_cell_dofs = num_faces * degree;
+
+    for (const auto& qp : cell_qps)
+    {
+        const auto phi     = cb.eval_functions(qp.point());
+        const auto phi_dof = lb.eval_functions(qp.point());
+
+        D.block(offset_cell_dofs, 0, lbs, cbs)  += qp.weight() * phi_dof * phi.transpose();
+    }
+    D.block(offset_cell_dofs, 0, lbs, cbs) /= area; 
 
     return D;
 }
