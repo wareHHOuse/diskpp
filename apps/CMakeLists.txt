@@ -1,3 +1,8 @@
+option(BUILD_CONDITIONING_TESTS "Build conditioning tests" ON)
+if (BUILD_CONDITIONING_TESTS)
+    add_subdirectory(conditioning)
+endif()
+
 option(BUILD_DISKPP_TUTORIALS "Build DiSk++ tutorials" ON)
 if (BUILD_DISKPP_TUTORIALS)
     add_subdirectory(diskpp_tutorials)

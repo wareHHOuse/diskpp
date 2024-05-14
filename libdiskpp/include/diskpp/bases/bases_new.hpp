@@ -13,6 +13,7 @@
 #include "diskpp/common/eigen.hpp"
 #include "diskpp/bases/bases_traits.hpp"
 #include "diskpp/quadratures/quadrature_point.hpp"
+#include "diskpp/quadratures/quadratures.hpp"
 namespace disk::basis {
 
 enum class rescaling_strategy
@@ -99,11 +100,12 @@ private:
     coordinate_type h_;
     size_t          degree_;
     size_t          size_;
+    coordinate_type scale_;
 
     point_type phys2ref(const point_type& pt) const {
         auto bv = (pb_ - bar_).to_vector();
         auto dv = (pt - bar_).to_vector();
-        auto nbv = h_/2.;
+        auto nbv = h_/scale_;
         return point_type( bv.dot(dv)/(nbv*nbv) );
     }
 
@@ -125,6 +127,7 @@ public:
         pa_ = pts[0];
         pb_ = pts[1];
         h_ = distance(pa_, pb_);
+        scale_ = 2.0;
     }
 
     value_array_type operator()(const point_type& pt) const {
@@ -155,7 +158,7 @@ public:
         auto ep = phys2ref(pt);
 
         ret(0) = 0.;
-        ret(1) = 2./h_;
+        ret(1) = scale_/h_;
         for (size_t k = 2; k <= degree_; k++)
             ret(k) = ret(k-1)*k*ep.x()/(k-1);
 
@@ -188,6 +191,14 @@ public:
 
     size_t integration_degree() const {
         return degree_;
+    }
+
+    void scalefactor(CoordT sf) {
+        scale_ = sf;
+    }
+
+    auto scalefactor(void) const {
+        return scale_;
     }
 };
 
