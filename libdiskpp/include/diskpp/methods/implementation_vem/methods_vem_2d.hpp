@@ -357,12 +357,10 @@ matrix_BT(const Mesh&    msh,
     int ipol = 2;
 
     auto h = diameter(msh, cl); 
-    auto h_powk = h;
+    auto h2 = h * h;
 
     for (int k = 2; k <= degree; k++)
     {
-        h_powk *= h;
-
         for (int i = 0; i <= k; i++) 
         {
             ipol++;
@@ -379,7 +377,7 @@ matrix_BT(const Mesh&    msh,
                 int dxx_col = i;
 
                 int ipolxx = 0.5 * (dxx_row + 1) * dxx_row + dxx_col;
-                BT(ipol, ipolxx) = -coeff_xx / h_powk ;
+                BT(ipol, ipolxx) = -coeff_xx / h2 ;
             }
 
             if(coeff_yy > 0) 
@@ -388,15 +386,12 @@ matrix_BT(const Mesh&    msh,
                 int dyy_col = i-2;
 
                 int ipolyy = 0.5 * (dyy_row + 1) * dyy_row + dyy_col;          
-                BT(ipol, ipolyy) = -coeff_yy / h_powk;    
+                BT(ipol, ipolyy) = -coeff_yy / h2;    
             }
         }
     }
 
     BT *= measure(msh, cl); 
-
-    auto P0v = 1;
-    BT(0, 0) = P0v; 
 
     return BT;
 }
@@ -415,11 +410,22 @@ matrix_B(const Mesh&    msh,
 
     const auto num_faces = howmany_faces(msh, cl);
     const auto num_dofs = num_faces * degree + lbs; 
-
+    const auto offset_cell_dofs = num_faces * degree;
     dynamic_matrix<T> B = dynamic_matrix<T>::Zero(cbs, num_dofs);
 
-    B.block(0, 0, cbs, num_faces * degree)  = matrix_BF(msh, cl, degree);
-    B.block(0,num_faces * degree, cbs, lbs) = matrix_BT(msh, cl, degree);
+    B.block(0, 0, cbs, offset_cell_dofs)  = matrix_BF(msh, cl, degree);
+
+    
+    if(degree < 2)
+    {
+        auto P0v = 1.0/num_faces;  
+        B.row(0).setConstant(P0v);
+        return B;
+    }
+
+    B.block(0,offset_cell_dofs, cbs, lbs) = matrix_BT(msh, cl, degree);
+    auto P0v = 1.0;
+    B(0, offset_cell_dofs) = P0v; 
 
     return B;
 }
@@ -465,6 +471,10 @@ matrix_D(const Mesh&    msh,
         }  
     }
 
+
+    if(degree < 2)
+        return D;
+
     auto area = measure(msh, cl);
     const auto cell_qps = integrate(msh, cl, 2*degree-2);
 
@@ -490,15 +500,8 @@ projector_nabla(const Mesh&    msh,
          const typename Mesh::cell_type&  cl,
          const size_t   degree,
          const dynamic_matrix<typename Mesh::coordinate_type>& G)
-{
-    using T = typename Mesh::coordinate_type;
-    using matrix_t = dynamic_matrix<typename Mesh::coordinate_type>;
-
-    matrix_t B = matrix_B(msh, cl, degree);
-
-    matrix_t PI_star = G.ldlt().solve(B);
-
-    return PI_star;
+{   
+    return  G.lu().solve(matrix_B(msh, cl, degree));
 }
 
 
@@ -525,13 +528,11 @@ local_stiffness_matrix(const Mesh&    msh,
     matrix_t D = matrix_D(msh, cl, degree);
     matrix_t PI_stab = D * PI_star; 
 
+
     G.row(0).setConstant(0);
 
     matrix_t A =  PI_star.transpose() * G * PI_star;    
     matrix_t S = (I - PI_stab).transpose() * (I - PI_stab); 
-
-    std::cout<< "A matrix: \n"<< A << "\n";
-    std::cout<< "S matrix: \n"<< S << "\n";
 
     return A + S;    
 }
