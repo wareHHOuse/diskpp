@@ -118,7 +118,8 @@ private:
     }
 
 public:
-    scalar_monomial(const mesh_type& msh, const cell_type& cl, size_t degree)
+    scalar_monomial(const mesh_type& msh, const cell_type& cl, size_t degree,
+        rescaling_strategy rs = rescaling_strategy::none)
         : degree_(degree), size_( size_of_degree(degree) )
     {
         bar_ = barycenter(msh, cl);
@@ -288,12 +289,13 @@ private:
     size_t              size_;
     tr_mat_type         tr_;
     vec_type            v0_, v1_;
+    coordinate_type     scale_;
 
     void
     compute_reference_frame(const mesh_type& msh, const cell_type& cl, rescaling_strategy rs)
     {
-        auto inv_diam = 1./diameter(msh, cl);
-        tr_ = 2.*tr_mat_type::Identity()*inv_diam;
+        auto inv_diam = scale_/diameter(msh, cl);
+        tr_ = tr_mat_type::Identity()*inv_diam;
 
         switch(rs)
         {
@@ -302,15 +304,6 @@ private:
                 break;
 
             case rescaling_strategy::gram_schmidt: {
-                /*
-                auto pts = points(msh, cl);
-                assert(pts.size() >= 3);
-                v0_ = (pts[1] - pts[0]).to_vector();
-                v1_ = (pts[2] - pts[0]).to_vector();
-                v1_ = v1_ - v1_.dot(v0_)*v0_/(v0_.dot(v0_)); // Gram-Schmidt
-                tr_.col(0) = v0_;
-                tr_.col(1) = v1_;
-                */
                 tr_ = element_local_axes(msh, cl);
                 tr_ = tr_.inverse().eval();
             } break;
@@ -338,7 +331,7 @@ private:
 public:
     scalar_monomial(const mesh_type& msh, const cell_type& cl, size_t degree, 
         rescaling_strategy rs = rescaling_strategy::inertial)
-        : degree_(degree), size_( size_of_degree(degree) )
+        : degree_(degree), size_( size_of_degree(degree) ), scale_(2.0)
     {
         bar_ = barycenter(msh, cl);
         compute_reference_frame(msh, cl, rs);
@@ -418,6 +411,14 @@ public:
 
     tr_mat_type element_coordinate_transform() const {
         return tr_;
+    }
+
+    void scalefactor(CoordT sf) {
+        scale_ = sf;
+    }
+
+    auto scalefactor(void) const {
+        return scale_;
     }
 };
 
@@ -539,21 +540,8 @@ private:
     void
     compute_reference_frame(const mesh_type& msh, const cell_type& cl)
     {
-        auto pts = points(msh, cl);
-        assert(pts.size() >= 4);
-        vec_type u0 = (pts[1] - pts[0]).to_vector();
-        vec_type u1 = (pts[2] - pts[0]).to_vector();
-        vec_type u2 = (pts[3] - pts[0]).to_vector();
-
 #if 0
-        // Gram-Schmidt
-        v0_ = u0;
-        v1_ = u1 - u1.dot(v0_)*v0_/v0_.dot(v0_);
-        v2_ = u2 - u2.dot(v0_)*v0_/v0_.dot(v0_)-u2.dot(v1_)*v1_/ v1_.dot(v1_);
-
-        tr_.col(0) = v0_;
-        tr_.col(1) = v1_;
-        tr_.col(2) = v2_;
+        tr_ = element_local_axes(msh, cl);
         tr_ = tr_.inverse().eval();
 #endif
 //#if 0

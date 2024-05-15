@@ -559,13 +559,38 @@ element_local_axes(const std::vector<point<T,DIM>>& pts)
 }
 } //namespace priv
 
-template<template<typename, size_t, typename> class Mesh, typename T, typename Storage>
-static_matrix<T, 2, 2>
-element_local_axes(const Mesh<T,2,Storage>& msh, const typename Mesh<T,2,Storage>::cell& cl)
+template<disk::mesh_2D Mesh>
+static_matrix<typename Mesh::coordinate_type, 2, 2>
+element_local_axes(const Mesh& msh, const typename Mesh::cell_type& cl)
 {
-    using point_type = typename Mesh<T,2,Storage>::point_type;
+    using point_type = typename Mesh::point_type;
     auto pts = points(msh, cl);
     return priv::element_local_axes(pts);
+}
+
+template<disk::mesh_3D Mesh>
+static_matrix<typename Mesh::coordinate_type, 3, 3>
+element_local_axes(const Mesh& msh, const typename Mesh::cell_type& cl)
+{
+    using T = typename Mesh::coordinate_type;
+    using mat_type = static_matrix<T, 3, 3>;
+    using vec_type = static_matrix<T, 3, 1>;
+    auto pts = points(msh, cl);
+    assert(pts.size() >= 4);
+    vec_type u0 = (pts[1] - pts[0]).to_vector();
+    vec_type u1 = (pts[2] - pts[0]).to_vector();
+    vec_type u2 = (pts[3] - pts[0]).to_vector();
+
+    // Gram-Schmidt
+    vec_type v0_ = u0;
+    vec_type v1_ = u1 - u1.dot(v0_)*v0_/v0_.dot(v0_);
+    vec_type v2_ = u2 - u2.dot(v0_)*v0_/v0_.dot(v0_)-u2.dot(v1_)*v1_/ v1_.dot(v1_);
+
+    mat_type ret;
+    ret.col(0) = v0_;
+    ret.col(1) = v1_;
+    ret.col(2) = v2_;
+    return ret;
 }
 
 } // namespace disk
