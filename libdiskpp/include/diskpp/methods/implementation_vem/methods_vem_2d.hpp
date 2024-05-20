@@ -89,7 +89,7 @@ faces_ccw(const generic_mesh<T,2>& msh, const typename generic_mesh<T,2>::cell_t
             std::swap(n0, n1);
             flipped = true;
         }
-        
+
         for (size_t j = 0; j < fcs.size(); j++) {
             auto fc_ptids = fcs[j].point_ids();
             assert(fc_ptids.size() == 2);
@@ -114,7 +114,7 @@ public:
     dof_mapper(const Mesh& msh, size_t k) {
         recompute(msh, k);
     }
-    
+
     void recompute(const Mesh& msh, size_t k) {
         if (k < 1)
             throw std::invalid_argument("dof_mapper: degree must be > 0");
@@ -154,7 +154,7 @@ public:
                 if (bi.is_boundary() && not bi.is_internal()) {
                     if (flip)
                         bnd_face_dofs[fcofs] = std::vector<size_t>{l2g.rbegin(), l2g.rend()};
-                    else 
+                    else
                         bnd_face_dofs[fcofs] = std::vector<size_t>{l2g.begin(), l2g.end()};
                 }
             }
@@ -193,7 +193,7 @@ schur(const dynamic_matrix<T>& L, const dynamic_vector<T>& R, size_t n_bndunks)
     using cdv = const dynamic_vector<T>;
     auto fs = n_bndunks;
     auto ts = L.cols() - n_bndunks;
-    
+
     cdm MFF = L.topLeftCorner(fs, fs);
     cdm MFT = L.topRightCorner(fs, ts);
     cdm MTF = L.bottomLeftCorner(ts, fs);
@@ -251,26 +251,26 @@ namespace vem_2d
 
 
 /**
- * @brief Compute mass matrix \f$ (m_i,m_j) i,j = 1,...,dim( \mathcal{P}^{k}(T)) \f$ 
+ * @brief Compute mass matrix \f$ (m_i,m_j) i,j = 1,...,dim( \mathcal{P}^{k}(T)) \f$
  *
  * @tparam Mesh type of the mesh
  * @param msh mesh
  * @param cl  cell T
- * @param degree  vem degree k 
- * @return dynamic_matrix<typename Mesh::coordinate_type> mass matrix in \f$ \mathcal{P}^{k}(T)\f$ 
+ * @param degree  vem degree k
+ * @return dynamic_matrix<typename Mesh::coordinate_type> mass matrix in \f$ \mathcal{P}^{k}(T)\f$
  */
 
 
 
 
 /**
- * @brief Compute stiffness matrix \f$ (\nabla m_i,\nabla m_j) i,j = 1,...,dim( \mathcal{P}^{k}(T)) \f$ 
+ * @brief Compute stiffness matrix \f$ (\nabla m_i,\nabla m_j) i,j = 1,...,dim( \mathcal{P}^{k}(T)) \f$
  *
  * @tparam Mesh type of the mesh
  * @param msh mesh
  * @param cl  cell T
- * @param degree  vem degree k 
- * @return dynamic_matrix<typename Mesh::coordinate_type> stiffness matrix in \f$ \mathcal{P}^{k}(T)\f$ 
+ * @param degree  vem degree k
+ * @return dynamic_matrix<typename Mesh::coordinate_type> stiffness matrix in \f$ \mathcal{P}^{k}(T)\f$
  */
 
 template<disk::mesh_2D Mesh>
@@ -285,14 +285,14 @@ matrix_G(const Mesh&    msh,
     const auto cbs = scalar_basis_size(degree, Mesh::dimension);
     const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
     dynamic_matrix<T> stiffness = make_stiffness_matrix(msh, cl, cb);
-    
+
     const auto qps = integrate(msh, cl, 2 * (degree - 1));
     for (auto& qp : qps)
     {
         const auto phi    = cb.eval_functions(qp.point());
         stiffness.row(0) += qp.weight() * phi.transpose();
     }
-    stiffness.row(0) /= measure(msh, cl); 
+    stiffness.row(0) /= measure(msh, cl);
 
     return stiffness;
 }
@@ -311,7 +311,7 @@ matrix_BF(const Mesh&    msh,
 
     const auto num_faces = howmany_faces(msh, cl);
     const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
-    const auto cbs = cb.size(); 
+    const auto cbs = cb.size();
     const auto num_dofs_bnd = num_faces * degree;
 
     dynamic_matrix<T> BF = dynamic_matrix<T>::Zero(cbs, num_dofs_bnd);
@@ -323,24 +323,24 @@ matrix_BF(const Mesh&    msh,
         const auto n   = normal(msh, cl, fc);
         const auto pts = points(msh, fc);
 
-        size_t idx0(0), idx1(1); 
+        size_t idx0(0), idx1(1);
         if(flip)
             std::swap(idx0,idx1);
 
         auto qps = disk::quadrature::gauss_lobatto(2 * degree -1, pts[idx0], pts[idx1]);
 
-        auto qcount = iface * degree; 
+        auto qcount = iface * degree;
 
         for (auto& qp : qps)
-        {       
+        {
             const auto dphi   = cb.eval_gradients(qp.point());
             const auto dphi_n = qp.weight() * (dphi * n);
 
-            size_t index_dof = qcount%(num_dofs_bnd); 
+            size_t index_dof = qcount%(num_dofs_bnd);
             BF.block(0, index_dof, cbs, 1) += dphi_n;
 
             qcount++;
-        }  
+        }
         iface++;
     }
 
@@ -360,7 +360,7 @@ matrix_BT(const Mesh&    msh,
     const auto lbs = scalar_basis_size(degree-2, Mesh::dimension);
 
     const auto num_faces = howmany_faces(msh, cl);
-    const auto num_dofs = num_faces * degree + lbs; 
+    const auto num_dofs = num_faces * degree + lbs;
 
     const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
     const auto lcb = make_scalar_monomial_basis(msh, cl, degree-2);
@@ -369,12 +369,12 @@ matrix_BT(const Mesh&    msh,
 
     int ipol = 2;
 
-    auto h = diameter(msh, cl); 
+    auto h = diameter(msh, cl);
     auto h2 = h * h;
 
     for (int k = 2; k <= degree; k++)
     {
-        for (int i = 0; i <= k; i++) 
+        for (int i = 0; i <= k; i++)
         {
             ipol++;
 
@@ -393,18 +393,18 @@ matrix_BT(const Mesh&    msh,
                 BT(ipol, ipolxx) = -coeff_xx / h2 ;
             }
 
-            if(coeff_yy > 0) 
+            if(coeff_yy > 0)
             {
                 int dyy_row = k-2;
                 int dyy_col = i-2;
 
-                int ipolyy = 0.5 * (dyy_row + 1) * dyy_row + dyy_col;          
-                BT(ipol, ipolyy) = -coeff_yy / h2;    
+                int ipolyy = 0.5 * (dyy_row + 1) * dyy_row + dyy_col;
+                BT(ipol, ipolyy) = -coeff_yy / h2;
             }
         }
     }
 
-    BT *= measure(msh, cl); 
+    BT *= measure(msh, cl);
 
     return BT;
 }
@@ -422,23 +422,23 @@ matrix_B(const Mesh&    msh,
     const auto lbs = scalar_basis_size(degree-2, Mesh::dimension);
 
     const auto num_faces = howmany_faces(msh, cl);
-    const auto num_dofs = num_faces * degree + lbs; 
+    const auto num_dofs = num_faces * degree + lbs;
     const auto offset_cell_dofs = num_faces * degree;
     dynamic_matrix<T> B = dynamic_matrix<T>::Zero(cbs, num_dofs);
 
     B.block(0, 0, cbs, offset_cell_dofs)  = matrix_BF(msh, cl, degree);
 
-    
+
     if(degree < 2)
     {
-        auto P0v = 1.0/num_faces;  
+        auto P0v = 1.0/num_faces;
         B.row(0).setConstant(P0v);
         return B;
     }
 
     B.block(0,offset_cell_dofs, cbs, lbs) = matrix_BT(msh, cl, degree);
     auto P0v = 1.0;
-    B(0, offset_cell_dofs) = P0v; 
+    B(0, offset_cell_dofs) = P0v;
 
     return B;
 }
@@ -459,7 +459,7 @@ matrix_D(const Mesh&    msh,
     const auto lb  = make_scalar_monomial_basis(msh, cl, degree-2);
 
     const auto num_faces = howmany_faces(msh, cl);
-    const auto num_dofs = num_faces * degree + lbs; 
+    const auto num_dofs = num_faces * degree + lbs;
 
     dynamic_matrix<T> D = dynamic_matrix<T>::Zero(num_dofs, cbs);
 
@@ -468,20 +468,20 @@ matrix_D(const Mesh&    msh,
     {
         const auto pts = points(msh, fc);
 
-        size_t idx0(0), idx1(1); 
+        size_t idx0(0), idx1(1);
         if(flip)
             std::swap(idx0,idx1);
 
         auto face_qps = disk::quadrature::gauss_lobatto(2 * degree -1, pts[idx0], pts[idx1]);
 
         for (size_t iq = 0; iq < face_qps.size() - 1;  iq++)
-        {  
-            auto qp = face_qps[iq];     
+        {
+            auto qp = face_qps[iq];
             const auto phi   = cb.eval_functions(qp.point());
 
             D.block(count, 0, 1, cbs) = phi.transpose();
             count++;
-        }  
+        }
     }
 
 
@@ -500,11 +500,10 @@ matrix_D(const Mesh&    msh,
 
         D.block(offset_cell_dofs, 0, lbs, cbs)  += qp.weight() * phi_dof * phi.transpose();
     }
-    D.block(offset_cell_dofs, 0, lbs, cbs) /= area; 
+    D.block(offset_cell_dofs, 0, lbs, cbs) /= area;
 
     return D;
 }
-
 
 
 template<disk::mesh_2D Mesh>
@@ -513,37 +512,39 @@ projector_nabla(const Mesh&    msh,
          const typename Mesh::cell_type&  cl,
          const size_t   degree,
          const dynamic_matrix<typename Mesh::coordinate_type>& G)
-{   
+{
     return  G.lu().solve(matrix_B(msh, cl, degree));
 }
-
 
 
 template<disk::mesh_2D Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
 local_rhs(const Mesh&    msh,
-         const typename Mesh::cell_type&  cl,
-         const size_t   degree,
-         const dynamic_matrix<typename Mesh::coordinate_type>& G)
-{   
+          const typename Mesh::cell_type&  cl,
+          const size_t   degree,
+          const dynamic_matrix<typename Mesh::coordinate_type>& PI_star)
+{
     using matrix_t = dynamic_matrix<typename Mesh::coordinate_type>;
 
     const auto cbs = scalar_basis_size(degree, Mesh::dimension);
     const auto lbs = scalar_basis_size(degree-2, Mesh::dimension);
 
-    const auto num_faces = howmany_faces(msh, cl); 
+    const auto num_faces = howmany_faces(msh, cl);
     const auto offset = num_faces * degree;
+    const auto num_dofs = offset + lbs;
+
+    const auto cb = make_scalar_monomial_basis(msh, cl, degree);
 
     matrix_t M = make_mass_matrix(msh, cl, cb);
-    matrix_t C = matrix_t::Zero(num_dofs, cbs); 
+    matrix_t C = matrix_t::Zero(num_dofs, cbs);
     matrix_t I = matrix_t::Identity(num_dofs, num_dofs);
 
     C.block(0, offset, lbs, lbs ) = matrix_t::Identity(lbs, lbs);
     C *= measure(msh, cl);
 
-    if(dgree > 2)
+    if(degree > 2)
     {
-        C.block(offset, offset, cbs-lbs, cbs-lbs ) = 
+        C.block(offset, offset, cbs-lbs, cbs-lbs ) =
                 M.block(offset, offset, cbs-lbs, cbs-lbs ) *
                     PI_star.block(offset, offset, cbs-lbs, cbs-lbs );
     }
@@ -552,45 +553,50 @@ local_rhs(const Mesh&    msh,
 }
 
 
-
 template<disk::mesh_2D Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
-local_stiffness_matrix(const Mesh&    msh,
-                            const typename Mesh::cell_type&  cl,
-                            const size_t   degree)
+local_stiffness_matrix( const Mesh&    msh,
+                        const typename Mesh::cell_type&  cl,
+                        const size_t   degree,
+                        const dynamic_matrix<typename Mesh::coordinate_type>& G,
+                        const dynamic_matrix<typename Mesh::coordinate_type>& PI_star)
 {
+    using matrix_t = dynamic_matrix<typename Mesh::coordinate_type>;
+
     const auto cbs = scalar_basis_size(degree, Mesh::dimension);
-    const auto lbs = scalar_basis_size(degree-2, Mesh::dimension);
+    const auto lbs = scalar_basis_size(degree - 2, Mesh::dimension);
 
     const auto num_faces = howmany_faces(msh, cl);
-    const auto num_dofs = num_faces * degree + lbs; 
+    const auto num_dofs = num_faces * degree + lbs;
 
     matrix_t I = matrix_t::Identity(num_dofs, num_dofs);
 
     G.row(0).setConstant(0);
 
     matrix_t D = matrix_D(msh, cl, degree);
-    matrix_t PI_stab = D * PI_star; 
+    matrix_t PI_stab = D * PI_star;
 
-    matrix_t A =  PI_star.transpose() * G * PI_star;    
-    matrix_t S = (I - PI_stab).transpose() * (I - PI_stab); 
+    matrix_t A =  PI_star.transpose() * G * PI_star;
+    matrix_t S = (I - PI_stab).transpose() * (I - PI_stab);
 
-    return A + S;    
+    return A + S;
 }
 
 
-
+template<disk::mesh_2D Mesh>
 std::pair<dynamic_matrix<typename Mesh::coordinate_type>,
           dynamic_vector<typename Mesh::coordinate_type> >
-compute_local()
+compute_local(const Mesh&    msh,
+              const typename Mesh::cell_type&  cl,
+              const size_t   degree)
 {
-
     using matrix_t = dynamic_matrix<typename Mesh::coordinate_type>;
-  
+    using vector_t = dynamic_matrix<typename Mesh::coordinate_type>;
+
     matrix_t G = matrix_G(msh, cl, degree);
     matrix_t PI_star = projector_nabla(msh, cl, degree, G);
 
-    matrix_t LHS = local_stiffness_matrix(msh, cl, degree, G, PI);
+    matrix_t LHS = local_stiffness_matrix(msh, cl, degree, G, PI_star);
     vector_t rhs = local_rhs(msh, cl, degree, PI_star);
 
     return std::make_pair(LHS, rhs);
