@@ -251,6 +251,19 @@ namespace vem_2d
 
 
 /**
+ * @brief Compute mass matrix \f$ (m_i,m_j) i,j = 1,...,dim( \mathcal{P}^{k}(T)) \f$ 
+ *
+ * @tparam Mesh type of the mesh
+ * @param msh mesh
+ * @param cl  cell T
+ * @param degree  vem degree k 
+ * @return dynamic_matrix<typename Mesh::coordinate_type> mass matrix in \f$ \mathcal{P}^{k}(T)\f$ 
+ */
+
+
+
+
+/**
  * @brief Compute stiffness matrix \f$ (\nabla m_i,\nabla m_j) i,j = 1,...,dim( \mathcal{P}^{k}(T)) \f$ 
  *
  * @tparam Mesh type of the mesh
@@ -508,6 +521,40 @@ projector_nabla(const Mesh&    msh,
 
 template<disk::mesh_2D Mesh>
 dynamic_matrix<typename Mesh::coordinate_type>
+local_rhs(const Mesh&    msh,
+         const typename Mesh::cell_type&  cl,
+         const size_t   degree,
+         const dynamic_matrix<typename Mesh::coordinate_type>& G)
+{   
+    using matrix_t = dynamic_matrix<typename Mesh::coordinate_type>;
+
+    const auto cbs = scalar_basis_size(degree, Mesh::dimension);
+    const auto lbs = scalar_basis_size(degree-2, Mesh::dimension);
+
+    const auto num_faces = howmany_faces(msh, cl); 
+    const auto offset = num_faces * degree;
+
+    matrix_t M = make_mass_matrix(msh, cl, cb);
+    matrix_t C = matrix_t::Zero(num_dofs, cbs); 
+    matrix_t I = matrix_t::Identity(num_dofs, num_dofs);
+
+    C.block(0, offset, lbs, lbs ) = matrix_t::Identity(lbs, lbs);
+    C *= measure(msh, cl);
+
+    if(dgree > 2)
+    {
+        C.block(offset, offset, cbs-lbs, cbs-lbs ) = 
+                M.block(offset, offset, cbs-lbs, cbs-lbs ) *
+                    PI_star.block(offset, offset, cbs-lbs, cbs-lbs );
+    }
+
+    return  M.ldlt().solve(C);
+}
+
+
+
+template<disk::mesh_2D Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
 local_stiffness_matrix(const Mesh&    msh,
                             const typename Mesh::cell_type&  cl,
                             const size_t   degree)
@@ -518,18 +565,12 @@ local_stiffness_matrix(const Mesh&    msh,
     const auto num_faces = howmany_faces(msh, cl);
     const auto num_dofs = num_faces * degree + lbs; 
 
-    using matrix_t = dynamic_matrix<typename Mesh::coordinate_type>;
-  
     matrix_t I = matrix_t::Identity(num_dofs, num_dofs);
 
-    matrix_t G = matrix_G(msh, cl, degree);
-    matrix_t PI_star = projector_nabla(msh, cl, degree, G);
+    G.row(0).setConstant(0);
 
     matrix_t D = matrix_D(msh, cl, degree);
     matrix_t PI_stab = D * PI_star; 
-
-
-    G.row(0).setConstant(0);
 
     matrix_t A =  PI_star.transpose() * G * PI_star;    
     matrix_t S = (I - PI_stab).transpose() * (I - PI_stab); 
@@ -537,6 +578,23 @@ local_stiffness_matrix(const Mesh&    msh,
     return A + S;    
 }
 
+
+
+std::pair<dynamic_matrix<typename Mesh::coordinate_type>,
+          dynamic_vector<typename Mesh::coordinate_type> >
+compute_local()
+{
+
+    using matrix_t = dynamic_matrix<typename Mesh::coordinate_type>;
+  
+    matrix_t G = matrix_G(msh, cl, degree);
+    matrix_t PI_star = projector_nabla(msh, cl, degree, G);
+
+    matrix_t LHS = local_stiffness_matrix(msh, cl, degree, G, PI);
+    vector_t rhs = local_rhs(msh, cl, degree, PI_star);
+
+    return std::make_pair(LHS, rhs);
+}
 
 } // end namespace vem 2d
 }// end namespace diskpp
