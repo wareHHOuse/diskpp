@@ -1,6 +1,6 @@
 #include <iostream>
 #include <iomanip>
-#include <regex>
+#include <optional>
 
 #include <unistd.h>
 
@@ -27,20 +27,24 @@ struct rhs_functor {
 
 };
 
-int main(void)
+std::vector<std::optional<size_t>>
+compress(const std::vector<size_t>& l2g,
+    const std::vector<std::optional<size_t>>& compress_map)
 {
-    using T = double;
-    size_t degree = 2;
+    std::vector<std::optional<size_t>> ret;
+    for (size_t i = 0; i < l2g.size(); i++) {
+        assert(l2g[i] < compress_map.size());
+        ret.push_back(compress_map[l2g[i]]);
+    }
 
-    //disk::generic_mesh<T,2> msh;
-    //auto mesher = make_fvca5_hex_mesher(msh);
-    //mesher.make_level(4);
+    return ret;
+}
 
-    disk::cartesian_mesh<T,2> msh;
-    auto mesher = make_simple_mesher(msh);
-    mesher.refine();
-    mesher.refine();
-    mesher.refine();
+template<disk::mesh_2D Mesh>
+void
+test_vem_diffusion(const Mesh& msh, size_t degree)
+{
+    using T = typename Mesh::coordinate_type;
 
     rhs_functor f(msh);
 
@@ -72,7 +76,7 @@ int main(void)
     std::cout << "totdofs = " << totdofs << ", nbndfcs = ";
     std::cout << nbndfcs << ", dirdofs = " << dirdofs << std::endl;
 
-    std::vector<size_t> compress_map(totdofs);
+    std::vector<std::optional<size_t>> compress_map(totdofs);
 
     for (size_t i = 0, cnum = 0; i < totdofs; i++) {
         if ( is_dirichlet[i] )
@@ -81,6 +85,8 @@ int main(void)
         compress_map[i] = cnum++;
     }
     size_t realdofs = totdofs - dirdofs;
+
+    std::cout << "Linear system DoFs: " << realdofs << std::endl;
 
     disk::sparse_matrix<T> LHS(realdofs, realdofs);
     disk::dynamic_vector<T> RHS = disk::dynamic_vector<T>::Zero(realdofs);
@@ -91,6 +97,9 @@ int main(void)
 
     for (size_t cl_i = 0; cl_i < msh.cells_size(); cl_i++)
     {
+        std::cout << "\r Assembling cell " << cl_i+1 << "/";
+        std::cout << msh.cells_size();
+        std::cout.flush();
         auto cl = msh[cl_i];
         auto pts = points(msh, cl);
         auto npts = pts.size();
@@ -99,43 +108,123 @@ int main(void)
         auto [L, R] = disk::vem_2d::compute_local(msh, cl, degree, f);
         auto [Lc, Rc] = disk::vem::schur(L, R, nbdofs);
 
-        auto l2g = dofmap.cell_to_global(cl_i);
+        auto l2g = compress(dofmap.cell_to_global(cl_i),
+            compress_map);
+
         assert(Lc.rows() == Lc.cols());
         assert(Lc.cols() == l2g.size());
 
         for (size_t i = 0; i < l2g.size(); i++) {
-            auto gi = l2g[i];
-            if (is_dirichlet[gi])
+            if (not l2g[i])
                 continue;
-            gi = compress_map[gi];
+            
+            auto gi = l2g[i].value();
             for (size_t j = 0; j < l2g.size(); j++) {
-                auto gj = l2g[j];
-                if (is_dirichlet[gj])
+                if (not l2g[j])
                     continue;
-                gj = compress_map[gj];
+                auto gj = l2g[j].value();
                 trips.push_back( triplet_t(gi, gj, Lc(i,j)) );
             }
 
             RHS[gi] += Rc[i];
         }
     }
+    std::cout << std::endl;
 
     LHS.setFromTriplets( trips.begin(), trips.end() );
+    trips.clear();
 
+    std::cout << "Linear solver..." << std::flush;
     csol = mumps_lu(LHS, RHS);
+    std::cout << "done" << std::endl;
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(msh.points_size());
 
     for (size_t i = 0; i < msh.points_size(); i++) {
-        if (is_dirichlet[i])
+        if (not compress_map[i])
             continue;
-        sol[i] = csol[ compress_map[i] ];
+        sol[i] = csol[ compress_map[i].value() ];
     }
 
     disk::silo_database db;
     db.create("vem.silo");
     db.add_mesh(msh, "mesh");
     db.add_variable("mesh", "u", sol, disk::nodal_variable_t);
+}
+
+enum class mesh_type {
+    triangles,
+    cartesian,
+    hexas,
+};
+
+int main(int argc, char **argv)
+{
+    using T = double;
+    size_t degree = 2;
+    size_t level = 2;
+    mesh_type mt = mesh_type::hexas;
+
+    int opt;
+    while ((opt = getopt(argc, argv, "k:m:l:")) != -1) {
+        switch (opt) {
+        case 'k': {
+            int k = atoi(optarg);
+            if (k < 1) {
+                std::cerr << "Degree must be greater than zero." << std::endl;
+                return 1;
+            }
+            degree = k;
+            } break;
+        case 'm': {
+            if ( std::string(optarg) == "tri" )
+                mt = mesh_type::triangles;
+            else if ( std::string(optarg) == "quad" )
+                mt = mesh_type::cartesian;
+            else if ( std::string(optarg) == "hex" )
+                mt = mesh_type::hexas;
+            else {
+                std::cerr << "Mesh type: tri, quad or hex" << std::endl;
+                return 1;
+            }
+            } break;
+        case 'l': {
+            int l = atoi(optarg);
+            if (l < 0) {
+                std::cerr << "Level must be positive." << std::endl;
+                return 1;
+            }
+            level = l;
+            } break;
+        }
+    }
+
+    if (mt == mesh_type::triangles) {
+        disk::simplicial_mesh<T,2> msh;
+        auto mesher = make_simple_mesher(msh);
+        for (size_t l = 0; l < level; l++)
+            mesher.refine();
+
+        test_vem_diffusion(msh, degree);
+    }
+
+    if (mt == mesh_type::cartesian) {
+        disk::cartesian_mesh<T,2> msh;
+        auto mesher = make_simple_mesher(msh);
+        for (size_t l = 0; l < level; l++)
+            mesher.refine();
+
+        test_vem_diffusion(msh, degree);
+    }
+
+    if (mt == mesh_type::hexas) {
+        disk::generic_mesh<T,2> msh;
+        auto mesher = make_fvca5_hex_mesher(msh);
+        mesher.make_level(level);
+
+        test_vem_diffusion(msh, degree);
+    }
+    
 
     return 0;
 }
