@@ -288,14 +288,12 @@ private:
     size_t              degree_;
     size_t              size_;
     tr_mat_type         tr_;
-    vec_type            v0_, v1_;
     coordinate_type     scale_;
 
     void
     compute_reference_frame(const mesh_type& msh, const cell_type& cl, rescaling_strategy rs)
     {
-        auto inv_diam = scale_/diameter(msh, cl);
-        tr_ = tr_mat_type::Identity()*inv_diam;
+        tr_ = scale_ * diameters(msh,cl).cwiseInverse().asDiagonal();
 
         switch(rs)
         {

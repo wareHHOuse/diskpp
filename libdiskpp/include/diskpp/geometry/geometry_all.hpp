@@ -162,6 +162,27 @@ diameter(const Mesh& msh, const Element& elem)
     return diam;
 }
 
+template<typename Mesh, typename Element>
+static_vector<typename Mesh::coordinate_type, Mesh::dimension>
+diameters(const Mesh& msh, const Element& elem)
+{
+    const auto pts = points(msh, elem);
+    using retv_t = static_vector<typename Mesh::coordinate_type, Mesh::dimension>;
+    retv_t retv = retv_t::Zero();
+
+    typename Mesh::coordinate_type diam = 0.;
+
+    for (size_t i = 0; i < pts.size(); i++) {
+        for (size_t j = i+1; j < pts.size(); j++) {
+            retv_t curv = (pts[i] - pts[j]).to_vector();
+            for (size_t k = 0; k < Mesh::dimension; k++)
+                retv[k] = std::max(retv[k], std::abs(curv[k]));
+        }
+    }
+
+    return retv;
+}
+
 /**
   * \brief Compute the diameter of the bounding box af an element, i.e, the maximum distance
   * between two different points of the bounding box.
