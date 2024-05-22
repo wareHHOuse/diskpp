@@ -544,9 +544,9 @@ projector_zero(const Mesh& msh,
             H.block(lbs, 0, pbs - lbs, pbs) * PIN_star.block(0, 0, pbs, num_dofs);
     }
 
-    std::cout << "PIN* \n" << PIN_star << std::endl;
-    std::cout << "H \n" << H << std::endl;
-    std::cout << "C \n" << C << std::endl;
+    //std::cout << "PIN* \n" << PIN_star << std::endl;
+    //std::cout << "H \n" << H << std::endl;
+    //std::cout << "C \n" << C << std::endl;
 
     return H.ldlt().solve(C);
 }
@@ -626,7 +626,7 @@ compute_local(const Mesh&    msh,
     using matrix_t = dynamic_matrix<typename Mesh::coordinate_type>;
     using vector_t = dynamic_vector<typename Mesh::coordinate_type>;
 
-    size_t proj_degree = degree;
+    size_t proj_degree = degree-1;
 
     matrix_t G = matrix_G(msh, cl, degree);
     matrix_t D = matrix_D(msh, cl, degree);
