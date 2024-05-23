@@ -1,6 +1,7 @@
 option(BUILD_CONDITIONING_TESTS "Build conditioning tests" ON)
 if (BUILD_CONDITIONING_TESTS)
     add_subdirectory(conditioning)
+endif()
 
 option(BUILD_APP_VEMASM "Build VEM assembly testing app" ON)
 if (BUILD_APP_VEMASM)
