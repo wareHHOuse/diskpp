@@ -279,6 +279,8 @@ matrix_G(const Mesh&    msh,
          const typename Mesh::cell_type&  cl,
          const size_t   degree)
 {
+    assert(degree > 0);
+
     using T = typename Mesh::coordinate_type;
     const auto num_faces = howmany_faces(msh, cl);
 
@@ -354,16 +356,16 @@ matrix_BT(const Mesh&    msh,
          const typename Mesh::cell_type&  cl,
          const size_t   degree)
 {
+    assert(degree > 0);
+
     using T = typename Mesh::coordinate_type;
 
     const auto cbs = scalar_basis_size(degree, Mesh::dimension);
-    const auto lbs = scalar_basis_size(degree-2, Mesh::dimension);
+    const auto lbs = (degree == 1) ? 0 :
+                      scalar_basis_size(degree - 2, Mesh::dimension);
 
     const auto num_faces = howmany_faces(msh, cl);
     const auto num_dofs = num_faces * degree + lbs;
-
-    const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
-    const auto lcb = make_scalar_monomial_basis(msh, cl, degree-2);
 
     dynamic_matrix<T> BT = dynamic_matrix<T>::Zero(cbs, lbs);
 
@@ -416,29 +418,31 @@ matrix_B(const Mesh&    msh,
          const typename Mesh::cell_type&  cl,
          const size_t   degree)
 {
+    assert(degree > 0);
+
     using T = typename Mesh::coordinate_type;
 
     const auto cbs = scalar_basis_size(degree, Mesh::dimension);
-    const auto lbs = scalar_basis_size(degree-2, Mesh::dimension);
+    const auto lbs = (degree == 1) ? 0 :
+                     scalar_basis_size(degree - 2, Mesh::dimension);
 
     const auto num_faces = howmany_faces(msh, cl);
     const auto num_dofs = num_faces * degree + lbs;
-    const auto offset_cell_dofs = num_faces * degree;
+    const auto offset = num_faces * degree;
     dynamic_matrix<T> B = dynamic_matrix<T>::Zero(cbs, num_dofs);
 
-    B.block(0, 0, cbs, offset_cell_dofs)  = matrix_BF(msh, cl, degree);
+    B.block(0, 0, cbs, offset)  = matrix_BF(msh, cl, degree);
 
-
-    if(degree < 2)
+    if(degree == 1)
     {
         auto P0v = 1.0/num_faces;
         B.row(0).setConstant(P0v);
         return B;
     }
 
-    B.block(0,offset_cell_dofs, cbs, lbs) = matrix_BT(msh, cl, degree);
+    B.block(0,offset, cbs, lbs) = matrix_BT(msh, cl, degree);
     auto P0v = 1.0;
-    B(0, offset_cell_dofs) = P0v;
+    B(0, offset) = P0v;
 
     return B;
 }
@@ -450,13 +454,15 @@ matrix_D(const Mesh&    msh,
          const typename Mesh::cell_type&  cl,
          const size_t   degree)
 {
+    assert(degree > 0);
+
     using T = typename Mesh::coordinate_type;
 
     const auto cbs = scalar_basis_size(degree, Mesh::dimension);
-    const auto lbs = scalar_basis_size(degree-2, Mesh::dimension);
+    const auto lbs = (degree == 1) ? 0 :
+                      scalar_basis_size(degree - 2, Mesh::dimension);
 
     const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
-    const auto lb  = make_scalar_monomial_basis(msh, cl, degree-2);
 
     const auto num_faces = howmany_faces(msh, cl);
     const auto num_dofs = num_faces * degree + lbs;
@@ -484,8 +490,10 @@ matrix_D(const Mesh&    msh,
         }
     }
 
-    if(degree < 2)
+    if(degree == 1)
         return D;
+
+    const auto lb = make_scalar_monomial_basis(msh, cl, degree - 2);
 
     auto area = measure(msh, cl);
     const auto cell_qps = integrate(msh, cl, 2*degree-2);
@@ -524,22 +532,31 @@ projector_zero(const Mesh& msh,
     const size_t  proj_degree,
     const dynamic_matrix<typename Mesh::coordinate_type>& PIN_star)
 {
+    assert(degree > 0);
+
     using matrix_t = dynamic_matrix<typename Mesh::coordinate_type>;
 
     const auto pbs = scalar_basis_size(proj_degree, Mesh::dimension);
-    const auto lbs = scalar_basis_size(degree - 2, Mesh::dimension);
+    const auto pb = make_scalar_monomial_basis(msh, cl, proj_degree);
+
+    matrix_t H = make_mass_matrix(msh, cl, pb);
 
     const auto num_faces = howmany_faces(msh, cl);
     const auto offset = num_faces * degree;
-    const auto num_dofs = offset + lbs;
 
-    const auto basis = make_scalar_monomial_basis(msh, cl, proj_degree);
-
-    matrix_t H = make_mass_matrix(msh, cl, basis);
-    matrix_t C = matrix_t::Zero(pbs, num_dofs);
-    C.block(0, offset, lbs, lbs) = matrix_t::Identity(lbs, lbs) * measure(msh, cl);
-    if (degree >= 2)
+    matrix_t C;
+    if (degree == 1)
     {
+        C.resize(pbs, offset);
+        C = H * PIN_star.block(0, 0, pbs, offset);
+    }
+    else
+    {
+        const auto lbs = scalar_basis_size(degree - 2, Mesh::dimension);
+        const auto num_dofs = offset + lbs;
+        C = matrix_t::Zero(pbs, num_dofs);
+
+        C.block(0, offset, lbs, lbs) = matrix_t::Identity(lbs, lbs) * measure(msh, cl);
         C.block(lbs, 0, pbs - lbs, num_dofs) =
             H.block(lbs, 0, pbs - lbs, pbs) * PIN_star.block(0, 0, pbs, num_dofs);
     }
@@ -561,10 +578,14 @@ local_stiffness_matrix( const Mesh&    msh,
                         const dynamic_matrix<typename Mesh::coordinate_type>& D,
                         const dynamic_matrix<typename Mesh::coordinate_type>& PI_star)
 {
+    assert(degree > 0);
+
     using matrix_t = dynamic_matrix<typename Mesh::coordinate_type>;
 
     const auto cbs = scalar_basis_size(degree, Mesh::dimension);
-    const auto lbs = scalar_basis_size(degree - 2, Mesh::dimension);
+    const auto lbs = (degree == 1) ? 0 :
+                      scalar_basis_size(degree - 2, Mesh::dimension);
+
 
     const auto num_faces = howmany_faces(msh, cl);
     const auto num_dofs = num_faces * degree + lbs;
@@ -591,8 +612,11 @@ local_rhs(  const Mesh&    msh,
             const dynamic_matrix<typename Mesh::coordinate_type>& PIN_star,
             const Function & rhs_fun)
 {
+    assert(degree > 0);
+
     const auto pbs = scalar_basis_size(proj_degree, Mesh::dimension);
-    const auto lbs = scalar_basis_size(degree - 2, Mesh::dimension);
+    const auto lbs = (degree == 1) ? 0 :
+                      scalar_basis_size(degree - 2, Mesh::dimension);
 
     const auto basis = make_scalar_monomial_basis(msh, cl, proj_degree);
 
@@ -623,6 +647,8 @@ compute_local(const Mesh&    msh,
               const size_t   degree,
               const Function & rhs_fun)
 {
+    assert(degree > 0);
+
     using matrix_t = dynamic_matrix<typename Mesh::coordinate_type>;
     using vector_t = dynamic_vector<typename Mesh::coordinate_type>;
 
