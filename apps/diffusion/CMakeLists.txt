@@ -3,6 +3,10 @@ project(diskpp_diffusion)
 
 set(LINK_LIBS diskpp)
 
+add_executable(diffusion_vem src/diffusion_vem.cpp)
+target_link_libraries(diffusion_vem ${LINK_LIBS})
+install(TARGETS diffusion_vem RUNTIME DESTINATION bin)
+
 add_executable(consistency src/consistency.cpp)
 target_link_libraries(consistency ${LINK_LIBS})
 install(TARGETS consistency RUNTIME DESTINATION bin)

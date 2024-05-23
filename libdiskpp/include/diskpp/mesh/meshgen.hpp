@@ -67,9 +67,7 @@ class simple_mesher<triangular_mesh<T>>
 
     std::shared_ptr<storage_type>   storage;
 
-public:
-    simple_mesher(mesh_type& msh)
-        : storage( msh.backend_storage() )
+    void init_pattern_1(void)
     {
         /* Init the first level of the mesh */
         storage->points.push_back( point_type(0.0, 0.0) );
@@ -113,6 +111,51 @@ public:
         storage->surfaces.push_back( surface_type({pi2, pi3, pi4}) );
 
         storage->subdomain_info.resize( storage->surfaces.size() );
+    }
+
+    void init_pattern_2(void)
+    {
+        /* Init the first level of the mesh */
+        storage->points.push_back( point_type(0.0, 0.0) );
+        auto pi0 = point_identifier<2>(0);
+        storage->nodes.push_back( node_type( {pi0} ) );
+
+        storage->points.push_back( point_type(1.0, 0.0) );
+        auto pi1 = point_identifier<2>(1);
+        storage->nodes.push_back( node_type( {pi1} ) );
+
+        storage->points.push_back( point_type(1.0, 1.0) );
+        auto pi2 = point_identifier<2>(2);
+        storage->nodes.push_back( node_type( {pi2} ) );
+
+        storage->points.push_back( point_type(0.0, 1.0) );
+        auto pi3 = point_identifier<2>(3);
+        storage->nodes.push_back( node_type( {pi3} ) );
+
+
+        storage->edges.push_back( edge_type({pi0, pi1}) ); //0 b0
+        storage->edges.push_back( edge_type({pi0, pi2}) ); //1
+        storage->edges.push_back( edge_type({pi0, pi3}) ); //2 b3
+        storage->edges.push_back( edge_type({pi1, pi2}) ); //3 b1
+        storage->edges.push_back( edge_type({pi2, pi3}) ); //4 b2
+
+        storage->boundary_info.resize(5); /* Total 5 edges in the mesh */
+        storage->boundary_info[0] = boundary_descriptor(0, true);
+        storage->boundary_info[2] = boundary_descriptor(3, true);
+        storage->boundary_info[3] = boundary_descriptor(1, true);
+        storage->boundary_info[4] = boundary_descriptor(2, true);
+
+        storage->surfaces.push_back( surface_type({pi0, pi1, pi2}) );
+        storage->surfaces.push_back( surface_type({pi0, pi2, pi3}) );
+
+        storage->subdomain_info.resize( storage->surfaces.size() );
+    }
+
+public:
+    simple_mesher(mesh_type& msh)
+        : storage( msh.backend_storage() )
+    {
+        init_pattern_1();
     }
 
     void refine(void)
@@ -1076,6 +1119,8 @@ void make_single_element_mesh(generic_mesh<T,2>& msh, const T& radius, const siz
     for (size_t i = 0; i < num_nodes; i++) {
         auto n0 = nodeid_type(i);
         auto n1 = nodeid_type( (i+1)%num_nodes );
+        if (i+1 == num_nodes)
+            std::swap(n0, n1);
         storage->edges.push_back( {n0, n1} );
         surface_nodes.push_back( typename node_type::id_type(i) );
         surface_edges.push_back( typename edge_type::id_type(i) );
@@ -1087,6 +1132,7 @@ void make_single_element_mesh(generic_mesh<T,2>& msh, const T& radius, const siz
 
     auto surface = surface_type(surface_edges);
     surface.set_point_ids(surface_nodes.begin(), surface_nodes.end()); /* XXX: crap */
+    std::sort(storage->edges.begin(), storage->edges.end());
 
     storage->surfaces.push_back(surface);
 
@@ -1142,6 +1188,8 @@ bool load_single_element_csv(generic_mesh<T,2>& msh, const std::string& filename
     for (size_t i = 0; i < num_nodes; i++) {
         auto n0 = nodeid_type(i);
         auto n1 = nodeid_type( (i+1)%num_nodes );
+        if (i+1 == num_nodes)
+            std::swap(n0, n1);
         storage->edges.push_back( {n0, n1} );
         surface_nodes.push_back( typename node_type::id_type(i) );
         surface_edges.push_back( typename edge_type::id_type(i) );
@@ -1150,6 +1198,7 @@ bool load_single_element_csv(generic_mesh<T,2>& msh, const std::string& filename
     storage->boundary_info.resize( storage->edges.size() );
     for (auto& bi : storage->boundary_info)
         bi = boundary_descriptor(0, true);
+    std::sort(storage->edges.begin(), storage->edges.end());
 
     auto surface = surface_type(surface_edges);
     surface.set_point_ids(surface_nodes.begin(), surface_nodes.end()); /* XXX: crap */

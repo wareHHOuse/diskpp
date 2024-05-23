@@ -255,7 +255,7 @@ measure(const cartesian_mesh<T,2>& msh,
         const typename cartesian_mesh<T,2>::cell& cl)
 {
     auto pts = points(msh, cl);
-    assert(pts.size() == 2);
+    assert(pts.size() == 4);
     auto v0 = (pts[1] - pts[0]).to_vector().norm();
     auto v1 = (pts[2] - pts[0]).to_vector().norm();
     return v0 * v1;

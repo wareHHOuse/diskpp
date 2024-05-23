@@ -1,6 +1,10 @@
 option(BUILD_CONDITIONING_TESTS "Build conditioning tests" ON)
 if (BUILD_CONDITIONING_TESTS)
     add_subdirectory(conditioning)
+
+option(BUILD_APP_VEMASM "Build VEM assembly testing app" ON)
+if (BUILD_APP_VEMASM)
+    add_subdirectory(vemasm)
 endif()
 
 option(BUILD_DISKPP_TUTORIALS "Build DiSk++ tutorials" ON)
@@ -111,5 +115,10 @@ endif()
 option(BUILD_APP_BARYTEST "Build barycenter test application" ON)
 if (BUILD_APP_BARYTEST)
     add_subdirectory(barycenter_test)
+endif()
+
+option(BUILD_APP_VEM_2D "Build VEM 2d application" ON)
+if (BUILD_APP_VEM_2D)
+    add_subdirectory(vem2d)
 endif()
 
