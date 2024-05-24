@@ -128,11 +128,6 @@ class scaled_monomial_abstract_basis<Mesh, typename Mesh::cell, ScalarType>
         return _use_inertia_axes;
     }
 
-    vector_type
-    scaling_factor() const
-    {
-        return _scaling_factor;
-    }
 
   public:
     scaled_monomial_abstract_basis(const mesh_type& msh, const cell_type& cl, bool use_inertia_axes = true)
@@ -148,8 +143,15 @@ class scaled_monomial_abstract_basis<Mesh, typename Mesh::cell, ScalarType>
             _axes = matrix_type::Identity();
         }
         _length_box = diameter_boundingbox(msh, cl, _axes);
+
         this->compute_scaling_factor();
         this->compute_passage_matrix();
+    }
+
+    vector_type
+    scaling_factor() const
+    {
+        return _scaling_factor;
     }
 
     bool

@@ -363,6 +363,7 @@ matrix_BT(const Mesh&    msh,
     const auto cbs = scalar_basis_size(degree, Mesh::dimension);
     const auto lbs = (degree == 1) ? 0 :
                       scalar_basis_size(degree - 2, Mesh::dimension);
+    const auto cb  = make_scalar_monomial_basis(msh, cl, degree);
 
     const auto num_faces = howmany_faces(msh, cl);
     const auto num_dofs = num_faces * degree + lbs;
@@ -371,8 +372,9 @@ matrix_BT(const Mesh&    msh,
 
     int ipol = 2;
 
-    auto h = diameter(msh, cl);
-    auto h2 = h * h;
+    auto factor = cb.scaling_factor();
+    auto fx2 = factor[0]* factor[0];
+    auto fy2 = factor[1]* factor[1];
 
     for (int k = 2; k <= degree; k++)
     {
@@ -392,7 +394,7 @@ matrix_BT(const Mesh&    msh,
                 int dxx_col = i;
 
                 int ipolxx = 0.5 * (dxx_row + 1) * dxx_row + dxx_col;
-                BT(ipol, ipolxx) = -coeff_xx / h2 ;
+                BT(ipol, ipolxx) = -coeff_xx * fx2 ;
             }
 
             if(coeff_yy > 0)
@@ -401,7 +403,7 @@ matrix_BT(const Mesh&    msh,
                 int dyy_col = i-2;
 
                 int ipolyy = 0.5 * (dyy_row + 1) * dyy_row + dyy_col;
-                BT(ipol, ipolyy) = -coeff_yy / h2;
+                BT(ipol, ipolyy) = -coeff_yy * fy2;
             }
         }
     }
