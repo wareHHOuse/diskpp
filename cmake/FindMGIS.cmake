@@ -27,9 +27,9 @@
 include(FindPackageHandleStandardArgs)
 
 find_path(MGIS_INCLUDE_DIRS
-    NAMES Integrate.hxx
+    NAMES MGIS/Behaviour/Integrate.hxx
     HINTS ENV MGIS_ROOT ${MGIS_ROOT}
-    PATH_SUFFIXES include/MGIS/Behaviour
+    PATH_SUFFIXES include
 )
 
 find_library(MGIS_MFRONT_LIBRARIES

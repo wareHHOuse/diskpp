@@ -86,6 +86,17 @@ class TimeStep
     }
 
     /**
+     * @brief Return increment the time step
+     *
+     * @return T increment time
+     */
+    T
+    increment_time(void) const
+    {
+        return m_end_time - m_start_time;
+    }
+
+    /**
      * @brief Return the level of time refining
      *
      * @return size_t level
@@ -134,10 +145,7 @@ class ListOfTimeStep
     }
 
   public:
-    ListOfTimeStep() : n_time_step_comp(0), user_end_time(0)
-    {
-        list_steps.clear();
-    }
+    ListOfTimeStep() : n_time_step_comp(0), user_end_time(0) { list_steps.clear(); }
 
     ListOfTimeStep(const T end_time, const size_t n_step) : n_time_step_comp(0), user_end_time(end_time)
     {
@@ -147,7 +155,7 @@ class ListOfTimeStep
     template<typename I>
     ListOfTimeStep(const std::vector<std::pair<T, I>> list_of_time_step) : n_time_step_comp(0)
     {
-        user_end_time = list_of_time_step[list_of_time_step.size()-1].first;
+        user_end_time = list_of_time_step[list_of_time_step.size() - 1].first;
         for (auto& [time, n_step] : list_of_time_step)
         {
             this->addTimeStepping(time, n_step, 0);
@@ -158,7 +166,10 @@ class ListOfTimeStep
     ListOfTimeStep(const std::vector<std::pair<T, I>> list_of_time_step, const T final_time) : n_time_step_comp(0)
     {
         user_end_time = final_time;
-        for (auto& [time, n_step] : list_of_time_step) { this->addTimeStepping(time, n_step, 0); }
+        for (auto& [time, n_step] : list_of_time_step)
+        {
+            this->addTimeStepping(time, n_step, 0);
+        }
     }
 
     /**

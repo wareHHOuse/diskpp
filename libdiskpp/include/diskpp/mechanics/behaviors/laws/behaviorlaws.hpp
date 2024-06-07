@@ -26,18 +26,18 @@
 
 #pragma once
 
-#include "Cavitation/Cavitation_qp.hpp"
-#include "HenckyMises/HenckyMises_qp.hpp"
-#include "IsotropicHardeningVMis/IsotropicHardeningVMis_qp.hpp"
-#include "LinearElasticityLaw/LinearElasticityLaw.hpp"
-#include "LinearIsotropicAndKinematicHardening/LinearIsotropicAndKinematicHardening_qp.hpp"
-#include "LinearLaw/LinearLaw_qp.hpp"
-#include "Neohookean/Neohookean_qp.hpp"
+#include "diskpp/mechanics/behaviors/laws/Cavitation/Cavitation_qp.hpp"
+#include "diskpp/mechanics/behaviors/laws/HenckyMises/HenckyMises_qp.hpp"
+#include "diskpp/mechanics/behaviors/laws/IsotropicHardeningVMis/IsotropicHardeningVMis_qp.hpp"
+#include "diskpp/mechanics/behaviors/laws/LinearElasticityLaw/LinearElasticityLaw.hpp"
+#include "diskpp/mechanics/behaviors/laws/LinearIsotropicAndKinematicHardening/LinearIsotropicAndKinematicHardening_qp.hpp"
+#include "diskpp/mechanics/behaviors/laws/LinearLaw/LinearLaw_qp.hpp"
+#include "diskpp/mechanics/behaviors/laws/Mfront/Mfront_law.hpp"
+#include "diskpp/mechanics/behaviors/laws/Neohookean/Neohookean_qp.hpp"
+#include "diskpp/mechanics/behaviors/laws/behaviorlaws_names.hpp"
+#include "diskpp/mechanics/behaviors/laws/law_bones.hpp"
 #include "diskpp/mechanics/behaviors/logarithmic_strain/LogarithmicStrain.hpp"
-#include "Mfront/Mfront_law.hpp"
 #include "diskpp/methods/hho"
-#include "law_bones.hpp"
-#include "behaviorlaws_names.hpp"
 
 #ifdef HAVE_MGIS
 #include "MGIS/Behaviour/Behaviour.hxx"
@@ -89,8 +89,8 @@ class Behavior
     typedef MaterialData<scalar_type>          material_type;
     typedef dynamic_vector<scalar_type>        vector_type;
 
-    typedef static_matrix<scalar_type, MeshType::dimension, MeshType::dimension>  static_matrix_type;
-    typedef static_tensor<scalar_type, MeshType::dimension>                       static_tensor_type;
+    typedef static_matrix<scalar_type, MeshType::dimension, MeshType::dimension> static_matrix_type;
+    typedef static_tensor<scalar_type, MeshType::dimension>                      static_tensor_type;
 
     size_t m_deformation;
     size_t m_law;
@@ -109,13 +109,13 @@ class Behavior
     LinearElasticityLaw<MeshType>                  m_elastic;
     LinearIsotropicAndKinematicHardening<MeshType> m_linearHard;
     IsotropicHardeningVMis<MeshType>               m_nonlinearHard;
-//
+    //
     mechanics::LogarithmicStrain<LinearElasticityLaw<MeshType>>                  m_log_elastic;
     mechanics::LogarithmicStrain<LinearIsotropicAndKinematicHardening<MeshType>> m_log_linearHard;
     mechanics::LogarithmicStrain<IsotropicHardeningVMis<MeshType>>               m_log_nonlinearHard;
 
 #ifdef HAVE_MGIS
-    Mfront<MeshType>                               m_mfront;
+    Mfront<MeshType> m_mfront;
 #endif
 
     void
@@ -181,16 +181,17 @@ class Behavior
             case 102: m_nonlinearHard = IsotropicHardeningVMis<MeshType>(msh, degree); break;
             case 103: m_henckymises = HenckyMises<MeshType>(msh, degree); break;
             case 200: m_neohokean = Neohookean<MeshType>(msh, degree); break;
-            case 201: m_cavitation = Cavitation<MeshType>(msh, degree); break;
-//
+            case 201:
+                m_cavitation = Cavitation<MeshType>(msh, degree);
+                break;
+                //
             case 300: m_log_elastic = mechanics::LogarithmicStrain<LinearElasticityLaw<MeshType>>(msh, degree); break;
             case 301:
                 m_log_linearHard =
                   mechanics::LogarithmicStrain<LinearIsotropicAndKinematicHardening<MeshType>>(msh, degree);
                 break;
             case 302:
-                m_log_nonlinearHard =
-                  mechanics::LogarithmicStrain<IsotropicHardeningVMis<MeshType>>(msh, degree);
+                m_log_nonlinearHard = mechanics::LogarithmicStrain<IsotropicHardeningVMis<MeshType>>(msh, degree);
                 break;
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");
@@ -246,7 +247,8 @@ class Behavior
     }
 #endif
 
-    size_t getDeformation(void) const
+    size_t
+    getDeformation(void) const
     {
         return m_deformation;
     }
@@ -254,7 +256,7 @@ class Behavior
     std::string
     getDeformationName(void) const
     {
-        return DeformationMeasureName( m_deformation);
+        return DeformationMeasureName(m_deformation);
     }
 
     std::string
@@ -384,13 +386,20 @@ class Behavior
         switch (m_id)
         {
             case 100: return m_elastic.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent); break;
-            case 101: return m_linearHard.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent); break;
-            case 102: return m_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent); break;
+            case 101:
+                return m_linearHard.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
+                break;
+            case 102:
+                return m_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
+                break;
             case 103:
                 return m_henckymises.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
                 break;
-            case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent); break;
-            case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
+            case 200:
+                return m_neohokean.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
+                break;
+            case 201:
+                return m_cavitation.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
                 break;
             case 300:
                 return m_log_elastic.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
@@ -402,9 +411,7 @@ class Behavior
                 return m_log_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
                 break;
 #ifdef HAVE_MGIS
-            case 500:
-                return m_mfront.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent);
-                break;
+            case 500: return m_mfront.getCellQPs(cell_id).getQP(qp_id).compute_whole(RkT_iqn, m_data, tangent); break;
 #endif
 
             default: throw std::invalid_argument("Behavior error: Unknown id law");
@@ -416,22 +423,12 @@ class Behavior
     {
         switch (m_id)
         {
-            case 100:
-                return m_elastic.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data);
-                break;
-            case 101:
-                return m_linearHard.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data);
-                break;
-            case 102:
-                return m_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data);
-                break;
-            case 103:
-                return m_henckymises.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data);
-                break;
+            case 100: return m_elastic.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data); break;
+            case 101: return m_linearHard.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data); break;
+            case 102: return m_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data); break;
+            case 103: return m_henckymises.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data); break;
             case 200: return m_neohokean.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data); break;
-            case 201:
-                return m_cavitation.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data);
-                break;
+            case 201: return m_cavitation.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data); break;
             case 300: return m_log_elastic.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data); break;
             case 301: return m_log_linearHard.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data); break;
             case 302: return m_log_nonlinearHard.getCellQPs(cell_id).getQP(qp_id).compute_stress3D(m_data); break;
@@ -487,7 +484,8 @@ class Behavior
         }
     }
 
-    void update(void)
+    void
+    update(void)
     {
         switch (m_id)
         {

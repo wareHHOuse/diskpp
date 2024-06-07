@@ -225,32 +225,6 @@ class hho_degree_info
     }
 };
 
-class assembly_index
-{
-    size_t idx;
-    bool   assem;
-
-public:
-    assembly_index(size_t i, bool as) : idx(i), assem(as) {}
-
-    operator size_t() const {
-        if (!assem)
-            throw std::logic_error("Invalid assembly_index");
-
-        return idx;
-    }
-
-    bool assemble() const {
-        return assem;
-    }
-
-    friend std::ostream&
-    operator<<(std::ostream& os, const assembly_index& as) {
-        os << "(" << as.idx << "," << as.assem << ")";
-        return os;
-    }
-};
-
 // const MeshDegreeInfo<Mesh>& degree_infos
 template<typename Mesh>
 size_t
@@ -597,6 +571,71 @@ compute_grad_matrix(const Mesh&                                           msh,
 
     return compute_grad_matrix(msh, cl, cell_infos, grad_vector);
 }
+
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+compute_symmetric_laplacian_matrix(const Mesh& msh, const typename Mesh::cell_type& cl, const size_t rec_degree)
+{
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+
+    const size_t N = Mesh::dimension;
+
+    const auto rb = make_vector_monomial_basis(msh, cl, rec_degree);
+    const auto rbs = disk::vector_basis_size(rec_degree, N, N);
+
+    matrix_type er_lhs = matrix_type::Zero(rbs, rbs);
+
+    // this is very costly to build it
+    const auto qps = integrate(msh, cl, 2 * (rec_degree - 1));
+    for (auto& qp : qps)
+    {
+        auto dphi    = rb.eval_gradients(qp.point());
+        decltype(dphi) dphi_s;
+        dphi_s.reserve(dphi.size());
+        for(auto& dphi_i : dphi){
+            dphi_s.push_back(0.5 * (dphi_i + dphi_i.transpose()));
+        }
+
+        const auto qp_dphi_s = disk::priv::inner_product(qp.weight(), dphi_s);
+        er_lhs += disk::priv::outer_product(qp_dphi_s, dphi_s);
+    }
+
+    return er_lhs.block(N, N, rbs - N, rbs-N);
+}
+
+template<typename Mesh>
+dynamic_matrix<typename Mesh::coordinate_type>
+compute_symmetric_gradrec_matrix(const Mesh& msh, const typename Mesh::cell_type& cl, const size_t grad_degree)
+{
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+
+    const size_t N = Mesh::dimension;
+
+    const auto gb  = make_matrix_monomial_basis(msh, cl, grad_degree);
+    const auto gbs = disk::matrix_basis_size(grad_degree, N, N);
+
+    matrix_type eg_lhs = matrix_type::Zero(gbs, gbs);
+
+    // this is very costly to build it
+    const auto qps = integrate(msh, cl, 2 * grad_degree);
+    for (auto& qp : qps)
+    {
+        auto           gphi = gb.eval_functions(qp.point());
+        decltype(gphi) gphi_s;
+        gphi_s.reserve(gphi.size());
+        for(auto& gphi_i : gphi){
+            gphi_s.push_back(0.5 * (gphi_i + gphi_i.transpose()));
+        }
+
+        const auto qp_gphi_s = disk::priv::inner_product(qp.weight(), gphi_s);
+        eg_lhs += disk::priv::outer_product(qp_gphi_s, gphi_s);
+    }
+
+    return eg_lhs;
+}
+
 } // end priv
 
 } // end diskpp

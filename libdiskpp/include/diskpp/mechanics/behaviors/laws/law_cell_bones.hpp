@@ -33,9 +33,8 @@
 #include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "diskpp/mechanics/behaviors/maths_tensor.hpp"
 #include "diskpp/mechanics/behaviors/maths_utils.hpp"
-#include "diskpp/quadratures/quadratures.hpp"
 #include "diskpp/methods/hho"
-
+#include "diskpp/quadratures/quadratures.hpp"
 
 namespace disk
 {
@@ -121,17 +120,17 @@ class LawTypeCellBones
     }
 
     vector_type
-    projectStressOnCell(const mesh_type&             msh,
-                        const cell_type&             cl,
-                        const hho_degree_info&       hdi,
-                        const data_type&             material_data) const
+    projectStressOnCell(const mesh_type&       msh,
+                        const cell_type&       cl,
+                        const hho_degree_info& hdi,
+                        const data_type&       material_data) const
     {
         const auto grad_degree     = hdi.grad_degree();
         const int  grad_basis_size = matrix_basis_size(grad_degree, dimension, dimension);
         const auto gb              = make_matrix_monomial_basis(msh, cl, grad_degree);
 
         const matrix_type mass = make_mass_matrix(msh, cl, gb);
-        vector_type rhs  = vector_type::Zero(grad_basis_size);
+        vector_type       rhs  = vector_type::Zero(grad_basis_size);
 
         for (auto& qp : m_list_qp)
         {
@@ -158,7 +157,7 @@ class LawTypeCellBones
             const auto pb = make_scalar_monomial_basis(msh, cl, grad_degree);
 
             const matrix_type mass = make_mass_matrix(msh, cl, pb);
-            vector_type rhs  = vector_type::Zero(pbs);
+            vector_type       rhs  = vector_type::Zero(pbs);
 
             for (auto& qp : m_list_qp)
             {
@@ -183,7 +182,7 @@ class LawTypeCellBones
             const auto pb = make_scalar_monomial_basis(msh, cl, grad_degree);
 
             const matrix_type mass = make_mass_matrix(msh, cl, pb);
-            vector_type rhs  = vector_type::Zero(pbs);
+            vector_type       rhs  = vector_type::Zero(pbs);
 
             for (auto& qp : m_list_qp)
             {
