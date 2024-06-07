@@ -116,7 +116,7 @@ compute_normal(const disk::point<T, 3>& p1, const disk::point<T, 3>& p2, const d
     t1 /= t1.norm();
     t2 /= t2.norm();
 
-    static_vector<T, 3> nor = disk::cross(t1, t2);
+    static_vector<T, 3> nor = t1.cross(t2);
 
     return nor / nor.norm();
 }

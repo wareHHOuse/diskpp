@@ -138,7 +138,7 @@ integrate_polyhedron(const disk::generic_mesh<T, 3>&                msh,
     const auto rss = split_in_raw_tetrahedra(msh, cl);
 
     std::vector<quadpoint_type> ret;
-    ret.reserve(10 * rss.size());
+    ret.reserve(tetrahedron_arbq_size(degree) * rss.size());
     for (auto& rs : rss)
     {
         const auto pts = rs.points();
@@ -161,7 +161,7 @@ integrate_polyhedron_face(const disk::generic_mesh<T, 3>&                msh,
     const auto rss = split_in_raw_triangles(msh, fc);
 
     std::vector<quadpoint_type> ret;
-    ret.reserve(5 * rss.size());
+    ret.reserve(quadrature::priv::triangle_gauss_rules[degree].num_points * rss.size());
     for (auto& rs : rss)
     {
         const auto pts = rs.points();

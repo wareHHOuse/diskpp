@@ -94,9 +94,12 @@ class diffusion_condensed_assembler
     SparseMatrix<T> LHS;
     vector_type     RHS;
 
-    diffusion_condensed_assembler(const Mesh& msh, hho_degree_info hdi) : di(hdi), use_bnd(false)
+    diffusion_condensed_assembler(const Mesh& msh, hho_degree_info hdi)
+        : di(hdi), use_bnd(false)
     {
-        auto is_dirichlet = [&](const typename Mesh::face_type& fc) -> bool { return msh.is_boundary(fc); };
+        auto is_dirichlet = [&](const typename Mesh::face_type& fc) -> bool {
+            return msh.is_boundary(fc);
+        };
 
         num_all_faces       = msh.faces_size();
         num_dirichlet_faces = std::count_if(msh.faces_begin(), msh.faces_end(), is_dirichlet);
@@ -124,11 +127,10 @@ class diffusion_condensed_assembler
         RHS = vector_type::Zero(system_size);
     }
 
-    diffusion_condensed_assembler(const Mesh& msh, hho_degree_info hdi, const boundary_type& bnd) :
-      di(hdi), use_bnd(true)
+    diffusion_condensed_assembler(const Mesh& msh, hho_degree_info hdi, const boundary_type& bnd)
+        : di(hdi), use_bnd(true)
     {
-        auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool
-        {
+        auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
             const auto fc_id = msh.lookup(fc);
             return bnd.is_dirichlet_face(fc_id);
         };

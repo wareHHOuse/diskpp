@@ -163,6 +163,11 @@ class hho_degree_info
         return cell_deg;
     }
 
+    void cell_degree(size_t k)
+    {
+        cell_deg = k;
+    }
+
     /**
      * @brief Return the polynomial degree used for the faces
      *
@@ -174,6 +179,11 @@ class hho_degree_info
         return face_deg;
     }
 
+    void face_degree(size_t k)
+    {
+        face_deg = k;
+    }
+
     /**
      * @brief Return the polynomial degree used for the reconstruction operator
      *
@@ -183,6 +193,11 @@ class hho_degree_info
     reconstruction_degree() const
     {
         return rec_deg;
+    }
+
+    void reconstruction_degree(size_t k)
+    {
+        rec_deg = k;
     }
 
     /**
