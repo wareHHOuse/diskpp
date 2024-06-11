@@ -489,7 +489,7 @@ class simple_mesher<tetrahedral_mesh<T>>
             return nsp1.first == nsp2.first;
         };
 
-        auto n_itor = storage->edges.begin() + node_offset;
+        auto n_itor = storage->edges.begin() + edge_offset;
         storage->edges.erase(storage->edges.begin(), n_itor);
         std::sort(storage->edges.begin(), storage->edges.end());
         auto elast = std::unique(storage->edges.begin(), storage->edges.end());

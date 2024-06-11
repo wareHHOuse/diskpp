@@ -34,6 +34,7 @@
 
 #include "diskpp/methods/dga"
 #include "diskpp/loaders/loader.hpp"
+#include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/output/silo.hpp"
 
 #include "mumps.hpp"
@@ -50,6 +51,7 @@ int main(int argc, char **argv)
         return sin(M_PI*pt.x()) * sin(M_PI*pt.y()) * sin(M_PI*pt.z());
     };
 
+    /*
     if (argc != 2)
     {
         std::cout << "Please specify file name." << std::endl;
@@ -69,6 +71,16 @@ int main(int argc, char **argv)
         return 1;
     }
     loader.populate_mesh(msh);
+    */
+
+    using mesh_type = disk::simplicial_mesh<T, 3>;
+
+    mesh_type msh;
+    auto mesher = make_simple_mesher(msh);
+    for (int i = 0; i < 4; i++)
+        mesher.refine();
+
+    msh.statistics();
 
     typedef Eigen::SparseMatrix<T>  sparse_matrix_type;
     typedef Eigen::Triplet<T>       triplet_type;
