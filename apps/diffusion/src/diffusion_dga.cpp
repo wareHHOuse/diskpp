@@ -1,4 +1,13 @@
 /*
+ * DISK++, a template library for DIscontinuous SKeletal methods.
+ *
+ * Matteo Cicuttin (C) 2024
+ * matteo.cicuttin@polito.it
+ *
+ * Politecnico di Torino - DISMA
+ * Dipartimento di Matematica
+ */
+/*
  *       /\         DISK++, a template library for DIscontinuous SKeletal
  *      /__\        methods.
  *     /_\/_\
@@ -25,6 +34,7 @@
 
 #include "diskpp/methods/dga"
 #include "diskpp/loaders/loader.hpp"
+#include "diskpp/output/silo.hpp"
 
 #include "mumps.hpp"
 
@@ -105,7 +115,7 @@ int main(int argc, char **argv)
 
         auto ptids = cl.point_ids();
         auto pts = points(msh, cl);
-        auto vol = disk::priv::volume(msh, cl, VOLUME_NOT_SIGNED);
+        auto vol = disk::priv::volume_unsigned(msh, cl);
 
         for (size_t i = 0; i < lapl.rows(); i++)
         {
@@ -149,6 +159,11 @@ int main(int argc, char **argv)
 
     ofs.close();
 
+    disk::silo_database silo;
+    silo.create("diffusion_dga.silo");
+    silo.add_mesh(msh, "mesh");
+    silo.add_variable("mesh", "u", sol, disk::nodal_variable_t);
+
     T error = 0.0;
     for (auto& cl : msh)
     {
@@ -166,6 +181,7 @@ int main(int argc, char **argv)
         {
             realsol(i) = sol_fun(pts[i]);
             compsol(i) = sol( size_t(ptids[i]) );
+
         }
 
         auto diff = realsol - compsol;
@@ -175,6 +191,7 @@ int main(int argc, char **argv)
 
         error += diff.dot(lapl*diff);
     }
+
 
     std::cout << "Error: " << std::sqrt(error) << std::endl;
 

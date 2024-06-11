@@ -1,4 +1,13 @@
 /*
+ * DISK++, a template library for DIscontinuous SKeletal methods.
+ *
+ * Matteo Cicuttin (C) 2024
+ * matteo.cicuttin@polito.it
+ *
+ * Politecnico di Torino - DISMA
+ * Dipartimento di Matematica
+ */
+/*
  *       /\         DISK++, a template library for DIscontinuous SKeletal
  *      /__\        methods.
  *     /_\/_\
@@ -79,13 +88,10 @@ cross(const vec3<T>& a, const vec3<T>& b)
     return a.cross(b);
 }
 
-#define VOLUME_SIGNED       true
-#define VOLUME_NOT_SIGNED   false
 template<typename T>
 T
-volume(const simplicial_mesh<T, 3>& mesh,
-       const typename simplicial_mesh<T, 3>::volume_type& vol,
-       bool signed_volume)
+volume_signed(const simplicial_mesh<T, 3>& mesh,
+       const typename simplicial_mesh<T, 3>::volume_type& vol)
 {
     auto pts = points(mesh, vol);
     assert(pts.size() == 4);
@@ -94,10 +100,22 @@ volume(const simplicial_mesh<T, 3>& mesh,
     auto v1 = (pts[2] - pts[0]).to_vector();
     auto v2 = (pts[3] - pts[0]).to_vector();
 
-    if (signed_volume)
-        return dot(v0, cross(v1, v2))/6.0;
-    else
-        return std::abs(dot(v0, cross(v1, v2))/6.0);
+    return dot(v0, cross(v1, v2))/6.0;
+}
+
+template<typename T>
+T
+volume_unsigned(const simplicial_mesh<T, 3>& mesh,
+       const typename simplicial_mesh<T, 3>::volume_type& vol)
+{
+    auto pts = points(mesh, vol);
+    assert(pts.size() == 4);
+
+    auto v0 = (pts[1] - pts[0]).to_vector();
+    auto v1 = (pts[2] - pts[0]).to_vector();
+    auto v2 = (pts[3] - pts[0]).to_vector();
+
+    return std::abs(dot(v0, cross(v1, v2))/6.0);
 }
 
 } //namespace priv
@@ -116,8 +134,8 @@ edges(const simplicial_mesh<T, 3>& msh,
     assert(ptids.size() == 3);
 
     ret[0] = edge_type({ptids[0], ptids[1]});
-    ret[1] = edge_type({ptids[1], ptids[2]});
-    ret[2] = edge_type({ptids[0], ptids[2]});
+    ret[1] = edge_type({ptids[0], ptids[2]});
+    ret[2] = edge_type({ptids[1], ptids[2]});
 
     return ret;
 }
@@ -126,7 +144,7 @@ template<typename T>
 std::array<typename simplicial_mesh<T, 3>::edge_type, 6>
 edges(const simplicial_mesh<T, 3>& msh,
       const typename simplicial_mesh<T, 3>::volume_type& vol)
-{
+{ //ok
     typedef typename simplicial_mesh<T, 3>::edge_type edge_type;
     std::array<edge_type, 6> ret;
 
@@ -134,11 +152,57 @@ edges(const simplicial_mesh<T, 3>& msh,
     assert(ptids.size() == 4);
 
     ret[0] = edge_type({ptids[0], ptids[1]});
-    ret[1] = edge_type({ptids[1], ptids[2]});
-    ret[2] = edge_type({ptids[0], ptids[2]});
-    ret[3] = edge_type({ptids[0], ptids[3]});
+    ret[1] = edge_type({ptids[0], ptids[2]});
+    ret[2] = edge_type({ptids[0], ptids[3]});
+    ret[3] = edge_type({ptids[1], ptids[2]});
     ret[4] = edge_type({ptids[1], ptids[3]});
     ret[5] = edge_type({ptids[2], ptids[3]});
+
+    return ret;
+}
+
+
+template<disk::mesh_3D Mesh>
+struct edge_iterproxy {
+    const Mesh& mesh;
+    edge_iterproxy(const Mesh& msh)
+        : mesh(msh)
+    {}
+
+    auto begin() { return mesh.backend_storage()->edges.begin(); }
+    auto end() { return mesh.backend_storage()->edges.end(); }
+    auto begin() const { return mesh.backend_storage()->edges.begin(); }
+    auto end() const { return mesh.backend_storage()->edges.end(); }
+    auto size() const { return mesh.backend_storage()->edges.size(); }
+};
+
+template<disk::mesh_3D Mesh>
+auto edges(const Mesh& msh) {
+    return edge_iterproxy(msh);
+}
+
+template<disk::mesh_3D Mesh>
+auto offset(const Mesh& msh, const typename Mesh::edge_type& edg)
+{
+    auto ebegin = msh.backend_storage()->edges.begin();
+    auto eend = msh.backend_storage()->edges.end();
+    auto itor = std::lower_bound(ebegin, eend, edg);
+    if (itor == eend || *itor != edg)
+        throw std::invalid_argument("offset(): edge not found");
+
+    return std::distance(ebegin, itor);
+}
+
+template<typename T>
+std::array<size_t, 6>
+edge_ids(const simplicial_mesh<T, 3>& msh,
+         const typename simplicial_mesh<T, 3>::volume_type& vol)
+{ //ok
+    auto edgs = edges(msh, vol);
+
+    std::array<size_t, 6> ret;
+    for (size_t i = 0; i < 6; i++)
+        ret[i] = offset(msh, edgs[i]);
 
     return ret;
 }
@@ -177,16 +241,16 @@ template<typename T>
 std::array<vec3<T>, 6>
 primal_edge_vectors(const simplicial_mesh<T, 3>& mesh,
                     const typename simplicial_mesh<T, 3>::volume_type& vol)
-{
+{ //ok
     std::array<vec3<T>, 6> ret;
 
     auto pts = points(mesh, vol);
     assert(pts.size() == 4);
 
     ret[0] = (pts[1] - pts[0]).to_vector();
-    ret[1] = (pts[2] - pts[1]).to_vector();
-    ret[2] = (pts[2] - pts[0]).to_vector();
-    ret[3] = (pts[3] - pts[0]).to_vector();
+    ret[1] = (pts[2] - pts[0]).to_vector();
+    ret[2] = (pts[3] - pts[0]).to_vector();
+    ret[3] = (pts[2] - pts[1]).to_vector();
     ret[4] = (pts[3] - pts[1]).to_vector();
     ret[5] = (pts[3] - pts[2]).to_vector();
 
@@ -199,7 +263,7 @@ template<typename T>
 std::array<vec3<T>, 4>
 primal_area_vectors(const simplicial_mesh<T, 3>& mesh,
                     const typename simplicial_mesh<T, 3>::volume_type& vol)
-{
+{ //ok
     typedef typename simplicial_mesh<T, 3>::edge_type edge_type;
 
     std::array<edge_type, 6> edgs = edges(mesh, vol);
@@ -213,10 +277,10 @@ primal_area_vectors(const simplicial_mesh<T, 3>& mesh,
 
     std::array<vec3<T>, 4> ret;
 
-    ret[0] = priv::cross( evecs[1], evecs[4] ) / 2.0;
-    ret[1] = priv::cross( evecs[2], evecs[3] ) / 2.0;
-    ret[2] = priv::cross( evecs[0], evecs[3] ) / 2.0;
-    ret[3] = priv::cross( evecs[0], evecs[2] ) / 2.0;
+    ret[0] = priv::cross( evecs[3], evecs[4] ) / 2.0;
+    ret[1] = priv::cross( evecs[1], evecs[2] ) / 2.0;
+    ret[2] = priv::cross( evecs[0], evecs[2] ) / 2.0;
+    ret[3] = priv::cross( evecs[0], evecs[1] ) / 2.0;
 
     return ret;
 }
@@ -232,7 +296,7 @@ dual_edge_vectors(const simplicial_mesh<T, 3>& mesh,
     /* the returned vectors are such that cross(pev, dev) = outward */
     std::array<vec3<T>, 3> ret;
 
-    bool negative = priv::volume(mesh, parent_vol, VOLUME_SIGNED) < 0;
+    bool negative = priv::volume_signed(mesh, parent_vol) < 0;
     auto fcs = faces(mesh, parent_vol);
 
     size_t face = 42;
@@ -298,7 +362,7 @@ dual_edge_vectors(const simplicial_mesh<T, 3>& mesh,
 
     auto vol_barycenter = barycenter(mesh, vol);
 
-    T sign = (priv::volume(mesh, vol, VOLUME_SIGNED) < 0) ? -1 : 1;
+    T sign = (priv::volume_signed(mesh, vol) < 0) ? -1 : 1;
 
     ret[0] = (face_barycenters[0] - vol_barycenter).to_vector()*sign;
     ret[1] = (vol_barycenter - face_barycenters[1]).to_vector()*sign;
@@ -333,7 +397,7 @@ dual_area_vectors(const simplicial_mesh<T, 3>& mesh,
      * area vector must be the same of the primal edge vector i.e. it must
      * satisfy 'dot(PEV, DAV) >= 0' */
 
-    T sign = (priv::volume(mesh, vol, VOLUME_SIGNED) < 0) ? -0.5 : 0.5;
+    T sign = (priv::volume_signed(mesh, vol) < 0) ? -0.5 : 0.5;
 
     ret[0] = priv::cross( (vb-ebs[0]).to_vector(), (fbs[2]-fbs[3]).to_vector() )*sign;
     ret[1] = priv::cross( (vb-ebs[1]).to_vector(), (fbs[0]-fbs[3]).to_vector() )*sign;
@@ -516,7 +580,7 @@ normals(const simplicial_mesh<T, 3>& mesh,
 
     auto pav = primal_area_vectors(mesh, t);
 
-    if ( priv::volume(mesh, t, VOLUME_SIGNED) > 0 )
+    if ( priv::volume_signed(mesh, t) > 0 )
     {
         ret[0] =  pav[0]/pav[0].norm();
         ret[1] = -pav[1]/pav[1].norm();
@@ -553,84 +617,189 @@ tri_grad_matrix(const tetrahedral_mesh<CoordT, IdxT>&,
 */
 
 template<typename T>
-using grad_matrix_t = Eigen::Matrix<T, 6, 4>;
-
-template<typename T>
-grad_matrix_t<T>
+Eigen::Matrix<T, 6, 4>
 grad_matrix(const simplicial_mesh<T, 3>&,
             const typename simplicial_mesh<T, 3>::volume_type&)
 {
-    grad_matrix_t<T> G;
+    Eigen::Matrix<T, 6, 4> G;
     G << -1,  1,  0,  0,
-          0, -1,  1,  0,
          -1,  0,  1,  0,
          -1,  0,  0,  1,
+          0, -1,  1,  0,
           0, -1,  0,  1,
           0,  0, -1,  1;
     return G;
 }
 
+template<typename T>
+Eigen::Matrix<T, 4, 6>
+curl_matrix(const simplicial_mesh<T, 3>&,
+            const typename simplicial_mesh<T, 3>::volume_type&)
+{
+    Eigen::Matrix<T, 4, 6> C;
+    C <<  0,  0,  0, +1, -1, +1,
+          0, +1, -1,  0,  0, +1,
+         +1,  0, -1,  0, +1,  0,
+         +1, -1,  0, +1,  0,  0;
+    return C;
+}
+
 /***************************************************************************/
 /* Calculate edge matrix - scalar parameter */
-template<typename T>
-using edge_matrix_t = Eigen::Matrix<T, 6, 6>;
+
+namespace priv {
 
 template<typename T>
-edge_matrix_t<T>
-edge_matrix(const simplicial_mesh<T, 3>& mesh,
-            const typename simplicial_mesh<T, 3>::volume_type& vol,
-            const T& scalar_parameter)
+Eigen::Matrix<T, 6, 6>
+edge_matrix_simplicial_element(const std::array<vec3<T>, 4>& pav,
+    const std::array<vec3<T>, 4>& Ppav)
 {
-    edge_matrix_t<T> ret;
+    Eigen::Matrix<T, 6, 6> ret;
 
-    auto pav = primal_area_vectors(mesh, vol);
-    auto mult = scalar_parameter / ( 36 * priv::volume(mesh, vol, VOLUME_NOT_SIGNED) );
-
-    using namespace priv;
     /* Eigen stores elements in column-major order, fill by column! */
-    ret(0,0) =  (dot(pav[1],  pav[1]) + dot(pav[0], pav[0])) * mult;
-    ret(1,0) = - dot(pav[0], pav[2]) * mult;
-    ret(2,0) = - dot(pav[1], pav[2]) * mult;
-    ret(3,0) =   dot(pav[1], pav[3]) * mult;
-    ret(4,0) =   dot(pav[0], pav[3]) * mult;
+    ret(0,0) =   dot(pav[0], Ppav[0]) + dot(pav[1], Ppav[1]);
+    ret(1,0) = - dot(pav[1], Ppav[2]);
+    ret(2,0) = + dot(pav[1], Ppav[3]);
+    ret(3,0) = - dot(pav[0], Ppav[2]);
+    ret(4,0) = + dot(pav[0], Ppav[3]);
     ret(5,0) =   0;
 
     ret(0,1) =   ret(1,0);
-    ret(1,1) =  (dot(pav[2], pav[2]) + dot(pav[1], pav[1])) * mult;
-    ret(2,1) = - dot(pav[1], pav[0]) * mult;
-    ret(3,1) =   0;
-    ret(4,1) = - dot(pav[2], pav[3]) * mult;
-    ret(5,1) = - dot(pav[1], pav[3]) * mult;
+    ret(1,1) =   dot(pav[0], Ppav[0]) + dot(pav[2], Ppav[2]);
+    ret(2,1) = - dot(pav[2], Ppav[3]);
+    ret(3,1) = - dot(pav[0], Ppav[1]);
+    ret(4,1) =   0;
+    ret(5,1) = + dot(pav[0], Ppav[3]);
 
     ret(0,2) =   ret(2,0);
     ret(1,2) =   ret(2,1);
-    ret(2,2) =  (dot(pav[2], pav[2]) + dot(pav[0], pav[0])) * mult;
-    ret(3,2) = - dot(pav[2], pav[3]) * mult;
-    ret(4,2) =   0;
-    ret(5,2) =   dot(pav[0], pav[3]) * mult;
+    ret(2,2) =   dot(pav[0], Ppav[0]) + dot(pav[3], Ppav[3]);
+    ret(3,2) =   0;
+    ret(4,2) = - dot(pav[0], Ppav[1]);
+    ret(5,2) =   dot(pav[0], Ppav[2]);
 
     ret(0,3) =   ret(3,0);
-    ret(1,3) =   0;
-    ret(2,3) =   ret(3,2);
-    ret(3,3) =  (dot(pav[3], pav[3]) + dot(pav[0], pav[0])) * mult;
-    ret(4,3) = - dot(pav[0], pav[1]) * mult;
-    ret(5,3) =   dot(pav[0], pav[2]) * mult;
+    ret(1,3) =   ret(3,1);
+    ret(2,3) =   0;
+    ret(3,3) =   dot(pav[1], Ppav[1]) + dot(pav[2], Ppav[2]);
+    ret(4,3) = - dot(pav[2], Ppav[3]);
+    ret(5,3) = - dot(pav[1], Ppav[3]);
 
     ret(0,4) =   ret(4,0);
-    ret(1,4) =   ret(4,1);
-    ret(2,4) =   0;
+    ret(1,4) =   0;
+    ret(2,4) =   ret(4,2);
     ret(3,4) =   ret(4,3);
-    ret(4,4) =  (dot(pav[3], pav[3]) + dot(pav[1], pav[1])) * mult;
-    ret(5,4) = - dot(pav[1], pav[2]) * mult;
+    ret(4,4) =   dot(pav[1], Ppav[1]) + dot(pav[3], Ppav[3]);
+    ret(5,4) = - dot(pav[1], Ppav[2]);
 
     ret(0,5) =   0;
     ret(1,5) =   ret(5,1);
     ret(2,5) =   ret(5,2);
     ret(3,5) =   ret(5,3);
     ret(4,5) =   ret(5,4);
-    ret(5,5) =  (dot(pav[3], pav[3]) + dot(pav[2], pav[2])) * mult;
+    ret(5,5) =   dot(pav[2], Ppav[2]) + dot(pav[3], Ppav[3]);
 
     return ret;
 }
+
+template<typename T>
+Eigen::Matrix<T, 4, 4>
+face_matrix_simplicial_element(const std::array<vec3<T>, 6>& pev,
+    const std::array<vec3<T>, 6>& Ppev)
+{
+    Eigen::Matrix<T, 4, 4> ret;
+
+    /* Eigen stores elements in column-major order, fill by column! */
+    ret(0,0) =   dot(pev[0], Ppev[0]) + dot(pev[1], Ppev[1]) + dot(pev[2], Ppev[2]);
+    ret(1,0) = - dot(pev[3], Ppev[1]) - dot(pev[4], Ppev[2]);
+    ret(2,0) = - dot(pev[3], Ppev[0]) + dot(pev[5], Ppev[2]);
+    ret(3,0) = + dot(pev[4], Ppev[0]) - dot(pev[5], Ppev[1]);
+
+    ret(0,1) =   ret(1,0);
+    ret(1,1) =   dot(pev[0], Ppev[0]) + dot(pev[3], Ppev[3]) + dot(pev[4], Ppev[4]);
+    ret(2,1) = - dot(pev[1], Ppev[0]) - dot(pev[5], Ppev[4]);
+    ret(3,1) = + dot(pev[2], Ppev[0]) + dot(pev[3], Ppev[5]);
+
+    ret(0,2) =   ret(2,0);
+    ret(1,2) =   ret(2,1);
+    ret(2,2) =   dot(pev[1], Ppev[1]) + dot(pev[3], Ppev[3]) + dot(pev[5], Ppev[5]);
+    ret(3,2) = - dot(pev[2], Ppev[1]) - dot(pev[4], Ppev[3]);
+
+    ret(0,3) =   ret(3,0);
+    ret(1,3) =   ret(3,1);
+    ret(2,3) =   ret(3,2);
+    ret(3,3) =   dot(pev[2], Ppev[2]) + dot(pev[4], Ppev[4]) + dot(pev[5], Ppev[5]);
+
+    return ret;
+}
+
+}
+
+template<typename T>
+Eigen::Matrix<T, 6, 6>
+edge_matrix(const simplicial_mesh<T, 3>& mesh,
+            const typename simplicial_mesh<T, 3>::volume_type& vol,
+            const T& scalar_parameter)
+{
+    auto mult = scalar_parameter / ( 36 * priv::volume_unsigned(mesh, vol) );
+
+    auto pav = primal_area_vectors(mesh, vol);
+    auto Ppav = pav;
+    for (auto& p : Ppav)
+        p *= mult;
+
+    return priv::edge_matrix_simplicial_element(pav, Ppav);
+}
+
+
+template<typename T>
+Eigen::Matrix<T, 6, 6>
+edge_matrix(const simplicial_mesh<T, 3>& mesh,
+            const typename simplicial_mesh<T, 3>::volume_type& vol,
+            const static_matrix<T, 3, 3>& tensor_parameter)
+{
+    auto mult = tensor_parameter / ( 36 * priv::volume_unsigned(mesh, vol) );
+
+    auto pav = primal_area_vectors(mesh, vol);
+    auto Ppav = pav;
+    for (auto& p : Ppav)
+        p = mult*p;
+
+    return priv::edge_matrix_simplicial_element(pav, Ppav);
+}
+
+template<typename T>
+Eigen::Matrix<T, 4, 4>
+face_matrix(const simplicial_mesh<T, 3>& mesh,
+            const typename simplicial_mesh<T, 3>::volume_type& vol,
+            const T& scalar_parameter)
+{
+    auto mult = scalar_parameter / ( 36 * priv::volume_unsigned(mesh, vol) );
+
+    auto pev = primal_edge_vectors(mesh, vol);
+    auto Ppev = pev;
+    for (auto& p : Ppev)
+        p *= mult;
+
+    return priv::face_matrix_simplicial_element(pev, Ppev);
+}
+
+
+template<typename T>
+Eigen::Matrix<T, 4, 4>
+face_matrix(const simplicial_mesh<T, 3>& mesh,
+            const typename simplicial_mesh<T, 3>::volume_type& vol,
+            const static_matrix<T, 3, 3>& tensor_parameter)
+{
+    auto mult = tensor_parameter / ( 36 * priv::volume_unsigned(mesh, vol) );
+
+    auto pev = primal_edge_vectors(mesh, vol);
+    auto Ppev = pev;
+    for (auto& p : Ppev)
+        p = mult*p;
+
+    return priv::face_matrix_simplicial_element(pev, Ppev);
+}
+
 
 } // namespace disk
