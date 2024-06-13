@@ -194,6 +194,20 @@ auto offset(const Mesh& msh, const typename Mesh::edge_type& edg)
 }
 
 template<typename T>
+std::array<size_t, 3>
+edge_ids(const simplicial_mesh<T, 3>& msh,
+         const typename simplicial_mesh<T, 3>::surface_type& surf)
+{ //ok
+    auto edgs = edges(msh, surf);
+
+    std::array<size_t, 3> ret;
+    for (size_t i = 0; i < 3; i++)
+        ret[i] = offset(msh, edgs[i]);
+
+    return ret;
+}
+
+template<typename T>
 std::array<size_t, 6>
 edge_ids(const simplicial_mesh<T, 3>& msh,
          const typename simplicial_mesh<T, 3>::volume_type& vol)
@@ -713,12 +727,12 @@ face_matrix_simplicial_element(const std::array<vec3<T>, 6>& pev,
     ret(0,0) =   dot(pev[0], Ppev[0]) + dot(pev[1], Ppev[1]) + dot(pev[2], Ppev[2]);
     ret(1,0) = - dot(pev[3], Ppev[1]) - dot(pev[4], Ppev[2]);
     ret(2,0) = - dot(pev[3], Ppev[0]) + dot(pev[5], Ppev[2]);
-    ret(3,0) = + dot(pev[4], Ppev[0]) - dot(pev[5], Ppev[1]);
+    ret(3,0) = + dot(pev[4], Ppev[0]) + dot(pev[5], Ppev[1]);
 
     ret(0,1) =   ret(1,0);
     ret(1,1) =   dot(pev[0], Ppev[0]) + dot(pev[3], Ppev[3]) + dot(pev[4], Ppev[4]);
     ret(2,1) = - dot(pev[1], Ppev[0]) - dot(pev[5], Ppev[4]);
-    ret(3,1) = + dot(pev[2], Ppev[0]) + dot(pev[3], Ppev[5]);
+    ret(3,1) = + dot(pev[2], Ppev[0]) - dot(pev[3], Ppev[5]);
 
     ret(0,2) =   ret(2,0);
     ret(1,2) =   ret(2,1);

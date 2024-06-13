@@ -47,35 +47,13 @@ int main(int argc, char **argv)
     using CoordT = double;
     using SolT = std::complex<double>;
 
-    /*
-    if (argc != 2)
-    {
-        std::cout << "Please specify file name." << std::endl;
-        return 1;
-    }
-
-    char *meshfile = argv[1];
-
-    typedef disk::simplicial_mesh<CoordT, 3>  mesh_type;
-
-    mesh_type msh;
-    disk::netgen_mesh_loader<CoordT, 3> loader;
-
-    if (!loader.read_mesh(meshfile))
-    {
-        std::cout << "Problem loading mesh." << std::endl;
-        return 1;
-    }
-    loader.populate_mesh(msh);
-    */
-    
     using mesh_type = disk::simplicial_mesh<CoordT, 3>;
 
     mesh_type msh;
     auto mesher = make_simple_mesher(msh);
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 4; i++)
         mesher.refine();
-
+    
     typedef Eigen::SparseMatrix<SolT>  sparse_matrix_type;
     typedef Eigen::Triplet<SolT>       triplet_type;
 
@@ -86,18 +64,19 @@ int main(int argc, char **argv)
     for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++)
     {
         auto fc = *itor;
-        if (msh.boundary_id(fc) == 1 or msh.boundary_id(fc) == 4)
+        if (msh.boundary_id(fc) == 2 or msh.boundary_id(fc) == 5)
             continue;
 
-        auto edgs = edges(msh, fc);
-        dirichlet_edges.at( offset(msh, edgs[0]) ) = true;
-        dirichlet_edges.at( offset(msh, edgs[1]) ) = true;
-        dirichlet_edges.at( offset(msh, edgs[2]) ) = true;
+        auto edgids = edge_ids(msh, fc);
+        assert(edgids.size() == 3);
+        dirichlet_edges.at( edgids[0] ) = true;
+        dirichlet_edges.at( edgids[1] ) = true;
+        dirichlet_edges.at( edgids[2] ) = true;
 
         if (msh.boundary_id(fc) == 0) {
-            source_edges.at( offset(msh, edgs[0]) ) = true;
-            source_edges.at( offset(msh, edgs[1]) ) = true;
-            source_edges.at( offset(msh, edgs[2]) ) = true;
+            source_edges.at( edgids[0] ) = true;
+            source_edges.at( edgids[1] ) = true;
+            source_edges.at( edgids[2] ) = true;
         }
     }
 
@@ -106,8 +85,7 @@ int main(int argc, char **argv)
     size_t system_size = std::count_if(dirichlet_edges.begin(), dirichlet_edges.end(), [](bool d) -> bool {return !d;});
     expand_map.resize( system_size );
 
-    auto nnum = 0;
-    for (size_t i = 0; i < num_all_edges; i++)
+    for (size_t i = 0, nnum = 0; i < num_all_edges; i++)
     {
         if ( dirichlet_edges.at(i) )
             continue;
@@ -120,19 +98,21 @@ int main(int argc, char **argv)
     disk::dynamic_vector<SolT>  gb(system_size), gx(system_size);
     gb = disk::dynamic_vector<SolT>::Zero(system_size);
 
+    double omega = 2*M_PI*300e6;
     disk::vec3<SolT> src = {0.0, 1.0, 0.0};
 
     std::vector<triplet_type>       triplets;
     for (auto& cl : msh)
     {
-        double omega = 2*M_PI*300e6;
         auto C = curl_matrix(msh, cl);
         auto Me = edge_matrix(msh, cl, 1.0*EPS_0);
         auto Mf = face_matrix(msh, cl, 1.0/MU_0);
         Eigen::Matrix<SolT,6,6> maxop = C.transpose() * Mf * C - omega*omega*Me;
 
         auto pev = primal_edge_vectors(msh, cl);
+        auto dav = dual_area_vectors(msh, cl);
 
+        auto edgs = edges(msh, cl);
         auto eids = edge_ids(msh, cl);
 
         for (size_t i = 0; i < maxop.rows(); i++)
@@ -142,10 +122,15 @@ int main(int argc, char **argv)
 
             for (size_t j = 0; j < maxop.cols(); j++)
             {
-                if ( dirichlet_edges.at(eids[j]) ) {
-                    if (source_edges.at(eids[j])) {
-                        gb(compress_map.at(eids[i])) = -maxop(i,j)*src.dot(pev[j]);
-                    } else continue;
+                if ( dirichlet_edges.at(eids[j]) )
+                {
+                    if (source_edges.at(eids[j]))
+                    {
+                        auto gi = compress_map.at(eids[i]);
+                        gb(gi) += -maxop(i,j)*src.dot(pev[j]);
+                    }
+                    
+                    continue;
                 }
 
                 triplets.push_back( triplet_type(compress_map.at(eids[i]),
@@ -153,8 +138,8 @@ int main(int argc, char **argv)
                                                  maxop(i,j)) );
             }
 
-            //auto rhs_val = rhs_fun(pts[i]);
-            //gb(compress_map.at(eids[i])) += rhs_val * vol * 0.25;
+            //auto bar = barycenter(msh, cl);
+            //gb(compress_map.at(eids[i])) += src.dot(dav[i])*std::sin(M_PI*bar.x())*std::sin(M_PI*bar.z());
         }
     }
 
@@ -171,18 +156,62 @@ int main(int argc, char **argv)
     for (size_t i = 0; i < gx.size(); i++)
         sol(expand_map.at(i)) = gx(i);
 
-    disk::silo_database silo;
-    silo.create("maxwell_dga.silo");
-    silo.add_mesh(msh, "mesh");
-    //silo.add_variable("mesh", "u", sol, disk::nodal_variable_t);
+    std::vector<CoordT> ex, ey, ez, emag;
 
     for (auto& cl : msh)
     {
         auto eids = edge_ids(msh, cl);
-        Eigen::Matrix<SolT, 6, 1> locsol;
+        Eigen::Matrix<SolT, 6, 1> locsol = Eigen::Matrix<SolT, 6, 1>::Zero();
         for (int i = 0; i < 6; i++)
             locsol(i) = sol( eids[i] );
+
+        //auto pev = primal_edge_vectors(msh, cl);
+        //for (int i = 0; i < 6; i++)
+        //    locsol(i) = src.dot(pev[i]);
+
+        auto pav = primal_area_vectors(msh, cl);
+        auto vf = 12*volume_signed(msh, cl);
+
+        disk::vec3<SolT> locfield;
+        locfield =  (locsol(0)*pav[1] - locsol(1)*pav[2] + locsol(2)*pav[3])/vf;
+        locfield += (locsol(0)*pav[0] - locsol(3)*pav[2] + locsol(4)*pav[3])/vf;
+        locfield += (locsol(1)*pav[0] - locsol(3)*pav[1] + locsol(5)*pav[3])/vf;
+        locfield += (locsol(2)*pav[0] - locsol(4)*pav[1] + locsol(5)*pav[2])/vf;
+
+        ex.push_back( real(locfield(0)) );
+        ey.push_back( real(locfield(1)) );
+        ez.push_back( real(locfield(2)) );
+        emag.push_back( sqrt(real(locfield.dot(locfield))) );
     }
+
+    SolT ee = 0.0;
+    SolT me = 0.0;
+    for (auto& cl : msh)
+    {
+        auto eids = edge_ids(msh, cl);
+        auto Me = edge_matrix(msh, cl, 1.0*EPS_0);
+        Eigen::Matrix<SolT, 6, 1> Us;
+        for (int i = 0; i < 6; i++)
+            Us(i) = sol( eids[i] );
+        ee += Us.dot(Me*Us);
+
+        auto Mf = face_matrix(msh, cl, 1.0/MU_0);
+        auto C = curl_matrix(msh, cl);
+        Eigen::Matrix<SolT, 4, 1> Phis = C*Us/omega;
+        me += Phis.dot(Mf*Phis);
+    }
+
+    std::cout << "Electric energy: " << ee << std::endl;
+    std::cout << "Magnetic energy: " << me << std::endl;
+
+
+    disk::silo_database silo;
+    silo.create("maxwell_dga.silo");
+    silo.add_mesh(msh, "mesh");
+    silo.add_variable("mesh", "ex", ex, disk::zonal_variable_t);
+    silo.add_variable("mesh", "ey", ey, disk::zonal_variable_t);
+    silo.add_variable("mesh", "ez", ez, disk::zonal_variable_t);
+    silo.add_variable("mesh", "emag", emag, disk::zonal_variable_t);
 
     return 0;
 }

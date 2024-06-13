@@ -55,3 +55,7 @@ add_test(NAME quad_raw_gauss_lobatto COMMAND quad_raw_gauss_lobatto)
 add_executable(simple_meshers_2D_boundary_numbering simple_meshers_2D_boundary_numbering.cpp)
 target_link_libraries(simple_meshers_2D_boundary_numbering ${LINK_LIBS})
 add_test(NAME simple_meshers_2D_boundary_numbering COMMAND simple_meshers_2D_boundary_numbering)
+
+add_executable(dga_matrices dga_matrices.cpp)
+target_link_libraries(dga_matrices ${LINK_LIBS})
+add_test(NAME dga_matrices COMMAND dga_matrices)
