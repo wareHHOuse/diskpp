@@ -366,6 +366,7 @@ std::array<vec3<T>, 4>
 dual_edge_vectors(const simplicial_mesh<T, 3>& mesh,
                   const typename simplicial_mesh<T, 3>::volume_type& vol)
 {
+    throw "fixme";
     typedef typename simplicial_mesh<T, 3>::surface_type surface_type;
     std::array<vec3<T>, 4> ret;
 
@@ -392,7 +393,7 @@ template<typename T>
 std::array<vec3<T>, 6>
 dual_area_vectors(const simplicial_mesh<T, 3>& mesh,
                   const typename simplicial_mesh<T, 3>::volume_type& vol)
-{
+{ //ok
     std::array<vec3<T>, 6> ret;
 
     auto edgs = edges(mesh, vol);
@@ -414,9 +415,9 @@ dual_area_vectors(const simplicial_mesh<T, 3>& mesh,
     T sign = (priv::volume_signed(mesh, vol) < 0) ? -0.5 : 0.5;
 
     ret[0] = priv::cross( (vb-ebs[0]).to_vector(), (fbs[2]-fbs[3]).to_vector() )*sign;
-    ret[1] = priv::cross( (vb-ebs[1]).to_vector(), (fbs[0]-fbs[3]).to_vector() )*sign;
-    ret[2] = priv::cross( (vb-ebs[2]).to_vector(), (fbs[3]-fbs[1]).to_vector() )*sign;
-    ret[3] = priv::cross( (vb-ebs[3]).to_vector(), (fbs[1]-fbs[2]).to_vector() )*sign;
+    ret[1] = priv::cross( (vb-ebs[1]).to_vector(), (fbs[3]-fbs[1]).to_vector() )*sign;
+    ret[2] = priv::cross( (vb-ebs[2]).to_vector(), (fbs[1]-fbs[2]).to_vector() )*sign;
+    ret[3] = priv::cross( (vb-ebs[3]).to_vector(), (fbs[0]-fbs[3]).to_vector() )*sign;
     ret[4] = priv::cross( (vb-ebs[4]).to_vector(), (fbs[2]-fbs[0]).to_vector() )*sign;
     ret[5] = priv::cross( (vb-ebs[5]).to_vector(), (fbs[0]-fbs[1]).to_vector() )*sign;
 
