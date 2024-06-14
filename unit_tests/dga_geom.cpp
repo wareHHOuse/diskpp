@@ -27,12 +27,26 @@ int main(int argc, char **argv)
         Eigen::Matrix<T,3,3> vol1 = Eigen::Matrix<T,3,3>::Zero();
         auto pev = primal_edge_vectors(msh, cl);
         auto dav = dual_area_vectors(msh, cl);
+        for (size_t i = 0; i < 6; i++) {
+            if ( pev[i].dot(dav[i]) < 0 ) {
+                std::cout << "Conflicting orientation" << std::endl;
+                return 1;
+            }
+        }
+        
         for (size_t i = 0; i < 6; i++)
             vol1 += pev[i]*dav[i].transpose();
 
         Eigen::Matrix<T,3,3> vol2 = Eigen::Matrix<T,3,3>::Zero();
         auto pav = primal_area_vectors(msh, cl);
         auto dev = dual_edge_vectors(msh, cl);
+        for (size_t i = 0; i < 4; i++) {
+            if ( pav[i].dot(dev[i]) < 0 ) {
+                std::cout << "Conflicting orientation" << std::endl;
+                return 1;
+            }
+        }
+
         for (size_t i = 0; i < 4; i++)
             vol2 += pav[i]*dev[i].transpose();
 

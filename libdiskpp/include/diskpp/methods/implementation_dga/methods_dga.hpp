@@ -245,8 +245,8 @@ primal_edge_vectors(const simplicial_mesh<T, 3>& mesh,
     assert(pts.size() == 3);
 
     ret[0] = (pts[1] - pts[0]).to_vector();
-    ret[1] = (pts[2] - pts[1]).to_vector();
-    ret[2] = (pts[2] - pts[0]).to_vector();
+    ret[1] = (pts[2] - pts[0]).to_vector();
+    ret[2] = (pts[2] - pts[1]).to_vector();
 
     return ret;
 }

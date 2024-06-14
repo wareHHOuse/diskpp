@@ -36,6 +36,7 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/output/silo.hpp"
+#include "diskpp/solvers/solver.hpp"
 
 #include "mumps.hpp"
 
@@ -51,7 +52,7 @@ int main(int argc, char **argv)
 
     mesh_type msh;
     auto mesher = make_simple_mesher(msh);
-    for (int i = 0; i < 5; i++)
+    for (int i = 0; i < 4; i++)
         mesher.refine();
     
     typedef Eigen::SparseMatrix<SolT>  sparse_matrix_type;
@@ -64,8 +65,8 @@ int main(int argc, char **argv)
     for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++)
     {
         auto fc = *itor;
-        //if (msh.boundary_id(fc) == 2 or msh.boundary_id(fc) == 5)
-        //    continue;
+        if (msh.boundary_id(fc) == 2 or msh.boundary_id(fc) == 5)
+            continue;
 
         auto edgids = edge_ids(msh, fc);
         assert(edgids.size() == 3);
@@ -73,11 +74,11 @@ int main(int argc, char **argv)
         dirichlet_edges.at( edgids[1] ) = true;
         dirichlet_edges.at( edgids[2] ) = true;
 
-        //if (msh.boundary_id(fc) == 0) {
-        //    source_edges.at( edgids[0] ) = true;
-        //    source_edges.at( edgids[1] ) = true;
-        //    source_edges.at( edgids[2] ) = true;
-        //}
+        if (msh.boundary_id(fc) == 0) {
+            source_edges.at( edgids[0] ) = true;
+            source_edges.at( edgids[1] ) = true;
+            source_edges.at( edgids[2] ) = true;
+        }
     }
 
     std::vector<size_t> compress_map, expand_map;
@@ -138,8 +139,8 @@ int main(int argc, char **argv)
                                                  maxop(i,j)) );
             }
 
-            auto bar = barycenter(msh, cl);
-            gb(compress_map.at(eids[i])) += src.dot(dav[i])*std::sin(M_PI*bar.x())*std::sin(M_PI*bar.z());
+            //auto bar = barycenter(msh, cl);
+            //gb(compress_map.at(eids[i])) += (M_PI*M_PI/MU_0 - omega*omega*EPS_0)*src.dot(dav[i])*std::sin(M_PI*bar.x())*std::sin(M_PI*bar.z());
         }
     }
 
@@ -150,7 +151,14 @@ int main(int argc, char **argv)
 
     std::cout << "Running MUMPS" << std::endl;
     gx = mumps_lu(gA, gb);
-    std::cout << gx.norm() << std::endl;
+    
+    //Eigen::SparseLU<Eigen::SparseMatrix<SolT>> solver;
+    //                solver.compute(gA);
+    //                if(solver.info() != Eigen::Success) {
+    //                    std::cout << "SparseLU failed" << std::endl;
+    //                }
+    //                gx = solver.solve(gb);
+    
     disk::dynamic_vector<SolT> sol = disk::dynamic_vector<SolT>::Zero( num_all_edges );
 
     for (size_t i = 0; i < gx.size(); i++)
