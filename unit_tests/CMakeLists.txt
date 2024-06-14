@@ -56,6 +56,10 @@ add_executable(simple_meshers_2D_boundary_numbering simple_meshers_2D_boundary_n
 target_link_libraries(simple_meshers_2D_boundary_numbering ${LINK_LIBS})
 add_test(NAME simple_meshers_2D_boundary_numbering COMMAND simple_meshers_2D_boundary_numbering)
 
+add_executable(dga_geom dga_geom.cpp)
+target_link_libraries(dga_geom ${LINK_LIBS})
+add_test(NAME dga_geom COMMAND dga_geom)
+
 add_executable(dga_matrices dga_matrices.cpp)
 target_link_libraries(dga_matrices ${LINK_LIBS})
 add_test(NAME dga_matrices COMMAND dga_matrices)

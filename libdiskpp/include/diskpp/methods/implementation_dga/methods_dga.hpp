@@ -366,7 +366,6 @@ std::array<vec3<T>, 4>
 dual_edge_vectors(const simplicial_mesh<T, 3>& mesh,
                   const typename simplicial_mesh<T, 3>::volume_type& vol)
 {
-    throw "fixme";
     typedef typename simplicial_mesh<T, 3>::surface_type surface_type;
     std::array<vec3<T>, 4> ret;
 
