@@ -1,5 +1,9 @@
 set(LINK_LIBS diskpp)
 
+add_executable(maxwell_dga src/maxwell_dga.cpp)
+target_link_libraries(maxwell_dga ${LINK_LIBS})
+install(TARGETS maxwell_dga RUNTIME DESTINATION bin)
+
 add_executable(maxwell src/maxwell.cpp)
 target_link_libraries(maxwell ${LINK_LIBS})
 set_target_properties(maxwell PROPERTIES
@@ -10,7 +14,7 @@ install(TARGETS maxwell RUNTIME DESTINATION bin)
 
 add_executable(maxwell_sip_dg src/maxwell_sip_dg.cpp)
 target_link_libraries(maxwell_sip_dg ${LINK_LIBS})
-install(TARGETS maxwell RUNTIME DESTINATION bin)
+install(TARGETS maxwell_sip_dg RUNTIME DESTINATION bin)
 
 add_executable(rectest src/rectest.cpp)
 target_link_libraries(rectest ${LINK_LIBS})
