@@ -55,7 +55,21 @@ struct boundary_condition_descriptor {
 
 #include "poisson_assembler.h"
 
+/* This concept is a workaround to make the code compile under
+ * gcc13+.
+ * The code compiles fine under clang and gcc 12.3.0, however
+ * starting from gcc 13, gcc tries to instantiate Mesh using
+ * complete nonsensical types, including stuff from the STL.
+ * I have no idea of what is happening, but it definitely looks
+ * like some nasty GCC bug. */
 template<typename Mesh>
+concept some_kind_of_mesh = requires {
+    typename Mesh::cell_type;
+    typename Mesh::face_type;
+    Mesh::dimension;
+};
+
+template<some_kind_of_mesh Mesh>
 struct hho_poisson_solver_state
 {
     using mesh_type = Mesh;
