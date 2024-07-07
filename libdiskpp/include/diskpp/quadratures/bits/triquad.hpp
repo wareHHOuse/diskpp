@@ -40,7 +40,7 @@ using vector_t = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 using matrix_t = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
 
 
-matrix_t
+inline matrix_t
 compute_AB(size_t N)
 {
     vector_t A = vector_t::Zero(N+1);
@@ -72,7 +72,7 @@ compute_AB(size_t N)
 
 
 
-matrix_t
+inline matrix_t
 compute_M(size_t N, const matrix_t& ab)
 {
     vector_t s = ab.block(1, 1, N, 1).cwiseSqrt();
@@ -91,7 +91,7 @@ compute_M(size_t N, const matrix_t& ab)
 
 
 
-std::pair<std::pair<vector_t, matrix_t>, std::vector<size_t>>
+inline std::pair<std::pair<vector_t, matrix_t>, std::vector<size_t>>
 compute_eigensolver(const matrix_t& mat)
 {
     size_t N = mat.rows();
@@ -115,7 +115,7 @@ compute_eigensolver(const matrix_t& mat)
 }
 
 
-std::pair<vector_t, vector_t>
+inline std::pair<vector_t, vector_t>
 compute_y(size_t N)
 {
     double eps = 2.2204e-16;
@@ -154,7 +154,7 @@ compute_y(size_t N)
 
 
 
-matrix_t
+inline matrix_t
 quad_weights(size_t N, const vector_t& y,
                 const vector_t& Lp,
                 const std::vector<size_t>& I,
@@ -189,7 +189,7 @@ quad_weights(size_t N, const vector_t& y,
 
 
 
-std::pair<matrix_t, matrix_t>
+inline std::pair<matrix_t, matrix_t>
 quad_points(size_t N, const vector_t& x, const vector_t& y,
             const matrix_t&  v)
 {
@@ -218,7 +218,7 @@ quad_points(size_t N, const vector_t& x, const vector_t& y,
 }
 
 
-std::tuple<vector_t, vector_t, vector_t>
+inline std::tuple<vector_t, vector_t, vector_t>
 triquad(size_t degree, const matrix_t& vertices)
 {
     auto AB = compute_AB(degree);
