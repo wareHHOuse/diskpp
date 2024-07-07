@@ -14,6 +14,8 @@
 #include "diskpp/quadratures/quadrature_point.hpp"
 #include "diskpp/common/simplicial_formula.hpp"
 #include "simplex_gm_rule.hpp"
+#include "diskpp/quadratures/bits/triquad.hpp"
+#include <iomanip>
 
 namespace disk {
 namespace quadrature {
@@ -2600,31 +2602,49 @@ std::vector<quadrature_point<T,DIM>>
 triangle_gauss(size_t degree, const point<T,DIM>& p0, const point<T,DIM>& p1, const point<T,DIM>& p2)
 {
     auto max_degree = sizeof(priv::triangle_gauss_rules)/sizeof(priv::triangle_gauss_rule);
-    if (degree > max_degree)
-        throw std::invalid_argument("Gauss triangle quadrature: degree too high");
-
-    size_t rule_num = (degree == 0) ? 0 : degree - 1;
-    assert(rule_num < max_degree-1);
-
-    auto area = area_triangle_kahan(p0, p1, p2);
-
-    auto num_points = priv::triangle_gauss_rules[rule_num].num_points;
-
+    
     std::vector<quadrature_point<T,DIM>> ret;
-    ret.reserve(num_points);
 
-    auto v0 = p1-p0;
-    auto v1 = p2-p0;
-
-    for (size_t i = 0; i < num_points; i++)
+    if (degree < max_degree)
     {
-        auto& gp = priv::triangle_gauss_rules[rule_num].points[i];
+        size_t rule_num = (degree == 0) ? 0 : degree - 1;
+        assert(rule_num < max_degree-1);
 
-        auto l0 = gp.coords[0];
-        auto l1 = gp.coords[1];
-        auto w = gp.weight;
+        auto area = area_triangle_kahan(p0, p1, p2);
 
-        ret.push_back({p0 + v0*l0 + v1*l1, 2.0*w*area});
+        auto num_points = priv::triangle_gauss_rules[rule_num].num_points;
+
+        ret.reserve(num_points);
+
+        auto v0 = p1-p0;
+        auto v1 = p2-p0;
+
+        for (size_t i = 0; i < num_points; i++)
+        {
+            auto& gp = priv::triangle_gauss_rules[rule_num].points[i];
+
+            auto l0 = gp.coords[0];
+            auto l1 = gp.coords[1];
+            auto w = gp.weight;
+
+            ret.push_back({p0 + v0*l0 + v1*l1, 2.0*w*area});
+        }
+    }
+    else 
+    {
+        Eigen::Matrix<double,3,2> vertices;
+        vertices << p0.x(), p0.y(), p1.x(), p1.y(), p2.x(), p2.y();  
+
+        auto qinfo = triquad(degree, vertices);
+
+        vector_t qX = std::get<0>(qinfo);
+        vector_t qY = std::get<1>(qinfo);
+        vector_t qw = std::get<2>(qinfo);
+
+        ret.reserve(degree*degree);
+
+        for(size_t i = 0; i < qX.size(); i++ )
+            ret.push_back({point<T,DIM>({qX[i], qY[i]}), qw[i]});        
     }
 
     return ret;

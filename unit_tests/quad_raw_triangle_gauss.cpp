@@ -20,7 +20,8 @@ using namespace sgr;
 
 #define THRESH 1e-15
 
-int main(void)
+bool
+test_triangle_gauss()
 {
     using T = double;
 
@@ -80,4 +81,56 @@ int main(void)
     }
 
     return fail;
+}
+
+
+bool
+test_triquad()
+{
+    using T = double;
+
+    point<T,2> p0(-1.0,-1.0);
+    point<T,2> p1( 1.0,-1.0);
+    point<T,2> p2(-1.0, 1.0);
+
+    auto ifun = [](const point<T,2>& pt) {
+        return 2.0*std::pow(pt.x(), 8) + (std::pow(pt.x(), 3) * std::pow(pt.y(), 4));
+    };
+
+    bool fail = false;
+
+    const int max_order = 50;
+    for (int m = 0; m <= max_order; m++)
+    { 
+        size_t order = m;
+        T int_num = 0.0;
+
+        auto qps1 = triangle_gauss(order, p0, p1, p2);
+        for (auto& qp : qps1)
+            int_num += qp.weight() * ifun(qp.point());
+           
+        auto err = std::abs(int_num - 0.4);
+        if (err > THRESH) 
+            std::cout <<  redfg <<  "[FAIL] ";
+        else
+            std::cout <<  Greenfg <<  "[PASS] ";
+
+        std::cout << std::setw(3) << order << " ";
+        std::cout << std::setw(15) << err << "     ";
+        std::cout << std::setw(10) << int_num << "    " << nofg << std::endl;
+        
+        if (err > THRESH) 
+            fail = true;
+    }
+
+    return fail;
+}
+
+
+int main(void)
+{
+    bool fail0 = test_triangle_gauss();
+    bool fail1 = test_triquad();
+
+    return fail0 || fail1; 
 }
