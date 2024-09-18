@@ -45,7 +45,7 @@ template<typename T>
 class StabCoef
 {
   private:
-    T      m_coeff;
+    T m_coeff;
 
   public:
     StabCoef() : m_coeff(T(1)) {}
@@ -69,7 +69,7 @@ class StabCoef
     }
 
     void
-    setValue( const T& value)
+    setValue(const T& value)
     {
         m_coeff = value;
     }
@@ -89,14 +89,14 @@ class StabCoeffManager
 
   public:
     template<typename Mesh>
-    StabCoeffManager(const Mesh& mesh,  const T value)
+    StabCoeffManager(const Mesh& mesh, const T value)
     {
         m_stab_coeff.clear();
         m_stab_coeff.reserve(mesh.cells_size());
         m_stab_coeff_new.clear();
         m_stab_coeff_new.reserve(mesh.cells_size());
 
-        for( auto& cl : mesh )
+        for (auto& cl : mesh)
         {
             m_stab_coeff.push_back(value);
             m_stab_coeff_new.push_back(value);

@@ -83,19 +83,9 @@ if (BUILD_APP_CFEM)
     add_subdirectory(cfem)
 endif()
 
-option(BUILD_APP_FINITE_STRAINS "Build Finite Strains application" ON)
-if (BUILD_APP_FINITE_STRAINS)
-    add_subdirectory(finite_strains)
-endif()
-
 option(BUILD_APP_NSM "Build Non-linear Solid Mechanics applications" ON)
 if (BUILD_APP_NSM)
     add_subdirectory(nonlinear_solid_mechanics)
-endif()
-
-option(BUILD_APP_PLASTICITY "Build plasticity application" ON)
-if (BUILD_APP_PLASTICITY)
-    add_subdirectory(plasticity)
 endif()
 
 option(BUILD_APP_UNST_LAPLACIAN "Build unsteady laplacian application" ON)

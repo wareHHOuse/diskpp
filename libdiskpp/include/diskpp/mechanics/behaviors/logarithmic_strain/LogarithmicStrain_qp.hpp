@@ -125,12 +125,13 @@ class LogarithmicStrain_qp
         }
 
         const auto projector2 = compute_projector_PK2(behavior3D_hpp.first, ev_C.first, ev_C.second, true);
-        const static_tensor<scalar_type, 3> CP2 = ContractedProduct<scalar_type, 3>(behavior3D_hpp.second, projector2.first);
+        const static_tensor<scalar_type, 3> CP2 =
+          ContractedProduct<scalar_type, 3>(behavior3D_hpp.second, projector2.first);
         const static_tensor<scalar_type, 3> C2 =
           ContractedProduct<scalar_type, 3>(transpose<scalar_type, 3>(projector2.first), CP2) + projector2.second;
         const static_matrix_type3D PK2 =
           ContractedProduct<scalar_type, 3>(this->compute_stress3D_T(data), projector2.first);
-        const static_tensor<scalar_type, 3> A   = convertCtoA(C2, PK2, F_curr);
+        const static_tensor<scalar_type, 3> A = convertCtoA(C2, PK2, F_curr);
 
         // std::cout << "dTdE" << std::endl;
         // std::cout << convertTensorNotationMangel<scalar_type, 3>(behavior3D_hpp.second) << std::endl;

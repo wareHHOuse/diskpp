@@ -15,6 +15,7 @@ struct gauss_point {
     double weight;
 };
 
+
 static gauss_point gauss_rule_1[] = {
     {                    0,                    2 }
 };
@@ -285,12 +286,10 @@ static gauss_point gauss_rule_20[] = {
     {    0.993128599185096,    0.017614007139152 }
 };
 
-
 struct gauss_rule {
     size_t          num_entries;
     gauss_point     *points;
 };
-
 
 static struct gauss_rule gauss_rules[] = {
     {  sizeof(gauss_rule_1)/(sizeof(gauss_point)), gauss_rule_1  },
@@ -321,16 +320,16 @@ static struct gauss_rule gauss_rules[] = {
 } // namespace priv
 
 template<typename T>
-std::vector<quadrature_point<T,1>>
+std::vector<quadrature_point<T, 1>>
 gauss_legendre(size_t degree, const T& a, const T& b)
 {
-    const auto num_rules = sizeof(priv::gauss_rules)/sizeof(priv::gauss_rule) - 1;
-    const auto rule_num = degree/2;
+    const auto num_rules = sizeof(priv::gauss_rules) / sizeof(priv::gauss_rule) - 1;
+    const auto rule_num  = degree / 2;
     if (rule_num >= num_rules)
         throw std::invalid_argument("gauss_legendre: order too high");
 
     auto npts = priv::gauss_rules[rule_num].num_entries;
-    std::vector<quadrature_point<T,1>> qps;
+    std::vector<quadrature_point<T, 1>> qps;
     qps.reserve(npts);
     for (size_t i = 0; i < npts; i++) {
         const auto &qp = priv::gauss_rules[rule_num].points[i];
@@ -343,22 +342,23 @@ gauss_legendre(size_t degree, const T& a, const T& b)
 }
 
 template<typename T, size_t DIM>
-std::vector<quadrature_point<T,DIM>>
-gauss_legendre(size_t degree, const point<T,DIM>& a, const point<T,DIM>& b)
+std::vector<quadrature_point<T, DIM>>
+gauss_legendre(size_t degree, const point<T, DIM>& a, const point<T, DIM>& b)
 {
-    const auto num_rules = sizeof(priv::gauss_rules)/sizeof(priv::gauss_rule) - 1;
-    const auto rule_num = degree/2;
+    const auto num_rules = sizeof(priv::gauss_rules) / sizeof(priv::gauss_rule) - 1;
+    const auto rule_num  = degree / 2;
     if (rule_num >= num_rules)
         throw std::invalid_argument("gauss_legendre: order too high");
 
     const auto& qrule = priv::gauss_rules[rule_num];
-    auto npts = qrule.num_entries;
-    std::vector<quadrature_point<T,DIM>> qps;
+    auto npts  = qrule.num_entries;
+    std::vector<quadrature_point<T, DIM>> qps;
     qps.reserve(npts);
-    for (size_t i = 0; i < npts; i++) {
-        const auto &qp = qrule.points[i];
-        auto tr_qp = 0.5 * (a + b) + 0.5 * (b - a) * qp.point;
-        auto tr_qw = 0.5 * distance(a,b) * qp.weight;
+    for (size_t i = 0; i < npts; i++)
+    {
+        const auto& qp    = qrule.points[i];
+        auto        tr_qp = 0.5 * (a + b) + 0.5 * (b - a) * qp.point;
+        auto        tr_qw = 0.5 * distance(a, b) * qp.weight;
         qps.push_back({tr_qp, tr_qw});
     }
 
@@ -366,57 +366,57 @@ gauss_legendre(size_t degree, const point<T,DIM>& a, const point<T,DIM>& b)
 }
 
 template<typename T>
-std::vector<quadrature_point<T,2>>
-tensorized_gauss_legendre(size_t degree, const point<T,2>& p0,
-    const point<T,2>& p1, const point<T,2>& p2, const point<T,2>& p3)
+std::vector<quadrature_point<T, 2>>
+tensorized_gauss_legendre(size_t             degree,
+                          const point<T, 2>& p0,
+                          const point<T, 2>& p1,
+                          const point<T, 2>& p2,
+                          const point<T, 2>& p3)
 {
-    const auto num_rules = sizeof(priv::gauss_rules)/sizeof(priv::gauss_rule) - 1;
-    const auto rule_num = degree/2;
+    const auto num_rules = sizeof(priv::gauss_rules) / sizeof(priv::gauss_rule) - 1;
+    const auto rule_num  = degree / 2;
     if (rule_num >= num_rules)
         throw std::invalid_argument("tensorized_gauss_legendre: order too high");
 
     const auto& qrule = priv::gauss_rules[rule_num];
 
-    auto npts = qrule.num_entries;
-    std::vector<quadrature_point<T,2>> qps;
-    qps.reserve(npts*npts); /* Collect the points in the [-1, 1]^2 square */
-    for (size_t i = 0; i < npts; i++) {
-        const auto &qpy = qrule.points[i];
-        for (size_t j = 0; j < npts; j++) {
-            const auto &qpx = qrule.points[j];
-            point<T,2> qp(qpx.point, qpy.point);
-            auto qw = qpx.weight * qpy.weight;
+    auto                                npts = qrule.num_entries;
+    std::vector<quadrature_point<T, 2>> qps;
+    qps.reserve(npts * npts); /* Collect the points in the [-1, 1]^2 square */
+    for (size_t i = 0; i < npts; i++)
+    {
+        const auto& qpy = qrule.points[i];
+        for (size_t j = 0; j < npts; j++)
+        {
+            const auto& qpx = qrule.points[j];
+            point<T, 2> qp(qpx.point, qpy.point);
+            auto        qw = qpx.weight * qpy.weight;
             qps.push_back({qp, qw});
         }
     }
 
     /* points in pts must be in _counterclockwise_ order */
-    auto X = [&](T xi, T eta) -> T {
-        return 0.25 * p0.x() * (1 - xi) * (1 - eta) +
-               0.25 * p1.x() * (1 + xi) * (1 - eta) +
-               0.25 * p2.x() * (1 + xi) * (1 + eta) +
-               0.25 * p3.x() * (1 - xi) * (1 + eta);
+    auto X = [&](T xi, T eta) -> T
+    {
+        return 0.25 * p0.x() * (1 - xi) * (1 - eta) + 0.25 * p1.x() * (1 + xi) * (1 - eta) +
+               0.25 * p2.x() * (1 + xi) * (1 + eta) + 0.25 * p3.x() * (1 - xi) * (1 + eta);
     };
 
-    auto Y = [&](T xi, T eta) -> T {
-        return 0.25 * p0.y() * (1 - xi) * (1 - eta) +
-               0.25 * p1.y() * (1 + xi) * (1 - eta) +
-               0.25 * p2.y() * (1 + xi) * (1 + eta) +
-               0.25 * p3.y() * (1 - xi) * (1 + eta);
+    auto Y = [&](T xi, T eta) -> T
+    {
+        return 0.25 * p0.y() * (1 - xi) * (1 - eta) + 0.25 * p1.y() * (1 + xi) * (1 - eta) +
+               0.25 * p2.y() * (1 + xi) * (1 + eta) + 0.25 * p3.y() * (1 - xi) * (1 + eta);
     };
 
-    auto J = [&](T xi, T eta) -> T {
-        auto j11 = 0.25 * ( (p1.x() - p0.x()) * (1 - eta) +
-                            (p2.x() - p3.x()) * (1 + eta) );
+    auto J = [&](T xi, T eta) -> T
+    {
+        auto j11 = 0.25 * ((p1.x() - p0.x()) * (1 - eta) + (p2.x() - p3.x()) * (1 + eta));
 
-        auto j12 = 0.25 * ( (p1.y() - p0.y()) * (1 - eta) +
-                            (p2.y() - p3.y()) * (1 + eta) );
+        auto j12 = 0.25 * ((p1.y() - p0.y()) * (1 - eta) + (p2.y() - p3.y()) * (1 + eta));
 
-        auto j21 = 0.25 * ( (p3.x() - p0.x()) * (1 - xi) +
-                            (p2.x() - p1.x()) * (1 + xi) );
+        auto j21 = 0.25 * ((p3.x() - p0.x()) * (1 - xi) + (p2.x() - p1.x()) * (1 + xi));
 
-        auto j22 = 0.25 * ( (p3.y() - p0.y()) * (1 - xi) +
-                            (p2.y() - p1.y()) * (1 + xi) );
+        auto j22 = 0.25 * ((p3.y() - p0.y()) * (1 - xi) + (p2.y() - p1.y()) * (1 + xi));
 
         return std::abs(j11 * j22 - j12 * j21);
     };
@@ -427,19 +427,204 @@ tensorized_gauss_legendre(size_t degree, const point<T,2>& p0,
         const T xi  = qp.point().x();
         const T eta = qp.point().y();
 
-        point<T,2> phys_point(X(xi, eta), Y(xi, eta));
-        const T phys_weight = qp.weight() * J(xi, eta);
-        qp = disk::make_qp(phys_point, phys_weight);
+        point<T, 2> phys_point(X(xi, eta), Y(xi, eta));
+        const T     phys_weight = qp.weight() * J(xi, eta);
+        qp                      = disk::make_qp(phys_point, phys_weight);
     }
 
     return qps;
 }
 
 template<typename T>
-std::vector<quadrature_point<T,2>>
-tensorized_gauss_legendre(size_t degree, const std::array<point<T,2>, 4>& pts)
+std::vector<quadrature_point<T, 2>>
+tensorized_gauss_legendre(const size_t degree, const std::array<point<T, 2>, 4>& pts)
 {
     return tensorized_gauss_legendre(degree, pts[0], pts[1], pts[2], pts[3]);
+}
+
+template<typename T>
+std::vector<quadrature_point<T, 3>>
+tensorized_gauss_legendre(size_t             degree,
+                          const point<T, 3>& p0,
+                          const point<T, 3>& p1,
+                          const point<T, 3>& p2,
+                          const point<T, 3>& p3)
+{
+    const auto num_rules = sizeof(priv::gauss_rules) / sizeof(priv::gauss_rule) - 1;
+    const auto rule_num  = degree / 2;
+    if (rule_num >= num_rules)
+        throw std::invalid_argument("tensorized_gauss_legendre: order too high");
+
+    const auto& qrule = priv::gauss_rules[rule_num];
+
+    auto                                npts = qrule.num_entries;
+    std::vector<quadrature_point<T, 2>> qps_2d;
+    qps_2d.reserve(npts * npts); /* Collect the points in the [-1, 1]^2 square */
+    for (size_t i = 0; i < npts; i++)
+    {
+        const auto& qpy = qrule.points[i];
+        for (size_t j = 0; j < npts; j++)
+        {
+            const auto& qpx = qrule.points[j];
+            point<T, 2> qp(qpx.point, qpy.point);
+            auto        qw = qpx.weight * qpy.weight;
+            qps_2d.push_back({qp, qw});
+        }
+    }
+
+    const auto v0    = (p1 - p0) / T(2);
+    const auto v1    = (p3 - p0) / T(2);
+    const T    meas4 = v0.to_vector().norm()*v1.to_vector().norm();
+
+    const auto bar = (p0 + p1 + p2 + p3) / T(4);
+
+    /* do ref->phys transform in place */
+    std::vector<quadrature_point<T, 3>> qps;
+    qps.reserve(qps_2d.size());
+    for (auto& qp : qps_2d)
+    {
+        const auto qpc    = qp.point();
+        const auto point  = v0 * qpc.x() + v1 * qpc.y() + bar;
+        const auto weight = qp.weight() * meas4;
+        qps.push_back(disk::make_qp(point, weight));
+    }
+
+    return qps;
+}
+
+template<typename T>
+std::vector<disk::quadrature_point<T, 3>>
+tensorized_gauss_legendre(const size_t degree, const std::array<point<T, 3>, 8>& pts)
+{
+    const auto num_rules = sizeof(priv::gauss_rules) / sizeof(priv::gauss_rule) - 1;
+    const auto rule_num  = degree / 2;
+    if (rule_num >= num_rules)
+        throw std::invalid_argument("gauss_legendre: order too high");
+
+    const auto&                           qrule = priv::gauss_rules[rule_num];
+    auto                                  npts  = qrule.num_entries;
+    std::vector<quadrature_point<T, 1>> qps;
+    qps.reserve(npts);
+    for (size_t i = 0; i < npts; i++)
+    {
+        const auto& qp    = qrule.points[i];
+        qps.push_back({qp.point, qp.weight});
+    }
+
+    // std::cout << "deg:" << degree << " nb : " << 3 * qps.size() << std::endl;
+
+    std::vector<disk::quadrature_point<T, 3>> ret;
+    ret.reserve(3 * qps.size());
+
+    auto P = [&pts](T xi, T eta, T zeta) -> T
+    {
+        const T val = pts[0].x() * (1 - xi) * (1 - eta) * (1 - zeta) + pts[1].x() * (1 + xi) * (1 - eta) * (1 - zeta) +
+                      pts[2].x() * (1 + xi) * (1 + eta) * (1 - zeta) + pts[3].x() * (1 - xi) * (1 + eta) * (1 - zeta) +
+                      pts[4].x() * (1 - xi) * (1 - eta) * (1 + zeta) + pts[5].x() * (1 + xi) * (1 - eta) * (1 + zeta) +
+                      pts[6].x() * (1 + xi) * (1 + eta) * (1 + zeta) + pts[7].x() * (1 - xi) * (1 + eta) * (1 + zeta);
+        return T(0.125) * val;
+    };
+
+    auto Q = [&pts](T xi, T eta, T zeta) -> T
+    {
+        const T val = pts[0].y() * (1 - xi) * (1 - eta) * (1 - zeta) + pts[1].y() * (1 + xi) * (1 - eta) * (1 - zeta) +
+                      pts[2].y() * (1 + xi) * (1 + eta) * (1 - zeta) + pts[3].y() * (1 - xi) * (1 + eta) * (1 - zeta) +
+                      pts[4].y() * (1 - xi) * (1 - eta) * (1 + zeta) + pts[5].y() * (1 + xi) * (1 - eta) * (1 + zeta) +
+                      pts[6].y() * (1 + xi) * (1 + eta) * (1 + zeta) + pts[7].y() * (1 - xi) * (1 + eta) * (1 + zeta);
+        return T(0.125) * val;
+    };
+
+    auto R = [&pts](T xi, T eta, T zeta) -> T
+    {
+        const T val = pts[0].z() * (1 - xi) * (1 - eta) * (1 - zeta) + pts[1].z() * (1 + xi) * (1 - eta) * (1 - zeta) +
+                      pts[2].z() * (1 + xi) * (1 + eta) * (1 - zeta) + pts[3].z() * (1 - xi) * (1 + eta) * (1 - zeta) +
+                      pts[4].z() * (1 - xi) * (1 - eta) * (1 + zeta) + pts[5].z() * (1 + xi) * (1 - eta) * (1 + zeta) +
+                      pts[6].z() * (1 + xi) * (1 + eta) * (1 + zeta) + pts[7].z() * (1 - xi) * (1 + eta) * (1 + zeta);
+        return T(0.125) * val;
+    };
+
+    auto J = [&pts](T xi, T eta, T zeta) -> T
+    {
+        static_matrix<T, 3, 3> Jac = static_matrix<T, 3, 3>::Zero();
+        Jac(0, 0)                  = -pts[0].x() * (1 - eta) * (1 - zeta) + pts[1].x() * (1 - eta) * (1 - zeta) +
+                    pts[2].x() * (1 + eta) * (1 - zeta) - pts[3].x() * (1 + eta) * (1 - zeta) -
+                    pts[4].x() * (1 - eta) * (1 + zeta) + pts[5].x() * (1 - eta) * (1 + zeta) +
+                    pts[6].x() * (1 + eta) * (1 + zeta) - pts[7].x() * (1 + eta) * (1 + zeta);
+
+        Jac(0, 1) = -pts[0].y() * (1 - eta) * (1 - zeta) + pts[1].y() * (1 - eta) * (1 - zeta) +
+                    pts[2].y() * (1 + eta) * (1 - zeta) - pts[3].y() * (1 + eta) * (1 - zeta) -
+                    pts[4].y() * (1 - eta) * (1 + zeta) + pts[5].y() * (1 - eta) * (1 + zeta) +
+                    pts[6].y() * (1 + eta) * (1 + zeta) - pts[7].y() * (1 + eta) * (1 + zeta);
+
+        Jac(0, 2) = -pts[0].z() * (1 - eta) * (1 - zeta) + pts[1].z() * (1 - eta) * (1 - zeta) +
+                    pts[2].z() * (1 + eta) * (1 - zeta) - pts[3].z() * (1 + eta) * (1 - zeta) -
+                    pts[4].z() * (1 - eta) * (1 + zeta) + pts[5].z() * (1 - eta) * (1 + zeta) +
+                    pts[6].z() * (1 + eta) * (1 + zeta) - pts[7].z() * (1 + eta) * (1 + zeta);
+
+        Jac(1, 0) = -pts[0].x() * (1 - xi) * (1 - zeta) - pts[1].x() * (1 + xi) * (1 - zeta) +
+                    pts[2].x() * (1 + xi) * (1 - zeta) + pts[3].x() * (1 - xi) * (1 - zeta) -
+                    pts[4].x() * (1 - xi) * (1 + zeta) - pts[5].x() * (1 + xi) * (1 + zeta) +
+                    pts[6].x() * (1 + xi) * (1 + zeta) + pts[7].x() * (1 - xi) * (1 + zeta);
+
+        Jac(1, 1) = -pts[0].y() * (1 - xi) * (1 - zeta) - pts[1].y() * (1 + xi) * (1 - zeta) +
+                    pts[2].y() * (1 + xi) * (1 - zeta) + pts[3].y() * (1 - xi) * (1 - zeta) -
+                    pts[4].y() * (1 - xi) * (1 + zeta) - pts[5].y() * (1 + xi) * (1 + zeta) +
+                    pts[6].y() * (1 + xi) * (1 + zeta) + pts[7].y() * (1 - xi) * (1 + zeta);
+
+        Jac(1, 2) = -pts[0].z() * (1 - xi) * (1 - zeta) - pts[1].z() * (1 + xi) * (1 - zeta) +
+                    pts[2].z() * (1 + xi) * (1 - zeta) + pts[3].z() * (1 - xi) * (1 - zeta) -
+                    pts[4].z() * (1 - xi) * (1 + zeta) - pts[5].z() * (1 + xi) * (1 + zeta) +
+                    pts[6].z() * (1 + xi) * (1 + zeta) + pts[7].z() * (1 - xi) * (1 + zeta);
+
+        Jac(2, 0) = -pts[0].x() * (1 - xi) * (1 - eta) - pts[1].x() * (1 + xi) * (1 - eta) -
+                    pts[2].x() * (1 + xi) * (1 + eta) - pts[3].x() * (1 - xi) * (1 + eta) +
+                    pts[4].x() * (1 - xi) * (1 - eta) + pts[5].x() * (1 + xi) * (1 - eta) +
+                    pts[6].x() * (1 + xi) * (1 + eta) + pts[7].x() * (1 - xi) * (1 + eta);
+
+        Jac(2, 1) = -pts[0].y() * (1 - xi) * (1 - eta) - pts[1].y() * (1 + xi) * (1 - eta) -
+                    pts[2].y() * (1 + xi) * (1 + eta) - pts[3].y() * (1 - xi) * (1 + eta) +
+                    pts[4].y() * (1 - xi) * (1 - eta) + pts[5].y() * (1 + xi) * (1 - eta) +
+                    pts[6].y() * (1 + xi) * (1 + eta) + pts[7].y() * (1 - xi) * (1 + eta);
+
+        Jac(2, 2) = -pts[0].z() * (1 - xi) * (1 - eta) - pts[1].z() * (1 + xi) * (1 - eta) -
+                    pts[2].z() * (1 + xi) * (1 + eta) - pts[3].z() * (1 - xi) * (1 + eta) +
+                    pts[4].z() * (1 - xi) * (1 - eta) + pts[5].z() * (1 + xi) * (1 - eta) +
+                    pts[6].z() * (1 + xi) * (1 + eta) + pts[7].z() * (1 - xi) * (1 + eta);
+
+        Jac *= T(0.125);
+        return std::abs(Jac.determinant());
+    };
+
+    for (auto& qp_x : qps)
+    {
+        const auto xi = qp_x.point().x();
+        const auto w_x   = qp_x.weight();
+        for (auto& qp_y : qps)
+        {
+            const auto eta   = qp_y.point().x();
+            const auto w_y   = qp_y.weight();
+            for (auto& qp_z : qps)
+            {
+                const auto zeta  = qp_z.point().x();
+                const auto w_z   = qp_z.weight();
+
+                const auto px = P(xi, eta, zeta);
+                const auto py = Q(xi, eta, zeta);
+                const auto pz = R(xi, eta, zeta);
+
+                // std::cout << xi << " " << px << std::endl;
+                // std::cout << eta << " " << py << std::endl;
+                // std::cout << zeta << " " << pz << std::endl;
+                // std::cout << J(xi, eta, zeta) << std::endl;
+
+                const auto w = w_x * w_y * w_z * J(xi, eta, zeta);
+
+                ret.push_back(disk::make_qp(point<T, 3>({px, py, pz}), w));
+            }
+        }
+    }
+
+    return ret;
 }
 
 } // namespace disk::quadrature

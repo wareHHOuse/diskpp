@@ -17,7 +17,7 @@
  *
  * This file is copyright of the following authors:
  * Matteo Cicuttin (C) 2016, 2017, 2018         matteo.cicuttin@enpc.fr
- * Nicolas Pignet  (C) 2018                     nicolas.pignet@enpc.fr
+ * Nicolas Pignet  (C) 2018, 2024               nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -35,16 +35,16 @@
 
 #pragma once
 
-
 #include "diskpp/geometry/geometry.hpp"
 #include "quad_bones.hpp"
 
-namespace disk {
+namespace disk
+{
 
 /**
  * @brief Compute a quadrature of order "degree" in the physical space of the specified element
- * Thic function is the genric function which leads to a static assertion. For each type of mesh and elements, a specialization has to exist
- * which is chosen at the compilatation time
+ * Thic function is the genric function which leads to a static assertion. For each type of mesh and elements, a
+ * specialization has to exist which is chosen at the compilatation time
  *
  * @tparam MeshType type of the mesh
  * @tparam Element  type of the element
@@ -63,7 +63,6 @@ integrate(const MeshType& msh, const Element& elem, const size_t degree)
 
 } // namespace disk
 
-#include "bits/quad_phys_simplicial.hpp"
-#include "quad_hexahedral.hpp"
+#include "bits/quad_phys_cartesian.hpp"
 #include "bits/quad_phys_generic.hpp"
-
+#include "bits/quad_phys_simplicial.hpp"
