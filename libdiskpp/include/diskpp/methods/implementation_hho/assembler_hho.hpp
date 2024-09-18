@@ -700,7 +700,7 @@ class stokes_assembler
                 if (asm_map[j].assemble())
                     triplets.push_back(Triplet<T>(asm_map[i], asm_map[j], lhs_A(i, j)));
                 else
-                    RHS(asm_map[i]) -= lhs_A(i, j) * dirichlet_data(j);
+                    RHS[asm_map[i]] -= lhs_A(i, j) * dirichlet_data(j);
             }
         }
 
@@ -1104,7 +1104,7 @@ class stokes_assembler_alg
                 if (asm_map[j].assemble())
                     triplets.push_back(Triplet<T>(asm_map[i], asm_map[j], lhs_A(i, j)));
                 else
-                    RHS_DIRICHLET(asm_map[i]) -= lhs_A(i, j) * dirichlet_data(j);
+                    RHS_DIRICHLET[asm_map[i]] -= lhs_A(i, j) * dirichlet_data(j);
             }
         }
 
@@ -1178,7 +1178,7 @@ class stokes_assembler_alg
             if (!asm_map[i].assemble())
                 continue;
 
-            RHS(asm_map[i]) += rhs(i);
+            RHS[asm_map[i]] += rhs(i);
         }
     } // assemble_alg()
 

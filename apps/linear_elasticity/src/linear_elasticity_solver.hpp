@@ -175,8 +175,8 @@ class linear_elasticity_solver
         for (auto& cl : m_msh)
         {
             tc.tic();
-            const auto sgr = make_vector_hho_symmetric_laplacian(m_msh, cl, m_hdi);
-            const auto sg  = make_matrix_symmetric_gradrec(m_msh, cl, m_hdi);
+            const auto sgr = disk::make_vector_hho_symmetric_laplacian(m_msh, cl, m_hdi);
+            const auto sg  = disk::make_matrix_hho_symmetric_gradrec(m_msh, cl, m_hdi);
             tc.toc();
             ai.time_gradrec += tc.elapsed();
 
