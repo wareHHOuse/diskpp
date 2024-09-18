@@ -30,4 +30,14 @@ IterMax
 10
 Epsilon
 1.0E-6
+Theta
+1.0
+Gamma0
+100
+Friction
+NO
+Threshold
+100
+Dynamic
+False
 EndParameters

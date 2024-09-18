@@ -79,19 +79,6 @@ template<typename T>
 using eigen_compatible_stdvector = std::vector<T, Eigen::aligned_allocator<T>>;
 
 template<typename T>
-static_vector<T, 3>
-cross(const static_vector<T, 2>& v1, const static_vector<T, 2>& v2)
-{
-    static_vector<T, 3> ret;
-
-    ret(0) = T(0);
-    ret(1) = T(0);
-    ret(2) = v1(0)*v2(1) - v1(1)*v2(0);
-
-    return ret;
-}
-
-template<typename T>
 class eigen_sparse_raw
 {
     bool m_one_based, m_already_restored;

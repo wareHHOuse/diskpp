@@ -34,11 +34,11 @@ class AssemblyInfo
     size_t m_linear_system_size;
     double m_time_assembly;
     double m_time_gradrec, m_time_statcond, m_time_stab, m_time_postpro;
-    double m_time_elem, m_time_law, m_time_contact;
+    double m_time_elem, m_time_law, m_time_contact, m_time_dyna;
 
     AssemblyInfo() :
       m_linear_system_size(0), m_time_assembly(0.0), m_time_gradrec(0.0), m_time_statcond(0.0), m_time_stab(0.0),
-      m_time_elem(0.0), m_time_law(0.0), m_time_contact(0.0), m_time_postpro(0.0)
+      m_time_elem(0.0), m_time_law(0.0), m_time_contact(0.0), m_time_postpro(0.0), m_time_dyna(0.0)
     {
     }
 
@@ -53,6 +53,7 @@ class AssemblyInfo
         m_time_elem += other.m_time_elem;
         m_time_law += other.m_time_law;
         m_time_contact += other.m_time_contact;
+        m_time_dyna += other.m_time_dyna;
         m_time_postpro += other.m_time_postpro;
         return *this;
     }
@@ -105,6 +106,7 @@ class NewtonSolverInfo
         std::cout << "****** Mechanical computation: " << m_assembly_info.m_time_elem << " sec" << std::endl;
         std::cout << "       *** Behavior computation: " << m_assembly_info.m_time_law << " sec" << std::endl;
         std::cout << "       *** Contact computation: " << m_assembly_info.m_time_contact << " sec" << std::endl;
+        std::cout << "       *** Dynamic computation: " << m_assembly_info.m_time_dyna << " sec" << std::endl;
         std::cout << "****** Static condensation: " << m_assembly_info.m_time_statcond << " sec" << std::endl;
         std::cout << "****** Postprocess time: " << m_assembly_info.m_time_postpro << " sec" << std::endl;
         std::cout << "**** Solver time: " << m_solve_info.m_time_solve << " sec" << std::endl;
@@ -147,6 +149,8 @@ class SolverInfo
         std::cout << "       *** Behavior computation: " << m_newton_info.m_assembly_info.m_time_law << " sec"
                   << std::endl;
         std::cout << "       *** Contact computation: " << m_newton_info.m_assembly_info.m_time_contact << " sec"
+                  << std::endl;
+        std::cout << "       *** Dynamic computation: " << m_newton_info.m_assembly_info.m_time_dyna << " sec"
                   << std::endl;
         std::cout << "****** Static condensation: " << m_newton_info.m_assembly_info.m_time_statcond << " sec"
                   << std::endl;
