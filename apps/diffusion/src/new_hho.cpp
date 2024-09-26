@@ -100,7 +100,7 @@ diffusion_solver(const Mesh& msh, size_t degree)
     for (auto& cl : msh)
     {
         auto [R, A] = local_operator(msh, cl, di);
-        auto S = local_stabilization(msh, cl, di, R);   
+        auto S = local_stabilization(msh, cl, di, R);
 
         disk::dynamic_matrix<T> lhs = A+S;
     
@@ -120,6 +120,7 @@ diffusion_solver(const Mesh& msh, size_t degree)
 
     tc.tic();
     disk::dynamic_vector<T> sol = mumps_lu(assm.LHS, assm.RHS);
+
     std::cout << "Solver time: " << tc.toc() << std::endl;
 
     std::vector<T> u_data;
@@ -131,6 +132,7 @@ diffusion_solver(const Mesh& msh, size_t degree)
     {
         auto [R, A] = local_operator(msh, cl, di);
         auto S = local_stabilization(msh, cl, di, R);       
+
 
         disk::dynamic_matrix<T> lhs = A+S;
 
@@ -162,17 +164,13 @@ int main(int argc, char **argv)
 {
     using T = double;
 
-    using mesh_type = disk::simplicial_mesh<T,3>;
-    mesh_type msh;
-    using point_type = typename mesh_type::point_type;
-    auto mesher = disk::make_simple_mesher(msh);
-
+    std::string mesh_filename;
 
     int num_refs = 0;
     int degree = 1;
 
     int ch;
-    while ( (ch = getopt(argc, argv, "k:r:")) != -1 )
+    while ( (ch = getopt(argc, argv, "k:r:m:")) != -1 )
     {
         switch(ch)
         {
@@ -188,9 +186,9 @@ int main(int argc, char **argv)
                     num_refs = 0;
                 break;
 
-            //case 'm':
-            //    mesh_filename = optarg;
-            //    break;
+            case 'm':
+                mesh_filename = optarg;
+                break;
 
             case '?':
             default:
@@ -199,6 +197,23 @@ int main(int argc, char **argv)
         }
     }
 
+    if (mesh_filename != "") {
+        disk::generic_mesh<T,2> msh_2D_fromfile;
+        load_single_element_csv(msh_2D_fromfile, mesh_filename);
+        diffusion_solver(msh_2D_fromfile, degree);
+        return 0;
+    }
+
+    using mesh_type = disk::cartesian_mesh<T,2>;
+    mesh_type msh;
+    auto mesher = disk::make_simple_mesher(msh);
+    for (auto r = 0; r < num_refs; r++)
+        mesher.refine();
+
+    diffusion_solver(msh, degree);
+    return 0;
+
+    #if 0
     timecounter tc;
     tc.tic();
     for (auto r = 0; r < num_refs; r++)
@@ -217,6 +232,6 @@ int main(int argc, char **argv)
     disk::load_mesh_netgen<T>(mesh_filename, msh);
     */
     diffusion_solver(msh, degree);
-
+    #endif
     return 0;
 }

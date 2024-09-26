@@ -171,6 +171,7 @@ diameter(const Mesh& msh, const Element& elem)
     return diam;
 }
 
+/* Compute the width in all directions of the bounding box of an element */
 template<typename Mesh, typename Element>
 static_vector<typename Mesh::coordinate_type, Mesh::dimension>
 diameters(const Mesh& msh, const Element& elem)
@@ -190,6 +191,26 @@ diameters(const Mesh& msh, const Element& elem)
     }
 
     return retv;
+}
+
+/* Compute the barycenter of the bounding box of an element */
+template<typename Mesh, typename Element>
+auto
+bb_barycenter(const Mesh& msh, const Element& elem)
+{
+    const auto pts = points(msh, elem);
+    auto ptmin = pts[0];
+    auto ptmax = pts[0];
+
+    for (size_t i = 1; i < pts.size(); i++) {
+        const auto& curpt = pts[i];
+        for (size_t j = 0; j < Mesh::dimension; j++) {
+            ptmin[j] = std::min(ptmin[j], curpt[j]);
+            ptmax[j] = std::max(ptmax[j], curpt[j]);
+        }
+    }
+
+    return (ptmin + ptmax) / 2.0;
 }
 
 /**

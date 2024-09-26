@@ -5,6 +5,8 @@
 #include "diskpp/bases/bases_new.hpp"
 #include "diskpp/bases/bases_operations.hpp"
 #include "diskpp/bases/bases.hpp"
+#include "diskpp/output/silo.hpp"
+#include "diskpp/common/timecounter.hpp"
 
 #include "sgr.hpp"
 
@@ -32,11 +34,12 @@ void test_conditioning(const Mesh& msh, double scalefactor,
     using cell_monomial_basis = scalar_monomial<mesh_type, cell_type, ScalT>;
     
     std::cout << Bgreenfg << "Scale factor = " << scalefactor << reset << std::endl;
-    for (size_t degree = 1; degree < 3; degree++)
+    for (size_t degree = 1; degree < 4; degree++)
     {
         std::cout << Bon << "  Degree " << degree << Boff << std::endl;  
         for (auto& cl : msh)
         {
+            std::cout << diameters(msh, cl).transpose() << std::endl;
             cell_monomial_basis phi(msh, cl, degree, rs);
             phi.scalefactor(scalefactor);
 
@@ -51,33 +54,60 @@ void test_conditioning(const Mesh& msh, double scalefactor,
             auto stiff_nc = stiff.bottomRightCorner(n,n).eval();
             std::cout << "stiff cond: " << cond(stiff_nc) << nofg << std::endl;
 
-            std::cout << mass << std::endl;
-            std::cout << "  Diameter " << diameter(msh, cl) << std::endl;
+            std::cout << stiff << std::endl;
+            //std::cout << "  Diameter " << diameter(msh, cl) << std::endl;
         }
     }
 }
 
-/*
-template<typename Mesh>
-void cmm(const Mesh& msh)
+#if 0
+int main2(int argc, char **argv)
 {
-    auto degree = 2;
+    using T = double;
+
+    disk::simplicial_mesh<T,3> msh;
+    auto mesher = make_simple_mesher(msh);
+    for (size_t i = 0; i < 5; i++)
+        mesher.refine();
+
+    std::cout << msh.cells_size() << std::endl;
+    
+    
+    using mesh_type = disk::simplicial_mesh<T,3>;
+    using cell_type = typename mesh_type::cell_type;
+    using face_type = typename mesh_type::face_type;
+    using ScalT = double;
+    using cell_monomial_basis = scalar_monomial<mesh_type, cell_type, ScalT>;
+    
+    timecounter tc;
+    
+    disk::dynamic_matrix<T> V = disk::dynamic_matrix<T>::Random(56,74);
+    Eigen::DiagonalMatrix<T, Eigen::Dynamic> A(74);
+
+    tc.tic();
     for (auto& cl : msh) {
-        const auto cb = make_scalar_monomial_basis(msh, cl, degree);
-        disk::dynamic_matrix<double> H2 =
-            disk::dynamic_matrix<double>::Zero(cb.size(), cb.size());
-        const auto qps = integrate(msh, cl, 2 * degree);
-        for (auto& qp : qps) {
-            const auto phi = cb.eval_functions(qp.point());
-            H2 += qp.weight() * phi * phi.transpose();
-        }
-        std::cout << "****** H2 ******" << std::endl;
-        std::cout << H2 << std::endl;
-        std::cout << yellowfg << "  H2 cond: " << cond(H2) << std::endl;
-        std::cout << "  Diameter " << diameter(msh, cl) << std::endl;
+        //cell_monomial_basis phi(msh, cl, 5);
+        disk::dynamic_matrix<T> mass = V*A*V.transpose();
     }
+    std::cout << tc.toc() << std::endl;
+
+    tc.tic();
+    for (auto& cl : msh) {
+        cell_monomial_basis phi(msh, cl, 5);
+        disk::dynamic_matrix<T> mass = integrate(msh, cl, phi, phi);
+    }
+    std::cout << tc.toc() << std::endl;
+    
+    tc.tic();
+    for (auto& cl : msh) {
+        cell_monomial_basis phi(msh, cl, 5);
+        disk::dynamic_matrix<T> stiffness = integrate(msh, cl, grad(phi), grad(phi));
+    }
+    std::cout << tc.toc() << std::endl;
+
+    return 0;
 }
-*/
+#endif
 
 int main(int argc, char **argv)
 {
@@ -86,22 +116,33 @@ int main(int argc, char **argv)
     disk::generic_mesh<T,1> msh_1D;
     make_single_element_mesh(msh_1D, 0.0, 1.0);
 
-    test_conditioning(msh_1D, 2.0, {1.0}, rescaling_strategy::none);
-    test_conditioning(msh_1D, 1.0, {1.0}, rescaling_strategy::none);
+    //test_conditioning(msh_1D, 2.0, {1.0}, rescaling_strategy::none);
+    //test_conditioning(msh_1D, 1.0, {1.0}, rescaling_strategy::none);
 
     disk::generic_mesh<T,2> msh_2D;
-    make_single_element_mesh(msh_2D, 1.0, 5);
-    auto tr2D = [](const disk::point<T,2>& pt) -> disk::point<T,2> {
-        return {pt.x(), 0.1*pt.y()};
+    make_single_element_mesh(msh_2D, 0.4, 5);
+    double cf = 0.1;
+    double theta = M_PI/4;
+    double c = std::cos(theta);
+    double s = std::sin(theta);
+    auto tr2D = [&](const disk::point<T,2>& pt) -> disk::point<T,2> {
+        double xn = pt.x()*c - pt.y()*s*cf;
+        double yn = pt.x()*s + pt.y()*c*cf;
+        return {xn, yn};
+        //return {pt.x(), 0.1*pt.y()};
     };
     msh_2D.transform(tr2D);
 
-    std::cout << " ----------- NONE " << std::endl;
+    //disk::silo_database db;
+    //db.create("elem.silo");
+    //db.add_mesh(msh_2D, "mesh");
+
+    //std::cout << " ----------- NONE " << std::endl;
     test_conditioning(msh_2D, 2.0, {1.0, 0.0}, rescaling_strategy::none);
-    std::cout << " ----------- INERTIAL " << std::endl;
-    test_conditioning(msh_2D, 2.0, {1.0, 0.0}, rescaling_strategy::inertial);
-    std::cout << " ----------- G-S " << std::endl;
-    test_conditioning(msh_2D, 2.0, {1.0, 0.0}, rescaling_strategy::gram_schmidt);
+    //std::cout << " ----------- INERTIAL " << std::endl;
+    //test_conditioning(msh_2D, 2.0, {1.0, 0.0}, rescaling_strategy::inertial);
+    //std::cout << " ----------- G-S " << std::endl;
+    //test_conditioning(msh_2D, 2.0, {1.0, 0.0}, rescaling_strategy::gram_schmidt);
 
     if (argc > 1) {
         disk::generic_mesh<T,2> msh_2D_fromfile;

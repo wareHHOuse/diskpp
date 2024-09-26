@@ -106,7 +106,7 @@ local_operator(const Mesh& msh, const typename Mesh::cell_type& cl,
 
 
 template<typename Mesh, typename Space = hho_space<Mesh>>
-auto
+dynamic_matrix<typename Space::scalar_type>
 local_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl,
     const degree_info& di, const dynamic_matrix<typename Space::scalar_type>& R)
 {
@@ -153,6 +153,57 @@ local_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl,
         S += scale * rhs.transpose() * MF * rhs;
         offset += szF;
     }
+
+    return S;
+}
+
+template<typename Mesh, typename Space = hho_space<Mesh>>
+dynamic_matrix<typename Space::scalar_type>
+local_stabilization_hdg(const Mesh& msh, const typename Mesh::cell_type& cl,
+    const degree_info& di)
+{
+    using namespace disk::basis;
+    using T = typename Space::scalar_type;
+
+    auto [szT, szF, szR] = space_dimensions<Space>(di);
+    auto fcs = faces(msh, cl);
+    auto num_faces = fcs.size();
+
+    auto sz_total = szT + num_faces*szF;
+    dynamic_matrix<T> S = dynamic_matrix<T>::Zero(sz_total, sz_total);
+
+    auto phiT = typename Space::cell_basis_type(msh, cl, di.cell);
+    auto phiR = typename Space::reco_basis_type(msh, cl, di.reco);
+    
+    auto scale = 1.;///diameter(msh, cl);
+
+    size_t offset = szT;
+    for (const auto& fc : fcs)
+    {
+        auto phiF = typename Space::face_basis_type(msh, fc, di.face);
+        dynamic_matrix<T> MF = integrate(msh, fc, phiF, phiF);
+        std::cout << "Mass: " << normal(msh,cl,fc).transpose() << std::endl;
+        std::cout << MF << std::endl;
+        Eigen::LDLT<dynamic_matrix<T>> MF_llt(MF);
+        dynamic_matrix<T> T2F = integrate(msh, fc, phiT, phiF);
+        std::cout << "T2F: " << std::endl;
+        std::cout << T2F << std::endl;
+        dynamic_matrix<T> P2 = MF_llt.solve(T2F);
+
+        std::cout << "P2: " << std::endl;
+        std::cout << P2 << std::endl;
+
+        dynamic_matrix<T> rhs = dynamic_matrix<T>::Zero(szF, szT+num_faces*szF);
+        rhs.block(0,0,szF,szT) = -P2;
+        rhs.block(0,offset,szF,szF) = dynamic_matrix<T>::Identity(szF, szF);
+        std::cout << "rhs: " << std::endl;
+        std::cout << rhs << std::endl;
+
+        S += scale * rhs.transpose() * MF * rhs;
+        offset += szF;
+    }
+
+    std::cout << S << std::endl;
 
     return S;
 }

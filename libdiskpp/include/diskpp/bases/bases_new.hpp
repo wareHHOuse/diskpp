@@ -936,7 +936,7 @@ auto integrate(const Mesh& msh, const Element& elem, const Trial& trial, const T
     auto ideg = trial.integration_degree() + test.integration_degree();
     auto qps = integrate(msh, elem, ideg);
     for (auto& qp : qps) {
-        ret += qp.weight() * ( test(qp.point()) * trial(qp.point()).transpose() );
+        ret += (qp.weight() * test(qp.point())) * trial(qp.point()).transpose();
     };
 
     return ret;
