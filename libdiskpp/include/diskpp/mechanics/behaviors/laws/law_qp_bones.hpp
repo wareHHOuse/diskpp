@@ -31,14 +31,13 @@
 #include "diskpp/mechanics/behaviors/maths_tensor.hpp"
 #include "diskpp/mechanics/behaviors/maths_utils.hpp"
 #include "diskpp/mechanics/behaviors/tensor_conversion.hpp"
-#include "diskpp/quadratures/quad_bones.hpp"
 #include "diskpp/mesh/point.hpp"
+#include "diskpp/quadratures/quadrature_point.hpp"
 
 namespace disk
 {
 
 // Bones for the computation of a behavior law at a quadrature point
-
 
 template<typename T, int DIM>
 class law_qp_bones

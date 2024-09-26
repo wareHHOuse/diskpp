@@ -34,30 +34,32 @@
 #include <thread>
 #include <vector>
 
-namespace disk {
+#include "diskpp/loaders/strtot.hpp"
 
+namespace disk
+{
 
 template<typename T>
 std::optional<size_t>
-boundary_number( const Eigen::Matrix<T, 2, 1>& n )
+boundary_number(const Eigen::Matrix<T, 2, 1>& n)
 {
     /* Give a number to the boundaries of the unit
      * cube [0,1]^3 depending on the normal */
 
-    Eigen::Matrix<T, 2, 1> x = {1.0, 0.0};
-    auto xn = n.dot(x);
-    if ( xn > -1.01 && xn < -0.99 ) // Plane x = 0
+    Eigen::Matrix<T, 2, 1> x  = {1.0, 0.0};
+    auto                   xn = n.dot(x);
+    if (xn > -1.01 && xn < -0.99) // Plane x = 0
         return 3;
 
-    if ( xn > 0.99 && xn < 1.01 ) // Plane x = 1
+    if (xn > 0.99 && xn < 1.01) // Plane x = 1
         return 1;
 
-    Eigen::Matrix<T, 2, 1> y = {0.0, 1.0}; 
-    auto yn = n.dot(y);
-    if ( yn > -1.01 && yn < -0.99 ) // Plane y = 0
+    Eigen::Matrix<T, 2, 1> y  = {0.0, 1.0};
+    auto                   yn = n.dot(y);
+    if (yn > -1.01 && yn < -0.99) // Plane y = 0
         return 0;
 
-    if ( yn > 0.99 && yn < 1.01 ) // Plane y = 1
+    if (yn > 0.99 && yn < 1.01) // Plane y = 1
         return 2;
 
     return {};
@@ -65,33 +67,33 @@ boundary_number( const Eigen::Matrix<T, 2, 1>& n )
 
 template<typename T>
 std::optional<size_t>
-boundary_number( const Eigen::Matrix<T, 3, 1>& n )
+boundary_number(const Eigen::Matrix<T, 3, 1>& n)
 {
     /* Give a number to the boundaries of the unit
      * cube [0,1]^3 depending on the normal */
 
-    Eigen::Matrix<T, 3, 1> x = {1.0, 0.0, 0.0};
-    auto xn = n.dot(x);
-    if ( xn > -1.01 && xn < -0.99 ) // Plane x = 0
+    Eigen::Matrix<T, 3, 1> x  = {1.0, 0.0, 0.0};
+    auto                   xn = n.dot(x);
+    if (xn > -1.01 && xn < -0.99) // Plane x = 0
         return 2;
 
-    if ( xn > 0.99 && xn < 1.01 ) // Plane x = 1
+    if (xn > 0.99 && xn < 1.01) // Plane x = 1
         return 5;
 
-    Eigen::Matrix<T, 3, 1> y = {0.0, 1.0, 0.0}; 
-    auto yn = n.dot(y);
-    if ( yn > -1.01 && yn < -0.99 ) // Plane y = 0
+    Eigen::Matrix<T, 3, 1> y  = {0.0, 1.0, 0.0};
+    auto                   yn = n.dot(y);
+    if (yn > -1.01 && yn < -0.99) // Plane y = 0
         return 1;
 
-    if ( yn > 0.99 && yn < 1.01 ) // Plane y = 1
+    if (yn > 0.99 && yn < 1.01) // Plane y = 1
         return 4;
 
-    Eigen::Matrix<T, 3, 1> z = {0.0, 0.0, 1.0}; 
-    auto zn = n.dot(z);
-    if ( zn > -1.01 && zn < -0.99 ) // Plane z = 0
+    Eigen::Matrix<T, 3, 1> z  = {0.0, 0.0, 1.0};
+    auto                   zn = n.dot(z);
+    if (zn > -1.01 && zn < -0.99) // Plane z = 0
         return 0;
 
-    if ( zn > 0.99 && zn < 1.01 ) // Plane z = 1
+    if (zn > 0.99 && zn < 1.01) // Plane z = 1
         return 3;
 
     return {};
@@ -104,21 +106,23 @@ template<typename Mesh>
 bool
 renumber_hypercube_boundaries(Mesh& msh)
 {
-    auto cvf = connectivity_via_faces(msh);
+    auto cvf     = connectivity_via_faces(msh);
     auto storage = msh.backend_storage();
 
-    for (const auto& cl : msh) {
+    for (const auto& cl : msh)
+    {
         const auto fcs = faces(msh, cl);
-        for (const auto& fc : fcs) {
+        for (const auto& fc : fcs)
+        {
             auto c = cvf.neighbour_via(msh, cl, fc);
             if (c.second)
                 continue; /* Not an external boundary */
 
-            auto bn = boundary_number( normal(msh, cl, fc) );
+            auto bn = boundary_number(normal(msh, cl, fc));
             if (!bn)
                 return false; /* Can't renumber, unexpected normal. */
 
-            auto& bi = storage->boundary_info[ offset(msh,fc) ];
+            auto& bi = storage->boundary_info[offset(msh, fc)];
             bi.is_boundary(true);
             bi.is_internal(false);
             bi.id(bn.value());
@@ -133,7 +137,7 @@ expect(std::ifstream& ifs, const std::string& str)
 {
     std::string keyword;
     ifs >> keyword;
-    if ( keyword != str )
+    if (keyword != str)
     {
         std::cout << "Expected keyword \"" << str << "\"" << std::endl;
         std::cout << "Found \"" << keyword << "\"" << std::endl;
@@ -143,7 +147,8 @@ expect(std::ifstream& ifs, const std::string& str)
     return true;
 }
 
-namespace priv {
+namespace priv
+{
 
 template<typename T>
 void
@@ -154,15 +159,43 @@ sort_uniq(std::vector<T>& v)
     v.erase(uniq_iter, v.end());
 }
 
-} //namespace priv
+template<typename T>
+point<T, 2>
+read_2d_point_line(const char* str, char** endptr, T scalefactor)
+{
+    T t1, t2;
 
-} //namespace disk
+    t1 = strtot<T>(str, endptr);
+    t2 = strtot<T>(*endptr, endptr);
+
+    return point<T, 2>{t1 * scalefactor, t2 * scalefactor};
+}
+
+template<typename T>
+point<T, 3>
+read_3d_point_line(const char* str, char** endptr, T scalefactor)
+{
+    T t1, t2, t3;
+
+    t1 = strtot<T>(str, endptr);
+    t2 = strtot<T>(*endptr, endptr);
+    t3 = strtot<T>(*endptr, endptr);
+
+    return point<T, 3>{t1 * scalefactor, t2 * scalefactor, t3 * scalefactor};
+}
+
+} // namespace priv
+
+} // namespace disk
 
 #define THREADED
 #ifdef THREADED
-    #define THREAD(name, body) std::thread name([&]{body})
-    #define WAIT_THREAD(name) name.join()
+#define THREAD(name, body) std::thread name([&] {  body })
+#define WAIT_THREAD(name) name.join()
 #else
-    #define THREAD(name, body) {body}
-    #define WAIT_THREAD(name)
+#define THREAD(name, body)                                                                                             \
+    {                                                                                                                  \
+        body                                                                                                           \
+    }
+#define WAIT_THREAD(name)
 #endif

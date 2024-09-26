@@ -31,7 +31,7 @@
 #include <vector>
 
 #include "MGIS/Behaviour/Behaviour.hxx"
-#include "core/mechanics/behaviors/laws/Mfront/Mfront_law_cell.hpp"
+#include "diskpp/mechanics/behaviors/laws/Mfront/Mfront_law_cell.hpp"
 
 namespace disk
 {

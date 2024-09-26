@@ -28,8 +28,8 @@
 
 #ifdef HAVE_MGIS
 
-#include "core/mechanics/behaviors/laws/Mfront/Mfront_qp.hpp"
-#include "core/quadratures/quadratures.hpp"
+#include "diskpp/mechanics/behaviors/laws/Mfront/Mfront_qp.hpp"
+#include "diskpp/quadratures/quadratures.hpp"
 
 #include "MGIS/Behaviour/Behaviour.hxx"
 

@@ -339,13 +339,12 @@ test_tetrahedron_quadrature(void)
             for (size_t k = 0; k <= max_test_degree; k++)
             {
                 /* This is the function we are testing: see quad_bones.hpp */
-                auto rqps = disk::tetrahedron_quadrature(m+n+k);
+                auto rqps = disk::quadrature::default_tetrahedron_quadrature(m+n+k, tp[0], tp[1], tp[2], tp[3]);
 
                 T int_num = 0.0;
                 for (auto& rqp : rqps)
                 {
-                    auto qp = transform(rqp);
-                    int_num += qp.second*monomial(qp.first,m,n,k);
+                    int_num += rqp.weight()*monomial(rqp.point(),m,n,k);
                 }
                 T int_ana = analytic_integral(m,n,k);
 

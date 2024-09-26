@@ -388,7 +388,7 @@ Odot(const static_matrix<T, DIM, DIM>& A, const static_matrix<T, DIM, DIM>& B)
                 for (int l = 0; l < DIM; l++)
                 {
                     T val = (A(i, k) * B(j, l) + A(i, l) * B(j, k)) / T(2);
-                    coeff<T,DIM>(ret, i, j, k, l, val);
+                    coeff<T, DIM>(ret, i, j, k, l, val);
                 }
             }
         }

@@ -7,7 +7,7 @@
  *  /_\/_\/_\/_\   methods.
  *
  * This file is copyright of the following authors:
- * Nicolas Pignet  (C) 2019                     nicolas.pignet@enpc.fr
+ * Nicolas Pignet  (C) 2019, 2024               nicolas.pignet@enpc.fr
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -30,14 +30,14 @@
 
 #include "diskpp/bases/bases.hpp"
 #include "diskpp/common/eigen.hpp"
+#include "diskpp/common/timecounter.hpp"
+#include "diskpp/mechanics/NewtonSolver/NewtonSolverContact.hpp"
+#include "diskpp/mechanics/NewtonSolver/StabilizationManager.hpp"
+#include "diskpp/mechanics/NewtonSolver/TimeManager.hpp"
 #include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "diskpp/mechanics/deformation_tensors.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/quadratures/quadratures.hpp"
-
-#include "diskpp/mechanics/NewtonSolver/StabilizationManger.hpp"
-
-#include "diskpp/common/timecounter.hpp"
 
 namespace disk
 {
@@ -52,8 +52,9 @@ class mechanical_computation
     typedef typename mesh_type::coordinate_type scalar_type;
     typedef typename mesh_type::cell            cell_type;
 
-    typedef NewtonSolverParameter<scalar_type> param_type;
-    typedef Behavior<mesh_type>                behavior_type;
+    typedef NewtonSolverParameter<scalar_type>    param_type;
+    typedef Behavior<mesh_type>                   behavior_type;
+    typedef vector_boundary_conditions<mesh_type> bnd_type;
 
     typedef static_matrix<scalar_type, mesh_type::dimension, mesh_type::dimension> static_matrix_type;
     typedef static_tensor<scalar_type, mesh_type::dimension>                       static_tensor_type;
@@ -215,15 +216,11 @@ class mechanical_computation
 
     template<typename Function>
     void
-    compute_external_forces(const mesh_type& msh,
-                            const cell_type& cl,
-                            const Function&  load,
-                            const size_t     cell_degree,
-                            vector_type&     RTF)
+    compute_external_forces(const mesh_type& msh, const cell_type& cl, const Function& load, const size_t cell_degree)
     {
         // compute (f,v)_T
-        const auto cb       = make_vector_monomial_basis(msh, cl, cell_degree);
-        RTF.head(cb.size()) = make_rhs(msh, cl, cb, load);
+        const auto cb = make_vector_monomial_basis(msh, cl, cell_degree);
+        RTF.head(cb.size()) += make_rhs(msh, cl, cb, load, 1);
     }
 
     void
@@ -281,9 +278,28 @@ class mechanical_computation
     }
 
     void
-    compute_contact_terms(void) const
+    compute_contact_terms(const mesh_type&                 msh,
+                          const cell_type&                 cl,
+                          const bnd_type&                  bnd,
+                          const param_type&                rp,
+                          const CellDegreeInfo<mesh_type>& cell_infos,
+                          const matrix_type&               RkT,
+                          const vector_type&               uTF,
+                          const TimeStep<scalar_type>&     time_step,
+                          behavior_type&                   behavior)
     {
-        // to fill in the future
+        if (bnd.cell_has_contact_faces(cl))
+        {
+            const auto& material_data = behavior.getMaterialData();
+            auto        cc            = contact_contribution(msh, material_data, rp, bnd);
+            cc.compute(cl, cell_infos, RkT, uTF);
+
+            time_contact += cc.time_contact;
+
+            K_int += cc.K_cont;
+            F_int += cc.F_cont;
+            RTF -= cc.F_cont;
+        }
     }
 
     size_t
@@ -311,6 +327,7 @@ class mechanical_computation
     vector_type F_int;
     double      time_law;
     double      time_contact;
+    double      time_dyna;
 
     mechanical_computation(void)
     {
@@ -326,17 +343,21 @@ class mechanical_computation
     void
     compute(const mesh_type&                 msh,
             const cell_type&                 cl,
+            const bnd_type&                  bnd,
             const param_type&                rp,
             const MeshDegreeInfo<mesh_type>& degree_infos,
             const Function&                  load,
             const matrix_type&               RkT,
             const vector_type&               uTF,
+            const vector_type&               aT_pred,
+            const TimeStep<scalar_type>&     time_step,
             behavior_type&                   behavior,
             StabCoeffManager<scalar_type>&   stab_manager,
             const bool                       small_def)
     {
         time_law     = 0.0;
         time_contact = 0.0;
+        time_dyna    = 0.0;
         timecounter tc;
 
         const auto cell_infos  = degree_infos.cellDegreeInfo(msh, cl);
@@ -345,6 +366,7 @@ class mechanical_computation
         const auto cell_degree = cell_infos.cell_degree();
         const auto grad_degree = cell_infos.grad_degree();
 
+        const auto cb              = make_vector_monomial_basis(msh, cl, cell_degree);
         const auto cell_basis_size = vector_basis_size(cell_degree, dimension, dimension);
 
         size_t gb_size = 0;
@@ -430,11 +452,6 @@ class mechanical_computation
             this->compute_rigidity(Cep, gphi, small_def, qp.weight(), grad_dim_dofs, grad_basis_size, AT);
             // Compute internal force
             this->compute_internal_forces(stress, gphi, small_def, qp.weight(), grad_dim_dofs, grad_basis_size, aT);
-            // Compute contact terms
-            tc.tic();
-            this->compute_contact_terms();
-            tc.toc();
-            time_contact += tc.elapsed();
 
             // compute new possible value for stabilization
             if (rp.m_adapt_stab)
@@ -457,7 +474,8 @@ class mechanical_computation
                     // const auto Cauchy = convertPK1toCauchy(stress, F);
                     // const auto eps    = convertGtoLinearizedStrain(RkT_iqn);
 
-                    // std::cout << sigma_dev_norm / eps_dev_norm << " vs " << deviator(Cauchy).norm() / deviator(eps).norm()
+                    // std::cout << sigma_dev_norm / eps_dev_norm << " vs " << deviator(Cauchy).norm() /
+                    // deviator(eps).norm()
                     //           << std::endl;
                 }
 
@@ -479,7 +497,9 @@ class mechanical_computation
         }
 
         // compute external forces
-        this->compute_external_forces(msh, cl, load, cell_degree, RTF);
+        this->compute_external_forces(msh, cl, load, cell_degree);
+        // std::cout << "R_ext: " << RTF.norm() << std::endl;
+        // std::cout << RTF.transpose() << std::endl;
 
         // Symmetrize rigidity matrix
         this->symmetrized_rigidity_matrix(grad_basis_size, AT, small_def);
@@ -492,14 +512,44 @@ class mechanical_computation
         F_int = RkT.transpose() * aT;
         RTF -= F_int;
 
+        // Compute contact terms
+        this->compute_contact_terms(msh, cl, bnd, rp, cell_infos, RkT, uTF, time_step, behavior);
+
         // std::cout << "K: " << K_int.norm() << std::endl;
-        // std::cout << K_int << std::endl;
-        // std::cout << "F: " << F_int.norm() << std::endl;
+        // // std::cout << K_int << std::endl;
+        // std::cout << "F_int: " << F_int.norm() << std::endl;
+        // std::cout << F_int.transpose() << std::endl;
         // std::cout << "RTF: " << RTF.norm() << std::endl;
+        // std::cout << RTF.transpose() << std::endl;
+
+        // throw std::runtime_error("");
 
         assert(K_int.rows() == num_total_dofs);
         assert(K_int.cols() == num_total_dofs);
         assert(RTF.rows() == num_total_dofs);
+
+        // Unsteady Computation
+        tc.tic();
+        if (rp.isUnsteady())
+        {
+            auto dt      = time_step.increment_time();
+            auto dyna_rp = rp.getUnsteadyParameters();
+            auto beta    = dyna_rp["beta"];
+            auto rho     = dyna_rp["rho"];
+
+            const matrix_type mass_mat = rho * make_mass_matrix(msh, cl, cb);
+
+            K_int.topLeftCorner(cell_basis_size, cell_basis_size) += mass_mat / (beta * dt * dt);
+
+            auto F_iner = (mass_mat / (beta * dt * dt)) * uTF.head(cell_basis_size);
+            F_int.head(cell_basis_size) += F_iner;
+            RTF.head(cell_basis_size) -= F_iner;
+
+            // std::cout << mass_mat.cols() << ", " << aT_pred.rows() << std::endl;
+            RTF.head(cell_basis_size) += mass_mat * aT_pred;
+        }
+        tc.toc();
+        time_dyna += tc.elapsed();
     }
 };
 }
