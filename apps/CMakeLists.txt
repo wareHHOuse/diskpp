@@ -1,3 +1,8 @@
+option(BUILD_APP_HHO_DD "Build HHO domain decomposition apps" ON)
+if (BUILD_APP_HHO_DD)
+    add_subdirectory(hho_dd)
+endif()
+
 option(BUILD_CONDITIONING_TESTS "Build conditioning tests" ON)
 if (BUILD_CONDITIONING_TESTS)
     add_subdirectory(conditioning)
