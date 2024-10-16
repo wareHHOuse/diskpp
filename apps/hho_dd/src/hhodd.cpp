@@ -37,16 +37,17 @@ make_overlapping_subdomains(const Mesh& msh, size_t overlap_layers)
                 auto fcs = faces(msh, cl);
                 for (auto& fc : fcs) {
                     /* for each neighbour */
-                    auto neigh_opt = cvf.neighbour_via(msh, cl, fc);
-                    if (neigh_opt) {
-                        /* and check if it is already in the current subdomain */
-                        bool present = std::binary_search(cells.begin(),
-                            cells.end(), neigh_opt.value());
+                    auto neigh = cvf.neighbour_via(msh, cl, fc);
+                    if (not neigh)
+                        continue;
 
-                        /* if not, save it */
-                        if (not present)
-                            layer_cells[tag].insert(neigh_opt.value());
-                    }
+                    /* and check if it is already in the current subdomain */
+                    bool present = std::binary_search(cells.begin(),
+                        cells.end(), neigh.value());
+
+                    /* if not, save it */
+                    if (not present)
+                        layer_cells[tag].insert(neigh.value());
                 }
             }
         }
@@ -63,11 +64,10 @@ make_overlapping_subdomains(const Mesh& msh, size_t overlap_layers)
 
 template<typename Mesh>
 void
-hhodd(const Mesh& msh)
+hhodd(const Mesh& msh, size_t levels)
 {
-    auto subdomains = make_overlapping_subdomains(msh, 5);
+    auto subdomains = make_overlapping_subdomains(msh, levels);
     
-
     disk::silo_database silo;
     silo.create("hhodd.silo");
     silo.add_mesh(msh, "mesh");
@@ -88,12 +88,29 @@ hhodd(const Mesh& msh)
 
 int main(int argc, char **argv)
 {
-    if (argc < 2) {
+    int levels = 1;
+    int opt;
+    while ((opt = getopt(argc, argv, "l:")) != -1) {
+        switch (opt) {
+        case 'l': {
+            int l = atoi(optarg);
+            if (l < 0) {
+                std::cerr << "Levels must be positive, resetting to 1." << std::endl;
+                l = 1;
+            }
+            levels = l;
+            } break;
+        }
+    }
+    argc -= optind;
+    argv += optind;
+
+    if (argc < 1) {
         std::cout << "missing filename" << std::endl;
         return 1;
     }
 
-    const char *mesh_filename = argv[1];
+    const char *mesh_filename = argv[0];
 
     using T = double;
 
@@ -109,7 +126,7 @@ int main(int argc, char **argv)
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        hhodd(msh);
+        hhodd(msh, levels);
 
         return 0;
     }
@@ -126,7 +143,7 @@ int main(int argc, char **argv)
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
 
-        hhodd(msh);
+        hhodd(msh, levels);
 
         return 0;
     }
