@@ -238,41 +238,61 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
                 return pl.plane_wave_source(bi.tag(), pt);
             };
 
-            matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
-            matrix_type Atn = matrix_type::Zero(tbasis.size(), tbasis.size());
-
             auto nv = cvf.neighbour_via(msh, tcl, fc);
-            auto ncl = nv.first;
-            auto nbasis = disk::make_vector_monomial_basis(msh, ncl, degree);
-            assert(tbasis.size() == nbasis.size());
 
             auto n     = normal(msh, tcl, fc);
             auto eta_l = eta / diameter(msh, fc);
             auto f_qps = disk::integrate(msh, fc, 2*degree);
 
-            for (auto& fqp : f_qps)
-            {
-                auto tphi       = tbasis.eval_functions(fqp.point());
-                auto tcphi      = tbasis.eval_curls2(fqp.point());
-                auto n_x_tphi   = disk::vcross(n, tphi);
-                auto n_x_tphi_x_n = disk::vcross(n_x_tphi, n);
+            if (nv) {
+                matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
+                matrix_type Atn = matrix_type::Zero(tbasis.size(), tbasis.size());
 
-                if (nv.second)
-                {   /* NOT on a boundary */
+                auto ncl = nv.value();
+                auto nbasis = disk::make_vector_monomial_basis(msh, ncl, degree);
+                assert(tbasis.size() == nbasis.size());
+                
+                for (auto& fqp : f_qps)
+                {
+                    auto tphi       = tbasis.eval_functions(fqp.point());
+                    auto tcphi      = tbasis.eval_curls2(fqp.point());
+                    auto n_x_tphi   = disk::vcross(n, tphi);
+                    auto n_x_tphi_x_n = disk::vcross(n_x_tphi, n);
+
+                    /* NOT on a boundary */
                     Att += + fqp.weight() * eta_l * n_x_tphi * n_x_tphi.transpose();
                     Att += - fqp.weight() * 0.5 * n_x_tphi * tcphi.transpose();
                     Att += - fqp.weight() * 0.5 * tcphi * n_x_tphi.transpose();
+
+                    auto nphi       = nbasis.eval_functions(fqp.point());
+                    auto ncphi      = nbasis.eval_curls2(fqp.point());
+                    auto n_x_nphi   = disk::vcross(n, nphi);
+
+                    Atn += - fqp.weight() * eta_l * n_x_tphi * n_x_nphi.transpose();
+                    Atn += - fqp.weight() * 0.5 * n_x_tphi * ncphi.transpose();
+                    Atn += + fqp.weight() * 0.5 * tcphi * n_x_nphi.transpose();
                 }
-                else
+
+                assm.assemble(msh, tcl, tcl, Att);
+                assm.assemble(msh, tcl, ncl, Atn);
+            }
+            else {
+                matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
+
+                for (auto& fqp : f_qps)
                 {
-                   /* On a boundary*/
+                    auto tphi       = tbasis.eval_functions(fqp.point());
+                    auto tcphi      = tbasis.eval_curls2(fqp.point());
+                    auto n_x_tphi   = disk::vcross(n, tphi);
+                    auto n_x_tphi_x_n = disk::vcross(n_x_tphi, n);
+                    
+                    /* On a boundary*/
                     if ( not pl.is_magnetic_like(bi.tag()) and not pl.is_impedance_like(bi.tag()) )
                     {
                         Att += + fqp.weight() * eta_l * n_x_tphi * n_x_tphi.transpose();
                         Att += - fqp.weight() * tcphi * n_x_tphi.transpose();
                         Att += - fqp.weight() * n_x_tphi * tcphi.transpose();
                     }
-
 
                     //loc_rhs -= fqp.weight() * tcphi_x_n;
                     //loc_rhs += fqp.weight() * eta_l * tphi;
@@ -282,26 +302,13 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
 
                     if ( pl.is_plane_wave(bi.tag()) )
                         loc_rhs -= 2*fqp.weight()*(jwmu0/Z)*n_x_tphi_x_n*f(fqp.point());
-
-                    continue;
                 }
 
-                auto nphi       = nbasis.eval_functions(fqp.point());
-                auto ncphi      = nbasis.eval_curls2(fqp.point());
-                auto n_x_nphi   = disk::vcross(n, nphi);
-
-                Atn += - fqp.weight() * eta_l * n_x_tphi * n_x_nphi.transpose();
-                Atn += - fqp.weight() * 0.5 * n_x_tphi * ncphi.transpose();
-                Atn += + fqp.weight() * 0.5 * tcphi * n_x_nphi.transpose();
-            }
-
-            assm.assemble(msh, tcl, tcl, Att);
-            if (nv.second)
-                assm.assemble(msh, tcl, ncl, Atn);
+                assm.assemble(msh, tcl, tcl, Att);
+            }   
         }
 
         matrix_type LC = (1./mur)*K - (ksq*epsr - jwmu0*sigma)*M;
-
         assm.assemble(msh, tcl, LC, loc_rhs);
     }
 

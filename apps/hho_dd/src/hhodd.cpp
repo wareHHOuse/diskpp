@@ -29,7 +29,7 @@ make_overlapping_subdomains(const Mesh& msh, size_t overlap_layers)
      * precondition for std::lower_bound() below. */
 
     for (size_t ol = 0; ol < overlap_layers; ol++) {
-        std::map<size_t, std::vector<cell_type>> layer_cells;
+        std::map<size_t, std::set<cell_type>> layer_cells;
         /* Iterate on the currently identified subdomains */
         for (auto& [tag, cells] : subdomains) {
             /* for each cell */
@@ -37,25 +37,22 @@ make_overlapping_subdomains(const Mesh& msh, size_t overlap_layers)
                 auto fcs = faces(msh, cl);
                 for (auto& fc : fcs) {
                     /* for each neighbour */
-                    auto [neigh, valid] = cvf.neighbour_via(msh, cl, fc);
-                    if (!valid)
-                        continue;
+                    auto neigh_opt = cvf.neighbour_via(msh, cl, fc);
+                    if (neigh_opt) {
+                        /* and check if it is already in the current subdomain */
+                        bool present = std::binary_search(cells.begin(),
+                            cells.end(), neigh_opt.value());
 
-                    /* and check if it is already in the current subdomain */
-                    bool present = std::binary_search(cells.begin(), cells.end(), neigh);
-
-                    /* if not, save it */
-                    if (not present)
-                        layer_cells[tag].push_back(neigh);
+                        /* if not, save it */
+                        if (not present)
+                            layer_cells[tag].insert(neigh_opt.value());
+                    }
                 }
             }
         }
 
         /* move the found neighbours to the subdomain */
         for (auto& [tag, cells] : layer_cells) {
-            std::sort(cells.begin(), cells.end());
-            auto last = std::unique(cells.begin(), cells.end());
-            cells.erase(last, cells.end());
             subdomains[tag].insert(subdomains[tag].end(), cells.begin(), cells.end());
             std::sort(subdomains[tag].begin(), subdomains[tag].end());
         }

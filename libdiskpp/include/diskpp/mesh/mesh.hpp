@@ -750,11 +750,10 @@ public:
         compute_connectivity(msh);
     }
 
-    std::pair<cell_type, bool>
+    std::optional<cell_type>
     neighbour_via(const Mesh& msh, const cell_type& cl, const face_type& fc)
     {
-        if ( face_owners.size() != msh.faces_size() )
-            throw std::logic_error("Inconsistent neighbour information.");
+        assert ( face_owners.size() == msh.faces_size() );
 
         auto cl_ofs = offset(msh, cl);
         auto fc_ofs = offset(msh, fc);
@@ -767,9 +766,9 @@ public:
         assert(fo[0].value() == cl_ofs);
 
         if (not fo[1])
-            return std::make_pair(*msh.cells_begin(), false);
+            return {};
 
-        return std::make_pair( *std::next(msh.cells_begin(), fo[1].value()), true);
+        return *std::next(msh.cells_begin(), fo[1].value());
     }
 };
 

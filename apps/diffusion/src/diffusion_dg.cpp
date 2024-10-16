@@ -163,52 +163,57 @@ run_diffusion_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_t
         auto fcs = faces(msh, tcl);
         for (auto& fc : fcs)
         {
-            matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
-            matrix_type Atn = matrix_type::Zero(tbasis.size(), tbasis.size());
-            
             auto nv = cvf.neighbour_via(msh, tcl, fc);
-            auto ncl = nv.first;
-            auto nbasis = disk::make_scalar_monomial_basis(msh, ncl, degree);
-            assert(tbasis.size() == nbasis.size());
             
             auto n     = normal(msh, tcl, fc);
             auto eta_l = eta / diameter(msh, fc);
             auto f_qps = disk::integrate(msh, fc, 2*degree);
             
-            for (auto& fqp : f_qps)
-            {
-                auto ep     = fqp.point();
-                auto tphi   = tbasis.eval_functions(ep);
-                auto tdphi  = tbasis.eval_gradients(ep);
+            if (nv) {
+                matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
+                matrix_type Atn = matrix_type::Zero(tbasis.size(), tbasis.size());
                 
-                if (nv.second)
-                {   /* NOT on a boundary */
+                auto ncl = nv.value();
+                auto nbasis = disk::make_scalar_monomial_basis(msh, ncl, degree);
+                assert(tbasis.size() == nbasis.size());
+                
+                for (auto& fqp : f_qps) {
+                    auto ep     = fqp.point();
+                    auto tphi   = tbasis.eval_functions(ep);
+                    auto tdphi  = tbasis.eval_gradients(ep);
+                
+                    /* NOT on a boundary */
                     Att += + fqp.weight() * eta_l * tphi * tphi.transpose();
                     Att += - fqp.weight() * 0.5 * tphi * (tdphi*n).transpose();
                     Att += - fqp.weight() * 0.5 * (tdphi*n) * tphi.transpose();
+                
+                    auto nphi   = nbasis.eval_functions(ep);
+                    auto ndphi  = nbasis.eval_gradients(ep);
+                
+                    Atn += - fqp.weight() * eta_l * tphi * nphi.transpose();
+                    Atn += - fqp.weight() * 0.5 * tphi * (ndphi*n).transpose();
+                    Atn += + fqp.weight() * 0.5 * (tdphi*n) * nphi.transpose();
                 }
-                else
-                {   /* On a boundary*/
+                assm.assemble(msh, tcl, tcl, Att);
+                assm.assemble(msh, tcl, ncl, Atn);
+            }
+            else {
+                matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
+                for (auto& fqp : f_qps) {
+                    auto ep     = fqp.point();
+                    auto tphi   = tbasis.eval_functions(ep);
+                    auto tdphi  = tbasis.eval_gradients(ep);
+                    
+                    /* On a boundary*/
                     Att += + fqp.weight() * eta_l * tphi * tphi.transpose();
                     Att += - fqp.weight() * tphi * (tdphi*n).transpose();
                     Att += - fqp.weight() * (tdphi*n) * tphi.transpose();
                     
                     //loc_rhs -= fqp.weight() * (tdphi*n);
                     //loc_rhs += fqp.weight() * eta_l * tphi;
-                    continue;
                 }
-                
-                auto nphi   = nbasis.eval_functions(ep);
-                auto ndphi  = nbasis.eval_gradients(ep);
-                
-                Atn += - fqp.weight() * eta_l * tphi * nphi.transpose();
-                Atn += - fqp.weight() * 0.5 * tphi * (ndphi*n).transpose();
-                Atn += + fqp.weight() * 0.5 * (tdphi*n) * nphi.transpose();
-            }
-            
-            assm.assemble(msh, tcl, tcl, Att);
-            if (nv.second)
-                assm.assemble(msh, tcl, ncl, Atn);
+                assm.assemble(msh, tcl, tcl, Att);
+            }   
         }
         
         assm.assemble(msh, tcl, K, loc_rhs);
