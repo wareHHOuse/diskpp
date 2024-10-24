@@ -633,9 +633,19 @@ public:
         return fi.second;
     }
 
-    auto operator[](size_t cell_num) const {
+    auto operator[](typename cell::id_type cell_num) const {
         assert(cell_num < this->cells_size());
         return *std::next(this->cells_begin(), cell_num);
+    }
+
+    auto cell_at(size_t cell_num) const {
+        assert(cell_num < this->cells_size());
+        return *std::next(this->cells_begin(), cell_num);
+    }
+
+    auto face_at(size_t face_num) const {
+        assert(face_num < this->faces_size());
+        return *std::next(this->faces_begin(), face_num);
     }
 
     void statistics(void) const
