@@ -96,7 +96,15 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
 
         auto hb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
         hb.maximum_polynomial_degree(rd);
-        
+
+        disk::dynamic_vector<T> p = cb.eval_functions(barycenter(msh, cl));
+        disk::dynamic_vector<T> q = hb.eval_functions(barycenter(msh, cl)).head(cb.size());
+        std::cout << "DIFF pq: " << (p-q).norm() << std::endl;
+
+        disk::dynamic_matrix<T> Gp = cb.eval_gradients(barycenter(msh, cl));
+        disk::dynamic_matrix<T> Gq = hb.eval_gradients(barycenter(msh, cl)).block(0,0,cb.size(),Mesh::dimension);
+        std::cout << "DIFF GpGq: " << (Gp-Gq).norm() << std::endl;
+
         /* Polynomial of degree k+1 to check consistency */
         Eigen::Matrix<T, Eigen::Dynamic, 1> poly_h = disk::project_function(msh, cl, hb, poly);
 
