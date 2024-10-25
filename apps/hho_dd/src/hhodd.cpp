@@ -8,36 +8,64 @@
 template<typename Mesh>
 using sdmap_t = std::map<size_t, std::vector<typename Mesh::cell_type>>;
 
+using flagmap_t = std::map<size_t, std::vector<bool>>;
+
+template<typename Mesh>
+static flagmap_t
+make_cell_flagmap(const Mesh& msh) {
+    flagmap_t ret;
+    for (size_t clnum = 0; clnum < msh.cells_size(); clnum++) {
+        auto cl = msh.cell_at(clnum);
+        auto di = msh.domain_info(cl);
+        auto& flags = ret[di.tag()];
+        if (flags.size() == 0)
+            flags.resize( msh.cells_size() );
+        flags[clnum] = true; 
+    }
+
+    return ret;
+}
+
+template<typename Mesh>
+static flagmap_t
+make_face_flagmap(const Mesh& msh) {
+    flagmap_t ret;
+    for (auto& cl : msh) {
+        auto di = msh.domain_info(cl);
+        auto& flags = ret[di.tag()];
+        if (flags.size() == 0)
+            flags.resize( msh.faces_size() );
+        auto fcs = faces(msh, cl);
+        for (auto& fc : fcs) {
+            auto bi = msh.boundary_info(fc);
+            if (bi.is_boundary() /*and bi.is_internal()*/)
+                continue;
+            flags[offset(msh, fc)] = true;
+        } 
+    }
+
+    return ret;
+}
+
 template<typename Mesh>
 auto
 make_overlapping_subdomains(const Mesh& msh, size_t overlap_layers)
 {
-    /* What this should actually do is a BFS, but Disk++ is missing
-     * some infrastructure to do a proper BFS. Therefore this code is
-     * quite inefficient and sooner or later must disappear. */
     using cell_type = typename Mesh::cell_type;
-
     using cvi = typename std::vector<cell_type>::iterator;
-
     auto cvf = connectivity_via_faces(msh);
 
-    /* Collect the cells in the various subdomains:
-     * the cells are stored ordered in msh, therefore each
-     * vector in the map will be sorted too. this is necessary
-     * precondition for std::lower_bound() below. */
-    sdmap_t<Mesh> subdomains;
-    for (auto& cl : msh) {
-        auto di = msh.domain_info(cl);
-        auto tag = di.tag();
-        subdomains[tag].push_back(cl);
-    }
-
+    auto subdomain_cells = make_cell_flagmap(msh);
     for (size_t ol = 0; ol < overlap_layers; ol++) {
-        std::map<size_t, std::set<cell_type>> layer_cells;
+        std::map<size_t, std::set<size_t>> layer_cells;
         /* Iterate on the currently identified subdomains */
-        for (auto& [tag, cells] : subdomains) {
+        for (auto& [tag, present] : subdomain_cells) {
             /* for each cell */
-            for (auto& cl : cells) {
+            for (size_t clnum = 0; clnum < present.size(); clnum++) {
+                if (not present[clnum])
+                    continue;
+
+                auto cl = msh.cell_at(clnum);
                 auto fcs = faces(msh, cl);
                 for (auto& fc : fcs) {
                     /* for each neighbour */
@@ -45,47 +73,26 @@ make_overlapping_subdomains(const Mesh& msh, size_t overlap_layers)
                     if (not neigh)
                         continue;
 
-                    /* and check if it is already in the current subdomain */
-                    bool present = std::binary_search(cells.begin(),
-                        cells.end(), neigh.value());
-
-                    /* if not, save it */
-                    if (not present)
-                        layer_cells[tag].insert(neigh.value());
+                    auto neighnum = offset(msh, neigh.value());
+                    if (not present[neighnum])
+                        layer_cells[tag].insert(neighnum);
                 }
             }
         }
 
         /* move the found neighbours to the subdomain */
-        for (auto& [tag, cells] : layer_cells) {
-            subdomains[tag].insert(subdomains[tag].end(), cells.begin(), cells.end());
-            std::sort(subdomains[tag].begin(), subdomains[tag].end());
+        for (auto& [tag, cellnums] : layer_cells) {
+            for (auto& cellnum : cellnums)
+                subdomain_cells[tag][cellnum] = true;
         }
     }
 
-    return subdomains;
-}
-
-template<typename Mesh>
-auto
-detect_dd_faces(const Mesh& msh, const sdmap_t<Mesh>& subdomains, bool include_dd_bnd) {
-    std::map<size_t, std::vector<bool>> sd_flags;
-    for (auto& [tag, cells] : subdomains) {
-        auto& flags = sd_flags[tag];
-        if (flags.size() == 0)
-            flags.resize(msh.cells_size());
-        for (auto& cl : cells)
-            flags[offset(msh, cl)] = true; 
-    }
-
-    auto cvf = connectivity_via_faces(msh);
-
-    std::map<size_t, std::vector<bool>> f_flags;
-    for (auto& [tag, cells] : subdomains) {
-        if (f_flags[tag].size() == 0)
-            f_flags[tag].resize( msh.faces_size() );
-
-        for (auto& cl : cells) {
+    auto subdomain_faces = make_face_flagmap(msh);
+    for (auto& [tag, cell_present] : subdomain_cells) {
+        for(size_t clnum = 0; clnum < cell_present.size(); clnum++) {
+            if (not cell_present[clnum])
+                continue;
+            auto cl = msh.cell_at(clnum);
             auto fcs = faces(msh, cl);
             for (auto& fc : fcs) {
                 auto neigh = cvf.neighbour_via(msh, cl, fc);
@@ -93,15 +100,41 @@ detect_dd_faces(const Mesh& msh, const sdmap_t<Mesh>& subdomains, bool include_d
                     continue;
 
                 auto neigh_id = offset(msh, neigh.value());
-                if (sd_flags[tag][neigh_id] or include_dd_bnd) {
-                    f_flags[tag][offset(msh, fc)] = true;
+                if (cell_present[neigh_id] /*or include_dd_bnd*/) {
+                    subdomain_faces[tag][offset(msh, fc)] = true;
                 }
             }
         }
     }
 
+    return std::pair(subdomain_cells, subdomain_faces);
+}
+
+template<typename Mesh>
+void
+hhodd(const Mesh& msh, size_t levels)
+{
+    auto [sd_cells, sd_faces] = make_overlapping_subdomains(msh, levels);
+    
+    disk::silo_database silo;
+    silo.create("hhodd.silo");
+    silo.add_mesh(msh, "mesh");
+
+    for (auto& [tag, cell_present] : sd_cells)
+    {
+        std::vector<double> yesno(msh.cells_size());
+        std::transform(cell_present.begin(), cell_present.end(),
+            yesno.begin(), [](bool x) { return double(x); } );
+
+        std::stringstream ss;
+        ss << "domain" << tag;
+        silo.add_variable("mesh", ss.str(), yesno, disk::zonal_variable_t);
+    }
+
+    silo.close();
+
     if constexpr (Mesh::dimension == 2) {
-        for (auto& [tag, ifcs] : f_flags ) {
+        for (auto& [tag, ifcs] : sd_faces ) {
             std::stringstream ss;
             ss << "faces_" << tag << ".m";
             std::ofstream ofs(ss.str());
@@ -115,31 +148,7 @@ detect_dd_faces(const Mesh& msh, const sdmap_t<Mesh>& subdomains, bool include_d
             }
         }
     }
-}
 
-template<typename Mesh>
-void
-hhodd(const Mesh& msh, size_t levels)
-{
-    auto subdomains = make_overlapping_subdomains(msh, levels);
-    detect_dd_faces(msh, subdomains, false);
-    
-    disk::silo_database silo;
-    silo.create("hhodd.silo");
-    silo.add_mesh(msh, "mesh");
-
-    for (auto& [tag, cells] : subdomains)
-    {
-        std::vector<double> yesno(msh.cells_size());
-        for (auto& cl : cells)
-            yesno[offset(msh, cl)] += 1.0;
-
-        std::stringstream ss;
-        ss << "domain" << tag;
-        silo.add_variable("mesh", ss.str(), yesno, disk::zonal_variable_t);
-    }
-
-    silo.close();
 }
 
 int main(int argc, char **argv)

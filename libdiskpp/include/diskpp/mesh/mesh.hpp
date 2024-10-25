@@ -633,7 +633,7 @@ public:
         return fi.second;
     }
 
-    auto operator[](typename cell::id_type cell_num) const {
+    auto operator[](size_t cell_num) const {
         assert(cell_num < this->cells_size());
         return *std::next(this->cells_begin(), cell_num);
     }
