@@ -7,10 +7,3 @@ Coherence;
 
 MeshSize{ PointsOf{ Volume{:}; } } = 0.05;
 
-Mesh.PartitionCreateTopology = 0;
-Mesh.PartitionCreateGhostCells = 0;
-Mesh.PartitionCreatePhysicals = 0;
-PartitionMesh 5;
-
-Delete{ Surface{1,2,3,4}; };
-
