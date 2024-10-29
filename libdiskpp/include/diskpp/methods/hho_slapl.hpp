@@ -182,28 +182,28 @@ local_stabilization_hdg(const Mesh& msh, const typename Mesh::cell_type& cl,
     {
         auto phiF = typename Space::face_basis_type(msh, fc, di.face);
         dynamic_matrix<T> MF = integrate(msh, fc, phiF, phiF);
-        std::cout << "Mass: " << normal(msh,cl,fc).transpose() << std::endl;
-        std::cout << MF << std::endl;
+        //std::cout << "Mass: " << normal(msh,cl,fc).transpose() << std::endl;
+        //std::cout << MF << std::endl;
         Eigen::LDLT<dynamic_matrix<T>> MF_llt(MF);
         dynamic_matrix<T> T2F = integrate(msh, fc, phiT, phiF);
-        std::cout << "T2F: " << std::endl;
-        std::cout << T2F << std::endl;
+        //std::cout << "T2F: " << std::endl;
+        //std::cout << T2F << std::endl;
         dynamic_matrix<T> P2 = MF_llt.solve(T2F);
 
-        std::cout << "P2: " << std::endl;
-        std::cout << P2 << std::endl;
+        //std::cout << "P2: " << std::endl;
+        //std::cout << P2 << std::endl;
 
         dynamic_matrix<T> rhs = dynamic_matrix<T>::Zero(szF, szT+num_faces*szF);
         rhs.block(0,0,szF,szT) = -P2;
         rhs.block(0,offset,szF,szF) = dynamic_matrix<T>::Identity(szF, szF);
-        std::cout << "rhs: " << std::endl;
-        std::cout << rhs << std::endl;
+        //std::cout << "rhs: " << std::endl;
+        //std::cout << rhs << std::endl;
 
         S += scale * rhs.transpose() * MF * rhs;
         offset += szF;
     }
 
-    std::cout << S << std::endl;
+    //std::cout << S << std::endl;
 
     return S;
 }

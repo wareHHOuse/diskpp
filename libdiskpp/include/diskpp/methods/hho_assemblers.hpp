@@ -210,6 +210,10 @@ public:
         LHS.setFromTriplets(triplets.begin(), triplets.end());
         triplets.clear();
     }
+
+    auto dirichlet_faces_flags() const {
+        return dirichlet_faces;
+    }
 };
 
 template<typename Basis, typename T>

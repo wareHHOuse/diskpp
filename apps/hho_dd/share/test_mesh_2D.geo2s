@@ -5,3 +5,6 @@ Rectangle(3) = {0, 0.5, 0, 0.5, 0.5, 0};
 Rectangle(4) = {0.5, 0.5, 0, 0.5, 0.5, 0};
 
 Coherence;
+
+MeshSize{ PointsOf{ Surface{:}; } } = 0.01;
+
