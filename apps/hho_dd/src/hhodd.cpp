@@ -12,6 +12,7 @@
 #include <regex>
 #include <set>
 
+#include "diskpp/common/util.h"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/output/silo.hpp"
 #include "diskpp/methods/hho_slapl.hpp"
@@ -224,6 +225,8 @@ diffusion_solver(const Mesh& msh, const solver_config& scfg)
 
 int main(int argc, char **argv)
 {
+    rusage_monitor rm;
+
     solver_config scfg;
     scfg.overlap = 1;
     scfg.ras_maxiter = 20;
@@ -319,4 +322,6 @@ int main(int argc, char **argv)
         return 0;
     }
 
+    std::cout << "Unrecognized mesh format. Exiting." << std::endl;
+    return 1;
 }

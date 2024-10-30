@@ -7,6 +7,9 @@ if ( WIN32 )
     message(FATAL_ERROR "Sorry, Windows is not supported.")
 endif()
 
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 ######################################################################
 ## project version
 set(diskpp_VERSION_MAJOR 0)
