@@ -70,6 +70,10 @@ public:
         : b_id(id), b_tag(tag), is_b(b), is_int(false)
     {}
 
+    boundary_descriptor(size_t id, size_t tag, bool b, bool itf)
+        : b_id(id), b_tag(tag), is_b(b), is_int(itf)
+    {}
+
     size_t id() const { return b_id; }
     void   id(size_t id) { b_id = id; b_tag = id; }
 

@@ -9,12 +9,36 @@
  */
 
 #include "diskpp/common/timecounter.hpp"
+#include "diskpp/output/silo.hpp"
 #include "mumps.hpp"
+
+enum class bicgstab_status {
+    undefined,
+    converged,
+    not_converged,
+    diverged,
+};
+
+template<typename T>
+struct bicgstab_io {
+    bicgstab_status     status;
+    size_t              iterations;
+    T                   rr_min;
+    T                   rr_max;
+    T                   rr;
+    bool                verbose;
+    std::vector<T>      history;
+
+    bicgstab_io() : status(bicgstab_status::undefined),
+        iterations(1000), rr_min(1e-6), rr_max(1e8),
+        verbose(false)
+    {}
+};
 
 template<typename T, typename Functor>
 disk::dynamic_vector<T>
 bicgstab(const Eigen::SparseMatrix<T>& A, const disk::dynamic_vector<T>& b,
-    const Functor& precond)
+    const Functor& precond, bicgstab_io<T>& bio)
 {
     using dv = disk::dynamic_vector<T>;
     dv ret = dv::Zero( b.size() );
@@ -27,28 +51,39 @@ bicgstab(const Eigen::SparseMatrix<T>& A, const disk::dynamic_vector<T>& b,
 
     T nr, nr0;
     nr = nr0 = r.norm();
+    bio.rr = nr/nr0;
 
-    for (size_t i = 0; i < 50; i++) {
-        std::cout << "BiCGStab iter " << i << ", RR = " << nr/nr0 << std::endl;
+    for (size_t i = 0; i < bio.iterations; i++) {
         dv y = precond(p);
         dv v = A*y;
         T alpha = rho/rhat.dot(v);
         dv h = x + alpha*y;
         dv s = r - alpha*v;
-        nr = h.norm();
-        if ( (nr/nr0) < 1e-6 ) {
-            std::cout << "BiCGStab converged 1 with RR = " << nr/nr0 << std::endl;
-            return x;
-        }
         dv z = precond(s);
         dv t = A*z;
         dv Mt = precond(t);
         T omega = Mt.dot(z)/Mt.dot(Mt);
         x = h + omega*z;
         r = s - omega*t;
+
         nr = r.norm();
-        if ( (nr/nr0) < 1e-6 ) {
-            std::cout << "BiCGStab converged 2 with RR = " << nr/nr0 << std::endl;
+        bio.rr = nr/nr0;
+        if ( bio.rr < bio.rr_min ) {
+            if (bio.verbose) {
+                std::cout << "BiCGStab converged with RR = ";
+                std::cout << bio.rr << std::endl;
+            }
+            bio.iterations = i+1;
+            bio.status = bicgstab_status::converged;
+            return x;
+        }
+        if ( bio.rr > bio.rr_max ) {
+            if (bio.verbose) {
+                std::cout << "BiCGStab DIVERGED with RR = ";
+                std::cout << bio.rr << std::endl;
+            }
+            bio.iterations = i+1;
+            bio.status = bicgstab_status::diverged;
             return x;
         }
 
@@ -56,9 +91,15 @@ bicgstab(const Eigen::SparseMatrix<T>& A, const disk::dynamic_vector<T>& b,
         rho = rhat.dot(r);
         T beta = (rho/rho_prev)*(alpha/omega);
         p = r + beta*(p - omega*v);
+        bio.history.push_back(bio.rr);
+        if (bio.verbose) {
+            std::cout << "BiCGStab iteration " << i+1 << "/";
+            std::cout << bio.iterations << ", RR = ";
+            std::cout << bio.rr << std::endl;
+        }
     }
 
-
+    bio.status = bicgstab_status::not_converged;
     return x;
 }
 
@@ -289,6 +330,39 @@ public:
             ret = ret + Rtj.transpose() * w1;
         }
         return ret;
+    }
+
+    void save_debug_data(void) const {
+        disk::silo_database silo_db;
+        silo_db.create("ras_debug.silo");
+        silo_db.add_mesh(msh, "mesh");
+
+        for (auto& [tag, cell_present] : subdomain_cells)
+        {
+            std::vector<double> yesno(msh.cells_size());
+            std::transform(cell_present.begin(), cell_present.end(),
+                yesno.begin(), [](bool x) { return double(x); } );
+
+            std::stringstream ss;
+            ss << "domain" << tag;
+            silo_db.add_variable("mesh", ss.str(), yesno, disk::zonal_variable_t);
+        }
+
+        if constexpr (Mesh::dimension == 2) {
+            for (auto& [tag, ifcs] : subdomain_faces ) {
+                std::stringstream ss;
+                ss << "ras_debug_faces_" << tag << ".m";
+                std::ofstream ofs(ss.str());
+                for (size_t i = 0; i < ifcs.size(); i++) {
+                    if (not ifcs[i])
+                        continue;
+                    auto fc = msh.face_at(i);
+                    auto pts = points(msh, fc);
+                    ofs << "line([" << pts[0].x() << "," << pts[1].x() << "],";
+                    ofs << "[" << pts[0].y() << "," << pts[1].y() << "]);" << std::endl;
+                }
+            }
+        }
     }
 };
 

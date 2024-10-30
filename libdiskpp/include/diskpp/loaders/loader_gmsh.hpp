@@ -986,5 +986,90 @@ public:
     }
 };
 
+/* When GMSH partitions a mesh via metis, the faces on the
+ * partition boundaries will not generate new interfaces
+ * (of course!). However, for RAS-DD we need that info:
+ * compute it. */
+template<typename Mesh>
+void make_interpartition_boundaries(Mesh& msh)
+{
+    auto cvf = disk::connectivity_via_faces(msh);
+
+    using ipair = std::pair<size_t, size_t>;
+    std::map<ipair, std::set<size_t>> newfaces;
+
+    auto mkipair = [](size_t tag_a, size_t tag_b) {
+        if (tag_a < tag_b)
+            return std::pair(tag_a, tag_b);
+        return std::pair(tag_b, tag_a);
+    };
+
+    for (auto& cl : msh) {
+        auto di = msh.domain_info(cl);
+        auto fcs = faces(msh, cl);
+        for (auto& fc : fcs) {
+            auto neigh = cvf.neighbour_via(msh, cl, fc);
+            if (not neigh)
+                continue;
+
+            auto ncl = neigh.value();
+            auto ndi = msh.domain_info(ncl);
+            if ( di.tag() == ndi.tag() )
+                continue;
+
+            newfaces[mkipair(di.tag(), ndi.tag())].insert(offset(msh, fc));
+        }
+    }
+
+    size_t maxbnd = 0;
+    auto storage = msh.backend_storage();
+    for (auto& bi : storage->boundary_info)
+        maxbnd = std::max(maxbnd, bi.tag());
+    
+    for (auto& [ip, fcnums] : newfaces) {
+        maxbnd++;
+        for (auto& fcnum : fcnums) {
+            if (not storage->boundary_info[fcnum].is_boundary())
+                storage->boundary_info[fcnum] = {maxbnd, maxbnd, true, true};
+        }
+    }
+}
+
+template<disk::mesh_2D Mesh>
+void dump_subdomain_boundaries(const Mesh& msh)
+{
+    using pt = typename Mesh::point_type;
+    std::map<size_t, std::vector<std::pair<pt, pt>>> epts; 
+    for (auto& cl : msh)
+    {
+        auto di = msh.domain_info(cl);
+
+        auto fcs = faces(msh, cl);
+        for (auto& fc : fcs)
+        {
+            auto bi = msh.boundary_info(fc);
+            if (not bi.is_boundary())
+                continue;
+            //if (not bi.is_internal())
+            //    continue;
+
+            auto pts = points(msh, fc);
+            epts[di.tag()].push_back({pts[0], pts[1]});
+        }
+    }
+
+    std::cout << epts.size() << std::endl;
+
+    for (auto& [tag, pts] : epts) {
+        std::cout << pts.size() << std::endl;
+        std::stringstream ss;
+        ss << "interface_" << tag << ".txt";
+        std::ofstream ofs(ss.str());
+        for (auto& [p0,p1] : pts) {
+            auto dp = p1 - p0;
+            ofs << p0.x() << " " << p0.y() << " " << dp.x() << " " << dp.y() << std::endl;
+        }
+    }
+}
 
 } //namespace disk
