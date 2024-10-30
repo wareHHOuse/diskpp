@@ -8,6 +8,9 @@
  * Dipartimento di Matematica
  */
 
+#include "diskpp/common/timecounter.hpp"
+#include "mumps.hpp"
+
 template<typename T, typename Functor>
 disk::dynamic_vector<T>
 bicgstab(const Eigen::SparseMatrix<T>& A, const disk::dynamic_vector<T>& b,
@@ -68,7 +71,17 @@ class rasdd {
     using flagmap_type = std::map<size_t, std::vector<bool>>;
     using weightmap_type = std::map<size_t, disk::dynamic_vector<CoordT>>;
     using Rmatmap_type = std::map<size_t, std::pair<spmat_t, spmat_t>>;
+
+#ifdef HHODD_USE_EIGEN_SPARSELU
+    using lu_type = Eigen::SparseLU<spmat_t>;
+#endif
+#ifdef HHODD_USE_PARDISO
     using lu_type = Eigen::PardisoLU<spmat_t>;
+#endif
+#ifdef HHODD_USE_MUMPS
+    using lu_type = mumps_solver<ScalT>;
+#endif
+
     using lumap_type = std::map<size_t, lu_type>;
 
     flagmap_type    subdomain_cells;
@@ -236,12 +249,23 @@ public:
             Rmats[tag] = std::pair(Rj, Rtj);
         }
 
-        std::cout << "Factorizing local matrices..." << std::endl;
+#ifdef HHODD_USE_EIGEN_SPARSELU
+        std::cout << "Factorizing local matrices (SparseLU)..." << std::endl;
+#endif
+#ifdef HHODD_USE_PARDISO
+        std::cout << "Factorizing local matrices (PARDISO)..." << std::endl;
+#endif
+#ifdef HHODD_USE_MUMPS
+        std::cout << "Factorizing local matrices (MUMPS)..." << std::endl;
+#endif
         for (auto& [tag, mats] : Rmats) {
-            std::cout << " - Subdomain " << tag << std::endl;
+            timecounter tc;
+            tc.tic();
+            std::cout << " - Subdomain " << tag << "..." << std::flush;
             auto& [Rj, Rtj] = mats;
             spmat_t Aj = Rj*A*Rj.transpose();
             invAs[tag].compute(Aj);
+            std::cout << "done in " << tc.toc() << " seconds" << std::endl;
         }
     }
 
