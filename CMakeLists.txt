@@ -7,7 +7,6 @@ if ( WIN32 )
     message(FATAL_ERROR "Sorry, Windows is not supported.")
 endif()
 
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 ######################################################################
@@ -69,7 +68,18 @@ if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
             message(FATAL_ERROR "git submodule update --init --recursive failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
         endif()
     endif()
+
+    execute_process( COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+      OUTPUT_VARIABLE "DISKPP_GIT_REVISION"
+      ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+else()
+    set(DISKPP_GIT_REVISION 0)
 endif()
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/diskpp_git_revision.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/diskpp_git_revision.h @ONLY)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 ######################################################################
 ## Eigen3

@@ -8,6 +8,7 @@
  * Dipartimento di Matematica
  */
 
+#include <cstddef>
 #include <iostream>
 #include <regex>
 #include <set>
@@ -16,11 +17,15 @@
 
 #include "diskpp/common/util.h"
 #include "diskpp/loaders/loader.hpp"
+#include "diskpp/loaders/loader_gmsh.hpp"
+#include "diskpp/loaders/loader_utils.hpp"
+#include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/output/silo.hpp"
 #include "diskpp/methods/hho_slapl.hpp"
 #include "diskpp/methods/hho"
 #include "rasdd.hpp"
 
+#include "diskpp_git_revision.h"
 
 
 namespace disk {
@@ -92,6 +97,13 @@ enum class ras_mode {
     iterate
 };
 
+enum class mesh_type {
+    triangles,
+    cartesian,
+    hexas,
+    tetras,
+    undefined,
+};
 struct solver_config {
     size_t          overlap;
     size_t          ras_maxiter;
@@ -103,6 +115,9 @@ struct solver_config {
     std::string     fn_silo;
     std::string     fn_err_hist;
     std::string     outdir;
+    mesh_type       meshtype;
+    size_t          imesh_reflevels;
+    size_t          imesh_partitions;
 };
 
 struct iterdata {
@@ -252,8 +267,83 @@ diffusion_solver(const Mesh& msh, const solver_config& scfg)
     }
 }
 
+template<typename Mesh>
+void
+partition_unit_square_mesh(Mesh& msh, size_t np)
+{
+    if (np < 2)
+        return;
+
+    auto storage = msh.backend_storage();
+    for (size_t cell_i = 0; cell_i < msh.cells_size(); cell_i++) {
+        auto cl = msh.cell_at(cell_i);
+        auto bar = barycenter(msh, cl);
+        auto domxy = bar * np;
+
+        size_t subdom = 0;
+        if constexpr (Mesh::dimension == 1)
+            subdom = size_t(domxy.x());
+        if constexpr (Mesh::dimension == 2)
+            subdom = size_t(domxy.x()) + np*size_t(domxy.y());
+        if constexpr (Mesh::dimension == 3)
+            subdom = size_t(domxy.x()) + np*(size_t(domxy.y()) + np*size_t(domxy.z()));
+
+        storage->subdomain_info[cell_i] = disk::subdomain_descriptor(subdom);
+    }
+
+    disk::make_interpartition_boundaries(msh);
+    disk::renumber_hypercube_boundaries(msh);
+}
+
+void
+run_on_internal_mesh(const solver_config& scfg)
+{
+    using T = double;
+
+    if (scfg.meshtype == mesh_type::triangles) {
+        disk::simplicial_mesh<T,2> msh;
+        auto mesher = make_simple_mesher(msh);
+        for (size_t l = 0; l < scfg.imesh_reflevels; l++)
+            mesher.refine();
+        
+        partition_unit_square_mesh(msh, scfg.imesh_partitions);
+        diffusion_solver(msh, scfg);
+    }
+
+    if (scfg.meshtype == mesh_type::cartesian) {
+        disk::cartesian_mesh<T,2> msh;
+        auto mesher = make_simple_mesher(msh);
+        for (size_t l = 0; l < scfg.imesh_reflevels; l++)
+            mesher.refine();
+        
+        partition_unit_square_mesh(msh, scfg.imesh_partitions);
+        diffusion_solver(msh, scfg);
+    }
+
+    if (scfg.meshtype == mesh_type::hexas) {
+        disk::generic_mesh<T,2> msh;
+        auto mesher = make_fvca5_hex_mesher(msh);
+        mesher.make_level(scfg.imesh_reflevels);
+
+        partition_unit_square_mesh(msh, scfg.imesh_partitions);
+        diffusion_solver(msh, scfg);
+    }
+
+    if (scfg.meshtype == mesh_type::tetras) {
+        disk::simplicial_mesh<T,3> msh;
+        auto mesher = make_simple_mesher(msh);
+        for (size_t l = 0; l < scfg.imesh_reflevels; l++)
+            mesher.refine();
+        
+        partition_unit_square_mesh(msh, scfg.imesh_partitions);
+        diffusion_solver(msh, scfg);
+    }
+}
+
 int main(int argc, char **argv)
 {
+    std::cout << "HHO-DD solver, revision " << GIT_REVISION << std::endl;
+    
     rusage_monitor rm(false);
 
     solver_config scfg;
@@ -267,15 +357,25 @@ int main(int argc, char **argv)
     scfg.fn_err_hist = "error.txt";
     scfg.fn_silo = "";
     scfg.outdir = "";
+    scfg.meshtype = mesh_type::undefined;
+    scfg.imesh_partitions = 2;
+    scfg.imesh_reflevels = 2;
 
     int opt;
-    while ((opt = getopt(argc, argv, "o:i:k:b:e:s:d:MIDR")) != -1) {
+    while ((opt = getopt(argc, argv, "b:d:e:i:k:m:o:p:r:s:DIMR")) != -1) {
         switch (opt) {
 
-        case 'o': { /* number of overlap layers */
-            int optval = std::max(0, atoi(optarg));
-            scfg.overlap = optval;
-            } break;
+        case 'b': /* BiCGStab history filename (bicgstab mode) */
+            scfg.fn_bicg_hist = optarg;
+            break;
+
+        case 'd': /* output data directory */
+            scfg.outdir = optarg;
+            break;
+
+        case 'e': /* Error history filename (iter mode) */
+            scfg.fn_err_hist = optarg;
+            break;
 
         case 'i': {
             int optval = std::max(0, atoi(optarg));
@@ -287,32 +387,48 @@ int main(int argc, char **argv)
             scfg.degree = optval;
             } break;
 
-        case 'b': /* BiCGStab history filename (bicgstab mode) */
-            scfg.fn_bicg_hist = optarg;
-            break;
-        
-        case 'e': /* Error history filename (iter mode) */
-            scfg.fn_err_hist = optarg;
-            break;
+        case 'm': { /* internal mesh type */
+            if ( std::string(optarg) == "tri" )
+                scfg.meshtype = mesh_type::triangles;
+            else if ( std::string(optarg) == "quad" )
+                scfg.meshtype = mesh_type::cartesian;
+            else if ( std::string(optarg) == "hex" )
+                scfg.meshtype = mesh_type::hexas;
+            else if ( std::string(optarg) == "tet" )
+                scfg.meshtype = mesh_type::tetras;
+            else
+                std::cout << "Warning: Wrong mesh type '" << optarg << "'" << std::endl;
+            } break;
 
+        case 'o': { /* number of overlap layers */
+            int optval = std::max(0, atoi(optarg));
+            scfg.overlap = optval;
+            } break;
+
+        case 'p': { /* partitions for internal mesh */
+            int optval = std::max(0, atoi(optarg));
+            scfg.imesh_partitions = optval;
+            } break;
+
+        case 'r': { /* refinement levels for internal mesh */
+            int optval = std::max(0, atoi(optarg));
+            scfg.imesh_reflevels = optval;
+            } break;
+            
         case 's': /* silo filename or prefix */
             scfg.fn_silo = optarg;
             break;
 
-        case 'd': /* output data directory */
-            scfg.outdir = optarg;
+        case 'D': /* Output subdomain debugging data */
+            scfg.ras_debug = true;
             break;
-
-        case 'M': /* enable mixed order */
-            scfg.variant = hho_variant::mixed_order;
-            break;
-
+        
         case 'I': /* Iterate instead of using BiCGStab */
             scfg.mode = ras_mode::iterate;
             break;
 
-        case 'D': /* Output subdomain debugging data */
-            scfg.mode = ras_mode::iterate;
+        case 'M': /* enable mixed order */
+            scfg.variant = hho_variant::mixed_order;
             break;
 
         case 'R': /* Enable resource usage reporting */
@@ -323,21 +439,24 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-    if (argc < 1) {
+    if ( (argc < 1) and (scfg.meshtype == mesh_type::undefined) ) {
         std::cout << "Usage: hhodd [options] <filename>\n\n";
         std::cout << " <filename> is the name of a GMSH script with `.geo2s`\n";
         std::cout << "   extension if the mesh is 2D or with `.geo3s` extension\n";
         std::cout << "   if the mesh is 3D.\n\nOther options:\n";
-        std::cout << "   -o <int> : number of overlap layers\n";
+        std::cout << "   -b <str> : BiCGStab history filename (default: bicgstab.txt)\n";
+        std::cout << "   -d <str> : Directory for all the output files\n";
+        std::cout << "   -e <str> : Error history filename (default: error.txt)\n";
         std::cout << "   -i <int> : maximum ras iterations (in iter mode)\n";
         std::cout << "   -k <int> : HHO degree\n";
-        std::cout << "   -b <str> : BiCGStab history filename (default: bicgstab.txt)\n";
-        std::cout << "   -e <str> : Error history filename (default: error.txt)\n";
+        std::cout << "   -m <std> : Use internal meshers (tri, quad, hex or tet)\n";
+        std::cout << "   -o <int> : number of overlap layers\n";
+        std::cout << "   -p <int> : Partitions for internal mesh\n";
+        std::cout << "   -r <int> : Refinement levels for internal mesh\n";
         std::cout << "   -s <str> : Silo filename (bicgstab mode) or prefix (iter mode)\n";
-        std::cout << "   -d <str> : Directory for all the output files\n";
-        std::cout << "   -M       : enable mixed-order HHO\n";
-        std::cout << "   -I       : iterate instead of using BiCGStab\n";
         std::cout << "   -D       : output subdomain debugging data\n";
+        std::cout << "   -I       : iterate instead of using BiCGStab\n";
+        std::cout << "   -M       : enable mixed-order HHO\n";
         std::cout << "   -R       : Report resource usage at exit\n";
         return 1;
     }
@@ -351,8 +470,19 @@ int main(int argc, char **argv)
     }
 
     const char *mesh_filename = argv[0];
+    if ( mesh_filename and (scfg.meshtype != mesh_type::undefined) ) {
+        std::cout << "Warning: both '-m' and a filename were specified. Ignoring -m.\n";
+    }
 
     using T = double;
+
+    if (scfg.meshtype != mesh_type::undefined)
+    {
+        run_on_internal_mesh(scfg);
+        return 0;
+    }
+
+    assert(argc > 0);
 
     /* GMSH */
     if (std::regex_match(mesh_filename, std::regex(".*\\.geo2s$") ))
@@ -362,11 +492,8 @@ int main(int argc, char **argv)
         using mesh_type = disk::simplicial_mesh<T,2>;
         mesh_type msh;
         disk::gmsh_geometry_loader< mesh_type > loader;
-        
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
-        //disk::make_interpartition_boundaries(msh);
-
         diffusion_solver(msh, scfg);
         return 0;
     }
@@ -379,11 +506,30 @@ int main(int argc, char **argv)
         using mesh_type = disk::simplicial_mesh<T,3>;
         mesh_type msh;
         disk::gmsh_geometry_loader< mesh_type > loader;
-        
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
-        //disk::make_interpartition_boundaries(msh);
+        diffusion_solver(msh, scfg);
+        return 0;
+    }
 
+    /* FVCA5 2D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
+        disk::generic_mesh<T,2> msh;
+        disk::load_mesh_fvca5_2d<T>(mesh_filename, msh);
+        partition_unit_square_mesh(msh, scfg.imesh_partitions);
+        diffusion_solver(msh, scfg);
+        return 0;
+    }
+
+    /* FVCA6 3D */
+    if (std::regex_match(mesh_filename, std::regex(".*\\.msh$") ))
+    {
+        std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
+        disk::generic_mesh<T,3> msh;
+        disk::load_mesh_fvca6_3d<T>(mesh_filename, msh);
+        partition_unit_square_mesh(msh, scfg.imesh_partitions);
         diffusion_solver(msh, scfg);
         return 0;
     }
