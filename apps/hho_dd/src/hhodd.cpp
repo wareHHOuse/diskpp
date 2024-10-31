@@ -11,6 +11,8 @@
 #include <iostream>
 #include <regex>
 #include <set>
+#include <string>
+#include <filesystem>
 
 #include "diskpp/common/util.h"
 #include "diskpp/loaders/loader.hpp"
@@ -97,8 +99,23 @@ struct solver_config {
     bool            ras_debug;
     hho_variant     variant;
     ras_mode        mode;
+    std::string     fn_bicg_hist;
+    std::string     fn_silo;
+    std::string     fn_err_hist;
+    std::string     outdir;
 };
 
+struct iterdata {
+    double error;
+    double residual;
+};
+
+std::ostream&
+operator<<(std::ostream& os, const iterdata& id)
+{
+    os << id.error << " " << id.residual;
+    return os;
+};
 
 template<typename Mesh>
 void
@@ -179,33 +196,41 @@ diffusion_solver(const Mesh& msh, const solver_config& scfg)
             dv diff = locsol - sol_ana;
             error += diff.dot(lhs*diff);
         }
-        disk::silo_database silo_db;
-        silo_db.create(filename);
-        silo_db.add_mesh(msh, "mesh");
-        silo_db.add_variable("mesh", "u", u_data, disk::zonal_variable_t);
+        if (filename != "") {
+            disk::silo_database silo_db;
+            silo_db.create(filename);
+            silo_db.add_mesh(msh, "mesh");
+            silo_db.add_variable("mesh", "u", u_data, disk::zonal_variable_t);
+        }
         return std::sqrt(error);
     };
 
     /* SOLVE */
     if (scfg.mode == ras_mode::iterate) {
-        std::vector<double> errors;
+        std::vector<iterdata> ids;
         disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.RHS.size());
         for (size_t niter = 0; niter < scfg.ras_maxiter; niter++) {
-            sol = sol + ras(assm.RHS - assm.LHS*sol);
-            
+            iterdata id;
+            disk::dynamic_vector<T> r = assm.RHS - assm.LHS*sol;
+            sol = sol + ras(r);
+            id.residual = r.norm();
             std::cout << "Postprocessing..." << std::endl;
             std::stringstream ss;
-            ss << "ras_iter_" << niter << ".silo";
-            std::cout << "  Saving solution to " << ss.str() << std::endl;
-            auto err = postpro(ss.str(), sol);
-            errors.push_back(err);
-            std::cout << "  A-norm error: " << err << std::endl;
+            
+            if (scfg.fn_silo != "") {
+                ss << scfg.fn_silo << "_iter" << niter << ".silo";
+                std::cout << "  Saving solution to " << ss.str() << std::endl;
+            }
+            
+            id.error = postpro(ss.str(), sol);
+            std::cout << "  A-norm error: " << id.error << std::endl;
+            ids.push_back(id);
         }
 
-        std::cout << "  Saving error history to error.txt" << std::endl;
-        std::ofstream ofs("error.txt");
-        for (auto& e : errors)
-            ofs << e << std::endl;
+        std::cout << "  Saving error history to " << scfg.fn_err_hist << std::endl;
+        std::ofstream ofs(scfg.fn_err_hist);
+        for (auto& id : ids)
+            ofs << id << std::endl;
     }
     else {
         disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.RHS.size());
@@ -213,19 +238,23 @@ diffusion_solver(const Mesh& msh, const solver_config& scfg)
         bio.verbose = true;
         sol = bicgstab(assm.LHS, assm.RHS, ras, bio);
         std::cout << "Postprocessing..." << std::endl;
-        std::cout << "  Saving BiCGStab history to bicgstab.txt" << std::endl;
-        std::ofstream ofs("bicgstab.txt");
+        std::cout << "  Saving BiCGStab history to " << scfg.fn_bicg_hist << std::endl;
+        std::ofstream ofs(scfg.fn_bicg_hist);
         for (auto& rr : bio.history)
             ofs << rr << std::endl;
-        std::cout << "  Saving solution to ras.silo" << std::endl;
-        auto err = postpro("ras.silo", sol);
+
+        if (scfg.fn_silo != "") {
+            std::cout << "  Saving solution to " << scfg.fn_silo << std::endl;
+        }
+        
+        auto err = postpro(scfg.fn_silo, sol);
         std::cout << "  A-norm error: " << err << std::endl;
     }
 }
 
 int main(int argc, char **argv)
 {
-    rusage_monitor rm;
+    rusage_monitor rm(false);
 
     solver_config scfg;
     scfg.overlap = 1;
@@ -234,9 +263,13 @@ int main(int argc, char **argv)
     scfg.ras_debug = false;
     scfg.variant = hho_variant::equal_order;
     scfg.mode = ras_mode::bicgstab;
+    scfg.fn_bicg_hist = "bicgstab.txt";
+    scfg.fn_err_hist = "error.txt";
+    scfg.fn_silo = "";
+    scfg.outdir = "";
 
     int opt;
-    while ((opt = getopt(argc, argv, "o:i:k:MID")) != -1) {
+    while ((opt = getopt(argc, argv, "o:i:k:b:e:s:d:MIDR")) != -1) {
         switch (opt) {
 
         case 'o': { /* number of overlap layers */
@@ -253,7 +286,23 @@ int main(int argc, char **argv)
             int optval = std::max(0, atoi(optarg));
             scfg.degree = optval;
             } break;
+
+        case 'b': /* BiCGStab history filename (bicgstab mode) */
+            scfg.fn_bicg_hist = optarg;
+            break;
         
+        case 'e': /* Error history filename (iter mode) */
+            scfg.fn_err_hist = optarg;
+            break;
+
+        case 's': /* silo filename or prefix */
+            scfg.fn_silo = optarg;
+            break;
+
+        case 'd': /* output data directory */
+            scfg.outdir = optarg;
+            break;
+
         case 'M': /* enable mixed order */
             scfg.variant = hho_variant::mixed_order;
             break;
@@ -264,6 +313,10 @@ int main(int argc, char **argv)
 
         case 'D': /* Output subdomain debugging data */
             scfg.mode = ras_mode::iterate;
+            break;
+
+        case 'R': /* Enable resource usage reporting */
+            rm.enabled(true);
             break;
         }
     }
@@ -278,10 +331,23 @@ int main(int argc, char **argv)
         std::cout << "   -o <int> : number of overlap layers\n";
         std::cout << "   -i <int> : maximum ras iterations (in iter mode)\n";
         std::cout << "   -k <int> : HHO degree\n";
+        std::cout << "   -b <str> : BiCGStab history filename (default: bicgstab.txt)\n";
+        std::cout << "   -e <str> : Error history filename (default: error.txt)\n";
+        std::cout << "   -s <str> : Silo filename (bicgstab mode) or prefix (iter mode)\n";
+        std::cout << "   -d <str> : Directory for all the output files\n";
         std::cout << "   -M       : enable mixed-order HHO\n";
         std::cout << "   -I       : iterate instead of using BiCGStab\n";
         std::cout << "   -D       : output subdomain debugging data\n";
+        std::cout << "   -R       : Report resource usage at exit\n";
         return 1;
+    }
+
+    if (scfg.outdir != "") {
+        std::filesystem::create_directory(scfg.outdir);
+        scfg.fn_bicg_hist = scfg.outdir + "/" + scfg.fn_bicg_hist;
+        scfg.fn_err_hist = scfg.outdir + "/" + scfg.fn_err_hist;
+        if (scfg.fn_silo != "")
+            scfg.fn_silo = scfg.outdir + "/" + scfg.fn_silo;
     }
 
     const char *mesh_filename = argv[0];
@@ -299,7 +365,7 @@ int main(int argc, char **argv)
         
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
-        disk::make_interpartition_boundaries(msh);
+        //disk::make_interpartition_boundaries(msh);
 
         diffusion_solver(msh, scfg);
         return 0;
@@ -316,7 +382,7 @@ int main(int argc, char **argv)
         
         loader.read_mesh(mesh_filename);
         loader.populate_mesh(msh);
-        disk::make_interpartition_boundaries(msh);
+        //disk::make_interpartition_boundaries(msh);
 
         diffusion_solver(msh, scfg);
         return 0;

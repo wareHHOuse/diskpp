@@ -39,17 +39,38 @@ unsigned int binomial(unsigned int n, unsigned int k)
 
 
 rusage_monitor::rusage_monitor()
+    : rm_enabled(true)
 {}
+
+rusage_monitor::rusage_monitor(bool enable)
+    : rm_enabled(enable)
+{}
+
+bool
+rusage_monitor::enabled(void) const
+{
+    return rm_enabled;
+}
+
+void
+rusage_monitor::enabled(bool enable)
+{
+    rm_enabled = enable;
+}
 
 rusage_monitor::~rusage_monitor()
 {
+    if (not enabled())
+        return;
+    
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);
 
     double u_secs = ru.ru_utime.tv_sec + ru.ru_utime.tv_usec/1e6;
     double s_secs = ru.ru_stime.tv_sec + ru.ru_stime.tv_usec/1e6;
 
-    std::cout << "User CPU time:   " << u_secs << " seconds" << std::endl;
-    std::cout << "System CPU time: " << s_secs << " seconds" << std::endl;
-    std::cout << "Max RSS:         " << ru.ru_maxrss/1024 << " MB" << std::endl;
+    std::cout << "Resource usage report:" << std::endl;
+    std::cout << "  User CPU time:   " << u_secs << " seconds" << std::endl;
+    std::cout << "  System CPU time: " << s_secs << " seconds" << std::endl;
+    std::cout << "  Max RSS:         " << ru.ru_maxrss/1024 << " MB" << std::endl;
 }

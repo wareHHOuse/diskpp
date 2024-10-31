@@ -3,15 +3,13 @@ Rectangle(1) = {0, 0, 0, 1.0, 1.0, 0};
 
 MeshSize{ PointsOf{ Surface{:}; } } = 0.02;
 
-RefineMesh;
-
 Mesh 2;
+RefineMesh;
+RefineMesh;
 
 Mesh.PartitionCreateTopology = 1;
 Mesh.PartitionCreateGhostCells = 0;
 Mesh.PartitionCreatePhysicals = 0;
-PartitionMesh 64;
-
+PartitionMesh 4;
 
 Recursive Delete{ Surface{1}; }
-

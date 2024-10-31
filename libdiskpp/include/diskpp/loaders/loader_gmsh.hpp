@@ -986,10 +986,14 @@ public:
     }
 };
 
-/* When GMSH partitions a mesh via metis, the faces on the
- * partition boundaries will not generate new interfaces
- * (of course!). However, for RAS-DD we need that info:
- * compute it. */
+/* I wrote this before discovering
+ *
+ *   Mesh.PartitionCreateTopology = 1;
+ *
+ * It essentially computes the boundaries between partitions
+ * and adds them to the mesh stucture.
+ * It can still be useful with other mesh formats...
+ */
 template<typename Mesh>
 void make_interpartition_boundaries(Mesh& msh)
 {
