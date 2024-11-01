@@ -114,8 +114,8 @@ renumber_hypercube_boundaries(Mesh& msh)
         const auto fcs = faces(msh, cl);
         for (const auto& fc : fcs)
         {
-            auto c = cvf.neighbour_via(msh, cl, fc);
-            if (not c)
+            auto neigh = cvf.neighbour_via(msh, cl, fc);
+            if (neigh)
                 continue; /* Not an external boundary */
 
             auto bn = boundary_number(normal(msh, cl, fc));
