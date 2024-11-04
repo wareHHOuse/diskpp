@@ -10,21 +10,26 @@
 
 #include <iostream>
 #include <vector>
+#include <map>
 #include <set>
 
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/output/silo.hpp"
 
-struct edge {
-    size_t p1;
-    size_t p2;
-};
+struct adjlist {
+    size_t nodes[2];
+    size_t used;
 
-std::ostream& operator<<(std::ostream& os, const edge& e) {
-    os << "[" << e.p1 << ", " << e.p2 << "]";
-    return os;
-}
+    adjlist() : used(0) {}
+
+    void insert(size_t n) {
+        if (used > 1)
+            throw std::logic_error("Adjacency list full.");
+
+        nodes[used++] = n;
+    }
+};
 
 template<typename SrcMesh>
 void agglomerate_by_subdomain(const SrcMesh& srcmsh,
@@ -34,37 +39,84 @@ void agglomerate_by_subdomain(const SrcMesh& srcmsh,
     using coord_type = typename SrcMesh::coordinate_type;
     using dst_mesh_type = disk::generic_mesh<coord_type, 2>;
     using src_face_type = typename src_mesh_type::face_type;
+    using dst_node_type = typename dst_mesh_type::node_type;
+    using dst_edge_type = typename dst_mesh_type::edge_type;
 
-    std::map<size_t, std::vector<edge>> elem_faces;
+    using polygraph_t = std::map<size_t, adjlist>;
+    std::map<size_t, polygraph_t> pgs;
+    std::vector<std::optional<size_t>> compress_map;
+    compress_map.resize(srcmsh.points_size());
 
+    /* Collect all the boundary edges of the subdomains we want to
+     * agglomerate in a polygon. Make a graph out of them. */
     for (auto& cl : srcmsh) {
         auto di = srcmsh.domain_info(cl);
+        auto& pg = pgs[di.tag()];
         auto fcs = faces(srcmsh, cl);
         for (auto& fc : fcs) {
             auto bi = srcmsh.boundary_info(fc);
             if (not bi.is_boundary())
                 continue;
-
             auto [pi1, pi2] = fc.point_ids();
-
-            elem_faces[di.tag()].push_back({pi1, pi2});
+            pg[pi1].insert(pi2);
+            pg[pi2].insert(pi1);
+            compress_map[pi1] = 1;
+            compress_map[pi2] = 1;
+            //auto node1 = typename dst_node_type::id_type(pi1);
+            //auto node2 = typename dst_node_type::id_type(pi2);
+            //auto e = dst_edge_type(node1, node2);
+            //edges.push_back(e);
         }
     }
 
-    for (auto& [tag, edges] : elem_faces) {
-        assert(edges.size() > 2);
-        for (size_t i = 0; i < edges.size(); i++) {
-            for (size_t j = 0; j < edges.size(); j++) {
-            if (edges[i-1].p2 == edges[i].p2)
-                std::swap(edges[i].p1, edges[i].p2);
-            }
+    std::vector<typename dst_mesh_type::edge_type> edges;
+    std::sort(edges.begin(), edges.end());
+    auto last = std::unique(edges.begin(), edges.end());
+    edges.erase(last, edges.end());
+
+    /* Make the original mesh to new mesh node mapping. Collect the
+     * necessary points and node numbers. */
+    auto srcstor = srcmsh.backend_storage();
+    auto dststor = dstmsh.backend_storage();
+    for (size_t i = 0, ci = 0; i < compress_map.size(); i++) {
+        if (compress_map[i]) {
+            dststor->points.push_back(srcstor->points[i]);
+            dststor->nodes.push_back(typename dst_mesh_type::node_type{ci});
+            compress_map[i] = ci++;
         }
     }
 
-    for (auto& [tag, edges] : elem_faces) {
-        for (auto& e : edges) 
-            std::cout << e << " ";
-        std::cout << std::endl;
+    /* Do a DFS to build the polygon out of its edges. This is a special
+     * case of DFS as each node is guaranteed to have only two neighbours.*/
+    for (auto& [tag, pg] : pgs) {
+        auto nvtx = pg.size();
+        assert(nvtx >= 3);
+        std::vector<size_t> path;
+        path.reserve(nvtx);
+        auto [n, adj] = *pg.begin();
+        assert(adj.used == 2);
+        size_t start = n;
+        size_t visiting = adj.nodes[0];
+        path.push_back(start);
+        for (size_t i = 1; i < nvtx; i++)
+        {
+            path.push_back(visiting);
+            adj = pg.at(visiting);
+            visiting = (adj.nodes[0] == path[i-1]) ? adj.nodes[1] : adj.nodes[0];
+        }
+        assert(visiting == start);
+        
+
+        /* Reverse the path if vertices are in clockwise order */
+        double dir = 0.0;
+        for (size_t i = 0; i < path.size(); i++) {
+            auto p0 = srcstor->points[ path[i] ];
+            auto p1 = srcstor->points[ path[(i+1)%path.size()] ];
+            dir += (p1.x() - p0.x())*(p1.y() + p0.y());
+        }
+
+        if (dir > 0)
+            std::reverse(path.begin(), path.end());
     }
 }
 
