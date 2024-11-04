@@ -13,6 +13,7 @@
 #include <map>
 #include <set>
 
+#include "diskpp/mesh/mesh.hpp"
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/output/silo.hpp"
@@ -41,6 +42,7 @@ void agglomerate_by_subdomain(const SrcMesh& srcmsh,
     using src_face_type = typename src_mesh_type::face_type;
     using dst_node_type = typename dst_mesh_type::node_type;
     using dst_edge_type = typename dst_mesh_type::edge_type;
+    using dst_surf_type = typename dst_mesh_type::surface_type;
 
     using polygraph_t = std::map<size_t, adjlist>;
     std::map<size_t, polygraph_t> pgs;
@@ -62,18 +64,9 @@ void agglomerate_by_subdomain(const SrcMesh& srcmsh,
             pg[pi2].insert(pi1);
             compress_map[pi1] = 1;
             compress_map[pi2] = 1;
-            //auto node1 = typename dst_node_type::id_type(pi1);
-            //auto node2 = typename dst_node_type::id_type(pi2);
-            //auto e = dst_edge_type(node1, node2);
-            //edges.push_back(e);
         }
     }
-
-    std::vector<typename dst_mesh_type::edge_type> edges;
-    std::sort(edges.begin(), edges.end());
-    auto last = std::unique(edges.begin(), edges.end());
-    edges.erase(last, edges.end());
-
+    
     /* Make the original mesh to new mesh node mapping. Collect the
      * necessary points and node numbers. */
     auto srcstor = srcmsh.backend_storage();
@@ -88,25 +81,23 @@ void agglomerate_by_subdomain(const SrcMesh& srcmsh,
 
     /* Do a DFS to build the polygon out of its edges. This is a special
      * case of DFS as each node is guaranteed to have only two neighbours.*/
+    std::map<size_t, std::vector<size_t>> paths;
     for (auto& [tag, pg] : pgs) {
         auto nvtx = pg.size();
         assert(nvtx >= 3);
         std::vector<size_t> path;
         path.reserve(nvtx);
-        auto [n, adj] = *pg.begin();
+        auto [start, adj] = *pg.begin();
         assert(adj.used == 2);
-        size_t start = n;
         size_t visiting = adj.nodes[0];
         path.push_back(start);
-        for (size_t i = 1; i < nvtx; i++)
-        {
+        for (size_t i = 1; i < nvtx; i++) {
             path.push_back(visiting);
             adj = pg.at(visiting);
             visiting = (adj.nodes[0] == path[i-1]) ? adj.nodes[1] : adj.nodes[0];
         }
         assert(visiting == start);
         
-
         /* Reverse the path if vertices are in clockwise order */
         double dir = 0.0;
         for (size_t i = 0; i < path.size(); i++) {
@@ -115,9 +106,51 @@ void agglomerate_by_subdomain(const SrcMesh& srcmsh,
             dir += (p1.x() - p0.x())*(p1.y() + p0.y());
         }
 
-        if (dir > 0)
-            std::reverse(path.begin(), path.end());
+        if (dir > 0) std::reverse(path.begin(), path.end());
+
+        /* and translate the node numbers to the new mesh numbering */
+        for (auto & n : path)
+            n = compress_map[ n ].value();
+
+        /* Now put all the edges in the mesh */
+        for (size_t i = 0; i < path.size(); i++) {
+            auto p0 = path[i];
+            auto p1 = path[(i+1)%path.size()];
+            auto node1 = typename dst_node_type::id_type(p0);
+            auto node2 = typename dst_node_type::id_type(p1);
+            auto e = dst_edge_type(node1, node2);
+            dststor->edges.push_back(e);
+        }
+
+        paths[tag] = std::move(path);
     }
+
+    /* Sort the edges and make them unique */
+    std::sort(dststor->edges.begin(), dststor->edges.end());
+    auto last = std::unique(dststor->edges.begin(), dststor->edges.end());
+    dststor->edges.erase(last, dststor->edges.end());
+
+    /* and finally all the elements */
+    for (auto& [tag, path] : paths) {
+        std::vector<typename dst_edge_type::id_type> surfedges;
+        for (size_t i = 0; i < path.size(); i++) {
+            auto p0 = path[i];
+            auto p1 = path[(i+1)%path.size()];
+            auto node1 = typename dst_node_type::id_type(p0);
+            auto node2 = typename dst_node_type::id_type(p1);
+            auto e = dst_edge_type(node1, node2);
+            auto eid = find_element_id(dststor->edges.begin(),
+                dststor->edges.end(), e);
+            surfedges.push_back(eid.second);
+        }
+
+        dst_surf_type newsurf(surfedges);
+        newsurf.set_point_ids(path.begin(), path.end());
+        dststor->surfaces.push_back(newsurf);
+    }
+
+    std::sort(dststor->surfaces.begin(), dststor->surfaces.end());
+    //disk::mark_internal_faces(dstmsh);
 }
 
 template<typename Mesh>
@@ -147,14 +180,51 @@ partition_unit_square_mesh(Mesh& msh, size_t np)
     disk::make_interpartition_boundaries(msh);
 }
 
+template<disk::mesh_2D Mesh>
+void dump_mesh(const Mesh& msh)
+{
+    for (size_t cli = 0; cli < msh.cells_size(); cli++) {
+        auto cl = msh.cell_at(cli);
+
+        std::stringstream ss;
+        ss << "cell_" << cli << ".m";
+        std::ofstream ofs(ss.str());
+        auto bar = barycenter(msh, cl);
+        ofs << "plot(" << bar.x() << "," << bar.y() << ",'*');\n";
+        ofs << "hold on;";
+        auto pts = points(msh, cl);
+        for (size_t i = 0; i < pts.size(); i++) {
+            auto p0 = pts[i];
+            auto p1 = pts[(i+1)%pts.size()];
+            if (i == 0)
+            {
+                ofs << "line([" << p0.x() << ", " << p1.x() << "], "
+                            "[" << p0.y() << ", " << p1.y() << "], 'Color', 'red');\n";
+            }
+            else
+            {
+                ofs << "line([" << p0.x() << ", " << p1.x() << "], "
+                            "[" << p0.y() << ", " << p1.y() << "], 'Color', 'blue');\n";
+            }
+        }
+    }
+}
+
 int main(void)
 {
     using T = double;
+    
+    
     disk::simplicial_mesh<T,2> srcmsh;
     auto mesher = make_simple_mesher(srcmsh);
     for (size_t l = 0; l < 1; l++)
         mesher.refine();
-        
+    
+/*
+    disk::generic_mesh<T,2> srcmsh;
+    auto mesher = make_fvca5_hex_mesher(srcmsh);
+    mesher.make_level(2);
+*/
     partition_unit_square_mesh(srcmsh, 2);
 
     std::vector<double> cp;
@@ -172,6 +242,28 @@ int main(void)
     disk::silo_database silo;
     silo.create("agglo.silo");
     silo.add_mesh(srcmsh, "srcmesh");
+    silo.add_mesh(dstmsh, "dstmesh");
     silo.add_variable("srcmesh", "partnum", cp, disk::zonal_variable_t);
+    
+    std::map<size_t, double> areas;
+    for (auto& scl : srcmsh) {
+        auto tag = srcmsh.domain_info(scl).tag();
+        areas[tag] += measure(srcmsh, scl);
+    }
+
+    for (auto& [tag, area] : areas)
+        std::cout << tag << " " << area << std::endl;
+
+    for (auto& dcl : dstmsh) {
+        std::cout << dcl << std::endl;
+        auto area = measure(dstmsh, dcl);
+        auto fcs = faces(dstmsh, dcl);
+        std::cout << area << " " << fcs.size() << std::endl;
+        for (auto& fc : fcs)
+            std::cout << normal(dstmsh, dcl, fc).transpose() << std::endl;
+    }
+
+    dump_mesh(dstmsh);
+
     return 0;
 }

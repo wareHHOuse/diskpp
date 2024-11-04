@@ -209,17 +209,14 @@ T
 measure(const generic_mesh<T,2>& msh,
     const typename generic_mesh<T,2>::cell& cl)
 {
-    /* Uses the divergence theorem: this way works on
-     * nonconvex elements without subtriangulating. */
     T tot_meas = 0.0;
-    auto fcs = faces(msh, cl);
-    for (auto& fc : fcs) {
-        auto bar = barycenter(msh, fc);
-        auto meas = measure(msh, fc);
-        auto n = normal(msh, cl, fc);
-        tot_meas += meas * (bar.x()*n[0]/2. + bar.y()*n[1]/2.);
+    auto pts = points(msh, cl);
+    for (size_t i = 0; i < pts.size(); i++) {
+        auto p0 = pts[i];
+        auto p1 = pts[(i+1)%pts.size()];
+        tot_meas -= (p1.x() - p0.x())*(p1.y() + p0.y());
     }
-    return tot_meas;
+    return tot_meas/2.0;
 }
 
 template<typename T>

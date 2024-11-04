@@ -648,6 +648,12 @@ public:
         return *std::next(this->faces_begin(), face_num);
     }
 
+    auto point_at(size_t point_num) const {
+        auto bs = this->backend_storage();
+        assert(point_num < bs->points.size());
+        return bs->points[point_num];
+    }
+
     void statistics(void) const
     {
         this->backend_storage()->statistics();
