@@ -3,6 +3,10 @@ project(diskpp_diffusion)
 
 set(LINK_LIBS diskpp)
 
+add_executable(hpoly_test src/hpoly_test.cpp)
+target_link_libraries(hpoly_test ${LINK_LIBS})
+install(TARGETS hpoly_test RUNTIME DESTINATION bin)
+
 add_executable(diffusion_vem src/diffusion_vem.cpp)
 target_link_libraries(diffusion_vem ${LINK_LIBS})
 install(TARGETS diffusion_vem RUNTIME DESTINATION bin)
