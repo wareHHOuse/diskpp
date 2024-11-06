@@ -107,6 +107,40 @@ faces(const generic_mesh<T, DIM>& msh,
     return ret;
 }
 
+#ifdef ENABLE_CCW_FACES
+template<typename T>
+std::vector<typename generic_mesh<T, 2>::face>
+faces(const generic_mesh<T, 2>& msh,
+      const typename generic_mesh<T, 2>::cell& cl)
+{
+    using face_type = typename generic_mesh<T, 2>::face;
+    using nodeid_type = typename generic_mesh<T, 2>::node_type::id_type;
+    std::vector<face_type> ret;
+    auto ptids = cl.point_ids();
+    for (size_t i = 0; i < ptids.size(); i++) {
+        auto p0 = nodeid_type(ptids[i]);
+        auto p1 = nodeid_type(ptids[(i+1)%ptids.size()]);
+        ret.push_back(face_type(p0,p1));
+    }
+    return ret;
+}
+
+template<typename T>
+static_vector<T, 2>
+normal(const generic_mesh<T, 2>& msh,
+       const typename generic_mesh<T, 2>::cell& cl,
+       const typename generic_mesh<T, 2>::face& fc)
+{
+    auto pts = points(msh, fc);
+    assert(pts.size() == 2);
+
+    auto v = pts[1] - pts[0];
+    auto n = (point<T,2>({v.y(), -v.x()})).to_vector();
+
+    return n/n.norm();
+}
+#endif
+
 template<typename T, size_t DIM>
 std::vector<typename generic_mesh<T, DIM>::face::id_type>
 faces_id(const generic_mesh<T, DIM>& msh, const typename generic_mesh<T, DIM>::cell& cl)
