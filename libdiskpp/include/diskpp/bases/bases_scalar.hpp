@@ -1146,7 +1146,7 @@ compute_averages(const Mesh& msh, const Element& elem, const Basis& basis)
 }
 */
 
-
+//#define USE_H2DT
 
 inline size_t
 harmonic_basis_size(size_t k, size_t d)
@@ -1154,9 +1154,13 @@ harmonic_basis_size(size_t k, size_t d)
     if (d == 2)
         return 2*k+1;
 
-    if (d == 3)
-        //return 3*k+1;
+    if (d == 3) {
+#ifdef USE_H2DT
         return (k == 0) ? 1 : 4+6*(k-1);
+#else
+        return 3*k+1;
+#endif
+    }
 
     throw std::invalid_argument("not yet implemented");
 }
@@ -1466,6 +1470,7 @@ public:
     }
 };
 
+#ifdef USE_H2DT
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
 class scaled_harmonic_top_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell, ScalarType>
@@ -1716,7 +1721,8 @@ public:
     }
 };
 
-#if 0
+#else /* USE_H2DT */
+
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
 class scaled_harmonic_top_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell, ScalarType>
     : public scaled_monomial_abstract_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell, ScalarType>
@@ -1756,15 +1762,31 @@ private:
         }
 
         auto R2 = bp.x()*bp.x() + bp.y()*bp.y() + bp.z()*bp.z();
+        auto r2 = bp.y()*bp.y() + bp.z()*bp.z();
 
         for(size_t n = 1; n < hmd; n++) {
             for (size_t m = 0; m <= n; m++) {
                 assert(n >= m and n > 0);
-                auto mult = 1.0/(n+m+1.0);
+                auto multn = 2*(m+1);
+                auto multd = (n+m+1)*r2;
+                auto mult = multn/multd;
+                auto c1 = (R2*Cs(n-1,m)-bp.x()*Cs(n,m))*bp.y();
+                auto c2 = (R2*Ss(n-1,m)-bp.x()*Ss(n,m))*bp.z();
+                Cs(n,m+1) = mult*(c1-c2);
+                auto s1 = (R2*Ss(n-1,m)-bp.x()*Ss(n,m))*bp.y();
+                auto s2 = (R2*Cs(n-1,m)-bp.x()*Cs(n,m))*bp.z();
+                Ss(n,m+1) = mult*(s1+s2);
+
+                mult = 1.0/(n+m+1.0);
                 Cs(n+1,m) = mult*( (2*n+1)*bp.x()*Cs(n,m) - (n-m)*R2*Cs(n-1, m) );
                 Ss(n+1,m) = mult*( (2*n+1)*bp.x()*Ss(n,m) - (n-m)*R2*Ss(n-1, m) );
             }
         }
+
+        //std::cout << " *** Cs ***" << std::endl;
+        //std::cout << Cs << std::endl;
+        //std::cout << " *** Ss ***" << std::endl;
+        //std::cout << Ss << std::endl;
 
         return std::pair(Cs, Ss);
     }
@@ -1955,7 +1977,7 @@ public:
     }
 };
 
-#endif
+#endif /* USE_H2DT */
 
 template<typename Mesh, typename ElemType, typename ScalarType = typename Mesh::coordinate_type>
 auto

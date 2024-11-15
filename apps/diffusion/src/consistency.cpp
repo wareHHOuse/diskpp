@@ -131,6 +131,8 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
             std::cout << "-GR rows: " << GR.rows() << std::endl;
         }
 
+        assert(GR.rows() == totto-1);
+
         Eigen::Matrix<T, Eigen::Dynamic, 1> poly_rec =
             GR * poly_hho;
 
