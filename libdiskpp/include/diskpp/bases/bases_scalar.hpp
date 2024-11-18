@@ -1158,7 +1158,7 @@ harmonic_basis_size(size_t k, size_t d)
 #ifdef USE_H2DT
         return (k == 0) ? 1 : 4+6*(k-1);
 #else
-        return 3*k+1;
+        return (k+1)*(k+1);
 #endif
     }
 
@@ -1509,7 +1509,7 @@ private:
             ret(3) = bp.z();
         }
 
-        if ( full_basis_degree > 1 && harmonic_min_degree < 2 ) {
+        if ( full_basis_degree > 1){//} && harmonic_min_degree < 2 ) {
             auto x = bp.x(); auto y = bp.y(); auto z = bp.z();
             ret(4) = x*x - y*y;
             ret(5) = 2*x*y;
@@ -1552,19 +1552,16 @@ private:
         if ( full_basis_degree > 0 ) {
             ret(1,0) = sx; ret(1,1) = 0.0; ret(1,2) = 0.0;
             ret(2,0) = 0.0; ret(2,1) = sy; ret(2,2) = 0.0;
-            ret(2,0) = 0.0; ret(2,1) = 0.0; ret(2,2) = sz;
+            ret(3,0) = 0.0; ret(3,1) = 0.0; ret(3,2) = sz;
+        }
 
-            if (full_basis_degree == 1)
-                return ret;
-
-            if (full_basis_degree > 1 && harmonic_min_degree < 2) {
-                ret(3,0) = sx*2.0*bp.x(); ret(3,1) = -sy*2.0*bp.y(); ret(3,2) = 0.0;
-                ret(4,0) = sx*2.0*bp.y(); ret(4,1) =  sy*2.0*bp.x(); ret(4,2) = 0.0;
-                ret(5,0) = sx*2.0*bp.x(); ret(5,1) = 0.0; ret(5,2) = -sz*2.0*bp.z();
-                ret(6,0) = sx*2.0*bp.z(); ret(6,1) = 0.0; ret(6,2) =  sz*2.0*bp.x();
-                ret(7,0) = 0.0; ret(5,1) = sy*2.0*bp.y(); ret(5,2) = -sz*2.0*bp.z();
-                ret(8,0) = 0.0; ret(6,1) = sy*2.0*bp.z(); ret(6,2) =  sz*2.0*bp.y();
-            }
+        if (full_basis_degree > 1){//} && harmonic_min_degree < 2) {
+            ret(4,0) = sx*2.0*bp.x(); ret(4,1) = -sy*2.0*bp.y(); ret(4,2) = 0.0;
+            ret(5,0) = sx*2.0*bp.y(); ret(5,1) =  sy*2.0*bp.x(); ret(5,2) = 0.0;
+            ret(6,0) = sx*2.0*bp.x(); ret(6,1) = 0.0; ret(6,2) = -sz*2.0*bp.z();
+            ret(7,0) = sx*2.0*bp.z(); ret(7,1) = 0.0; ret(7,2) =  sz*2.0*bp.x();
+            ret(8,0) = 0.0; ret(8,1) = sy*2.0*bp.y(); ret(8,2) = -sz*2.0*bp.z();
+            ret(9,0) = 0.0; ret(9,1) = sy*2.0*bp.z(); ret(9,2) =  sz*2.0*bp.y();
         }
 
         auto funcs = eval_harmonic(bp);
@@ -1578,10 +1575,10 @@ private:
             auto k_iQi = i*funcs(6*i-9);
             ret(6*i-8, 0) = sx*i_iPi; ret(6*i-8, 1) = -sy*i_iQi; ret(6*i-8, 2) = 0.0;
             ret(6*i-7, 0) = sx*i_iQi; ret(6*i-7, 1) =  sy*i_iPi; ret(6*i-7, 2) = 0.0;
-            ret(6*i-6, 0) = sx*j_iPi; ret(6*i-8, 1) = 0.0; ret(6*i-6, 2) = -sz*j_iQi; 
-            ret(6*i-5, 0) = sx*j_iQi; ret(6*i-7, 1) = 0.0; ret(6*i-5, 2) =  sz*j_iPi;
-            ret(6*i-8, 0) = 0.0; ret(6*i-6, 1) = sy*k_iPi; ret(6*i-6, 2) = -sz*k_iQi; 
-            ret(6*i-7, 0) = 0.0; ret(6*i-5, 1) = sy*k_iQi; ret(6*i-5, 2) =  sz*k_iPi;  
+            ret(6*i-6, 0) = sx*j_iPi; ret(6*i-6, 1) = 0.0; ret(6*i-6, 2) = -sz*j_iQi; 
+            ret(6*i-5, 0) = sx*j_iQi; ret(6*i-5, 1) = 0.0; ret(6*i-5, 2) =  sz*j_iPi;
+            ret(6*i-4, 0) = 0.0; ret(6*i-4, 1) = sy*k_iPi; ret(6*i-4, 2) = -sz*k_iQi; 
+            ret(6*i-3, 0) = 0.0; ret(6*i-3, 1) = sy*k_iQi; ret(6*i-3, 2) =  sz*k_iPi;  
         }
 
         return ret;
@@ -1764,22 +1761,24 @@ private:
         auto R2 = bp.x()*bp.x() + bp.y()*bp.y() + bp.z()*bp.z();
         auto r2 = bp.y()*bp.y() + bp.z()*bp.z();
 
-        for(size_t n = 1; n < hmd; n++) {
-            for (size_t m = 0; m <= n; m++) {
-                assert(n >= m and n > 0);
-                auto multn = 2*(m+1);
-                auto multd = (n+m+1)*r2;
-                auto mult = multn/multd;
-                auto c1 = (R2*Cs(n-1,m)-bp.x()*Cs(n,m))*bp.y();
-                auto c2 = (R2*Ss(n-1,m)-bp.x()*Ss(n,m))*bp.z();
-                Cs(n,m+1) = mult*(c1-c2);
-                auto s1 = (R2*Ss(n-1,m)-bp.x()*Ss(n,m))*bp.y();
-                auto s2 = (R2*Cs(n-1,m)-bp.x()*Cs(n,m))*bp.z();
-                Ss(n,m+1) = mult*(s1+s2);
-
-                mult = 1.0/(n+m+1.0);
-                Cs(n+1,m) = mult*( (2*n+1)*bp.x()*Cs(n,m) - (n-m)*R2*Cs(n-1, m) );
-                Ss(n+1,m) = mult*( (2*n+1)*bp.x()*Ss(n,m) - (n-m)*R2*Ss(n-1, m) );
+        for(int n = 0; n <= hmd; n++) {
+            for (int m = 0; m <= n; m++) {
+                if (n >= 2 && m < n) {
+                    auto multn = 2*(m+1);
+                    auto multd = (n+m+1)*r2;
+                    auto mult = multn/multd;
+                    auto c1 = (R2*Cs(n-1,m)-bp.x()*Cs(n,m))*bp.y();
+                    auto c2 = (R2*Ss(n-1,m)-bp.x()*Ss(n,m))*bp.z();
+                    Cs(n,m+1) = mult*(c1-c2);
+                    auto s1 = (R2*Ss(n-1,m)-bp.x()*Ss(n,m))*bp.y();
+                    auto s2 = (R2*Cs(n-1,m)-bp.x()*Cs(n,m))*bp.z();
+                    Ss(n,m+1) = mult*(s1+s2);
+                }
+                if (n >= 1 and m < 2 and n < hmd) {
+                    auto mult = 1.0/(n+m+1.0);
+                    Cs(n+1,m) = mult*( (2*n+1)*bp.x()*Cs(n,m) - (n-m)*R2*Cs(n-1, m) );
+                    Ss(n+1,m) = mult*( (2*n+1)*bp.x()*Ss(n,m) - (n-m)*R2*Ss(n-1, m) );
+                }
             }
         }
 
@@ -1802,15 +1801,15 @@ private:
         ret(0) = 1.0;
         size_t ofs = 1;
         for(size_t n = 1; n <= hmd; n++) {
-            for (size_t m = 0; m <= 1; m++) {
+            for (size_t m = 0; m <= n; m++) {
                 ret(ofs++) = Cs(n,m);
             }
             
-            for (size_t m = 1; m <= 1; m++) {
+            for (size_t m = 1; m <= n; m++) {
                 ret(ofs++) = Ss(n,m);
             }
         }
-        //assert(ofs == bsize);
+        assert(ofs == bsize);
         return ret;
     }
 
@@ -1826,21 +1825,21 @@ private:
 
         size_t ofs = 1;
         for(size_t n = 1; n <= hmd; n++) {
-            for (size_t m = 0; m <= 1; m++) {
+            for (size_t m = 0; m <= n; m++) {
                 ret(ofs, 0) = (n-m)*Cs(n-1,m);
                 ret(ofs, 1) = (bp.y()/r2)*(n*Cs(n,m) - (n-m)*bp.x()*Cs(n-1,m)) + m*Ss(n,m)*bp.z()/r2;
                 ret(ofs, 2) = (bp.z()/r2)*(n*Cs(n,m) - (n-m)*bp.x()*Cs(n-1,m)) - m*Ss(n,m)*bp.y()/r2;
                 ofs++;
             }
 
-            for (size_t m = 1; m <= 1; m++) {
+            for (size_t m = 1; m <= n; m++) {
                 ret(ofs, 0) = (n-m)*Ss(n-1,m);
                 ret(ofs, 1) = (bp.y()/r2)*(n*Ss(n,m) - (n-m)*bp.x()*Ss(n-1,m)) - m*Cs(n,m)*bp.z()/r2;
                 ret(ofs, 2) = (bp.z()/r2)*(n*Ss(n,m) - (n-m)*bp.x()*Ss(n-1,m)) + m*Cs(n,m)*bp.y()/r2;
                 ofs++;
             }
         }
-        //assert(ofs == bsize);
+        assert(ofs == bsize);
 
         return ret;
     }
