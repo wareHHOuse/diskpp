@@ -54,6 +54,7 @@
 #pragma once
 
 
+#include <Eigen/src/Core/util/Constants.h>
 #include <silo.h>
 #include <complex>
 #include <algorithm>
@@ -708,6 +709,43 @@ public:
         }
         else
             return false;
+
+        return true;
+    }
+
+    template<typename T>
+    bool add_variable(const std::string& mesh_name,
+                      const std::string& var_name,
+                      const Eigen::Matrix<T, Eigen::Dynamic, 2>& var,
+                      variable_centering_t centering)
+    {
+        Eigen::Matrix<T, Eigen::Dynamic, 1> c = var.col(0);
+        add_variable(mesh_name, var_name+"_x", c, centering);
+        c = var.col(1);
+        add_variable(mesh_name, var_name+"_y", c, centering);
+        std::stringstream exprss;
+        exprss << "{" << var_name << "_x" << ", " << var_name << "_y" << "}";
+        add_expression(var_name, exprss.str().c_str(), DB_VARTYPE_VECTOR);
+
+        return true;
+    }
+
+    template<typename T>
+    bool add_variable(const std::string& mesh_name,
+                      const std::string& var_name,
+                      const Eigen::Matrix<T, Eigen::Dynamic, 3>& var,
+                      variable_centering_t centering)
+    {
+        Eigen::Matrix<T, Eigen::Dynamic, 1> c = var.col(0);
+        add_variable(mesh_name, var_name+"_x", c, centering);
+        c = var.col(1);
+        add_variable(mesh_name, var_name+"_y", c, centering);
+        c = var.col(2);
+        add_variable(mesh_name, var_name+"_z", c, centering);
+        std::stringstream exprss;
+        exprss << "{" << var_name << "_x" << ", " << var_name << "_y";
+        exprss << ", " << var_name << "_z" << "}";
+        add_expression(var_name, exprss.str().c_str(), DB_VARTYPE_VECTOR);
 
         return true;
     }
