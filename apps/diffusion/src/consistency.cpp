@@ -96,7 +96,15 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
 
         auto hb = make_scalar_harmonic_top_basis(msh, cl, hdi.reconstruction_degree());
         hb.maximum_polynomial_degree(rd);
-        
+
+        disk::dynamic_vector<T> p = cb.eval_functions(barycenter(msh, cl));
+        disk::dynamic_vector<T> q = hb.eval_functions(barycenter(msh, cl)).head(cb.size());
+        std::cout << "DIFF pq: " << (p-q).norm() << std::endl;
+
+        disk::dynamic_matrix<T> Gp = cb.eval_gradients(barycenter(msh, cl));
+        disk::dynamic_matrix<T> Gq = hb.eval_gradients(barycenter(msh, cl)).block(0,0,cb.size(),Mesh::dimension);
+        std::cout << "DIFF GpGq: " << (Gp-Gq).norm() << std::endl;
+
         /* Polynomial of degree k+1 to check consistency */
         Eigen::Matrix<T, Eigen::Dynamic, 1> poly_h = disk::project_function(msh, cl, hb, poly);
 
@@ -122,6 +130,8 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
             GR = oper.first;
             std::cout << "-GR rows: " << GR.rows() << std::endl;
         }
+
+        assert(GR.rows() == totto-1);
 
         Eigen::Matrix<T, Eigen::Dynamic, 1> poly_rec =
             GR * poly_hho;
@@ -235,6 +245,16 @@ int main(int argc, char **argv)
             load_single_element_csv(msh_gen, mesh_filename);
             test_consistency(msh_gen, degree, increment, variant);
             std::cout << std::endl;
+            return 0;
+        }
+
+        /* FVCA5 2D */
+        if (std::regex_match(mesh_filename, std::regex(".*\\.typ1$") ))
+        {
+            std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
+            disk::generic_mesh<T,2> msh;
+            disk::load_mesh_fvca5_2d<T>(mesh_filename.c_str(), msh);
+            test_consistency(msh, degree, increment, variant);
             return 0;
         }
 

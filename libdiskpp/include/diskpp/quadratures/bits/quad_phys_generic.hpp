@@ -138,12 +138,12 @@ integrate_polyhedron(const disk::generic_mesh<T, 3>&                msh,
     const auto rss = split_in_raw_tetrahedra(msh, cl);
 
     std::vector<quadpoint_type> ret;
-    ret.reserve(tetrahedron_arbq_size(degree) * rss.size());
+    //ret.reserve(tetrahedron_arbq_size(degree) * rss.size());
     for (auto& rs : rss)
     {
         const auto pts = rs.points();
         assert(pts.size() == 4);
-        const auto quad_tet = disk::quadrature::arbq(degree, pts[0], pts[1], pts[2], pts[3]);
+        const auto quad_tet = disk::quadrature::grundmann_moeller(degree, pts[0], pts[1], pts[2], pts[3]);
         ret.insert(ret.end(), quad_tet.begin(), quad_tet.end());
     }
 

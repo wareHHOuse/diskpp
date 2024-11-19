@@ -1146,7 +1146,7 @@ compute_averages(const Mesh& msh, const Element& elem, const Basis& basis)
 }
 */
 
-
+//#define USE_H2DT
 
 inline size_t
 harmonic_basis_size(size_t k, size_t d)
@@ -1154,9 +1154,14 @@ harmonic_basis_size(size_t k, size_t d)
     if (d == 2)
         return 2*k+1;
 
-    if (d == 3)
-        //return (k+1)*(k+1);
-        return 3*k+1;
+    if (d == 3) {
+#ifdef USE_H2DT
+        return (k == 0) ? 1 : 4+6*(k-1);
+#else
+        return (k+1)*(k+1);
+#endif
+    }
+
     throw std::invalid_argument("not yet implemented");
 }
 
@@ -1465,6 +1470,255 @@ public:
     }
 };
 
+#ifdef USE_H2DT
+
+template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
+class scaled_harmonic_top_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell, ScalarType>
+    : public scaled_monomial_abstract_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell, ScalarType>
+{
+
+public:
+    typedef Mesh<T, 3, Storage>                 mesh_type;
+    typedef ScalarType                          scalar_type;
+    typedef typename mesh_type::coordinate_type coordinate_type;
+
+    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::point_type      point_type;
+    typedef Matrix<scalar_type, Dynamic, 3>     gradient_type;
+    typedef Matrix<scalar_type, Dynamic, 1>     function_type;
+
+    using base = scaled_monomial_abstract_basis<mesh_type, cell_type, scalar_type>;
+
+private:
+    size_t full_basis_degree, full_basis_size;
+    size_t polynomial_max_degree, polynomial_part_size;
+    size_t harmonic_min_degree, harmonic_part_size;
+    point_type bar;
+    T diam;
+
+    function_type
+    eval_harmonic(const point_type& bp) const
+    {
+        auto hbs = harmonic_basis_size(full_basis_degree, 3);
+        function_type ret = function_type::Zero(hbs);
+        ret(0) = 1.0;
+
+        if ( full_basis_degree > 0 ) {
+            ret(1) = bp.x();
+            ret(2) = bp.y();
+            ret(3) = bp.z();
+        }
+
+        if ( full_basis_degree > 1){//} && harmonic_min_degree < 2 ) {
+            auto x = bp.x(); auto y = bp.y(); auto z = bp.z();
+            ret(4) = x*x - y*y;
+            ret(5) = 2*x*y;
+            ret(6) = x*x - z*z;
+            ret(7) = 2*x*z;
+            ret(8) = y*y - z*z;
+            ret(9) = 2*y*z;
+        }
+
+        for (size_t i = 3; i <= full_basis_degree; i++) {
+            auto x = bp.x(); auto y = bp.y(); auto z = bp.z();
+            auto iPi = ret(6*i-14);
+            auto iQi = ret(6*i-13);
+            auto jPi = ret(6*i-12);
+            auto jQi = ret(6*i-11);
+            auto kPi = ret(6*i-10);
+            auto kQi = ret(6*i-9);
+            ret(6*i-8) = x*iPi - y*iQi;
+            ret(6*i-7) = y*iPi + x*iQi;
+            ret(6*i-6) = x*jPi - z*jQi;
+            ret(6*i-5) = z*jPi + x*jQi;
+            ret(6*i-4) = y*kPi - z*kQi;
+            ret(6*i-3) = z*kPi + y*kQi;
+        }
+
+        return ret;
+    }
+
+    gradient_type
+    eval_harmonic_gradients(const point_type& bp) const
+    {
+        auto hbs = harmonic_basis_size(full_basis_degree, 3);
+        gradient_type ret = gradient_type::Zero(hbs, 3);
+        ret(0,0) = 0.0; ret(0,1) = 0.0; ret(0,2) = 0.0;
+
+        auto sx = 1.0;
+        auto sy = 1.0;
+        auto sz = 1.0;
+
+        if ( full_basis_degree > 0 ) {
+            ret(1,0) = sx; ret(1,1) = 0.0; ret(1,2) = 0.0;
+            ret(2,0) = 0.0; ret(2,1) = sy; ret(2,2) = 0.0;
+            ret(3,0) = 0.0; ret(3,1) = 0.0; ret(3,2) = sz;
+        }
+
+        if (full_basis_degree > 1){//} && harmonic_min_degree < 2) {
+            ret(4,0) = sx*2.0*bp.x(); ret(4,1) = -sy*2.0*bp.y(); ret(4,2) = 0.0;
+            ret(5,0) = sx*2.0*bp.y(); ret(5,1) =  sy*2.0*bp.x(); ret(5,2) = 0.0;
+            ret(6,0) = sx*2.0*bp.x(); ret(6,1) = 0.0; ret(6,2) = -sz*2.0*bp.z();
+            ret(7,0) = sx*2.0*bp.z(); ret(7,1) = 0.0; ret(7,2) =  sz*2.0*bp.x();
+            ret(8,0) = 0.0; ret(8,1) = sy*2.0*bp.y(); ret(8,2) = -sz*2.0*bp.z();
+            ret(9,0) = 0.0; ret(9,1) = sy*2.0*bp.z(); ret(9,2) =  sz*2.0*bp.y();
+        }
+
+        auto funcs = eval_harmonic(bp);
+
+        for (size_t i = 3; i <= full_basis_degree; i++) {
+            auto i_iPi = i*funcs(6*i-14);
+            auto i_iQi = i*funcs(6*i-13);
+            auto j_iPi = i*funcs(6*i-12);
+            auto j_iQi = i*funcs(6*i-11);
+            auto k_iPi = i*funcs(6*i-10);
+            auto k_iQi = i*funcs(6*i-9);
+            ret(6*i-8, 0) = sx*i_iPi; ret(6*i-8, 1) = -sy*i_iQi; ret(6*i-8, 2) = 0.0;
+            ret(6*i-7, 0) = sx*i_iQi; ret(6*i-7, 1) =  sy*i_iPi; ret(6*i-7, 2) = 0.0;
+            ret(6*i-6, 0) = sx*j_iPi; ret(6*i-6, 1) = 0.0; ret(6*i-6, 2) = -sz*j_iQi; 
+            ret(6*i-5, 0) = sx*j_iQi; ret(6*i-5, 1) = 0.0; ret(6*i-5, 2) =  sz*j_iPi;
+            ret(6*i-4, 0) = 0.0; ret(6*i-4, 1) = sy*k_iPi; ret(6*i-4, 2) = -sz*k_iQi; 
+            ret(6*i-3, 0) = 0.0; ret(6*i-3, 1) = sy*k_iQi; ret(6*i-3, 2) =  sz*k_iPi;  
+        }
+
+        return ret;
+    }
+
+public:
+    scaled_harmonic_top_scalar_basis(const mesh_type& msh, const cell_type& cl, size_t fbd)
+        : base(msh, cl, false)
+    {
+        full_basis_degree       = fbd;
+        full_basis_size         = scalar_basis_size(full_basis_degree, 3);
+        polynomial_max_degree   = full_basis_degree;
+        polynomial_part_size    = full_basis_size;
+        harmonic_min_degree     = full_basis_degree+1;
+        harmonic_part_size      = 0;
+        bar                     = barycenter(msh, cl);
+        diam                    = diameter(msh, cl);
+    }
+
+    void
+    maximum_polynomial_degree(size_t pd)
+    {
+        if (pd > full_basis_degree)
+            return;
+        
+        polynomial_max_degree = pd;
+        polynomial_part_size = scalar_basis_size(polynomial_max_degree, 3);
+        harmonic_min_degree = polynomial_max_degree+1;
+        assert(harmonic_min_degree > 0);
+        size_t hs_notused = harmonic_basis_size(harmonic_min_degree-1, 3);
+        size_t hs_used = harmonic_basis_size(full_basis_degree, 3);
+        assert(hs_notused <= hs_used);
+        harmonic_part_size = hs_used - hs_notused;
+        full_basis_size = polynomial_part_size + harmonic_part_size;
+
+        std::cout << "HMD: " << harmonic_min_degree << std::endl;
+    }
+
+    size_t
+    maximum_polynomial_degree(void) const
+    {
+        return polynomial_max_degree;
+    }
+
+    function_type
+    eval_functions(const point_type& pt) const
+    {
+        const auto bp = this->scaling_point(pt);
+        function_type ret = function_type::Zero(full_basis_size);
+
+        size_t pos = 0;
+        for (size_t k = 0; k <= polynomial_max_degree; k++) {
+            for (size_t pow_x = 0; pow_x <= k; pow_x++) {
+                for (size_t pow_y = 0, pow_z = k - pow_x; pow_y <= k - pow_x; pow_y++, pow_z--) {
+                    const auto px = iexp_pow(bp.x(), pow_x);
+                    const auto py = iexp_pow(bp.y(), pow_y);
+                    const auto pz = iexp_pow(bp.z(), pow_z);
+                    ret(pos++) = px * py * pz;
+                }
+            }
+        }
+        assert(pos == polynomial_part_size);
+
+        if (harmonic_part_size > 0) {
+            assert(polynomial_max_degree < full_basis_degree);
+            auto hep = 2.0*(pt-bar)/diam; /* beware of scaling: must be the same in all dirs */
+            function_type hp = eval_harmonic(hep);
+            ret.tail(harmonic_part_size) = hp.tail(harmonic_part_size);
+        }
+        return ret;
+    }
+
+    gradient_type
+    eval_gradients(const point_type& pt) const
+    {
+        gradient_type ret = gradient_type::Zero(full_basis_size, 3);
+        const auto bp = this->scaling_point(pt);
+
+        const auto bx = bp.x();
+        const auto by = bp.y();
+        const auto bz = bp.z();
+
+        const auto                        passage = this->passage_new2old();
+        static_vector<coordinate_type, 3> grad_new, grad;
+
+        size_t pos = 0;
+        for (size_t k = 0; k <= polynomial_max_degree; k++) {
+            for (size_t pow_x = 0; pow_x <= k; pow_x++) {
+                for (size_t pow_y = 0, pow_z = k - pow_x; pow_y <= k - pow_x; pow_y++, pow_z--) {
+                    const auto px = iexp_pow(bx, pow_x);
+                    const auto py = iexp_pow(by, pow_y);
+                    const auto pz = iexp_pow(bz, pow_z);
+                    const auto dx = (pow_x == 0) ? 0 : pow_x * iexp_pow(bx, pow_x - 1);
+                    const auto dy = (pow_y == 0) ? 0 : pow_y * iexp_pow(by, pow_y - 1);
+                    const auto dz = (pow_z == 0) ? 0 : pow_z * iexp_pow(bz, pow_z - 1);
+
+                    grad_new(0) = dx * py * pz;
+                    grad_new(1) = px * dy * pz;
+                    grad_new(2) = px * py * dz;
+                    grad        = passage * grad_new;
+
+                    ret(pos, 0) = grad(0);
+                    ret(pos, 1) = grad(1);
+                    ret(pos, 2) = grad(2);
+
+                    pos++;
+                }
+            }
+        }
+
+        assert(pos == polynomial_part_size);
+
+        if (harmonic_part_size > 0) {
+            assert(polynomial_max_degree < full_basis_degree);
+            auto hep = 2.0*(pt-bar)/diam; /* beware of scaling: must be the same in all dirs */
+            gradient_type hg = eval_harmonic_gradients(hep);
+            ret.block(ret.rows()-harmonic_part_size, 0, harmonic_part_size, 3) =
+                hg.block(hg.rows()-harmonic_part_size, 0, harmonic_part_size, 3);
+        }
+        return ret;
+    }
+
+    size_t size() const {
+        return full_basis_size;
+    }
+
+    size_t poly_size() const {
+        return polynomial_part_size;
+    }
+
+    size_t harmonic_size() const {
+        return harmonic_part_size;
+    }
+
+    size_t degree() const {
+        return full_basis_degree;
+    }
+};
+
+#else /* USE_H2DT */
 
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
 class scaled_harmonic_top_scalar_basis<Mesh<T, 3, Storage>, typename Mesh<T, 3, Storage>::cell, ScalarType>
@@ -1505,15 +1759,33 @@ private:
         }
 
         auto R2 = bp.x()*bp.x() + bp.y()*bp.y() + bp.z()*bp.z();
+        auto r2 = bp.y()*bp.y() + bp.z()*bp.z();
 
-        for(size_t n = 1; n < hmd; n++) {
-            for (size_t m = 0; m <= n; m++) {
-                assert(n >= m and n > 0);
-                auto mult = 1.0/(n+m+1.0);
-                Cs(n+1,m) = mult*( (2*n+1)*bp.x()*Cs(n,m) - (n-m)*R2*Cs(n-1, m) );
-                Ss(n+1,m) = mult*( (2*n+1)*bp.x()*Ss(n,m) - (n-m)*R2*Ss(n-1, m) );
+        for(int n = 0; n <= hmd; n++) {
+            for (int m = 0; m <= n; m++) {
+                if (n >= 2 && m < n) {
+                    auto multn = 2*(m+1);
+                    auto multd = (n+m+1)*r2;
+                    auto mult = multn/multd;
+                    auto c1 = (R2*Cs(n-1,m)-bp.x()*Cs(n,m))*bp.y();
+                    auto c2 = (R2*Ss(n-1,m)-bp.x()*Ss(n,m))*bp.z();
+                    Cs(n,m+1) = mult*(c1-c2);
+                    auto s1 = (R2*Ss(n-1,m)-bp.x()*Ss(n,m))*bp.y();
+                    auto s2 = (R2*Cs(n-1,m)-bp.x()*Cs(n,m))*bp.z();
+                    Ss(n,m+1) = mult*(s1+s2);
+                }
+                if (n >= 1 and m < 2 and n < hmd) {
+                    auto mult = 1.0/(n+m+1.0);
+                    Cs(n+1,m) = mult*( (2*n+1)*bp.x()*Cs(n,m) - (n-m)*R2*Cs(n-1, m) );
+                    Ss(n+1,m) = mult*( (2*n+1)*bp.x()*Ss(n,m) - (n-m)*R2*Ss(n-1, m) );
+                }
             }
         }
+
+        //std::cout << " *** Cs ***" << std::endl;
+        //std::cout << Cs << std::endl;
+        //std::cout << " *** Ss ***" << std::endl;
+        //std::cout << Ss << std::endl;
 
         return std::pair(Cs, Ss);
     }
@@ -1529,15 +1801,15 @@ private:
         ret(0) = 1.0;
         size_t ofs = 1;
         for(size_t n = 1; n <= hmd; n++) {
-            for (size_t m = 0; m <= 1; m++) {
+            for (size_t m = 0; m <= n; m++) {
                 ret(ofs++) = Cs(n,m);
             }
             
-            for (size_t m = 1; m <= 1; m++) {
+            for (size_t m = 1; m <= n; m++) {
                 ret(ofs++) = Ss(n,m);
             }
         }
-        //assert(ofs == bsize);
+        assert(ofs == bsize);
         return ret;
     }
 
@@ -1553,21 +1825,21 @@ private:
 
         size_t ofs = 1;
         for(size_t n = 1; n <= hmd; n++) {
-            for (size_t m = 0; m <= 1; m++) {
+            for (size_t m = 0; m <= n; m++) {
                 ret(ofs, 0) = (n-m)*Cs(n-1,m);
                 ret(ofs, 1) = (bp.y()/r2)*(n*Cs(n,m) - (n-m)*bp.x()*Cs(n-1,m)) + m*Ss(n,m)*bp.z()/r2;
                 ret(ofs, 2) = (bp.z()/r2)*(n*Cs(n,m) - (n-m)*bp.x()*Cs(n-1,m)) - m*Ss(n,m)*bp.y()/r2;
                 ofs++;
             }
 
-            for (size_t m = 1; m <= 1; m++) {
+            for (size_t m = 1; m <= n; m++) {
                 ret(ofs, 0) = (n-m)*Ss(n-1,m);
                 ret(ofs, 1) = (bp.y()/r2)*(n*Ss(n,m) - (n-m)*bp.x()*Ss(n-1,m)) - m*Cs(n,m)*bp.z()/r2;
                 ret(ofs, 2) = (bp.z()/r2)*(n*Ss(n,m) - (n-m)*bp.x()*Ss(n-1,m)) + m*Cs(n,m)*bp.y()/r2;
                 ofs++;
             }
         }
-        //assert(ofs == bsize);
+        assert(ofs == bsize);
 
         return ret;
     }
@@ -1704,7 +1976,7 @@ public:
     }
 };
 
-
+#endif /* USE_H2DT */
 
 template<typename Mesh, typename ElemType, typename ScalarType = typename Mesh::coordinate_type>
 auto
