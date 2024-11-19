@@ -111,6 +111,61 @@ compute_errors(const Mesh& msh,
     return std::make_pair(std::sqrt(error_vel), std::sqrt(error_pres));
 }
 
+template<disk::mesh_2D Mesh>
+struct test_problem_1 {
+
+    using mesh_type = Mesh;
+    using point_type = typename mesh_type::point_type;
+    using T = typename mesh_type::coordinate_type;
+
+    disk::static_vector<T,2>
+    rhs(const point_type& pt) const
+    {
+        auto x = pt.x();
+        auto y = pt.y();
+        auto ax = std::sin(2.0*M_PI*x)*std::cos(2.0*M_PI*x);
+        auto ay = std::sin(2.0*M_PI*y)*std::cos(2.0*M_PI*y);
+
+        auto coscosx = std::pow(std::cos(2.0*M_PI*x), 2);
+        auto coscosy = std::pow(std::cos(2.0*M_PI*y), 2);
+        auto sinsinx = std::pow(std::sin(2.0*M_PI*x), 2);
+
+        auto sinsiny = std::pow(std::sin(2.0*M_PI*y), 2);
+        
+        auto d2xu =  4.0*M_PI*M_PI*(1.0 - 2.0*sinsinx)*ay;
+        auto d2yu = -8.0*M_PI*M_PI*sinsinx*ay;
+
+        auto d2yv = -4.0*M_PI*M_PI*(1.0 - 2.0*sinsiny)*ax;
+        auto d2xv =  8.0*M_PI*M_PI*sinsiny*ax;
+
+        return {-d2xu-d2yu, -d2xv-d2yv};
+    }
+
+    T psol(const point_type& pt) const
+    {
+        return 0.0;
+    }
+
+    disk::static_vector<T,2>
+    vsol(const point_type& pt) const
+    {
+        auto x = pt.x();
+        auto y = pt.y();
+
+        auto vx = 0.5*std::pow(std::sin(2.0*M_PI*x),2) *
+            std::sin(2.0*M_PI*y) *
+            std::cos(2.0*M_PI*y);
+
+        auto vy = -0.5*std::pow(std::sin(2.0*M_PI*y),2) *
+            std::sin(2.0*M_PI*x) *
+            std::cos(2.0*M_PI*x);
+
+
+        return {vx, vy};
+    }
+};
+
+
 template<typename Mesh>
 auto
 run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
@@ -125,7 +180,11 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 
     using point_type = typename mesh_type::point_type;
 
-    auto rhs_fun = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
+    test_problem_1<Mesh> tp;
+
+    auto rhs_fun = [&](const point_type& p) -> Matrix<scalar_type, 2, 1> {
+        return tp.rhs(p);
+        /*
         Matrix<scalar_type, 2, 1> ret;
 
         scalar_type x1 = p.x();
@@ -146,8 +205,11 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
         ret(1) = + cy * bx + ay * dx + 5.* y2 * y2;
 
         return ret;
+        */
     };
-    auto velocity = [](const point_type& p) -> Matrix<scalar_type, 2, 1> {
+    auto velocity = [&](const point_type& p) -> Matrix<scalar_type, 2, 1> {
+        return tp.vsol(p);
+        /*
         Matrix<scalar_type, 2, 1> ret;
 
         scalar_type x1 = p.x();
@@ -159,9 +221,11 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
         ret(1) = -y2 * (y2 - 2. * y1 + 1. ) * x1 * (4. * x2 - 6. * x1 + 2.);
 
         return ret;
+        */
     };
-    auto pressure =  [](const point_type& p) -> scalar_type {
-        return std::pow(p.x(), 5.)  +  std::pow(p.y(), 5.)  - 1./3.;
+    auto pressure =  [&](const point_type& p) -> scalar_type {
+        return tp.psol(p);
+        //return std::pow(p.x(), 5.)  +  std::pow(p.y(), 5.)  - 1./3.;
     };
 
     typename disk::hho_degree_info hdi(degree + 1, degree);
