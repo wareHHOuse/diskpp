@@ -177,7 +177,7 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
             max_eig = std::max(max_eig, eigsa[i]);
         }
 
-        T min2_eig = max_eig;Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+        T min2_eig = max_eig;
         for (size_t i = 0; i < eigsa.rows(); i++)
         {
             if ( eigsa[i] < tol ) {
