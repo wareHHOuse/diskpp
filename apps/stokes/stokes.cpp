@@ -34,6 +34,8 @@
 #include "diskpp/solvers/solver.hpp"
 #include "diskpp/output/silo.hpp"
 
+#include "mumps.hpp"
+
 template<typename Mesh, typename Velocity, typename Pressure, typename Assembler>
 auto
 compute_errors(const Mesh& msh,
@@ -190,10 +192,26 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 
     disk::dynamic_vector<scalar_type> sol = disk::dynamic_vector<scalar_type>::Zero(systsz);
 
-    disk::solvers::pardiso_params<scalar_type> pparams;
-    mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);
+    sol = mumps_lu(assembler.LHS, assembler.RHS);
     //std::ofstream ofs("velocity.dat");
 
+    disk::silo_database db;
+    db.create("stokes.silo");
+    db.add_mesh(msh, "mesh");
+
+    std::vector<scalar_type> ps;
+    Eigen::Matrix<scalar_type, Eigen::Dynamic, Mesh::dimension> vs =
+        Eigen::Matrix<scalar_type, Eigen::Dynamic, Mesh::dimension>::Zero(msh.cells_size(), Mesh::dimension);
+    size_t i = 0;
+    for (auto cl : msh) {
+        auto v = assembler.take_velocity(msh, cl, sol);
+        auto p = assembler.take_pressure(msh, cl, sol);
+        ps.push_back(p(0));
+        vs.row(i++) = v.template head<Mesh::dimension>();
+    }
+
+    db.add_variable("mesh", "p", ps, disk::zonal_variable_t);
+    db.add_variable("mesh", "v", vs, disk::zonal_variable_t);
     auto error = compute_errors(msh, sol, hdi, velocity, pressure, assembler, use_sym_grad);
 
     return error;
@@ -205,11 +223,11 @@ void convergence_test_typ1(void)
     bool use_sym_grad = true;
     std::vector<std::string> meshfiles;
 
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_1.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_2.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_3.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_4.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_5.typ1");
+    meshfiles.push_back("../../../meshes/2D_triangles/fvca5/mesh1_1.typ1");
+    meshfiles.push_back("../../../meshes/2D_triangles/fvca5/mesh1_2.typ1");
+    meshfiles.push_back("../../../meshes/2D_triangles/fvca5/mesh1_3.typ1");
+    meshfiles.push_back("../../../meshes/2D_triangles/fvca5/mesh1_4.typ1");
+    meshfiles.push_back("../../../meshes/2D_triangles/fvca5/mesh1_5.typ1");
     //meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_6.typ1");
 
     /*
