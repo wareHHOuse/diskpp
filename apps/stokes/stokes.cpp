@@ -112,7 +112,61 @@ compute_errors(const Mesh& msh,
 }
 
 template<disk::mesh_2D Mesh>
-struct test_problem_1 {
+struct test_case_0 {
+
+    using mesh_type = Mesh;
+    using point_type = typename mesh_type::point_type;
+    using T = typename mesh_type::coordinate_type;
+
+    disk::static_vector<T,2>
+    rhs(const point_type& pt) const
+    {
+        disk::static_vector<T,2> ret;
+
+        auto x1 = pt.x();
+        auto x2 = x1 * x1;
+        auto y1 = pt.y();
+        auto y2 = y1 * y1;
+
+        auto ax =  x2 * (x2 - 2. * x1 + 1.);
+        auto ay =  y2 * (y2 - 2. * y1 + 1.);
+        auto bx =  x1 * (4. * x2 - 6. * x1 + 2.);
+        auto by =  y1 * (4. * y2 - 6. * y1 + 2.);
+        auto cx = 12. * x2 - 12.* x1 + 2.;
+        auto cy = 12. * y2 - 12.* y1 + 2.;
+        auto dx = 24. * x1 - 12.;
+        auto dy = 24. * y1 - 12.;
+
+        ret(0) = - cx * by - ax * dy + 5.* x2 * x2;
+        ret(1) = + cy * bx + ay * dx + 5.* y2 * y2;
+
+        return ret;
+    }
+
+    T psol(const point_type& pt) const
+    {
+        return std::pow(pt.x(), 5.)  +  std::pow(pt.y(), 5.)  - 1./3.;
+    }
+
+    disk::static_vector<T,2>
+    vsol(const point_type& pt) const
+    {
+        disk::static_vector<T,2> ret;
+
+        auto x1 = pt.x();
+        auto x2 = x1 * x1;
+        auto y1 = pt.y();
+        auto y2 = y1 * y1;
+
+        ret(0) =  x2 * (x2 - 2. * x1 + 1.)  * y1 * (4. * y2 - 6. * y1 + 2.);
+        ret(1) = -y2 * (y2 - 2. * y1 + 1. ) * x1 * (4. * x2 - 6. * x1 + 2.);
+
+        return ret;
+    }
+};
+
+template<disk::mesh_2D Mesh>
+struct test_case_1 {
 
     using mesh_type = Mesh;
     using point_type = typename mesh_type::point_type;
@@ -180,52 +234,16 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 
     using point_type = typename mesh_type::point_type;
 
-    test_problem_1<Mesh> tp;
+    test_case_1<Mesh> tp;
 
-    auto rhs_fun = [&](const point_type& p) -> Matrix<scalar_type, 2, 1> {
+    auto rhs_fun = [&](const point_type& p) {
         return tp.rhs(p);
-        /*
-        Matrix<scalar_type, 2, 1> ret;
-
-        scalar_type x1 = p.x();
-        scalar_type x2 = x1 * x1;
-        scalar_type y1 = p.y();
-        scalar_type y2 = y1 * y1;
-
-        scalar_type ax =  x2 * (x2 - 2. * x1 + 1.);
-        scalar_type ay =  y2 * (y2 - 2. * y1 + 1.);
-        scalar_type bx =  x1 * (4. * x2 - 6. * x1 + 2.);
-        scalar_type by =  y1 * (4. * y2 - 6. * y1 + 2.);
-        scalar_type cx = 12. * x2 - 12.* x1 + 2.;
-        scalar_type cy = 12. * y2 - 12.* y1 + 2.;
-        scalar_type dx = 24. * x1 - 12.;
-        scalar_type dy = 24. * y1 - 12.;
-
-        ret(0) = - cx * by - ax * dy + 5.* x2 * x2;
-        ret(1) = + cy * bx + ay * dx + 5.* y2 * y2;
-
-        return ret;
-        */
     };
-    auto velocity = [&](const point_type& p) -> Matrix<scalar_type, 2, 1> {
+    auto velocity = [&](const point_type& p) {
         return tp.vsol(p);
-        /*
-        Matrix<scalar_type, 2, 1> ret;
-
-        scalar_type x1 = p.x();
-        scalar_type x2 = x1 * x1;
-        scalar_type y1 = p.y();
-        scalar_type y2 = y1 * y1;
-
-        ret(0) =  x2 * (x2 - 2. * x1 + 1.)  * y1 * (4. * y2 - 6. * y1 + 2.);
-        ret(1) = -y2 * (y2 - 2. * y1 + 1. ) * x1 * (4. * x2 - 6. * x1 + 2.);
-
-        return ret;
-        */
     };
-    auto pressure =  [&](const point_type& p) -> scalar_type {
+    auto pressure =  [&](const point_type& p) {
         return tp.psol(p);
-        //return std::pow(p.x(), 5.)  +  std::pow(p.y(), 5.)  - 1./3.;
     };
 
     typename disk::hho_degree_info hdi(degree + 1, degree);
@@ -264,8 +282,8 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
     db.add_mesh(msh, "mesh");
 
     std::vector<scalar_type> ps;
-    Eigen::Matrix<scalar_type, Eigen::Dynamic, Mesh::dimension> vs =
-        Eigen::Matrix<scalar_type, Eigen::Dynamic, Mesh::dimension>::Zero(msh.cells_size(), Mesh::dimension);
+    using mXD = Matrix<scalar_type, Dynamic, Mesh::dimension>;
+    mXD vs = mXD::Zero(msh.cells_size(), Mesh::dimension);
     size_t i = 0;
     for (auto cl : msh) {
         auto v = assembler.take_velocity(msh, cl, sol);
@@ -284,7 +302,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 void convergence_test_typ1(void)
 {
     using T = double;
-    bool use_sym_grad = true;
+    bool use_sym_grad = false;
     std::vector<std::string> meshfiles;
 
     meshfiles.push_back("../../../meshes/2D_triangles/fvca5/mesh1_1.typ1");
@@ -301,12 +319,13 @@ void convergence_test_typ1(void)
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_4.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
     */
+    
     /*
-    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_1.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_2.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_3.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_4.typ1");
-    meshfiles.push_back("../../../diskpp/meshes/2D_hex/fvca5/hexagonal_5.typ1");
+    meshfiles.push_back("../../../meshes/2D_hex/fvca5/hexagonal_1.typ1");
+    meshfiles.push_back("../../../meshes/2D_hex/fvca5/hexagonal_2.typ1");
+    meshfiles.push_back("../../../meshes/2D_hex/fvca5/hexagonal_3.typ1");
+    meshfiles.push_back("../../../meshes/2D_hex/fvca5/hexagonal_4.typ1");
+    meshfiles.push_back("../../../meshes/2D_hex/fvca5/hexagonal_5.typ1");
     */
     std::cout << "                   velocity H1-error";
     std::cout << "    -     pressure L2-error "<< std::endl;
