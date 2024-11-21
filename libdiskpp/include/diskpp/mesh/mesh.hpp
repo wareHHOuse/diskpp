@@ -847,6 +847,22 @@ public:
     auto end() const    { return m_msh.boundary_faces_end(); }
 };
 
+template<typename Mesh>
+class points_iterproxy
+{
+    const Mesh& m_msh;
+
+public:
+    points_iterproxy(const Mesh& msh)
+        : m_msh(msh)
+    {}
+
+    auto begin()        { return m_msh.points_begin(); }
+    auto begin() const  { return m_msh.points_begin(); }
+    auto end()          { return m_msh.points_end(); }
+    auto end() const    { return m_msh.points_end(); }
+};
+
 } // namespace priv
 
 /**
@@ -876,7 +892,7 @@ auto faces(const mesh<T, DIM, Storage>& msh)
 
 
 /**
- * Get iterator proxy to iterate on boundry faces with
+ * Get iterator proxy to iterate on boundary faces with
  *
  *      for (auto& fc : boundary_faces(msh)) {}
 */
@@ -896,6 +912,19 @@ auto boundary_faces(mesh<T, DIM, Storage>& msh, size_t boundary_id)
     return priv::boundary_faces_iterproxy<Mesh>(msh);
 }
 */
+
+/**
+ * Get iterator proxy to iterate on points with
+ *
+ *      for (auto& fc : points(msh)) {}
+*/
+
+template<typename T, size_t DIM, typename Storage>
+auto points(const mesh<T, DIM, Storage>& msh)
+{
+    using Mesh = mesh<T, DIM, Storage>;
+    return priv::points_iterproxy<Mesh>(msh);
+}
 
 
 template<typename Mesh>
