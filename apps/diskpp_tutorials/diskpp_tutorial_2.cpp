@@ -35,7 +35,6 @@
  */
 
 
-
 #include <iostream>
 #include <unistd.h>
 
@@ -61,6 +60,20 @@ auto fun(const disk::point<T,2>& pt)
 }
 
 template<typename T>
+auto fun_grad(const disk::point<T,2>& pt)
+{
+    using gv = Eigen::Matrix<T, 2, 1>;
+    gv ret;
+    auto sx = std::sin(M_PI*pt.x());
+    auto cx = std::cos(M_PI*pt.x());
+    auto sy = std::sin(M_PI*pt.y());
+    auto cy = std::cos(M_PI*pt.y());
+    ret(0) = cx*sy;
+    ret(1) = sx*cy;
+    return ret;
+}
+
+template<typename T>
 auto fun(const disk::point<T,3>& pt)
 {
     auto sx = std::sin(M_PI*pt.x());
@@ -69,28 +82,65 @@ auto fun(const disk::point<T,3>& pt)
     return sx*sy*sz;
 }
 
+template<typename T>
+auto fun_grad(const disk::point<T,3>& pt)
+{
+    using gv = Eigen::Matrix<T, 3, 1>;
+    gv ret;
+    auto sx = std::sin(M_PI*pt.x());
+    auto cx = std::cos(M_PI*pt.x());
+    auto sy = std::sin(M_PI*pt.y());
+    auto cy = std::cos(M_PI*pt.y());
+    auto sz = std::sin(M_PI*pt.z());
+    auto cz = std::cos(M_PI*pt.z());
+    ret(0) = cx*sy*sz;
+    ret(1) = sx*cy*sz;
+    ret(2) = sx*sy*cz;
+    return ret;
+}
+
 template<typename Mesh>
 void
 plot_function(const Mesh& msh, const std::string& output_filename)
 {
     using T = typename Mesh::coordinate_type;
-    std::vector<T> fun_vals;
-
-    for (auto& cl : msh)
-    {
-        auto pt = barycenter(msh, cl);
-        auto val = fun(pt);
-        fun_vals.push_back( fun(pt) ); 
-    }
+    static const size_t DIM = Mesh::dimension;
+    using gvs = Eigen::Matrix<T, Eigen::Dynamic, DIM>;
 
     disk::silo_database db; /* SILO database object*/
     db.create(output_filename); /* Create a new database */
     db.add_mesh(msh, "mesh"); /* Put the mesh in it */
 
+    /* Iterate on the mesh cells, compute the value of fun() in the
+     * barycenter of each cell and collect the values in a vector */
+    std::vector<T> fun_vals_zonal;
+    gvs grad_vals_zonal = gvs::Zero(msh.cells_size(), DIM);
+    size_t cell_i = 0;
+    for (auto& cl : msh) {
+        auto pt = barycenter(msh, cl);
+        auto val = fun(pt);
+        fun_vals_zonal.push_back( fun(pt) );
+        grad_vals_zonal.row(cell_i++) = fun_grad(pt);
+    }
     /* The data is zonal, meaning that for each mesh cell there is one
      * single value. SILO/VisIt do not support high-order visualization. */
-    db.add_variable("mesh", "fun", fun_vals, disk::zonal_variable_t);
-    /* Nodal variables also exist, see diskpp/output/silo.hpp for the details. */
+    db.add_variable("mesh", "fun_zonal", fun_vals_zonal, disk::zonal_variable_t);
+    db.add_variable("mesh", "grad_zonal", grad_vals_zonal, disk::zonal_variable_t);
+
+    /* Now iterate the mesh nodes, compute the value of fun() in
+     * each node and collect the values in a vector */
+    std::vector<T> fun_vals_nodal;
+    gvs grad_vals_nodal = gvs::Zero(msh.points_size(), DIM);
+    size_t point_i = 0;
+    for (auto& pt : points(msh)) {
+        auto val = fun(pt);
+        fun_vals_nodal.push_back( fun(pt) ); 
+        grad_vals_nodal.row(point_i++) = fun_grad(pt);
+    }
+    /* The data is nodal and VisIt will use linear interpolation to
+     * produce a smooth visualization */
+    db.add_variable("mesh", "fun_nodal", fun_vals_nodal, disk::nodal_variable_t);
+    db.add_variable("mesh", "grad_nodal", grad_vals_nodal, disk::nodal_variable_t);
 }
 
 int main(int argc, char **argv)
