@@ -17,6 +17,6 @@ RUN apt install -y libmkl-dev
 WORKDIR /diskpp
 RUN git clone --recursive https://github.com/wareHHOuse/diskpp.git
 WORKDIR /diskpp/diskpp/build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j $(nproc)
+RUN cmake -DCMAKE_BUILD_TYPE=Release ..
+RUN make -j $(nproc)
 
