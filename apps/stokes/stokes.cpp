@@ -219,6 +219,45 @@ struct test_case_1 {
     }
 };
 
+template<disk::mesh_2D Mesh>
+struct test_case_2 {
+
+    using mesh_type = Mesh;
+    using point_type = typename mesh_type::point_type;
+    using T = typename mesh_type::coordinate_type;
+
+    disk::static_vector<T,2>
+    rhs(const point_type& pt) const
+    {
+        auto x = pt.x();
+        auto y = pt.y();
+        
+        auto fx = -(12./5.)*std::pow(x,5)*std::pow(y,2);
+        auto fy = 8.0*std::pow(x,4)*std::pow(y,3) + (12./5.)*std::pow(x,2)*std::pow(y,5);
+
+        return {fx, fy};
+    }
+
+    T psol(const point_type& pt) const
+    {
+        auto x = pt.x();
+        auto y = pt.y();
+        return std::pow(x,4)*std::pow(y,4) - (1./25.);
+    }
+
+    disk::static_vector<T,2>
+    vsol(const point_type& pt) const
+    {
+        auto x = pt.x();
+        auto y = pt.y();
+
+        auto vx =  0.2*std::pow(x, 5)*std::pow(y, 4);
+        auto vy = -0.2*std::pow(x, 4)*std::pow(y, 5);
+
+        return {vx, vy};
+    }
+};
+
 
 template<typename Mesh>
 auto
@@ -234,7 +273,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 
     using point_type = typename mesh_type::point_type;
 
-    test_case_1<Mesh> tp;
+    test_case_2<Mesh> tp;
 
     auto rhs_fun = [&](const point_type& p) {
         return tp.rhs(p);
@@ -305,13 +344,14 @@ void convergence_test_typ1(void)
     bool use_sym_grad = false;
     std::vector<std::string> meshfiles;
 
+    /*
     meshfiles.push_back("../../../meshes/2D_triangles/fvca5/mesh1_1.typ1");
     meshfiles.push_back("../../../meshes/2D_triangles/fvca5/mesh1_2.typ1");
     meshfiles.push_back("../../../meshes/2D_triangles/fvca5/mesh1_3.typ1");
     meshfiles.push_back("../../../meshes/2D_triangles/fvca5/mesh1_4.typ1");
     meshfiles.push_back("../../../meshes/2D_triangles/fvca5/mesh1_5.typ1");
     //meshfiles.push_back("../../../diskpp/meshes/2D_triangles/fvca5/mesh1_6.typ1");
-
+    */
     /*
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_1.typ1");
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_2.typ1");
@@ -320,13 +360,13 @@ void convergence_test_typ1(void)
     meshfiles.push_back("../../../diskpp/meshes/2D_quads/fvca5/mesh2_5.typ1");
     */
     
-    /*
+    
     meshfiles.push_back("../../../meshes/2D_hex/fvca5/hexagonal_1.typ1");
     meshfiles.push_back("../../../meshes/2D_hex/fvca5/hexagonal_2.typ1");
     meshfiles.push_back("../../../meshes/2D_hex/fvca5/hexagonal_3.typ1");
     meshfiles.push_back("../../../meshes/2D_hex/fvca5/hexagonal_4.typ1");
     meshfiles.push_back("../../../meshes/2D_hex/fvca5/hexagonal_5.typ1");
-    */
+    
     std::cout << "                   velocity H1-error";
     std::cout << "    -     pressure L2-error "<< std::endl;
 
