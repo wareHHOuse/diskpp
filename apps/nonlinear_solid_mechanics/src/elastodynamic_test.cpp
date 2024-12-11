@@ -90,60 +90,23 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>&      msh,
         return -M_PI * M_PI / (lambda + 1) * result_type{fx, fy};
     };
 
-    auto displacement = [material_data](const disk::point<T, 2>& p) -> result_type
+    auto displacement = [material_data](const disk::point<T, 2>& p, const T& time) -> result_type
     {
-        T time = 1.0;
         T fx   = sin(2 * M_PI * p.y()) * (cos(2 * M_PI * p.x()) - 1) +
                1.0 / (1 + material_data.getLambda()) * sin(M_PI * p.x()) * sin(M_PI * p.y());
         T fy = -sin(2 * M_PI * p.x()) * (cos(2 * M_PI * p.y()) - 1) +
                1.0 / (1 + material_data.getLambda()) * sin(M_PI * p.x()) * sin(M_PI * p.y());
 
-        return result_type{fx, fy};
+        return time * result_type{fx, fy};
     };
 
-    auto velocity = [material_data](const disk::point<T, 2>& p) -> result_type
+    auto velocity = [material_data, displacement](const disk::point<T, 2>& p, const T& time) -> result_type
     {
-        T fx = sin(2 * M_PI * p.y()) * (cos(2 * M_PI * p.x()) - 1) +
-               1.0 / (1 + material_data.getLambda()) * sin(M_PI * p.x()) * sin(M_PI * p.y());
-        T fy = -sin(2 * M_PI * p.x()) * (cos(2 * M_PI * p.y()) - 1) +
-               1.0 / (1 + material_data.getLambda()) * sin(M_PI * p.x()) * sin(M_PI * p.y());
-
-        return result_type{fx, fy};
+        return displacement(p, 1.0);
     };
 
-    auto acceleration = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0., 0.}; };
-
-    auto sigma = [material_data](const disk::point<T, 2>& p) -> grad_type
-    {
-        const T lambda = material_data.getLambda();
-        const T mu     = material_data.getMu();
-
-        T g11 =
-          -(2 * (lambda + 1) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) - sin(M_PI * p.y()) * cos(M_PI * p.x()));
-        T g12 = (2 * lambda + 2) * (cos(2 * M_PI * p.x()) - 1) * cos(2 * M_PI * p.y()) +
-                sin(M_PI * p.x()) * cos(M_PI * p.y());
-
-        T g21 = (-2 * lambda + 2) * (cos(2 * M_PI * p.y()) - 1) * cos(2 * M_PI * p.x()) +
-                sin(M_PI * p.y()) * cos(M_PI * p.x());
-
-        T g22 =
-          2 * (lambda + 1) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) + sin(M_PI * p.x()) * cos(M_PI * p.y());
-
-        grad_type g = grad_type::Zero();
-
-        g(0, 0) = g11;
-        g(0, 1) = g12;
-        g(1, 0) = g21;
-        g(1, 1) = g22;
-
-        g *= M_PI / (lambda + 1);
-
-        const grad_type gs = 0.5 * (g + g.transpose());
-
-        const T divu = gs.trace();
-
-        return 2 * mu * gs + lambda * divu * disk::static_matrix<T, 2, 2>::Identity();
-    };
+    auto acceleration = [material_data, displacement](const disk::point<T, 2> &p, const T &time) -> result_type
+    { return displacement(p, 0.0); };
 
     Bnd_type bnd(msh);
     bnd.addDirichletEverywhere(displacement);
@@ -153,7 +116,12 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>&      msh,
     nl.addBehavior(disk::DeformationMeasure::SMALL_DEF, disk::LawType::ELASTIC);
     nl.addMaterialData(material_data);
 
-    nl.initial_fields(displacement, velocity, acceleration);
+    nl.initial_field(disk::mechanics::FieldName::DEPL, [displacement](const disk::point<T, 2> &p)
+                     { return displacement(p, 0.0); });
+    nl.initial_field(disk::mechanics::FieldName::VITE_CELLS, [velocity](const disk::point<T, 2> &p)
+                     { return velocity(p, 0.0); });
+    nl.initial_field(disk::mechanics::FieldName::ACCE_CELLS, [acceleration](const disk::point<T, 2> &p)
+                     { return acceleration(p, 0.0); });
 
     if (nl.verbose())
     {
@@ -171,8 +139,10 @@ run_linear_elasticity_solver(const Mesh<T, 2, Storage>&      msh,
     error.h        = average_diameter(msh);
     error.degree   = rp.m_face_degree;
     error.nb_dof   = nl.numberOfDofs();
-    error.error_L2 = nl.compute_l2_displacement_error(displacement);
-    error.error_H1 = nl.compute_H1_error(displacement);
+    error.error_L2 = nl.compute_l2_displacement_error([displacement](const disk::point<T, 2> &p)
+                                                      { return displacement(p, 1.0); });
+    error.error_H1 = nl.compute_H1_error([displacement](const disk::point<T, 2> &p)
+                                         { return displacement(p, 1.0); });
 
     return error;
 }
@@ -212,46 +182,14 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>&      msh,
         return -M_PI * M_PI / (lambda + 1) * result_type{fx, fy, 0};
     };
 
-    auto displacement = [material_data](const disk::point<T, 3>& p) -> result_type
+    auto displacement = [material_data](const disk::point<T, 3>& p, const T& time) -> result_type
     {
         T fx = sin(2 * M_PI * p.y()) * (cos(2 * M_PI * p.x()) - 1) +
                1.0 / (1 + material_data.getLambda()) * sin(M_PI * p.x()) * sin(M_PI * p.y());
         T fy = -sin(2 * M_PI * p.x()) * (cos(2 * M_PI * p.y()) - 1) +
                1.0 / (1 + material_data.getLambda()) * sin(M_PI * p.x()) * sin(M_PI * p.y());
 
-        return result_type{fx, fy, 0};
-    };
-
-    auto sigma = [material_data](const disk::point<T, 3>& p) -> grad_type
-    {
-        const T lambda = material_data.getLambda();
-        const T mu     = material_data.getMu();
-
-        T g11 =
-          -(2 * (lambda + 1) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) - sin(M_PI * p.y()) * cos(M_PI * p.x()));
-        T g12 = (2 * lambda + 2) * (cos(2 * M_PI * p.x()) - 1) * cos(2 * M_PI * p.y()) +
-                sin(M_PI * p.x()) * cos(M_PI * p.y());
-
-        T g21 = (-2 * lambda + 2) * (cos(2 * M_PI * p.y()) - 1) * cos(2 * M_PI * p.x()) +
-                sin(M_PI * p.y()) * cos(M_PI * p.x());
-
-        T g22 =
-          2 * (lambda + 1) * sin(2 * M_PI * p.x()) * sin(2 * M_PI * p.y()) + sin(M_PI * p.x()) * cos(M_PI * p.y());
-
-        grad_type g = grad_type::Zero();
-
-        g(0, 0) = g11;
-        g(0, 1) = g12;
-        g(1, 0) = g21;
-        g(1, 1) = g22;
-
-        g *= M_PI / (lambda + 1);
-
-        const grad_type gs = 0.5 * (g + g.transpose());
-
-        const T divu = gs.trace();
-
-        return 2 * mu * gs + lambda * divu * disk::static_matrix<T, 3, 3>::Identity();
+        return time * result_type{fx, fy, 0};
     };
 
     Bnd_type bnd(msh);
@@ -262,7 +200,8 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>&      msh,
     nl.addBehavior(disk::DeformationMeasure::SMALL_DEF, disk::LawType::ELASTIC);
     nl.addMaterialData(material_data);
 
-    nl.initial_guess(displacement);
+    nl.initial_field(disk::mechanics::FieldName::DEPL, [displacement](const disk::point<T, 3> &p)
+                     { return displacement(p, 0.0); });
 
     if (nl.verbose())
     {
@@ -280,8 +219,9 @@ run_linear_elasticity_solver(const Mesh<T, 3, Storage>&      msh,
     error.h        = average_diameter(msh);
     error.degree   = rp.m_face_degree;
     error.nb_dof   = nl.numberOfDofs();
-    error.error_L2 = nl.compute_l2_displacement_error(displacement);
-    error.error_H1 = nl.compute_H1_error(displacement);
+    error.error_L2 = nl.compute_l2_displacement_error([displacement](const disk::point<T, 3> &p)
+                                                      { return displacement(p, 1.0); });
+    error.error_H1 = nl.compute_H1_error([displacement](const disk::point<T, 3> &p) { return displacement(p, 1.0); } );
 
     return error;
 }

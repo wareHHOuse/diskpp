@@ -196,37 +196,8 @@ public:
         return ret;
     }
 
-    [[deprecated("Is this implementation correct?")]]
     function_type
-    eval_curls(const point_type& pt) const
-    {
-        function_type ret = function_type::Zero(basis_size, 3);
-
-        const function_type dphi = scalar_basis.eval_gradients(pt);
-
-        size_t j = 0;
-        for (size_t i = 0; i < scalar_basis.size(); i++)
-        {
-            const Matrix<scalar_type, 1, 3> dphi_i = dphi.row(i);
-            // row 1
-            ret(j, 0) = dphi_i(1);
-            ret(j, 1) = dphi_i(2);
-            j++;
-            // row 2
-            ret(j, 0) = -dphi_i(0);
-            ret(j, 2) = dphi_i(2);
-            j++;
-            // row 2
-            ret(j, 1) = -dphi_i(0);
-            ret(j, 2) = -dphi_i(1);
-            j++;
-        }
-        assert(j == basis_size);
-        return ret;
-    }
-
-    function_type
-    eval_curls2(const point_type& pt) const
+    eval_curls(const point_type &pt) const
     {
         function_type ret = function_type::Zero(basis_size, 3);
 
@@ -684,24 +655,6 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         }
         assert(ret.size() == basis_size);
 
-        return ret;
-    }
-
-    Matrix<scalar_type, Dynamic, 1>
-    eval_curls(const point_type& pt) const
-    {
-        Matrix<scalar_type, Dynamic, 1> ret = Matrix<scalar_type, Dynamic, 1>::Zero(basis_size);
-
-        const function_type dphi = scalar_basis.eval_gradients(pt);
-
-        size_t j = 0;
-        for (size_t i = 0; i < scalar_basis.size(); i++)
-        {
-            Matrix<scalar_type, 1, 2> dphi_i = dphi.row(i);
-
-            ret(j++) = dphi_i(1);
-            ret(j++) = -dphi_i(0);
-        }
         return ret;
     }
 

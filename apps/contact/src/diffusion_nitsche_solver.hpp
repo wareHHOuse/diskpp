@@ -208,7 +208,7 @@ run_hho_diffusion_nitsche_faces(const Mesh& msh,
         auto diff = realsol - fullsol;
         H1_error += diff.dot(A*diff);
 
-        matrix_type mass  = make_mass_matrix(msh, cl, cb, hdi.cell_degree());
+        matrix_type mass  = make_mass_matrix(msh, cl, cb);
         vector_type u_diff = diff.block(0, 0, cbs, 1);
         L2_error += u_diff.dot(mass * u_diff);
 
@@ -374,7 +374,7 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
         auto diff = realsol - fullsol;
         H1_error += diff.dot(A*diff);
 
-        matrix_type mass  = make_mass_matrix(msh, cl, cb, hdi.cell_degree());
+        matrix_type mass  = make_mass_matrix(msh, cl, cb);
 
         vector_type u_diff = diff.block(0, 0, cbs, 1);
         L2_error += u_diff.dot(mass * u_diff);
