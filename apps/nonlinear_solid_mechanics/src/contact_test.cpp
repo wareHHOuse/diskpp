@@ -204,15 +204,18 @@ run_tresca_solver(Mesh<T, 2, Storage>&            msh,
         return -time * result_type{fx, fy} * exy / (3.0 * (1.0 + material_data.getLambda()));
     };
 
-    auto solution = [material_data](const disk::point<T, 2>& p) -> result_type
+    auto solution = [material_data](const disk::point<T, 2>& p, const T time) -> result_type
     {
         T y     = p.y();
         T x     = p.x();
         T exy   = std::exp(x * y);
         T coeff = 1.0 / (1.0 + material_data.getLambda());
 
-        return result_type{x * exy * (1.0 + coeff), y * exy * (-1.0 + coeff)} / 6.0;
+        return time*result_type{x * exy * (1.0 + coeff), y * exy * (-1.0 + coeff)} / 6.0;
     };
+
+    auto sol = [solution](const disk::point<T, 2>& p) -> auto
+        { return solution(p, 1.0); };
 
     auto s = [rp, material_data](const disk::point<T, 2>& p) -> T
     {
@@ -236,7 +239,7 @@ run_tresca_solver(Mesh<T, 2, Storage>&            msh,
     nl.addBehavior(disk::DeformationMeasure::SMALL_DEF, disk::LawType::ELASTIC);
     nl.addMaterialData(material_data);
 
-    nl.initial_guess(solution);
+    nl.initial_guess(sol);
 
     if (nl.verbose())
     {
@@ -254,8 +257,8 @@ run_tresca_solver(Mesh<T, 2, Storage>&            msh,
     error.h        = average_diameter(msh);
     error.degree   = rp.m_face_degree;
     error.nb_dof   = nl.numberOfDofs();
-    error.error_L2 = nl.compute_l2_displacement_error(solution);
-    error.error_H1 = nl.compute_H1_error(solution);
+    error.error_L2 = nl.compute_l2_displacement_error(sol);
+    error.error_H1 = nl.compute_H1_error(sol);
 
     // nl.compute_stress_GP("stress2D_GP_test.msh");
     // nl.compute_continuous_displacement("depl2D_cont_test.msh");
@@ -294,15 +297,18 @@ run_tresca_solver(const Mesh<T, 3, Storage>&      msh,
         return -time * result_type{fx, 0.0, fz} * exz / (3.0 * (1.0 + material_data.getLambda()));
     };
 
-    auto solution = [material_data](const disk::point<T, 3>& p) -> result_type
+    auto solution = [material_data](const disk::point<T, 3>& p, const T& time) -> result_type
     {
         T z     = p.z();
         T x     = p.x();
         T exz   = std::exp(x * z);
         T coeff = 1.0 / (1.0 + material_data.getLambda());
 
-        return result_type{x * exz * (1.0 + coeff), 0.0, z * exz * (-1.0 + coeff)} / 6.0;
+        return time*result_type{x * exz * (1.0 + coeff), 0.0, z * exz * (-1.0 + coeff)} / 6.0;
     };
+
+    auto sol = [solution](const disk::point<T, 3>& p) -> auto
+        { return solution(p, 1.0); };
 
     auto s = [rp, material_data](const disk::point<T, 3>& p) -> T
     {
@@ -322,7 +328,7 @@ run_tresca_solver(const Mesh<T, 3, Storage>&      msh,
     nl.addBehavior(disk::DeformationMeasure::SMALL_DEF, disk::LawType::ELASTIC);
     nl.addMaterialData(material_data);
 
-    nl.initial_guess(solution);
+    nl.initial_guess(sol);
 
     SolverInfo solve_info = nl.compute(load);
 
@@ -335,8 +341,8 @@ run_tresca_solver(const Mesh<T, 3, Storage>&      msh,
     error.h        = average_diameter(msh);
     error.degree   = rp.m_face_degree;
     error.nb_dof   = nl.numberOfDofs();
-    error.error_L2 = nl.compute_l2_displacement_error(solution);
-    error.error_H1 = nl.compute_H1_error(solution);
+    error.error_L2 = nl.compute_l2_displacement_error(sol);
+    error.error_H1 = nl.compute_H1_error(sol);
 
     return error;
 }

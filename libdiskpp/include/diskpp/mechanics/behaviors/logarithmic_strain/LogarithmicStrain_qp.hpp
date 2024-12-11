@@ -155,13 +155,13 @@ class LogarithmicStrain_qp
         Pn           = static_tensor<scalar_type, 3>::Zero();
     }
 
-    quadrature_point<scalar_type, DIM>
+    auto
     quadrature_point() const
     {
         return make_qp(point(), weight());
     }
 
-    point<scalar_type, DIM>
+    auto
     point() const
     {
         return m_law_hpp_qp.point();

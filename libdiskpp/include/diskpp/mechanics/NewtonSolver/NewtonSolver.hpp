@@ -37,6 +37,7 @@
 #include "diskpp/mechanics/NewtonSolver/NewtonStep.hpp"
 #include "diskpp/mechanics/NewtonSolver/StabilizationManager.hpp"
 #include "diskpp/mechanics/NewtonSolver/TimeManager.hpp"
+#include "diskpp/mechanics/NewtonSolver/Fields.hpp"
 #include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "diskpp/mechanics/behaviors/tensor_conversion.hpp"
 #include "diskpp/mechanics/stress_tensors.hpp"
@@ -91,8 +92,7 @@ class NewtonSolver
     MeshDegreeInfo<mesh_type>     m_degree_infos;
     StabCoeffManager<scalar_type> m_stab_manager;
 
-    std::vector<vector_type> m_displ, m_displ_faces;
-    std::vector<vector_type> m_velocity, m_acce;
+    MultiTimeField<scalar_type> m_fields;
     std::vector<matrix_type> m_gradient_precomputed, m_stab_precomputed;
 
     PostMesh<mesh_type> m_post_mesh;
@@ -134,68 +134,17 @@ class NewtonSolver
     void
     init(void)
     {
-        const auto dimension = mesh_type::dimension;
-
-        size_t total_dof = 0;
-
-        m_displ.clear();
-        m_displ_faces.clear();
-
-        m_displ.reserve(m_msh.cells_size());
-        m_displ_faces.reserve(m_msh.faces_size());
-
+        TimeField<scalar_type> tf;
+        tf.createZeroField(FieldName::DEPL, m_msh, m_degree_infos);
+        tf.createZeroField(FieldName::DEPL_CELLS, m_msh, m_degree_infos);
+        tf.createZeroField(FieldName::DEPL_FACES, m_msh, m_degree_infos);
         if (m_rp.isUnsteady())
         {
-            m_velocity.clear();
-            m_acce.clear();
-
-            m_velocity.reserve(m_msh.cells_size());
-            m_acce.reserve(m_msh.cells_size());
+            tf.createZeroField(FieldName::VITE_CELLS, m_msh, m_degree_infos);
+            tf.createZeroField(FieldName::ACCE_CELLS, m_msh, m_degree_infos);
         }
-
-        for (auto& cl : m_msh)
-        {
-            const auto di            = m_degree_infos.cellDegreeInfo(m_msh, cl);
-            const auto num_cell_dofs = vector_basis_size(di.cell_degree(), dimension, dimension);
-            total_dof += num_cell_dofs;
-
-            const auto fcs    = faces(m_msh, cl);
-            const auto fcs_di = di.facesDegreeInfo();
-
-            const auto grad_degree = di.grad_degree();
-
-            size_t num_faces_dofs = 0;
-            for (auto& fc_di : fcs_di)
-            {
-                if (fc_di.hasUnknowns())
-                {
-                    num_faces_dofs += vector_basis_size(fc_di.degree(), dimension - 1, dimension);
-                }
-            }
-
-            m_displ.push_back(vector_type::Zero(num_cell_dofs + num_faces_dofs));
-
-            if (m_rp.isUnsteady())
-            {
-                m_velocity.push_back(vector_type::Zero(num_cell_dofs));
-                m_acce.push_back(vector_type::Zero(num_cell_dofs));
-            }
-        }
-
-        for (auto itor = m_msh.faces_begin(); itor != m_msh.faces_end(); itor++)
-        {
-            const auto fc = *itor;
-            const auto di = m_degree_infos.degreeInfo(m_msh, fc);
-
-            size_t num_face_dofs = 0;
-            if (di.hasUnknowns())
-            {
-                num_face_dofs = vector_basis_size(di.degree(), dimension - 1, dimension);
-            }
-            total_dof += num_face_dofs;
-
-            m_displ_faces.push_back(vector_type::Zero(num_face_dofs));
-        }
+        m_fields.setCurrentTimeField(tf);
+        m_fields.setTimeField(-1, tf);
 
         // compute mesh for post-processing
         m_post_mesh = PostMesh<mesh_type>(m_msh);
@@ -205,9 +154,7 @@ class NewtonSolver
             std::cout << "** Numbers of cells: " << m_msh.cells_size() << std::endl;
             std::cout << "** Numbers of faces: " << m_msh.faces_size()
                       << "  ( boundary faces: " << m_msh.boundary_faces_size() << " )" << std::endl;
-            std::cout << "** Numbers of dofs: " << std::endl;
-            std::cout << "   ** Before static condensation: " << total_dof << std::endl;
-            std::cout << "   ** After static condensation: " << this->numberOfDofs() << std::endl;
+            std::cout << "** Numbers of dofs after static condensation: " << this->numberOfDofs() << std::endl;
             std::cout << " " << std::endl;
         }
     }
@@ -246,19 +193,16 @@ class NewtonSolver
                 {
                     case HHO:
                     {
-                        // we do not make any difference for the displacement reconstruction
-                        // if (m_behavior.getDeformation() == SMALL_DEF)
-                        // {
-                        //     const auto recons = make_vector_hho_symmetric_laplacian(m_msh, cl, m_degree_infos);
-                        //     m_stab_precomputed.push_back(
-                        //       make_vector_hho_stabilization(m_msh, cl, recons.first, m_degree_infos));
-                        // }
-                        // else
-                        // {
                         const auto recons_scalar = make_scalar_hho_laplacian(m_msh, cl, m_degree_infos);
                         m_stab_precomputed.push_back(
-                          make_vector_hho_stabilization_optim(m_msh, cl, recons_scalar.first, m_degree_infos));
-                        // }
+                            make_vector_hho_stabilization_optim(m_msh, cl, recons_scalar.first, m_degree_infos));
+                        break;
+                    }
+                    case HHO_SYM:
+                    {
+                        const auto recons = make_vector_hho_symmetric_laplacian(m_msh, cl, m_degree_infos);
+                        m_stab_precomputed.push_back(
+                            make_vector_hho_stabilization(m_msh, cl, recons.first, m_degree_infos));
                         break;
                     }
                     case HDG:
@@ -282,58 +226,60 @@ class NewtonSolver
     }
 
   public:
-    NewtonSolver(const mesh_type& msh, const bnd_type& bnd, const param_type& rp) :
-      m_msh(msh), m_verbose(rp.m_verbose), m_convergence(false), m_rp(rp), m_bnd(bnd), m_stab_manager(msh, rp.m_beta)
-    {
-        if (m_verbose)
-        {
-            std::cout << "------------------------------------------------------------------------"
-                         "----------------------"
-                      << std::endl;
-            std::cout
-              << "|********************** Nonlinear Newton's Solver for solid mechanics ***********************|"
-              << std::endl;
-            std::cout << "------------------------------------------------------------------------"
-                         "----------------------"
-                      << std::endl;
-        }
-        int face_degree = rp.m_face_degree;
-        if (rp.m_face_degree < 0)
-        {
-            std::cout << "'face_degree' should be > 0. Reverting to 1." << std::endl;
-            face_degree = 1;
-        }
+      NewtonSolver(const mesh_type &msh, const bnd_type &bnd, const param_type &rp) : m_msh(msh), m_verbose(rp.m_verbose),
+                                                                                      m_convergence(false), m_rp(rp), m_bnd(bnd),
+                                                                                      m_stab_manager(msh, rp.m_beta),
+                                                                                      m_fields(2)
+      {
+          if (m_verbose)
+          {
+              std::cout << "------------------------------------------------------------------------"
+                           "----------------------"
+                        << std::endl;
+              std::cout
+                  << "|********************** Nonlinear Newton's Solver for solid mechanics ***********************|"
+                  << std::endl;
+              std::cout << "------------------------------------------------------------------------"
+                           "----------------------"
+                        << std::endl;
+          }
+          int face_degree = rp.m_face_degree;
+          if (rp.m_face_degree < 0)
+          {
+              std::cout << "'face_degree' should be > 0. Reverting to 1." << std::endl;
+              face_degree = 1;
+          }
 
-        m_rp.m_face_degree = face_degree;
+          m_rp.m_face_degree = face_degree;
 
-        int cell_degree = rp.m_cell_degree;
-        if ((face_degree - 1 > cell_degree) or (cell_degree > face_degree + 1))
-        {
-            std::cout << "'cell_degree' should be 'face_degree + 1' =>"
-                      << "'cell_degree' => 'face_degree -1'. Reverting to 'face_degree'." << std::endl;
-            cell_degree = face_degree;
-        }
+          int cell_degree = rp.m_cell_degree;
+          if ((face_degree - 1 > cell_degree) or (cell_degree > face_degree + 1))
+          {
+              std::cout << "'cell_degree' should be 'face_degree + 1' =>"
+                        << "'cell_degree' => 'face_degree -1'. Reverting to 'face_degree'." << std::endl;
+              cell_degree = face_degree;
+          }
 
-        m_rp.m_cell_degree = cell_degree;
+          m_rp.m_cell_degree = cell_degree;
 
-        int grad_degree = rp.m_grad_degree;
-        if (grad_degree < face_degree)
-        {
-            std::cout << "'grad_degree' should be >= 'face_degree'. Reverting to 'face_degree'." << std::endl;
-            grad_degree = face_degree;
-        }
+          int grad_degree = rp.m_grad_degree;
+          if (grad_degree < face_degree)
+          {
+              std::cout << "'grad_degree' should be >= 'face_degree'. Reverting to 'face_degree'." << std::endl;
+              grad_degree = face_degree;
+          }
 
-        if (m_verbose)
-        {
-            m_rp.infos();
-        }
+          if (m_verbose)
+          {
+              m_rp.infos();
+          }
 
-        // Initialization
-        if (m_verbose)
-            std::cout << "Initialization ..." << std::endl;
-        this->init_degree(cell_degree, face_degree, grad_degree);
-        this->init();
-    }
+          // Initialization
+          if (m_verbose)
+              std::cout << "Initialization ..." << std::endl;
+          this->init_degree(cell_degree, face_degree, grad_degree);
+          this->init();
+      }
 
     /**
      * @brief return a boolean to know if the verbosity mode is activated
@@ -366,36 +312,11 @@ class NewtonSolver
     {
         size_t cell_i = 0;
 
-        for (auto& cl : m_msh)
-        {
-            m_displ.at(cell_i++) = project_function(m_msh, cl, m_degree_infos, func, 2);
-        }
+        m_fields.createField(0, FieldName::DEPL, m_msh, m_degree_infos, func);
+        m_fields.createField(0, FieldName::DEPL_CELLS, m_msh, m_degree_infos, func);
+        m_fields.createField(0, FieldName::DEPL_FACES, m_msh, m_degree_infos, func);
 
-        for (auto itor = m_msh.faces_begin(); itor != m_msh.faces_end(); itor++)
-        {
-            const auto bfc     = *itor;
-            const auto face_id = m_msh.lookup(bfc);
-            const auto fdi     = m_degree_infos.degreeInfo(m_msh, bfc);
-
-            if (m_bnd.contact_boundary_type(face_id) == SIGNORINI_FACE)
-            {
-                const auto proj_bcf = project_function(m_msh, bfc, fdi.degree(), func, 2);
-                assert(m_displ_faces[face_id].size() == proj_bcf.size());
-
-                m_displ_faces[face_id] = proj_bcf;
-            }
-            else if (m_bnd.contact_boundary_type(face_id) == SIGNORINI_CELL)
-            {
-                assert(m_displ_faces[face_id].size() == 0);
-            }
-            else
-            {
-                const auto proj_bcf = project_function(m_msh, bfc, fdi.degree(), func, 2);
-                assert(m_displ_faces[face_id].size() == proj_bcf.size());
-
-                m_displ_faces[face_id] = proj_bcf;
-            }
-        }
+        /*TODO: look for contact.*/
     }
 
     /**
@@ -404,22 +325,16 @@ class NewtonSolver
      * @param func given function
      */
     void
-    initial_fields(const vector_rhs_function<mesh_type> depl,
-                   const vector_rhs_function<mesh_type> velo,
-                   const vector_rhs_function<mesh_type> acce)
+    initial_field(const FieldName &name, const vector_rhs_function<mesh_type> func)
     {
-        if (m_rp.isUnsteady())
-        {
-            this->initial_guess(depl);
-            for (auto& cl : m_msh)
-            {
-                const auto cell_id = m_msh.lookup(cl);
-                const auto di      = m_degree_infos.cellDegreeInfo(m_msh, cl);
-
-                m_velocity.at(cell_id) = project_function(m_msh, cl, di.cell_degree(), velo, 2);
-                m_acce.at(cell_id)     = project_function(m_msh, cl, di.cell_degree(), acce, 2);
-            }
+        if(name == FieldName::DEPL){
+            m_fields.createField(-1, FieldName::DEPL_CELLS, m_msh, m_degree_infos, func);
+            m_fields.createField(-1, FieldName::DEPL_FACES, m_msh, m_degree_infos, func);
+            m_fields.createField(0, FieldName::DEPL_CELLS, m_msh, m_degree_infos, func);
+            m_fields.createField(0, FieldName::DEPL_FACES, m_msh, m_degree_infos, func);
         }
+        m_fields.createField(-1, name, m_msh, m_degree_infos, func);
+        m_fields.createField(0, name, m_msh, m_degree_infos, func);
     }
 
     /**
@@ -543,23 +458,22 @@ class NewtonSolver
 
         // Newton step
         NewtonStep<mesh_type> newton_step(m_rp);
-        newton_step.initialize(m_displ, m_displ_faces, m_velocity, m_acce);
 
         // Loop on time step
         while (!list_time_step.empty())
         {
             const auto current_step = list_time_step.getCurrentTimeStep();
             const auto current_time = current_step.end_time();
+            m_fields.setCurrentTime(current_time);
 
             if (m_verbose)
             {
                 list_time_step.printCurrentTimeStep();
             }
 
-            auto rlf = [&lf, &current_time](const point<scalar_type, mesh_type::dimension>& p) -> auto
+            auto rlf = [&lf, &current_time](const point<scalar_type, mesh_type::dimension> &p) -> auto
             { return lf(p, current_time); };
-
-            m_bnd.multiplyAllFunctionsByAFactor(current_time);
+            m_bnd.setTime(current_time);
 
             //  Newton correction
             NewtonSolverInfo newton_info = newton_step.compute(m_msh,
@@ -571,7 +485,8 @@ class NewtonSolver
                                                                m_gradient_precomputed,
                                                                m_stab_precomputed,
                                                                m_behavior,
-                                                               m_stab_manager);
+                                                               m_stab_manager,
+                                                               m_fields);
             si.updateInfo(newton_info);
 
             if (m_verbose)
@@ -608,36 +523,30 @@ class NewtonSolver
                 list_time_step.removeCurrentTimeStep();
                 m_behavior.update();
                 m_stab_manager.update();
+                m_fields.update();
 
-                if (time_saving)
+                if (time_saving && (m_rp.m_time_save.front() < current_time + 1E-5))
                 {
-                    if (m_rp.m_time_save.front() < current_time + 1E-5)
-                    {
-                        newton_step.save_solutions(m_displ, m_displ_faces, m_velocity, m_acce);
+                    std::cout << "** Save results" << std::endl;
+                    std::string name =
+                        "result" + std::to_string(mesh_type::dimension) + "D_t" + std::to_string(current_time) + "_";
 
-                        std::cout << "** Save results" << std::endl;
-                        std::string name =
-                          "result" + std::to_string(mesh_type::dimension) + "D_t" + std::to_string(current_time) + "_";
+                    this->output_discontinuous_displacement(name + "depl_disc.msh");
+                    this->output_continuous_displacement(name + "depl_cont.msh");
+                    this->output_CauchyStress_GP(name + "CauchyStress_GP.msh");
+                    this->output_CauchyStress_GP(name + "CauchyStress_GP_def.msh", true);
+                    this->output_discontinuous_deformed(name + "deformed_disc.msh");
+                    this->output_is_plastic_GP(name + "plastic_GP.msh");
+                    this->output_stabCoeff(name + "stabCoeff.msh");
+                    this->output_equivalentPlasticStrain_GP(name + "equivalentPlasticStrain_GP.msh");
 
-                        this->output_discontinuous_displacement(name + "depl_disc.msh");
-                        this->output_continuous_displacement(name + "depl_cont.msh");
-                        this->output_CauchyStress_GP(name + "CauchyStress_GP.msh");
-                        this->output_CauchyStress_GP(name + "CauchyStress_GP_def.msh", true);
-                        this->output_discontinuous_deformed(name + "deformed_disc.msh");
-                        this->output_is_plastic_GP(name + "plastic_GP.msh");
-                        this->output_stabCoeff(name + "stabCoeff.msh");
-                        this->output_equivalentPlasticStrain_GP(name + "equivalentPlasticStrain_GP.msh");
-
-                        m_rp.m_time_save.pop_front();
-                        if (m_rp.m_time_save.empty())
-                            time_saving = false;
-                    }
+                    m_rp.m_time_save.pop_front();
+                    if (m_rp.m_time_save.empty())
+                        time_saving = false;
                 }
             }
         }
 
-        // save solutions
-        newton_step.save_solutions(m_displ, m_displ_faces, m_velocity, m_acce);
         si.m_time_step = list_time_step.numberOfTimeStep();
 
         ttot.toc();
@@ -674,13 +583,13 @@ class NewtonSolver
     printSolutionCell() const
     {
         size_t cell_i = 0;
+        const auto depl_cells = m_fields.getCurrentField(FieldName::DEPL_CELLS);
+
         std::cout << "Solution at the cells:" << std::endl;
         for (auto& cl : m_msh)
         {
-            const auto di            = m_degree_infos.degreeInfo(m_msh, cl);
-            const auto num_cell_dofs = vector_basis_size(di.cell_degree(), mesh_type::dimension, mesh_type::dimension);
             std::cout << "cell " << cell_i << ": " << std::endl;
-            std::cout << m_displ.at(cell_i++).head(num_cell_dofs).transpose() << std::endl;
+            std::cout << depl_cells.at(cell_i++).transpose() << std::endl;
         }
     }
 
@@ -692,12 +601,12 @@ class NewtonSolver
         scalar_type err_dof = 0;
 
         size_t cell_i = 0;
+        const auto depl_cells = m_fields.getCurrentField(FieldName::DEPL_CELLS);
 
         for (auto& cl : m_msh)
         {
             const auto cdi             = m_degree_infos.degreeInfo(m_msh, cl);
-            const auto num_cell_dofs   = vector_basis_size(cdi.degree(), mesh_type::dimension, mesh_type::dimension);
-            const vector_type comp_dof = m_displ.at(cell_i++).head(num_cell_dofs);
+            const vector_type comp_dof = depl_cells.at(cell_i++);
             const vector_type true_dof = project_function(m_msh, cl, cdi.degree(), as, 2);
 
             const auto        cb   = make_vector_monomial_basis(m_msh, cl, cdi.degree());
@@ -719,11 +628,12 @@ class NewtonSolver
         scalar_type err_dof = 0;
 
         size_t cell_i = 0;
+        const auto depl = m_fields.getCurrentField(FieldName::DEPL);
 
         matrix_type grad;
         matrix_type stab;
 
-        for (auto& cl : m_msh)
+        for (auto &cl : m_msh)
         {
             // std::cout << m_degree_infos.cellDegreeInfo(m_msh, cl) << std::endl;
             /////// Gradient Reconstruction /////////
@@ -740,44 +650,42 @@ class NewtonSolver
             {
                 switch (m_rp.m_stab_type)
                 {
-                    case HHO:
-                    {
-                        // we do not make any difference for thre displacement reconstruction
-                        // if (m_behavior.getDeformation() == SMALL_DEF)
-                        // {
-                        //     const auto recons = make_vector_hho_symmetric_laplacian(m_msh, cl, m_degree_infos);
-                        //     stab              = make_vector_hho_stabilization(m_msh, cl, recons.first,
-                        //     m_degree_infos);
-                        // }
-                        // else
-                        // {
-                        const auto recons_scalar = make_scalar_hho_laplacian(m_msh, cl, m_degree_infos);
-                        stab = make_vector_hho_stabilization_optim(m_msh, cl, recons_scalar.first, m_degree_infos);
-                        // }
-                        break;
-                    }
-                    case HDG:
-                    {
-                        stab = make_vector_hdg_stabilization(m_msh, cl, m_degree_infos);
-                        break;
-                    }
-                    case DG:
-                    {
-                        stab = make_vector_dg_stabilization(m_msh, cl, m_degree_infos);
-                        break;
-                    }
-                    case NO:
-                    {
-                        break;
-                        stab.setZero();
-                    }
-                    default: throw std::invalid_argument("Unknown stabilization");
+                case HHO_SYM:
+                {
+                    const auto recons = make_vector_hho_symmetric_laplacian(m_msh, cl, m_degree_infos);
+                    stab = make_vector_hho_stabilization(m_msh, cl, recons.first,
+                                                         m_degree_infos);
+                    break;
+                }
+                case HHO:
+                {
+                    const auto recons_scalar = make_scalar_hho_laplacian(m_msh, cl, m_degree_infos);
+                    stab = make_vector_hho_stabilization_optim(m_msh, cl, recons_scalar.first, m_degree_infos);
+                    break;
+                }
+                case HDG:
+                {
+                    stab = make_vector_hdg_stabilization(m_msh, cl, m_degree_infos);
+                    break;
+                }
+                case DG:
+                {
+                    stab = make_vector_dg_stabilization(m_msh, cl, m_degree_infos);
+                    break;
+                }
+                case NO:
+                {
+                    break;
+                    stab.setZero();
+                }
+                default:
+                    throw std::invalid_argument("Unknown stabilization");
                 }
             }
 
             const auto Ah = grad + stab;
 
-            const vector_type comp_dof = m_displ.at(cell_i);
+            const vector_type comp_dof = depl.at(cell_i);
             const vector_type true_dof = project_function(m_msh, cl, m_degree_infos, as, 2);
 
             const vector_type diff_dof = (true_dof - comp_dof);
@@ -798,13 +706,15 @@ class NewtonSolver
         std::vector<gmsh::Data>          data;    // create data (not used)
         const std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
 
+        const auto depl_cells = m_fields.getCurrentField(FieldName::DEPL_CELLS);
+
         int cell_i   = 0;
         int nb_nodes = 0;
         for (auto& cl : m_msh)
         {
             const auto              di         = m_degree_infos.cellDegreeInfo(m_msh, cl);
             const auto              cb         = make_vector_monomial_basis(m_msh, cl, di.cell_degree());
-            const vector_type       x          = m_displ.at(cell_i++).head(cb.size());
+            const vector_type x = depl_cells.at(cell_i++);
             auto                    cell_nodes = points(m_msh, cl);
             std::vector<gmsh::Node> new_nodes;
 
@@ -848,6 +758,7 @@ class NewtonSolver
 
         const static_vector<scalar_type, dimension> vzero = static_vector<scalar_type, dimension>::Zero();
 
+        const auto depl_cells = m_fields.getCurrentField(FieldName::DEPL_CELLS);
         const size_t nb_nodes(gmsh.getNumberofNodes());
 
         // first(number of data at this node), second(cumulated value)
@@ -858,7 +769,7 @@ class NewtonSolver
         {
             const auto        di         = m_degree_infos.cellDegreeInfo(m_msh, cl);
             const auto        cb         = make_vector_monomial_basis(m_msh, cl, di.cell_degree());
-            const vector_type x          = m_displ.at(cell_i).head(cb.size());
+            const vector_type x = depl_cells.at(cell_i);
             auto              cell_nodes = m_post_mesh.nodes_cell(cell_i);
 
             // Loop on the nodes of the cell
@@ -904,12 +815,14 @@ class NewtonSolver
         std::vector<gmsh::SubData> subdata; // create subdata to save soution at gauss point
         size_t                     nb_nodes(gmsh.getNumberofNodes());
 
+        const auto depl = m_fields.getCurrentField(FieldName::DEPL);
+
         int cell_i = 0;
         for (auto& cl : m_msh)
         {
             const auto di = m_degree_infos.cellDegreeInfo(m_msh, cl);
 
-            const auto  uTF = m_displ.at(cell_i);
+            const auto uTF = depl.at(cell_i);
             matrix_type gr;
             if (m_rp.m_precomputation)
             {
@@ -1074,6 +987,7 @@ class NewtonSolver
         gmsh::Gmesh gmsh(mesh_type::dimension);
         auto        storage = m_msh.backend_storage();
 
+        const auto depl_cells = m_fields.getCurrentField(FieldName::DEPL_CELLS);
         int    cell_i   = 0;
         size_t nb_nodes = 0;
         for (auto& cl : m_msh)
@@ -1081,7 +995,7 @@ class NewtonSolver
             const auto di = m_degree_infos.cellDegreeInfo(m_msh, cl);
 
             auto                    cb         = make_vector_monomial_basis(m_msh, cl, di.cell_degree());
-            const vector_type       x          = m_displ.at(cell_i++).head(cb.size());
+            const vector_type x = depl_cells.at(cell_i++);
             const auto              cell_nodes = points(m_msh, cl);
             std::vector<gmsh::Node> new_nodes;
 

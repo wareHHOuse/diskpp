@@ -142,7 +142,7 @@ struct test_functor_curl_reconstruction<Mesh<T,3,Storage>, mixed>
             auto qps = integrate(msh, cl, 2*rd);
             for (auto& qp : qps)
             {
-                auto phi = rb.eval_curls2(qp.point());
+                auto phi = rb.eval_curls(qp.point());
                 Matrix<T,3,1> val = disk::eval(reconstr_curl, phi) - curl_f(qp.point());
                 error += qp.weight() * val.dot(val);
             }

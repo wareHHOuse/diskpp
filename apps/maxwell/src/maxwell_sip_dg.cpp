@@ -222,7 +222,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
         for (auto& qp : qps)
         {
             auto phi = tbasis.eval_functions(qp.point());
-            auto cphi = tbasis.eval_curls2(qp.point());
+            auto cphi = tbasis.eval_curls(qp.point());
 
             M += qp.weight() * phi * phi.transpose();
             K += qp.weight() * cphi * cphi.transpose();
@@ -253,7 +253,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
             for (auto& fqp : f_qps)
             {
                 auto tphi       = tbasis.eval_functions(fqp.point());
-                auto tcphi      = tbasis.eval_curls2(fqp.point());
+                auto tcphi = tbasis.eval_curls(fqp.point());
                 auto n_x_tphi   = disk::vcross(n, tphi);
                 auto n_x_tphi_x_n = disk::vcross(n_x_tphi, n);
 
@@ -287,7 +287,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
                 }
 
                 auto nphi       = nbasis.eval_functions(fqp.point());
-                auto ncphi      = nbasis.eval_curls2(fqp.point());
+                auto ncphi = nbasis.eval_curls(fqp.point());
                 auto n_x_nphi   = disk::vcross(n, nphi);
 
                 Atn += - fqp.weight() * eta_l * n_x_tphi * n_x_nphi.transpose();
@@ -375,7 +375,7 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
             {
                 Matrix<scalar_type, Dynamic, 3> cphi_tmp = cb.eval_functions(fc_pts[j]);
                 Matrix<scalar_type, Dynamic, 3> n_x_cphi_x_n = disk::vcross(n, disk::vcross(cphi_tmp, n));
-                Matrix<scalar_type, Dynamic, 3> ccphi_tmp = cb.eval_curls2(fc_pts[j]);
+                Matrix<scalar_type, Dynamic, 3> ccphi_tmp = cb.eval_curls(fc_pts[j]);
                 Matrix<scalar_type, Dynamic, 3> ccphi_x_n = disk::vcross(ccphi_tmp, n);
 
                 Matrix<scalar_type, Dynamic, 3> imp = (1./mur)*ccphi_x_n - (jwmu0/Z)*n_x_cphi_x_n;
@@ -513,7 +513,7 @@ run_maxwell_eigenvalue_solver(Mesh& msh, size_t degree, const typename Mesh::coo
         for (auto& qp : qps)
         {
             auto phi = tbasis.eval_functions(qp.point());
-            auto cphi = tbasis.eval_curls2(qp.point());
+            auto cphi = tbasis.eval_curls(qp.point());
 
             M += qp.weight() * phi * phi.transpose();
             K += qp.weight() * cphi * cphi.transpose();
@@ -540,7 +540,7 @@ run_maxwell_eigenvalue_solver(Mesh& msh, size_t degree, const typename Mesh::coo
             for (auto& fqp : f_qps)
             {
                 auto tphi       = tbasis.eval_functions(fqp.point());
-                auto tcphi      = tbasis.eval_curls2(fqp.point());
+                auto tcphi = tbasis.eval_curls(fqp.point());
                 auto n_x_tphi   = disk::vcross(n, tphi);
 
                 if (nv.second)
@@ -558,7 +558,7 @@ run_maxwell_eigenvalue_solver(Mesh& msh, size_t degree, const typename Mesh::coo
                 }
 
                 auto nphi       = nbasis.eval_functions(fqp.point());
-                auto ncphi      = nbasis.eval_curls2(fqp.point());
+                auto ncphi = nbasis.eval_curls(fqp.point());
                 auto n_x_nphi   = disk::vcross(n, nphi);
 
                 Atn += - fqp.weight() * eta_l * n_x_tphi * n_x_nphi.transpose();

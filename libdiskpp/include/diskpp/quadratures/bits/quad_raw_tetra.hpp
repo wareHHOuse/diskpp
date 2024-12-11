@@ -10,9 +10,11 @@
 
 #pragma once
 
+#include <vector>
+
+#include "diskpp/common/simplicial_formula.hpp"
 #include "diskpp/mesh/point.hpp"
 #include "diskpp/quadratures/quadrature_point.hpp"
-#include <vector>
 
 #include "simplex_gm_rule.hpp"
 #include "tetrahedron_arbq_rule.hpp"
@@ -26,18 +28,9 @@ namespace quadrature
 namespace priv
 {
 
-template<typename T>
-inline T
-tetra_volume(const Eigen::Matrix<T, 3, 1>& v0, const Eigen::Matrix<T, 3, 1>& v1, const Eigen::Matrix<T, 3, 1>& v2)
-{
-    return std::abs(v0.dot(v1.cross(v2))) / 6.;
-}
-
-static const double arbq_to_ref_A[3][3] = {
-    {  0.500000000000000, -0.288675134594813, -0.204124145231932 },
-    {  0.000000000000000,  0.577350269189626, -0.204124145231932 },
-    {  0.000000000000000,  0.000000000000000,  0.612372435695795 }
-};
+static const double arbq_to_ref_A[3][3] = {{0.500000000000000, -0.288675134594813, -0.204124145231932},
+                                           {0.000000000000000, 0.577350269189626, -0.204124145231932},
+                                           {0.000000000000000, 0.000000000000000, 0.612372435695795}};
 
 static const double arbq_to_ref_b[3] = {-1.000000000000000, -0.577350269189626, -0.408248290463863};
 
@@ -61,7 +54,7 @@ arbq(size_t degree, const point<T, 3>& p0, const point<T, 3>& p1, const point<T,
     auto v0   = p1 - p0;
     auto v1   = p2 - p0;
     auto v2   = p3 - p0;
-    auto tvol = priv::tetra_volume(v0.to_vector(), v1.to_vector(), v2.to_vector());
+    auto tvol = volume_tetrahedron_kahan(p0, p1, p2, p3);
 
     tetrahedron_arbq(rule, point_num, pts.data(), ws.data());
 
@@ -111,7 +104,7 @@ grundmann_moeller(size_t             degree,
     auto v0   = p1 - p0;
     auto v1   = p2 - p0;
     auto v2   = p3 - p0;
-    auto tvol = priv::tetra_volume(v0.to_vector(), v1.to_vector(), v2.to_vector());
+    auto tvol = volume_tetrahedron_kahan(p0, p1, p2, p3);
 
     for (size_t i = 0; i < point_num; i++)
     {

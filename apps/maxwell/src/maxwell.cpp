@@ -663,7 +663,7 @@ vector_wave_solver(Mesh<T,2,Storage>& msh, size_t order,
         auto qps = integrate(msh, cl, 2*chdi.reconstruction_degree());
         for (auto& qp : qps)
         {
-            Matrix<T, Dynamic, 2> hphi  = rb.eval_curls2(qp.point());
+            Matrix<T, Dynamic, 2> hphi  = rb.eval_curls(qp.point());
             Matrix<T, Dynamic, 2> hphi2 = hphi.block(0,0,cb.size(),2);
             Matrix<T, Dynamic, 1> ephi  = cb.eval_functions(qp.point());
             //Matrix<T, Dynamic, 3> rphi = rb.eval_functions(qp.point());
@@ -1156,7 +1156,7 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, parameter_loader<Mesh<Co
         for (size_t i = 0; i < pts.size(); i++)
         {
             auto phi = cb.eval_functions(pts[i]);
-            auto cphi = cb.eval_curls2(pts[i]);
+            auto cphi = cb.eval_curls(pts[i]);
             auto ls = phi.transpose()*esolseg;
             auto ptid = ptids.at(i);
             data_ex[ptid].first += ls(0);
@@ -1197,7 +1197,7 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, parameter_loader<Mesh<Co
             for (auto& qp : qps_f)
             {
                 Matrix<scalar_type, Dynamic, 3> f_phi = fb.eval_functions(qp.point());
-                Matrix<scalar_type, Dynamic, 3> c_cphi_tmp = cb.eval_curls2(qp.point());
+                Matrix<scalar_type, Dynamic, 3> c_cphi_tmp = cb.eval_curls(qp.point());
                 Matrix<scalar_type, Dynamic, 3> c_cphi = disk::vcross(c_cphi_tmp, n);
 
                 mass += qp.weight() * f_phi * f_phi.transpose();
@@ -1217,7 +1217,7 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, parameter_loader<Mesh<Co
 
                 Matrix<scalar_type, Dynamic, 3> cphi_tmp = cb.eval_functions(fc_pts[j]);
                 Matrix<scalar_type, Dynamic, 3> n_x_cphi_x_n = disk::vcross(n, disk::vcross(cphi_tmp, n));
-                Matrix<scalar_type, Dynamic, 3> ccphi_tmp = cb.eval_curls2(fc_pts[j]);
+                Matrix<scalar_type, Dynamic, 3> ccphi_tmp = cb.eval_curls(fc_pts[j]);
                 Matrix<scalar_type, Dynamic, 3> ccphi_x_n = disk::vcross(ccphi_tmp, n);
 
                 Matrix<scalar_type, Dynamic, 3> imp = (1./mur)*ccphi_x_n + (jwmu0/Z)*n_x_cphi_x_n;
