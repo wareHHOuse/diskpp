@@ -291,6 +291,29 @@ public:
 
         throw std::invalid_argument("Can't convert diffusion coefficient to a valid type.");
     }
+
+    template<typename T>
+    diffusion_parameter<T,3>
+    diffusion_coefficient(size_t domain_num, const disk::point<T,3>& pt) const
+    {
+        auto dc = lua["diffusion_coefficient"](domain_num, pt.x(), pt.y());
+
+        sol::optional<double> dc_dbl = dc;
+        if (dc_dbl) {
+            diffusion_parameter<T,3> ret;
+            ret.entry(0, 0, dc_dbl.value());
+            ret.entry(1, 1, dc_dbl.value());
+            ret.entry(2, 2, dc_dbl.value());
+            return ret;
+        }
+
+        sol::optional<diffusion_parameter<T,3>> dc_tens = dc;
+        if (dc_tens) {
+            return dc_tens.value();
+        }
+
+        throw std::invalid_argument("Can't convert diffusion coefficient to a valid type.");
+    }
 };
 
 struct lua_solution_data

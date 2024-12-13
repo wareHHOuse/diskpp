@@ -515,7 +515,7 @@ public:
     }
 
     template<typename T>
-    bool add_mesh(generic_mesh<T,3>& msh, const std::string& name)
+    bool add_mesh(const generic_mesh<T,3>& msh, const std::string& name)
     {
         if (!m_siloDb) {
             std::cout << "add_mesh(): Database not opened." << std::endl;

@@ -18,6 +18,7 @@
 
 //#include <matplot/matplot.h>
 
+#include "diskpp/bases/bases.hpp"
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
@@ -401,6 +402,33 @@ adjust_stabfree_recdeg(const Mesh& msh, const typename Mesh::cell_type& cl,
     }
 }
 
+template<mesh_3D Mesh>
+void
+adjust_stabfree_recdeg(const Mesh& msh, const typename Mesh::cell_type& cl,
+    hho_degree_info& hdi)
+{
+    size_t cd = hdi.cell_degree();
+    size_t fd = hdi.face_degree();
+    size_t n = faces(msh, cl).size();
+
+    /* HHO space dofs */
+    size_t from = ((cd+3)*(cd+2)*(cd+1))/6 + (n*(fd+2)*(fd+1))/2;
+    /* Reconstruction dofs, polynomial part (degree is cd+2) */
+    size_t to = ((cd+5)*(cd+4)*(cd+3))/6;
+
+    size_t rdofs = to;
+    size_t incr = 0;
+
+    size_t unused = harmonic_basis_size(cd+2, 3);
+
+    while (from > rdofs) {
+        incr += 1;
+        size_t used = harmonic_basis_size(cd+2+incr, 3);
+        rdofs = to + used - unused;
+    }
+    hdi.reconstruction_degree(cd+2+incr);
+}
+
 
 template<typename Mesh>
 void
@@ -542,6 +570,20 @@ int main(int argc, char **argv)
 
     if (shape == "tri") {
         disk::triangular_mesh<T> msh;
+        auto mesher = make_simple_mesher(msh);
+        mesher.refine();
+
+        for (size_t i = 0; i < max_refinements; i++)
+        {
+            test_stabfree_hho(msh, cdb_plain, plain_hho);
+            //test_stabfree_hho(msh, cdb_mixed, mixed_hho);
+            //test_stabfree_hho(msh, cdb_mixed_proj, mixed_proj_hho);
+            mesher.refine();
+        }
+    }
+
+    if (shape == "tet") {
+        disk::tetrahedral_mesh<T> msh;
         auto mesher = make_simple_mesher(msh);
         mesher.refine();
 

@@ -326,6 +326,7 @@ public:
         storage->edges      = std::move(edges);
         storage->surfaces   = std::move(faces);
         storage->volumes    = std::move(volumes);
+        storage->subdomain_info.resize(storage->volumes.size());
 
         std::vector<size_t> bf(storage->surfaces.size());
         for (auto& vol : storage->volumes)

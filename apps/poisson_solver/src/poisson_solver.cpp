@@ -16,6 +16,7 @@
 #include <iomanip>
 #include <map>
 
+#include "diskpp/loaders/loader_fvca6.hpp"
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
@@ -60,6 +61,34 @@ adjust_stabfree_recdeg(const Mesh& msh, const typename Mesh::cell_type& cl,
         hdi.reconstruction_degree(rpd+incr);
     }
 }
+
+template<disk::mesh_3D Mesh>
+void
+adjust_stabfree_recdeg(const Mesh& msh, const typename Mesh::cell_type& cl,
+    disk::hho_degree_info& hdi)
+{
+    size_t cd = hdi.cell_degree();
+    size_t fd = hdi.face_degree();
+    size_t n = faces(msh, cl).size();
+
+    /* HHO space dofs */
+    size_t from = ((cd+3)*(cd+2)*(cd+1))/6 + (n*(fd+2)*(fd+1))/2;
+    /* Reconstruction dofs, polynomial part (degree is cd+2) */
+    size_t to = ((cd+5)*(cd+4)*(cd+3))/6;
+
+    size_t rdofs = to;
+    size_t incr = 0;
+
+    size_t unused = disk::harmonic_basis_size(cd+2, 3);
+
+    while (from > rdofs) {
+        incr += 1;
+        size_t used = disk::harmonic_basis_size(cd+2+incr, 3);
+        rdofs = to + used - unused;
+    }
+    hdi.reconstruction_degree(cd+2+incr);
+}
+
 
 template<typename Mesh, typename ProblemData>
 auto
@@ -145,6 +174,9 @@ compute_element_contribution(hho_poisson_solver_state<Mesh>& state,
 
     auto fcs = faces(msh, cl);
     auto num_faces = fcs.size();
+
+    state.hdis[offset(msh, cl)] = std::pair(num_faces, hdi);
+
     auto cbs = disk::scalar_basis_size(hdi.cell_degree(), Mesh::dimension);
     auto fbs = disk::scalar_basis_size(hdi.face_degree(), Mesh::dimension-1);
     Eigen::Matrix<T, Eigen::Dynamic, 1> strong_data =
@@ -605,6 +637,81 @@ struct silo_io
         }
     }
 
+    template<disk::mesh_3D MeshP>
+    void
+    export_solution_aux(const MeshP& msh)
+    {
+        using T = typename MeshP::coordinate_type;
+        auto& sol = state.sol_full;
+        auto& hdi = state.hdi;
+
+        std::vector<double> u_data;
+        std::vector<double> gx_data, gy_data, gz_data;
+        std::vector<double> fx_data, fy_data, fz_data;
+        std::vector<double> rhs;
+
+        std::string gx_name = grad_name + "_x";
+        std::string gy_name = grad_name + "_y";
+        std::string gz_name = grad_name + "_z";
+        std::string fx_name = flux_name + "_x";
+        std::string fy_name = flux_name + "_y";
+        std::string fz_name = flux_name + "_z";
+
+        size_t cell_i = 0;
+        for (auto& cl : msh)
+        {
+            auto subdomain_id = msh.domain_info(cl).tag();
+            auto cb = disk::make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
+            auto cbs = cb.size();
+            auto bar = barycenter(msh, cl);
+            auto cl_dof_ofs = cbs*cell_i;
+
+            Eigen::Matrix<T, Eigen::Dynamic, 1> loc_sol = sol.segment(cl_dof_ofs, cbs);
+
+            auto phi = cb.eval_functions(bar);
+            auto u = disk::eval(loc_sol, phi);
+            
+            if (sol_name != "") {
+                u_data.push_back(u);
+            }
+
+            Eigen::Matrix<T,Eigen::Dynamic,3> dphi = cb.eval_gradients(bar);
+            Eigen::Matrix<T,3,1> grad_u = disk::eval(loc_sol, dphi);
+            auto flux_u = data.diffusion_coefficient(subdomain_id, bar).tensor()*grad_u;
+
+            if (grad_name != "") {
+                gx_data.push_back( grad_u(0) );
+                gy_data.push_back( grad_u(1) );
+                gy_data.push_back( grad_u(2) );
+            }
+
+            if (flux_name != "") {
+                fx_data.push_back( flux_u(0) );
+                fy_data.push_back( flux_u(1) );
+                fy_data.push_back( flux_u(2) );
+            }
+
+            cell_i++;
+        }
+
+        if (sol_name != "") {
+            db.add_variable(mesh_name, sol_name, u_data, disk::zonal_variable_t);
+        }
+
+        if (grad_name != "") {
+            db.add_variable(mesh_name, gx_name, gx_data, disk::zonal_variable_t);
+            db.add_variable(mesh_name, gy_name, gy_data, disk::zonal_variable_t);
+            db.add_variable(mesh_name, gz_name, gz_data, disk::zonal_variable_t);
+            db.add_expression( grad_name, "{" + gx_name + "," + gy_name + "," + gz_name + "}", DB_VARTYPE_VECTOR );
+        }
+
+        if (flux_name != "") {
+            db.add_variable(mesh_name, fx_name, fx_data, disk::zonal_variable_t);
+            db.add_variable(mesh_name, fy_name, fy_data, disk::zonal_variable_t);
+            db.add_expression( flux_name, "{" + fx_name + "," + fy_name +  "," + fz_name + "}", DB_VARTYPE_VECTOR );
+        }
+    }
+
     void export_solution()
     {
         export_solution_aux(state.msh);
@@ -679,7 +786,7 @@ init_solver_state(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
 
     state.use_stabfree = lua_use_stabfree_hho(lua);
     state.use_dt_stab = lua_use_diffusion_tensor_in_stab(lua);
-
+    state.hdis.resize(state.msh.cells_size());
     return 0;
 }
 
@@ -707,6 +814,20 @@ collect_boundary_info(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
         }
 
         boundary_info.push_back(bcd);
+    }
+}
+
+template<typename Mesh>
+void
+dump_hdis(hho_poisson_solver_state<Mesh>& state, const char *fn) {
+    std::ofstream ofs(fn);
+
+    auto& hdis = state.hdis;
+
+    for (size_t i = 0; i < hdis.size(); i++) {
+        ofs << i << ";" << hdis[i].first << ";" << hdis[i].second.cell_degree(); 
+        ofs << ";" << hdis[i].second.face_degree() << ";";
+        ofs << hdis[i].second.reconstruction_degree() << std::endl; 
     }
 }
 
@@ -756,6 +877,11 @@ setup_and_run(sol::state& lua, hho_poisson_solver_state<Mesh>& state)
     scope_limited_binding mesh_h_b(lua,
         "mesh_h", [&]() {
             return disk::average_diameter(state.msh);
+        });
+
+    scope_limited_binding dump_hdis_b(lua,
+        "dump_hdis", [&](const char *fn) {
+            return dump_hdis(state, fn);
         });
 
     /* Call user code */
@@ -818,7 +944,7 @@ int run(sol::state& lua)
             mesher.make_level(mps.level);
             return setup_and_run(lua, state);
         }
-        /*
+        
         if (mps.type == internal_mesh_type::tetrahedra)
         {
             using mesh_type = disk::simplicial_mesh<T,3>;
@@ -829,7 +955,7 @@ int run(sol::state& lua)
                 mesher.refine();
             return setup_and_run(lua, state);
         }
-        */
+        
     }
 
     if (mps.source == mesh_source::file)
@@ -837,6 +963,18 @@ int run(sol::state& lua)
         std::cout << "file" << std::endl;        
         auto mesh_filename = lua_mesh_filename(lua);
         
+        /* FVCA6 3D */
+        if (std::regex_match(mesh_filename, std::regex(".*\\.msh$") ))
+        {
+            using mesh_type = disk::generic_mesh<T,3>;
+            hho_poisson_solver_state<mesh_type> state;
+            std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
+            disk::fvca6_mesh_loader<T, 3> loader;
+            loader.read_mesh(mesh_filename);
+            loader.populate_mesh(state.msh);
+            return setup_and_run(lua, state);
+        }
+
 #ifdef HAVE_GMSH
         /* GMSH 2D simplicials */
         if (std::regex_match(mesh_filename, std::regex(".*\\.geo2s$") ))
