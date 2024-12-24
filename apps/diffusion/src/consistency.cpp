@@ -14,6 +14,7 @@
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/bases/bases_utils.hpp"
+#include "diskpp/output/silo.hpp"
 
 #include "sgr.hpp"
 
@@ -32,6 +33,8 @@ template<typename Mesh>
 auto
 test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
 {
+    std::ofstream ofs("eigdata.dat");
+
     using T = typename Mesh::coordinate_type;
     using point_type = typename Mesh::point_type;
 
@@ -60,6 +63,12 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
     std::cout << Bwhitefg << "HHO(" << cd << "," << fd << "). Reconstruction: ";
     std::cout << rd+increment << " (poly: " << rd << ", harmonic increment: ";
     std::cout << increment << ")" << reset << std::endl;
+
+    double Tmin_eig = 99999999.0;
+    double Tmax_eig = 0.0;
+
+    std::vector<double> var_hv;
+    std::vector<double> var_eigv;
 
     for (auto& cl : msh)
     {
@@ -133,8 +142,7 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
 
         assert(GR.rows() == totto-1);
 
-        Eigen::Matrix<T, Eigen::Dynamic, 1> poly_rec =
-            GR * poly_hho;
+        Eigen::Matrix<T, Eigen::Dynamic, 1> poly_rec = GR * poly_hho;
 
         Eigen::Matrix<T, Eigen::Dynamic, 1> diff =
             poly_rec.head( cb.size()-1 ) - poly_k1.tail( cb.size()-1 );
@@ -174,11 +182,47 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
         }
 
         std::cout << Cyanfg << "[" << zero_eigs << " null eigs]" << reset << std::endl;
-        if (zero_eigs == 1)
-            std::cout << "Smallest nonzero eig: " << BMagentafg << min2_eig << reset << std::endl;
+        if (zero_eigs == 1) {
+            auto h = diameter(msh, cl);
+            if (Mesh::dimension == 2)
+                std::cout << "Smallest nonzero eig: " << BMagentafg << min2_eig << reset << std::endl;
+            if (Mesh::dimension == 3) {
+                
+                std::cout << "Smallest nonzero eig: " << BMagentafg << min2_eig;
+                std::cout << " (h = " << h << ", corrected by h: " << min2_eig/h << ")" << reset << std::endl;
+            }
 
+            Tmin_eig = std::min(Tmin_eig, min2_eig/h);
+            Tmax_eig = std::max(Tmax_eig, min2_eig/h);
+
+            var_hv.push_back(h);
+            var_eigv.push_back(min2_eig);
+
+            ofs << h << " " << min2_eig << " " << min2_eig/h << " " << measure(msh, cl) << " ";
+            
+            
+            auto pts = points(msh, cl);
+            for (auto& pt : pts)
+                ofs << pt << " ";
+        
+            ofs << "bar: " << barycenter(msh, cl) << " ";
+
+            ofs << std::endl;
+
+            continue;
+        }
+
+        std::cout << "NOT STABLE" << std::endl;
         break;
     }
+
+    std::cout << Tmin_eig << " " << Tmax_eig << std::endl;
+
+    disk::silo_database db;
+    db.create("consist.silo");
+    db.add_mesh(msh, "mesh");
+    db.add_variable("mesh", "h", var_hv, disk::zonal_variable_t);
+    db.add_variable("mesh", "eig", var_eigv, disk::zonal_variable_t);
 }
 
 
@@ -188,12 +232,13 @@ int main(int argc, char **argv)
 
     int degree = 0;
     int increment = 0;
+    int refs = 0;
     double radius = 1.0;
     hho_variant variant = hho_variant::equal_order;
     std::string mesh_filename;
 
     int ch;
-    while ( (ch = getopt(argc, argv, "k:i:v:m:r:")) != -1 )
+    while ( (ch = getopt(argc, argv, "k:i:v:m:r:z:")) != -1 )
     {
         switch(ch)
         {
@@ -226,6 +271,12 @@ int main(int argc, char **argv)
                 radius = std::stod(optarg);
                 if (radius <= 0)
                     radius = 1.0;
+                break;
+
+            case 'z':
+                refs = std::stod(optarg);
+                if (refs < 0)
+                    refs = 0;
                 break;
 
             case '?':
@@ -267,16 +318,37 @@ int main(int argc, char **argv)
             test_consistency(msh, degree, increment, variant);
             return 0;
         }
+
+        if (std::regex_match(mesh_filename, std::regex(".*\\.geo3s$") ))
+        {
+            std::cout << "Guessed mesh format: GMSH simplicial 3D" << std::endl;
+            disk::simplicial_mesh<T,3> msh;
+            disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
+            loader.read_mesh(mesh_filename);
+            loader.populate_mesh(msh);
+            test_consistency(msh, degree, increment, variant);
+            return 0;
+        }
     }
 
-
+    /*
     for (size_t i = 3; i < 11; i++) {
         std::cout << BYellowfg << " **** Faces = " << i << " ****" << reset << std::endl;
         disk::generic_mesh<T,2> msh_gen;
         disk::make_single_element_mesh(msh_gen, radius, i);
         test_consistency(msh_gen, degree, increment, variant);
         std::cout << std::endl;
-    }    
+    }
+    */
+
+    {
+        using mesh_type = disk::simplicial_mesh<T,3>;
+        mesh_type msh;
+        auto mesher = disk::make_simple_mesher(msh);
+        for (size_t i = 0; i < refs; i++)
+            mesher.refine();
+        test_consistency(msh, degree, increment, variant);
+    }
 
     return 0;
 }
