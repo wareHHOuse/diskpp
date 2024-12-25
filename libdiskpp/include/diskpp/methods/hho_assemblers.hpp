@@ -217,7 +217,7 @@ auto
 schur(const dynamic_matrix<T>& L, const dynamic_vector<T>& R, const Basis& basis)
 {
     assert(L.cols() == L.rows());
-    assert(L.cols() == R.rows());
+    assert( (L.cols() == R.rows()) or (R.rows() == basis.size()) );
 
     using cdm = const dynamic_matrix<T>;
     using cdv = const dynamic_vector<T>;
@@ -235,10 +235,15 @@ schur(const dynamic_matrix<T>& L, const dynamic_vector<T>& R, const Basis& basis
     cdv RT = R.head(ts);
     cdm A = MTT_ldlt.solve(MTF);
     cdv B = MTT_ldlt.solve(RT);
-    cdv RF = R.tail(fs);
     cdm Lc = MFF - MFT*A;
-    cdv Rc = RF - MFT*B;
 
+    if ( L.cols() == R.rows() ) {
+        cdv RF = R.tail(fs);
+        cdv Rc = RF - MFT*B;
+        return std::pair(Lc, Rc);
+    }
+
+    cdv Rc = -MFT*B;
     return std::pair(Lc, Rc);
 }
 
@@ -248,7 +253,7 @@ deschur(const dynamic_matrix<T>& lhs, const dynamic_vector<T>& rhs,
     const dynamic_vector<T>& solF, const Basis& basis)
 {
     assert(lhs.cols() == lhs.rows());
-    assert(lhs.cols() == rhs.rows());
+    assert( (lhs.cols() == rhs.rows()) or (rhs.rows() == basis.size()) );
 
     using cdm = const dynamic_matrix<T>;
     using cdv = const dynamic_vector<T>;
