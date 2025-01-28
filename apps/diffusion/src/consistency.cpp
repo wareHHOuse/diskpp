@@ -205,6 +205,10 @@ test_consistency(Mesh& msh, size_t degree, size_t increment, hho_variant hv)
             for (auto& pt : pts)
                 ofs << pt << " ";
         
+            auto ptids = cl.point_ids();
+            for (auto& ptid : ptids)
+                ofs << '[' << ptid << "] ";
+
             ofs << "bar: " << barycenter(msh, cl) << " ";
 
             ofs << std::endl;
@@ -233,7 +237,7 @@ int main(int argc, char **argv)
     int degree = 0;
     int increment = 0;
     int refs = 0;
-    double radius = 1.0;
+    double scale = 1.0;
     hho_variant variant = hho_variant::equal_order;
     std::string mesh_filename;
 
@@ -268,9 +272,9 @@ int main(int argc, char **argv)
                 break;
 
             case 'r':
-                radius = std::stod(optarg);
-                if (radius <= 0)
-                    radius = 1.0;
+                scale = std::stod(optarg);
+                if (scale <= 0)
+                    scale = 1.0;
                 break;
 
             case 'z':
@@ -286,6 +290,10 @@ int main(int argc, char **argv)
         }
     }
 
+    auto tr = [&](auto& pt) {
+        return pt*scale;
+    };
+
     if ( mesh_filename.length() > 0 )
     {
         /* Single element CSV 2D */
@@ -294,6 +302,7 @@ int main(int argc, char **argv)
             std::cout << "Guessed mesh format: CSV 2D" << std::endl;
             disk::generic_mesh<T,2> msh_gen;
             load_single_element_csv(msh_gen, mesh_filename);
+            msh_gen.transform(tr);
             test_consistency(msh_gen, degree, increment, variant);
             std::cout << std::endl;
             return 0;
@@ -305,6 +314,7 @@ int main(int argc, char **argv)
             std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
             disk::generic_mesh<T,2> msh;
             disk::load_mesh_fvca5_2d<T>(mesh_filename.c_str(), msh);
+            msh.transform(tr);
             test_consistency(msh, degree, increment, variant);
             return 0;
         }
@@ -313,8 +323,10 @@ int main(int argc, char **argv)
         if (std::regex_match(mesh_filename, std::regex(".*\\.msh$") ))
         {
             std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
-            disk::generic_mesh<T,3> msh;
+            using mesh_type = disk::generic_mesh<T,3>;
+            mesh_type msh;
             disk::load_mesh_fvca6_3d<T>(mesh_filename.c_str(), msh);
+            msh.transform(tr);
             test_consistency(msh, degree, increment, variant);
             return 0;
         }
@@ -326,6 +338,7 @@ int main(int argc, char **argv)
             disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
             loader.read_mesh(mesh_filename);
             loader.populate_mesh(msh);
+            msh.transform(tr);
             test_consistency(msh, degree, increment, variant);
             return 0;
         }
@@ -335,7 +348,7 @@ int main(int argc, char **argv)
     for (size_t i = 3; i < 11; i++) {
         std::cout << BYellowfg << " **** Faces = " << i << " ****" << reset << std::endl;
         disk::generic_mesh<T,2> msh_gen;
-        disk::make_single_element_mesh(msh_gen, radius, i);
+        disk::make_single_element_mesh(msh_gen, scale, i);
         test_consistency(msh_gen, degree, increment, variant);
         std::cout << std::endl;
     }
@@ -347,6 +360,7 @@ int main(int argc, char **argv)
         auto mesher = disk::make_simple_mesher(msh);
         for (size_t i = 0; i < refs; i++)
             mesher.refine();
+        msh.transform(tr);
         test_consistency(msh, degree, increment, variant);
     }
 
