@@ -8,6 +8,8 @@
  * Dipartimento di Matematica
  */
 
+#include "diskpp/mesh/mesh_storage.hpp"
+#include <algorithm>
 #include <iostream>
 #include <vector>
 #include <map>
@@ -125,6 +127,10 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
 
     auto assm = make_assembler(msh, di);
 
+    using MT = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+    using VT = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+    std::vector<std::pair<MT, VT>> lcs;
+
     timecounter tc;
     tc.tic();
     for (auto& cl : msh)
@@ -134,6 +140,7 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
         disk::dynamic_matrix<T> lhs = A+S;
         auto phiT = typename hho_space<mesh_type>::cell_basis_type(msh, cl, di.cell);
         disk::dynamic_vector<T> rhs = integrate(msh, cl, f, phiT);
+        lcs.push_back({lhs, rhs});
         auto [lhsc, rhsc] = disk::hho::schur(lhs, rhs, phiT);
         assm.assemble(msh, cl, lhsc, rhsc);
     }
@@ -150,14 +157,16 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
     T L2error = 0.0;
     auto u_sol = make_solution_function(msh);
     tc.tic();
+    size_t cell_i = 0;
     for (auto& cl : msh)
     {
-        auto [R, A] = local_operator(msh, cl, di);
-        auto S = local_stabilization(msh, cl, di, R);       
-        disk::dynamic_matrix<T> lhs = A+S;
+        //auto [R, A] = local_operator(msh, cl, di);
+        //auto S = local_stabilization(msh, cl, di, R);       
+        //disk::dynamic_matrix<T> lhs = A+S;
         auto phiT = typename hho_space<mesh_type>::cell_basis_type(msh, cl, di.cell);
-        disk::dynamic_vector<T> rhs = integrate(msh, cl, f, phiT);
+        //disk::dynamic_vector<T> rhs = integrate(msh, cl, f, phiT);
         auto MMe = integrate(msh, cl, phiT, phiT);
+        const auto& [lhs, rhs] = lcs[cell_i++];
         disk::dynamic_vector<T> sol_ana = local_reduction(msh, cl, di, u_sol);
         auto locsolF = assm.take_local_solution(msh, cl, sol);
         disk::dynamic_vector<T> locsol = disk::hho::deschur(lhs, rhs, locsolF, phiT);
@@ -173,6 +182,8 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
 
     silo.add_variable("dstmesh", "u_hho", u_data, disk::zonal_variable_t);
 }
+
+#define NEW_BASIS
 
 template<typename Mesh>
 void
@@ -195,11 +206,19 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
     tc.tic();
     for (auto& tcl : msh)
     {
+#ifdef NEW_BASIS
+        auto tbasis = disk::basis::scaled_monomial_basis(msh, tcl, degree);
+#else
         auto tbasis = disk::make_scalar_monomial_basis(msh, tcl, degree);
-        auto qps = disk::integrate(msh, tcl, 2*degree);
+#endif
         
+#ifdef NEW_BASIS
+        matrix_type K = integrate(msh, tcl, grad(tbasis), grad(tbasis));
+        vector_type loc_rhs = integrate(msh, tcl, f, tbasis);
+#else
         matrix_type K = matrix_type::Zero(tbasis.size(), tbasis.size());
         vector_type loc_rhs = vector_type::Zero(tbasis.size());
+        auto qps = disk::integrate(msh, tcl, 2*degree);
         for (auto& qp : qps)
         {
             auto ep = qp.point();
@@ -209,7 +228,7 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
             K += qp.weight() * dphi * dphi.transpose();
             loc_rhs += qp.weight() * phi * f(qp.point());
         }
-        
+#endif
         auto fcs = faces(msh, tcl);
         for (auto& fc : fcs)
         {
@@ -224,9 +243,22 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
                 matrix_type Atn = matrix_type::Zero(tbasis.size(), tbasis.size());
                 
                 auto ncl = nv.value();
+#ifdef NEW_BASIS
+                auto nbasis = disk::basis::scaled_monomial_basis(msh, ncl, degree);
+#else
                 auto nbasis = disk::make_scalar_monomial_basis(msh, ncl, degree);
+#endif
                 assert(tbasis.size() == nbasis.size());
                 
+#ifdef NEW_BASIS
+                Att += + eta_l * integrate(msh, fc, tbasis, tbasis);
+                Att += - 0.5 * integrate(msh, fc, grad(tbasis).dot(n), tbasis);
+                Att += - 0.5 * integrate(msh, fc, tbasis, grad(tbasis).dot(n));
+
+                Atn += - eta_l * integrate(msh, fc, nbasis, tbasis);
+                Atn += - 0.5 * integrate(msh, fc, grad(nbasis).dot(n), tbasis);
+                Atn += + 0.5 * integrate(msh, fc, nbasis, grad(tbasis).dot(n));
+#else
                 for (auto& fqp : f_qps) {
                     auto ep     = fqp.point();
                     auto tphi   = tbasis.eval_functions(ep);
@@ -244,11 +276,19 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
                     Atn += - fqp.weight() * 0.5 * tphi * (ndphi*n).transpose();
                     Atn += + fqp.weight() * 0.5 * (tdphi*n) * nphi.transpose();
                 }
+#endif
+
                 assm.assemble(msh, tcl, tcl, Att);
                 assm.assemble(msh, tcl, ncl, Atn);
             }
             else {
                 matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
+#ifdef NEW_BASIS
+                Att += + eta_l * integrate(msh, fc, tbasis, tbasis);
+                Att += - integrate(msh, fc, grad(tbasis).dot(n), tbasis);
+                Att += - integrate(msh, fc, tbasis, grad(tbasis).dot(n));
+                
+#else
                 for (auto& fqp : f_qps) {
                     auto ep     = fqp.point();
                     auto tphi   = tbasis.eval_functions(ep);
@@ -262,6 +302,8 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
                     //loc_rhs -= fqp.weight() * (tdphi*n);
                     //loc_rhs += fqp.weight() * eta_l * tphi;
                 }
+#endif
+
                 assm.assemble(msh, tcl, tcl, Att);
             }   
         }
@@ -283,49 +325,63 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
 
     auto sol_fun = make_solution_function(msh);
 
-    std::vector<double> data;
+    std::vector<double> u;
+    u.reserve(msh.cells_size());
 
     T err = 0.0; size_t cell_i = 0;
     tc.tic();
     for (auto& cl : msh)
     {
+#ifdef NEW_BASIS
+        auto cb = disk::basis::scaled_monomial_basis(msh, cl, degree);
+        auto MMe = integrate(msh, cl, cb, cb);
+        auto arhs = integrate(msh, cl, sol_fun, cb);
+#else
         auto cb = make_scalar_monomial_basis(msh, cl, degree);
         Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb);
         Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun);
+#endif
         Matrix<T, Dynamic, 1> asol = MMe.llt().solve(arhs);
         Matrix<T, Dynamic, 1> lsol = sol.segment(cell_i*cb.size(), cb.size());
         Matrix<T, Dynamic, 1> diff = lsol - asol;
         err += diff.dot(MMe*diff);
-        data.push_back( lsol(0) );
+        u.push_back( lsol(0) );
         cell_i++;
     }
     std::cout << " Postpro time: " << tc.toc() << std::endl;
-    std::cout << " L2-norm error: " << std::sqrt(err) << std::endl;
-    disk::silo_zonal_variable<T> u("u_dg", data);
-    silo.add_variable("dstmesh", u);
+    std::cout << " L2-norm error: " << std::sqrt(err) << std::endl;;
+    silo.add_variable("dstmesh", "u_dg", u, disk::zonal_variable_t);
 }
 
-struct adjlist {
-    size_t nodes[2];
-    size_t used;
 
-    adjlist() : used(0) {}
+template<disk::mesh_2D FineMesh>
+using coarse_mesh_t = disk::generic_mesh<typename FineMesh::coordinate_type, 2>;
 
-    void insert(size_t n) {
-        if (used > 1)
-            throw std::logic_error("Adjacency list full.");
-
-        nodes[used++] = n;
-    }
-};
-
-template<typename SrcMesh>
-void agglomerate_by_subdomain(const SrcMesh& srcmsh,
-    disk::generic_mesh<typename SrcMesh::coordinate_type, 2>& dstmsh)
+/* This function agglomerates elements in a 2D mesh to polygons
+ * of a new 2D mesh. Agglomeration is based on the subdomain
+ * numbering: elements with the same subdomain id get agglomerated
+ * into the same polygon. This works only for connected patches
+ * of elements. If elements with the same subdomain id are in two
+ * different, disconnected patches, the result is not defined.
+ */
+template<typename FineMesh>
+void agglomerate_by_subdomain(const FineMesh& srcmsh,
+    coarse_mesh_t<FineMesh>& dstmsh)
 {
-    using src_mesh_type = SrcMesh;
-    using coord_type = typename SrcMesh::coordinate_type;
-    using dst_mesh_type = disk::generic_mesh<coord_type, 2>;
+    struct adjlist {
+        size_t nodes[2];
+        size_t used;
+        adjlist() : used(0) {}
+        void insert(size_t n) {
+            if (used > 1)
+                throw std::logic_error("Adjacency list full.");
+            nodes[used++] = n;
+        }
+    };
+
+    using src_mesh_type = FineMesh;
+    using coord_type = typename FineMesh::coordinate_type;
+    using dst_mesh_type = coarse_mesh_t<FineMesh>;
     using src_face_type = typename src_mesh_type::face_type;
     using dst_node_type = typename dst_mesh_type::node_type;
     using dst_edge_type = typename dst_mesh_type::edge_type;
@@ -385,7 +441,8 @@ void agglomerate_by_subdomain(const SrcMesh& srcmsh,
         }
         assert(visiting == start);
         
-        /* Reverse the path if vertices are in clockwise order */
+        /* Reverse the path if vertices are in clockwise order 
+         * (uses shoelace formula).*/
         double dir = 0.0;
         for (size_t i = 0; i < path.size(); i++) {
             auto p0 = srcstor->points[ path[i] ];
@@ -412,10 +469,15 @@ void agglomerate_by_subdomain(const SrcMesh& srcmsh,
         paths[tag] = std::move(path);
     }
 
-    /* Sort the edges and make them unique */
+    /* We have all the edges: sort them and make them unique */
     std::sort(dststor->edges.begin(), dststor->edges.end());
     auto last = std::unique(dststor->edges.begin(), dststor->edges.end());
     dststor->edges.erase(last, dststor->edges.end());
+
+    using newsurf_pair_t = std::pair<size_t, dst_surf_type>;
+    using newsurfs_vec_t = std::vector<newsurf_pair_t>;
+    newsurfs_vec_t newsurfs;
+    newsurfs.reserve(paths.size());
 
     /* and finally all the elements */
     for (auto& [tag, path] : paths) {
@@ -431,18 +493,38 @@ void agglomerate_by_subdomain(const SrcMesh& srcmsh,
             surfedges.push_back(eid.second);
         }
 
+        /* We store in [tag, surf] pairs to not lose the association
+         * during sorting. Later we unzip the pair and store the
+         * data in the mesh. */
         dst_surf_type newsurf(surfedges);
         newsurf.set_point_ids(path.begin(), path.end());
-        dststor->surfaces.push_back(newsurf);
+        newsurfs.push_back({tag, newsurf});
     }
 
-    std::sort(dststor->surfaces.begin(), dststor->surfaces.end());
-    dststor->subdomain_info.resize( dststor->surfaces.size() );
+    /* Sort all the tag-surface pairs according to the surface ordering */
+    std::sort(newsurfs.begin(), newsurfs.end(),
+        [](const newsurf_pair_t& a, const newsurf_pair_t& b) {
+            return a.second < b.second;
+        }
+    );
+
+    /* Unzip the newsurf array in the appropriate storage arrays */
+    dststor->surfaces.clear();
+    dststor->subdomain_info.clear();
+    dststor->surfaces.reserve( newsurfs.size() );
+    dststor->subdomain_info.reserve( newsurfs.size() );
+    for (const auto& [tag, newsurf] : newsurfs) {
+        dststor->surfaces.push_back(newsurf);
+        auto di = disk::subdomain_descriptor(tag);
+        dststor->subdomain_info.push_back(di);
+    }
+    assert( dststor->surfaces.size() == newsurfs.size() );
+    assert( dststor->subdomain_info.size() == newsurfs.size() );
+
     dststor->boundary_info.resize( dststor->edges.size() );
 
-
+    /* Count the elements adjacent to each face */
     std::vector<size_t> counts(dststor->edges.size());
-
     for (auto& cl : dstmsh) {
         auto fcs = faces(dstmsh, cl);
         for (auto& fc : fcs) {
@@ -450,6 +532,10 @@ void agglomerate_by_subdomain(const SrcMesh& srcmsh,
         }
     }
 
+    /* All the faces adjacent to only one element are
+     * boundary faces. This should preserve the original
+     * boundaries, but we leave this for later. Not
+     * necessary for now. */
     for ( size_t i = 0; i < counts.size(); i++) {
         if (counts[i] == 1) {
             dststor->boundary_info[i].is_boundary(true);
@@ -459,6 +545,50 @@ void agglomerate_by_subdomain(const SrcMesh& srcmsh,
 
     disk::mark_internal_faces(dstmsh);
 }
+
+template<typename FM>
+using cc2ff_t = std::map<typename coarse_mesh_t<FM>::cell_type, std::set<typename FM::face_type>>;
+
+template<typename FineMesh>
+auto make_cc2ff(const FineMesh& fmsh,
+    const coarse_mesh_t<FineMesh>& cmsh)
+{
+    using fine_mesh_type = FineMesh;
+    using coord_type = typename fine_mesh_type::coordinate_type;
+    using coarse_mesh_type = coarse_mesh_t<FineMesh>;
+    using fine_face_type = typename fine_mesh_type::face_type;
+    using coarse_cell_type = typename coarse_mesh_type::cell_type;
+
+    /* This maps from Coarse Cells to Fine Faces */
+    cc2ff_t<fine_mesh_type> cc2ff;
+
+    for (const auto& fcl : fmsh) {
+        auto di = fmsh.domain_info(fcl);
+        auto ccl = cmsh.cell_at(di.id());
+        auto ffcs = faces(fmsh, fcl);
+        cc2ff[ccl].insert(ffcs.begin(), ffcs.end());
+    }
+
+    return cc2ff;
+}
+
+template<typename FineMesh>
+auto make_projectors(const FineMesh& fmsh, const coarse_mesh_t<FineMesh>& cmsh,
+    cc2ff_t<FineMesh>& cc2ff, size_t coarse_degree, size_t fine_degree)
+{
+    for (auto& ccl : cmsh) {
+
+        /* Coarse cell basis */
+        //auto ccb = disk::make_scalar_monomial_basis(cmsh, ccl, coarse_degree);
+
+        const auto& ffcs = cc2ff[ccl];
+        for (const auto& ffc : ffcs) {
+            /* Fine face basis */
+            //auto ffb = disk::make_scalar_monomial_basis(fmsh, ffc, fine_degree);
+        } 
+    }
+}
+
 
 template<typename Mesh>
 void
@@ -517,6 +647,29 @@ void dump_mesh(const Mesh& msh)
     }
 }
 
+/* If called with `base = 0`, simply make the subdomain
+ * numbering zero-based. Otherwise, make the subdomain
+ * numbering start from `base`. */
+template<typename Mesh>
+void rebase_subdomain_numbering(Mesh& msh, size_t base = 0)
+{
+    if (msh.cells_size() == 0)
+        return;
+
+    auto di0 = msh.domain_info(msh.cell_at(0));
+    auto min_tag = di0.tag();
+
+    for (size_t i = 1; i < msh.cells_size(); i++) {
+        const auto& cl = msh.cell_at(i);
+        auto di = msh.domain_info(cl);
+        min_tag = std::min(min_tag, di.tag());
+    }
+
+    auto storage = msh.backend_storage();
+    for (auto& di : storage->subdomain_info)
+        di = disk::subdomain_descriptor( (di.tag() - min_tag) + base);
+}
+
 int main(int argc, char **argv)
 {
     using T = double;
@@ -540,60 +693,58 @@ int main(int argc, char **argv)
     partition_unit_square_mesh(srcmsh, 4);
     #endif
 
+    timecounter tc;
     
+    tc.tic();
     using mesh_type = disk::simplicial_mesh<T,2>;
-    mesh_type srcmsh;
+    mesh_type finemsh;
     disk::gmsh_geometry_loader< mesh_type > loader;
     loader.read_mesh(argv[1]);
-    loader.populate_mesh(srcmsh);
+    loader.populate_mesh(finemsh);
+    std::cout << "GMSH: " << tc.toc() << " seconds" << std::endl;
+
+    rebase_subdomain_numbering(finemsh);
+
+    disk::generic_mesh<T, 2> coarsemsh;
+    
+    tc.tic();
+    agglomerate_by_subdomain(finemsh, coarsemsh);
+    std::cout << "Agglomeration: " << tc.toc() << " seconds" << std::endl;
     
 
-    
+    tc.tic();
+    make_cc2ff(finemsh, coarsemsh);
+    std::cout << "cc2ff: " << tc.toc() << " seconds" << std::endl;
 
-    std::vector<double> cp;
-    for (auto& cl : srcmsh) {
-        auto di = srcmsh.domain_info(cl);
-        cp.push_back(di.tag());
+    std::vector<double> cell_partnum;
+    for (auto& cl : finemsh) {
+        auto di = finemsh.domain_info(cl);
+        cell_partnum.push_back(di.tag());
     }
 
-
-    disk::generic_mesh<T, 2> dstmsh;
-
-    agglomerate_by_subdomain(srcmsh, dstmsh);
-
+    std::vector<double> elemnum;
+    for (const auto& cl : coarsemsh) {
+        auto di = coarsemsh.domain_info(cl);
+        elemnum.push_back(di.id());
+    }
 
     disk::silo_database silo;
     silo.create("agglo.silo");
-    silo.add_mesh(srcmsh, "srcmesh");
-    silo.add_mesh(dstmsh, "dstmesh");
-    silo.add_variable("srcmesh", "partnum", cp, disk::zonal_variable_t);
+    silo.add_mesh(finemsh, "srcmesh");
+    silo.add_mesh(coarsemsh, "dstmesh");
+    silo.add_variable("srcmesh", "partnum", cell_partnum, disk::zonal_variable_t);
+    silo.add_variable("dstmesh", "cellnum", elemnum, disk::zonal_variable_t);
     
-    std::map<size_t, double> areas;
-    for (auto& scl : srcmsh) {
-        auto tag = srcmsh.domain_info(scl).tag();
-        areas[tag] += measure(srcmsh, scl);
-    }
 
-
-    //for (auto& [tag, area] : areas)
-    //    std::cout << tag << " " << area << std::endl;
-
-    double tot_area = 0.0;
-    for (auto& dcl : dstmsh) {
-        tot_area += measure(dstmsh, dcl);
-    }
-
-    std::cout << "Total mesh area: " << tot_area << std::endl;
-
-    dump_mesh(dstmsh);
+    //dump_mesh(coarsemsh);
 
     auto degree = 2;
 
-    size_t min_faces = faces(dstmsh, dstmsh.cell_at(0)).size();
-    size_t max_faces = faces(dstmsh, dstmsh.cell_at(0)).size();
+    size_t min_faces = faces(coarsemsh, coarsemsh.cell_at(0)).size();
+    size_t max_faces = faces(coarsemsh, coarsemsh.cell_at(0)).size();
 
-    for (auto& cl : dstmsh) {
-        auto fcs = faces(dstmsh, cl);
+    for (auto& cl : coarsemsh) {
+        auto fcs = faces(coarsemsh, cl);
         min_faces = std::min(min_faces, fcs.size());
         max_faces = std::max(max_faces, fcs.size());
     }
@@ -601,8 +752,8 @@ int main(int argc, char **argv)
     std::cout << "Min. number of faces in a cell: " << min_faces << std::endl;
     std::cout << "Max. number of faces in a cell: " << max_faces << std::endl;
 
-    dg_diffusion_solver(dstmsh, degree+1, 100.0, silo);
-    hho_diffusion_solver(dstmsh, degree, silo);
+    dg_diffusion_solver(coarsemsh, degree+1, 200.0, silo);
+    hho_diffusion_solver(coarsemsh, degree, silo);
 
     return 0;
 }
