@@ -8,7 +8,6 @@
  * Dipartimento di Matematica
  */
 
-#include "diskpp/mesh/mesh_storage.hpp"
 #include <algorithm>
 #include <iostream>
 #include <vector>
@@ -40,7 +39,6 @@
 
 #include "diskpp/common/eigen.hpp"
 #include "diskpp/mesh/mesh.hpp"
-#include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/output/silo.hpp"
 #include "diskpp/common/timecounter.hpp"
@@ -183,7 +181,7 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
     silo.add_variable("dstmesh", "u_hho", u_data, disk::zonal_variable_t);
 }
 
-#define NEW_BASIS
+//#define NEW_BASIS
 
 template<typename Mesh>
 void
