@@ -144,7 +144,7 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
         auto [R, A] = local_operator(msh, cl, di);
         auto S = local_stabilization(msh, cl, di, R);
         disk::dynamic_matrix<T> lhs = A+S;
-        auto phiT = typename hho_space<mesh_type>::cell_basis_type(msh, cl, di.cell);
+        auto phiT = hho_space<mesh_type>::cell_basis(msh, cl, di.cell);
         disk::dynamic_vector<T> rhs = integrate(msh, cl, f, phiT);
         lcs.push_back({lhs, rhs});
         auto [lhsc, rhsc] = disk::hho::schur(lhs, rhs, phiT);
@@ -166,7 +166,7 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
     size_t cell_i = 0;
     for (auto& cl : msh)
     {
-        auto phiT = typename hho_space<mesh_type>::cell_basis_type(msh, cl, di.cell);
+        auto phiT = hho_space<mesh_type>::cell_basis(msh, cl, di.cell);
         auto MMe = integrate(msh, cl, phiT, phiT);
         const auto& [lhs, rhs] = lcs[cell_i++];
         disk::dynamic_vector<T> sol_ana = local_reduction(msh, cl, di, u_sol);
@@ -197,7 +197,7 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
     typedef Matrix<T, Dynamic, 1>       vector_type;
 
-    auto basis_rescaling = disk::basis::rescaling_strategy::none;
+    auto basis_rescaling = disk::basis::rescaling_strategy::inertial;
 
     auto f = make_rhs_function(msh);
 
@@ -689,7 +689,7 @@ int main(int argc, char **argv)
     std::cout << "Min. number of faces in a cell: " << min_faces << std::endl;
     std::cout << "Max. number of faces in a cell: " << max_faces << std::endl;
 
-    dg_diffusion_solver(coarsemsh, degree+1, 200.0, silo);
+    dg_diffusion_solver(coarsemsh, degree+1, 100.0, silo);
     hho_diffusion_solver(coarsemsh, degree, silo);
 
     return 0;

@@ -511,7 +511,7 @@ template<template<typename, size_t, typename> class Mesh,
     typename CoordT, typename Storage, typename ScalT>
 class scalar_monomial<Mesh<CoordT, 3, Storage>, typename Mesh<CoordT, 3, Storage>::cell_type, ScalT>
 {
-    public:
+public:
     using mesh_type = Mesh<CoordT, 3, Storage>;
     using cell_type = typename mesh_type::cell_type;
     using element_type = cell_type;
@@ -555,7 +555,8 @@ private:
 
 
     public:
-    scalar_monomial(const mesh_type& msh, const cell_type& cl, size_t degree)
+    scalar_monomial(const mesh_type& msh, const cell_type& cl, size_t degree,
+        rescaling_strategy rs = rescaling_strategy::unspecified)
         : degree_(degree), size_( size_of_degree(degree) )
     {
         bar_ = barycenter(msh, cl);
