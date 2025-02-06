@@ -34,7 +34,14 @@
  * The only way to really fix this is to reimplement generic_mesh<T,2>
  * properly in something like polygonal_mesh<T> and gradually migrate
  * everything to polygonal_mesh<T>.
+ *
+ * The reason why we need ENABLE_CCW_FACES in this program is that the
+ * agglomeration process generates polygons on which the original
+ * implementation of the normal computation fails because the direction
+ * of the normal cannot be deduced from the barycenter of the polygon
+ * and the barycenter of the face.
  */
+
 #define ENABLE_CCW_FACES
 
 #include "diskpp/common/eigen.hpp"
@@ -42,6 +49,7 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/output/silo.hpp"
 #include "diskpp/common/timecounter.hpp"
+
 #include "diskpp/methods/hho"
 #include "diskpp/methods/hho_slapl.hpp"
 #include "diskpp/methods/dg"
@@ -158,11 +166,7 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
     size_t cell_i = 0;
     for (auto& cl : msh)
     {
-        //auto [R, A] = local_operator(msh, cl, di);
-        //auto S = local_stabilization(msh, cl, di, R);       
-        //disk::dynamic_matrix<T> lhs = A+S;
         auto phiT = typename hho_space<mesh_type>::cell_basis_type(msh, cl, di.cell);
-        //disk::dynamic_vector<T> rhs = integrate(msh, cl, f, phiT);
         auto MMe = integrate(msh, cl, phiT, phiT);
         const auto& [lhs, rhs] = lcs[cell_i++];
         disk::dynamic_vector<T> sol_ana = local_reduction(msh, cl, di, u_sol);
@@ -181,8 +185,6 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
     silo.add_variable("dstmesh", "u_hho", u_data, disk::zonal_variable_t);
 }
 
-//#define NEW_BASIS
-
 template<typename Mesh>
 void
 dg_diffusion_solver(Mesh& msh, size_t degree,
@@ -195,6 +197,8 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
     typedef Matrix<T, Dynamic, 1>       vector_type;
 
+    auto basis_rescaling = disk::basis::rescaling_strategy::none;
+
     auto f = make_rhs_function(msh);
 
     auto cbs = disk::scalar_basis_size(degree, Mesh::dimension);
@@ -204,29 +208,11 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
     tc.tic();
     for (auto& tcl : msh)
     {
-#ifdef NEW_BASIS
-        auto tbasis = disk::basis::scaled_monomial_basis(msh, tcl, degree);
-#else
-        auto tbasis = disk::make_scalar_monomial_basis(msh, tcl, degree);
-#endif
+        auto tbasis = disk::basis::scaled_monomial_basis(msh, tcl, degree, basis_rescaling);
         
-#ifdef NEW_BASIS
         matrix_type K = integrate(msh, tcl, grad(tbasis), grad(tbasis));
         vector_type loc_rhs = integrate(msh, tcl, f, tbasis);
-#else
-        matrix_type K = matrix_type::Zero(tbasis.size(), tbasis.size());
-        vector_type loc_rhs = vector_type::Zero(tbasis.size());
-        auto qps = disk::integrate(msh, tcl, 2*degree);
-        for (auto& qp : qps)
-        {
-            auto ep = qp.point();
-            auto phi = tbasis.eval_functions(ep);
-            auto dphi = tbasis.eval_gradients(ep);
-            
-            K += qp.weight() * dphi * dphi.transpose();
-            loc_rhs += qp.weight() * phi * f(qp.point());
-        }
-#endif
+
         auto fcs = faces(msh, tcl);
         for (auto& fc : fcs)
         {
@@ -241,14 +227,9 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
                 matrix_type Atn = matrix_type::Zero(tbasis.size(), tbasis.size());
                 
                 auto ncl = nv.value();
-#ifdef NEW_BASIS
-                auto nbasis = disk::basis::scaled_monomial_basis(msh, ncl, degree);
-#else
-                auto nbasis = disk::make_scalar_monomial_basis(msh, ncl, degree);
-#endif
+                auto nbasis = disk::basis::scaled_monomial_basis(msh, ncl, degree, basis_rescaling);
                 assert(tbasis.size() == nbasis.size());
-                
-#ifdef NEW_BASIS
+
                 Att += + eta_l * integrate(msh, fc, tbasis, tbasis);
                 Att += - 0.5 * integrate(msh, fc, grad(tbasis).dot(n), tbasis);
                 Att += - 0.5 * integrate(msh, fc, tbasis, grad(tbasis).dot(n));
@@ -256,52 +237,15 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
                 Atn += - eta_l * integrate(msh, fc, nbasis, tbasis);
                 Atn += - 0.5 * integrate(msh, fc, grad(nbasis).dot(n), tbasis);
                 Atn += + 0.5 * integrate(msh, fc, nbasis, grad(tbasis).dot(n));
-#else
-                for (auto& fqp : f_qps) {
-                    auto ep     = fqp.point();
-                    auto tphi   = tbasis.eval_functions(ep);
-                    auto tdphi  = tbasis.eval_gradients(ep);
-                
-                    /* NOT on a boundary */
-                    Att += + fqp.weight() * eta_l * tphi * tphi.transpose();
-                    Att += - fqp.weight() * 0.5 * tphi * (tdphi*n).transpose();
-                    Att += - fqp.weight() * 0.5 * (tdphi*n) * tphi.transpose();
-                
-                    auto nphi   = nbasis.eval_functions(ep);
-                    auto ndphi  = nbasis.eval_gradients(ep);
-                
-                    Atn += - fqp.weight() * eta_l * tphi * nphi.transpose();
-                    Atn += - fqp.weight() * 0.5 * tphi * (ndphi*n).transpose();
-                    Atn += + fqp.weight() * 0.5 * (tdphi*n) * nphi.transpose();
-                }
-#endif
 
                 assm.assemble(msh, tcl, tcl, Att);
                 assm.assemble(msh, tcl, ncl, Atn);
             }
             else {
                 matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
-#ifdef NEW_BASIS
                 Att += + eta_l * integrate(msh, fc, tbasis, tbasis);
                 Att += - integrate(msh, fc, grad(tbasis).dot(n), tbasis);
                 Att += - integrate(msh, fc, tbasis, grad(tbasis).dot(n));
-                
-#else
-                for (auto& fqp : f_qps) {
-                    auto ep     = fqp.point();
-                    auto tphi   = tbasis.eval_functions(ep);
-                    auto tdphi  = tbasis.eval_gradients(ep);
-                    
-                    /* On a boundary*/
-                    Att += + fqp.weight() * eta_l * tphi * tphi.transpose();
-                    Att += - fqp.weight() * tphi * (tdphi*n).transpose();
-                    Att += - fqp.weight() * (tdphi*n) * tphi.transpose();
-                    
-                    //loc_rhs -= fqp.weight() * (tdphi*n);
-                    //loc_rhs += fqp.weight() * eta_l * tphi;
-                }
-#endif
-
                 assm.assemble(msh, tcl, tcl, Att);
             }   
         }
@@ -330,15 +274,10 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
     tc.tic();
     for (auto& cl : msh)
     {
-#ifdef NEW_BASIS
-        auto cb = disk::basis::scaled_monomial_basis(msh, cl, degree);
+        auto cb = disk::basis::scaled_monomial_basis(msh, cl, degree, basis_rescaling);
         auto MMe = integrate(msh, cl, cb, cb);
         auto arhs = integrate(msh, cl, sol_fun, cb);
-#else
-        auto cb = make_scalar_monomial_basis(msh, cl, degree);
-        Matrix<T, Dynamic, Dynamic> MMe = disk::make_mass_matrix(msh, cl, cb);
-        Matrix<T, Dynamic, 1> arhs = disk::make_rhs(msh, cl, cb, sol_fun);
-#endif
+
         Matrix<T, Dynamic, 1> asol = MMe.llt().solve(arhs);
         Matrix<T, Dynamic, 1> lsol = sol.segment(cell_i*cb.size(), cb.size());
         Matrix<T, Dynamic, 1> diff = lsol - asol;
