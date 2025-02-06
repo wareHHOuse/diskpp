@@ -55,6 +55,8 @@
 #include "diskpp/methods/dg"
 #include "mumps.hpp"
 
+#include "sgr.hpp"
+
 template<typename Mesh>
 struct source_functor;
 
@@ -186,7 +188,7 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
 }
 
 template<typename Mesh>
-void
+auto
 dg_diffusion_solver(Mesh& msh, size_t degree,
     const typename Mesh::coordinate_type eta,
     disk::silo_database& silo)
@@ -215,13 +217,11 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
 
         auto fcs = faces(msh, tcl);
         for (auto& fc : fcs)
-        {
-            auto nv = cvf.neighbour_via(msh, tcl, fc);
-            
+        {   
             auto n     = normal(msh, tcl, fc);
             auto eta_l = eta / diameter(msh, fc);
-            auto f_qps = disk::integrate(msh, fc, 2*degree);
             
+            auto nv = cvf.neighbour_via(msh, tcl, fc);
             if (nv) {
                 matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
                 matrix_type Atn = matrix_type::Zero(tbasis.size(), tbasis.size());
@@ -288,6 +288,8 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
     std::cout << " Postpro time: " << tc.toc() << std::endl;
     std::cout << " L2-norm error: " << std::sqrt(err) << std::endl;;
     silo.add_variable("dstmesh", "u_dg", u, disk::zonal_variable_t);
+
+    return sol;
 }
 
 
@@ -501,7 +503,7 @@ auto make_cc2ff(const FineMesh& fmsh,
 
     for (const auto& fcl : fmsh) {
         auto di = fmsh.domain_info(fcl);
-        auto ccl = cmsh.cell_at(di.id());
+        auto ccl = cmsh.cell_at(di.tag());
         auto ffcs = faces(fmsh, fcl);
         cc2ff[ccl].insert(ffcs.begin(), ffcs.end());
     }
@@ -513,17 +515,50 @@ template<typename FineMesh>
 auto make_projectors(const FineMesh& fmsh, const coarse_mesh_t<FineMesh>& cmsh,
     cc2ff_t<FineMesh>& cc2ff, size_t coarse_degree, size_t fine_degree)
 {
+    using T = typename FineMesh::coordinate_type;
+    using fine_mesh_type = FineMesh;
+    using coarse_mesh_type = coarse_mesh_t<FineMesh>;
+    using MT = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+    using SM = Eigen::SparseMatrix<T>;
+    using triplet = Eigen::Triplet<T>;
+
+    auto cbs = disk::scalar_basis_size(coarse_degree, coarse_mesh_type::dimension);
+    auto fbs = disk::scalar_basis_size(fine_degree, fine_mesh_type::dimension-1);
+
+    auto nrows = fbs * fmsh.faces_size();
+    auto ncols = cbs * cmsh.cells_size();
+
+    SM gproj = SM(nrows, ncols);
+
+    std::vector<triplet> triplets;
     for (auto& ccl : cmsh) {
-
         /* Coarse cell basis */
-        //auto ccb = disk::make_scalar_monomial_basis(cmsh, ccl, coarse_degree);
+        auto cphi = disk::basis::scaled_monomial_basis(cmsh, ccl, coarse_degree);
 
-        const auto& ffcs = cc2ff[ccl];
+        auto col = cbs * offset(cmsh, ccl);
+
+        const auto& ffcs = cc2ff.at(ccl);
         for (const auto& ffc : ffcs) {
             /* Fine face basis */
-            //auto ffb = disk::make_scalar_monomial_basis(fmsh, ffc, fine_degree);
-        } 
+            auto fphi = disk::basis::scaled_monomial_basis(fmsh, ffc, fine_degree);
+
+            auto row = fbs * offset(fmsh, ffc);
+
+            auto C2F = integrate(fmsh, ffc, cphi, fphi);
+            auto mass = integrate(fmsh, ffc, fphi, fphi);
+            decltype(C2F) P = mass.llt().solve(C2F);
+
+            for (size_t i = 0; i < fbs; i++) {
+                for (size_t j = 0; j < cbs; j++) {
+                    triplets.push_back( {row+i, col+j, P(i,j)} );
+                }
+            }
+        }
     }
+    gproj.setFromTriplets( triplets.begin(), triplets.end() );
+    triplets.clear();
+
+    return gproj;
 }
 
 
@@ -607,6 +642,50 @@ void rebase_subdomain_numbering(Mesh& msh, size_t base = 0)
         di = disk::subdomain_descriptor( (di.tag() - min_tag) + base);
 }
 
+template<typename FineMesh>
+void dg_to_hho(const FineMesh& msh, size_t degree,
+    const Eigen::SparseMatrix<typename FineMesh::coordinate_type>& proj,
+    const disk::dynamic_vector<typename FineMesh::coordinate_type>& dg_sol,
+    disk::silo_database& silo)
+{
+    using namespace disk::hho::slapl;
+
+    auto f = make_rhs_function(msh);
+
+    degree_info di(degree);
+
+    using mesh_type = FineMesh;
+    using T = typename mesh_type::coordinate_type;
+
+    disk::dynamic_vector<T> hho_sol = proj * dg_sol;
+
+    auto fbs = disk::scalar_basis_size(degree, mesh_type::dimension - 1);
+
+    std::vector<double> u;
+
+    for (auto& cl : msh)
+    {
+        auto [R, A] = local_operator(msh, cl, di);
+        auto S = local_stabilization(msh, cl, di, R);
+        disk::dynamic_matrix<T> lhs = A+S;
+        auto phiT = hho_space<mesh_type>::cell_basis(msh, cl, di.cell);
+        disk::dynamic_vector<T> rhs = integrate(msh, cl, f, phiT);
+
+        auto fcs = faces(msh, cl);
+        disk::dynamic_vector<T> locsolF = disk::dynamic_vector<T>::Zero(fbs * fcs.size());
+        for (size_t iF = 0; iF < fcs.size(); iF++) {
+            const auto& fc = fcs[iF];
+            auto gofs = offset(msh, fc);
+            locsolF.segment(fbs*iF, fbs) = hho_sol.segment(fbs*gofs, fbs);
+        }
+
+        disk::dynamic_vector<T> locsol = disk::hho::deschur(lhs, rhs, locsolF, phiT);
+        u.push_back(locsol(0));
+    }
+
+    silo.add_variable("srcmesh", "u_dg2hho", u, disk::zonal_variable_t);
+}
+
 int main(int argc, char **argv)
 {
     using T = double;
@@ -650,7 +729,7 @@ int main(int argc, char **argv)
     
 
     tc.tic();
-    make_cc2ff(finemsh, coarsemsh);
+    auto cc2ff = make_cc2ff(finemsh, coarsemsh);
     std::cout << "cc2ff: " << tc.toc() << " seconds" << std::endl;
 
     std::vector<double> cell_partnum;
@@ -662,7 +741,7 @@ int main(int argc, char **argv)
     std::vector<double> elemnum;
     for (const auto& cl : coarsemsh) {
         auto di = coarsemsh.domain_info(cl);
-        elemnum.push_back(di.id());
+        elemnum.push_back(di.tag());
     }
 
     disk::silo_database silo;
@@ -675,7 +754,7 @@ int main(int argc, char **argv)
 
     //dump_mesh(coarsemsh);
 
-    auto degree = 2;
+    auto degree = 1;
 
     size_t min_faces = faces(coarsemsh, coarsemsh.cell_at(0)).size();
     size_t max_faces = faces(coarsemsh, coarsemsh.cell_at(0)).size();
@@ -689,7 +768,26 @@ int main(int argc, char **argv)
     std::cout << "Min. number of faces in a cell: " << min_faces << std::endl;
     std::cout << "Max. number of faces in a cell: " << max_faces << std::endl;
 
-    dg_diffusion_solver(coarsemsh, degree+1, 100.0, silo);
+    tc.tic();
+    auto proj = make_projectors(finemsh, coarsemsh, cc2ff, degree+1, degree);
+    std::cout << "projectors: " << tc.toc() << " seconds" << std::endl;
+
+    /*
+    for (degree = 0; degree < 5; degree++) {
+        std::vector<double> etas = {0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0};
+        for(auto& eta : etas) {
+            std::cout << sgr::BRedfg << "Degree " << degree+1 << ", eta = " << eta << sgr::reset << std::endl; 
+            dg_diffusion_solver(coarsemsh, degree+1, eta, silo);
+        }
+    }
+    */
+    
+    auto sol = dg_diffusion_solver(coarsemsh, degree+1, 1.0, silo);
+    
+    std::cout << "DG to HHO" << std::endl;
+    tc.tic();
+    dg_to_hho(finemsh, degree, proj, sol, silo);
+    std::cout << "  " << tc.toc() << " seconds" << std::endl;
     hho_diffusion_solver(coarsemsh, degree, silo);
 
     return 0;

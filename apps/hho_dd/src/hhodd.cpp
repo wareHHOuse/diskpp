@@ -140,9 +140,10 @@ diffusion_solver(const Mesh& msh, const solver_config& scfg)
     using namespace disk::hho::slapl;
 
     using mesh_type = Mesh;
-    using T = typename hho_space<Mesh>::scalar_type;
-    using cell_basis_type = typename hho_space<mesh_type>::cell_basis_type;
-    using face_basis_type = typename hho_space<mesh_type>::face_basis_type;
+    using hho_space = hho_space<Mesh>;
+    using T = typename hho_space::scalar_type;
+    using cell_basis_type = typename hho_space::cell_basis_type;
+    using face_basis_type = typename hho_space::face_basis_type;
 
     bool mixed_order = (scfg.variant == hho_variant::mixed_order);
 
@@ -177,7 +178,7 @@ diffusion_solver(const Mesh& msh, const solver_config& scfg)
             lhs = A+S;
         }
 
-        auto phiT = cell_basis_type(msh, cl, di.cell);
+        auto phiT = hho_space::cell_basis(msh, cl, di.cell);
         dv rhs = integrate(msh, cl, f, phiT);
         auto [lhsc, rhsc] = disk::hho::schur(lhs, rhs, phiT);
         assm.assemble(msh, cl, lhsc, rhsc);
@@ -203,7 +204,7 @@ diffusion_solver(const Mesh& msh, const solver_config& scfg)
         {
             auto cl = msh.cell_at(cell_i);   
             auto& [lhs, rhs] = local_contribs[cell_i];
-            auto phiT = cell_basis_type(msh, cl, di.cell);
+            auto phiT = hho_space::cell_basis(msh, cl, di.cell);
             dv sol_ana = local_reduction(msh, cl, di, u_sol);
             auto locsolF = assm.take_local_solution(msh, cl, sol);
             dv locsol = disk::hho::deschur(lhs, rhs, locsolF, phiT);
