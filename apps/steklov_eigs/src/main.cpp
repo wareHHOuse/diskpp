@@ -379,7 +379,7 @@ assemble(const Config& config, State& state)
         /* Make standard HHO Laplacian */
         auto [GR, A] = make_scalar_hho_laplacian(state.msh, cl, state.hdi);
         dm S = make_scalar_hho_stabilization(state.msh, cl, GR, state.hdi);
-        dm L = A+S;
+        dm L = A+config.hho.stabparam*S;
 
         /* Make face mass matrices */
         auto fcs = faces(state.msh, cl);
@@ -449,7 +449,6 @@ solve(const Config& config, State& state)
     for (size_t retries = 1; retries <= 10; retries++)
     {
         auto fep = config.feast;
-    
         fep.subspace_size = fep.subspace_size*retries;
 
         fs = disk::feast(fep, state.assm.LHS, state.assm.RHS,

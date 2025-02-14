@@ -14,9 +14,10 @@ namespace disk::lua {
 
 struct hho_parameters {
     size_t order;
+    double stabparam;
 
     hho_parameters()
-        : order(0)
+        : order(0), stabparam(1.0)
     {}
 };
 
@@ -27,6 +28,7 @@ void register_hho_usertypes(sol::state& lua)
         sol::constructors<hho_parameters()>()
     );
     hpt["order"] = &hho_parameters::order;
+    hpt["stabparam"] = &hho_parameters::stabparam;
 }
 
 } //namespace disk::lua
