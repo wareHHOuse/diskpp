@@ -184,7 +184,7 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
     std::cout << " L2-norm error: " << std::sqrt(L2error) << ", ";
     std::cout << "A-norm error: " << std::sqrt(error) << std::endl;
 
-    silo.add_variable("dstmesh", "u_hho", u_data, disk::zonal_variable_t);
+    silo.add_variable("srcmesh", "u_hho", u_data, disk::zonal_variable_t);
 }
 
 template<typename Mesh>
@@ -508,12 +508,28 @@ auto make_cc2ff(const FineMesh& fmsh,
         cc2ff[ccl].insert(ffcs.begin(), ffcs.end());
     }
 
-    return cc2ff;
+    std::vector<int> occs(fmsh.faces_size());
+    for (const auto& [ccl, ffcs] : cc2ff) {
+        for (const auto& ffc : ffcs) {
+            occs[ offset(fmsh, ffc) ]++;
+        }
+    }
+
+    int min = occs[0];
+    int max = occs[0];
+    for (size_t i = 1; i < occs.size(); i++) {
+        min = std::min(min, occs[i]);
+        max = std::max(max, occs[i]);
+    }
+
+    std::cout << "Occs: " << min << " " << max << std::endl;
+
+    return std::pair(cc2ff, occs);
 }
 
 template<typename FineMesh>
 auto make_projectors(const FineMesh& fmsh, const coarse_mesh_t<FineMesh>& cmsh,
-    cc2ff_t<FineMesh>& cc2ff, size_t coarse_degree, size_t fine_degree)
+    cc2ff_t<FineMesh>& cc2ff, const std::vector<int>& occs, size_t coarse_degree, size_t fine_degree)
 {
     using T = typename FineMesh::coordinate_type;
     using fine_mesh_type = FineMesh;
@@ -542,11 +558,12 @@ auto make_projectors(const FineMesh& fmsh, const coarse_mesh_t<FineMesh>& cmsh,
             /* Fine face basis */
             auto fphi = disk::basis::scaled_monomial_basis(fmsh, ffc, fine_degree);
 
-            auto row = fbs * offset(fmsh, ffc);
+            auto fcofs = offset(fmsh, ffc);
+            auto row = fbs * fcofs;
 
             auto C2F = integrate(fmsh, ffc, cphi, fphi);
             auto mass = integrate(fmsh, ffc, fphi, fphi);
-            decltype(C2F) P = mass.llt().solve(C2F);
+            decltype(C2F) P = mass.ldlt().solve(C2F)/occs[fcofs];
 
             for (size_t i = 0; i < fbs; i++) {
                 for (size_t j = 0; j < cbs; j++) {
@@ -769,7 +786,7 @@ int main(int argc, char **argv)
     std::cout << "Max. number of faces in a cell: " << max_faces << std::endl;
 
     tc.tic();
-    auto proj = make_projectors(finemsh, coarsemsh, cc2ff, degree+1, degree);
+    auto proj = make_projectors(finemsh, coarsemsh, cc2ff.first, cc2ff.second, degree+1, degree);
     std::cout << "projectors: " << tc.toc() << " seconds" << std::endl;
 
     /*
@@ -788,7 +805,7 @@ int main(int argc, char **argv)
     tc.tic();
     dg_to_hho(finemsh, degree, proj, sol, silo);
     std::cout << "  " << tc.toc() << " seconds" << std::endl;
-    hho_diffusion_solver(coarsemsh, degree, silo);
+    hho_diffusion_solver(finemsh, degree, silo);
 
     return 0;
 }

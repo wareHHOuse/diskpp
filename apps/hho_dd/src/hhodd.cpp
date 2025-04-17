@@ -221,6 +221,39 @@ diffusion_solver(const Mesh& msh, const solver_config& scfg)
         return std::sqrt(error);
     };
 
+    auto postpro_residual = [&](const std::string& filename, const dv& r) {
+        std::vector<T> r_data;
+        for(size_t cell_i = 0; cell_i < msh.cells_size(); cell_i++)
+        {
+            auto cl = msh.cell_at(cell_i);   
+            auto [lhs, rhs] = local_contribs[cell_i];
+            rhs = dv::Zero(rhs.size());
+            auto phiT = hho_space::cell_basis(msh, cl, di.cell);
+            auto locsolF = assm.take_local_solution(msh, cl, r);
+            dv locsol = disk::hho::deschur(lhs, rhs, locsolF, phiT);
+            r_data.push_back(locsol(0));
+        }
+
+        std::ofstream ofs( filename + ".txt" );
+        for(size_t face_i = 0; face_i < msh.faces_size(); face_i++)
+        {
+            auto fc = msh.face_at(face_i);
+            auto phiF = hho_space::face_basis(msh, fc, di.face);
+            dv fcdofs = r.segment(phiF.size() * face_i, phiF.size());
+            auto bar = barycenter(msh, fc);
+            auto val = fcdofs.dot(phiF(bar));
+            ofs << bar.x() << " " << bar.y() << " " << val << std::endl;
+        }
+        
+        if (filename != "") {
+            disk::silo_database silo_db;
+            silo_db.create(filename);
+            silo_db.add_mesh(msh, "mesh");
+            silo_db.add_variable("mesh", "r", r_data, disk::zonal_variable_t);
+        }
+    };
+    
+
     /* SOLVE */
     if (scfg.mode == ras_mode::iterate) {
         std::vector<iterdata> ids;
@@ -239,6 +272,11 @@ diffusion_solver(const Mesh& msh, const solver_config& scfg)
             }
             
             id.error = postpro(ss.str(), sol);
+
+            std::stringstream ss2;
+            ss2 << "residual_iter_" << niter << ".silo";
+            postpro_residual(ss2.str(), r);
+
             std::cout << "  A-norm error: " << id.error << std::endl;
             ids.push_back(id);
         }

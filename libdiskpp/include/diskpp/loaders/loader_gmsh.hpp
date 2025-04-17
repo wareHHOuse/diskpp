@@ -451,6 +451,27 @@ public:
         return true;
     }
 
+    bool read_mesh()
+    {
+        //if ( ! gmsh::isInitialized() ) {
+        //    std::cout << "GMSH is not initialized, can't read mesh" << std::endl;
+        //    return false;
+        //}
+        
+        if (this->verbose())
+            gmsh::option::setNumber("General.Terminal", 1);
+        else
+            gmsh::option::setNumber("General.Terminal", 0);
+        
+        gmsh::model::mesh::generate( 2 /*dimension*/ );
+        gmsh::model::mesh::setOrder( 1 /*element order*/ );
+        gmsh_get_nodes();
+        gmsh_get_elements();
+        detect_boundary_edges();
+
+        return true;
+    }
+
     bool populate_mesh(mesh_type& msh)
     {
         auto storage = msh.backend_storage();
@@ -481,6 +502,57 @@ public:
         return true;
     }
 };
+
+template<disk::mesh_2D Mesh>
+void submesh_via_gmsh(const Mesh& msh, disk::simplicial_mesh<typename Mesh::coordinate_type, 2>& dmsh, double scale)
+{
+    gmsh::initialize();
+    gmsh::option::setNumber("General.Terminal", 0);
+    gmsh::option::setNumber("Mesh.Algorithm", 1);
+    gmsh::option::setNumber("Mesh.Algorithm3D", 1);
+
+    gmsh::model::add("test");
+
+    static const int point_ofs = 1000;
+
+    for (int i = 0; i < msh.points_size(); i++) {
+        auto pt = msh.point_at(i);
+        gmsh::model::occ::addPoint(pt.x(), pt.y(), 0.0, 0.0, i+point_ofs);
+    }
+
+    std::vector<int> all_linetags;
+    all_linetags.reserve(msh.faces_size());
+    for (const auto& fc : faces(msh)) {
+        auto ptids = fc.point_ids();
+        assert(ptids.size() == 2);
+        all_linetags.push_back( gmsh::model::occ::addLine(ptids[0]+point_ofs, ptids[1]+point_ofs) );
+    }
+
+    for (const auto& cl : msh) {
+        std::vector<int> local_linetags;
+        auto fcs = faces(msh, cl);
+        for (const auto& fc : fcs)
+            local_linetags.push_back( all_linetags[ offset(msh, fc) ] );
+
+        int loop = gmsh::model::occ::addCurveLoop(local_linetags);
+        gmsh::model::occ::addPlaneSurface({loop});
+    
+        auto h = diameter(msh, cl);
+        auto ptids = cl.point_ids();
+        gmsh::vectorpair vp;
+        for (auto& ptid : ptids)
+            vp.push_back({0, ptid+point_ofs});
+        gmsh::model::occ::mesh::setSize(vp, h*scale);
+    }
+
+    gmsh::model::occ::synchronize();
+
+    disk::gmsh_geometry_loader<disk::simplicial_mesh<double,2>> loader;
+    loader.read_mesh();
+    loader.populate_mesh(dmsh);
+
+    gmsh::finalize();
+}
 
 namespace priv {
 

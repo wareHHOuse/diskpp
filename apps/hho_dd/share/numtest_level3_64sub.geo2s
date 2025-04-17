@@ -10,6 +10,6 @@ RefineMesh;
 Mesh.PartitionCreateTopology = 1;
 Mesh.PartitionCreateGhostCells = 0;
 Mesh.PartitionCreatePhysicals = 0;
-PartitionMesh 200;
+PartitionMesh 64;
 
 Recursive Delete{ Surface{1}; }

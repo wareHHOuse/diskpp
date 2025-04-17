@@ -6,6 +6,9 @@ target_link_libraries(hhodd ${LINK_LIBS})
 add_executable(agglo2d src/agglo2d.cpp)
 target_link_libraries(agglo2d ${LINK_LIBS})
 
+add_executable(mesh2gmsh src/mesh2gmsh.cpp)
+target_link_libraries(mesh2gmsh ${LINK_LIBS})
+
 install(TARGETS hhodd RUNTIME DESTINATION bin)
 
 set(HHODD_LOCAL_SOLVER "Eigen::SparseLU" CACHE STRING "HHO-DD local solver")
