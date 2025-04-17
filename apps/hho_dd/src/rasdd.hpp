@@ -28,6 +28,7 @@ struct bicgstab_io {
     T                   rr;
     bool                verbose;
     std::vector<T>      history;
+    disk::dynamic_vector<T> residual;
 
     bicgstab_io() : status(bicgstab_status::undefined),
         iterations(1000), rr_min(1e-6), rr_max(1e8),
@@ -74,6 +75,7 @@ bicgstab(const Eigen::SparseMatrix<T>& A, const disk::dynamic_vector<T>& b,
                 std::cout << bio.rr << std::endl;
             }
             bio.iterations = i+1;
+            bio.residual = r;
             bio.status = bicgstab_status::converged;
             return x;
         }
@@ -83,6 +85,7 @@ bicgstab(const Eigen::SparseMatrix<T>& A, const disk::dynamic_vector<T>& b,
                 std::cout << bio.rr << std::endl;
             }
             bio.iterations = i+1;
+            bio.residual = r;
             bio.status = bicgstab_status::diverged;
             return x;
         }

@@ -196,8 +196,10 @@ diffusion_solver(const Mesh& msh, const solver_config& scfg)
         ras.save_debug_data();
 
     /* HELPER FUNCTION FOR POSTPRO */
-    auto postpro = [&](const std::string& filename, const dv& sol) {
+    auto postpro = [&](const std::string& filename,
+        const dv& sol, const dv& r) {
         std::vector<T> u_data;
+        std::vector<T> r_data;
         T error = 0.0;
         disk::solution<Mesh> u_sol;
         for(size_t cell_i = 0; cell_i < msh.cells_size(); cell_i++)
@@ -211,49 +213,26 @@ diffusion_solver(const Mesh& msh, const solver_config& scfg)
             u_data.push_back(locsol(0));
             dv diff = locsol - sol_ana;
             error += diff.dot(lhs*diff);
+
+            /* This does not make much sense, as the residual is not
+             * in the solution space. It is however useful since it
+             * allows to check that things are zero where they should
+             * be zero. */
+            auto locresF = assm.take_local_solution(msh, cl, r);
+            dv zero = dv::Zero(rhs.size());
+            dv locres = disk::hho::deschur(lhs, zero, locresF, phiT);
+            r_data.push_back(locres(0));
         }
         if (filename != "") {
             disk::silo_database silo_db;
             silo_db.create(filename);
             silo_db.add_mesh(msh, "mesh");
             silo_db.add_variable("mesh", "u", u_data, disk::zonal_variable_t);
+            silo_db.add_variable("mesh", "residual", r_data, disk::zonal_variable_t);
         }
         return std::sqrt(error);
     };
-
-    auto postpro_residual = [&](const std::string& filename, const dv& r) {
-        std::vector<T> r_data;
-        for(size_t cell_i = 0; cell_i < msh.cells_size(); cell_i++)
-        {
-            auto cl = msh.cell_at(cell_i);   
-            auto [lhs, rhs] = local_contribs[cell_i];
-            rhs = dv::Zero(rhs.size());
-            auto phiT = hho_space::cell_basis(msh, cl, di.cell);
-            auto locsolF = assm.take_local_solution(msh, cl, r);
-            dv locsol = disk::hho::deschur(lhs, rhs, locsolF, phiT);
-            r_data.push_back(locsol(0));
-        }
-
-        std::ofstream ofs( filename + ".txt" );
-        for(size_t face_i = 0; face_i < msh.faces_size(); face_i++)
-        {
-            auto fc = msh.face_at(face_i);
-            auto phiF = hho_space::face_basis(msh, fc, di.face);
-            dv fcdofs = r.segment(phiF.size() * face_i, phiF.size());
-            auto bar = barycenter(msh, fc);
-            auto val = fcdofs.dot(phiF(bar));
-            ofs << bar.x() << " " << bar.y() << " " << val << std::endl;
-        }
-        
-        if (filename != "") {
-            disk::silo_database silo_db;
-            silo_db.create(filename);
-            silo_db.add_mesh(msh, "mesh");
-            silo_db.add_variable("mesh", "r", r_data, disk::zonal_variable_t);
-        }
-    };
     
-
     /* SOLVE */
     if (scfg.mode == ras_mode::iterate) {
         std::vector<iterdata> ids;
@@ -271,11 +250,7 @@ diffusion_solver(const Mesh& msh, const solver_config& scfg)
                 std::cout << "  Saving solution to " << ss.str() << std::endl;
             }
             
-            id.error = postpro(ss.str(), sol);
-
-            std::stringstream ss2;
-            ss2 << "residual_iter_" << niter << ".silo";
-            postpro_residual(ss2.str(), r);
+            id.error = postpro(ss.str(), sol, r);
 
             std::cout << "  A-norm error: " << id.error << std::endl;
             ids.push_back(id);
@@ -301,7 +276,7 @@ diffusion_solver(const Mesh& msh, const solver_config& scfg)
             std::cout << "  Saving solution to " << scfg.fn_silo << std::endl;
         }
         
-        auto err = postpro(scfg.fn_silo, sol);
+        auto err = postpro(scfg.fn_silo, sol, bio.residual);
         std::cout << "  A-norm error: " << err << std::endl;
     }
 }
@@ -563,8 +538,10 @@ int main(int argc, char **argv)
         std::cout << "Guessed mesh format: FVCA5 2D" << std::endl;
         disk::generic_mesh<T,2> msh;
         disk::load_mesh_fvca5_2d<T>(mesh_filename, msh);
-        partition_unit_square_mesh(msh, scfg.imesh_partitions);
-        diffusion_solver(msh, scfg);
+        //partition_unit_square_mesh(msh, scfg.imesh_partitions);
+        disk::simplicial_mesh<T,2> fmsh;
+        submesh_via_gmsh(msh, fmsh, 0.1);
+        diffusion_solver(fmsh, scfg);
         return 0;
     }
 
