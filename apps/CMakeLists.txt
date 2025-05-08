@@ -113,3 +113,13 @@ if (BUILD_APP_VEM_2D)
     add_subdirectory(vem2d)
 endif()
 
+
+option(BUILD_APP_UNFITTED_HHO "Build unfitted_HHO application" ON)
+if (BUILD_APP_UNFITTED_HHO)
+    add_subdirectory(unfitted_HHO)
+endif()
+
+option(BUILD_APP_WAVE_PROPAGATION "Build wave_propagation application" ON)
+if (BUILD_APP_WAVE_PROPAGATION)
+    add_subdirectory(wave_propagation)
+endif()
