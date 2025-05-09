@@ -68,6 +68,8 @@ if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
     endif()
 endif()
 
+find_package(Spectra REQUIRED)
+
 ######################################################################
 ## Eigen3
 #add_subdirectory(contrib/eigen)
@@ -279,3 +281,5 @@ set(CPACK_DEBIAN_PACKAGE_SECTION "science")
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6,libgcc1,libstdc++6")
 
 include(CPack)
+
+
