@@ -352,18 +352,18 @@ auto make_projectors(const FineMesh& fmsh, const coarse_mesh_t<FineMesh>& cmsh,
     auto nrows = fbs * fmsh.faces_size();
     auto ncols = cbs * cmsh.cells_size();
 
-    SM gproj = SM(352, ncols);
-
     std::vector<std::optional<size_t>> cmap(fmsh.faces_size());
-
-    for (size_t i = 0, ci = 0; i < cmap.size(); i++) {
+    size_t ci = 0;
+    for (size_t i = 0; i < cmap.size(); i++) {
         auto ffc = fmsh.face_at(i);
         auto bi = fmsh.boundary_info(ffc);
-        if ( bi.is_boundary() )
+        if ( bi.is_boundary() and not bi.is_internal() )
             continue;
-        else
-            cmap[i] = ci++;
+        
+        cmap[i] = ci++;
     }
+
+    SM gproj = SM(ci*fbs, ncols);
 
     std::vector<triplet> triplets;
     for (auto& ccl : cmsh) {
@@ -397,6 +397,10 @@ auto make_projectors(const FineMesh& fmsh, const coarse_mesh_t<FineMesh>& cmsh,
         }
     }
     gproj.setFromTriplets( triplets.begin(), triplets.end() );
+    std::ofstream ofs("proj.txt");
+    for (auto& t : triplets)
+        ofs << t.row()+1 << " " << t.col()+1 << " " << t.value() << std::endl;
+
     triplets.clear();
 
     return gproj;
@@ -443,6 +447,8 @@ struct solver_config {
     mesh_type       meshtype;
     size_t          imesh_reflevels;
     size_t          imesh_partitions;
+    bool            use_twolevel;
+    size_t          dgdegree;
 };
 
 struct iterdata {
@@ -522,17 +528,21 @@ diffusion_solver(const disk::simplicial_mesh<T,2>& msh, const solver_config& scf
     if (scfg.ras_debug)
         ras.save_debug_data();
 
-    size_t degree = 0;
+    /* PREPARE TWO-LEVEL */
     disk::generic_mesh<T, 2> coarsemsh;
-    agglomerate_by_subdomain(msh, coarsemsh);
-    auto cc2ff = make_cc2ff(msh, coarsemsh);
-    auto proj = make_projectors(msh, coarsemsh, cc2ff.first, cc2ff.second, degree+1, degree);
+    disk::sparse_matrix<T> proj;
+    if (scfg.use_twolevel) {
+        agglomerate_by_subdomain(msh, coarsemsh);
+        auto cc2ff = make_cc2ff(msh, coarsemsh);
+        proj = make_projectors(msh, coarsemsh, cc2ff.first, cc2ff.second, scfg.dgdegree, scfg.degree);
+    }
 
     /* HELPER FUNCTION FOR POSTPRO */
     auto postpro = [&](const std::string& filename,
-        const dv& sol, const dv& r) {
+        const dv& sol, const dv& r, const dv& rr) {
         std::vector<T> u_data;
         std::vector<T> r_data;
+        std::vector<T> rr_data;
         T error = 0.0;
         disk::solution<Mesh> u_sol;
         for(size_t cell_i = 0; cell_i < msh.cells_size(); cell_i++)
@@ -555,6 +565,10 @@ diffusion_solver(const disk::simplicial_mesh<T,2>& msh, const solver_config& scf
             dv zero = dv::Zero(rhs.size());
             dv locres = disk::hho::deschur(lhs, zero, locresF, phiT);
             r_data.push_back(locres(0));
+
+            auto locresF2 = assm.take_local_solution(msh, cl, rr);
+            dv locres2 = disk::hho::deschur(lhs, zero, locresF2, phiT);
+            rr_data.push_back(locres2(0));
         }
         if (filename != "") {
             disk::silo_database silo_db;
@@ -562,25 +576,45 @@ diffusion_solver(const disk::simplicial_mesh<T,2>& msh, const solver_config& scf
             silo_db.add_mesh(msh, "mesh");
             silo_db.add_variable("mesh", "u", u_data, disk::zonal_variable_t);
             silo_db.add_variable("mesh", "residual", r_data, disk::zonal_variable_t);
+            silo_db.add_variable("mesh", "residual2", rr_data, disk::zonal_variable_t);
         }
         return std::sqrt(error);
     };
-    
+
     /* SOLVE */
     if (scfg.mode == ras_mode::iterate) {
         std::vector<iterdata> ids;
         disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.RHS.size());
-        disk::sparse_matrix<T> Ac = proj.transpose() * assm.LHS * proj;
+        disk::sparse_matrix<T> Ac;
+        if (scfg.use_twolevel) {
+            Ac = proj.transpose() * assm.LHS * proj;
+        }
+
         for (size_t niter = 0; niter < scfg.ras_maxiter; niter++) {
             iterdata id;
             disk::dynamic_vector<T> r = assm.RHS - assm.LHS*sol;
             sol = sol + ras(r);
-            /*
-            r = assm.RHS - assm.LHS*sol;
-            disk::dynamic_vector<T> rc = proj.transpose() * r;
-            disk::dynamic_vector<T> ec = mumps_lu(Ac, rc);
-            sol = sol + proj * ec;
-            */
+            disk::dynamic_vector<T> e2 = disk::dynamic_vector<T>::Zero(r.size());
+            if (scfg.use_twolevel) {
+                r = assm.RHS - assm.LHS*sol;
+                disk::dynamic_vector<T> rc = proj.transpose() * r;
+                disk::dynamic_vector<T> ec = mumps_lu(Ac, rc);
+                sol = sol + proj * ec;
+                e2 = proj * ec;
+            }
+
+            disk::dynamic_vector<T> e = mumps_lu(assm.LHS, r);
+            disk::dynamic_vector<T> ee = proj*(proj.transpose()*e);
+
+            std::string errfn_e = "e_step_" + std::to_string(niter) + ".txt";
+            std::ofstream ef(errfn_e);
+
+            if ( e.size() != ee.size() or ee.size() != e2.size() or e2.size() != e.size() )
+                throw 42;
+
+            for (int i = 0; i < e.size(); i++)
+                ef << e(i) << " " << ee(i) << " " << e2(i) << std::endl;
+
             id.residual = r.norm();
             std::cout << "Postprocessing..." << std::endl;
             std::stringstream ss;
@@ -590,7 +624,7 @@ diffusion_solver(const disk::simplicial_mesh<T,2>& msh, const solver_config& scf
                 std::cout << "  Saving solution to " << ss.str() << std::endl;
             }
             
-            id.error = postpro(ss.str(), sol, r);
+            id.error = postpro(ss.str(), sol, ee, e2);
 
             std::cout << "  A-norm error: " << id.error << std::endl;
             ids.push_back(id);
@@ -616,8 +650,8 @@ diffusion_solver(const disk::simplicial_mesh<T,2>& msh, const solver_config& scf
             std::cout << "  Saving solution to " << scfg.fn_silo << std::endl;
         }
         
-        auto err = postpro(scfg.fn_silo, sol, bio.residual);
-        std::cout << "  A-norm error: " << err << std::endl;
+        //auto err = postpro(scfg.fn_silo, sol, bio.residual);
+        //std::cout << "  A-norm error: " << err << std::endl;
     }
 }
 
@@ -716,9 +750,11 @@ int main(int argc, char **argv)
     scfg.meshtype = mesh_type::undefined;
     scfg.imesh_partitions = 2;
     scfg.imesh_reflevels = 2;
+    scfg.use_twolevel = false;
+    scfg.dgdegree = 1;
 
     int opt;
-    while ((opt = getopt(argc, argv, "b:d:e:i:k:m:o:p:r:s:DIMR")) != -1) {
+    while ((opt = getopt(argc, argv, "b:d:e:i:k:m:o:p:q:r:s:DIMR2")) != -1) {
         switch (opt) {
 
         case 'b': /* BiCGStab history filename (bicgstab mode) */
@@ -766,6 +802,11 @@ int main(int argc, char **argv)
             scfg.imesh_partitions = optval;
             } break;
 
+        case 'q': { /* coarse space degree */
+            int optval = std::max(1, atoi(optarg));
+            scfg.dgdegree = optval;
+            } break;
+
         case 'r': { /* refinement levels for internal mesh */
             int optval = std::max(0, atoi(optarg));
             scfg.imesh_reflevels = optval;
@@ -789,6 +830,10 @@ int main(int argc, char **argv)
 
         case 'R': /* Enable resource usage reporting */
             rm.enabled(true);
+            break;
+
+        case '2':
+            scfg.use_twolevel = true;
             break;
         }
     }
@@ -814,12 +859,15 @@ int main(int argc, char **argv)
         std::cout << "   -m <std> : Use internal meshers (tri, quad, hex or tet)\n";
         std::cout << "   -o <int> : Number of overlap layers\n";
         std::cout << "   -p <int> : Partitions for internal mesh\n";
+        std::cout << "   -q <int> : DG degree\n";
         std::cout << "   -r <int> : Refinement levels for internal mesh\n";
         std::cout << "   -s <str> : Silo filename (bicgstab mode) or prefix (iter mode)\n";
         std::cout << "   -D       : Output subdomain debugging data\n";
         std::cout << "   -I       : Iterate instead of using BiCGStab\n";
         std::cout << "   -M       : Enable mixed-order HHO\n";
         std::cout << "   -R       : Report resource usage at exit\n";
+        std::cout << "   -2       : Use two-level method\n";
+        std::cout << "   -K <int> : Coarse space degree\n";
         return 1;
     }
 
