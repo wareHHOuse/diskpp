@@ -30,8 +30,8 @@ using namespace Eigen;
 #include "diskpp/output/silo.hpp"
 
 // application common sources
-#include "common/display_settings.hpp"
-#include "common/fitted_geometry_builders.hpp"
+// #include "common/display_settings.hpp"
+// #include "common/fitted_geometry_builders.hpp"
 // #include "common/linear_solver.hpp"
 // #include "common/acoustic_material_data.hpp"
 // #include "common/elastic_material_data.hpp"
