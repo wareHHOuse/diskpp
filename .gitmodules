@@ -23,4 +23,4 @@
 	url = https://github.com/alandefreitas/matplotplusplus/
 [submodule "libdiskpp/contrib/spectra"]
 	path = libdiskpp/contrib/spectra
-	url = git@github.com:yixuan/spectra.git
+	url = https://github.com/yixuan/spectra.git
