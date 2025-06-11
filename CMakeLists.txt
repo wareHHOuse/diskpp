@@ -68,13 +68,12 @@ if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
     endif()
 endif()
 
-find_package(Spectra REQUIRED)
-
 ######################################################################
 ## Eigen3
 #add_subdirectory(contrib/eigen)
 find_package(Eigen3 REQUIRED)
 set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
+include_directories(libdiskpp/contrib/spectra/include)
 
 ######################################################################
 ## ~jburkardt code
