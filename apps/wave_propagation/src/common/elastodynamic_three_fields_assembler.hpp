@@ -103,7 +103,7 @@ public:
         std::vector<assembly_index> asm_map;
         asm_map.reserve(n_cbs + n_fbs*fcs.size());
 
-        auto cell_offset        = disk::priv::offset(msh, cl);
+        auto cell_offset        = disk::offset(msh, cl);
         auto cell_LHS_offset    = cell_offset * n_cbs;
 
         for (size_t i = 0; i < n_cbs; i++)
@@ -112,7 +112,7 @@ public:
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc = fcs[face_i];
-            auto face_offset = disk::priv::offset(msh, fc);
+            auto face_offset = disk::offset(msh, fc);
             auto face_LHS_offset = n_cbs * msh.cells_size() + m_compress_indexes.at(face_offset)*n_fbs;
 
             auto fc_id = msh.lookup(fc);
@@ -158,7 +158,7 @@ public:
         std::vector<assembly_index> asm_map;
         asm_map.reserve(n_cbs + n_fbs*fcs.size());
 
-        auto cell_offset        = disk::priv::offset(msh, cl);
+        auto cell_offset        = disk::offset(msh, cl);
         auto cell_LHS_offset    = cell_offset * n_cbs;
 
         for (size_t i = 0; i < n_cbs; i++)
@@ -168,7 +168,7 @@ public:
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc = fcs[face_i];
-            auto face_offset = disk::priv::offset(msh, fc);
+            auto face_offset = disk::offset(msh, fc);
             auto face_LHS_offset = n_cbs * msh.cells_size() + m_compress_indexes.at(face_offset)*n_fbs;
 
             auto fc_id = msh.lookup(fc);
@@ -215,7 +215,7 @@ public:
         std::vector<assembly_index> asm_map;
         asm_map.reserve(n_cbs);
 
-        auto cell_offset        = disk::priv::offset(msh, cl);
+        auto cell_offset        = disk::offset(msh, cl);
         auto cell_LHS_offset    = cell_offset * n_cbs;
 
         for (size_t i = 0; i < n_cbs; i++)
@@ -242,7 +242,7 @@ public:
         std::vector<assembly_index> asm_map;
         asm_map.reserve(n_cbs);
 
-        auto cell_offset        = disk::priv::offset(msh, cl);
+        auto cell_offset        = disk::offset(msh, cl);
         auto cell_LHS_offset    = cell_offset * n_cbs;
 
         for (size_t i = 0; i < n_cbs; i++)
@@ -263,7 +263,7 @@ public:
         }
     }
 
-    void assemble(const Mesh& msh, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> rhs_fun){
+    void assemble(const Mesh& msh, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> rhs_fun){
         
         LHS.setZero();
         RHS.setZero();
@@ -302,7 +302,7 @@ public:
         
     }
             
-    void assemble_rhs(const Mesh& msh, std::function<static_vector<double, 2>(const typename Mesh::point_type& )>  rhs_fun){
+    void assemble_rhs(const Mesh& msh, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )>  rhs_fun){
         
         RHS.setZero();
          
@@ -477,7 +477,7 @@ public:
         }
     }
             
-    void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2,2>(const typename Mesh::point_type& )> ten_fun){
+    void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<disk::static_matrix<double, 2,2>(const typename Mesh::point_type& )> ten_fun){
         size_t n_dof = MASS.rows();
         x_glob = Matrix<T, Dynamic, 1>::Zero(n_dof);
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
@@ -499,7 +499,7 @@ public:
     }
             
     Matrix<T, Dynamic, 1> project_ten_function(const Mesh& msh, const typename Mesh::cell_type& cell,
-                      std::function<static_matrix<T, 2,2>(const typename Mesh::point_type& )> ten_fun){
+                      std::function<disk::static_matrix<T, 2,2>(const typename Mesh::point_type& )> ten_fun){
     
         Matrix<T, Dynamic, Dynamic> mass_matrix  = symmetric_tensor_mass_matrix(msh, cell);
         size_t dim = Mesh::dimension;
@@ -512,12 +512,12 @@ public:
         for (auto& qp : qps)
         {
             auto phi = ten_b.eval_functions(qp.point());
-            static_matrix<T, 2,2> sigma = ten_fun(qp.point());
+            disk::static_matrix<T, 2,2> sigma = ten_fun(qp.point());
             T trace = 0.0;
             for (size_t d = 0; d < dim; d++){
              trace += sigma(d,d);
             }
-            static_matrix<T, 2,2> sigma_s = sigma - (trace)*static_matrix<T, 2, 2>::Identity();
+            disk::static_matrix<T, 2,2> sigma_s = sigma - (trace)*disk::static_matrix<T, 2, 2>::Identity();
             for (size_t i = 0; i < ten_bs; i++){
                 auto qp_phi_i = disk::priv::inner_product(qp.weight(), phi[i]);
                 rhs(i,0) += disk::priv::inner_product(qp_phi_i,sigma_s);
@@ -528,7 +528,7 @@ public:
     }
             
     Matrix<T, Dynamic, 1> project_hydrostatic_function(const Mesh& msh, const typename Mesh::cell_type& cell,
-                      std::function<static_matrix<double, 2,2>(const typename Mesh::point_type& )> ten_fun){
+                      std::function<disk::static_matrix<double, 2,2>(const typename Mesh::point_type& )> ten_fun){
 
         size_t dim = Mesh::dimension;
         auto facedeg = m_hho_di.face_degree();
@@ -541,7 +541,7 @@ public:
         for (auto& qp : qps)
         {
             auto phi = sca_basis.eval_functions(qp.point());
-            static_matrix<double, 2,2> sigma = ten_fun(qp.point());
+            disk::static_matrix<double, 2,2> sigma = ten_fun(qp.point());
             T trace = 0.0;
             for (size_t d = 0; d < dim; d++){
              trace += sigma(d,d);
@@ -555,7 +555,7 @@ public:
         return x_dof;
     }
             
-    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun){
+    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun){
 
         for (auto& cell : msh)
         {
@@ -592,7 +592,7 @@ public:
                     const Matrix<T, Dynamic, 1>& x_glob) const
     {
         auto num_faces = howmany_faces(msh, cl);
-        auto cell_ofs = disk::priv::offset(msh, cl);
+        auto cell_ofs = disk::offset(msh, cl);
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_sca_cbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
@@ -620,7 +620,7 @@ public:
             }
             else
             {
-                auto face_ofs = disk::priv::offset(msh, fc);
+                auto face_ofs = disk::offset(msh, fc);
                 auto global_ofs = n_cbs * msh.cells_size() + m_compress_indexes.at(face_ofs)*n_fbs;
                 x_el.block(n_cbs + i*n_fbs, 0, n_fbs, 1) = x_glob.block(global_ofs, 0, n_fbs, 1);
             }
@@ -631,7 +631,7 @@ public:
     void scatter_cell_dof_data(  const Mesh& msh, const typename Mesh::cell_type& cell,
                     Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> & x_proj_dof) const
     {
-        auto cell_ofs = disk::priv::offset(msh, cell);
+        auto cell_ofs = disk::offset(msh, cell);
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_sca_cbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
@@ -648,7 +648,7 @@ public:
         size_t n_cbs = n_ten_cbs + n_sca_cbs + n_vec_cbs;
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
         size_t n_cells = msh.cells_size();
-        auto face_offset = disk::priv::offset(msh, face);
+        auto face_offset = disk::offset(msh, face);
         auto glob_offset = n_cbs * n_cells + m_compress_indexes.at(face_offset)*n_fbs;
         x_glob.block(glob_offset, 0, n_fbs, 1) = x_proj_dof;
     }
@@ -784,7 +784,7 @@ public:
     }
             
     Matrix<typename Mesh::coordinate_type, Dynamic, 1>
-    mixed_rhs(const Mesh& msh, const typename Mesh::cell_type& cell, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> & rhs_fun, size_t di = 0)
+    mixed_rhs(const Mesh& msh, const typename Mesh::cell_type& cell, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> & rhs_fun, size_t di = 0)
     {
         auto recdeg = m_hho_di.grad_degree();
         auto celdeg = m_hho_di.cell_degree();

@@ -1,0 +1,328 @@
+
+
+//  Created by Romain Mottier
+
+
+void IPulseEfficiency(int argc, char **argv);
+
+void IPulseEfficiency(int argc, char **argv){
+    
+  // ###################################################################### Simulation paramaters 
+  // ######################################################################
+
+  using RealType = double;
+  simulation_data sim_data = preprocessor::process_args(argc, argv);
+  sim_data.print_simulation_data();
+  timecounter tc, tcit;
+
+  // ###################################################################### Mesh generation 
+  // ######################################################################
+  
+  typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
+  typedef disk::BoundaryConditions<mesh_type, false> e_boundary_type;
+  typedef disk::BoundaryConditions<mesh_type, true> a_boundary_type;
+  mesh_type msh;
+
+  RealType lx = 5000.0;  
+  RealType ly = 3500.0;          
+  size_t nx = 140;
+  size_t ny = 140;
+  cartesian_2d_mesh_builder<RealType> mesh_builder(lx, ly, nx, ny);
+  mesh_builder.refine_mesh(sim_data.m_n_divs);
+  mesh_builder.set_translation_data(-2500.0, -2500.0);
+  mesh_builder.build_mesh();
+  mesh_builder.move_to_mesh_storage(msh);
+
+  // ###################################################################### Time controls 
+  // ######################################################################
+  
+  size_t nt = 10;
+  for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
+    nt *= 2;
+  }
+  RealType ti = 0.0;
+  RealType tf = 0.425;
+  RealType dt = (tf-ti)/nt;
+  RealType t  = ti;
+  
+  // ###################################################################### HHO setting 
+  // ######################################################################
+  
+  // Creating HHO approximation spaces and corresponding linear operator
+  size_t cell_k_degree = sim_data.m_k_degree;
+  if(sim_data.m_hdg_stabilization_Q){
+    cell_k_degree++;
+  }
+  disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
+  
+  // ###################################################################### Assigning Material Data
+  // ###################################################################### 
+
+  std::map<size_t,elastic_material_data<RealType>>  e_material;
+  std::map<size_t,acoustic_material_data<RealType>> a_material;
+  std::set<size_t> elastic_bc_face_indexes, acoustic_bc_face_indexes, interface_face_indexes;
+  std::map<size_t,std::pair<size_t,size_t>> interface_cell_pair_indexes;
+  
+  RealType eps = 1.0e-10;
+  for (auto face_it = msh.faces_begin(); face_it != msh.faces_end(); face_it++) {
+    const auto face = *face_it;
+    mesh_type::point_type bar = barycenter(msh, face);
+    auto fc_id = msh.lookup(face);
+    if (std::fabs(bar.y()) < eps) {
+      interface_face_indexes.insert(fc_id);
+      continue;
+    }      
+  }
+
+  for (auto & cell : msh ) {
+    auto cell_ind = msh.lookup(cell);
+    mesh_type::point_type bar = barycenter(msh, cell);
+    
+    // Assigning the material properties
+    if (bar.y() > 0) {
+      acoustic_material_data<RealType> material = water_mat_fun(bar);
+      a_material.insert(std::make_pair(cell_ind,material));
+    }
+    else {
+      elastic_material_data<RealType> material = granit_mat_fun(bar);
+      e_material.insert(std::make_pair(cell_ind,material));
+    }
+    
+    // Detection of faces on the interfaces
+    auto cell_faces = faces(msh,cell);
+    for (auto face :cell_faces) {
+      auto fc_id = msh.lookup(face);
+      bool is_member_Q = interface_face_indexes.find(fc_id) != interface_face_indexes.end();
+      if (is_member_Q) {
+        if (bar.y() > 0) {
+          interface_cell_pair_indexes[fc_id].second = cell_ind;
+        }
+        else {
+          interface_cell_pair_indexes[fc_id].first = cell_ind;
+        }
+      }
+    }
+  }
+  
+  size_t bc_elastic_id  = 0;
+  size_t bc_acoustic_id = 1;
+  for (auto face_it = msh.boundary_faces_begin(); face_it != msh.boundary_faces_end(); face_it++) {
+    auto face = *face_it;
+    mesh_type::point_type bar = barycenter(msh, face);
+    auto fc_id = msh.lookup(face);
+    if (bar.y() > 0) {
+      disk::boundary_descriptor bi{bc_acoustic_id, true};
+      msh.backend_storage()->boundary_info.at(fc_id) = bi;
+      acoustic_bc_face_indexes.insert(fc_id);
+    }
+    else {
+      disk::boundary_descriptor bi{bc_elastic_id, true};
+      msh.backend_storage()->boundary_info.at(fc_id) = bi;
+      elastic_bc_face_indexes.insert(fc_id);
+    }  
+  }
+  
+  // Detect interface elastic - acoustic
+  e_boundary_type e_bnd(msh);
+  a_boundary_type a_bnd(msh);
+  e_bnd.addDirichletBC(disk::DirichletType::DIRICHLET, bc_elastic_id, null_fun);
+  a_bnd.addDirichletBC(disk::DirichletType::DIRICHLET, bc_acoustic_id, null_s_fun);
+  
+  // ###################################################################### Solving a primal HHO mixed problem 
+  // ######################################################################
+  
+  tc.tic();
+  auto assembler = elastoacoustic_four_fields_assembler<mesh_type>(msh, hho_di, e_bnd, a_bnd, e_material, a_material);
+  assembler.set_interface_cell_indexes(interface_cell_pair_indexes);
+
+  // Stabilization type 
+  if(sim_data.m_hdg_stabilization_Q){
+    assembler.set_hdg_stabilization();
+  }
+  if(sim_data.m_scaled_stabilization_Q){
+    assembler.set_scaled_stabilization();
+  }
+
+  tc.toc();
+  std::cout << bold << red << "   ASSEMBLY 1 : " << std::endl;
+  std::cout << bold << cyan << "      Assembler generation : ";
+  std::cout << tc << " seconds" << reset << std::endl;
+  
+  tc.tic();
+  assembler.assemble_mass(msh);
+  tc.toc();
+  std::cout << bold << cyan << "      Mass Assembly : ";
+  std::cout << tc << " seconds" << reset << std::endl;
+  
+  tc.tic();
+  assembler.assemble_coupling_terms(msh);
+  tc.toc();
+  std::cout << bold << cyan << "      Coupling assembly : ";
+  std::cout << tc << " seconds" << reset << std::endl << std::endl << std::endl;    
+  
+  // ###################################################################### Projecting initial data 
+  // ######################################################################
+  
+  Matrix<RealType, Dynamic, 1> x_dof;
+
+  // Acoustic pulse intialized in pressure 
+  assembler.project_over_cells(msh, x_dof, null_fun, null_flux_fun, null_s_fun, pulse_geophysic_v);
+  assembler.project_over_faces(msh, x_dof, null_fun, null_s_fun);
+  
+  ////////// Post process of the initial data 
+  if (sim_data.m_render_silo_files_Q) {
+    size_t it = 0;
+    std::string silo_file_name = "elasto_acoustic_inhomogeneous_four_fields_";
+    postprocessor<mesh_type>::write_silo_four_fields_elastoacoustic(silo_file_name, it, msh, hho_di, x_dof, e_material, a_material, false);
+  }
+  
+  std::ofstream simulation_log("elasto_acoustic_inhomogeneous_four_fields.txt");
+  std::ofstream energy_file("energy_file.txt");
+  
+  bool e_side_Q = true;
+  bool a_side_Q = false;
+  std::ofstream Acoustic_sensor_1_log("Acoustic.csv");
+  std::ofstream Interface_sensor_1_log("Interface.csv");    
+  std::ofstream Elastic_sensor_1_log("Elastic.csv");
+  typename mesh_type::point_type Acoustic_s1_pt(-500,  250);
+  typename mesh_type::point_type Interface_s1_pt(-500, 0.0);
+  typename mesh_type::point_type Elastic_s1_pt(-500,  -250);
+  std::pair<typename mesh_type::point_type,size_t> Acoustic_s1_pt_cell  = std::make_pair(Acoustic_s1_pt, -1);
+  std::pair<typename mesh_type::point_type,size_t> Interface_s1_pt_cell = std::make_pair(Interface_s1_pt, -1);
+  std::pair<typename mesh_type::point_type,size_t> Elastic_s1_pt_cell   = std::make_pair(Elastic_s1_pt, -1);
+  postprocessor<mesh_type>::record_acoustic_data_elasto_acoustic_four_fields(0, Acoustic_s1_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Acoustic_sensor_1_log);
+  postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(0, Interface_s1_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Interface_sensor_1_log);
+  postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(0, Elastic_s1_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Elastic_sensor_1_log);
+
+  if (sim_data.m_report_energy_Q) {
+    postprocessor<mesh_type>::compute_elasto_acoustic_energy_four_field(msh, hho_di, assembler, t, x_dof, energy_file);
+  }  
+  
+  // Solving a first order equation HDG/HHO propagation problem
+  Matrix<RealType, Dynamic, Dynamic> a;
+  Matrix<RealType, Dynamic, 1> b;
+  Matrix<RealType, Dynamic, 1> c;
+  
+  // DIRK(s) schemes
+  int s = 3;
+  bool is_sdirk_Q = true;
+  
+  if (is_sdirk_Q) {
+    dirk_butcher_tableau::sdirk_tables(s, a, b, c);
+  } 
+  else {
+    dirk_butcher_tableau::dirk_tables(s, a, b, c);
+  }
+  
+  std::cout << std::endl << std::endl;
+  std::cout << bold << red << "   ASSEMBLY 2 : " << std::endl;
+  std::cout << bold << cyan << "      First stiffness assembly completed: ";
+  tc.tic();
+  assembler.assemble(msh, null_fun, null_s_fun, false);
+  tc.toc();
+  std::cout << bold << cyan << tc << " seconds" << reset << std::endl;
+  assembler.LHS += assembler.COUPLING; 
+  dirk_hho_scheme<RealType> dirk_an(assembler.LHS,assembler.RHS,assembler.MASS);
+  
+  if (sim_data.m_sc_Q) {
+    std::vector<std::pair<size_t,size_t>> vec_cell_basis_data(2);
+    vec_cell_basis_data[0] = std::make_pair(assembler.get_e_material_data().size(), assembler.get_e_cell_basis_data());
+    vec_cell_basis_data[1] = std::make_pair(assembler.get_a_material_data().size(), assembler.get_a_cell_basis_data());
+    dirk_an.set_static_condensation_data(vec_cell_basis_data, assembler.get_n_face_dof());
+  }
+  
+  if (is_sdirk_Q) {
+    double scale = a(0,0) * dt;
+    dirk_an.SetScale(scale);
+    std::cout << bold << cyan << "      Matrix decomposed: "; 
+    tc.tic();
+    dirk_an.ComposeMatrix();
+    //        dirk_an.setIterativeSolver();
+    dirk_an.DecomposeMatrix();
+    tc.toc();
+    std::cout << tc << " seconds" << reset << std::endl;
+  }
+  
+  // ##################################################
+  // ################################################## Time marching
+  // ##################################################
+  
+  std::cout << std::endl << std::endl;
+  
+  Matrix<RealType, Dynamic, 1> x_dof_n;
+  
+  for(size_t it = 1; it <= nt; it++) {
+    
+
+    tcit.tic();
+    std::cout << bold << red << "   Time step number " << it << ": t = " << t 
+              << reset;
+              
+    RealType tn = dt*(it-1)+ti;
+    
+    // DIRK step
+    tc.tic();
+    {
+      size_t n_dof = x_dof.rows();
+      Matrix<double, Dynamic, Dynamic> k = Matrix<double, Dynamic, Dynamic>::Zero(n_dof, s);
+      Matrix<double, Dynamic, 1> Fg, Fg_c,xd;
+      xd = Matrix<double, Dynamic, 1>::Zero(n_dof, 1);
+      
+      RealType t;
+      Matrix<double, Dynamic, 1> yn, ki;
+      
+      x_dof_n = x_dof;
+      for (int i = 0; i < s; i++) {	
+        yn = x_dof;
+        for (int j = 0; j < s - 1; j++) {
+          yn += a(i,j) * dt * k.block(0, j, n_dof, 1);
+        }
+        t = tn + c(i,0) * dt;
+        assembler.RHS.setZero();
+        dirk_an.SetFg(assembler.RHS);
+        dirk_an.irk_weight(yn, ki, dt, a(i,i),is_sdirk_Q);
+        // Accumulated solution
+        x_dof_n += dt*b(i,0)*ki;
+        k.block(0, i, n_dof, 1) = ki;
+      }
+    }
+    tc.toc();
+    // std::cout << std::endl << bold << cyan << "      DIRK step completed: " << tc << " seconds" 
+    //                                                            << reset << std::endl;
+
+    x_dof = x_dof_n;
+
+    // ##################################################
+    // ################################################## Last postprocess
+    // ##################################################
+
+    if (sim_data.m_render_silo_files_Q) {
+      std::string silo_file_name = "elasto_acoustic_inhomogeneous_four_fields_";
+      postprocessor<mesh_type>::write_silo_four_fields_elastoacoustic(silo_file_name, it, msh, hho_di, x_dof, e_material, a_material, false);
+    }
+
+    postprocessor<mesh_type>::record_acoustic_data_elasto_acoustic_four_fields(it, Acoustic_s1_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Acoustic_sensor_1_log);
+
+    t += dt;
+    
+    postprocessor<mesh_type>::record_acoustic_data_elasto_acoustic_four_fields(it, Acoustic_s1_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Acoustic_sensor_1_log);
+    postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(it, Interface_s1_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Interface_sensor_1_log);
+    postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(it, Elastic_s1_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Elastic_sensor_1_log);
+
+    if (sim_data.m_report_energy_Q) {
+      postprocessor<mesh_type>::compute_elasto_acoustic_energy_four_field(msh, hho_di, assembler, t, x_dof, energy_file);
+    } 
+
+    std::cout << std::endl;
+    tcit.toc();
+    std::cout << bold << cyan << "      Iteration completed in " << tcit << " seconds" << reset << std::endl << std::endl;
+  }
+  sim_data.write_simulation_data(simulation_log);
+  simulation_log << "Number of equations: " << dirk_an.DirkAnalysis().n_equations() << std::endl;
+  simulation_log << "Number of DIRK steps =  " << s << std::endl;
+  simulation_log << "Number of time steps =  " << nt << std::endl;
+  simulation_log << "Step size =  " << dt << std::endl;
+  simulation_log.flush();
+
+}
+

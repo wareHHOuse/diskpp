@@ -178,7 +178,7 @@ public:
                 T xv = range_x[i] + m_x_t;
                 point_type point(xv, yv);
                 points.push_back(point);
-                vertices.push_back(node_type(point_identifier<2>(node_id)));
+                vertices.push_back(node_type(disk::point_identifier<2>(node_id)));
                 node_id++;
             }
         }
@@ -326,10 +326,11 @@ public:
             auto node1 = typename node_type::id_type(facets[i][0]);
             auto node2 = typename node_type::id_type(facets[i][1]);
 
-            auto e = edge_type{{node1, node2}};
+            auto e = edge_type(node1, node2);
 
-            e.set_point_ids(facets[i].begin(), facets[i].end());
+            // e.set_point_ids(facets[i].begin(), facets[i].end());
             edges.push_back(e);
+            
         }
         std::sort(edges.begin(), edges.end());
             
@@ -340,7 +341,7 @@ public:
             auto node1 = typename node_type::id_type(boundary_edges[i][0]);
             auto node2 = typename node_type::id_type(boundary_edges[i][1]);
 
-            auto e = edge_type{{node1, node2}};
+            auto e = edge_type(node1, node2);
 
             auto position = find_element_id(edges.begin(), edges.end(), e);
 
@@ -351,7 +352,7 @@ public:
                 return;
             }
 
-                disk::bnd_info bi{0, true};
+                disk::boundary_descriptor bi{0, true};
                 storage->boundary_info.at(position.second) = bi;
         }
             
@@ -369,7 +370,7 @@ public:
                 auto n1 = typename node_type::id_type(e[0]);
                 auto n2 = typename node_type::id_type(e[1]);
 
-                edge_type edge{{n1, n2}};
+                edge_type edge(n1, n2);
                 auto edge_id = find_element_id(storage->edges.begin(),
                                                storage->edges.end(), edge);
                 if (!edge_id.first)
@@ -456,18 +457,9 @@ public:
     std::vector<std::array<size_t, 2>>              skeleton_edges;
     std::vector<std::array<size_t, 2>>              boundary_edges;
     std::vector<polygon_2d>                         polygons;
-    // std::vector<FaceInfo>                           faces;
     std::string poly_mesh_file;
     std::set<size_t> bc_points;
-                    // FaceInfo face_info; 
-                // face_info.face_id = edge_id.second;
-                // if (face_info.cell1_id == -1) {
-                //     face_info.cell1_id == compteur;
-                // }
-                // else { 
-                //     face_info.cell2_id == compteur;
-                // }
-                // faces.push_back(face_info);
+    
     void clear_storage() {
         points.clear();
         vertices.clear();
@@ -576,7 +568,7 @@ public:
                     std::stringstream(line) >> xv >> yv;
                     point_type point(xv, yv);
                     points.push_back(point);
-                    vertices.push_back(node_type(point_identifier<2>(id)));
+                    vertices.push_back(node_type(disk::point_identifier<2>(id)));
                 }
                 else{
                     break;
@@ -670,7 +662,7 @@ public:
                     std::stringstream(line) >> xv >> yv;
                     point_type point(xv, yv);
                     points.push_back(point);
-                    vertices.push_back(node_type(point_identifier<2>(id)));
+                    vertices.push_back(node_type(disk::point_identifier<2>(id)));
                 }
                 else{
                     break;
@@ -763,7 +755,6 @@ public:
         return true;
     }
     
-    
     void move_to_mesh_storage(mesh_type& msh){
         
         auto storage = msh.backend_storage();
@@ -777,9 +768,9 @@ public:
             auto node1 = typename node_type::id_type(facets[i][0]);
             auto node2 = typename node_type::id_type(facets[i][1]);
 
-            auto e = edge_type{{node1, node2}};
+            auto e = edge_type(node1, node2);
 
-            e.set_point_ids(facets[i].begin(), facets[i].end());
+            // e.set_point_ids(facets[i].begin(), facets[i].end());
             edges.push_back(e);
         }
         std::sort(edges.begin(), edges.end());
@@ -789,14 +780,14 @@ public:
             assert(boundary_edges[i][0] < boundary_edges[i][1]);
             auto node1 = typename node_type::id_type(boundary_edges[i][0]);
             auto node2 = typename node_type::id_type(boundary_edges[i][1]);
-            auto e = edge_type{{node1, node2}};
+            auto e = edge_type(node1, node2);
             auto position = find_element_id(edges.begin(), edges.end(), e);
             if (position.first == false) {
                 std::cout << "Bad bug at " << __FILE__ << "("
                           << __LINE__ << ")" << std::endl;
                 return;
             }
-            disk::bnd_info bi{0, true};
+            disk::boundary_descriptor bi{0, true};
             storage->boundary_info.at(position.second) = bi;
         }
             
@@ -817,7 +808,7 @@ public:
                 auto n1 = typename node_type::id_type(e[0]);
                 auto n2 = typename node_type::id_type(e[1]);
 
-                edge_type edge{{n1, n2}};
+                edge_type edge(n1, n2);
                 auto edge_id = find_element_id(storage->edges.begin(),
                                                storage->edges.end(), edge);
                 if (!edge_id.first)

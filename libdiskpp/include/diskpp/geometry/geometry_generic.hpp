@@ -248,6 +248,14 @@ barycenter(const generic_mesh<T,2>& msh,
     return point<T,2>(Cx, Cy);
 }
 
+template<typename Mesh, typename Element>
+point<typename Mesh::coordinate_type, Mesh::dimension>
+barycenter_bis(const Mesh& msh, const Element& elm)
+{
+    auto pts = points(msh, elm);
+    auto bar = std::accumulate(std::next(pts.begin()), pts.end(), pts.front());
+    return bar / typename Mesh::coordinate_type( pts.size() );
+}
 
 /**
  * \brief Return the length of the specified 2D face

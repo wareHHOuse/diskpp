@@ -23,9 +23,7 @@
 #include <tbb/parallel_for.h>
 #endif
 
-// using namespace priv;
-// namespace priv
-// {
+
 template<typename Mesh>
 class postprocessor {
     
@@ -519,7 +517,7 @@ public:
     }
     
     /// Compute L2 and H1 errors for one field vectorial approximation
-    static void compute_errors_one_field_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, elastodynamic_one_field_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
+    static void compute_errors_one_field_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, elastodynamic_one_field_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<disk::static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -562,10 +560,10 @@ public:
                 Matrix<RealType, Dynamic, 1> all_dofs = assembler.gather_dof_data(msh, cell, x_dof);
                 
                 auto           sgr = make_vector_hho_symmetric_laplacian(msh, cell, hho_di);
-                dynamic_vector<RealType> GTu = sgr.first * all_dofs;
+                disk::dynamic_vector<RealType> GTu = sgr.first * all_dofs;
 
                 auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
-                dynamic_vector<RealType> divu = dr.first * all_dofs;
+                disk::dynamic_vector<RealType> divu = dr.first * all_dofs;
 
                 auto cbas_v = disk::make_vector_monomial_basis(msh, cell, hho_di.reconstruction_degree());
                 auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
@@ -582,7 +580,7 @@ public:
                     auto epsilon = disk::eval(GTu, gphi, dim);
                     auto divphi   = cbas_s.eval_functions(point_pair.point());
                     auto trace_epsilon = disk::eval(divu, divphi);
-                    auto sigma = 2.0 * mu * epsilon + lambda * trace_epsilon * static_matrix<RealType, 2, 2>::Identity();
+                    auto sigma = 2.0 * mu * epsilon + lambda * trace_epsilon * disk::static_matrix<RealType, 2, 2>::Identity();
                     auto flux_diff = (flux_fun(point_pair.point()) - sigma).eval();
                     flux_l2_error += omega * flux_diff.squaredNorm();
 
@@ -603,7 +601,7 @@ public:
     }
     
     /// Compute L2 and H1 errors for two fields vectorial approximation
-    static void compute_errors_two_fields_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
+    static void compute_errors_two_fields_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<disk::static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -675,7 +673,7 @@ public:
     }
     
     /// Compute L2 and H1 errors for three fields vectorial approximation
-    static void compute_errors_three_fields_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
+    static void compute_errors_three_fields_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<disk::static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -734,7 +732,7 @@ public:
                     assert(t_sca_phi.size() == sca_basis.size());
                     auto sigma_v_h = disk::eval(sigma_v_x_cell_dof, t_sca_phi);
                     
-                    sigma_h  += sigma_v_h * static_matrix<RealType, 2, 2>::Identity();
+                    sigma_h  += sigma_v_h * disk::static_matrix<RealType, 2, 2>::Identity();
                     
                     auto flux_diff = (flux_fun(point_pair.point()) - sigma_h).eval();
                     flux_l2_error += omega * flux_diff.squaredNorm();
@@ -1590,7 +1588,7 @@ public:
         
     // Write a silo file for one field vectorial approximation
     static void write_silo_one_field_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,
-    std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, bool cell_centered_Q){
+    std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, bool cell_centered_Q){
     
             timecounter tc;
             tc.tic();
@@ -1704,7 +1702,7 @@ public:
         }
         
     // Write a silo file for two fields vectorial approximation
-    static void write_silo_two_fields_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, bool cell_centered_Q){
+    static void write_silo_two_fields_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<disk::static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, bool cell_centered_Q){
     
             timecounter tc;
             tc.tic();
@@ -1903,7 +1901,7 @@ public:
         }
         
     // Write a silo file for three fields vectorial approximation
-    static void write_silo_three_fields_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, bool cell_centered_Q){
+    static void write_silo_three_fields_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<disk::static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, bool cell_centered_Q){
     
             timecounter tc;
             tc.tic();
@@ -1971,7 +1969,7 @@ public:
                         assert(t_sca_phi.size() == sca_basis.size());
                         auto sigma_v_h = disk::eval(sigma_v_x_cell_dof, t_sca_phi);
                     
-                        sigma_h  += sigma_v_h * static_matrix<RealType, 2, 2>::Identity();
+                        sigma_h  += sigma_v_h * disk::static_matrix<RealType, 2, 2>::Identity();
     
                         approx_sxx.push_back(sigma_h(0,0));
                         approx_sxy.push_back(sigma_h(0,1));
@@ -2050,7 +2048,7 @@ public:
                         assert(t_sca_phi.size() == sca_basis.size());
                         auto sigma_v_h = disk::eval(sigma_v_x_cell_dof, t_sca_phi);
                     
-                        sigma_h  += sigma_v_h * static_matrix<RealType, 2, 2>::Identity();
+                        sigma_h  += sigma_v_h * disk::static_matrix<RealType, 2, 2>::Identity();
     
                         approx_sxx.push_back(sigma_h(0,0));
                         approx_sxy.push_back(sigma_h(0,1));
@@ -2194,7 +2192,7 @@ public:
     ////////////////////////////////////////////////////////////////////////////////
 
     /// Compute errors
-    static void compute_errors_two_fields_elastoacoustic(Mesh & msh, disk::hho_degree_info & hho_di, elastoacoustic_two_fields_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> sigma_fun,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
+    static void compute_errors_two_fields_elastoacoustic(Mesh & msh, disk::hho_degree_info & hho_di, elastoacoustic_two_fields_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<disk::static_matrix<double, 2, 2>(const typename Mesh::point_type& )> sigma_fun,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -2244,10 +2242,10 @@ public:
                 Matrix<RealType, Dynamic, 1> all_dofs = assembler.gather_e_dof_data(e_cell_ind, msh, cell, x_dof);
                 
                 auto           sgr = make_vector_hho_symmetric_laplacian(msh, cell, hho_di);
-                dynamic_vector<RealType> GTu = sgr.first * all_dofs;
+                disk::dynamic_vector<RealType> GTu = sgr.first * all_dofs;
 
                 auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
-                dynamic_vector<RealType> divu = dr.first * all_dofs;
+                disk::dynamic_vector<RealType> divu = dr.first * all_dofs;
 
                 auto cbas_v = disk::make_vector_monomial_basis(msh, cell, hho_di.reconstruction_degree());
                 auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
@@ -2264,7 +2262,7 @@ public:
                     auto epsilon = disk::eval(GTu, gphi, dim);
                     auto divphi   = cbas_s.eval_functions(point_pair.point());
                     auto trace_epsilon = disk::eval(divu, divphi);
-                    auto sigma = 2.0 * mu * epsilon + lambda * trace_epsilon * static_matrix<RealType, 2, 2>::Identity();
+                    auto sigma = 2.0 * mu * epsilon + lambda * trace_epsilon * disk::static_matrix<RealType, 2, 2>::Identity();
                     auto flux_diff = (sigma_fun(point_pair.point()) - sigma).eval();
                     sigma_l2_error += omega * flux_diff.squaredNorm();
 
@@ -2338,7 +2336,7 @@ public:
         error_file.flush();
     }
     
-    static void compute_errors_four_fields_elastoacoustic(Mesh & msh, disk::hho_degree_info & hho_di, elastoacoustic_four_fields_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> sigma_fun,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
+    static void compute_errors_four_fields_elastoacoustic(Mesh & msh, disk::hho_degree_info & hho_di, elastoacoustic_four_fields_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<disk::static_matrix<double, 2, 2>(const typename Mesh::point_type& )> sigma_fun,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -2476,7 +2474,7 @@ public:
         error_file.flush();
     }
     
-    static void compute_errors_four_fields_elastoacoustic_energy_norm(Mesh & msh, disk::hho_degree_info & hho_di, elastoacoustic_four_fields_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> sigma_fun,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
+    static void compute_errors_four_fields_elastoacoustic_energy_norm(Mesh & msh, disk::hho_degree_info & hho_di, elastoacoustic_four_fields_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<disk::static_matrix<double, 2, 2>(const typename Mesh::point_type& )> sigma_fun,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
 
         timecounter tc;
         tc.tic();

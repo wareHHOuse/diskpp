@@ -567,7 +567,7 @@ public:
 
     }
     
-    void assemble(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> e_rhs_fun, std::function<T(const typename Mesh::point_type& )> a_rhs_fun){
+    void assemble(const Mesh& msh, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> e_rhs_fun, std::function<T(const typename Mesh::point_type& )> a_rhs_fun){
         
         auto storage = msh.backend_storage();
         LHS.setZero();
@@ -612,7 +612,7 @@ public:
         finalize_coupling();
     }
     
-    void apply_bc_conditions_on_interface(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> e_vel_fun, std::function<T(const typename Mesh::point_type& )> a_vel_fun){
+    void apply_bc_conditions_on_interface(const Mesh& msh, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> e_vel_fun, std::function<T(const typename Mesh::point_type& )> a_vel_fun){
         
         auto storage = msh.backend_storage();
         // Applying transmission conditions as neumann data for the case of uncoupled problems
@@ -654,7 +654,7 @@ public:
         finalize_mass();
     }
     
-    void assemble_rhs(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> e_rhs_fun, std::function<T(const typename Mesh::point_type& )> a_rhs_fun){
+    void assemble_rhs(const Mesh& msh, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> e_rhs_fun, std::function<T(const typename Mesh::point_type& )> a_rhs_fun){
         
         RHS.setZero();
         #ifdef HAVE_INTEL_TBB2
@@ -830,7 +830,7 @@ public:
         return neumann_operator;
         }
     
-    Matrix<T, Dynamic, Dynamic> a_neumman_bc_operator(const Mesh& msh, const typename Mesh::face_type& face, const typename Mesh::cell_type& e_cell, const typename Mesh::cell_type& a_cell, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> e_vel_fun){
+    Matrix<T, Dynamic, Dynamic> a_neumman_bc_operator(const Mesh& msh, const typename Mesh::face_type& face, const typename Mesh::cell_type& e_cell, const typename Mesh::cell_type& a_cell, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> e_vel_fun){
 
         Matrix<T, Dynamic, Dynamic> neumann_operator;
         auto facdeg = m_hho_di.face_degree();
@@ -916,7 +916,7 @@ public:
         }
     }
     
-    void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun, std::function<T(const typename Mesh::point_type& )> scal_fun){
+    void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun, std::function<T(const typename Mesh::point_type& )> scal_fun){
         
         auto storage = msh.backend_storage();
         size_t n_dof = MASS.rows();
@@ -960,7 +960,7 @@ public:
     
     
     
-    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun, std::function<T(const typename Mesh::point_type& )> scal_fun){
+    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun, std::function<T(const typename Mesh::point_type& )> scal_fun){
 
         auto storage = msh.backend_storage();
 

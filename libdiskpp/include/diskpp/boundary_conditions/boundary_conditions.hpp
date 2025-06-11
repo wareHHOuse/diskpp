@@ -341,6 +341,14 @@ class BoundaryConditions
         }
     }
 
+    template<typename Function>
+    void
+    updateDirichletFunction(const Function& bcf, size_t bcf_index)
+    {
+        assert(0 <= bcf_index && bcf_index < m_dirichlet_func.size());
+        m_dirichlet_func[bcf_index] = bcf;
+    }
+
     void
     multiplyAllFunctionsByAFactor(const scalar_type& factor)
     {

@@ -119,7 +119,7 @@ public:
         std::vector<assembly_index> asm_map;
         asm_map.reserve(n_cbs + n_fbs*fcs.size());
 
-        auto cell_offset        = disk::priv::offset(msh, cl);
+        auto cell_offset        = disk::offset(msh, cl);
         auto cell_LHS_offset    = cell_offset * n_cbs;
 
         for (size_t i = 0; i < n_cbs; i++)
@@ -129,7 +129,7 @@ public:
         for (size_t face_i = 0; face_i < fcs.size(); face_i++)
         {
             auto fc = fcs[face_i];
-            auto face_offset = disk::priv::offset(msh, fc);
+            auto face_offset = disk::offset(msh, fc);
             auto face_LHS_offset = n_cbs * msh.cells_size() + m_compress_indexes.at(face_offset)*n_fbs;
 
             auto fc_id = msh.lookup(fc);
@@ -232,7 +232,7 @@ public:
                     const Matrix<T, Dynamic, 1>& x_glob) const
     {
         auto num_faces = howmany_faces(msh, cl);
-        auto cell_ofs = disk::priv::offset(msh, cl);
+        auto cell_ofs = disk::offset(msh, cl);
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_sca_cbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
@@ -259,7 +259,7 @@ public:
             }
             else
             {
-                auto face_ofs = disk::priv::offset(msh, fc);
+                auto face_ofs = disk::offset(msh, fc);
                 auto global_ofs = n_cbs * msh.cells_size() + m_compress_indexes.at(face_ofs)*n_fbs;
                 x_el.block(n_vec_cbs + i*n_fbs, 0, n_fbs, 1) = x_glob.block(global_ofs, 0, n_fbs, 1);
             }

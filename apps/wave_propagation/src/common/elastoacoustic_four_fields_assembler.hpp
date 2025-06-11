@@ -594,7 +594,7 @@ public:
 
     }
     
-    void assemble(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> e_rhs_fun, std::function<T(const typename Mesh::point_type& )> a_rhs_fun, bool explicit_scheme){
+    void assemble(const Mesh& msh, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> e_rhs_fun, std::function<T(const typename Mesh::point_type& )> a_rhs_fun, bool explicit_scheme){
         
         auto storage = msh.backend_storage();
         LHS.setZero();
@@ -662,7 +662,7 @@ public:
         finalize_mass();
     }
     
-    void assemble_rhs(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> e_rhs_fun, std::function<T(const typename Mesh::point_type& )> a_rhs_fun, bool explicit_scheme){
+    void assemble_rhs(const Mesh& msh, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> e_rhs_fun, std::function<T(const typename Mesh::point_type& )> a_rhs_fun, bool explicit_scheme){
         
         RHS.setZero();
         #ifdef HAVE_INTEL_TBB2
@@ -745,8 +745,8 @@ public:
         auto n_cols = R_operator.cols();
         Matrix<T, Dynamic, Dynamic> S_operator = Matrix<T, Dynamic, Dynamic>::Zero(n_rows, n_cols);
 
-        if(explicit_scheme) {
-            auto stabilization_operator = make_vector_hdg_stabilization(msh, cell, m_hho_di, m_scaled_stabilization_Q);
+        if (explicit_scheme) {
+            auto stabilization_operator = make_vector_hdg_stabilization(msh, cell, m_hho_di, false, m_scaled_stabilization_Q);
             auto n_s_rows = stabilization_operator.rows();
             auto n_s_cols = stabilization_operator.cols();
             S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
@@ -760,7 +760,7 @@ public:
                 S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
             }
             else {
-                auto stabilization_operator = make_vector_hdg_stabilization(msh, cell, m_hho_di, m_scaled_stabilization_Q);
+                auto stabilization_operator = make_vector_hdg_stabilization(msh, cell, m_hho_di, false, m_scaled_stabilization_Q);
                 auto n_s_rows = stabilization_operator.rows();
                 auto n_s_cols = stabilization_operator.cols();
                 S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
@@ -863,7 +863,7 @@ public:
     }
     
     Matrix<typename Mesh::coordinate_type, Dynamic, 1>
-    e_mixed_rhs(const Mesh& msh, const typename Mesh::cell_type& cell, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> & rhs_fun, size_t di = 0)
+    e_mixed_rhs(const Mesh& msh, const typename Mesh::cell_type& cell, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> & rhs_fun, size_t di = 0)
     {
         auto recdeg = m_hho_di.grad_degree();
         auto celdeg = m_hho_di.cell_degree();
@@ -1053,7 +1053,7 @@ public:
 
         Matrix<T, Dynamic, Dynamic> S_operator = Matrix<T, Dynamic, Dynamic>::Zero(n_rows, n_cols);
         if(explicit_scheme) {
-            auto stabilization_operator = make_scalar_hdg_stabilization(msh, cell, m_hho_di, m_scaled_stabilization_Q);
+            auto stabilization_operator = make_scalar_hdg_stabilization(msh, cell, m_hho_di, false, m_scaled_stabilization_Q);
             auto n_s_rows = stabilization_operator.rows();
             auto n_s_cols = stabilization_operator.cols();
             S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
@@ -1066,7 +1066,7 @@ public:
                 S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
             } 
             else {
-                auto stabilization_operator = make_scalar_hdg_stabilization(msh, cell, m_hho_di, m_scaled_stabilization_Q);
+                auto stabilization_operator = make_scalar_hdg_stabilization(msh, cell, m_hho_di, false, m_scaled_stabilization_Q);
                 auto n_s_rows = stabilization_operator.rows();
                 auto n_s_cols = stabilization_operator.cols();
                 S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
@@ -1192,8 +1192,9 @@ public:
           const auto s_f_phi = sfb.eval_functions(qp.point());
           assert(v_f_phi.rows() == vfbs);
           assert(s_f_phi.rows() == sfbs);
-          const auto n_dot_v_f_phi = disk::priv::inner_product(v_f_phi,disk::priv::inner_product(qp.weight(), n));
-          const auto result = -1.0*disk::priv::outer_product(n_dot_v_f_phi, s_f_phi);
+          auto q_n = disk::priv::inner_product(qp.weight(), n);
+          const auto n_dot_v_f_phi = disk::priv::inner_product(v_f_phi,q_n);
+          const auto result = (-1.0*disk::priv::outer_product(n_dot_v_f_phi, s_f_phi)).eval();
           interface_operator += result;
         }
         return interface_operator;
@@ -1225,7 +1226,7 @@ public:
         return neumann_operator;
         }
     
-    Matrix<T, Dynamic, Dynamic> a_neumman_bc_operator(const Mesh& msh, const typename Mesh::face_type& face, const typename Mesh::cell_type& e_cell, const typename Mesh::cell_type& a_cell, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> e_vel_fun){
+    Matrix<T, Dynamic, Dynamic> a_neumman_bc_operator(const Mesh& msh, const typename Mesh::face_type& face, const typename Mesh::cell_type& e_cell, const typename Mesh::cell_type& a_cell, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> e_vel_fun){
 
         Matrix<T, Dynamic, Dynamic> neumann_operator;
         auto facdeg = m_hho_di.face_degree();
@@ -1314,7 +1315,7 @@ public:
 
     }
     
-    void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> v_fun, std::function<static_matrix<T,2,2>(const typename Mesh::point_type& )> flux_fun, std::function<T(const typename Mesh::point_type& )> v_s_fun, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> flux_s_fun){
+    void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> v_fun, std::function<disk::static_matrix<T,2,2>(const typename Mesh::point_type& )> flux_fun, std::function<T(const typename Mesh::point_type& )> v_s_fun, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> flux_s_fun){
         
         auto storage = msh.backend_storage();
         size_t n_dof = MASS.rows();
@@ -1360,7 +1361,7 @@ public:
     }
     
     Matrix<T, Dynamic, 1> project_vec_function(const Mesh& msh, const typename Mesh::cell_type& cell,
-                      std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun){
+                      std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun){
     
             auto recdeg = m_hho_di.reconstruction_degree();
             auto rec_basis = make_scalar_monomial_basis(msh, cell, recdeg);
@@ -1386,7 +1387,7 @@ public:
     }
 
     Matrix<T, Dynamic, 1> project_ten_function(const Mesh& msh, const typename Mesh::cell_type& cell,
-                      std::function<static_matrix<T, 2,2>(const typename Mesh::point_type& )> ten_fun){
+                      std::function<disk::static_matrix<T, 2,2>(const typename Mesh::point_type& )> ten_fun){
     
         Matrix<T, Dynamic, Dynamic> mass_matrix  = symmetric_tensor_mass_matrix(msh, cell);
         size_t dim = Mesh::dimension;
@@ -1399,7 +1400,7 @@ public:
         for (auto& qp : qps)
         {
             auto phi = ten_b.eval_functions(qp.point());
-            static_matrix<T, 2,2> sigma = ten_fun(qp.point());
+            disk::static_matrix<T, 2,2> sigma = ten_fun(qp.point());
             for (size_t i = 0; i < ten_bs; i++){
                 auto qp_phi_i = disk::priv::inner_product(qp.weight(), phi[i]);
                 rhs(i,0) += disk::priv::inner_product(qp_phi_i,sigma);
@@ -1428,7 +1429,7 @@ public:
     }
     
     
-    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun, std::function<T(const typename Mesh::point_type& )> scal_fun){
+    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun, std::function<T(const typename Mesh::point_type& )> scal_fun){
 
         auto storage = msh.backend_storage();
 
@@ -1585,13 +1586,10 @@ public:
     }   
 
     void set_hdg_stabilization() {
-        // std::cout << bold << red << "   SUMMARY: " << reset << std::endl;
-        if(m_hho_di.cell_degree() > m_hho_di.face_degree()) {
-          m_hho_stabilization_Q = false;
-      }                                                 
-        else{
+        if(m_hho_di.cell_degree() > m_hho_di.face_degree()) 
+          m_hho_stabilization_Q = false;                                            
+        else
             m_hho_stabilization_Q = true;
-        }
     }
     
     void set_interface_cell_indexes(std::map<size_t,std::pair<size_t,size_t>> & interface_cell_indexes){

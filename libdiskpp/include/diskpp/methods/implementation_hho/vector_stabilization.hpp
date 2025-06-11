@@ -217,9 +217,10 @@ dynamic_matrix<typename Mesh::coordinate_type>
 make_vector_hdg_stabilization(const Mesh&                     msh,
                               const typename Mesh::cell_type& cl,
                               const hho_degree_info&          di,
-                              const bool                      hF = true)
+                              bool                            hF = true,
+                              bool                            scaling = true)
 {
-    const auto hdg_scalar_stab = make_scalar_hdg_stabilization(msh, cl, di, hF);
+    const auto hdg_scalar_stab = make_scalar_hdg_stabilization(msh, cl, di, hF, scaling);
 
     return priv::compute_lhs_vector(msh, cl, di, hdg_scalar_stab);
 }
@@ -240,9 +241,10 @@ dynamic_matrix<typename Mesh::coordinate_type>
 make_vector_hdg_stabilization(const Mesh&                     msh,
                               const typename Mesh::cell_type& cl,
                               const MeshDegreeInfo<Mesh>&     msh_infos,
-                              const bool                      hF = true)
+                              const bool                      hF = true,
+                              bool                            scaling = true)
 {
-    const auto hdg_scalar_stab = make_scalar_hdg_stabilization(msh, cl, msh_infos, hF);
+    const auto hdg_scalar_stab = make_scalar_hdg_stabilization(msh, cl, msh_infos, hF, scaling);
 
     return priv::compute_lhs_vector(msh, cl, msh_infos.cellDegreeInfo(msh, cl), hdg_scalar_stab);
 }
