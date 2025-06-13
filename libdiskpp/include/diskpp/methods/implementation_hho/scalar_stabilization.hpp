@@ -212,10 +212,12 @@ make_scalar_hdg_stabilization(const Mesh&                     msh,
             tr.block(0, 0, fbs, cbs)      = trace;
 
             oper.block(0, 0, fbs, cbs) = mass.ldlt().solve(trace);
-            if (scaling)
+            if (scaling) {
                 data += oper.transpose() * tr * (1. / h);
-            else 
+            }
+            else {
                 data += oper.transpose() * tr;
+            }
 
             offset += fbs;
         }

@@ -768,10 +768,12 @@ public:
         std::set<cell_type> ret;
         auto face_id = msh.lookup(fc);
         auto fo = face_owners.at( face_id );
-        if (fo[0])
-            ret.insert( msh[fo[0].value()] );
-        if (fo[1])
-            ret.insert( msh[fo[1].value()] );
+        if (fo[0]) {
+            ret.insert(msh[fo[0].value()]);
+        }
+        if (fo[1]) {
+            ret.insert(msh[fo[1].value()]);
+        }
 
         return ret;
     }
