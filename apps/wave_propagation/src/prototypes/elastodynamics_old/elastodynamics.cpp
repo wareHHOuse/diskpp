@@ -1,5 +1,5 @@
 
-//  Contributions by Omar Durán and Romain Mottier
+//  Created by Omar Durán 
 
 #include <iostream>
 #include <fstream>

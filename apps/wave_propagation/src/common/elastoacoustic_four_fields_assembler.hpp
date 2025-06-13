@@ -3,7 +3,7 @@
 //  acoustics
 //
 //  Created by Omar Durán on 9/7/20.
-//  
+//  Contributor: Romain Mottier
 
 
 #pragma once

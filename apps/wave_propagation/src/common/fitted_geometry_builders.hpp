@@ -1,8 +1,9 @@
 //
 //  fitted_geometry_builder.hpp
-//  acoustics
 //
-//
+//  Created by Omar Durán
+//  Contributor: Romain Mottier
+
 
 #pragma once
 #ifndef fitted_geometry_builder_hpp

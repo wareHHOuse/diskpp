@@ -3,7 +3,7 @@
 //  acoustics
 //
 //  Created by Omar Durán on 4/10/20.
-//
+//  Contributor: Romain Mottier
 
 #pragma once
 #ifndef postprocessor_hpp

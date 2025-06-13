@@ -1,4 +1,7 @@
 
+//  Created by Omar Durán
+//  Contributor: Romain Mottier
+
 #pragma once
 #ifndef scal_vec_analytic_functions_hpp
 #define scal_vec_analytic_functions_hpp

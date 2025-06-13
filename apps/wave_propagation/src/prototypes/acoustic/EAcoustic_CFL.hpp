@@ -1,7 +1,6 @@
 
 
 //  Created by Romain Mottier
-//  ../wave_propagation -k 2 -s 0 -r 0 -c 1 -p 0 -l 2 -n 300 -f 0 -e 0
 
 void EAcoustic_CFL(int argc, char **argv);
 
