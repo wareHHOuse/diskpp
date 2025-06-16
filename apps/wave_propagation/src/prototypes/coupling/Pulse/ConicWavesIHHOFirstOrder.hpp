@@ -105,7 +105,7 @@ void ConicWavesIHHOFirstOrder(int argc, char **argv){
         nt *= 2;
     
     RealType ti = 0.0;
-    RealType tf = 0.625;
+    RealType tf = 0.425;
     RealType dt = (tf-ti)/nt;
     RealType t  = ti;
   
@@ -330,7 +330,7 @@ void ConicWavesIHHOFirstOrder(int argc, char **argv){
         std::cout << bold << cyan << "      Matrix decomposed: "; 
         tc.tic();
         dirk_an.ComposeMatrix();
-        bool iteratif_solver = true; // if false load library: source /opt/intel/oneapi/setvars.sh intel64
+        bool iteratif_solver = false; // if false load library: source /opt/intel/oneapi/setvars.sh intel64
         if (iteratif_solver) 
             dirk_an.setIterativeSolver();
         dirk_an.DecomposeMatrix();

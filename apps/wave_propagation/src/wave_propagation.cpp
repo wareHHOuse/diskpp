@@ -1,4 +1,5 @@
 #include <iostream>
+#include <libgen.h>
 #include <fstream>
 #include <vector>
 #include <array>
@@ -73,6 +74,19 @@ using namespace Eigen;
 
 int main(int argc, char **argv){
 
+    DBSetDeprecateWarnings(0);
+
+    // REGRESSION TESTS
+    if (basename(argv[0]) == std::string("name1") ) {
+        std::cout << "called with name1" << std::endl;
+        return 0;
+    }
+
+    if (basename(argv[0]) == std::string("name2") ) {
+        std::cout << "called with name2" << std::endl;
+        return 0;
+    }
+    
 // CFL tables:
    // EAcoustic_CFL(argc, argv); 
    // EElasticity_CFL(argc, argv);
@@ -93,8 +107,8 @@ int main(int argc, char **argv){
 
 // Pulse:
    // HeterogeneousIHHOFirstOrder(argc, argv); 
-   HeterogeneousEHHOFirstOrder(argc, argv); 
-   // ConicWavesIHHOFirstOrder(argc, argv);
+   // HeterogeneousEHHOFirstOrder(argc, argv); 
+   ConicWavesIHHOFirstOrder(argc, argv);
    // ConicWavesEHHOFirstOrder(argc, argv);
 
 // Sedimentary basin:
