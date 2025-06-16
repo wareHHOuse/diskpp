@@ -105,7 +105,7 @@ void ConicWavesIHHOFirstOrder(int argc, char **argv){
         nt *= 2;
     
     RealType ti = 0.0;
-    RealType tf = 0.625;
+    RealType tf = 0.425;
     RealType dt = (tf-ti)/nt;
     RealType t  = ti;
   

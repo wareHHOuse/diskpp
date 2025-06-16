@@ -93,8 +93,8 @@ int main(int argc, char **argv){
 
 // Pulse:
    // HeterogeneousIHHOFirstOrder(argc, argv); 
-   HeterogeneousEHHOFirstOrder(argc, argv); 
-   // ConicWavesIHHOFirstOrder(argc, argv);
+   // HeterogeneousEHHOFirstOrder(argc, argv); 
+   ConicWavesIHHOFirstOrder(argc, argv);
    // ConicWavesEHHOFirstOrder(argc, argv);
 
 // Sedimentary basin:
