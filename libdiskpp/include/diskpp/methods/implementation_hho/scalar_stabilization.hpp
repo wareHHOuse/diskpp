@@ -147,7 +147,8 @@ dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hdg_stabilization(const Mesh&                     msh,
                               const typename Mesh::cell_type& cl,
                               const CellDegreeInfo<Mesh>&     cell_infos,
-                              bool hF = true)
+                              bool hF = true,
+                              bool scaling = true)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -179,7 +180,7 @@ make_scalar_hdg_stabilization(const Mesh&                     msh,
             const auto fc     = fcs[i];
             const auto facdeg = fdi.degree();
 
-            if(hF){
+            if (hF) {
                 h = diameter(msh, fc);
             }
 
@@ -211,7 +212,12 @@ make_scalar_hdg_stabilization(const Mesh&                     msh,
             tr.block(0, 0, fbs, cbs)      = trace;
 
             oper.block(0, 0, fbs, cbs) = mass.ldlt().solve(trace);
-            data += oper.transpose() * tr * (1. / h);
+            if (scaling) {
+                data += oper.transpose() * tr * (1. / h);
+            }
+            else {
+                data += oper.transpose() * tr;
+            }
 
             offset += fbs;
         }
@@ -496,11 +502,12 @@ dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hdg_stabilization(const Mesh&                     msh,
                               const typename Mesh::cell_type& cl,
                               const hho_degree_info&          di,
-                              bool                            hF = true)
+                              bool                            hF = true,
+                              bool                            scaling = true)
 {
     const CellDegreeInfo<Mesh> cell_infos(msh, cl, di.cell_degree(), di.face_degree(), di.grad_degree());
 
-    return make_scalar_hdg_stabilization(msh, cl, cell_infos, hF);
+    return make_scalar_hdg_stabilization(msh, cl, cell_infos, hF, scaling);
 }
 
 /**
@@ -519,9 +526,10 @@ dynamic_matrix<typename Mesh::coordinate_type>
 make_scalar_hdg_stabilization(const Mesh&                     msh,
                               const typename Mesh::cell_type& cl,
                               const MeshDegreeInfo<Mesh>&     msh_infos,
-                              bool                            hF = true)
+                              bool                            hF = true,
+                              bool                            scaling = true)
 {
-    return make_scalar_hdg_stabilization(msh, cl, msh_infos.cellDegreeInfo(msh, cl), hF);
+    return make_scalar_hdg_stabilization(msh, cl, msh_infos.cellDegreeInfo(msh, cl), hF, scaling);
 }
 
 /**

@@ -73,6 +73,7 @@ endif()
 #add_subdirectory(contrib/eigen)
 find_package(Eigen3 REQUIRED)
 set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
+include_directories(libdiskpp/contrib/spectra/include)
 
 ######################################################################
 ## ~jburkardt code
@@ -279,3 +280,5 @@ set(CPACK_DEBIAN_PACKAGE_SECTION "science")
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6,libgcc1,libstdc++6")
 
 include(CPack)
+
+
