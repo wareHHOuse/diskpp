@@ -330,7 +330,7 @@ void ConicWavesIHHOFirstOrder(int argc, char **argv){
         std::cout << bold << cyan << "      Matrix decomposed: "; 
         tc.tic();
         dirk_an.ComposeMatrix();
-        bool iteratif_solver = true; // if false load library: source /opt/intel/oneapi/setvars.sh intel64
+        bool iteratif_solver = false; // if false load library: source /opt/intel/oneapi/setvars.sh intel64
         if (iteratif_solver) 
             dirk_an.setIterativeSolver();
         dirk_an.DecomposeMatrix();
