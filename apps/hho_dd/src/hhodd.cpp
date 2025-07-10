@@ -25,66 +25,8 @@
 #include "diskpp/methods/hho"
 #include "rasdd.hpp"
 #include "common.hpp"
-
+#include "solvers.hpp"
 #include "diskpp_git_revision.h"
-
-
-namespace disk {
-
-
-template<typename Mesh>
-struct source;
-
-template<mesh_2D Mesh>
-struct source<Mesh> {
-    using point_type = typename Mesh::point_type;
-    auto operator()(const point_type& pt) const {
-        auto sx = std::sin(M_PI*pt.x());
-        auto sy = std::sin(M_PI*pt.y());
-        return 2.0*M_PI*M_PI*sx*sy;
-    }
-};
-
-
-template<mesh_3D Mesh>
-struct source<Mesh> {
-    using point_type = typename Mesh::point_type;
-    auto operator()(const point_type& pt) const {
-        auto sx = std::sin(M_PI*pt.x());
-        auto sy = std::sin(M_PI*pt.y());
-        auto sz = std::sin(M_PI*pt.z());
-        return 3.0*M_PI*M_PI*sx*sy*sz;
-    }
-};
-
-
-template<typename Mesh>
-struct solution;
-
-template<mesh_2D Mesh>
-struct solution<Mesh> {
-    using point_type = typename Mesh::point_type;
-    auto operator()(const point_type& pt) const {
-        auto sx = std::sin(M_PI*pt.x());
-        auto sy = std::sin(M_PI*pt.y());
-        return sx*sy;
-    }
-};
-
-
-template<mesh_3D Mesh>
-struct solution<Mesh> {
-    using point_type = typename Mesh::point_type;
-    auto operator()(const point_type& pt) const {
-        auto sx = std::sin(M_PI*pt.x());
-        auto sy = std::sin(M_PI*pt.y());
-        auto sz = std::sin(M_PI*pt.z());
-        return sx*sy*sz;
-    }
-};
-
-
-} // namespace disk
 
 
 template<typename FineMesh>
@@ -239,7 +181,7 @@ diffusion_solver(const disk::simplicial_mesh<T,2>& msh, const solver_config& scf
 
     degree_info di(cell_degree, face_degree);
 
-    disk::source<Mesh> f;
+    disk::source_functor<Mesh> f;
 
     auto assm = make_assembler(msh, di);
 
@@ -298,7 +240,7 @@ diffusion_solver(const disk::simplicial_mesh<T,2>& msh, const solver_config& scf
         std::vector<T> r_data;
         std::vector<T> rr_data;
         T error = 0.0;
-        disk::solution<Mesh> u_sol;
+        disk::solution_functor<Mesh> u_sol;
         for(size_t cell_i = 0; cell_i < msh.cells_size(); cell_i++)
         {
             auto cl = msh.cell_at(cell_i);   
@@ -340,34 +282,30 @@ diffusion_solver(const disk::simplicial_mesh<T,2>& msh, const solver_config& scf
         std::vector<iterdata> ids;
         disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.RHS.size());
         disk::sparse_matrix<T> Ac;
+        mumps_solver<T> solverAc;
         if (scfg.use_twolevel) {
             Ac = proj.transpose() * assm.LHS * proj;
+            solverAc.factorize(Ac);
         }
 
+        mumps_solver<T> solverLHS;
+        solverLHS.factorize(assm.LHS);
         for (size_t niter = 0; niter < scfg.ras_maxiter; niter++) {
+            std::cout << "RAS iteration " << niter+1 << std::endl;
             iterdata id;
             disk::dynamic_vector<T> r = assm.RHS - assm.LHS*sol;
-            sol = sol + ras(r);
+            disk::dynamic_vector<T> rasr = ras(r);
+            sol = sol + rasr;
             disk::dynamic_vector<T> e2 = disk::dynamic_vector<T>::Zero(r.size());
             if (scfg.use_twolevel) {
                 r = assm.RHS - assm.LHS*sol;
                 disk::dynamic_vector<T> rc = proj.transpose() * r;
-                disk::dynamic_vector<T> ec = mumps_lu(Ac, rc);
-                sol = sol + proj * ec;
+                disk::dynamic_vector<T> ec = solverAc.solve(rc);
                 e2 = proj * ec;
+                sol = sol + e2;
             }
 
-            disk::dynamic_vector<T> e = mumps_lu(assm.LHS, r);
-            disk::dynamic_vector<T> ee = proj*(proj.transpose()*e);
-
-            std::string errfn_e = "e_step_" + std::to_string(niter) + ".txt";
-            std::ofstream ef(errfn_e);
-
-            if ( e.size() != ee.size() or ee.size() != e2.size() or e2.size() != e.size() )
-                throw 42;
-
-            for (int i = 0; i < e.size(); i++)
-                ef << e(i) << " " << ee(i) << " " << e2(i) << std::endl;
+            disk::dynamic_vector<T> e = solverLHS.solve(r);
 
             id.residual = r.norm();
             std::cout << "Postprocessing..." << std::endl;
@@ -378,7 +316,7 @@ diffusion_solver(const disk::simplicial_mesh<T,2>& msh, const solver_config& scf
                 std::cout << "  Saving solution to " << ss.str() << std::endl;
             }
             
-            id.error = postpro(ss.str(), sol, ee, e2);
+            id.error = postpro(ss.str(), sol, e, e2);
 
             std::cout << "  A-norm error: " << id.error << std::endl;
             ids.push_back(id);
@@ -404,8 +342,8 @@ diffusion_solver(const disk::simplicial_mesh<T,2>& msh, const solver_config& scf
             std::cout << "  Saving solution to " << scfg.fn_silo << std::endl;
         }
         
-        //auto err = postpro(scfg.fn_silo, sol, bio.residual);
-        //std::cout << "  A-norm error: " << err << std::endl;
+        auto err = postpro(scfg.fn_silo, sol, bio.residual, bio.residual);
+        std::cout << "  A-norm error: " << err << std::endl;
     }
 }
 
@@ -634,6 +572,11 @@ int main(int argc, char **argv)
         loader.populate_mesh(msh);
         rebase_subdomain_numbering(msh);
         diffusion_solver(msh, scfg);
+
+        disk::silo_database db;
+        db.create("plain_hho.silo");
+        db.add_mesh(msh, "srcmesh");
+        hho_diffusion_solver(msh, scfg.degree, db);
         return 0;
     }
 

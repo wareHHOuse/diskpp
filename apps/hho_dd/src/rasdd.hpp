@@ -347,9 +347,17 @@ public:
                 yesno.begin(), [](bool x) { return double(x); } );
 
             std::stringstream ss;
-            ss << "domain" << tag;
+            ss << "ext_domain" << tag;
             silo_db.add_variable("mesh", ss.str(), yesno, disk::zonal_variable_t);
         }
+
+        std::vector<double> initial_dom;
+        initial_dom.reserve( msh.cells_size() );
+        for (auto& cl : msh) {
+            auto di = msh.domain_info(cl);
+            initial_dom.push_back( di.tag() );
+        }
+        silo_db.add_variable("mesh", "orig_doms", initial_dom, disk::zonal_variable_t);
 
         if constexpr (Mesh::dimension == 2) {
             for (auto& [tag, ifcs] : subdomain_faces ) {
