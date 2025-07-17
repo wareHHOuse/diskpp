@@ -3,6 +3,10 @@ project(diskpp_diffusion)
 
 set(LINK_LIBS diskpp)
 
+add_executable(stabfree_find_bad_poly src/stabfree_find_bad_poly.cpp)
+target_link_libraries(stabfree_find_bad_poly ${LINK_LIBS})
+install(TARGETS stabfree_find_bad_poly RUNTIME DESTINATION bin)
+
 add_executable(hpoly_test src/hpoly_test.cpp)
 target_link_libraries(hpoly_test ${LINK_LIBS})
 install(TARGETS hpoly_test RUNTIME DESTINATION bin)
