@@ -323,31 +323,11 @@ minimize_step(Mesh& msh)
     return candidates;
 }
 
-template<disk::mesh_2D Mesh>
-void explore(Mesh& msh, const config& cfg)
-{
-    disk::silo_database silo;
-    if (cfg.silo_fn.length() > 0) {
-        silo.create(cfg.silo_fn);
-        silo.add_mesh(msh, "polygon");
-    }
 
-    size_t N = cfg.nsamples;
-    double eps = cfg.eps;
-
-    using point_type = typename Mesh::point_type;
-    auto storage = msh.backend_storage();
-    auto& mpts = storage->points;
-    auto p0 = mpts[cfg.vertex];
-    point_type base(p0.x() - (N/2)*eps, p0.y() - (N/2)*eps);
-
-
+    #if 0
     auto nthreads = std::thread::hardware_concurrency();
 
     std::mutex mtx;
-    std::vector<point_type> coords;
-    std::vector<double> vals;
-
     auto compute = [&](int tnum) {
         Mesh mymsh;
         msh.copy_to(mymsh);
@@ -387,10 +367,53 @@ void explore(Mesh& msh, const config& cfg)
 
     for (auto& t : threads)
         t.join();
+    #endif
 
+
+template<disk::mesh_2D Mesh>
+void explore(Mesh& msh, const config& cfg)
+{
+    disk::silo_database silo;
     if (cfg.silo_fn.length() > 0) {
-        silo.add_mesh(coords, "pmsh");
-        silo.add_variable("pmsh", "mineig", vals);
+        silo.create(cfg.silo_fn);
+        silo.add_mesh(msh, "polygon");
+    }
+
+    size_t N = cfg.nsamples;
+    double eps = cfg.eps;
+
+    using point_type = typename Mesh::point_type;
+    auto storage = msh.backend_storage();
+    auto& mpts = storage->points;
+    
+    
+    for(size_t i = 0; i < mpts.size(); i++)
+    {
+        std::vector<point_type> coords;
+        std::vector<double> vals;
+        
+        auto p0 = mpts[i];
+        point_type base(p0.x() - (N/2)*eps, p0.y() - (N/2)*eps);
+
+        for (size_t j = 0; j < N; j++) {
+            std::cout << "\rVertex " << i << ": " << j+1 << "/" << N << std::flush;
+            for (size_t k = 0; k < N; k++) {
+                point_type ofs(eps*j, eps*k);
+                coords.push_back( base+ofs );
+                mpts[i] = base+ofs;
+                vals.push_back( test(msh, cfg) );
+            }
+        }
+        mpts[i] = p0;
+        std::cout << std::endl;
+
+
+
+        if (cfg.silo_fn.length() > 0) {
+            std::string meshname = "pmsh" + std::to_string(i);
+            silo.add_mesh(coords, meshname);
+            silo.add_variable(meshname, "mineig" + std::to_string(i), vals);
+        }
     }
 }
 
