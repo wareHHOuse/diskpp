@@ -67,6 +67,10 @@ struct config {
     {}
 };
 
+template<typename T>
+std::vector<T> make_T_vector() {
+    return {};
+}
 
 sol::table init_config(sol::this_state L) {
     sol::state_view lua(L);
@@ -82,6 +86,18 @@ sol::table init_config(sol::this_state L) {
         "eps", &config::eps,
         "variant", &config::variant
     );
+
+    using T = double;
+    using point_type = disk::point<T,2>;
+    module.new_usertype<point_type>("point",
+        sol::constructors<point_type(),
+            point_type(const T&, const T&)
+            >(),
+        "x", sol::resolve<T(void) const>(&point_type::template x<T>),
+        "y", sol::resolve<T(void) const>(&point_type::template y<T>)
+    );
+
+    lua["make_point_vector"] = make_T_vector<point_type>;
 
     return module;
 }

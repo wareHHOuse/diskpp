@@ -1210,5 +1210,52 @@ bool load_single_element_csv(generic_mesh<T,2>& msh, const std::string& filename
     return true;
 }
 
+template<typename T>
+bool make_single_elem_mesh_from_points(generic_mesh<T,2>& msh, const std::vector<point<T,2>>& pts)
+{
+    using mesh_type = generic_mesh<T,2>;
+    using point_type = typename mesh_type::point_type;
+    using node_type = typename mesh_type::node_type;
+    using edge_type = typename mesh_type::edge_type;
+    using surface_type = typename mesh_type::surface_type;
+    using nodeid_type = typename node_type::id_type;
+
+    auto storage = msh.backend_storage();
+
+    size_t ptnum = 0;
+    for (auto& pt : pts)
+    {
+        storage->points.push_back( pt );
+        auto p = point_identifier<2>(ptnum++);
+        storage->nodes.push_back( node_type(p) );
+    }
+
+    std::vector<typename node_type::id_type> surface_nodes;
+    std::vector<typename edge_type::id_type> surface_edges;
+    auto num_nodes = storage->nodes.size();
+    for (size_t i = 0; i < num_nodes; i++) {
+        auto n0 = nodeid_type(i);
+        auto n1 = nodeid_type( (i+1)%num_nodes );
+        if (i+1 == num_nodes)
+            std::swap(n0, n1);
+        storage->edges.push_back( {n0, n1} );
+        surface_nodes.push_back( typename node_type::id_type(i) );
+        surface_edges.push_back( typename edge_type::id_type(i) );
+    }
+
+    storage->boundary_info.resize( storage->edges.size() );
+    for (auto& bi : storage->boundary_info)
+        bi = boundary_descriptor(0, true);
+    std::sort(storage->edges.begin(), storage->edges.end());
+
+    auto surface = surface_type(surface_edges);
+    surface.set_point_ids(surface_nodes.begin(), surface_nodes.end()); /* XXX: crap */
+
+    storage->surfaces.push_back(surface);
+
+    storage->subdomain_info.resize( 1 );
+
+    return true;
+}
 
 } //namespace disk
