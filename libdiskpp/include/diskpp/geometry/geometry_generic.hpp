@@ -131,14 +131,35 @@ normal(const generic_mesh<T, 2>& msh,
        const typename generic_mesh<T, 2>::cell& cl,
        const typename generic_mesh<T, 2>::face& fc)
 {
-    auto pts = points(msh, fc);
-    assert(pts.size() == 2);
+    auto pts = points(msh, cl);
+    Eigen::Matrix<T, 3, 3> OM;
+    OM << 1.0, pts[0].x(), pts[0].y(),
+          1.0, pts[1].x(), pts[1].y(),
+          1.0, pts[2].x(), pts[2].y();
 
-    auto v = pts[1] - pts[0];
-    auto n = (point<T,2>({v.y(), -v.x()})).to_vector();
+    double orientation = OM.determinant();
+    orientation /= std::abs(orientation);
 
-    return n/n.norm();
+    auto clptids = cl.point_ids();
+    auto fcpts = fc.point_ids();
+    assert(fcpts.size() == 2);
+
+    for (size_t i = 0; i < clptids.size(); i++) {
+        auto p0 = clptids[i];
+        auto p1 = clptids[(i+1)%clptids.size()];
+        if ( (p0 == fcpts[0] and p1 == fcpts[1]) or
+             (p0 == fcpts[1] and p1 == fcpts[0]) ) {
+
+            auto v = pts[(i+1)%clptids.size()] - pts[i];
+            auto n = (point<T,2>({v.y(), -v.x()})).to_vector();
+
+            return orientation*n/n.norm();
+        }
+    }
+
+    throw std::logic_error("face not found");
 }
+
 #endif
 
 template<typename T, size_t DIM>

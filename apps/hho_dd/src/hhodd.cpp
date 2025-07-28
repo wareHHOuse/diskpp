@@ -60,6 +60,8 @@ auto make_projectors(const FineMesh& fmsh, const coarse_mesh_t<FineMesh>& cmsh,
 
     SM gproj = SM(ci*fbs, ncols);
 
+    std::ofstream ofs("face_coeffs.m");
+
     std::vector<triplet> triplets;
     for (auto& ccl : cmsh) {
         /* Coarse cell basis */
@@ -71,7 +73,7 @@ auto make_projectors(const FineMesh& fmsh, const coarse_mesh_t<FineMesh>& cmsh,
         for (const auto& ffc : ffcs) {
 
             auto bi = fmsh.boundary_info(ffc);
-            if ( bi.is_boundary() )
+            if ( bi.is_boundary() and not bi.is_internal() )
                 continue;
 
             /* Fine face basis */
@@ -85,6 +87,18 @@ auto make_projectors(const FineMesh& fmsh, const coarse_mesh_t<FineMesh>& cmsh,
             auto mass = integrate(fmsh, ffc, fphi, fphi);
             decltype(C2F) P = mass.ldlt().solve(C2F)/occs[fcofs_full];
 
+
+            /*
+            auto pts = points(fmsh, ffc);
+            
+            ofs << "line([" << pts[0].x() << "," << pts[1].x() << "], [" << pts[0].y() << "," << pts[1].y() << "], ";
+            if (occs[fcofs_full] == 2)
+                ofs << "'r' );" << std::endl;
+            else
+                ofs << "'k' );" << std::endl;
+            */
+
+            
             for (size_t i = 0; i < fbs; i++) {
                 for (size_t j = 0; j < cbs; j++) {
                     triplets.push_back( {row+i, col+j, P(i,j)} );
@@ -93,9 +107,9 @@ auto make_projectors(const FineMesh& fmsh, const coarse_mesh_t<FineMesh>& cmsh,
         }
     }
     gproj.setFromTriplets( triplets.begin(), triplets.end() );
-    std::ofstream ofs("proj.txt");
-    for (auto& t : triplets)
-        ofs << t.row()+1 << " " << t.col()+1 << " " << t.value() << std::endl;
+    //std::ofstream ofs("proj.txt");
+    //for (auto& t : triplets)
+    //    ofs << t.row()+1 << " " << t.col()+1 << " " << t.value() << std::endl;
 
     triplets.clear();
 
@@ -284,7 +298,7 @@ diffusion_solver(const disk::simplicial_mesh<T,2>& msh, const solver_config& scf
         disk::sparse_matrix<T> Ac;
         mumps_solver<T> solverAc;
         if (scfg.use_twolevel) {
-            Ac = proj.transpose() * assm.LHS * proj;
+            Ac = proj.transpose() * (assm.LHS * proj);
             solverAc.factorize(Ac);
         }
 
@@ -306,7 +320,17 @@ diffusion_solver(const disk::simplicial_mesh<T,2>& msh, const solver_config& scf
             }
 
             disk::dynamic_vector<T> e = solverLHS.solve(r);
+            
+            //e2 = proj * (proj.transpose() * e);
 
+            
+            //disk::dynamic_vector<T> lc = proj.transpose() * assm.RHS;
+            //disk::dynamic_vector<T> sol_uc = solverAc.solve( lc );
+            
+            //sol = proj * sol_uc;
+            
+            
+            
             id.residual = r.norm();
             std::cout << "Postprocessing..." << std::endl;
             std::stringstream ss;
@@ -469,7 +493,7 @@ int main(int argc, char **argv)
             } break;
 
         case 'q': { /* coarse space degree */
-            int optval = std::max(1, atoi(optarg));
+            int optval = std::max(0, atoi(optarg));
             scfg.dgdegree = optval;
             } break;
 
