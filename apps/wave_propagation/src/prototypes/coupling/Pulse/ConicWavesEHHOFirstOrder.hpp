@@ -19,7 +19,8 @@ void ConicWavesEHHOFirstOrder(int argc, char **argv){
     sim_data.print_simulation_data();
     timecounter tc, tcit, cpu;
     cpu.tic();
-
+    DBSetDeprecateWarnings(0);
+    
     // ##################################################
     // ################################################## Mesh generation 
     // ##################################################
@@ -73,8 +74,8 @@ void ConicWavesEHHOFirstOrder(int argc, char **argv){
         RealType ly = 5250.0;   
         // size_t nx = 140;
         // size_t ny = 140;
-        size_t nx = 322; // k= 4 -> 224
-        size_t ny = 322;
+        size_t nx = 322/2; // k= 4 -> 224
+        size_t ny = 322/2;
         cartesian_2d_mesh_builder<RealType> mesh_builder(lx, ly, nx, ny);
         mesh_builder.refine_mesh(sim_data.m_n_divs);
         // mesh_builder.set_translation_data(-2500.0, -2500.0);
@@ -101,10 +102,7 @@ void ConicWavesEHHOFirstOrder(int argc, char **argv){
     // ###################################################################### Time controls 
     // ######################################################################
     
-    size_t nt = 10;
-    for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) 
-        nt = sim_data.m_nt_divs;
-    
+    size_t nt = sim_data.m_nt_divs;
     RealType ti = 0.0;
     RealType tf = 0.625;
     RealType dt = (tf-ti)/nt;
@@ -465,7 +463,7 @@ void ConicWavesEHHOFirstOrder(int argc, char **argv){
         
         if (sensors) {
             postprocessor<mesh_type>::record_acoustic_data_elasto_acoustic_four_fields(it, Acoustic_s1_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Acoustic_sensor_1_log);
-            postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(it, Interface_s1_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Interface_sensor_1_log);
+            // postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(it, Interface_s1_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Interface_sensor_1_log);
             postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(it, Elastic_s1_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Elastic_sensor_1_log);
         }
 
@@ -484,7 +482,4 @@ void ConicWavesEHHOFirstOrder(int argc, char **argv){
     std::cout << bold << red << "   TOTAL CPU TIME: " << cpu << std::endl << std::endl;
     
 }
-
-
-
 

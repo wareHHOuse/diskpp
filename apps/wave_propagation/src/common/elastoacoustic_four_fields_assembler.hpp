@@ -604,7 +604,7 @@ public:
         for (auto e_chunk : m_e_material) {
             size_t e_cell_ind = m_e_cell_index[e_chunk.first];
             auto& cell = storage->surfaces[e_chunk.first];
-            Matrix<T, Dynamic, Dynamic> mixed_operator_loc = e_mixed_operator(e_chunk.second,msh,cell,explicit_scheme);
+            Matrix<T, Dynamic, Dynamic> mixed_operator_loc = e_mixed_operator(e_chunk.second, msh, cell, explicit_scheme);
             Matrix<T, Dynamic, 1> f_loc = e_mixed_rhs(msh, cell, e_rhs_fun);
             scatter_e_data(e_cell_ind, msh, cell, mixed_operator_loc, f_loc);
         }
@@ -613,7 +613,7 @@ public:
         for (auto a_chunk : m_a_material) {
             size_t a_cell_ind = m_a_cell_index[a_chunk.first];
             auto& cell = storage->surfaces[a_chunk.first];
-            Matrix<T, Dynamic, Dynamic> mixed_operator_loc = a_mixed_operator(a_chunk.second, msh, cell,explicit_scheme);
+            Matrix<T, Dynamic, Dynamic> mixed_operator_loc = a_mixed_operator(a_chunk.second, msh, cell, explicit_scheme);
             Matrix<T, Dynamic, 1> f_loc = a_mixed_rhs(msh, cell, a_rhs_fun);
             scatter_a_data(a_cell_ind, msh, cell, mixed_operator_loc, f_loc);
         }

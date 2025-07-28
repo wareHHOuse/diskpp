@@ -80,7 +80,7 @@ class dirk_hho_scheme {
     
     void setIterativeSolver() {
         m_iteraive_solver_Q = true;
-        m_analysis.set_iterative_solver(false, 1.0e-2);
+        m_analysis.set_iterative_solver(false, 1.0e-1);
     }
         
     void DecomposeMatrix() {

@@ -3,7 +3,6 @@
 //  Created by Romain Mottier
 
 void IHHOFirstOrder(int argc, char **argv);
-
 void IHHOFirstOrder(int argc, char **argv){
   
     // ##################################################
@@ -92,8 +91,8 @@ void IHHOFirstOrder(int argc, char **argv){
     
     size_t nt = 10;
     for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
-        // nt *= 2;
-        nt = sim_data.m_nt_divs;
+        nt *= 2;
+        // nt = sim_data.m_nt_divs;
     }
     
     RealType ti = 0.0;
@@ -131,7 +130,7 @@ void IHHOFirstOrder(int argc, char **argv){
   
     // Creating HHO approximation spaces and corresponding linear operator
     size_t cell_k_degree = sim_data.m_k_degree;
-    if(sim_data.m_hdg_stabilization_Q){
+    if (sim_data.m_hdg_stabilization_Q){
         cell_k_degree++;
     }
     disk::hho_degree_info hho_di(cell_k_degree, sim_data.m_k_degree);
@@ -174,7 +173,7 @@ void IHHOFirstOrder(int argc, char **argv){
     std::map<size_t,std::pair<size_t,size_t>> interface_cell_pair_indexes;
     
     RealType eps = 1.0e-10;
-    for (auto face_it = msh.faces_begin(); face_it != msh.faces_end(); face_it++){
+    for (auto face_it = msh.faces_begin(); face_it != msh.faces_end(); face_it++) {
         const auto face = *face_it;
         mesh_type::point_type bar = barycenter(msh, face);
         auto fc_id = msh.lookup(face);
@@ -306,7 +305,7 @@ void IHHOFirstOrder(int argc, char **argv){
         std::cout << bold << cyan << "      Matrix decomposed: "; 
         tc.tic();
         dirk_an.ComposeMatrix();
-        bool iteratif_solver = true; // if false load library: source /opt/intel/oneapi/setvars.sh intel64
+        bool iteratif_solver = false; // if false load library: source /opt/intel/oneapi/setvars.sh intel64
         if (iteratif_solver) 
             dirk_an.setIterativeSolver();
         dirk_an.DecomposeMatrix();
@@ -346,6 +345,19 @@ void IHHOFirstOrder(int argc, char **argv){
         postprocessor<mesh_type>::compute_elasto_acoustic_energy_four_field(msh, hho_di, assembler, t, x_dof, energy_file);
 
     std::cout << std::endl;
+
+    bool e_side_Q = true;
+    bool a_side_Q = false;
+    bool sensors = true;
+    std::ostringstream filename_acou;
+    filename_acou << "A_implicit_l_" << sim_data.m_n_divs << "_n_" << sim_data.m_nt_divs << "_k_" << sim_data.m_k_degree << "_s_" << s << ".csv";
+    std::string filename_acou_str = filename_acou.str();
+    std::ofstream Acoustic_sensor_1_log(filename_acou_str);
+    typename mesh_type::point_type Acoustic_s1_pt(0.5, 0.5);
+    std::pair<typename mesh_type::point_type,size_t> Acoustic_s1_pt_cell  = std::make_pair(Acoustic_s1_pt, -1);
+    if (sensors) {
+        postprocessor<mesh_type>::record_acoustic_data_elasto_acoustic_four_fields(0, Acoustic_s1_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Acoustic_sensor_1_log);
+    }
 
     // ##################################################
     // ################################################## Time marching
@@ -417,7 +429,11 @@ void IHHOFirstOrder(int argc, char **argv){
             postprocessor<mesh_type>::compute_elasto_acoustic_energy_four_field(msh, hho_di, assembler, t, x_dof, energy_file);
         }  
         
-        if(it == nt){
+        if (sensors) {
+            postprocessor<mesh_type>::record_acoustic_data_elasto_acoustic_four_fields(it, Acoustic_s1_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Acoustic_sensor_1_log);
+        }
+
+        if (it == nt){
             // Computing errors
             postprocessor<mesh_type>::compute_errors_four_fields_elastoacoustic(msh, hho_di, assembler, x_dof, v_fun, flux_fun, s_v_fun, s_flux_fun, simulation_log);
             postprocessor<mesh_type>::compute_errors_four_fields_elastoacoustic_energy_norm(msh, hho_di, assembler, x_dof, v_fun, flux_fun, s_v_fun, s_flux_fun, simulation_log);

@@ -19,7 +19,8 @@ void ConicWavesIHHOFirstOrder(int argc, char **argv){
     sim_data.print_simulation_data();
     timecounter tc, tcit, cpu;
     cpu.tic();
-
+    DBSetDeprecateWarnings(0);
+    
     // ##################################################
     // ################################################## Mesh generation 
     // ##################################################
@@ -73,8 +74,8 @@ void ConicWavesIHHOFirstOrder(int argc, char **argv){
         RealType ly = 5250.0;   
         // size_t nx = 140;
         // size_t ny = 140;
-        size_t nx = 322; // k= 4 -> 224
-        size_t ny = 322;
+        size_t nx = 322/4; //250;// 322; // k= 4 -> 224
+        size_t ny = 322/4; //175;// 322;
         cartesian_2d_mesh_builder<RealType> mesh_builder(lx, ly, nx, ny);
         mesh_builder.refine_mesh(sim_data.m_n_divs);
         // mesh_builder.set_translation_data(-2500.0, -2500.0);
@@ -100,12 +101,14 @@ void ConicWavesIHHOFirstOrder(int argc, char **argv){
     // ###################################################################### Time controls 
     // ######################################################################
     
-    size_t nt = 10;
-    for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) 
+    size_t nt = sim_data.m_nt_divs;
+    nt = 10;
+    for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
         nt *= 2;
+    }
     
     RealType ti = 0.0;
-    RealType tf = 0.425;
+    RealType tf = 1.0; //0.625; // 0.425;
     RealType dt = (tf-ti)/nt;
     RealType t  = ti;
   
@@ -273,9 +276,9 @@ void ConicWavesIHHOFirstOrder(int argc, char **argv){
         x    = pt.x();
         y    = pt.y();
         xc   = 0.0;
-        yc   = 100.0;
+        yc   = 100.0; // 100.0;
         fc   = 10.0;
-        c    = 10.0;
+        c    = 1.0;
         vp   = 1500.0;
         lp   = vp/fc;
         r    = std::sqrt((x-xc)*(x-xc)+(y-yc)*(y-yc));
@@ -285,11 +288,29 @@ void ConicWavesIHHOFirstOrder(int argc, char **argv){
         disk::static_vector<double, 2> v{vx,vy};
         return v;
     };
-  
+
+    // Acoustic pulse - Heterogeneous domain - Fluide = Eau
+    auto pulse_geophysic_p = [](const disk::mesh<double, 2, disk::generic_mesh_storage<double, 2>>::point_type& pt) -> double {    
+        double x, y, xc, yc, r, wave, vp, lp, fc, c, vx, vy;
+        x    = pt.x();
+        y    = pt.y();
+        xc   = 0.0;
+        yc   = 200.0; // 100.0;
+        fc   = 10.0;
+        c    = 1.0;
+        vp   = 1500.0;
+        lp   = vp/fc;
+        r    = std::sqrt((x-xc)*(x-xc)+(y-yc)*(y-yc));
+        wave = (c)/(std::exp((1.0/(lp*lp))*r*r*M_PI*M_PI));
+        return wave;
+    };
+
     Matrix<RealType, Dynamic, 1> x_dof;
     // Acoustic pulse intialized in pressure 
-    assembler.project_over_cells(msh, x_dof, null_fun, null_flux_fun, null_s_fun, pulse_geophysic_v);
-    assembler.project_over_faces(msh, x_dof, null_fun, null_s_fun);
+    // assembler.project_over_cells(msh, x_dof, null_fun, null_flux_fun, null_s_fun, pulse_geophysic_v);
+    // assembler.project_over_faces(msh, x_dof, null_fun, null_s_fun);
+    assembler.project_over_cells(msh, x_dof, null_fun, null_flux_fun, pulse_geophysic_p, null_fun);
+    assembler.project_over_faces(msh, x_dof, null_fun, pulse_geophysic_p);
     
     // ##################################################
     // ################################################## Solving a first order equation HDG/HHO propagation problem
@@ -302,10 +323,12 @@ void ConicWavesIHHOFirstOrder(int argc, char **argv){
     // DIRK(s) schemes
     int s = 3;
     bool is_sdirk_Q = true;
-    if (is_sdirk_Q) 
+    if (is_sdirk_Q) {
         dirk_butcher_tableau::sdirk_tables(s, a, b, c);
-    else 
+    }
+    else {
         dirk_butcher_tableau::dirk_tables(s, a, b, c);
+    }
     
     std::cout << std::endl;
     std::cout << bold << red << "   ASSEMBLY 2 : " << std::endl;
@@ -367,7 +390,6 @@ void ConicWavesIHHOFirstOrder(int argc, char **argv){
     if (sim_data.m_report_energy_Q) 
         postprocessor<mesh_type>::compute_elasto_acoustic_energy_four_field(msh, hho_di, assembler, t, x_dof, energy_file);
     
-    
     // ##################################################
     // ################################################## Sensors
     // ##################################################
@@ -379,13 +401,13 @@ void ConicWavesIHHOFirstOrder(int argc, char **argv){
     filename_acou << "AP_implicit_l_" << sim_data.m_n_divs << "_n_" << sim_data.m_nt_divs << "_k_" << sim_data.m_k_degree << "_s_" << s << ".csv";
     std::string filename_acou_str = filename_acou.str();
     std::ofstream Acoustic_sensor_1_log(filename_acou_str);
-    typename mesh_type::point_type Acoustic_s1_pt(-2300,  100);
+    typename mesh_type::point_type Acoustic_s1_pt(-2300.0,  100.0);
     std::pair<typename mesh_type::point_type,size_t> Acoustic_s1_pt_cell  = std::make_pair(Acoustic_s1_pt, -1);
     std::ostringstream filename_acou2;
     filename_acou2 << "AV_implicit_l_" << sim_data.m_n_divs << "_n_" << sim_data.m_nt_divs << "_k_" << sim_data.m_k_degree << "_s_" << s << ".csv";
     std::string filename_acou_str2 = filename_acou2.str();
     std::ofstream Acoustic_sensor_2_log(filename_acou_str2);
-    typename mesh_type::point_type Acoustic_s2_pt(-2300,  100);
+    typename mesh_type::point_type Acoustic_s2_pt(-2300.0,  100.0);
     std::pair<typename mesh_type::point_type,size_t> Acoustic_s2_pt_cell  = std::make_pair(Acoustic_s2_pt, -1);
 
     std::ostringstream filename_int;
@@ -417,28 +439,28 @@ void ConicWavesIHHOFirstOrder(int argc, char **argv){
     filename_ela <<  "EV_implicit_l_" << sim_data.m_n_divs << "_n_" << sim_data.m_nt_divs << "_k_" << sim_data.m_k_degree << "_s_" << s << ".csv";
     std::string filename_ela_str = filename_ela.str();
     std::ofstream Elastic_sensor_1_log(filename_ela_str);
-    typename mesh_type::point_type Elastic_s1_pt(-2300,  -200);
+    typename mesh_type::point_type Elastic_s1_pt(-2300.0,  -200.0);
     std::pair<typename mesh_type::point_type,size_t> Elastic_s1_pt_cell = std::make_pair(Elastic_s1_pt, -1);
     std::ostringstream filename_ela2;
     filename_ela2 <<  "ES_implicit_l_" << sim_data.m_n_divs << "_n_" << sim_data.m_nt_divs << "_k_" << sim_data.m_k_degree << "_s_" << s << ".csv";
     std::string filename_ela_str2 = filename_ela2.str();
     std::ofstream Elastic_sensor_2_log(filename_ela_str2);
-    typename mesh_type::point_type Elastic_s2_pt(-2300,  -200);
+    typename mesh_type::point_type Elastic_s2_pt(-2300.0,  -200.0);
     std::pair<typename mesh_type::point_type,size_t> Elastic_s2_pt_cell = std::make_pair(Elastic_s2_pt, -1);
 
     bool sensors = true;
     if (sensors) {
         // Acoustic sensor
         postprocessor<mesh_type>::record_acoustic_data_elasto_acoustic_four_fields(0, Acoustic_s1_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Acoustic_sensor_1_log);
-        postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(0, Acoustic_s2_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Acoustic_sensor_2_log);
+        // postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(0, Acoustic_s2_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Acoustic_sensor_2_log);
         // Interface sensor
-        postprocessor<mesh_type>::record_acoustic_data_elasto_acoustic_four_fields(0, Interface_s1_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Interface_sensor_acoustic_pressure);
-        postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(0, Interface_s3_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Interface_sensor_elastic_velocity);
-        postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(0, Interface_s2_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Interface_sensor_acoustic_velocity);
-        postprocessor<mesh_type>::record_elastic_data_elasto_acoustic_four_fields(0,  Interface_s4_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Interface_sensor_elastic_stress);
+        // postprocessor<mesh_type>::record_acoustic_data_elasto_acoustic_four_fields(0, Interface_s1_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Interface_sensor_acoustic_pressure);
+        // postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(0, Interface_s3_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Interface_sensor_elastic_velocity);
+        // postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(0, Interface_s2_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Interface_sensor_acoustic_velocity);
+        // postprocessor<mesh_type>::record_elastic_data_elasto_acoustic_four_fields(0,  Interface_s4_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Interface_sensor_elastic_stress);
         // Elastic sensor 
         postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(0, Elastic_s1_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Elastic_sensor_1_log);
-        postprocessor<mesh_type>::record_elastic_data_elasto_acoustic_four_fields(0, Elastic_s2_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Elastic_sensor_2_log);
+        // postprocessor<mesh_type>::record_elastic_data_elasto_acoustic_four_fields(0, Elastic_s2_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Elastic_sensor_2_log);
     }
 
     std::cout << std::endl;
@@ -499,15 +521,15 @@ void ConicWavesIHHOFirstOrder(int argc, char **argv){
         if (sensors) {
             // Acoustic sensor
             postprocessor<mesh_type>::record_acoustic_data_elasto_acoustic_four_fields(it, Acoustic_s1_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Acoustic_sensor_1_log);
-            postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(it, Acoustic_s2_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Acoustic_sensor_2_log);
+            // postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(it, Acoustic_s2_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Acoustic_sensor_2_log);
             // Interface sensor
-            postprocessor<mesh_type>::record_acoustic_data_elasto_acoustic_four_fields(it, Interface_s1_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Interface_sensor_acoustic_pressure);
-            postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(it, Interface_s3_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Interface_sensor_elastic_velocity);
-            postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(it, Interface_s2_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Interface_sensor_acoustic_velocity);
-            postprocessor<mesh_type>::record_elastic_data_elasto_acoustic_four_fields(it,  Interface_s4_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Interface_sensor_elastic_stress);
+            // postprocessor<mesh_type>::record_acoustic_data_elasto_acoustic_four_fields(it, Interface_s1_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Interface_sensor_acoustic_pressure);
+            // postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(it, Interface_s3_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Interface_sensor_elastic_velocity);
+            // postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(it, Interface_s2_pt_cell, msh, hho_di, assembler, x_dof, a_side_Q, Interface_sensor_acoustic_velocity);
+            // postprocessor<mesh_type>::record_elastic_data_elasto_acoustic_four_fields(it,  Interface_s4_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Interface_sensor_elastic_stress);
             // Elastic sensor
             postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(it, Elastic_s1_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Elastic_sensor_1_log);
-            postprocessor<mesh_type>::record_elastic_data_elasto_acoustic_four_fields(it, Elastic_s2_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Elastic_sensor_2_log);
+            // postprocessor<mesh_type>::record_elastic_data_elasto_acoustic_four_fields(it, Elastic_s2_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, Elastic_sensor_2_log);
         }
 
         if (sim_data.m_report_energy_Q) 
@@ -522,7 +544,7 @@ void ConicWavesIHHOFirstOrder(int argc, char **argv){
     
     cpu.toc();
     simulation_log << "TOTAL CPU TIME: " << cpu << std::endl;
-    std::cout << bold << red << "   TOTAL CPU TIME: " << cpu << std::endl << std::endl;
+    std::cout << bold << red << "   TOTAL CPU TIME: " << cpu << reset << std::endl << std::endl;
     
 }
 

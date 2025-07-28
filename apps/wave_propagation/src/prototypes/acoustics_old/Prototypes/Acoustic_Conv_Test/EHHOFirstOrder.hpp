@@ -43,7 +43,8 @@ void EHHOFirstOrder(char **argv){
         mesh_builder.set_poly_mesh_file(mesh_files[l]);
         mesh_builder.build_mesh();
         mesh_builder.move_to_mesh_storage(msh);
-    }else{
+    }
+    else {
         RealType lx = 1.0;
         RealType ly = 1.0;
         size_t nx = 2;
@@ -68,7 +69,7 @@ void EHHOFirstOrder(char **argv){
     }
     RealType ti = 0.0;
     RealType tf = 1.0;
-    RealType dt     = (tf-ti)/nt;
+    RealType dt = (tf-ti)/nt;
     
     scal_analytic_functions functions;
     switch (sim_data.m_exact_functions) {
@@ -84,13 +85,13 @@ void EHHOFirstOrder(char **argv){
     }
     
     RealType t = ti;
-    auto exact_vel_fun      = functions.Evaluate_v(t);
-    auto exact_flux_fun     = functions.Evaluate_q(t);
-    auto rhs_fun            = functions.Evaluate_f(t);
+    auto exact_vel_fun  = functions.Evaluate_v(t);
+    auto exact_flux_fun = functions.Evaluate_q(t);
+    auto rhs_fun        = functions.Evaluate_f(t);
     
     // Creating HHO approximation spaces and corresponding linear operator
     size_t cell_k_degree = sim_data.m_k_degree;
-    if(sim_data.m_hdg_stabilization_Q){
+    if(sim_data.m_hdg_stabilization_Q) {
         cell_k_degree++;
     }
     disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
@@ -101,10 +102,10 @@ void EHHOFirstOrder(char **argv){
     tc.tic();
     auto assembler = acoustic_two_fields_assembler<mesh_type>(msh, hho_di, bnd);
     assembler.load_material_data(msh);
-    if(sim_data.m_hdg_stabilization_Q){
+    if (sim_data.m_hdg_stabilization_Q) {
         assembler.set_hdg_stabilization();
     }
-    if(sim_data.m_scaled_stabilization_Q){
+    if (sim_data.m_scaled_stabilization_Q) {
         assembler.set_scaled_stabilization();
     }
     tc.toc();

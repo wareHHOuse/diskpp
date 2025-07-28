@@ -1,5 +1,6 @@
 #include <iostream>
 #include <libgen.h>
+#include <libgen.h>
 #include <fstream>
 #include <vector>
 #include <array>
@@ -57,6 +58,7 @@ using namespace Eigen;
 #include "prototypes/elastic/EElastic_stability.hpp"               // Linear Elasticity
 #include "prototypes/coupling/EHHOFirstOrder_stability.hpp"        // Elasto-Acoustic Coupling                   
 // Convergence test on sinusoidal analytical solution 
+#include "prototypes/acoustic/EAcoustic_conv_test.hpp"             // Explicit Acoustic               
 #include "prototypes/acoustic/IAcoustic_conv_test.hpp"             // Implicit Acoustic               
 #include "prototypes/elastic/IElastic_conv_test.hpp"               // Implicit Elastic 
 #include "prototypes/coupling/Conv_Tests/IHHOFirstOrder.hpp"                // Implicit Coupling                         
@@ -67,6 +69,7 @@ using namespace Eigen;
 #include "prototypes/coupling/Pulse/HeterogeneousIHHOFirstOrder.hpp"        // Implicit Pulse (adimensional)
 #include "prototypes/coupling/Pulse/HeterogeneousEHHOFirstOrder.hpp"        // Explicit Pulse (adimensional)
 #include "prototypes/coupling/Pulse/ConicWavesIHHOFirstOrder.hpp"           // Implicit Pulse (geophysic) 
+#include "prototypes/coupling/Pulse/review_CMAME.hpp"           // Implicit Pulse (geophysic) 
 #include "prototypes/coupling/Pulse/ConicWavesEHHOFirstOrder.hpp"           // Implicit Pulse (geophysic) 
 // Sedimentary Basin
 #include "prototypes/coupling/Basin/BassinIHHOFirstOrder.hpp"               // Implicit Sedimentary Basin
@@ -75,7 +78,7 @@ using namespace Eigen;
 int main(int argc, char **argv){
 
     DBSetDeprecateWarnings(0);
-
+    
     // REGRESSION TESTS
     if (basename(argv[0]) == std::string("name1") ) {
         std::cout << "called with name1" << std::endl;
@@ -98,6 +101,7 @@ int main(int argc, char **argv){
    // EHHOFirstOrder_stability(argc, argv); 
 
 // Convergence test:
+   // EAcousticFirstOrder(argc, argv);
    // IAcoustic_conv_test(argc, argv);
    // IElastic_conv_test(argc, argv);
    // IHHOFirstOrder(argc, argv);
@@ -105,11 +109,13 @@ int main(int argc, char **argv){
    // EHHOFirstOrder(argc, argv);
    // EHHOFirstOrder_conv_tests(argc, argv);
 
-// Pulse:
+// Pulse: 
    // HeterogeneousIHHOFirstOrder(argc, argv); 
    // HeterogeneousEHHOFirstOrder(argc, argv); 
-   ConicWavesIHHOFirstOrder(argc, argv);
+   // ConicWavesIHHOFirstOrder(argc, argv);
+   // ConicWavesIHHOFirstOrder_review(argc, argv);
    // ConicWavesEHHOFirstOrder(argc, argv);
+   ConicWavesEHHOFirstOrder_review(argc, argv);
 
 // Sedimentary basin:
    // BassinIHHOFirstOrder(argc, argv);
