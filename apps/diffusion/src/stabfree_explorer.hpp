@@ -5,6 +5,7 @@
 //#if 0
 namespace disk {
 
+/*
 template<typename T>
 std::vector<typename generic_mesh<T, 2>::face>
 faces(const generic_mesh<T, 2>& msh,
@@ -21,6 +22,7 @@ faces(const generic_mesh<T, 2>& msh,
     }
     return ret;
 }
+*/
 
 template<typename T>
 static_vector<T, 2>
@@ -28,13 +30,33 @@ normal(const generic_mesh<T, 2>& msh,
        const typename generic_mesh<T, 2>::cell& cl,
        const typename generic_mesh<T, 2>::face& fc)
 {
-    auto pts = points(msh, fc);
-    assert(pts.size() == 2);
+    auto pts = points(msh, cl);
+    Eigen::Matrix<T, 3, 3> OM;
+    OM << 1.0, pts[0].x(), pts[0].y(),
+          1.0, pts[1].x(), pts[1].y(),
+          1.0, pts[2].x(), pts[2].y();
 
-    auto v = pts[1] - pts[0];
-    auto n = (point<T,2>({v.y(), -v.x()})).to_vector();
+    double orientation = OM.determinant();
+    orientation /= std::abs(orientation);
 
-    return n/n.norm();
+    auto clptids = cl.point_ids();
+    auto fcpts = fc.point_ids();
+    assert(fcpts.size() == 2);
+
+    for (size_t i = 0; i < clptids.size(); i++) {
+        auto p0 = clptids[i];
+        auto p1 = clptids[(i+1)%clptids.size()];
+        if ( (p0 == fcpts[0] and p1 == fcpts[1]) or
+             (p0 == fcpts[1] and p1 == fcpts[0]) ) {
+
+            auto v = pts[(i+1)%clptids.size()] - pts[i];
+            auto n = (point<T,2>({v.y(), -v.x()})).to_vector();
+
+            return orientation*n/n.norm();
+        }
+    }
+
+    throw std::logic_error("face not found");
 }
 
 }
@@ -59,11 +81,12 @@ struct config {
     size_t          nsamples;
     double          eps;
     int             variant;
+    bool            multi_thread;
 
     config() :
         degree(0), use_stabfree(true), num_vertices(3),
         vertex(0), nsamples(101), eps(0.02),
-        variant(0)
+        variant(0), multi_thread(false)
     {}
 };
 
@@ -84,7 +107,8 @@ sol::table init_config(sol::this_state L) {
         "silo_fn", &config::silo_fn,
         "nsamples", &config::nsamples,
         "eps", &config::eps,
-        "variant", &config::variant
+        "variant", &config::variant,
+        "multi_thread", &config::multi_thread
     );
 
     using T = double;
@@ -118,6 +142,9 @@ operator<<(std::ostream& os, const config& cfg)
         os << "variant:      equal-order" << std::endl;
     if (cfg.variant > 0)
         os << "variant:      mixed-order high" << std::endl;
+
+    os << "multi_thread: " << std::boolalpha << cfg.multi_thread << std::endl;    
+    
     return os;
 }
 
@@ -370,6 +397,99 @@ minimize_step(Mesh& msh)
     #endif
 
 
+template<typename T>
+bool
+is_convex(const std::vector<disk::point<T,2>>& pts)
+{
+    if (pts.size() < 4)
+        return false;
+
+    for (size_t i = 0; i < pts.size(); i++) {
+        auto v0 = pts[(i+1) % pts.size()] - pts[i];
+        auto v1 = pts[(i+2) % pts.size()] - pts[(i+1) % pts.size()];
+
+        if ( det(v0,v1) <= 0 )
+            return true;
+    }
+
+    return false;
+}
+
+
+template<typename T>
+int orientation(const disk::point<T,2>& p, const disk::point<T,2>& q, const disk::point<T,2>& r) {
+    double val = (q.y() - p.y()) * (r.x() - q.x()) -
+                 (q.x() - p.x()) * (r.y() - q.y());
+    if (val == 0.0) return 0;  // colinear
+    return (val > 0.0) ? 1 : 2; // clock or counterclockwise
+}
+
+// Check if point q lies on segment pr
+template<typename T>
+bool onSegment(const disk::point<T,2>& p, const disk::point<T,2>& q, const disk::point<T,2>& r) {
+    return q.x() <= std::max(p.x(), r.x()) && q.x() >= std::min(p.x(), r.x()) &&
+           q.y() <= std::max(p.y(), r.y()) && q.y() >= std::min(p.y(), r.y());
+}
+
+// Check if segments p1q1 and p2q2 intersect
+template<typename T>
+bool segmentsIntersect(const disk::point<T,2>& p1, const disk::point<T,2>& q1,
+                       const disk::point<T,2>& p2, const disk::point<T,2>& q2) {
+    int o1 = orientation(p1, q1, p2);
+    int o2 = orientation(p1, q1, q2);
+    int o3 = orientation(p2, q2, p1);
+    int o4 = orientation(p2, q2, q1);
+
+    // General case
+    if (o1 != o2 && o3 != o4)
+        return true;
+
+    // Special cases
+    if (o1 == 0 && onSegment(p1, p2, q1)) return true;
+    if (o2 == 0 && onSegment(p1, q2, q1)) return true;
+    if (o3 == 0 && onSegment(p2, p1, q2)) return true;
+    if (o4 == 0 && onSegment(p2, q1, q2)) return true;
+
+    return false;
+}
+
+// Check if a polygon is self-intersecting
+template<typename T>
+bool is_self_intersecting(const std::vector<disk::point<T,2>>& polygon) {
+    int n = polygon.size();
+    if (n < 4) return false; // Triangle or less cannot self-intersect
+
+    for (int i = 0; i < n; ++i) {
+        disk::point<T,2> p1 = polygon[i];
+        disk::point<T,2> q1 = polygon[(i + 1) % n];
+
+        for (int j = i + 1; j < n; ++j) {
+            // Skip adjacent segments and same segment
+            if (j == i || (j + 1) % n == i || (i + 1) % n == j)
+                continue;
+
+            disk::point<T,2> p2 = polygon[j];
+            disk::point<T,2> q2 = polygon[(j + 1) % n];
+
+            if (segmentsIntersect(p1, q1, p2, q2))
+                return true;
+        }
+    }
+    return false;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 template<disk::mesh_2D Mesh>
 void explore(Mesh& msh, const config& cfg)
 {
@@ -386,27 +506,77 @@ void explore(Mesh& msh, const config& cfg)
     auto storage = msh.backend_storage();
     auto& mpts = storage->points;
     
-    
+    is_self_intersecting(mpts);
     for(size_t i = 0; i < mpts.size(); i++)
     {
         std::vector<point_type> coords;
         std::vector<double> vals;
-        
+
         auto p0 = mpts[i];
         point_type base(p0.x() - (N/2)*eps, p0.y() - (N/2)*eps);
 
-        for (size_t j = 0; j < N; j++) {
-            std::cout << "\rVertex " << i << ": " << j+1 << "/" << N << std::flush;
-            for (size_t k = 0; k < N; k++) {
-                point_type ofs(eps*j, eps*k);
-                coords.push_back( base+ofs );
-                mpts[i] = base+ofs;
-                vals.push_back( test(msh, cfg) );
-            }
-        }
-        mpts[i] = p0;
-        std::cout << std::endl;
+        if (cfg.multi_thread) {
+            auto nthreads = std::thread::hardware_concurrency();
 
+            std::mutex mtx;
+            auto compute = [&](int tnum) {
+                Mesh mymsh;
+                msh.copy_to(mymsh);
+                auto& my_mpts = mymsh.backend_storage()->points;
+
+                size_t lines_per_proc = std::ceil( double(N)/nthreads );
+                size_t from = tnum * lines_per_proc;
+                size_t to = std::min( (tnum+1)*lines_per_proc, N );
+
+                std::vector<point_type> my_coords;
+                my_coords.reserve( N*lines_per_proc );
+                std::vector<double> my_vals;
+                my_vals.reserve( N*lines_per_proc );
+
+                for (size_t j = from; j < to; j++) {
+                    for (size_t k = 0; k < N; k++) {
+                        point_type ofs(eps*j, eps*k);
+                        my_mpts[i] = base+ofs;
+                        if ( is_self_intersecting(my_mpts) )
+                            continue;
+                        my_coords.push_back( base+ofs );
+                        my_vals.push_back( test(mymsh, cfg) );
+                    }
+                }
+                my_mpts[i] = p0;
+
+                mtx.lock();
+                coords.insert( coords.end(), my_coords.begin(), my_coords.end() );
+                vals.insert( vals.end(), my_vals.begin(), my_vals.end() );
+                mtx.unlock();
+            };
+
+            std::cout << "Started computation with " << nthreads << " threads";
+            std::cout << std::endl;
+
+            std::vector<std::thread> threads;
+            for (size_t i = 0; i < nthreads; i++)
+                threads.push_back( std::thread(compute, i) );
+
+            for (auto& t : threads)
+                t.join();
+        }
+        else {
+            for (size_t j = 0; j < N; j++) {
+                std::cout << "\rVertex " << i << ": " << j+1 << "/" << N << std::flush;
+                for (size_t k = 0; k < N; k++) {
+                    point_type ofs(eps*j, eps*k);
+                    
+                    mpts[i] = base+ofs;
+                    if ( is_self_intersecting(mpts) )
+                        continue;
+                    coords.push_back( base+ofs );
+                    vals.push_back( test(msh, cfg) );
+                }
+            }
+            mpts[i] = p0;
+            std::cout << std::endl;
+        }
 
 
         if (cfg.silo_fn.length() > 0) {
