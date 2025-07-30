@@ -56,7 +56,8 @@ struct solution_functor<Mesh> {
     auto operator()(const point_type& pt) const {
         auto sx = std::sin(M_PI*pt.x());
         auto sy = std::sin(M_PI*pt.y());
-        return sx*sy;
+        //return sx*sy;
+        return sx;
     }
 };
 
@@ -84,7 +85,7 @@ auto make_solution_function(const Mesh& msh)
 }
 
 enum bc {
-    none,   /* zero dirichlet actually */
+    none,
     dirichlet,
     neumann,
 };
@@ -110,7 +111,7 @@ set_boundary(const Mesh& msh, std::vector<bc>& bcs, bc bc_type, size_t bnd)
 template<typename Mesh>
 auto hho_nitsche_reconstruction(const Mesh& msh,
     const typename Mesh::cell_type& cl, size_t degree,
-    typename Mesh::coordinate_type eta)
+    typename Mesh::coordinate_type eta, const std::vector<bc>& bcs)
 {
     using scalar_type = typename Mesh::coordinate_type;
     /* Reconstruction space basis */
@@ -135,17 +136,17 @@ auto hho_nitsche_reconstruction(const Mesh& msh,
     /* Local problem RHS */
     disk::dynamic_matrix<scalar_type> RHS =
         disk::dynamic_matrix<scalar_type>::Zero(rbs, rbs + n_allfacedofs);
-
+    
     auto qps = disk::integrate(msh, cl, 2*degree);
     for (const auto& qp : qps) {
         /* average fixing */
         auto phi = rb.eval_functions(qp.point());
-        K.row(0) += qp.weight() * phi.transpose();
+        //K.row(0) += qp.weight() * phi.transpose();;
         /* (grad(v), grad(w))_T */ 
         auto dphi = rb.eval_gradients(qp.point());
         K += (qp.weight() * dphi) * dphi.transpose();
     }
-
+    bool db = false;
     auto inv_hT = 1.0/diameter(msh, cl);
     for (size_t fcnum = 0; fcnum < fcs.size(); fcnum++) {
         const auto& fc = fcs[fcnum];
@@ -154,14 +155,15 @@ auto hho_nitsche_reconstruction(const Mesh& msh,
         auto ofs = rbs + fbs*fcnum;
         auto fqps = disk::integrate(msh, fc, 2*degree+2);
         auto n = normal(msh, cl, fc);
+        auto fcid = offset(msh, fc);
 
         if (bi.is_boundary()) { /* Do Nitsche if it is a boundary */
-            for (const auto& qp : fqps) {
-                auto phi = rb.eval_functions(qp.point());
-                auto dphi = rb.eval_gradients(qp.point());
-                auto dphi_dot_n = dphi*n;
-                
-                if (bi.id() == 1 or bi.id() == 3) {
+            if (bcs[fcid] == bc::dirichlet) {
+                /* Dirichlet needs all the three "DG" boundary terms*/
+                for (const auto& qp : fqps) {
+                    auto phi = rb.eval_functions(qp.point());
+                    auto dphi = rb.eval_gradients(qp.point());
+                    auto dphi_dot_n = dphi*n;
                     /* (v, grad(w)).n)_F */
                     Nf -= (qp.weight() * dphi_dot_n) * phi.transpose();
                     /* (grad(v).n, w)_F */
@@ -170,6 +172,11 @@ auto hho_nitsche_reconstruction(const Mesh& msh,
                     Nf += (inv_hT*eta*qp.weight() * phi) * phi.transpose();
                 }
             }
+
+            if (bcs[fcid] == bc::neumann) {
+                /* Only stiffness term */
+            }
+
         } else { /* Do std. HHO otherwise */
             for (const auto& qp : fqps) {
                 auto cphi = rb.eval_functions(qp.point());
@@ -213,8 +220,8 @@ hho_nitsche_stabilization(const Mesh& msh,
     T hT = diameter(msh, cl);
     T stabparam = 1.0/hT;
 
-    size_t offset   = cbs;
     for (size_t i = 0; i < fcs.size(); i++) {
+        size_t offset = cbs+i*fbs;
         const auto fc = fcs[i];
         auto bi = msh.boundary_info(fc);
         if (bi.is_boundary()) {
@@ -251,8 +258,6 @@ hho_nitsche_stabilization(const Mesh& msh,
 
         oper.block(0, 0, fbs, cbs) = mass.ldlt().solve(trace);
         data += oper.transpose() * tr * stabparam;
-
-        offset += fbs;
     }
 
     return data;
@@ -325,7 +330,7 @@ hho_nitsche_rhs(const Mesh& msh, const typename Mesh::cell_type& cl,
 }
 
 template<typename Mesh>
-void
+auto
 nitsche_hho_solver(const Mesh& msh, size_t degree, const std::vector<bc>& bcs)
 {
     using scalar_type = typename Mesh::coordinate_type;
@@ -353,7 +358,7 @@ nitsche_hho_solver(const Mesh& msh, size_t degree, const std::vector<bc>& bcs)
     auto lhsfun = make_rhs_function(msh);
 
     for (auto& cl : msh) {
-        auto [R, A] = hho_nitsche_reconstruction(msh, cl, degree, eta);
+        auto [R, A] = hho_nitsche_reconstruction(msh, cl, degree, eta, bcs);
         auto S = hho_nitsche_stabilization(msh, cl, degree);
         disk::dynamic_matrix<scalar_type> lhs = A+S;
 
@@ -373,16 +378,17 @@ nitsche_hho_solver(const Mesh& msh, size_t degree, const std::vector<bc>& bcs)
     }
     assm.finalize();
 
-    std::cout << " Assembly time: " << tc.toc() << std::endl;
-    std::cout << " Unknowns: " << assm.LHS.rows() << " ";
-    std::cout << " Nonzeros: " << assm.LHS.nonZeros() << std::endl;
+    //std::cout << " Assembly time: " << tc.toc() << std::endl;
+    //std::cout << " Unknowns: " << assm.LHS.rows() << " ";
+    //std::cout << " Nonzeros: " << assm.LHS.nonZeros() << std::endl;
     tc.tic();
     disk::dynamic_vector<scalar_type> sol = mumps_lu(assm.LHS, assm.RHS);
-    std::cout << " Solver time: " << tc.toc() << std::endl;
+    //std::cout << " Solver time: " << tc.toc() << std::endl;
     
     std::vector<scalar_type> u_data;
     
-    scalar_type error = 0.0;
+    auto solfun = make_solution_function(msh);
+
     scalar_type L2error = 0.0;
     auto u_sol = make_solution_function(msh);
     tc.tic();
@@ -390,43 +396,68 @@ nitsche_hho_solver(const Mesh& msh, size_t degree, const std::vector<bc>& bcs)
     for (auto& cl : msh)
     {
         const auto& [lhs, rhs] = lcs[cell_i++];
-        //disk::dynamic_vector<T> sol_ana = local_reduction(msh, cl, di, u_sol);
         auto locsolF = assm.take_local_solution(msh, cl, sol);
         auto cbs = disk::scalar_basis_size(degree+1, Mesh::dimension);
         disk::dynamic_vector<scalar_type> locsol =
             disk::static_decondensation(lhs, rhs, locsolF);
         u_data.push_back(locsol(0));
+
+        disk::dynamic_vector<scalar_type> ana_sol =
+            disk::project_function(msh, cl, degree+1, solfun);
+
+        disk::dynamic_vector<scalar_type> diff = ana_sol - locsol.head(cbs);
+
+        auto cb = disk::make_scalar_monomial_basis(msh, cl, degree+1);
+        disk::dynamic_matrix<scalar_type> mass = disk::make_mass_matrix(msh, cl, cb);
+
+        L2error += diff.dot(mass*diff);
     }
-    std::cout << " Postpro time: " << tc.toc() << std::endl;
-    std::cout << " L2-norm error: " << std::sqrt(L2error) << ", ";
-    std::cout << "A-norm error: " << std::sqrt(error) << std::endl;
+    //std::cout << " Postpro time: " << tc.toc() << std::endl;
+    //std::cout << " L2-norm error: " << std::sqrt(L2error) << std::endl;
 
     disk::silo_database silo;
     silo.create("nitsche.silo");
     silo.add_mesh(msh, "mesh");
     silo.add_variable("mesh", "u", u_data, disk::zonal_variable_t);
+
+    return std::sqrt(L2error);
 }
 
 int main(void)
 {
     using T = double;
     using mesh_type = disk::cartesian_mesh<T,2>;
-    mesh_type msh;
-    auto mesher = make_simple_mesher(msh);
-    mesher.refine();
-    mesher.refine();
-    mesher.refine();
-    mesher.refine();
-    mesher.refine();
 
-    disk::renumber_hypercube_boundaries(msh);
 
-    std::vector<bc> bcs;
-    set_boundary(msh, bcs, bc::neumann, 0);
-    set_boundary(msh, bcs, bc::dirichlet, 1);
-    set_boundary(msh, bcs, bc::neumann, 2);
-    set_boundary(msh, bcs, bc::dirichlet, 3);
-    nitsche_hho_solver(msh, 1, bcs);
+    for (size_t k = 0; k < 5; k++) {
+        mesh_type msh;
+        auto mesher = make_simple_mesher(msh);
+        
+        auto prev_err = 0.0;
+        auto prev_h = 0.0;
+
+        std::cout << "Nitsche-HHO(k+1, k), k = " << k << std::endl;
+        for (size_t i = 0; i < 4; i++) {
+            mesher.refine();
+            std::vector<bc> bcs;
+            set_boundary(msh, bcs, bc::neumann, 0);
+            set_boundary(msh, bcs, bc::dirichlet, 1);
+            set_boundary(msh, bcs, bc::neumann, 2);
+            set_boundary(msh, bcs, bc::dirichlet, 3);
+            auto err = nitsche_hho_solver(msh, k, bcs);
+            auto h = disk::average_diameter(msh);
+
+            if (i == 0) {
+                std::cout << "  h = " << h << ", err = " << err << std::endl;
+            }
+            else {
+                auto rate = std::log(prev_err/err)/std::log(prev_h/h);
+                std::cout << "  h = " << h << ", err = " << err << ", rate = " << rate << std::endl;
+            }
+            prev_h = h;
+            prev_err = err;
+        }
+    }
 
     return 0;
 }
