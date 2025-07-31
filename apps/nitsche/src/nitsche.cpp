@@ -21,6 +21,10 @@
 #include "diskpp/common/timecounter.hpp"
 #include "diskpp/output/silo.hpp"
 
+
+/***************************************************************
+ * Sources for the test problems
+ */
 template<typename Mesh>
 struct source_functor;
 
@@ -47,6 +51,9 @@ struct source_functor<Mesh> {
 };
 
 
+/***************************************************************
+ * Analytical solutions for the test problems
+ */
 template<typename Mesh>
 struct solution_functor;
 
@@ -72,6 +79,9 @@ struct solution_functor<Mesh> {
     }
 };
 
+/***************************************************************
+ * Helpers
+ */
 template<typename Mesh>
 auto make_rhs_function(const Mesh& msh)
 {
@@ -83,6 +93,10 @@ auto make_solution_function(const Mesh& msh)
 {
     return solution_functor<Mesh>();
 }
+
+/***************************************************************
+ * Boundary conditions helpers
+ */
 
 enum bc {
     none,
@@ -108,6 +122,9 @@ set_boundary(const Mesh& msh, std::vector<bc>& bcs, bc bc_type, size_t bnd)
     }   
 }
 
+/***************************************************************
+ * Nitsche-HHO reconstruction operator
+ */
 template<typename Mesh>
 auto hho_nitsche_reconstruction(const Mesh& msh,
     const typename Mesh::cell_type& cl, size_t degree,
@@ -129,7 +146,7 @@ auto hho_nitsche_reconstruction(const Mesh& msh,
     disk::dynamic_matrix<scalar_type> K =
         disk::dynamic_matrix<scalar_type>::Zero(rbs, rbs);
 
-    /* Nitsche contributions */
+    /* Nitsche contributions (consistency, symmetry, penalization) */
     disk::dynamic_matrix<scalar_type> Nf =
         disk::dynamic_matrix<scalar_type>::Zero(rbs, rbs);
     
@@ -139,14 +156,11 @@ auto hho_nitsche_reconstruction(const Mesh& msh,
     
     auto qps = disk::integrate(msh, cl, 2*degree);
     for (const auto& qp : qps) {
-        /* average fixing */
-        auto phi = rb.eval_functions(qp.point());
-        //K.row(0) += qp.weight() * phi.transpose();;
         /* (grad(v), grad(w))_T */ 
         auto dphi = rb.eval_gradients(qp.point());
         K += (qp.weight() * dphi) * dphi.transpose();
     }
-    bool db = false;
+
     auto inv_hT = 1.0/diameter(msh, cl);
     for (size_t fcnum = 0; fcnum < fcs.size(); fcnum++) {
         const auto& fc = fcs[fcnum];
@@ -157,9 +171,12 @@ auto hho_nitsche_reconstruction(const Mesh& msh,
         auto n = normal(msh, cl, fc);
         auto fcid = offset(msh, fc);
 
-        if (bi.is_boundary()) { /* Do Nitsche if it is a boundary */
+        if (bi.is_boundary()) { /* Do Nitsche if on a domain boundary */
+
+            /* See chapter 4 of "Mathematical aspects of DG methods"
+             * by Di Pietro & Ern, in particular (4.12) and (4.16). */
             if (bcs[fcid] == bc::dirichlet) {
-                /* Dirichlet needs all the three "DG" boundary terms*/
+                /* Dirichlet needs all the three "SIP-DG" boundary terms*/
                 for (const auto& qp : fqps) {
                     auto phi = rb.eval_functions(qp.point());
                     auto dphi = rb.eval_gradients(qp.point());
@@ -177,7 +194,7 @@ auto hho_nitsche_reconstruction(const Mesh& msh,
                 /* Only stiffness term */
             }
 
-        } else { /* Do std. HHO otherwise */
+        } else { /* Do standard HHO if not on a domain boundary */
             for (const auto& qp : fqps) {
                 auto cphi = rb.eval_functions(qp.point());
                 auto fphi = fb.eval_functions(qp.point());
@@ -192,6 +209,9 @@ auto hho_nitsche_reconstruction(const Mesh& msh,
     disk::dynamic_matrix<scalar_type> Nt = K + Nf;
     RHS.block(0, 0, rbs, rbs) += Nt;
 
+    /* We didn't do any kind of average fixing: we rely on LDLT to
+     * have one. This point must be clarified a bit to figure out
+     * _which_ one. */
     disk::dynamic_matrix<scalar_type> oper = Nt.ldlt().solve(RHS);
     disk::dynamic_matrix<scalar_type> data = oper.transpose() * Nt * oper;
 
@@ -203,6 +223,10 @@ disk::dynamic_matrix<typename Mesh::coordinate_type>
 hho_nitsche_stabilization(const Mesh& msh,
     const typename Mesh::cell_type& cl, size_t degree)
 {
+    /* Nitsche-HHO as implemented here is mixed-order (k+1 on cells
+     * and k on faces). We use a standard Lehrenfeld-Schoeberl
+     * stabilization. We need to stabilize only on the internal
+     * interfaces, not on the domain boundary. */
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
 
@@ -223,11 +247,14 @@ hho_nitsche_stabilization(const Mesh& msh,
     for (size_t i = 0; i < fcs.size(); i++) {
         size_t offset = cbs+i*fbs;
         const auto fc = fcs[i];
+
+        /* If the face is on the domain boundary, just skip to the next */
         auto bi = msh.boundary_info(fc);
         if (bi.is_boundary()) {
             continue;
         }
 
+        /* Compute standard L-S stabilization otherwise. */
         const auto facdeg = degree;
         const auto fb  = make_scalar_monomial_basis(msh, fc, facdeg);
         const auto fbs = disk::scalar_basis_size(facdeg, Mesh::dimension - 1);
@@ -287,7 +314,6 @@ hho_nitsche_rhs(const Mesh& msh, const typename Mesh::cell_type& cl,
         ret.head(cbs) += qp.weight() * f(qp.point()) * phi;
     }
 
-
     auto inv_hT = 1.0/diameter(msh, cl);
     for (size_t fcnum = 0; fcnum < fcs.size(); fcnum++) {
         const auto& fc = fcs[fcnum];
@@ -303,6 +329,8 @@ hho_nitsche_rhs(const Mesh& msh, const typename Mesh::cell_type& cl,
 
         auto fcid = offset(msh, fc);
 
+        /* Compute the Dirichlet contributions on the RHS.
+         * Same stuff as SIP-DG */
         if (bcs[fcid] == bc::dirichlet) {
             for (const auto& qp : fqps) {
                 auto phi = cb.eval_functions(qp.point());
@@ -316,6 +344,8 @@ hho_nitsche_rhs(const Mesh& msh, const typename Mesh::cell_type& cl,
             }
         }
 
+        /* Compute the Neumann contributions on the RHS.
+         * Same stuff as SIP-DG */
         if (bcs[fcid] == bc::neumann) {
             for (const auto& qp : fqps) {
                 auto phi = cb.eval_functions(qp.point());
