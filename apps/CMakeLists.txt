@@ -113,3 +113,8 @@ if (BUILD_APP_VEM_2D)
     add_subdirectory(vem2d)
 endif()
 
+option(BUILD_APP_NITSCHE "Build Nitsche application" ON)
+if (BUILD_APP_NITSCHE)
+    add_subdirectory(nitsche)
+endif()
+
