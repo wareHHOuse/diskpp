@@ -385,7 +385,7 @@ nitsche_hho_solver(const Mesh& msh, size_t degree, const std::vector<bc>& bcs)
     using VT = disk::dynamic_vector<scalar_type>;
     std::vector<std::pair<MT, VT>> lcs;
 
-    auto lhsfun = make_rhs_function(msh);
+    auto rhsfun = make_rhs_function(msh);
 
     for (auto& cl : msh) {
         auto [R, A] = hho_nitsche_reconstruction(msh, cl, degree, eta, bcs);
@@ -394,7 +394,7 @@ nitsche_hho_solver(const Mesh& msh, size_t degree, const std::vector<bc>& bcs)
 
         disk::dynamic_vector<scalar_type> rhs =
             hho_nitsche_rhs(msh, cl,
-                lhsfun,     // source
+                rhsfun,     // source
                 zerofun,    // dirichlet
                 zerofun,    // neumann
                 degree, eta, bcs);
