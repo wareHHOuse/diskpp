@@ -96,6 +96,8 @@ struct hho_poisson_solver_state
 
     double                      A_norm;
     double                      AS_norm;
+
+    std::vector<std::pair<size_t, disk::hho_degree_info>> hdis;
 };
 
 

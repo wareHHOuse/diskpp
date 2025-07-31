@@ -34,6 +34,7 @@ set(LINK_LIBS ${LINK_LIBS} SOLVER_WRAPPERS)
 
 add_library(diskpp SHARED src/common/util.cpp src/common/mapped_file.cpp src/common/colormanip.cpp)
 target_link_libraries(diskpp ${LINK_LIBS})
+set_target_properties(diskpp PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(diskpp PUBLIC include)
 
 install(TARGETS diskpp DESTINATION lib)

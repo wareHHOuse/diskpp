@@ -246,6 +246,7 @@ faces_id(const simplicial_mesh<T, 2>& msh, const typename simplicial_mesh<T, 2>:
  * @param signed_volume return a signed volume
  * @return T volume of the cell
  */
+/*
 template<typename T>
 T
 measure(const simplicial_mesh<T, 3>& msh,
@@ -268,6 +269,28 @@ measure(const simplicial_mesh<T, 3>& msh,
     }
 
     return vol;
+}
+*/
+
+template<typename T>
+T
+measure(const simplicial_mesh<T, 3>& msh,
+        const typename simplicial_mesh<T, 3>::cell& cl,
+        bool signed_volume = false)
+{
+    auto pts = points(msh, cl);
+    assert(pts.size() == 4);
+
+    const auto v0  = (pts[1] - pts[0]).to_vector();
+    const auto v1  = (pts[2] - pts[0]).to_vector();
+    const auto v2  = (pts[3] - pts[0]).to_vector();
+    
+    const auto vol = v0.dot(v1.cross(v2)) / 6.0;
+
+    if (signed_volume)
+        return vol;
+
+    return std::abs(vol);
 }
 
 template<typename T>

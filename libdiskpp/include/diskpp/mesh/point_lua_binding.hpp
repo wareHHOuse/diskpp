@@ -52,9 +52,9 @@ register_point_usertype(sol::state& lua, const point<T,3>&)
         sol::constructors<point_type(),
             point_type(const T&, const T&, const T&)
             >(),
-        "x", &point_type::template x<T>,
-        "y", &point_type::template y<T>,
-        "z", &point_type::template z<T>
+        "x", sol::resolve<T(void) const>(&point_type::template x<T>),
+        "y", sol::resolve<T(void) const>(&point_type::template y<T>),
+        "z", sol::resolve<T(void) const>(&point_type::template z<T>)
     );
 }
 

@@ -227,6 +227,12 @@ public:
     {
         return m_storage;
     }
+
+    void
+    copyin_storage(std::shared_ptr<Storage> stor)
+    {
+        *m_storage = *stor;
+    }
 };
 
 /* \brif Generic template for a mesh.
@@ -635,6 +641,10 @@ public:
     void statistics(void) const
     {
         this->backend_storage()->statistics();
+    }
+
+    void copy_to(mesh& othermsh) {
+        othermsh.copyin_storage( this->backend_storage() ); 
     }
 };
 
