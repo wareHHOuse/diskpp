@@ -39,6 +39,15 @@ namespace disk
 
 // Bones for the computation of a behavior law at a quadrature point
 
+/* pqrst is there only to squelch -fpermissive
+ * GCC warnings. sorry for this. */
+
+template<typename T, size_t DIM>
+using pqrst = point<T,DIM>;
+
+template<typename T, size_t DIM>
+using qprst = quadrature_point<T,DIM>;
+
 template<typename T, int DIM>
 class law_qp_bones
 {
@@ -51,7 +60,7 @@ class law_qp_bones
 
   protected:
     // coordinat and weight of considered gauss point.
-    point<scalar_type, DIM> m_point;
+    pqrst<scalar_type, DIM> m_point;
     scalar_type             m_weight;
 
     // internal variables at current step
@@ -92,13 +101,13 @@ class law_qp_bones
     {
     }
 
-    quadrature_point<scalar_type, DIM>
+    qprst<scalar_type, DIM>
     quadrature_point() const
     {
         return make_qp(m_point, m_weight);
     }
 
-    point<scalar_type, DIM>
+    auto
     point() const
     {
         return m_point;

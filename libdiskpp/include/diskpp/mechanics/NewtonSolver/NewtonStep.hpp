@@ -71,19 +71,12 @@ class NewtonStep
     typedef vector_boundary_conditions<mesh_type> bnd_type;
     typedef Behavior<mesh_type>                   behavior_type;
 
-    std::vector<vector_type> m_displ, m_displ_faces;
-    std::vector<vector_type> m_velocity, m_acce;
-
     bool m_verbose;
     bool m_convergence;
 
   public:
     NewtonStep(const param_type& rp) : m_verbose(rp.m_verbose), m_convergence(false)
     {
-        m_displ.clear();
-        m_displ_faces.clear();
-        m_velocity.clear();
-        m_acce.clear();
     }
 
     /**
@@ -108,32 +101,6 @@ class NewtonStep
     }
 
     /**
-     * @brief Initialize the initial guess of the Newton's step with a given guess
-     *
-     *  @param initial_displ solution \f$ u_T, u_{\partial T} \f$ for each cell
-     *  @param initial_displ_faces solution \f$ u_{F} \f$ for each face
-     */
-
-    void
-    initialize(const std::vector<vector_type>& initial_displ,
-               const std::vector<vector_type>& initial_displ_faces,
-               const std::vector<vector_type>& initial_velocity,
-               const std::vector<vector_type>& initial_acce)
-    {
-        m_displ_faces.clear();
-        m_displ_faces = initial_displ_faces;
-
-        m_displ.clear();
-        m_displ = initial_displ;
-
-        m_velocity.clear();
-        m_velocity = initial_velocity;
-
-        m_acce.clear();
-        m_acce = initial_acce;
-    }
-
-    /**
      * @brief Compute the Newton's step until convergence or stopped criterion
      *
      * @tparam LoadIncrement Type of the loading function
@@ -142,18 +109,19 @@ class NewtonStep
      * @param stab_precomputed contains the precomputed stabilization operators for HHO methods (can be empty)
      * @return NewtonSolverInfo Informations about the Newton's step during the computation
      */
-    template<typename LoadIncrement>
+    template <typename LoadIncrement>
     NewtonSolverInfo
-    compute(const mesh_type&                 msh,
-            const bnd_type&                  bnd,
-            const param_type&                rp,
-            const MeshDegreeInfo<mesh_type>& degree_infos,
-            const LoadIncrement&             lf,
-            const TimeStep<scalar_type>&     current_step,
-            const std::vector<matrix_type>&  gradient_precomputed,
-            const std::vector<matrix_type>&  stab_precomputed,
-            behavior_type&                   behavior,
-            StabCoeffManager<scalar_type>&   stab_manager)
+    compute(const mesh_type &msh,
+            const bnd_type &bnd,
+            const param_type &rp,
+            const MeshDegreeInfo<mesh_type> &degree_infos,
+            const LoadIncrement &lf,
+            const TimeStep<scalar_type> &current_step,
+            const std::vector<matrix_type> &gradient_precomputed,
+            const std::vector<matrix_type> &stab_precomputed,
+            behavior_type &behavior,
+            StabCoeffManager<scalar_type> &stab_manager,
+            MultiTimeField<scalar_type> &fields)
     {
         NewtonSolverInfo ni;
         timecounter      tc;
@@ -162,7 +130,7 @@ class NewtonStep
         // initialise the NewtonRaphson iteration
         NewtonIteration<mesh_type> newton_iter(msh, bnd, rp, degree_infos, current_step);
 
-        newton_iter.initialize(msh, rp, m_displ, m_displ_faces, m_velocity, m_acce);
+        newton_iter.initialize(msh, fields);
 
         m_convergence = false;
 
@@ -173,7 +141,7 @@ class NewtonStep
             try
             {
                 assembly_info = newton_iter.assemble(
-                  msh, bnd, rp, degree_infos, lf, gradient_precomputed, stab_precomputed, behavior, stab_manager);
+                    msh, bnd, rp, degree_infos, lf, gradient_precomputed, stab_precomputed, behavior, stab_manager, fields);
             }
             catch (const std::invalid_argument& ia)
             {
@@ -201,7 +169,6 @@ class NewtonStep
 
             if (m_convergence)
             {
-                newton_iter.save_solutions(m_displ, m_displ_faces, m_velocity, m_acce);
                 tc.toc();
                 ni.m_time_newton = tc.elapsed();
                 return ni;
@@ -211,7 +178,7 @@ class NewtonStep
             SolveInfo solve_info = newton_iter.solve();
             ni.updateSolveInfo(solve_info);
             // update unknowns
-            ni.m_assembly_info.m_time_postpro += newton_iter.postprocess(msh, bnd, rp, degree_infos);
+            ni.m_assembly_info.m_time_postpro += newton_iter.postprocess(msh, bnd, rp, degree_infos, fields);
 
             ni.m_iter++;
         }
@@ -231,33 +198,6 @@ class NewtonStep
     convergence() const
     {
         return m_convergence;
-    }
-
-    /**
-     * @brief Save solution of the Newton's step
-     *
-     */
-    void
-    save_solutions(std::vector<vector_type>& displ,
-                   std::vector<vector_type>& displ_faces,
-                   std::vector<vector_type>& velocity,
-                   std::vector<vector_type>& acce)
-    {
-        displ_faces.clear();
-        displ_faces = m_displ_faces;
-        assert(m_displ_faces.size() == displ_faces.size());
-
-        displ.clear();
-        displ = m_displ;
-        assert(m_displ.size() == displ.size());
-
-        velocity.clear();
-        velocity = m_velocity;
-        assert(m_velocity.size() == velocity.size());
-
-        acce.clear();
-        acce = m_acce;
-        assert(m_acce.size() == acce.size());
     }
 };
 }

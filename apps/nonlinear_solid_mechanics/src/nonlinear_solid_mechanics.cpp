@@ -58,7 +58,7 @@ run_nl_solid_mechanics_solver(const Mesh<T, 2, Storage>&      msh,
     // Cook with quadrilaterals
     auto zero = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0.0, 0}; };
 
-    auto trac = [material_data](const disk::point<T, 2>& p) -> result_type { return result_type{0.0, 0.3125}; };
+    auto trac = [material_data](const disk::point<T, 2>& p, const T& time) -> result_type { return time*result_type{0.0, 0.3125}; };
 
     bnd.addDirichletBC(disk::CLAMPED, 3, zero);
     bnd.addNeumannBC(disk::NEUMANN, 8, trac);
@@ -132,7 +132,7 @@ run_nl_solid_mechanics_solver(const Mesh<T, 3, Storage>&      msh,
         return 3 * er;
     };
 
-    auto deplr = [material_data](const disk::point<T, 3>& p) -> result_type
+    auto deplr = [material_data](const disk::point<T, 3>& p, const T& time) -> result_type
     {
         result_type er = result_type::Zero();
 
@@ -142,7 +142,7 @@ run_nl_solid_mechanics_solver(const Mesh<T, 3, Storage>&      msh,
 
         er /= er.norm();
 
-        return 0.157 * er;
+        return time*0.157 * er;
     };
 
     // Sphere Hpp

@@ -1,11 +1,11 @@
 /*
  * DISK++, a template library for DIscontinuous SKeletal methods.
- *  
+ *
  * Matteo Cicuttin (C) 2020
  * matteo.cicuttin@uliege.be
  *
  * University of Liège - Montefiore Institute
- * Applied and Computational Electromagnetics group  
+ * Applied and Computational Electromagnetics group
  */
 
 
@@ -260,7 +260,7 @@ curl_reconstruction(const Mesh<T,2,Storage>&                     msh,
     const auto qps = integrate(msh, cl, 2*recdeg);
     for (auto& qp : qps)
     {
-        const auto cphi = rb.eval_curls2(qp.point());
+        const auto cphi = rb.eval_curls(qp.point());
         stiff += qp.weight() * cphi * cphi.transpose();
     }
 
@@ -277,7 +277,7 @@ curl_reconstruction(const Mesh<T,2,Storage>&                     msh,
         const auto qps_f = integrate(msh, fc, 2*recdeg);
         for (auto& qp : qps_f)
         {
-            Matrix<T, Dynamic, 2> cphi      = rb.eval_curls2(qp.point());
+            Matrix<T, Dynamic, 2> cphi      = rb.eval_curls(qp.point());
             Matrix<T, Dynamic, 1> cphi_n    = vcross(cphi, n).block(1,0,rbs-1,1);
             Matrix<T, Dynamic, 1> f_phi     = fb.eval_functions(qp.point());
             Matrix<T, Dynamic, 1> c_phi     = cb.eval_functions(qp.point());
@@ -330,7 +330,7 @@ curl_reconstruction(const Mesh<CoordT,3,Storage>&                     msh,
     const auto qps = integrate(msh, cl, 2*recdeg);
     for (auto& qp : qps)
     {
-        const auto cphi = rb.eval_curls2(qp.point());
+        const auto cphi = rb.eval_curls(qp.point());
         stiff += qp.weight() * cphi * cphi.transpose();
     }
 
@@ -347,7 +347,7 @@ curl_reconstruction(const Mesh<CoordT,3,Storage>&                     msh,
         const auto qps_f = integrate(msh, fc, 2*recdeg);
         for (auto& qp : qps_f)
         {
-            Matrix<scalar_type, Dynamic, 3> cphi      = rb.eval_curls2(qp.point());
+            Matrix<scalar_type, Dynamic, 3> cphi      = rb.eval_curls(qp.point());
             Matrix<scalar_type, Dynamic, 3> cphi_n    = vcross(cphi, n).block(3,0,rbs-3,3);
             Matrix<scalar_type, Dynamic, 3> f_phi     = fb.eval_functions(qp.point());
             Matrix<scalar_type, Dynamic, 3> c_phi     = cb.eval_functions(qp.point());
@@ -378,7 +378,7 @@ maxwell_prj(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     const auto fbs = vector_basis_size(hdi.face_degree(), Mesh::dimension - 1, Mesh::dimension-1);
     const auto cbs = vector_basis_size(hdi.cell_degree(), Mesh::dimension, Mesh::dimension);
-    
+
     const auto fcs = faces(msh, cl);
 
     dynamic_vector<T> ret = dynamic_vector<T>::Zero(cbs+fcs.size() * fbs);
@@ -449,7 +449,7 @@ curl_reconstruction_pk(const Mesh&                       msh,
         const auto r_phi = rb.eval_functions(qp.point());
         mass += qp.weight() * r_phi * r_phi.transpose();
 
-        const auto r_cphi = rb.eval_curls2(qp.point());
+        const auto r_cphi = rb.eval_curls(qp.point());
         const auto c_phi = cb.eval_functions(qp.point());
         cr_rhs.block(0, 0, rbs, cbs) += qp.weight() * r_cphi * c_phi.transpose();
     }
@@ -516,7 +516,7 @@ curl_reconstruction_nedelec(const Mesh&                       msh,
         const auto r_phi = rb.eval_functions(qp.point());
         mass += qp.weight() * r_phi * r_phi.transpose();
 
-        const auto r_cphi = rb.eval_curls2(qp.point());
+        const auto r_cphi = rb.eval_curls(qp.point());
         const auto c_phi = cb.eval_functions(qp.point());
         cr_rhs.block(0, 0, rbs, cbs) += qp.weight() * r_cphi * c_phi.transpose();
     }
@@ -772,7 +772,7 @@ curl_hdg_stabilization(const Mesh<CoordT,3,Storage>&                     msh,
             abort();
         }
 
-        rhs.block(0,0,fbs,cbs) = -llt.solve(trace);   
+        rhs.block(0,0,fbs,cbs) = -llt.solve(trace);
 
         stab += rhs.transpose() * mass * rhs;// / ht;
 
@@ -847,7 +847,7 @@ curl_hdg_stabilization_nedelec(const Mesh<CoordT,3,Storage>&                    
             abort();
         }
 
-        rhs.block(0,0,fbs,cbs) = -llt.solve(trace);   
+        rhs.block(0,0,fbs,cbs) = -llt.solve(trace);
 
         stab += rhs.transpose() * mass * rhs / ht;
 
@@ -921,7 +921,7 @@ curl_Z_stabilization(const Mesh<CoordT,3,Storage>&                     msh,
             Matrix<scalar_type, Dynamic, 3> n_x_phi_x_n = disk::vcross(n, disk::vcross(phi_tmp, n));
 
             /* Evaluate (1/mur)*(∇×Eᵗ)×n */
-            //Matrix<scalar_type, Dynamic, 3> cphi_tmp = cb.eval_curls2(qp.point());
+            //Matrix<scalar_type, Dynamic, 3> cphi_tmp = cb.eval_curls(qp.point());
             //Matrix<scalar_type, Dynamic, 3> cphi_x_n = (1./mur)*disk::vcross(cphi_tmp, n);
 
             Matrix<scalar_type, Dynamic, 3> f_phi = fb.eval_functions(qp.point());
@@ -957,7 +957,7 @@ make_curl_curl_matrix(const Mesh& msh, const Element& elem, const Basis& basis, 
     const auto qps = integrate(msh, elem, 2*(degree+di));
     for (auto& qp : qps)
     {
-        const auto cphi    = basis.eval_curls2(qp.point());
+        const auto cphi    = basis.eval_curls(qp.point());
         ret += qp.weight() * cphi * cphi.transpose();
     }
 
@@ -1017,12 +1017,12 @@ curl_reconstruction_div(const Mesh<T,3,Storage>&                     msh,
     for (auto& qp : qps)
     {
         const auto      Rphi = rb.eval_functions(qp.point());
-        const auto curl_Rphi = rb.eval_curls2(qp.point());
+        const auto curl_Rphi = rb.eval_curls(qp.point());
         const auto  div_Rphi = rb.eval_divergences(qp.point());
-        
+
         const auto      Dphi = db.eval_functions(qp.point());
         const auto grad_Dphi = db.eval_gradients(qp.point());
-        
+
         const Matrix<T, Dynamic, 3>      Cphi = Rphi.block(0, 0, cbs, 3);
         const Matrix<T, Dynamic, 3> curl_Cphi = curl_Rphi.block(0, 0, cbs, 3);
         const Matrix<T, Dynamic, 1>  div_Cphi = div_Rphi.segment(0, cb.size());
@@ -1053,7 +1053,7 @@ curl_reconstruction_div(const Mesh<T,3,Storage>&                     msh,
         {
             Matrix<T, Dynamic, 3> phi           = rb.eval_functions(qp.point());
             Matrix<T, Dynamic, 3> phi_n         = vcross(phi, n);
-            Matrix<T, Dynamic, 3> curl_phi      = rb.eval_curls2(qp.point());
+            Matrix<T, Dynamic, 3> curl_phi      = rb.eval_curls(qp.point());
             Matrix<T, Dynamic, 3> curl_phi_n    = vcross(curl_phi, n);
             Matrix<T, Dynamic, 3> f_phi         = fb.eval_functions(qp.point());
             Matrix<T, Dynamic, 3> c_phi         = cb.eval_functions(qp.point());
@@ -1108,7 +1108,7 @@ curl_hho_stabilization(const Mesh<T,3,Storage>&                     msh,
     const auto num_faces_dofs = fcs.size() * fbs;
 
     matrix_type stab = matrix_type::Zero(cbs + num_faces_dofs, cbs + num_faces_dofs);
-    
+
     matrix_type Rtrace = matrix_type::Zero(cbs, rbs);
 
     auto qps = integrate(msh, cl, 2*recdeg);

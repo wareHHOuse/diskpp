@@ -40,14 +40,27 @@ namespace disk
 
 namespace priv
 {
-inline size_t
-nb_lag(const size_t dim)
-{
-    size_t lag = 1;
-    if (dim == 3)
-        lag = 3;
-    return lag;
-}
+    template <size_t N>
+    inline size_t
+    nb_lag()
+    {
+        static_assert(N != 1);
+        return 0;
+    }
+
+    template <>
+    constexpr size_t
+    nb_lag<2>()
+    {
+        return 1;
+    }
+
+    template <>
+    constexpr size_t
+    nb_lag<3>()
+    {
+        return 3;
+    }
 }
 
 template<typename Mesh>
@@ -77,7 +90,7 @@ make_vector_hho_symmetric_laplacian(const Mesh&                     msh,
 
     const size_t rbs_ho         = rbs - N;
     const size_t num_total_dofs = cbs + num_faces_dofs;
-    const size_t nb_lag         = priv::nb_lag(N);
+    constexpr size_t nb_lag = priv::nb_lag<N>();
 
     matrix_type stiff  = matrix_type::Zero(rbs, rbs);
     matrix_type gr_lhs = matrix_type::Zero(rbs_ho + nb_lag, rbs_ho + nb_lag);
@@ -130,10 +143,43 @@ make_vector_hho_symmetric_laplacian(const Mesh&                     msh,
 
     const auto qps_2 = integrate(msh, cl, recdeg);
 
+    const auto lb = make_scalar_monomial_basis(msh, cl, recdeg);
+
+    matrix_type::Zero(rbs, nb_lag);
+
     matrix_type rot = matrix_type::Zero(rbs, nb_lag);
     for (auto& qp : qps_2)
     {
-        const auto rphi = rb.eval_curls(qp.point());
+        const function_type dphi = lb.eval_gradients(qp.point());
+        Matrix<T, Dynamic, nb_lag> rphi = Matrix<T, Dynamic, nb_lag>::Zero(rbs, N);
+
+        int j = 0;
+        for (size_t i = 0; i < lb.size(); i++)
+        {
+            const auto dphi_i = dphi.row(i);
+            if (N == 2)
+            {
+                rphi(j++) = dphi_i(1);
+                rphi(j++) = -dphi_i(0);
+            }
+            else
+            {
+                // row 1
+                rphi(j, 0) = dphi_i(1);
+                rphi(j, 1) = dphi_i(2);
+                j++;
+                // row 2
+                rphi(j, 0) = -dphi_i(0);
+                rphi(j, 2) = dphi_i(2);
+                j++;
+                // row 3
+                rphi(j, 1) = -dphi_i(0);
+                rphi(j, 2) = -dphi_i(1);
+                j++;
+            }
+        }
+        assert(rbs == j);
+
         rot += qp.weight() * rphi;
     }
     gr_lhs.block(0, rbs_ho, rbs_ho, nb_lag) += rot.bottomLeftCorner(rbs_ho, nb_lag);

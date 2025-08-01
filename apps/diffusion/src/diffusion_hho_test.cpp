@@ -191,7 +191,7 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
         matrix_type ATT = A.block(0,0, cbs, cbs);
         vector_type u_cell = fullsol.block(0,0, cbs, 1);
         vector_type res = ATT * u_cell - rhs;
-        matrix_type mm  = make_mass_matrix(msh, cl, cb, hdi.cell_degree());
+        matrix_type mm  = make_mass_matrix(msh, cl, cb);
         error += res.dot(mm * res);
 
         //auto diff = realsol - fullsol;

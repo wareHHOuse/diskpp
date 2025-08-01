@@ -286,7 +286,7 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
     }
 
     gradient_type
-    eval_curls2(const point_type& pt) const
+    eval_curls(const point_type& pt) const
     {
         gradient_type ret = gradient_type::Zero(basis_size, 2);
 

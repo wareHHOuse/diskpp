@@ -34,33 +34,39 @@
 namespace disk
 {
 
-/**
- * @brief Compute the area of a triangle by using the Kahan formula,
- * which minimize the round-off error
- *
- * @param p0 first point of the triangle
- * @param p1 second point of the triangle
- * @param p2 third point of the triangle
- * @return T area
- */
-template<typename T, size_t N>
-T
-area_triangle_kahan(const point<T, N>& p0, const point<T, N>& p1, const point<T, N>& p2)
-{
-    const T l10 = (p1 - p0).to_vector().norm();
-    const T l20 = (p2 - p0).to_vector().norm();
-    const T l21 = (p2 - p1).to_vector().norm();
+    /**
+     * @brief Compute the area of a triangle by using the Kahan formula,
+     * which minimize the round-off error
+     *https://inria.hal.science/hal-00790071/document
+     *
+     * @param p0 first point of the triangle
+     * @param p1 second point of the triangle
+     * @param p2 third point of the triangle
+     * @return T area
+     */
+    template <typename T, size_t N>
+    T area_triangle_kahan(const point<T, N> &p0, const point<T, N> &p1, const point<T, N> &p2)
+    {
+        const T l10 = (p1 - p0).to_vector().norm();
+        const T l20 = (p2 - p0).to_vector().norm();
+        const T l21 = (p2 - p1).to_vector().norm();
 
-    std::array<T, 3> length = {l10, l20, l21};
+        std::array<T, 3> length = {l10, l20, l21};
 
-    std::sort(length.begin(), length.end());
+        std::sort(length.begin(), length.end());
 
-    const T a = length[2];
-    const T b = length[1];
-    const T c = length[0];
+        const T a = length[2];
+        const T b = length[1];
+        const T c = length[0];
 
-    return T(0.25) * std::sqrt((a + (b + c)) * (c - (a - b)) * (c + (a - b)) * (a + (b - c)));
-}
+        // Minimal assumption on geometry
+        if (a > (b + c))
+        {
+            throw std::runtime_error("Area is negative");
+        }
+
+        return T(0.25) * std::sqrt((((a + (b + c)) * (a + (b - c))) * (c + (a - b))) * (c - (a - b)));
+    }
 
 /**
  * @brief Compute the integration basis in order to map a point from the reference to physcal frame (for a triangle)
@@ -107,11 +113,11 @@ integration_basis(const point<T, N>& p0, const point<T, N>& p1, const point<T, N
 }
 
 /**
- * @brief Compute the volume of a tetrahedron
- *
+ * @brief Compute the volume of a tetrahedron by using the Kahan formula,
+ * which minimize the round-off error
+ * https://people.eecs.berkeley.edu/~wkahan/VtetLang.pdf
  *
  * @tparam T scalar type
- * @tparam N dimension
  * @param p0 first point of the tetrahedron
  * @param p1 second point of the tetrahedron
  * @param p2 third point of the tetrahedron
@@ -123,11 +129,50 @@ template<typename T>
 T
 volume_tetrahedron_kahan(const point<T, 3>& p0, const point<T, 3>& p1, const point<T, 3>& p2, const point<T, 3>& p3)
 {
-    const auto v0 = (p1 - p0).to_vector();
-    const auto v1 = (p2 - p0).to_vector();
-    const auto v2 = (p3 - p0).to_vector();
+    // facial difference = (u-v+w)
+    auto fd = [](const T &u, const T &v, const T &w)
+    { return (std::max(u, w) - v) + std::min(u, w); };
 
-    return std::abs(v0.dot(v1.cross(v2))) / T(6);
+    // lengths of the edges
+    const auto l10 = (p1 - p0).to_vector().norm();
+    const auto l20 = (p2 - p0).to_vector().norm();
+    const auto l30 = (p3 - p0).to_vector().norm();
+
+    const auto l32 = (p3 - p2).to_vector().norm();
+    const auto l31 = (p3 - p1).to_vector().norm();
+    const auto l21 = (p2 - p1).to_vector().norm();
+
+    // sort edges
+    std::array<std::pair<T, T>, 3> length = {
+        std::make_pair(l10, l32),
+        std::make_pair(l20, l31),
+        std::make_pair(l30, l21)};
+
+    std::sort(length.begin(), length.end(), [&](const std::pair<T, T> &va, const std::pair<T, T> &vb)
+              { return (va.first + va.second < vb.first + vb.second); });
+
+    const auto [u, U] = length[2];
+    const auto [v, V] = length[1];
+    const auto [w, W] = length[0];
+
+    // Accurate products
+    const auto X = fd(w, U, v) * (U + v + w);
+    const auto Y = fd(u, V, w) * (V + w + u);
+    const auto Z = fd(v, W, u) * (W + u + v);
+
+    const auto x = fd(U, v, w) * fd(v, w, U);
+    const auto y = fd(V, w, u) * fd(w, u, V);
+    const auto z = fd(W, u, v) * fd(u, v, W);
+
+    // elementary factors
+    const auto xi = std::sqrt(x * Y * Z);
+    const auto eta = std::sqrt(y * Z * X);
+    const auto zeta = std::sqrt(z * X * Y);
+    const auto lambda = std::sqrt(x * y * z);
+
+    const auto det = T(192.) * u * v * w;
+
+    return std::sqrt((xi + eta + zeta - lambda) * (lambda + xi + eta - zeta) * (eta + zeta + lambda - xi) * (zeta + lambda + xi - eta)) / det;
 }
 
 /**
