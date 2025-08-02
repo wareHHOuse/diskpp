@@ -63,7 +63,9 @@ hho_mixedhigh_symlapl(const Mesh& msh,
         auto fcofs = rbs+fbs*fcnum;
         const auto& fc = fcs[fcnum];
         auto bi = msh.boundary_info(fc);
-        if (true or (bi.is_boundary() && bi.id() == 0)) {
+        
+        if (true) {
+        //if (not bi.is_boundary() or (bi.is_boundary() && bi.id() == 0)) {
             auto fb = disk::make_vector_monomial_basis(msh, fc, degree);
             auto n = normal(msh, cl, fc);
             auto fqps = disk::integrate(msh, fc, 2*degree+1);
@@ -78,17 +80,7 @@ hho_mixedhigh_symlapl(const Mesh& msh,
                     disk::priv::outer_product(r_dphi_n, c_phi).bottomRows(rbs-DIM);
             }
         } else {
-            auto n = normal(msh, cl, fc);
-            auto fqps = disk::integrate(msh, fc, 2*degree+1);
-            for (auto& qp : fqps) {
-                auto c_phi = rb.eval_functions(qp.point());
-                auto r_dphi = rb.eval_sgradients(qp.point());
-                auto r_dphi_n = disk::priv::inner_product(r_dphi, (qp.weight()*n).eval());
-                //RHS.block(0, fcofs, rbs-DIM, fbs) +=
-                //    disk::priv::outer_product(r_dphi_n, f_phi).bottomRows(rbs-DIM);
-                //RHS.block(0, 0, rbs-DIM, rbs) -=
-                //    disk::priv::outer_product(r_dphi_n, c_phi).bottomRows(rbs-DIM);
-            }
+            /* Nothing to do */
         }
     }
 
@@ -143,7 +135,8 @@ hho_mixedhigh_divrec(const Mesh& msh,
         const auto& fc = fcs[fcnum];
         
         auto bi = msh.boundary_info(fc);
-        if (true or (bi.is_boundary() && bi.id() == 0)) {   
+        if (true) {
+        //if (not bi.is_boundary() or (bi.is_boundary() && bi.id() == 0)) {   
             auto fb = disk::make_vector_monomial_basis(msh, fc, degree);
             auto n = normal(msh, cl, fc);
             auto fqps = disk::integrate(msh, fc, 2*degree+1);
