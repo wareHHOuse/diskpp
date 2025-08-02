@@ -1,0 +1,249 @@
+template<typename Mesh>
+using DM = disk::dynamic_matrix<typename Mesh::coordinate_type>;
+
+template<typename Mesh>
+using DV = disk::dynamic_vector<typename Mesh::coordinate_type>;
+
+template<typename Mesh>
+auto
+hho_mixedhigh_symlapl(const Mesh& msh,
+    const typename Mesh::cell_type& cl, size_t degree)
+{
+    const static size_t DIM = Mesh::dimension;
+    static_assert(DIM==2 or DIM==3, "Symmetric laplacian: only DIM = 2 or DIM = 3");
+
+    using scalar_type = typename Mesh::coordinate_type;
+    /* Reconstruction space basis */
+    auto rb = disk::make_vector_monomial_basis(msh, cl, degree+1);
+    auto rbs = rb.size();
+
+    auto fcs = faces(msh, cl);
+    auto fbs = disk::vector_basis_size(degree, DIM-1, DIM);
+    auto n_allfacedofs = fcs.size() * fbs;
+
+    /* The local problem has rbs rows, minus the DIM dofs
+     * for constants in each direction, plus the rigid
+     * body constraint (1 row in 2D, 3 rows in 3D) */
+    constexpr auto curldofs = ((DIM == 2) ? 1 : 3);
+    auto lprows = rbs - DIM + curldofs;
+
+    /* Stiffness */
+    disk::dynamic_matrix<scalar_type> K =
+        disk::dynamic_matrix<scalar_type>::Zero(rbs, rbs);
+
+    /* Local problem LHS */
+    disk::dynamic_matrix<scalar_type> LHS =
+        disk::dynamic_matrix<scalar_type>::Zero(lprows, lprows);
+    
+    /* Local problem RHS */
+    disk::dynamic_matrix<scalar_type> RHS =
+        disk::dynamic_matrix<scalar_type>::Zero(lprows, rbs + n_allfacedofs);
+
+    /* (symgrad, symgrad) */
+    auto qps = disk::integrate(msh, cl, 2*degree);
+    for (auto& qp : qps) {
+        auto sym_dphi = rb.eval_sgradients(qp.point());
+        K += qp.weight() * disk::priv::outer_product(sym_dphi, sym_dphi);
+    }
+    LHS.block(0, 0, rbs-DIM, rbs-DIM) = K.bottomRightCorner(rbs-DIM, rbs-DIM);
+    RHS.block(0, 0, rbs-DIM, rbs) = K.bottomRows(rbs-DIM);
+
+    /* Rigid body constraints (LHS), lagrange multiplier then eqn */
+    auto qps_lm = disk::integrate(msh, cl, degree);
+    for (auto& qp : qps_lm) {
+        auto rphi = rb.eval_curls(qp.point());
+        LHS.block(0, LHS.cols()-curldofs, rbs-DIM, curldofs) =
+            rphi.bottomRows(rbs-DIM);
+    }
+    LHS.block(LHS.cols()-curldofs, 0, curldofs, rbs-DIM) =
+        LHS.block(0, LHS.cols()-curldofs, rbs-DIM, curldofs).transpose();
+    
+    /* Now the face stuff */
+    for (size_t fcnum = 0; fcnum < fcs.size(); fcnum++) {
+        auto fcofs = rbs+fbs*fcnum;
+        const auto& fc = fcs[fcnum];
+        auto bi = msh.boundary_info(fc);
+        if (true or (bi.is_boundary() && bi.id() == 0)) {
+            auto fb = disk::make_vector_monomial_basis(msh, fc, degree);
+            auto n = normal(msh, cl, fc);
+            auto fqps = disk::integrate(msh, fc, 2*degree+1);
+            for (auto& qp : fqps) {
+                auto c_phi = rb.eval_functions(qp.point());
+                auto f_phi = fb.eval_functions(qp.point());
+                auto r_dphi = rb.eval_sgradients(qp.point());
+                auto r_dphi_n = disk::priv::inner_product(r_dphi, (qp.weight()*n).eval());
+                RHS.block(0, fcofs, rbs-DIM, fbs) +=
+                    disk::priv::outer_product(r_dphi_n, f_phi).bottomRows(rbs-DIM);
+                RHS.block(0, 0, rbs-DIM, rbs) -=
+                    disk::priv::outer_product(r_dphi_n, c_phi).bottomRows(rbs-DIM);
+            }
+        } else {
+            auto n = normal(msh, cl, fc);
+            auto fqps = disk::integrate(msh, fc, 2*degree+1);
+            for (auto& qp : fqps) {
+                auto c_phi = rb.eval_functions(qp.point());
+                auto r_dphi = rb.eval_sgradients(qp.point());
+                auto r_dphi_n = disk::priv::inner_product(r_dphi, (qp.weight()*n).eval());
+                //RHS.block(0, fcofs, rbs-DIM, fbs) +=
+                //    disk::priv::outer_product(r_dphi_n, f_phi).bottomRows(rbs-DIM);
+                //RHS.block(0, 0, rbs-DIM, rbs) -=
+                //    disk::priv::outer_product(r_dphi_n, c_phi).bottomRows(rbs-DIM);
+            }
+        }
+    }
+
+    Eigen::FullPivLU<disk::dynamic_matrix<scalar_type>> fact(LHS);
+    disk::dynamic_matrix<scalar_type> sol = fact.solve(RHS);
+    //if (fact.info() != Eigen::Success) {
+    //    std::cout << "Symgrad: cannot factorize local matrix" << std::endl;
+    //}
+    disk::dynamic_matrix<scalar_type> oper = sol.topRows(rbs-DIM);
+    disk::dynamic_matrix<scalar_type> data = RHS.topRows(rbs-DIM).transpose()*oper;
+    return std::pair(oper, data);
+}
+
+template<typename Mesh>
+auto
+hho_mixedhigh_divrec(const Mesh& msh,
+    const typename Mesh::cell_type& cl, size_t degree)
+{
+    const static size_t DIM = Mesh::dimension;
+
+    using scalar_type = typename Mesh::coordinate_type;
+    /* Reconstruction space basis */
+    auto rb = disk::make_scalar_monomial_basis(msh, cl, degree+1);
+    auto rbs = rb.size();
+
+    auto cb = disk::make_vector_monomial_basis(msh, cl, degree+1);
+    auto cbs = cb.size();
+
+    auto fcs = faces(msh, cl);
+    auto fbs = disk::vector_basis_size(degree, DIM-1, DIM);
+    auto n_allfacedofs = fcs.size() * fbs;
+
+    disk::dynamic_matrix<scalar_type> LHS =
+        disk::dynamic_matrix<scalar_type>::Zero(rbs, rbs);
+
+    disk::dynamic_matrix<scalar_type> RHS =
+        disk::dynamic_matrix<scalar_type>::Zero(rbs, cbs + n_allfacedofs);
+    
+    auto qps = disk::integrate(msh, cl, 2*degree+2);
+    for (auto& qp : qps) {
+        auto scalphi = rb.eval_functions(qp.point());
+        LHS += qp.weight() * scalphi * scalphi.transpose();
+
+        auto dscalphi = rb.eval_gradients(qp.point());
+        auto vecphi = cb.eval_functions(qp.point());
+
+        RHS.leftCols(cbs) -= qp.weight() * dscalphi * vecphi.transpose();
+    }
+
+    for (size_t fcnum = 0; fcnum < fcs.size(); fcnum++) {
+        auto fcofs = cbs+fbs*fcnum;
+        const auto& fc = fcs[fcnum];
+        
+        auto bi = msh.boundary_info(fc);
+        if (true or (bi.is_boundary() && bi.id() == 0)) {   
+            auto fb = disk::make_vector_monomial_basis(msh, fc, degree);
+            auto n = normal(msh, cl, fc);
+            auto fqps = disk::integrate(msh, fc, 2*degree+1);
+            for (auto& qp : fqps) {
+                auto r_phi = rb.eval_functions(qp.point());
+                auto f_phi = fb.eval_functions(qp.point());
+                
+                RHS.block(0, fcofs, rbs, fbs) +=
+                    qp.weight()*r_phi*(f_phi*n).transpose();
+            }
+        }
+        else {
+            auto n = normal(msh, cl, fc);
+            auto fqps = disk::integrate(msh, fc, 2*degree+2);
+            for (auto& qp : fqps) {
+                auto r_phi = rb.eval_functions(qp.point());
+                auto c_phi = cb.eval_functions(qp.point());
+                
+                RHS.block(0, 0, rbs, cbs) +=
+                    qp.weight()*r_phi*(c_phi*n).transpose();
+            }
+        }
+    }
+
+    Eigen::LLT<disk::dynamic_matrix<scalar_type>> fact(LHS);
+    if (fact.info() != Eigen::Success) {
+        std::cout << "Divrec: cannot factorize local matrix" << std::endl;
+    }
+    disk::dynamic_matrix<scalar_type> oper = fact.solve(RHS);
+    disk::dynamic_matrix<scalar_type> data = RHS.transpose() * oper; 
+
+    return std::pair(oper, data);
+}
+
+template<typename Mesh>
+disk::dynamic_matrix<typename Mesh::coordinate_type>
+vstab(const Mesh& msh,
+    const typename Mesh::cell_type& cl, size_t degree)
+{
+    /* Nitsche-HHO as implemented here is mixed-order (k+1 on cells
+     * and k on faces). We use a standard Lehrenfeld-Schoeberl
+     * stabilization. We need to stabilize only on the internal
+     * interfaces, not on the domain boundary. */
+    using T = typename Mesh::coordinate_type;
+    typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+
+    const auto celdeg = degree+1;
+    const auto cb = disk::make_vector_monomial_basis(msh, cl, celdeg);
+    const auto cbs = cb.size();
+
+    const auto fcs = faces(msh, cl);
+    const auto fbs = disk::vector_basis_size(degree, Mesh::dimension-1, Mesh::dimension);
+    const auto num_faces_dofs = fbs*fcs.size();
+    const auto total_dofs     = cbs + num_faces_dofs;
+
+    matrix_type data = matrix_type::Zero(total_dofs, total_dofs);
+
+    T hT = diameter(msh, cl);
+    T stabparam = 1.0/hT;
+
+    for (size_t i = 0; i < fcs.size(); i++) {
+        size_t offset = cbs+i*fbs;
+        const auto fc = fcs[i];
+
+        auto bi = msh.boundary_info(fc);
+        if (false and (bi.is_boundary() && bi.id() != 0)) {
+            continue;
+        }
+
+        /* Compute standard L-S stabilization otherwise. */
+        const auto facdeg = degree;
+        const auto fb  = make_vector_monomial_basis(msh, fc, facdeg);
+
+        const matrix_type If    = matrix_type::Identity(fbs, fbs);
+        matrix_type       oper  = matrix_type::Zero(fbs, total_dofs);
+        matrix_type       tr    = matrix_type::Zero(fbs, total_dofs);
+        matrix_type       mass  = make_mass_matrix(msh, fc, fb);
+        matrix_type       trace = matrix_type::Zero(fbs, cbs);
+
+        oper.block(0, offset, fbs, fbs) = -If;
+
+        const auto qps = integrate(msh, fc, facdeg + celdeg);
+        for (auto& qp : qps)
+        {
+            const auto c_phi = cb.eval_functions(qp.point());
+            const auto f_phi = fb.eval_functions(qp.point());
+
+            assert(c_phi.rows() == cbs);
+            assert(f_phi.rows() == fbs);
+            assert(c_phi.cols() == f_phi.cols());
+
+            trace += (qp.weight() * f_phi) * c_phi.transpose();
+        }
+
+        tr.block(0, offset, fbs, fbs) = -mass;
+        tr.block(0, 0, fbs, cbs)      = trace;
+
+        oper.block(0, 0, fbs, cbs) = mass.ldlt().solve(trace);
+        data += oper.transpose() * tr * stabparam;
+    }
+
+    return data;
+}
