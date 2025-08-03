@@ -1,3 +1,11 @@
+#pragma once
+#include "asm.hpp"
+
+enum hho_mode {
+    standard,
+    nitsche
+};
+
 template<typename Mesh>
 using DM = disk::dynamic_matrix<typename Mesh::coordinate_type>;
 
@@ -7,7 +15,8 @@ using DV = disk::dynamic_vector<typename Mesh::coordinate_type>;
 template<typename Mesh>
 auto
 hho_mixedhigh_symlapl(const Mesh& msh,
-    const typename Mesh::cell_type& cl, size_t degree)
+    const typename Mesh::cell_type& cl, size_t degree,
+    hho_mode mode, const std::vector<bc>& bcs)
 {
     const static size_t DIM = Mesh::dimension;
     static_assert(DIM==2 or DIM==3, "Symmetric laplacian: only DIM = 2 or DIM = 3");
@@ -63,8 +72,9 @@ hho_mixedhigh_symlapl(const Mesh& msh,
         auto fcofs = rbs+fbs*fcnum;
         const auto& fc = fcs[fcnum];
         auto bi = msh.boundary_info(fc);
-        
-        if (true) {
+        auto fcid = offset(msh, fc);
+        if ( (mode == hho_mode::standard) or
+            ( (mode == hho_mode::nitsche) and bcs[fcid] != bc::neumann ) ) {
         //if (not bi.is_boundary() or (bi.is_boundary() && bi.id() == 0)) {
             auto fb = disk::make_vector_monomial_basis(msh, fc, degree);
             auto n = normal(msh, cl, fc);
@@ -97,7 +107,8 @@ hho_mixedhigh_symlapl(const Mesh& msh,
 template<typename Mesh>
 auto
 hho_mixedhigh_divrec(const Mesh& msh,
-    const typename Mesh::cell_type& cl, size_t degree)
+    const typename Mesh::cell_type& cl, size_t degree,
+    hho_mode mode, const std::vector<bc>& bcs)
 {
     const static size_t DIM = Mesh::dimension;
 
@@ -133,9 +144,10 @@ hho_mixedhigh_divrec(const Mesh& msh,
     for (size_t fcnum = 0; fcnum < fcs.size(); fcnum++) {
         auto fcofs = cbs+fbs*fcnum;
         const auto& fc = fcs[fcnum];
-        
+        auto fcid = offset(msh, fc);
         auto bi = msh.boundary_info(fc);
-        if (true) {
+        if ( (mode == hho_mode::standard) or
+            ( (mode == hho_mode::nitsche) and (bcs[fcid] != bc::neumann) ) ) {
         //if (not bi.is_boundary() or (bi.is_boundary() && bi.id() == 0)) {   
             auto fb = disk::make_vector_monomial_basis(msh, fc, degree);
             auto n = normal(msh, cl, fc);
@@ -174,7 +186,8 @@ hho_mixedhigh_divrec(const Mesh& msh,
 template<typename Mesh>
 disk::dynamic_matrix<typename Mesh::coordinate_type>
 vstab(const Mesh& msh,
-    const typename Mesh::cell_type& cl, size_t degree)
+    const typename Mesh::cell_type& cl, size_t degree,
+    hho_mode mode, const std::vector<bc>& bcs)
 {
     /* Nitsche-HHO as implemented here is mixed-order (k+1 on cells
      * and k on faces). We use a standard Lehrenfeld-Schoeberl
@@ -198,12 +211,14 @@ vstab(const Mesh& msh,
     T stabparam = 1.0/hT;
 
     for (size_t i = 0; i < fcs.size(); i++) {
-        size_t offset = cbs+i*fbs;
+        size_t fcofs = cbs+i*fbs;
         const auto fc = fcs[i];
+        auto fcid = offset(msh, fc);
 
         auto bi = msh.boundary_info(fc);
-        if (false and (bi.is_boundary() && bi.id() != 0)) {
-            continue;
+        if ( (mode == hho_mode::nitsche) and 
+             bi.is_boundary() and (bcs[fcid] == bc::neumann) ) {
+                continue;
         }
 
         /* Compute standard L-S stabilization otherwise. */
@@ -216,7 +231,7 @@ vstab(const Mesh& msh,
         matrix_type       mass  = make_mass_matrix(msh, fc, fb);
         matrix_type       trace = matrix_type::Zero(fbs, cbs);
 
-        oper.block(0, offset, fbs, fbs) = -If;
+        oper.block(0, fcofs, fbs, fbs) = -If;
 
         const auto qps = integrate(msh, fc, facdeg + celdeg);
         for (auto& qp : qps)
@@ -231,7 +246,7 @@ vstab(const Mesh& msh,
             trace += (qp.weight() * f_phi) * c_phi.transpose();
         }
 
-        tr.block(0, offset, fbs, fbs) = -mass;
+        tr.block(0, fcofs, fbs, fbs) = -mass;
         tr.block(0, 0, fbs, cbs)      = trace;
 
         oper.block(0, 0, fbs, cbs) = mass.ldlt().solve(trace);

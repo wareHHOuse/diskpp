@@ -9,6 +9,7 @@
  */
 
 #include <iostream>
+#include <algorithm>
 
 #include "diskpp/mesh/mesh.hpp"
 #include "diskpp/mesh/meshgen.hpp"
@@ -22,6 +23,7 @@
 #include "diskpp/output/silo.hpp"
 #include "operators.hpp"
 #include "diskpp/solvers/solver.hpp"
+#include "asm.hpp"
 
 template<typename Mesh>
 class condensed_assembler {
@@ -241,27 +243,42 @@ int main(int argc, char **argv) {
 
     using T = double;
     //using mesh_type = disk::simplicial_mesh<T,2>;
-    using mesh_type = disk::cartesian_mesh<T,2>;
-    //using mesh_type = disk::simplicial_mesh<T,3>;
+    //using mesh_type = disk::cartesian_mesh<T,2>;
+    using mesh_type = disk::simplicial_mesh<T,3>;
 
     mesh_type msh;
     auto mesher = make_simple_mesher(msh);
     mesher.refine();
     mesher.refine();
     mesher.refine();
-    //mesher.refine();
+    mesher.refine();
     //mesher.refine();
 
-    size_t degree = 1;
+    size_t degree = 2;
 
     const static size_t DIM = mesh_type::dimension;
     auto fbs = disk::vector_basis_size(degree, DIM-1, DIM);
 
+    hho_mode mode = hho_mode::nitsche;
+
+    std::vector<bc> bcs;
+    set_boundary(msh, bcs, bc::dirichlet, 0);
+    set_boundary(msh, bcs, bc::neumann, 1);
+    set_boundary(msh, bcs, bc::neumann, 2);
+    set_boundary(msh, bcs, bc::neumann, 3);
+
     std::vector<bool> dirfaces;
-    set_dirichlet(msh, dirfaces, 0);
-    //set_dirichlet(msh, dirfaces, 1);
-    //set_dirichlet(msh, dirfaces, 2);
-    //set_dirichlet(msh, dirfaces, 3);
+    dirfaces.resize( bcs.size() );
+
+    auto df = [&](bc b) {
+        if (mode == hho_mode::standard) {
+            return b == bc::dirichlet;
+        }
+        
+        return (b == bc::dirichlet) or (b == bc::neumann);
+    };
+
+    std::transform(bcs.begin(), bcs.end(), dirfaces.begin(), df);
 
     condensed_assembler assm(msh, fbs, dirfaces);
 
@@ -277,10 +294,10 @@ int main(int argc, char **argv) {
     tc.tic();
     std::cout << "ASM: " << std::flush;
     for (auto& cl : msh) {
-        auto [SGR, Asgr] = hho_mixedhigh_symlapl(msh, cl, degree);
-        auto [DR, Adr] = hho_mixedhigh_divrec(msh, cl, degree);
+        auto [SGR, Asgr] = hho_mixedhigh_symlapl(msh, cl, degree, mode, bcs);
+        auto [DR, Adr] = hho_mixedhigh_divrec(msh, cl, degree, mode, bcs);
         disk::hho_degree_info hdi(degree+1, degree);
-        auto S = vstab(msh, cl, degree);
+        auto S = vstab(msh, cl, degree, mode, bcs);
 
         MT lhs = 2*mu*Asgr + lambda*Adr + 2*mu*S;
         auto cb = disk::make_vector_monomial_basis(msh, cl, degree+1);
