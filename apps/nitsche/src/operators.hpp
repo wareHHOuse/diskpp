@@ -73,9 +73,16 @@ hho_mixedhigh_symlapl(const Mesh& msh,
         const auto& fc = fcs[fcnum];
         auto bi = msh.boundary_info(fc);
         auto fcid = offset(msh, fc);
-        if ( (mode == hho_mode::standard) or
-            ( (mode == hho_mode::nitsche) and bcs[fcid] != bc::neumann ) ) {
-        //if (not bi.is_boundary() or (bi.is_boundary() && bi.id() == 0)) {
+
+        /* Dirichlet boundary conditions are always applied HHO-style,
+         * so we don't need to add additional face-based terms to the
+         * bilinear form and we do not have user-specified penalization
+         * parameter. Neumann boundary conditions are applied either
+         * HHO-style or Nitsche-style, depending on the user choice.
+         * Don't forget boundary HHO terms on the internal interfaces.*/
+        bool std_hho = (mode == hho_mode::standard);
+        bool nitsche_not_neumann = (mode == hho_mode::nitsche) and (bcs[fcid] != bc::neumann);
+        if (std_hho or nitsche_not_neumann) {
             auto fb = disk::make_vector_monomial_basis(msh, fc, degree);
             auto n = normal(msh, cl, fc);
             auto fqps = disk::integrate(msh, fc, 2*degree+1);
@@ -146,9 +153,15 @@ hho_mixedhigh_divrec(const Mesh& msh,
         const auto& fc = fcs[fcnum];
         auto fcid = offset(msh, fc);
         auto bi = msh.boundary_info(fc);
-        if ( (mode == hho_mode::standard) or
-            ( (mode == hho_mode::nitsche) and (bcs[fcid] != bc::neumann) ) ) {
-        //if (not bi.is_boundary() or (bi.is_boundary() && bi.id() == 0)) {   
+        /* Dirichlet boundary conditions are always applied HHO-style,
+         * so we don't need to add additional face-based terms to the
+         * bilinear form and we do not have user-specified penalization
+         * parameter. Neumann boundary conditions are applied either
+         * HHO-style or Nitsche-style, depending on the user choice.
+         * Don't forget boundary HHO terms on the internal interfaces.*/
+         bool std_hho = (mode == hho_mode::standard);
+         bool nitsche_not_neumann = (mode == hho_mode::nitsche) and (bcs[fcid] != bc::neumann);
+         if (std_hho or nitsche_not_neumann) {   
             auto fb = disk::make_vector_monomial_basis(msh, fc, degree);
             auto n = normal(msh, cl, fc);
             auto fqps = disk::integrate(msh, fc, 2*degree+1);
@@ -161,6 +174,8 @@ hho_mixedhigh_divrec(const Mesh& msh,
             }
         }
         else {
+            /* Divergence reconstruction needs to be adjusted
+             * on Nitsche-Neumann boundaries */
             auto n = normal(msh, cl, fc);
             auto fqps = disk::integrate(msh, fc, 2*degree+2);
             for (auto& qp : fqps) {
@@ -218,7 +233,12 @@ vstab(const Mesh& msh,
         auto bi = msh.boundary_info(fc);
         if ( (mode == hho_mode::nitsche) and 
              bi.is_boundary() and (bcs[fcid] == bc::neumann) ) {
-                continue;
+            /* Nitsche-HHO boundary faces don't need stabilization
+             * contributions, as there are no face unknowns there.
+             * All other faces do (remember that we do Dirichlet
+             * HHO-style)
+             */
+            continue;
         }
 
         /* Compute standard L-S stabilization otherwise. */
