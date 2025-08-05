@@ -120,8 +120,8 @@ int main(int argc, char **argv) {
 
     std::cout << "mu = " << mu << ", lambda = " << lambda << std::endl; 
 
-    using mesh_type = disk::simplicial_mesh<T,2>;
-    //using mesh_type = disk::cartesian_mesh<T,2>;
+    //using mesh_type = disk::simplicial_mesh<T,2>;
+    using mesh_type = disk::cartesian_mesh<T,2>;
     //using mesh_type = disk::generic_mesh<T,2>;
     //using mesh_type = disk::simplicial_mesh<T,3>;
     using point_type = typename mesh_type::point_type;
@@ -177,6 +177,7 @@ int main(int argc, char **argv) {
         auto [SGR, Asgr] = hho_mixedhigh_symlapl(msh, cl, degree, mode, bcs);
         auto [DR, Adr] = hho_mixedhigh_divrec(msh, cl, degree, mode, bcs);
         disk::hho_degree_info hdi(degree+1, degree);
+        //auto S = disk::make_vector_hho_stabilization(msh, cl, SGR, hdi);
         auto S = vstab(msh, cl, degree, mode, bcs);
 
         MT lhs = 2*mu*Asgr + lambda*Adr + 2*mu*S;
@@ -190,14 +191,14 @@ int main(int argc, char **argv) {
         f(0) = fx;
         f(1) = fy;
 
-        /*        
-        f *= 10;
+
+        /*
         for (auto& qp : qps) {
             auto phi = cb.eval_functions(qp.point());
             rhs.head(cbs) += qp.weight() * (phi * f);
         }
         */
-        
+
         auto fcs = faces(msh, cl);
         for (size_t fcnum = 0; fcnum < fcs.size(); fcnum++) {
             const auto& fc = fcs[fcnum];
@@ -237,8 +238,9 @@ int main(int argc, char **argv) {
 
     tc.tic();
     std::cout << "MUMPS: " << std::flush;
-    disk::dynamic_vector<T> sol = mumps_lu(assm.LHS, assm.RHS);
-    
+    //disk::dynamic_vector<T> sol = mumps_lu(assm.LHS, assm.RHS);
+    Eigen::SparseLU<Eigen::SparseMatrix<T>> solver(assm.LHS);
+    disk::dynamic_vector<T> sol = solver.solve(assm.RHS);
     /*
     disk::dynamic_vector<T> sol = assm.RHS;
     disk::solvers::conjugated_gradient_params<T> cgp;
@@ -257,7 +259,6 @@ int main(int argc, char **argv) {
     {
         const auto& [lhs, rhs] = lcs[cell_i];
         auto locsolF = assm.take_local_solution(msh, cl, sol);
-        auto cbs = disk::scalar_basis_size(degree+1, DIM);
         disk::dynamic_vector<T> locsol =
             disk::static_decondensation(lhs, rhs, locsolF);
         

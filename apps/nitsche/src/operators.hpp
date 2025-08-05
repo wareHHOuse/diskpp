@@ -26,6 +26,9 @@ hho_mixedhigh_symlapl(const Mesh& msh,
     auto rb = disk::make_vector_monomial_basis(msh, cl, degree+1);
     auto rbs = rb.size();
 
+    auto cb = disk::make_vector_monomial_basis(msh, cl, degree+1);
+    auto cbs = cb.size();
+
     auto fcs = faces(msh, cl);
     auto fbs = disk::vector_basis_size(degree, DIM-1, DIM);
     auto n_allfacedofs = fcs.size() * fbs;
@@ -46,7 +49,7 @@ hho_mixedhigh_symlapl(const Mesh& msh,
     
     /* Local problem RHS */
     disk::dynamic_matrix<scalar_type> RHS =
-        disk::dynamic_matrix<scalar_type>::Zero(lprows, rbs + n_allfacedofs);
+        disk::dynamic_matrix<scalar_type>::Zero(lprows, cbs + n_allfacedofs);
 
     /* (symgrad, symgrad) */
     auto qps = disk::integrate(msh, cl, 2*degree);
@@ -55,7 +58,7 @@ hho_mixedhigh_symlapl(const Mesh& msh,
         K += qp.weight() * disk::priv::outer_product(sym_dphi, sym_dphi);
     }
     LHS.block(0, 0, rbs-DIM, rbs-DIM) = K.bottomRightCorner(rbs-DIM, rbs-DIM);
-    RHS.block(0, 0, rbs-DIM, rbs) = K.bottomRows(rbs-DIM);
+    RHS.block(0, 0, rbs-DIM, cbs) = K.block(DIM, 0, rbs-DIM, cbs);
 
     /* Rigid body constraints (LHS), lagrange multiplier then eqn */
     auto qps_lm = disk::integrate(msh, cl, degree);
@@ -69,7 +72,7 @@ hho_mixedhigh_symlapl(const Mesh& msh,
     
     /* Now the face stuff */
     for (size_t fcnum = 0; fcnum < fcs.size(); fcnum++) {
-        auto fcofs = rbs+fbs*fcnum;
+        auto fcofs = cbs+fbs*fcnum;
         const auto& fc = fcs[fcnum];
         auto bi = msh.boundary_info(fc);
         auto fcid = offset(msh, fc);
@@ -87,14 +90,14 @@ hho_mixedhigh_symlapl(const Mesh& msh,
             auto n = normal(msh, cl, fc);
             auto fqps = disk::integrate(msh, fc, 2*degree+1);
             for (auto& qp : fqps) {
-                auto c_phi = rb.eval_functions(qp.point());
+                auto c_phi = cb.eval_functions(qp.point());
                 auto f_phi = fb.eval_functions(qp.point());
                 auto r_dphi = rb.eval_sgradients(qp.point());
                 auto r_dphi_n = disk::priv::inner_product(r_dphi, (qp.weight()*n).eval());
                 RHS.block(0, fcofs, rbs-DIM, fbs) +=
                     disk::priv::outer_product(r_dphi_n, f_phi).bottomRows(rbs-DIM);
-                RHS.block(0, 0, rbs-DIM, rbs) -=
-                    disk::priv::outer_product(r_dphi_n, c_phi).bottomRows(rbs-DIM);
+                RHS.block(0, 0, rbs-DIM, cbs) -=
+                    disk::priv::outer_product(r_dphi_n, c_phi).block(DIM, 0, rbs-DIM, cbs);
             }
         } else {
             /* Nothing to do */
@@ -211,8 +214,7 @@ vstab(const Mesh& msh,
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
 
-    const auto celdeg = degree+1;
-    const auto cb = disk::make_vector_monomial_basis(msh, cl, celdeg);
+    const auto cb = disk::make_vector_monomial_basis(msh, cl, degree+1);
     const auto cbs = cb.size();
 
     const auto fcs = faces(msh, cl);
@@ -229,6 +231,7 @@ vstab(const Mesh& msh,
         size_t fcofs = cbs+i*fbs;
         const auto fc = fcs[i];
         auto fcid = offset(msh, fc);
+        stabparam = 1./diameter(msh, fc);
 
         auto bi = msh.boundary_info(fc);
         if ( (mode == hho_mode::nitsche) and 
@@ -242,18 +245,14 @@ vstab(const Mesh& msh,
         }
 
         /* Compute standard L-S stabilization otherwise. */
-        const auto facdeg = degree;
-        const auto fb  = make_vector_monomial_basis(msh, fc, facdeg);
+        const auto fb  = make_vector_monomial_basis(msh, fc, degree);
 
         const matrix_type If    = matrix_type::Identity(fbs, fbs);
         matrix_type       oper  = matrix_type::Zero(fbs, total_dofs);
-        matrix_type       tr    = matrix_type::Zero(fbs, total_dofs);
-        matrix_type       mass  = make_mass_matrix(msh, fc, fb);
+        matrix_type       mass  = matrix_type::Zero(fbs, fbs);
         matrix_type       trace = matrix_type::Zero(fbs, cbs);
 
-        oper.block(0, fcofs, fbs, fbs) = -If;
-
-        const auto qps = integrate(msh, fc, facdeg + celdeg);
+        const auto qps = integrate(msh, fc, 2*degree+1);
         for (auto& qp : qps)
         {
             const auto c_phi = cb.eval_functions(qp.point());
@@ -262,15 +261,13 @@ vstab(const Mesh& msh,
             assert(c_phi.rows() == cbs);
             assert(f_phi.rows() == fbs);
             assert(c_phi.cols() == f_phi.cols());
-
+            mass += (qp.weight() * f_phi) * f_phi.transpose();
             trace += (qp.weight() * f_phi) * c_phi.transpose();
         }
 
-        tr.block(0, fcofs, fbs, fbs) = -mass;
-        tr.block(0, 0, fbs, cbs)      = trace;
-
         oper.block(0, 0, fbs, cbs) = mass.ldlt().solve(trace);
-        data += oper.transpose() * tr * stabparam;
+        oper.block(0, fcofs, fbs, fbs) = -If;
+        data += oper.transpose() * mass * oper * stabparam;
     }
 
     return data;
