@@ -85,8 +85,9 @@ int main(int argc, char **argv) {
     T fx = 0.0;
     T fy = 0.0;
     bool do_cook = false;
+    bool compute_cond = false;
 
-    while ((opt = getopt(argc, argv, "k:m:l:r:g:ncx:y:")) != -1) {
+    while ((opt = getopt(argc, argv, "k:m:l:r:g:ncCx:y:")) != -1) {
         switch (opt) {
         case 'k': /* method order */
             degree = std::max(1, std::stoi(optarg));
@@ -106,6 +107,9 @@ int main(int argc, char **argv) {
         case 'c':
             do_cook = true;
             break;
+        case 'C':
+            compute_cond = true;
+            break;
         case 'x':
             fx = std::stod(optarg);
             break;
@@ -121,8 +125,8 @@ int main(int argc, char **argv) {
     std::cout << "mu = " << mu << ", lambda = " << lambda << std::endl; 
 
     //using mesh_type = disk::simplicial_mesh<T,2>;
-    using mesh_type = disk::cartesian_mesh<T,2>;
-    //using mesh_type = disk::generic_mesh<T,2>;
+    //using mesh_type = disk::cartesian_mesh<T,2>;
+    using mesh_type = disk::generic_mesh<T,2>;
     //using mesh_type = disk::simplicial_mesh<T,3>;
     using point_type = typename mesh_type::point_type;
 
@@ -254,6 +258,8 @@ int main(int argc, char **argv) {
 
     std::cout << tc.toc() << std::endl;
 
+    std::vector<T> conditioning;
+
     size_t cell_i = 0;
     for (auto& cl : msh)
     {
@@ -267,6 +273,11 @@ int main(int argc, char **argv) {
         if constexpr (DIM == 3) {
             u_data(cell_i, 2) = locsol(2);
         }
+
+        if (compute_cond) {
+            constexpr auto dimker = (DIM == 2) ? 3 : 6;
+            conditioning.push_back( cond(lhs, dimker) );
+        }
         cell_i++;
     }
 
@@ -274,6 +285,9 @@ int main(int argc, char **argv) {
     silo.create("linelast.silo");
     silo.add_mesh(msh, "mesh");
     silo.add_variable("mesh", "u", u_data, disk::zonal_variable_t);
+    if (compute_cond) {
+        silo.add_variable("mesh", "cond", conditioning, disk::zonal_variable_t);
+    }
 
     return 0;
 }

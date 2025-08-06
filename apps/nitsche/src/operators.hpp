@@ -6,6 +6,30 @@ enum hho_mode {
     nitsche
 };
 
+template<typename T>
+Eigen::Matrix<T, Eigen::Dynamic, 1>
+cross(const Eigen::Matrix<T, 2, 1>& n, const Eigen::Matrix<T, Eigen::Dynamic, 2>& phi)
+{
+    Eigen::Matrix<T, Eigen::Dynamic, 1> ret =
+        Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero( phi.rows() );
+    for (size_t i = 0; i < phi.rows(); i++) {
+        ret(i) = n(0)*phi(i,1) - n(1)*phi(i,0);
+    }
+    return ret;
+}
+
+template<typename T>
+Eigen::Matrix<T, Eigen::Dynamic, 3>
+cross(const Eigen::Matrix<T, 3, 1>& n, const Eigen::Matrix<T, Eigen::Dynamic, 3>& phi)
+{
+    Eigen::Matrix<T, Eigen::Dynamic, 3> ret =
+        Eigen::Matrix<T, Eigen::Dynamic, 3>::Zero( phi.rows(), 3 );
+    for (size_t i = 0; i < phi.rows(); i++) {
+        ret.row(i) = n.cross(phi.row(i));
+    }
+    return ret;
+}
+
 template<typename Mesh>
 using DM = disk::dynamic_matrix<typename Mesh::coordinate_type>;
 
@@ -63,9 +87,15 @@ hho_mixedhigh_symlapl(const Mesh& msh,
     /* Rigid body constraints (LHS), lagrange multiplier then eqn */
     auto qps_lm = disk::integrate(msh, cl, degree);
     for (auto& qp : qps_lm) {
-        auto rphi = rb.eval_curls(qp.point());
-        LHS.block(0, LHS.cols()-curldofs, rbs-DIM, curldofs) =
-            rphi.bottomRows(rbs-DIM);
+        if constexpr (DIM == 3) {
+            auto rphi = rb.eval_curls2(qp.point());
+            LHS.block(0, LHS.cols()-curldofs, rbs-DIM, curldofs) =
+                rphi.bottomRows(rbs-DIM);
+        } else {
+            auto rphi = rb.eval_curls(qp.point());
+            LHS.block(0, LHS.cols()-curldofs, rbs-DIM, curldofs) =
+                rphi.bottomRows(rbs-DIM);
+        }
     }
     LHS.block(LHS.cols()-curldofs, 0, curldofs, rbs-DIM) =
         LHS.block(0, LHS.cols()-curldofs, rbs-DIM, curldofs).transpose();
@@ -98,6 +128,7 @@ hho_mixedhigh_symlapl(const Mesh& msh,
                     disk::priv::outer_product(r_dphi_n, f_phi).bottomRows(rbs-DIM);
                 RHS.block(0, 0, rbs-DIM, cbs) -=
                     disk::priv::outer_product(r_dphi_n, c_phi).block(DIM, 0, rbs-DIM, cbs);
+                RHS.block(rbs-DIM, fcofs, curldofs, fbs) += qp.weight() * cross(n, f_phi).transpose();
             }
         } else {
             /* Nothing to do */
@@ -110,7 +141,7 @@ hho_mixedhigh_symlapl(const Mesh& msh,
     //    std::cout << "Symgrad: cannot factorize local matrix" << std::endl;
     //}
     disk::dynamic_matrix<scalar_type> oper = sol.topRows(rbs-DIM);
-    disk::dynamic_matrix<scalar_type> data = RHS.topRows(rbs-DIM).transpose()*oper;
+    disk::dynamic_matrix<scalar_type> data = RHS.transpose()*sol;//RHS.topRows(rbs-DIM).transpose()*oper;
     return std::pair(oper, data);
 }
 

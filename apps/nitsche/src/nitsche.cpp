@@ -337,6 +337,7 @@ template<typename Mesh>
 auto
 nitsche_hho_solver(const Mesh& msh, size_t degree, const std::vector<bc>& bcs)
 {
+    bool compute_cond = true;
     using scalar_type = typename Mesh::coordinate_type;
 
     scalar_type eta = 1.0;
@@ -390,7 +391,7 @@ nitsche_hho_solver(const Mesh& msh, size_t degree, const std::vector<bc>& bcs)
     //std::cout << " Solver time: " << tc.toc() << std::endl;
     
     std::vector<scalar_type> u_data;
-    
+    std::vector<scalar_type> conditioning;
     auto solfun = make_solution_function(msh);
 
     scalar_type L2error = 0.0;
@@ -414,6 +415,10 @@ nitsche_hho_solver(const Mesh& msh, size_t degree, const std::vector<bc>& bcs)
         auto cb = disk::make_scalar_monomial_basis(msh, cl, degree+1);
         disk::dynamic_matrix<scalar_type> mass = disk::make_mass_matrix(msh, cl, cb);
 
+        if (compute_cond) {
+            conditioning.push_back( cond(lhs) );
+        }
+
         L2error += diff.dot(mass*diff);
     }
     //std::cout << " Postpro time: " << tc.toc() << std::endl;
@@ -423,6 +428,9 @@ nitsche_hho_solver(const Mesh& msh, size_t degree, const std::vector<bc>& bcs)
     silo.create("nitsche.silo");
     silo.add_mesh(msh, "mesh");
     silo.add_variable("mesh", "u", u_data, disk::zonal_variable_t);
+    if (compute_cond) {
+        silo.add_variable("mesh", "cond", conditioning, disk::zonal_variable_t);
+    }
 
     return std::sqrt(L2error);
 }

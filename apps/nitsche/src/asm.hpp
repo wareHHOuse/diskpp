@@ -220,3 +220,13 @@ public:
         triplets.clear();
     }
 };
+
+template<typename T>
+T cond(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& M, size_t excl = 0)
+{
+    JacobiSVD svd(M);
+        auto cond = svd.singularValues()(0) 
+            / svd.singularValues()(svd.singularValues().size()-(1+excl));
+        std::cout << svd.singularValues().transpose() << std::endl << std::endl;
+    return cond;
+}
