@@ -63,6 +63,15 @@ hho_mixedhigh_symlapl(const Mesh& msh,
     constexpr auto curldofs = ((DIM == 2) ? 1 : 3);
     auto lprows = rbs - DIM + curldofs;
 
+    constexpr auto VS = (DIM == 2) ? 3 : 6;
+    Eigen::DiagonalMatrix<scalar_type, VS, VS> VC;
+    if constexpr (DIM == 2) {
+        VC = Eigen::DiagonalMatrix<scalar_type, VS, VS>(1.0, 1.0, 2.0);
+    }
+    if constexpr (DIM == 3) {
+        VC = Eigen::DiagonalMatrix<scalar_type, VS, VS>(1.0, 1.0, 1.0, 2.0, 2.0, 2.0);
+    }
+
     /* Stiffness */
     disk::dynamic_matrix<scalar_type> K =
         disk::dynamic_matrix<scalar_type>::Zero(rbs, rbs);
@@ -78,8 +87,8 @@ hho_mixedhigh_symlapl(const Mesh& msh,
     /* (symgrad, symgrad) */
     auto qps = disk::integrate(msh, cl, 2*degree);
     for (auto& qp : qps) {
-        auto sym_dphi = rb.eval_sgradients(qp.point());
-        K += qp.weight() * disk::priv::outer_product(sym_dphi, sym_dphi);
+        auto sym_dphi = rb.eval_sgradients_voigt(qp.point());
+        K += qp.weight() * sym_dphi * VC * sym_dphi.transpose();
     }
     LHS.block(0, 0, rbs-DIM, rbs-DIM) = K.bottomRightCorner(rbs-DIM, rbs-DIM);
     RHS.block(0, 0, rbs-DIM, cbs) = K.block(DIM, 0, rbs-DIM, cbs);
@@ -122,7 +131,7 @@ hho_mixedhigh_symlapl(const Mesh& msh,
             for (auto& qp : fqps) {
                 auto c_phi = cb.eval_functions(qp.point());
                 auto f_phi = fb.eval_functions(qp.point());
-                auto r_dphi = rb.eval_sgradients(qp.point());
+                auto r_dphi = rb.eval_sgradients_voigt(qp.point());
                 auto r_dphi_n = disk::priv::inner_product(r_dphi, (qp.weight()*n).eval());
                 RHS.block(0, fcofs, rbs-DIM, fbs) +=
                     disk::priv::outer_product(r_dphi_n, f_phi).bottomRows(rbs-DIM);

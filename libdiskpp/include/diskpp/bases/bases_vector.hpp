@@ -98,6 +98,7 @@ public:
     typedef Matrix<scalar_type, 3, 3>           gradient_type;
     typedef Matrix<scalar_type, Dynamic, 3>     function_type;
     typedef Matrix<scalar_type, Dynamic, 1>     divergence_type;
+    typedef Matrix<scalar_type, Dynamic, 6>     voigt_gradient_type;
 
     using base = scaled_monomial_abstract_basis<mesh_type, cell_type, scalar_type>;
 
@@ -196,6 +197,31 @@ public:
         return ret;
     }
 
+    voigt_gradient_type
+    eval_sgradients_voigt(const point_type& pt) const
+    {
+        voigt_gradient_type ret = voigt_gradient_type::Zero(basis_size, 6);
+
+        function_type dphi = scalar_basis.eval_gradients(pt);
+
+        for (size_t i = 0; i < scalar_basis.size(); i++)
+        {
+            ret(3*i+0, 0) = dphi(i,0);
+            ret(3*i+0, 4) = 0.5*dphi(i,2);
+            ret(3*i+0, 5) = 0.5*dphi(i,1);
+
+            ret(3*i+1, 1) = dphi(i,1);
+            ret(3*i+1, 3) = 0.5*dphi(i,2);
+            ret(3*i+1, 5) = 0.5*dphi(i,0);
+
+            ret(3*i+2, 2) = dphi(i,2);
+            ret(3*i+2, 3) = 0.5*dphi(i,1);
+            ret(3*i+2, 4) = 0.5*dphi(i,0);
+        }
+
+        return ret;
+    }
+
     [[deprecated("Is this implementation correct?")]]
     function_type
     eval_curls(const point_type& pt) const
@@ -286,6 +312,25 @@ public:
         return basis_degree;
     }
 };
+
+namespace priv {
+
+/* Product between Voigt-notation 3x3 symmetric tensors
+ * and 3x1 vectors */
+template<typename T>
+Eigen::Matrix<T, Eigen::Dynamic, 3>
+inner_product(const Eigen::Matrix<T, Eigen::Dynamic, 6>& vst, const Eigen::Matrix<T,3,1>& v)
+{
+    Eigen::Matrix<T, Eigen::Dynamic, 3> ret (vst.rows(), 3);
+    for (size_t i = 0; i < vst.rows(); i++) {
+        ret(i,0) = vst(i,0)*v(0) + vst(i,5)*v(1) + vst(i,4)*v(2);
+        ret(i,1) = vst(i,5)*v(0) + vst(i,1)*v(1) + vst(i,3)*v(2);
+        ret(i,2) = vst(i,4)*v(0) + vst(i,3)*v(1) + vst(i,2)*v(2);
+    }
+    return ret;
+}
+
+}
 
 /* Specialization for 3D meshes, faces */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
@@ -598,6 +643,7 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
     typedef Matrix<scalar_type, 2, 2>           gradient_type;
     typedef Matrix<scalar_type, Dynamic, 2>     function_type;
     typedef Matrix<scalar_type, Dynamic, 1>     divergence_type;
+    typedef Matrix<scalar_type, Dynamic, 3>     voigt_gradient_type;
 
     using base = scaled_monomial_abstract_basis<mesh_type, cell_type, scalar_type>;
 
@@ -687,6 +733,24 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         return ret;
     }
 
+    voigt_gradient_type
+    eval_sgradients_voigt(const point_type& pt) const
+    {
+        voigt_gradient_type ret = voigt_gradient_type::Zero(basis_size, 3);
+
+        const function_type dphi = scalar_basis.eval_gradients(pt);
+
+        for (size_t i = 0; i < scalar_basis.size(); i++)
+        {
+            ret(2*i+0, 0) = dphi(i,0);
+            ret(2*i+0, 2) = 0.5*dphi(i,1);
+            ret(2*i+1, 1) = dphi(i,1);
+            ret(2*i+1, 2) = 0.5*dphi(i,0);
+        }
+
+        return ret;
+    }
+
     Matrix<scalar_type, Dynamic, 1>
     eval_curls(const point_type& pt) const
     {
@@ -733,6 +797,24 @@ class scaled_monomial_vector_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         return basis_degree;
     }
 };
+
+namespace priv {
+
+/* Product between Voigt-notation 2x2 symmetric tensors
+    * and 2x1 vectors */
+template<typename T>
+Eigen::Matrix<T, Eigen::Dynamic, 2>
+inner_product(const Eigen::Matrix<T, Eigen::Dynamic, 3>& vst, const Eigen::Matrix<T,2,1>& v)
+{
+    Eigen::Matrix<T, Eigen::Dynamic, 2> ret (vst.rows(), 2);
+    for (size_t i = 0; i < vst.rows(); i++) {
+        ret(i,0) = vst(i,0)*v(0) + vst(i,2)*v(1);
+        ret(i,1) = vst(i,2)*v(0) + vst(i,1)*v(1);
+    }
+    return ret;
+}
+
+}
 
 /* Specialization for 2D meshes, faces */
 template<template<typename, size_t, typename> class Mesh, typename T, typename Storage, typename ScalarType>
