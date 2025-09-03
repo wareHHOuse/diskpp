@@ -21,8 +21,27 @@ set_boundary(const Mesh& msh, std::vector<bc>& bcs, bc bc_type, size_t bnd)
     size_t fcnum = 0;
     for (auto& fc : faces(msh)) {
         auto bi = msh.boundary_info(fc);
-        if (bi.is_boundary() and bi.id() == bnd) {
+        if (bi.is_boundary() and bi.tag() == bnd) {
+            std::cout << "fcnum: " << fcnum << ", id: " << bi.id() << ", tag: " << bi.tag() << std::endl;
             bcs[fcnum] = bc_type;
+        }
+        fcnum++;
+    }  
+}
+
+template<typename Mesh>
+void
+set_all_neumann(const Mesh& msh, std::vector<bc>& bcs)
+{
+    if (bcs.size() != msh.faces_size()) {
+        bcs.resize( msh.faces_size() );
+    }
+
+    size_t fcnum = 0;
+    for (auto& fc : faces(msh)) {
+        auto bi = msh.boundary_info(fc);
+        if (bi.is_boundary() and not bi.is_internal()) {
+            bcs[fcnum] = bc::neumann;
         }
         fcnum++;
     }   

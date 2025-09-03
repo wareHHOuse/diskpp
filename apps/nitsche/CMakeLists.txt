@@ -10,3 +10,7 @@ install(TARGETS linelast RUNTIME DESTINATION bin)
 
 #add_executable(test_divrec src/test_divrec.cpp)
 #target_link_libraries(test_divrec ${LINK_LIBS})
+
+
+add_executable(bridge src/bridge.cpp)
+target_link_libraries(bridge ${LINK_LIBS})

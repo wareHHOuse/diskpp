@@ -1,0 +1,4 @@
+Bridge model taken from grabcad
+https://grabcad.com/library/tsa-middle-school-structural-bridge-1
+
+dirichlet: 994 967
