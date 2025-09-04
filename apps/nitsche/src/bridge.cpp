@@ -51,17 +51,53 @@ set_dirichlet(const Mesh& msh, std::vector<bool>& bcs, size_t bnd)
 int main(int argc, char **argv)
 {
     using T = double;
+    std::string mesh_filename;
     size_t degree = 1;
-    hho_mode mode = hho_mode::nitsche;
+    hho_mode mode = hho_mode::standard;
     T mu = 10.0;
     T lambda = 1000.0;
+    T fx = 0.0;
+    T fy = 0.0;
+    T fz = 0.0;
+    int opt;
+    while ((opt = getopt(argc, argv, "k:m:l:nx:y:z:g:")) != -1) {
+        switch (opt) {
+        case 'k': /* method order */
+            degree = std::max(1, std::stoi(optarg));
+            break;
+        case 'n': /* enable nitsche */
+            mode = hho_mode::nitsche;
+            break;
+        case 'm':
+            mu = std::stod(optarg);
+            break;
+        case 'l':
+            lambda = std::stod(optarg);
+            break;
+        case 'x':
+            fx = std::stod(optarg);
+            break;
+        case 'y':
+            fy = std::stod(optarg);
+            break;
+        case 'z':
+            fz = std::stod(optarg);
+            break;
+        case 'g':
+            mesh_filename = optarg;
+            break;
+        default:
+            std::cout << "Invalid options." << std::endl;
+            exit(EXIT_FAILURE);
+        }
+    }
 
-    if (argc < 2) {
-        std::cout << "args!" << std::endl;
+    if (mesh_filename == "") {
+        std::cout << "Mesh not specified" << std::endl;
         return 1;
     }
 
-    std::string mesh_filename = argv[1];
+    std::cout << "mu = " << mu << ", lambda = " << lambda << std::endl; 
 
     using mesh_type = disk::simplicial_mesh<T,3>;
 
@@ -120,9 +156,9 @@ int main(int argc, char **argv)
         auto qps = disk::integrate(msh, cl, 2*degree+2);
         disk::static_vector<T,DIM> f =
             disk::static_vector<T,DIM>::Zero();
-        f(0) = 0;
-        f(1) = 0;
-        f(2) = -0.001;
+        f(0) = fx;
+        f(1) = fy;
+        f(2) = fz;
 
         for (auto& qp : qps) {
             auto phi = cb.eval_functions(qp.point());
@@ -141,6 +177,7 @@ int main(int argc, char **argv)
 
     std::cout << "DoFs: " << assm.LHS.rows() << std::endl;
     std::cout << "NNZ: " << assm.LHS.nonZeros() << std::endl;
+    std::cout << "Fill-in: " << (100.0*assm.LHS.nonZeros())/(assm.LHS.rows()*assm.LHS.rows()) << std::endl;
 
     tc.tic();
     std::cout << "MUMPS: " << std::flush;
