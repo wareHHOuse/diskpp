@@ -41,7 +41,6 @@ set_dirichlet(const Mesh& msh, std::vector<bool>& bcs, size_t bnd)
     for (auto& fc : faces(msh)) {
         auto bi = msh.boundary_info(fc);
         if (bi.is_boundary() and bi.id() == bnd) {
-            std::cout << "fcnum: " << fcnum << ", id: " << bi.id() << ", tag: " << bi.tag() << std::endl;
             bcs[fcnum] = true;
         }
         fcnum++;
@@ -53,6 +52,7 @@ int main(int argc, char **argv)
     using T = double;
     std::string mesh_filename;
     size_t degree = 1;
+    timecounter tc;
     hho_mode mode = hho_mode::standard;
     T mu = 10.0;
     T lambda = 1000.0;
@@ -100,12 +100,14 @@ int main(int argc, char **argv)
     std::cout << "mu = " << mu << ", lambda = " << lambda << std::endl; 
 
     using mesh_type = disk::simplicial_mesh<T,3>;
-
     mesh_type msh;
-        
+    
+    std::cout << "GMSH: " << std::flush;
+    tc.tic();
     disk::gmsh_geometry_loader< mesh_type > loader;    
     loader.read_mesh(mesh_filename);
     loader.populate_mesh(msh);
+    std::cout << tc.toc() << " seconds" << std::endl;
 
     std::cout << "Cells: " << msh.cells_size() << std::endl;
     std::cout << "Faces: " << msh.faces_size() << std::endl;
@@ -138,14 +140,12 @@ int main(int argc, char **argv)
     using VT = disk::dynamic_vector<T>;
     std::vector<std::pair<MT, VT>> lcs;
 
-    timecounter tc;
+    size_t done_cells = 0;
     tc.tic();
-    std::cout << "ASM: " << std::flush;
     for (auto& cl : msh) {
         auto [SGR, Asgr] = hho_mixedhigh_symlapl(msh, cl, degree, mode, bcs);
         auto [DR, Adr] = hho_mixedhigh_divrec(msh, cl, degree, mode, bcs);
         disk::hho_degree_info hdi(degree+1, degree);
-        //auto S = disk::make_vector_hho_stabilization(msh, cl, SGR, hdi);
         auto S = vstab(msh, cl, degree, mode, bcs);
 
         MT lhs = 2*mu*Asgr + lambda*Adr + 2*mu*S;
@@ -170,32 +170,35 @@ int main(int argc, char **argv)
         auto [Lc, Rc] = disk::static_condensation(lhs, rhs, cbs);
 
         assm.assemble(msh, cl, Lc, Rc);
+        std::cout << "\rASM: " << ++done_cells << "/" << msh.cells_size() << std::flush;
     }
-    std::cout << tc.toc() << std::endl;
+    std::cout  << "\rASM: " << tc.toc() << " seconds" << std::endl;
 
     assm.finalize();
 
     std::cout << "DoFs: " << assm.LHS.rows() << std::endl;
     std::cout << "NNZ: " << assm.LHS.nonZeros() << std::endl;
-    std::cout << "Fill-in: " << (100.0*assm.LHS.nonZeros())/(assm.LHS.rows()*assm.LHS.rows()) << std::endl;
+    std::cout << "Fill-in: " << (100.0*assm.LHS.nonZeros())/(assm.LHS.rows()*assm.LHS.rows()) << "%" << std::endl;
 
     tc.tic();
     std::cout << "MUMPS: " << std::flush;
     disk::dynamic_vector<T> sol = mumps_lu(assm.LHS, assm.RHS);
     //Eigen::SparseLU<Eigen::SparseMatrix<T>> solver(assm.LHS);
     //disk::dynamic_vector<T> sol = solver.solve(assm.RHS);
+    
     /*
     disk::dynamic_vector<T> sol = assm.RHS;
     disk::solvers::conjugated_gradient_params<T> cgp;
+    cgp.rr_max = 100;
     cgp.verbose = true;
     cgp.max_iter = assm.LHS.rows();
     disk::solvers::conjugated_gradient(cgp, assm.LHS, assm.RHS, sol);
     */
 
+    std::cout << tc.toc() << " seconds" << std::endl;
+
     Eigen::Matrix<T, Eigen::Dynamic, DIM> u_data =
         Eigen::Matrix<T, Eigen::Dynamic, DIM>::Zero(msh.cells_size(), DIM);
-
-    std::cout << tc.toc() << std::endl;
 
     size_t cell_i = 0;
     for (auto& cl : msh)
