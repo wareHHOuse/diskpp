@@ -125,8 +125,11 @@ endif()
 find_package(MKL)
 if (MKL_FOUND)
   include_directories(${MKL_INCLUDE_DIRS})
-  set(LINK_LIBS ${LINK_LIBS} MKL)
+  set(LINK_LIBS ${LINK_LIBS} MKL::MKL)
   set(HAVE_INTEL_MKL TRUE)
+  add_definitions(-DHAVE_INTEL_MKL)
+  add_definitions(-DHAVE_PARDISO)
+
 endif()
 
 ######################################################################

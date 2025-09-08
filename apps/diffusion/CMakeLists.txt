@@ -8,9 +8,9 @@ set_target_properties(sfexp PROPERTIES PREFIX "")
 set_target_properties(sfexp PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(sfexp ${LUA_LIBRARIES} sol2::sol2 ${LINK_LIBS})
 
-add_executable(stabfree_find_bad_poly src/stabfree_find_bad_poly.cpp)
-target_link_libraries(stabfree_find_bad_poly ${LINK_LIBS})
-install(TARGETS stabfree_find_bad_poly RUNTIME DESTINATION bin)
+#add_executable(stabfree_find_bad_poly src/stabfree_find_bad_poly.cpp)
+#target_link_libraries(stabfree_find_bad_poly ${LINK_LIBS})
+#install(TARGETS stabfree_find_bad_poly RUNTIME DESTINATION bin)
 
 add_executable(hpoly_test src/hpoly_test.cpp)
 target_link_libraries(hpoly_test ${LINK_LIBS})
