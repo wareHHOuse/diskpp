@@ -173,6 +173,134 @@ operator<<(std::ostream& os, const iterdata& id)
     return os;
 };
 
+template<typename T>
+void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
+    disk::simplicial_mesh<T,2>& submsh, size_t subdom_id)
+{
+    auto stor = msh.backend_storage();
+    auto substor = submsh.backend_storage();
+    
+    using cell_type = disk::simplicial_mesh<T,2>::cell_type;
+    using face_type = disk::simplicial_mesh<T,2>::face_type;
+    using node_type = disk::simplicial_mesh<T,2>::node_type;
+
+    size_t max_index = 0;
+
+    for (auto& cl : msh) {
+        /* cycle on all the elements and copy those of
+         * the specified subdomain. */
+        auto di = msh.domain_info(cl);
+        if (di.tag() != subdom_id)
+            continue;
+
+        auto ptids = cl.point_ids();
+        assert(ptids.size() == 3);
+        for (auto& ptid : ptids) {
+            max_index = std::max(ptid, max_index);
+        }
+
+        substor->surfaces.push_back(cl);
+    }
+
+    /* mark the used indices, to take only the
+     * necessary points */
+    std::vector<std::optional<size_t>> used(max_index+1);
+    for (auto& cl : substor->surfaces) {
+        auto ptids = cl.point_ids();
+        used[ptids[0]] = 1;
+        used[ptids[1]] = 1;
+        used[ptids[2]] = 1;
+    }
+
+    /* Compute the new indices */
+    int ci = 0;
+    for (auto& uopt : used) {
+        if (uopt) {
+            uopt = ci++;
+        }
+    }
+
+    /* Copy points in the right positions */
+    substor->points.resize(ci);
+    for (size_t i = 0; i < used.size(); i++) {
+        const auto& uopt = used[i];
+        if (uopt) {
+            substor->points[uopt.value()] = stor->points[i];
+        }
+    }
+
+    for (auto& cl : substor->surfaces) {
+        auto ptids = cl.point_ids();
+        auto np0 = used[ ptids[0] ].value();
+        auto np1 = used[ ptids[1] ].value();
+        auto np2 = used[ ptids[2] ].value();
+        cl = cell_type({np0, np1, np2});
+        substor->edges.push_back( face_type{np0, np1} );
+        substor->edges.push_back( face_type{np1, np2} );
+        substor->edges.push_back( face_type{np0, np2} );
+        substor->nodes.push_back( node_type{ np0 } );
+        substor->nodes.push_back( node_type{ np1 } );
+        substor->nodes.push_back( node_type{ np2 } );
+    }
+
+    disk::priv::sort_uniq(substor->nodes);
+    disk::priv::sort_uniq(substor->edges);
+    disk::priv::sort_uniq(substor->surfaces);
+    substor->boundary_info.resize(substor->edges.size());
+    substor->subdomain_info.resize(substor->surfaces.size(),
+        disk::subdomain_descriptor(subdom_id) );
+}
+
+template<disk::mesh_2D Mesh>
+void
+diffusion_solver_refinement(const Mesh& cmsh, const solver_config& scfg)
+{
+    using mesh_type = Mesh;
+    using scalar_type = typename mesh_type::coordinate_type;
+
+    disk::simplicial_mesh<scalar_type, 2> fmsh;
+    disk::submesh_via_gmsh(cmsh, fmsh, disk::average_diameter(cmsh)/4.0);
+
+    std::vector<double> subdom_ids;
+    for (auto& cl : fmsh) {
+        auto di = fmsh.domain_info(cl);
+        subdom_ids.push_back( di.tag() );
+    }
+
+    disk::simplicial_mesh<scalar_type, 2> smsh;
+    make_submesh_from_subdomain(fmsh, smsh, 15);
+
+    disk::silo_database silo;
+    silo.create("c2f.silo");
+    silo.add_mesh(cmsh, "coarse");
+    silo.add_mesh(fmsh, "fine");
+    silo.add_mesh(smsh, "element0");
+    silo.add_variable("fine", "domain_id", subdom_ids, disk::zonal_variable_t);
+}
+
+template<typename T>
+void
+diffusion_solver_agglomeration(const disk::simplicial_mesh<T,2>& fmsh, const solver_config& scfg)
+{
+    using mesh_type = disk::simplicial_mesh<T,2>;
+    using scalar_type = typename mesh_type::coordinate_type;
+
+    disk::generic_mesh<T,2> cmsh;
+    agglomerate_by_subdomain(fmsh, cmsh);
+
+    std::vector<double> subdom_ids;
+    for (auto& cl : fmsh) {
+        auto di = fmsh.domain_info(cl);
+        subdom_ids.push_back( di.tag() );
+    }
+
+    disk::silo_database silo;
+    silo.create("f2c.silo");
+    silo.add_mesh(cmsh, "coarse");
+    silo.add_mesh(fmsh, "fine");
+    silo.add_variable("fine", "domain_id", subdom_ids, disk::zonal_variable_t);
+}
+
 //template<typename Mesh>
 template<typename T>
 void
@@ -372,8 +500,6 @@ diffusion_solver(const disk::simplicial_mesh<T,2>& msh, const solver_config& scf
 }
 
 
-
-#if 0
 void
 run_on_internal_mesh(const solver_config& scfg)
 {
@@ -386,7 +512,7 @@ run_on_internal_mesh(const solver_config& scfg)
             mesher.refine();
         
         partition_unit_square_mesh(msh, scfg.imesh_partitions);
-        diffusion_solver(msh, scfg);
+        diffusion_solver_refinement(msh, scfg);
     }
 
     if (scfg.meshtype == mesh_type::cartesian) {
@@ -396,7 +522,7 @@ run_on_internal_mesh(const solver_config& scfg)
             mesher.refine();
         
         partition_unit_square_mesh(msh, scfg.imesh_partitions);
-        diffusion_solver(msh, scfg);
+        diffusion_solver_refinement(msh, scfg);
     }
 
     if (scfg.meshtype == mesh_type::hexas) {
@@ -405,9 +531,10 @@ run_on_internal_mesh(const solver_config& scfg)
         mesher.make_level(scfg.imesh_reflevels);
 
         partition_unit_square_mesh(msh, scfg.imesh_partitions);
-        diffusion_solver(msh, scfg);
+        diffusion_solver_refinement(msh, scfg);
     }
 
+    #if 0
     if (scfg.meshtype == mesh_type::tetras) {
         disk::simplicial_mesh<T,3> msh;
         auto mesher = make_simple_mesher(msh);
@@ -415,10 +542,11 @@ run_on_internal_mesh(const solver_config& scfg)
             mesher.refine();
         
         partition_unit_square_mesh(msh, scfg.imesh_partitions);
-        diffusion_solver(msh, scfg);
+        diffusion_solver_refinement(msh, scfg);
     }
+    #endif
 }
-#endif
+
 
 int main(int argc, char **argv)
 {
@@ -578,7 +706,7 @@ int main(int argc, char **argv)
 
     if (scfg.meshtype != mesh_type::undefined)
     {
-        //run_on_internal_mesh(scfg);
+        run_on_internal_mesh(scfg);
         return 0;
     }
 
