@@ -342,7 +342,7 @@ diffusion_solver(const disk::simplicial_mesh<T,2>& msh, const solver_config& scf
             
             id.error = postpro(ss.str(), sol, e, e2);
 
-            std::cout << "  A-norm error: " << id.error << std::endl;
+            std::cout << "  A-norm error: " << id.error << ", residual norm: " << id.residual << std::endl;
             ids.push_back(id);
         }
 
