@@ -277,7 +277,7 @@ void EAcoustic_CFL(int argc, char **argv){
         simulation_log << "Number of ERK steps =  " << s << std::endl;
         simulation_log << "Number of time steps =  " << nt << std::endl;
         simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
-        auto block_dimension = assembler.Scc_block_dimension();
+        // auto block_dimension = assembler.Scc_block_dimension();
         // erk_an.compute_eigenvalues_bis(assembler.LHS_STAB, block_dimension, simulation_log);
         // erk_an.compute_eigenvalues(simulation_log);
         simulation_log.flush();

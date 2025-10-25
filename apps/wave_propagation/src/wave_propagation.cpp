@@ -73,7 +73,10 @@ using namespace Eigen;
 #include "prototypes/coupling/Pulse/ConicWavesEHHOFirstOrder.hpp"           // Implicit Pulse (geophysic) 
 // Sedimentary Basin
 #include "prototypes/coupling/Basin/BassinIHHOFirstOrder.hpp"               // Implicit Sedimentary Basin
-// #include "prototypes/coupling/Basin/BassinEHHOFirstOrder.hpp"            // Explicit Sedimentary Basin - not working
+// LTS
+#include "prototypes/LTS/ELTSAcoustic_conv_test.hpp"
+#include "prototypes/LTS/ERK4_LTS_conv_test.hpp"
+#include "prototypes/LTS/HeterogeneousERK4_LTS_HHO_FirstOrder.hpp"
 
 int main(int argc, char **argv){
 
@@ -90,17 +93,17 @@ int main(int argc, char **argv){
         return 0;
     }
     
-// CFL tables:
+// CFL TABLE:
    // EAcoustic_CFL(argc, argv); 
    // EElasticity_CFL(argc, argv);
    // EHHOFirstOrderCFL(argc, argv); 
-
-// Stability study & Spectral radius computation:
+ 
+// STABILITY STUDY & SPECTRAL RADIUS COMPUTATION:
    // EAcoustic_stability(argc, argv);
    // EElastic_stability(argc, argv);
    // EHHOFirstOrder_stability(argc, argv); 
 
-// Convergence test:
+// CV TESTS:
    // EAcousticFirstOrder(argc, argv);
    // IAcoustic_conv_test(argc, argv);
    // IElastic_conv_test(argc, argv);
@@ -109,19 +112,23 @@ int main(int argc, char **argv){
    // EHHOFirstOrder(argc, argv);
    // EHHOFirstOrder_conv_tests(argc, argv);
 
-// Pulse: 
+// PULSE: 
    // HeterogeneousIHHOFirstOrder(argc, argv); 
    // HeterogeneousEHHOFirstOrder(argc, argv); 
    // ConicWavesIHHOFirstOrder(argc, argv);
    // ConicWavesIHHOFirstOrder_review(argc, argv);
    // ConicWavesEHHOFirstOrder(argc, argv);
-   ConicWavesEHHOFirstOrder_review(argc, argv);
+   // ConicWavesEHHOFirstOrder_review(argc, argv);
 
-// Sedimentary basin:
+// SEDIMENTARY BASIN:
    // BassinIHHOFirstOrder(argc, argv);
    // Test(argc, argv);
    // BassinEHHOFirstOrder(argc, argv); Not working 
   
+// LOCAL TIME STEPPING 
+   // ELTSAcousticFirstOrder(argc, argv);
+   // ERK4_LTS_conv_test(argc, argv);
+   HeterogeneousERK4_LTS_HHO_FirstOrder(argc, argv);
 }
 
 

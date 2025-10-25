@@ -311,8 +311,7 @@ class BoundaryConditions
 
     template<typename Function>
     void
-    addDirichletBC(const size_t& btype, const size_t& b_id, const Function& bcf)
-    {
+    addDirichletBC(const size_t& btype, const size_t& b_id, const Function& bcf) {
         const size_t bcf_id = m_dirichlet_func.size();
         m_dirichlet_func.push_back(bcf);
 

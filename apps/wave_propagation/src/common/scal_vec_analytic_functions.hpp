@@ -12,15 +12,16 @@ class scal_vec_analytic_functions {
     
     /// Enumerate defining the function type
     enum EFunctionType { 
-      EFunctionNonPolynomial         = 0,  
-      EFunctionQuadraticInTime       = 1,
-      EFunctionQuadraticInSpace      = 2, 
-      reproduction_acoustic          = 3,
-      reproduction_elastic           = 4,
-      EFunctionNonPolynomial_paper   = 5, 
-      EFunctionCubicInTimeAcoustic   = 6,
-      EFunctionQuarticInTimeAcoustic = 7,
-      EFunctionQuadraticInSpaceAcoustic = 8};
+      EFunctionNonPolynomial            = 0,  
+      EFunctionQuadraticInTime          = 1,
+      EFunctionQuadraticInSpace         = 2, 
+      reproduction_acoustic             = 3,
+      reproduction_elastic              = 4,
+      EFunctionNonPolynomial_paper      = 5, 
+      EFunctionCubicInTimeAcoustic      = 6,
+      EFunctionQuarticInTimeAcoustic    = 7,
+      EFunctionQuadraticInSpaceAcoustic = 8,
+      EFunctionPlaneWaveAcoustic = 9};
       
       scal_vec_analytic_functions() {
           m_function_type = EFunctionNonPolynomial;
@@ -411,7 +412,6 @@ class scal_vec_analytic_functions {
           }    
       }
       
-      
       std::function<disk::static_matrix<double,2,2>
       (const typename disk::generic_mesh<double, 2>::point_type& )> Evaluate_sigma(double & t){
           
@@ -551,6 +551,7 @@ class scal_vec_analytic_functions {
           
       }
       
+      // ACOUSTIC
       std::function<double
       (const typename disk::generic_mesh<double, 2>::point_type& )> Evaluate_s_u(double & t) {
           
@@ -637,6 +638,17 @@ class scal_vec_analytic_functions {
                       x = pt.x();
                       y = pt.y();
                       return t*t*t*std::sin(M_PI*x)*std::sin(M_PI*y);
+                  };
+              }
+              break;
+
+              case EFunctionPlaneWaveAcoustic: {
+                  return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> double { 
+                      double x,y, theta;
+                      x = pt.x();
+                      y = pt.y();
+                      theta = x + y - std::sqrt(2)*t;
+                      return -(1.0/std::sqrt(2)) * std::sin(theta);
                   };
               }
               break;
@@ -736,6 +748,17 @@ class scal_vec_analytic_functions {
                   };
               }
               break;
+
+              case EFunctionPlaneWaveAcoustic: {
+                  return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> double { 
+                      double x,y, theta;
+                      x = pt.x();
+                      y = pt.y();
+                      theta = x + y - std::sqrt(2)*t;
+                      return std::cos(theta);
+                  };
+              }
+              break;
               
               default: {
                   std::cout << " Function not implemented " << std::endl;
@@ -832,6 +855,17 @@ class scal_vec_analytic_functions {
                       x = pt.x();
                       y = pt.y();
                       return 6*t * std::sin(M_PI*x)*std::sin(M_PI*y);
+                  };
+              }
+              break;
+
+              case EFunctionPlaneWaveAcoustic: {
+                  return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> double { 
+                      double x,y, theta;
+                      x = pt.x();
+                      y = pt.y();
+                      theta = x + y - std::sqrt(2)*t;
+                      return std::sqrt(2) * std::sin(theta);
                   };
               }
               break;
@@ -947,6 +981,17 @@ class scal_vec_analytic_functions {
               }
               break;
               
+              case EFunctionPlaneWaveAcoustic: {
+                  return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> double { 
+                      double x,y,f;
+                      x = pt.x();
+                      y = pt.y();
+                      f = 0.0;
+                      return f;
+                  };
+              }
+              break;
+
               default: {
                   std::cout << " Function not implemented " << std::endl;
                   return [](const typename disk::generic_mesh<double, 2>::point_type& pt) -> double {
@@ -956,7 +1001,6 @@ class scal_vec_analytic_functions {
               break;
           }
       }
-      
       
       std::function<disk::static_vector<double, 2>
       (const typename disk::generic_mesh<double, 2>::point_type& )> Evaluate_s_q(double & t){
@@ -1081,6 +1125,20 @@ class scal_vec_analytic_functions {
               }
               break;
               
+              case EFunctionPlaneWaveAcoustic: {
+                  return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> disk::static_vector<double, 2> {
+                      double x, y, qx, qy, theta;
+                      x = pt.x();
+                      y = pt.y();
+                      theta = x + y - std::sqrt(2)*t;
+                      qx = (1.0/std::sqrt(2.0)) * std::sin(theta);
+                      qy = (1.0/std::sqrt(2.0)) * std::sin(theta);
+                      disk::static_vector<double, 2> q{qx,qy};
+                      return q;
+                  };
+              }
+              break;
+
               default: {
                   std::cout << " Function not implemented " << std::endl;
                   return [](const typename disk::generic_mesh<double, 2>::point_type& pt)

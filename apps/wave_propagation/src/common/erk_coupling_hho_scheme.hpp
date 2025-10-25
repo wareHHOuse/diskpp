@@ -28,7 +28,7 @@ class erk_coupling_hho_scheme
     Matrix<T, Dynamic, 1> m_Fc;
 
     #ifdef HAVE_INTEL_MKL
-        PardisoLDLT<Eigen::SparseMatrix<T>>  m_analysis_f;
+        PardisoLDLT<SparseMatrix<T>>  m_analysis_f;
     #else
         SimplicialLDLT<SparseMatrix<T>> m_analysis_f;
     #endif
@@ -291,14 +291,14 @@ class erk_coupling_hho_scheme
     void inverse_Sff() {
 
         // Bi CG
-        Eigen::BiCGSTAB<Eigen::SparseMatrix<double>> solverBiCG;
+        BiCGSTAB<SparseMatrix<double>> solverBiCG;
         solverBiCG.compute(m_Sff);
-        if (solverBiCG.info() != Eigen::Success) 
+        if (solverBiCG.info() != Success) 
             std::cout << "Error: Matrix decomposition failed, the matrix may not be invertible";
-        Eigen::SparseMatrix<double> identity(m_Sff.rows(), m_Sff.cols());
+        SparseMatrix<double> identity(m_Sff.rows(), m_Sff.cols());
         identity.setIdentity();
         m_inv_Sff = solverBiCG.solve(identity);
-        if (solverBiCG.info() != Eigen::Success) 
+        if (solverBiCG.info() != Success) 
             std::cout << "Error: Solving the system failed, the matrix may not be invertible";
 
       return;
@@ -339,30 +339,190 @@ class erk_coupling_hho_scheme
       }
     }
 
-    void erk_weight(Matrix<T, Dynamic, 1> & y, Matrix<T, Dynamic, 1> & k){
+    void erk_weight(Matrix<T, Dynamic, 1> & y, Matrix<T, Dynamic, 1> & k) {
         
-      k=y;
-      Matrix<T, Dynamic, 1> y_c_dof = y.block(0, 0, m_n_c_dof, 1);
-      Matrix<T, Dynamic, 1> y_f_dof = y.block(m_n_c_dof, 0, m_n_f_dof, 1);
+        k=y;
+        Matrix<T, Dynamic, 1> y_c_dof = y.block(0, 0, m_n_c_dof, 1);
+        Matrix<T, Dynamic, 1> y_f_dof = y.block(m_n_c_dof, 0, m_n_f_dof, 1);
         
-      // Cells update
-      Matrix<T, Dynamic, 1> RHSc = Fc() - Kcc()*y_c_dof - Kcf()*y_f_dof;
-      Matrix<T, Dynamic, 1> k_c_dof = m_Mc_inv * RHSc;
-      k.block(0, 0, m_n_c_dof, 1) = k_c_dof;
+        ////////// CELLS UPDATE
+        Matrix<T, Dynamic, 1> RHSc = Fc() - Kcc()*y_c_dof - Kcf()*y_f_dof;
+        Matrix<T, Dynamic, 1> k_c_dof = m_Mc_inv * RHSc;
+        k.block(0, 0, m_n_c_dof, 1) = k_c_dof;
         
-      // Faces update
-      Matrix<T, Dynamic, 1> RHSf = Kfc()*k_c_dof ;
-      // To comment to test eta = 0
-      if (m_sff_is_block_diagonal_Q) {
-        k.block(m_n_c_dof, 0, m_n_f_dof, 1) = - m_Sff_inv * RHSf; 
-      }
-      else {
-        k.block(m_n_c_dof, 0, m_n_f_dof, 1) = - m_inv_Sff * RHSf; 
-      }
+        // FACES UPDATE 
+        Matrix<T, Dynamic, 1> RHSf = Kfc()*k_c_dof ;
+        if (m_sff_is_block_diagonal_Q) {
+            k.block(m_n_c_dof, 0, m_n_f_dof, 1) = - m_Sff_inv * RHSf; 
+        }
+        else {
+            k.block(m_n_c_dof, 0, m_n_f_dof, 1) = - m_inv_Sff * RHSf; 
+        }
+
+    }
+
+    void erk_lts_weight(const Matrix<T, Dynamic, 1> & y, Matrix<T, Dynamic, 1> & k, const Matrix<T, Dynamic, 1> & w_stage) {
+        
+        k=y;
+        Matrix<T, Dynamic, 1> y_c = y.block(0,0,m_n_c_dof,1);
+        Matrix<T, Dynamic, 1> y_f = y.block(m_n_c_dof,0,m_n_f_dof,1);
+        
+        // CELLS UPDATE
+        Matrix<T, Dynamic, 1> RHSc = w_stage + Kcc()*y_c + Kcf()*y_f; // w_stage contient déjà les termes (I-P)
+        Matrix<T, Dynamic, 1> k_c = m_Mc_inv * RHSc;
+        k.block(0,0,m_n_c_dof,1) = k_c;
+        
+        // FACES UPDATE (condensation)
+        Matrix<T, Dynamic, 1> RHSf = Kfc()*k_c;
+        if (m_sff_is_block_diagonal_Q) {
+            k.block(m_n_c_dof,0,m_n_f_dof,1) = - m_Sff_inv * RHSf;
+        } 
+        else {
+            k.block(m_n_c_dof,0,m_n_f_dof,1) = - m_inv_Sff * RHSf;
+        }
+
     }
     
+    void compute_wi(const Matrix<T, Dynamic, 1> &y, const int n_w, const Eigen::SparseMatrix<double> &IminusP, std::vector<Eigen::VectorXd> &w, std::vector<Eigen::VectorXd> &k) {
+    
+        w.resize(n_w);
+        k.resize(n_w);
+        int total_dof = m_n_c_dof + m_n_f_dof;
+        for(int i=0;i<n_w;i++) {
+            w[i].resize(m_n_c_dof);
+            k[i].resize(total_dof);
+        }
+    
+        Matrix<T, Dynamic, 1> Biy = y;          // B^i y0
+        Matrix<T, Dynamic, 1> tmp(total_dof);
+        Matrix<T, Dynamic, 1> By_c(m_n_c_dof), By_f(m_n_f_dof);
+        
+        for(int i=0; i<n_w; i++){
+
+            if(i > 0) {
+                Matrix<T, Dynamic, 1> y_c = Biy.block(0, 0, m_n_c_dof, 1);
+                Matrix<T, Dynamic, 1> y_f = Biy.block(m_n_c_dof, 0, m_n_f_dof, 1);
+
+                Matrix<T, Dynamic, 1> kc = - m_Mc_inv * (Kcc()*y_c + Kcf()*y_f );
+                Matrix<T, Dynamic, 1> kf = - m_Sff_inv * (Kfc()*kc);
+                
+                Biy.block(0,0,m_n_c_dof,1) = kc;
+                Biy.block(m_n_c_dof,0,m_n_f_dof,1) = kf;
+            }
+            auto tmp_c = IminusP * Biy.block(0,0,m_n_c_dof,1);
+            auto tmp_f = - m_Sff_inv * (Kfc()*tmp_c);
+
+            By_c = - m_Mc_inv  * ( Kcc() * tmp_c + Kcf() * tmp_f );            
+            w[i] = By_c;
+        }
+    }
+    
+    void erk_LTS_weight(Matrix<T, Dynamic, 1> & y, Matrix<T, Dynamic, 1> & k) {
+        
+        k=y;
+        Matrix<T, Dynamic, 1> y_c_dof = y.block(0, 0, m_n_c_dof, 1);
+        Matrix<T, Dynamic, 1> y_f_dof = y.block(m_n_c_dof, 0, m_n_f_dof, 1);
+        
+        ////////// CELLS UPDATE
+        Matrix<T, Dynamic, 1> RHSc = Fc() - Kcc()*y_c_dof - Kcf()*y_f_dof;
+        Matrix<T, Dynamic, 1> k_c_dof = m_Mc_inv * RHSc;
+        k.block(0, 0, m_n_c_dof, 1) = k_c_dof;
+        
+        // FACES UPDATE 
+        Matrix<T, Dynamic, 1> RHSf = Kfc()*k_c_dof ;
+        if (m_sff_is_block_diagonal_Q) {
+            k.block(m_n_c_dof, 0, m_n_f_dof, 1) = - m_Sff_inv * RHSf; 
+        }
+        else {
+            k.block(m_n_c_dof, 0, m_n_f_dof, 1) = - m_inv_Sff * RHSf; 
+        }
+
+    }
+
+    Matrix<T, Dynamic, 1>
+    apply_B(const Matrix<T, Dynamic, 1>& vT) {
+        Matrix<T, Dynamic, 1> Kcc_v = Kcc() * vT;
+        Matrix<T, Dynamic, 1> Kfc_v = Kfc() * vT;
+        Matrix<T, Dynamic, 1> tmpF;
+        if (m_sff_is_block_diagonal_Q) {
+            tmpF = m_Sff_inv * Kfc_v;        
+        }
+        else {
+            tmpF = m_inv_Sff * Kfc_v;        
+        }
+        Matrix<T, Dynamic, 1> corr = Kcf() * tmpF;
+        Matrix<T, Dynamic, 1> result = - m_Mc_inv * (Kcc_v - corr);
+        return result;
+    }
+
+    Matrix<T, Dynamic, 1>
+    apply_B_power(const Matrix<T, Dynamic, 1>& vT, int n) {
+        Matrix<T, Dynamic, 1> result = vT;
+        for (int i = 0; i < n; ++i) {
+            result = apply_B(result); 
+        }
+        return result;
+    }
+
+    Matrix<T, Dynamic, Dynamic>
+    coarse_predictor(int s, Matrix<double, Dynamic, 1> &b, Matrix<double, Dynamic, 1> &c, Matrix<T, Dynamic, 1> & y, SparseMatrix<T> IminusP) {
+
+        Matrix<T, Dynamic, Dynamic> W = Matrix<T, Dynamic, Dynamic>::Zero(m_n_c_dof, s);
+        Matrix<T, Dynamic, 1> y_c_dof = y.block(0, 0, m_n_c_dof, 1);
+        
+        for (int i = 0; i < s; ++i) {
+            Matrix<T, Dynamic, 1> S = Matrix<T, Dynamic, 1>::Zero(m_n_c_dof);
+            for (int j = 0; j < s; ++j) {
+                T coeff = b(j,0) * std::pow(c(j,0), i);
+                Matrix<T, Dynamic, 1> term = apply_B_power(y_c_dof, i);
+                for (int ell = 1; ell <= i; ++ell) {
+                    // term += apply_B_power(H(ell-1), i-ell);
+                }
+                S += coeff * term;
+            }
+            T factor = T(i+1) / tgamma(i+1);
+            S *= factor;
+            W.col(i) = apply_B(IminusP * S);
+        }
+        
+        return W;  
+    }
+
+    void compute_k(int r, int m, int s, T Delta_tau, Matrix<T, Dynamic, Dynamic> W, Matrix<T, Dynamic, 1> c, Matrix<T, Dynamic, 1> & y,Matrix<T, Dynamic, Dynamic> k, Matrix<T, Dynamic, Dynamic> a, SparseMatrix<T> P, SparseMatrix<T> IminusP) {
+
+        Matrix<T, Dynamic, Dynamic> k_T = Matrix<T, Dynamic, 1>::Zero(m_n_c_dof,1);
+        Matrix<T, Dynamic, Dynamic> k_F = Matrix<T, Dynamic, 1>::Zero(m_n_f_dof,1);
+
+        // CELL UPDATE
+        T alpha = (m + c(r-1,0)) * Delta_tau;
+        for(int j = 0; j < s; ++j) {
+            k_T += std::pow(alpha, j) * W.col(j);
+        }
+        Matrix<T, Dynamic, 1> tmp = Matrix<T, Dynamic, 1>::Zero(m_n_c_dof,1);
+        for(int i = 1; i <= r-1; ++i) {
+            tmp += a(r,i) * k_T;
+        }
+        tmp *= Delta_tau;
+        Matrix<T, Dynamic, 1> y_c = y.block(0, 0, m_n_c_dof, 1);
+        tmp += y_c;
+        k_T = apply_B(P * tmp);
+        
+        // FACE UPDATE
+        Matrix<T, Dynamic, 1> RHSf = Kfc()*k_T;
+        if (m_sff_is_block_diagonal_Q) {
+            k_F = - m_Sff_inv * RHSf;
+        }
+        else { 
+            k_F = - m_inv_Sff * RHSf;
+        }
+
+        k.block(0, r, m_n_c_dof, 1) = k_T;
+        k.block(m_n_c_dof, r, m_n_f_dof, 1) = k_F;
+
+    }
+
     #ifdef HAVE_INTEL_MKL
-        PardisoLDLT<Eigen::SparseMatrix<T>> & FacesAnalysis(){
+        PardisoLDLT<SparseMatrix<T>> & FacesAnalysis(){
             return m_analysis_f;
         }
     #else
@@ -373,6 +533,10 @@ class erk_coupling_hho_scheme
     
     SparseMatrix<T> & Mc(){
         return m_Mc;
+    }
+
+    SparseMatrix<T> & invMc(){
+        return m_Mc_inv;
     }
 
     SparseMatrix<T> & Kcc(){
@@ -461,12 +625,6 @@ class erk_coupling_hho_scheme
         simulation_log << "Eigenvalue found: " << eigs.eigenvalues() << std::endl;
         
     }
-
-// Delta = A_{TF} A_{FF}^{-1} A_{FT}
-// A' = A_{TT}-Delta
-// S'=S_{TT}-Delta
-
-// Pb spectral pour A'MA' - S'MS'
 
 };
 

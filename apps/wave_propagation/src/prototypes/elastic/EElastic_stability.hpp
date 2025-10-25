@@ -324,7 +324,7 @@ void EElastic_stability(int argc, char **argv){
     simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
     simulation_log << "h size =  " << h << std::endl;
     simulation_log << "CFL c(dt/h) =  " << std::sqrt(3.0)*dt/h << std::endl;
-    auto block_dimension = assembler.Scc_block_dimension();
+    // auto block_dimension = assembler.Scc_block_dimension();
     // erk_an.compute_eigenvalues_bis(assembler.LHS_STAB, block_dimension, simulation_log);
     erk_an.compute_eigenvalues(simulation_log);
     simulation_log.flush();

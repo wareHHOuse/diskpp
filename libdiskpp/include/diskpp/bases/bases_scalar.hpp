@@ -65,6 +65,8 @@ struct scaled_monomial_scalar_basis
 
 /* Basis 'factory'. */
 #ifndef USE_LEGENDRE
+#ifndef ORTHO_BASIS
+
 template<typename MeshType, typename ElementType, typename ScalarType = typename MeshType::coordinate_type>
 auto
 make_scalar_monomial_basis(const MeshType&    msh,
@@ -74,6 +76,17 @@ make_scalar_monomial_basis(const MeshType&    msh,
 {
     return scaled_monomial_scalar_basis<MeshType, ElementType, ScalarType>(msh, elem, degree, use_inertia_axes);
 }
+#else
+template<typename MeshType, typename ElementType, typename ScalarType = typename MeshType::coordinate_type>
+auto
+make_scalar_monomial_basis(const MeshType&    msh,
+                           const ElementType& elem,
+                           size_t             degree,
+                           bool               use_inertia_axes = USE_INERTIA_AXES)
+{
+    return scaled_monomial_scalar_basis_ortho<MeshType, ElementType, ScalarType>(msh, elem, degree, use_inertia_axes);
+}
+#endif
 #endif
 
 /***************************************************************************************************/

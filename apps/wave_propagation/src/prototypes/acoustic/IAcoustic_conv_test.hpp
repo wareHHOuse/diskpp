@@ -2,6 +2,8 @@
 
 //  Created by Romain Mottier
 
+// ../wave_propagation -s1 -k3 -r1 -c1 -p0 -l4 -n7 -i0 -f1 -e0
+
 void IAcoustic_conv_test(int argc, char **argv);
 
 void IAcoustic_conv_test(int argc, char **argv){
@@ -121,10 +123,11 @@ void IAcoustic_conv_test(int argc, char **argv){
     // ##################################################
     
     scal_vec_analytic_functions functions;
-    //functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionNonPolynomial);
-    //functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionQuadraticInTime);
-    //functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionQuadraticInSpace);
+    // functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionNonPolynomial);
+    // functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionQuadraticInTime);
+    // functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionQuadraticInSpaceAcoustic); 
     functions.set_function_type(scal_vec_analytic_functions::EFunctionType::reproduction_acoustic);
+    // functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionPlaneWaveAcoustic);
     
     auto null_flux_fun = [](const typename disk::mesh<double, 2, disk::generic_mesh_storage<double, 2>>::point_type& pt) -> disk::static_matrix<double,2,2> {
         double x,y;
@@ -202,7 +205,7 @@ void IAcoustic_conv_test(int argc, char **argv){
     // boundary conditions
     e_boundary_type e_bnd(msh);
     a_boundary_type a_bnd(msh);
-    a_bnd.addDirichletBC(disk::DirichletType::DIRICHLET, bc_acoustic_id, s_u_fun);
+    a_bnd.addDirichletBC(disk::DirichletType::DIRICHLET, bc_acoustic_id, s_v_fun);
     
     // ##################################################
     // ################################################## Solving a primal HHO mixed problem 
@@ -344,6 +347,7 @@ void IAcoustic_conv_test(int argc, char **argv){
                 }
                 
                 t = tn + c(i,0) * dt;
+                
                 // Manufactured solution
                 auto s_v_fun    = functions.Evaluate_s_v(t);
                 auto s_f_fun    = functions.Evaluate_s_f(t);

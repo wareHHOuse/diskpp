@@ -22,8 +22,7 @@
 #endif
 
 template<typename Mesh>
-class elastoacoustic_four_fields_assembler
-{
+class elastoacoustic_four_fields_assembler {
     
     typedef disk::BoundaryConditions<Mesh, false>    e_boundary_type;
     typedef disk::BoundaryConditions<Mesh, true>     a_boundary_type;
@@ -71,21 +70,22 @@ public:
     SparseMatrix<T>         LHS_STAB;
     Matrix<T, Dynamic, 1>   RHS;
     SparseMatrix<T>         MASS;
+    SparseMatrix<T>         P;
+    SparseMatrix<T>         IminusP;
     SparseMatrix<T>         COUPLING;
 
-    elastoacoustic_four_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const e_boundary_type& e_bnd, const a_boundary_type& a_bnd, std::map<size_t,elastic_material_data<T>> & e_material, std::map<size_t,acoustic_material_data<T>> & a_material)
-        : m_hho_di(hho_di), m_e_bnd(e_bnd), m_a_bnd(a_bnd), m_e_material(e_material), m_a_material(a_material), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
-    {
+
+    // Identification of Dirichlet faces; Construction of compressed face index maps; Computation of dofs counts; 
+    // Initialization of global matrices and RHS; Setup of cell classification and local-to-global mapping structures.
+    elastoacoustic_four_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const e_boundary_type& e_bnd, const a_boundary_type& a_bnd, std::map<size_t,elastic_material_data<T>> & e_material, std::map<size_t,acoustic_material_data<T>> & a_material) : m_hho_di(hho_di), m_e_bnd(e_bnd), m_a_bnd(a_bnd), m_e_material(e_material), m_a_material(a_material), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false) {
             
         auto storage = msh.backend_storage();
         auto is_e_dirichlet = [&](const typename Mesh::face& fc) -> bool {
-
             auto fc_id = msh.lookup(fc);
             return e_bnd.is_dirichlet_face(fc_id);
         };
         
         auto is_a_dirichlet = [&](const typename Mesh::face& fc) -> bool {
-
             auto fc_id = msh.lookup(fc);
             return a_bnd.is_dirichlet_face(fc_id);
         };
@@ -131,15 +131,15 @@ public:
 
         size_t e_compressed_offset = 0;
         for (auto face_id : e_egdes) {
-          m_e_compress_indexes.at(face_id) = e_compressed_offset;
-          m_e_expand_indexes.at(e_compressed_offset) = face_id;
-          e_compressed_offset++;
+            m_e_compress_indexes.at(face_id) = e_compressed_offset;
+            m_e_expand_indexes.at(e_compressed_offset) = face_id;
+            e_compressed_offset++;
         }
         size_t a_compressed_offset = 0;
         for (auto face_id : a_egdes) {
-          m_a_compress_indexes.at(face_id) = a_compressed_offset;
-          m_a_expand_indexes.at(a_compressed_offset) = face_id;
-          a_compressed_offset++;
+            m_a_compress_indexes.at(face_id) = a_compressed_offset;
+            m_a_expand_indexes.at(a_compressed_offset) = face_id;
+            a_compressed_offset++;
         }
     
         size_t n_cbs = get_e_cell_basis_data();
@@ -160,14 +160,17 @@ public:
         RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
         MASS = SparseMatrix<T>( system_size, system_size );
         COUPLING = SparseMatrix<T>( system_size, system_size );
+        P = SparseMatrix<T>( system_size, system_size );
+        IminusP = SparseMatrix<T>( m_n_elastic_cell_dof + m_n_acoustic_cell_dof, m_n_elastic_cell_dof + m_n_acoustic_cell_dof );
+
         classify_cells(msh);
         build_cells_maps();
     }
     
-    void scatter_e_data_stab(size_t e_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl,
-             const Matrix<T, Dynamic, Dynamic>& lhs,
-             const Matrix<T, Dynamic, 1>& rhs)
-    {
+    // Elastic cell– and face–dofs mapping; construction of assembly indices with Dirichlet filtering; Computation of global offsets for elastic unknowns; 
+    // Insertion of local matrix entries into global triplets; Insertion of local RHS contributions into the global vector.
+    void scatter_e_data(size_t e_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl, const Matrix<T, Dynamic, Dynamic>& lhs, const Matrix<T, Dynamic, 1>& rhs) {
+
         auto fcs = faces(msh, cl);
         size_t n_cbs = get_e_cell_basis_data();
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
@@ -175,468 +178,139 @@ public:
         asm_map.reserve(n_cbs + n_fbs*fcs.size());
 
         auto cell_LHS_offset = e_cell_ind * n_cbs;
-
-        for (size_t i = 0; i < n_cbs; i++)
+        for (size_t i = 0; i < n_cbs; i++) {
             asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
+        }
             
-        for (size_t face_i = 0; face_i < fcs.size(); face_i++)
-        {
+        for (size_t face_i = 0; face_i < fcs.size(); face_i++) {
             auto fc = fcs[face_i];
             auto fc_id = msh.lookup(fc);
             auto face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_e_compress_indexes.at(fc_id)*n_fbs;
             bool dirichlet = m_e_bnd.is_dirichlet_face(fc_id);
-
-            for (size_t i = 0; i < n_fbs; i++)
+            for (size_t i = 0; i < n_fbs; i++) {
                 asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
-        }
-            
-        assert( asm_map.size() == lhs.rows() && asm_map.size() == lhs.cols() );
-
-        for (size_t i = 0; i < lhs.rows(); i++)
-        {
-            if (!asm_map[i].assemble())
-                continue;
-
-            for (size_t j = 0; j < lhs.cols(); j++)
-            {
-                if ( asm_map[j].assemble() )
-                    m_triplets_stab.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs(i,j)) );
             }
         }
-
-    }
-    
-
-    void scatter_e_data(size_t e_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl,
-             const Matrix<T, Dynamic, Dynamic>& lhs,
-             const Matrix<T, Dynamic, 1>& rhs)
-    {
-        auto fcs = faces(msh, cl);
-        size_t n_cbs = get_e_cell_basis_data();
-        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
-        std::vector<assembly_index> asm_map;
-        asm_map.reserve(n_cbs + n_fbs*fcs.size());
-
-        auto cell_LHS_offset = e_cell_ind * n_cbs;
-
-        for (size_t i = 0; i < n_cbs; i++)
-            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
-            
-        for (size_t face_i = 0; face_i < fcs.size(); face_i++)
-        {
-            auto fc = fcs[face_i];
-            auto fc_id = msh.lookup(fc);
-            auto face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_e_compress_indexes.at(fc_id)*n_fbs;
-            bool dirichlet = m_e_bnd.is_dirichlet_face(fc_id);
-
-            for (size_t i = 0; i < n_fbs; i++)
-                asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
-        }
             
         assert( asm_map.size() == lhs.rows() && asm_map.size() == lhs.cols() );
-
-        for (size_t i = 0; i < lhs.rows(); i++)
-        {
-            if (!asm_map[i].assemble())
+        for (size_t i = 0; i < lhs.rows(); i++) {
+            if (!asm_map[i].assemble()) {
                 continue;
-
-            for (size_t j = 0; j < lhs.cols(); j++)
-            {
-                if ( asm_map[j].assemble() )
+            }
+            for (size_t j = 0; j < lhs.cols(); j++) {
+                if ( asm_map[j].assemble() ) {
                     m_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs(i,j)) );
+                }
             }
         }
-
-        for (size_t i = 0; i < rhs.rows(); i++)
-        {
-            if (!asm_map[i].assemble())
-                continue;
-            RHS(asm_map[i].vidx()) += rhs(i);
-        }
-
-    }
-    
-    void scatter_a_data(size_t a_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl,
-    const Matrix<T, Dynamic, Dynamic>& lhs,
-    const Matrix<T, Dynamic, 1>& rhs)
-    {
-        auto fcs = faces(msh, cl);
-        size_t n_cbs = get_a_cell_basis_data();
-        size_t n_fbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
-        std::vector<assembly_index> asm_map;
-        asm_map.reserve(n_cbs + n_fbs*fcs.size());
-
-        auto cell_LHS_offset    = a_cell_ind * n_cbs + m_n_elastic_cell_dof;
-
-        for (size_t i = 0; i < n_cbs; i++)
-            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
-        
-        for (size_t face_i = 0; face_i < fcs.size(); face_i++)
-        {
-            auto fc = fcs[face_i];
-            auto fc_id = msh.lookup(fc);
-            auto face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_n_elastic_face_dof + m_a_compress_indexes.at(fc_id)*n_fbs;
-
-            bool dirichlet = m_a_bnd.is_dirichlet_face(fc_id);
-
-            for (size_t i = 0; i < n_fbs; i++)
-                asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
-            
-        }
-
-        assert( asm_map.size() == lhs.rows() && asm_map.size() == lhs.cols() );
-
-        for (size_t i = 0; i < lhs.rows(); i++)
-        {
-            if (!asm_map[i].assemble())
-                continue;
-
-            for (size_t j = 0; j < lhs.cols(); j++)
-            {
-                if ( asm_map[j].assemble() )
-                    m_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs(i,j)) );
-            }
-        }
-
-        for (size_t i = 0; i < rhs.rows(); i++)
-        {
-            if (!asm_map[i].assemble())
-                continue;
-            RHS(asm_map[i].vidx()) += rhs(i);
-        }
-
-    }
-    
-    void scatter_a_data_stab(size_t a_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl,
-    const Matrix<T, Dynamic, Dynamic>& lhs,
-    const Matrix<T, Dynamic, 1>& rhs)
-    {
-        auto fcs = faces(msh, cl);
-        size_t n_cbs = get_a_cell_basis_data();
-        size_t n_fbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
-        std::vector<assembly_index> asm_map;
-        asm_map.reserve(n_cbs + n_fbs*fcs.size());
-
-        auto cell_LHS_offset    = a_cell_ind * n_cbs + m_n_elastic_cell_dof;
-
-        for (size_t i = 0; i < n_cbs; i++)
-            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
-        
-        for (size_t face_i = 0; face_i < fcs.size(); face_i++)
-        {
-            auto fc = fcs[face_i];
-            auto fc_id = msh.lookup(fc);
-            auto face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_n_elastic_face_dof + m_a_compress_indexes.at(fc_id)*n_fbs;
-
-            bool dirichlet = m_a_bnd.is_dirichlet_face(fc_id);
-
-            for (size_t i = 0; i < n_fbs; i++)
-                asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
-            
-        }
-
-        assert( asm_map.size() == lhs.rows() && asm_map.size() == lhs.cols() );
-
-        for (size_t i = 0; i < lhs.rows(); i++)
-        {
-            if (!asm_map[i].assemble())
-                continue;
-
-            for (size_t j = 0; j < lhs.cols(); j++)
-            {
-                if ( asm_map[j].assemble() )
-                    m_triplets_stab.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs(i,j)) );
-            }
-        }
-    }
-    
-    void scatter_e_mass_data(size_t e_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl,
-             const Matrix<T, Dynamic, Dynamic>& mass_matrix)
-    {
-        
-        size_t n_cbs = get_e_cell_basis_data();
-        std::vector<assembly_index> asm_map;
-        asm_map.reserve(n_cbs);
-        
-        auto cell_LHS_offset    = e_cell_ind * n_cbs;
-
-        for (size_t i = 0; i < n_cbs; i++)
-            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
-
-        assert( asm_map.size() == mass_matrix.rows() && asm_map.size() == mass_matrix.cols() );
-
-        for (size_t i = 0; i < mass_matrix.rows(); i++)
-        {
-            if (!asm_map[i].assemble())
-                continue;
-
-            for (size_t j = 0; j < mass_matrix.cols(); j++)
-            {
-                if ( asm_map[j].assemble() )
-                    m_mass_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], mass_matrix(i,j)) );
-            }
-        }
-
-    }
-    
-    void scatter_a_mass_data(size_t a_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl,
-             const Matrix<T, Dynamic, Dynamic>& mass_matrix)
-    {
-        size_t n_cbs = get_a_cell_basis_data();
-        std::vector<assembly_index> asm_map;
-        asm_map.reserve(n_cbs);
-
-        auto cell_LHS_offset    = a_cell_ind * n_cbs + m_n_elastic_cell_dof;
-        
-        for (size_t i = 0; i < n_cbs; i++)
-            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
-
-        assert( asm_map.size() == mass_matrix.rows() && asm_map.size() == mass_matrix.cols() );
-
-        for (size_t i = 0; i < mass_matrix.rows(); i++)
-        {
-            if (!asm_map[i].assemble())
-                continue;
-
-            for (size_t j = 0; j < mass_matrix.cols(); j++)
-            {
-                if ( asm_map[j].assemble() )
-                    m_mass_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], mass_matrix(i,j)) );
-            }
-        }
-
-    }
-    
-    void scatter_ea_interface_data(const Mesh& msh, const typename Mesh::face_type& face, const Matrix<T, Dynamic, Dynamic>& interface_matrix) {
-        
-        auto vfbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
-        auto sfbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
-
-        std::vector<assembly_index> asm_map_e, asm_map_a;
-        asm_map_e.reserve(vfbs);
-        asm_map_a.reserve(sfbs);
-        auto fc_id = msh.lookup(face);
-        
-        auto e_face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_e_compress_indexes.at(fc_id)*vfbs;
-        bool e_dirichlet = m_e_bnd.is_dirichlet_face(fc_id);
-        for (size_t i = 0; i < vfbs; i++){
-            asm_map_e.push_back( assembly_index(e_face_LHS_offset+i, !e_dirichlet) );
-        }
-            
-        auto a_face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_n_elastic_face_dof + m_a_compress_indexes.at(fc_id)*sfbs;
-        bool a_dirichlet = m_a_bnd.is_dirichlet_face(fc_id);
-        for (size_t i = 0; i < sfbs; i++){
-            asm_map_a.push_back( assembly_index(a_face_LHS_offset+i, !a_dirichlet) );
-        }
-        
-        assert( asm_map_e.size() == interface_matrix.rows() && asm_map_a.size() == interface_matrix.cols() );
-
-        for (size_t i = 0; i < interface_matrix.rows(); i++) {
-            for (size_t j = 0; j < interface_matrix.cols(); j++) {
-              m_c_triplets.push_back( Triplet<T>(asm_map_e[i].vidx(), asm_map_a[j].vidx(),   interface_matrix(i,j)) );
-              m_c_triplets.push_back( Triplet<T>(asm_map_a[j].vidx(), asm_map_e[i].vidx(), - interface_matrix(i,j)) );
-            }
-        }
-
-    }
-    
-    void scatter_e_rhs_data(size_t e_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl, const Matrix<T, Dynamic, 1>& rhs) {
-    
-        size_t n_cbs = get_e_cell_basis_data();
-        std::vector<assembly_index> asm_map;
-        asm_map.reserve(n_cbs);
-
-        auto cell_LHS_offset    = e_cell_ind * n_cbs;
-
-        for (size_t i = 0; i < n_cbs; i++)
-            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
-
-        assert( asm_map.size() == rhs.rows() );
 
         for (size_t i = 0; i < rhs.rows(); i++) {
-            if (!asm_map[i].assemble())
+            if (!asm_map[i].assemble()) {
                 continue;
-            RHS(asm_map[i].vidx()) += rhs(i);
-        }
-
-    }
-    
-    void scatter_a_rhs_data(size_t a_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl,
-             const Matrix<T, Dynamic, 1>& rhs)
-    {
-        size_t n_cbs = get_a_cell_basis_data();
-        std::vector<assembly_index> asm_map;
-        asm_map.reserve(n_cbs);
-
-        auto cell_LHS_offset    = a_cell_ind * n_cbs + m_n_elastic_cell_dof;
-
-        for (size_t i = 0; i < n_cbs; i++)
-            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
-
-        assert( asm_map.size() == rhs.rows());
-
-        for (size_t i = 0; i < rhs.rows(); i++)
-        {
-            if (!asm_map[i].assemble())
-                continue;
-            RHS(asm_map[i].vidx()) += rhs(i);
-        }
-
-    }
-    
-    void scatter_e_bc_data(size_t e_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl,
-             const Matrix<T, Dynamic, Dynamic>& lhs)
-    {
-    
-        auto fcs = faces(msh, cl);
-        size_t n_cbs = get_e_cell_basis_data();
-        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
-        std::vector<assembly_index> asm_map;
-        asm_map.reserve(n_cbs + n_fbs*fcs.size());
-
-        auto cell_LHS_offset    = e_cell_ind * n_cbs;
-
-        for (size_t i = 0; i < n_cbs; i++)
-            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
-        
-        Matrix<T, Dynamic, 1> dirichlet_data = Matrix<T, Dynamic, 1>::Zero(n_cbs + fcs.size()*n_fbs);
-        for (size_t face_i = 0; face_i < fcs.size(); face_i++)
-        {
-            auto fc = fcs[face_i];
-            auto fc_id = msh.lookup(fc);
-            auto face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_e_compress_indexes.at(fc_id)*n_fbs;
-
-            bool dirichlet = m_e_bnd.is_dirichlet_face(fc_id);
-
-            for (size_t i = 0; i < n_fbs; i++)
-                asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
-            
-            if (dirichlet)
-             {
-                 auto fb = make_vector_monomial_basis(msh, fc, m_hho_di.face_degree());
-                 auto dirichlet_fun  = m_e_bnd.dirichlet_boundary_func(fc_id);
-
-                 Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb);
-                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_fun);
-                 dirichlet_data.block(n_cbs + face_i*n_fbs, 0, n_fbs, 1) = mass.llt().solve(rhs);
-             }
-            
-        }
-
-        assert( asm_map.size() == lhs.rows() && asm_map.size() == lhs.cols() );
-
-        for (size_t i = 0; i < lhs.rows(); i++)
-        {
-            if (!asm_map[i].assemble())
-                continue;
-
-            for (size_t j = 0; j < lhs.cols(); j++)
-            {
-                if ( !asm_map[j].assemble() )
-                    RHS(asm_map[i].vidx()) -= lhs(i,j) * dirichlet_data(j);
             }
+            RHS(asm_map[i].vidx()) += rhs(i);
         }
-
     }
     
-    void scatter_a_bc_data(size_t a_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl,
-             const Matrix<T, Dynamic, Dynamic>& lhs)
-    {
+    // Acoustic cell– and face–dofs mapping; Construction of assembly indices with Dirichlet filtering; Computation of global offsets for acoustic unknowns; 
+    // Insertion of local matrix entries into global triplets; Insertion of local RHS contributions into the global vector.
+    void scatter_a_data(size_t a_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl, const Matrix<T, Dynamic, Dynamic>& lhs, const Matrix<T, Dynamic, 1>& rhs) {
+
         auto fcs = faces(msh, cl);
         size_t n_cbs = get_a_cell_basis_data();
         size_t n_fbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
         std::vector<assembly_index> asm_map;
         asm_map.reserve(n_cbs + n_fbs*fcs.size());
-        
-        auto cell_LHS_offset    = a_cell_ind * n_cbs + m_n_elastic_cell_dof;
 
-        for (size_t i = 0; i < n_cbs; i++)
+        auto cell_LHS_offset    = a_cell_ind * n_cbs + m_n_elastic_cell_dof;
+        for (size_t i = 0; i < n_cbs; i++) {
             asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
+        }
         
-        Matrix<T, Dynamic, 1> dirichlet_data = Matrix<T, Dynamic, 1>::Zero(n_cbs + fcs.size()*n_fbs);
-        for (size_t face_i = 0; face_i < fcs.size(); face_i++)
-        {
+        for (size_t face_i = 0; face_i < fcs.size(); face_i++) {
             auto fc = fcs[face_i];
             auto fc_id = msh.lookup(fc);
             auto face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_n_elastic_face_dof + m_a_compress_indexes.at(fc_id)*n_fbs;
-            
             bool dirichlet = m_a_bnd.is_dirichlet_face(fc_id);
-
-            for (size_t i = 0; i < n_fbs; i++)
+            for (size_t i = 0; i < n_fbs; i++) {
                 asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
-            
-            if (dirichlet)
-             {
-                 auto fb = make_scalar_monomial_basis(msh, fc, m_hho_di.face_degree());
-                 auto dirichlet_fun  = m_a_bnd.dirichlet_boundary_func(fc_id);
-
-                 Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb);
-                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_fun);
-                 dirichlet_data.block(n_cbs + face_i*n_fbs, 0, n_fbs, 1) = mass.llt().solve(rhs);
-             }
-            
-        }
-
-        assert( asm_map.size() == lhs.rows() && asm_map.size() == lhs.cols() );
-
-        for (size_t i = 0; i < lhs.rows(); i++)
-        {
-            if (!asm_map[i].assemble())
-                continue;
-
-            for (size_t j = 0; j < lhs.cols(); j++)
-            {
-                if ( !asm_map[j].assemble() )
-                    RHS(asm_map[i].vidx()) -= lhs(i,j) * dirichlet_data(j);
-                    
             }
         }
 
+        assert( asm_map.size() == lhs.rows() && asm_map.size() == lhs.cols() );
+        for (size_t i = 0; i < lhs.rows(); i++) {
+            if (!asm_map[i].assemble()) {
+                continue;
+            }
+            for (size_t j = 0; j < lhs.cols(); j++) {
+                if (asm_map[j].assemble()) {
+                    m_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs(i,j)) );
+                }
+            }
+        }
+
+        for (size_t i = 0; i < rhs.rows(); i++) {
+            if (!asm_map[i].assemble()) {
+                continue;
+            }
+            RHS(asm_map[i].vidx()) += rhs(i);
+        }
+        
     }
     
-    void assemble(const Mesh& msh, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> e_rhs_fun, std::function<T(const typename Mesh::point_type& )> a_rhs_fun, bool explicit_scheme){
+    // Elastic cell–DoF mapping; Construction of assembly indices; Computation of global offsets for elastic cell unknowns; 
+    // Insertion of local mass-matrix entries into global mass triplets.
+    void scatter_e_mass_data(size_t e_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl, const Matrix<T, Dynamic, Dynamic>& mass_matrix) {
         
-        auto storage = msh.backend_storage();
-        LHS.setZero();
-        RHS.setZero();
-        
-        // elastic block
-        for (auto e_chunk : m_e_material) {
-            size_t e_cell_ind = m_e_cell_index[e_chunk.first];
-            auto& cell = storage->surfaces[e_chunk.first];
-            Matrix<T, Dynamic, Dynamic> mixed_operator_loc = e_mixed_operator(e_chunk.second, msh, cell, explicit_scheme);
-            Matrix<T, Dynamic, 1> f_loc = e_mixed_rhs(msh, cell, e_rhs_fun);
-            scatter_e_data(e_cell_ind, msh, cell, mixed_operator_loc, f_loc);
+        size_t n_cbs = get_e_cell_basis_data();
+        std::vector<assembly_index> asm_map;
+        asm_map.reserve(n_cbs);        
+        auto cell_LHS_offset = e_cell_ind * n_cbs;
+        for (size_t i = 0; i < n_cbs; i++) {
+            asm_map.push_back(assembly_index(cell_LHS_offset+i, true));
         }
-        
-        // acoustic block
-        for (auto a_chunk : m_a_material) {
-            size_t a_cell_ind = m_a_cell_index[a_chunk.first];
-            auto& cell = storage->surfaces[a_chunk.first];
-            Matrix<T, Dynamic, Dynamic> mixed_operator_loc = a_mixed_operator(a_chunk.second, msh, cell, explicit_scheme);
-            Matrix<T, Dynamic, 1> f_loc = a_mixed_rhs(msh, cell, a_rhs_fun);
-            scatter_a_data(a_cell_ind, msh, cell, mixed_operator_loc, f_loc);
+
+        assert( asm_map.size() == mass_matrix.rows() && asm_map.size() == mass_matrix.cols() );
+        for (size_t i = 0; i < mass_matrix.rows(); i++) {
+            if (!asm_map[i].assemble()) {
+                continue;
+            }
+            for (size_t j = 0; j < mass_matrix.cols(); j++) {
+                if (asm_map[j].assemble()) {
+                    m_mass_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], mass_matrix(i,j)) );
+                }
+            }
         }
-        finalize();
     }
     
+    // Acoustic cell–DoF mapping; Construction of assembly indices; Computation of global offsets for acoustic cell unknowns; 
+    // Insertion of local mass-matrix entries into global mass triplets.
+    void scatter_a_mass_data(size_t a_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl, const Matrix<T, Dynamic, Dynamic>& mass_matrix) {
 
-    void assemble_coupling_terms(const Mesh& msh){
-        
-        auto storage = msh.backend_storage();
-        COUPLING.setZero();
-        // coupling blocks
-        for (auto chunk : m_interface_cell_indexes) {
-            auto& face = storage->edges[chunk.first];
-            auto& e_cell = storage->surfaces[chunk.second.first];
-            auto& a_cell = storage->surfaces[chunk.second.second];
-            Matrix<T, Dynamic, Dynamic> interface_operator_loc = e_interface_operator(msh, face, e_cell, a_cell);
-            scatter_ea_interface_data(msh, face, interface_operator_loc);
+        size_t n_cbs = get_a_cell_basis_data();
+        std::vector<assembly_index> asm_map;
+        asm_map.reserve(n_cbs);
+        auto cell_LHS_offset = a_cell_ind * n_cbs + m_n_elastic_cell_dof;
+        for (size_t i = 0; i < n_cbs; i++) {
+            asm_map.push_back(assembly_index(cell_LHS_offset+i, true));
         }
-        finalize_coupling();
+
+        assert( asm_map.size() == mass_matrix.rows() && asm_map.size() == mass_matrix.cols() );
+        for (size_t i = 0; i < mass_matrix.rows(); i++) {
+            if (!asm_map[i].assemble()) {
+                continue;
+            }
+            for (size_t j = 0; j < mass_matrix.cols(); j++) {
+                if (asm_map[j].assemble()) {
+                    m_mass_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], mass_matrix(i,j)) );
+                }
+            }
+        }
     }
 
-    void assemble_mass(const Mesh& msh, bool add_vector_mass_Q = true){
+    // Assembly of global mass matrix; local elastic and acoustic cell mass matrix computation; 
+    // Scattering of elastic and acoustic mass contributions into global triplets; Finalization of mass assembly.
+    void assemble_mass(const Mesh& msh, bool add_vector_mass_Q = true) {
         
         auto storage = msh.backend_storage();
         MASS.setZero();
@@ -661,40 +335,145 @@ public:
         
         finalize_mass();
     }
+
+    // Elastic cell–DoF mapping; Construction of assembly indices; Computation of global offsets for elastic cell unknowns; 
+    // Insertion of local RHS contributions into the global vector.
+    void scatter_e_rhs_data(size_t e_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl, const Matrix<T, Dynamic, 1>& rhs) {
     
-    void assemble_rhs(const Mesh& msh, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> e_rhs_fun, std::function<T(const typename Mesh::point_type& )> a_rhs_fun, bool explicit_scheme){
-        
-        RHS.setZero();
-        #ifdef HAVE_INTEL_TBB2
-                size_t n_cells = msh.cells_size();
-                tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
-                    [this,&msh,&rhs_fun] (size_t & cell_ind){
-                        auto& cell = msh.backend_storage()->surfaces[cell_ind];
-                        auto cell_basis   = make_vector_monomial_basis(msh, cell, m_hho_di.cell_degree());
-                        Matrix<T, Dynamic, 1> f_loc = make_rhs(msh, cell, cell_basis, rhs_fun);
-                        this->scatter_rhs_data(msh, cell, f_loc);
-                }
-            );
-        #else
-            auto storage = msh.backend_storage();
-             for (auto e_chunk : m_e_material) {
-                 size_t e_cell_ind = m_e_cell_index[e_chunk.first];
-                 auto& cell = storage->surfaces[e_chunk.first];
-                 Matrix<T, Dynamic, 1> f_loc = e_mixed_rhs(msh, cell, e_rhs_fun);
-                 scatter_e_rhs_data(e_cell_ind, msh, cell, f_loc);
-             }
-        
-            for (auto a_chunk : m_a_material) {
-                size_t a_cell_ind = m_a_cell_index[a_chunk.first];
-                auto& cell = storage->surfaces[a_chunk.first];
-                Matrix<T, Dynamic, 1> f_loc = a_mixed_rhs(msh, cell, a_rhs_fun);
-                scatter_a_rhs_data(a_cell_ind, msh, cell, f_loc);
+        size_t n_cbs = get_e_cell_basis_data();
+        std::vector<assembly_index> asm_map;
+        asm_map.reserve(n_cbs);
+
+        auto cell_LHS_offset    = e_cell_ind * n_cbs;
+        for (size_t i = 0; i < n_cbs; i++) {
+            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
+        }
+
+        assert( asm_map.size() == rhs.rows() );
+        for (size_t i = 0; i < rhs.rows(); i++) {
+            if (!asm_map[i].assemble()) {
+                continue;
             }
-        
-        #endif
-        apply_bc(msh, explicit_scheme);
+            RHS(asm_map[i].vidx()) += rhs(i);
+        }
     }
     
+    // Acoustic cell–DoF mapping; Construction of assembly indices; Computation of global offsets for acoustic cell unknowns; 
+    // Insertion of local RHS contributions into the global vector.
+    void scatter_a_rhs_data(size_t a_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl, const Matrix<T, Dynamic, 1>& rhs) {
+
+        size_t n_cbs = get_a_cell_basis_data();
+        std::vector<assembly_index> asm_map;
+        asm_map.reserve(n_cbs);
+
+        auto cell_LHS_offset    = a_cell_ind * n_cbs + m_n_elastic_cell_dof;
+        for (size_t i = 0; i < n_cbs; i++) {
+            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
+        }
+
+        assert( asm_map.size() == rhs.rows());
+        for (size_t i = 0; i < rhs.rows(); i++) {
+            if (!asm_map[i].assemble()) {
+                continue;
+            }
+            RHS(asm_map[i].vidx()) += rhs(i);
+        }
+    }
+    
+    // Elastic Dirichlet face identification; Construction of assembly indices for cell and face DoFs; 
+    // Computation of Dirichlet face contributions via local mass matrices; Insertion of bc into the global RHS using local-to-global mapping.
+    void scatter_e_bc_data(size_t e_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl, const Matrix<T, Dynamic, Dynamic>& lhs) {
+    
+        auto fcs = faces(msh, cl);
+        size_t n_cbs = get_e_cell_basis_data();
+        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+        std::vector<assembly_index> asm_map;
+        asm_map.reserve(n_cbs + n_fbs*fcs.size());
+
+        auto cell_LHS_offset = e_cell_ind * n_cbs;
+        for (size_t i = 0; i < n_cbs; i++) {
+            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
+        }
+        
+        Matrix<T, Dynamic, 1> dirichlet_data = Matrix<T, Dynamic, 1>::Zero(n_cbs + fcs.size()*n_fbs);
+        for (size_t face_i = 0; face_i < fcs.size(); face_i++) {
+            auto fc = fcs[face_i];
+            auto fc_id = msh.lookup(fc);
+            auto face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_e_compress_indexes.at(fc_id)*n_fbs;
+            bool dirichlet = m_e_bnd.is_dirichlet_face(fc_id);
+            for (size_t i = 0; i < n_fbs; i++) {
+                asm_map.push_back(assembly_index(face_LHS_offset+i, !dirichlet) );
+            }
+            if (dirichlet) {
+                 auto fb = make_vector_monomial_basis(msh, fc, m_hho_di.face_degree());
+                 auto dirichlet_fun  = m_e_bnd.dirichlet_boundary_func(fc_id);
+                 Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb);
+                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_fun);
+                 dirichlet_data.block(n_cbs + face_i*n_fbs, 0, n_fbs, 1) = mass.llt().solve(rhs);
+             }
+        }
+
+        assert(asm_map.size() == lhs.rows() && asm_map.size() == lhs.cols() );
+        for (size_t i = 0; i < lhs.rows(); i++) {
+            if (!asm_map[i].assemble()) {
+                continue;
+            }
+            for (size_t j = 0; j < lhs.cols(); j++) {
+                if (!asm_map[j].assemble() ) {
+                    RHS(asm_map[i].vidx()) -= lhs(i,j) * dirichlet_data(j);
+                }
+            }
+        }
+    }
+    
+    // Acoustic Dirichlet face identification; construction of assembly indices for cell and face DoFs; 
+    // Computation of Dirichlet face contributions via local mass matrices; Insertion of bc into the global RHS using local-to-global mapping.
+    void scatter_a_bc_data(size_t a_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl, const Matrix<T, Dynamic, Dynamic>& lhs) {
+
+        auto fcs = faces(msh, cl);
+        size_t n_cbs = get_a_cell_basis_data();
+        size_t n_fbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
+        std::vector<assembly_index> asm_map;
+        asm_map.reserve(n_cbs + n_fbs*fcs.size());
+        
+        auto cell_LHS_offset    = a_cell_ind * n_cbs + m_n_elastic_cell_dof;
+        for (size_t i = 0; i < n_cbs; i++) {
+            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
+        }
+        
+        Matrix<T, Dynamic, 1> dirichlet_data = Matrix<T, Dynamic, 1>::Zero(n_cbs + fcs.size()*n_fbs);
+        for (size_t face_i = 0; face_i < fcs.size(); face_i++) {
+            auto fc = fcs[face_i];
+            auto fc_id = msh.lookup(fc);
+            auto face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_n_elastic_face_dof + m_a_compress_indexes.at(fc_id)*n_fbs;            
+            bool dirichlet = m_a_bnd.is_dirichlet_face(fc_id);
+            for (size_t i = 0; i < n_fbs; i++) {
+                asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
+            }
+            if (dirichlet) {
+                 auto fb = make_scalar_monomial_basis(msh, fc, m_hho_di.face_degree());
+                 auto dirichlet_fun  = m_a_bnd.dirichlet_boundary_func(fc_id);
+                 Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb);
+                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_fun);
+                 dirichlet_data.block(n_cbs + face_i*n_fbs, 0, n_fbs, 1) = mass.llt().solve(rhs);
+             }
+        }
+
+        assert( asm_map.size() == lhs.rows() && asm_map.size() == lhs.cols() );
+        for (size_t i = 0; i < lhs.rows(); i++) {
+            if (!asm_map[i].assemble()) {
+                continue;
+            }
+            for (size_t j = 0; j < lhs.cols(); j++) {
+                if (!asm_map[j].assemble()) {
+                    RHS(asm_map[i].vidx()) -= lhs(i,j) * dirichlet_data(j);
+                }
+            }
+        }
+    }
+    
+    // Application of boundary conditions; local elastic and acoustic cell operator computation for cells with boundary faces; 
+    // Scattering of Dirichlet contributions into the global RHS;
     void apply_bc(const Mesh& msh, bool explicit_scheme){
         
         #ifdef HAVE_INTEL_TBB2
@@ -709,8 +488,7 @@ public:
             );
         #else
             auto storage = msh.backend_storage();
-            for (auto& cell_ind : m_e_elements_with_bc_eges)
-            {
+            for (auto& cell_ind : m_e_elements_with_bc_eges) {
                 auto& cell = storage->surfaces[cell_ind];
                 size_t e_cell_ind = m_e_cell_index[cell_ind];
                 elastic_material_data<T> e_mat = m_e_material.find(cell_ind)->second;
@@ -718,8 +496,7 @@ public:
                 scatter_e_bc_data(e_cell_ind, msh, cell, mixed_operator_loc);
             }
         
-            for (auto& cell_ind : m_a_elements_with_bc_eges)
-            {
+            for (auto& cell_ind : m_a_elements_with_bc_eges) {
                 auto& cell = storage->surfaces[cell_ind];
                 size_t a_cell_ind = m_a_cell_index[cell_ind];
                 acoustic_material_data<T> a_mat = m_a_material.find(cell_ind)->second;
@@ -731,7 +508,111 @@ public:
         
     }
 
-    Matrix<T, Dynamic, Dynamic> e_mixed_operator(elastic_material_data<T> & material, const Mesh& msh, const typename Mesh::cell_type& cell, bool explicit_scheme){
+    // Assembly of global RHS vector; Local elastic and acoustic cell RHS computation; 
+    // Scattering of local RHS contributions into the global vector; Application of boundary condition corrections.
+    void assemble_rhs(const Mesh& msh, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> e_rhs_fun, std::function<T(const typename Mesh::point_type& )> a_rhs_fun, bool explicit_scheme) {
+        
+        RHS.setZero();
+        auto storage = msh.backend_storage();
+        for (auto e_chunk : m_e_material) {
+            size_t e_cell_ind = m_e_cell_index[e_chunk.first];
+            auto& cell = storage->surfaces[e_chunk.first];
+            Matrix<T, Dynamic, 1> f_loc = e_mixed_rhs(msh, cell, e_rhs_fun);
+            scatter_e_rhs_data(e_cell_ind, msh, cell, f_loc);
+        }
+        
+        for (auto a_chunk : m_a_material) {
+            size_t a_cell_ind = m_a_cell_index[a_chunk.first];
+            auto& cell = storage->surfaces[a_chunk.first];
+            Matrix<T, Dynamic, 1> f_loc = a_mixed_rhs(msh, cell, a_rhs_fun);
+            scatter_a_rhs_data(a_cell_ind, msh, cell, f_loc);
+        }
+        apply_bc(msh, explicit_scheme);
+    }
+    
+    // Assembly of acoustic and elastic part separately; 
+    void assemble(const Mesh& msh, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> e_rhs_fun, std::function<T(const typename Mesh::point_type& )> a_rhs_fun, bool explicit_scheme) {
+        
+        auto storage = msh.backend_storage();
+        LHS.setZero();
+        RHS.setZero();
+        
+        // Elastic block
+        for (auto e_chunk : m_e_material) {
+            size_t e_cell_ind = m_e_cell_index[e_chunk.first];
+            auto& cell = storage->surfaces[e_chunk.first];
+            Matrix<T, Dynamic, Dynamic> mixed_operator_loc = e_mixed_operator(e_chunk.second, msh, cell, explicit_scheme);
+            Matrix<T, Dynamic, 1> f_loc = e_mixed_rhs(msh, cell, e_rhs_fun);
+            scatter_e_data(e_cell_ind, msh, cell, mixed_operator_loc, f_loc);
+        }
+        
+        // Acoustic block
+        for (auto a_chunk : m_a_material) {
+            size_t a_cell_ind = m_a_cell_index[a_chunk.first];
+            auto& cell = storage->surfaces[a_chunk.first];
+            Matrix<T, Dynamic, Dynamic> mixed_operator_loc = a_mixed_operator(a_chunk.second, msh, cell, explicit_scheme);
+            Matrix<T, Dynamic, 1> f_loc = a_mixed_rhs(msh, cell, a_rhs_fun);
+            scatter_a_data(a_cell_ind, msh, cell, mixed_operator_loc, f_loc);
+        }
+
+        finalize();
+
+    }
+    
+    // Elasto–acoustic interface face identification; Construction of Interface matrix.
+    void scatter_ea_interface_data(const Mesh& msh, const typename Mesh::face_type& face, const Matrix<T, Dynamic, Dynamic>& interface_matrix) {
+        
+        auto vfbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+        auto sfbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
+
+        std::vector<assembly_index> asm_map_e, asm_map_a;
+        asm_map_e.reserve(vfbs);
+        asm_map_a.reserve(sfbs);
+        auto fc_id = msh.lookup(face);
+        
+        auto e_face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_e_compress_indexes.at(fc_id)*vfbs;
+        bool e_dirichlet = m_e_bnd.is_dirichlet_face(fc_id);
+        for (size_t i = 0; i < vfbs; i++){
+            asm_map_e.push_back( assembly_index(e_face_LHS_offset+i, !e_dirichlet) );
+        }
+            
+        auto a_face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_n_elastic_face_dof + m_a_compress_indexes.at(fc_id)*sfbs;
+        bool a_dirichlet = m_a_bnd.is_dirichlet_face(fc_id);
+        for (size_t i = 0; i < sfbs; i++){
+            asm_map_a.push_back( assembly_index(a_face_LHS_offset+i, !a_dirichlet) );
+        }
+        
+        assert( asm_map_e.size() == interface_matrix.rows() && asm_map_a.size() == interface_matrix.cols() );
+        for (size_t i = 0; i < interface_matrix.rows(); i++) {
+            for (size_t j = 0; j < interface_matrix.cols(); j++) {
+              m_c_triplets.push_back( Triplet<T>(asm_map_e[i].vidx(), asm_map_a[j].vidx(),   interface_matrix(i,j)) );
+              m_c_triplets.push_back( Triplet<T>(asm_map_a[j].vidx(), asm_map_e[i].vidx(), - interface_matrix(i,j)) );
+            }
+        }
+
+    }
+    
+    // Assembly of global coupling matrix; Local elasto–acoustic interface operator computation for each interface face; 
+    // Scattering of interface contributions into global coupling triplets; finalization of coupling assembly.
+    void assemble_coupling_terms(const Mesh& msh){
+        
+        auto storage = msh.backend_storage();
+        COUPLING.setZero();
+
+        // coupling blocks
+        for (auto chunk : m_interface_cell_indexes) {
+            auto& face = storage->edges[chunk.first];
+            auto& e_cell = storage->surfaces[chunk.second.first];
+            auto& a_cell = storage->surfaces[chunk.second.second];
+            Matrix<T, Dynamic, Dynamic> interface_operator_loc = e_interface_operator(msh, face, e_cell, a_cell);
+            scatter_ea_interface_data(msh, face, interface_operator_loc);
+        }
+
+        finalize_coupling();
+    }
+
+    // Computation of local elastic mixed operator; Strain reconstruction & Stabilization operator; 
+    Matrix<T, Dynamic, Dynamic> e_mixed_operator(elastic_material_data<T> & material, const Mesh& msh, const typename Mesh::cell_type& cell, bool explicit_scheme) {
             
         T rho = material.rho();
         T vp = material.vp();
@@ -767,7 +648,7 @@ public:
             }
         }
         
-        // // COEF SPECTRAL RADIUS
+        // COEF SPECTRAL RADIUS
         T equal_order_eta = 1.50;
         T mixed_order_eta = 0.95; 
 
@@ -777,6 +658,7 @@ public:
         return R_operator + eta*(rho*vs)*S_operator;
     }
             
+    // Computation of local symmetric tensor mass matrix; 
     Matrix<T, Dynamic, Dynamic>
     symmetric_tensor_mass_matrix(const Mesh& msh, const typename Mesh::cell_type& cell) {
             
@@ -787,32 +669,30 @@ public:
         Matrix<T, Dynamic, Dynamic> mass_matrix = Matrix<T, Dynamic, Dynamic>::Zero(ten_bs, ten_bs);
         
         auto qps = integrate(msh, cell, 2 * gradeg);
-
         // number of tensor components
         size_t dec = 0;
-         if (dim == 3)
+         if (dim == 3) {
              dec = 6;
-         else if (dim == 2)
+         }
+         else if (dim == 2) {
              dec = 3;
-         else
+         }
+         else {
              std::logic_error("Expected 3 >= dim > 1");
+         }
 
-         for (auto& qp : qps)
-         {
+         for (auto& qp : qps) {
              auto phi = ten_b.eval_functions(qp.point());
-
-             for (size_t j = 0; j < ten_bs; j++)
-             {
-                 
+             for (size_t j = 0; j < ten_bs; j++) {
                 auto qp_phi_j = disk::priv::inner_product(qp.weight(), phi[j]);
-                for (size_t i = j; i < ten_bs; i += dec){
-                         mass_matrix(i, j) += disk::priv::inner_product(phi[i], qp_phi_j);
+                for (size_t i = j; i < ten_bs; i += dec) {
+                    mass_matrix(i, j) += disk::priv::inner_product(phi[i], qp_phi_j);
                 }
              }
          }
 
-        for (size_t j = 0; j < ten_bs; j++){
-            for (size_t i = 0; i < j; i++){
+        for (size_t j = 0; j < ten_bs; j++) {
+            for (size_t i = 0; i < j; i++) {
                  mass_matrix(i, j) = mass_matrix(j, i);
             }
         }
@@ -820,9 +700,10 @@ public:
         return mass_matrix;
     }
     
+    // Computation of local symmetric tensor trace mass matrix;
     Matrix<T, Dynamic, Dynamic>
     symmetric_tensor_trace_mass_matrix(const Mesh& msh, const typename Mesh::cell_type& cell) {
-            
+        
         size_t dim = Mesh::dimension;
         auto gradeg = m_hho_di.grad_degree();
         auto ten_b = make_sym_matrix_monomial_basis(msh, cell, gradeg);
@@ -830,41 +711,42 @@ public:
         Matrix<T, Dynamic, Dynamic> mass_matrix = Matrix<T, Dynamic, Dynamic>::Zero(ten_bs, ten_bs);
         
         auto qps = integrate(msh, cell, 2 * gradeg);
-
         // number of tensor components
         size_t dec = 0;
-         if (dim == 3)
-             dec = 6;
-         else if (dim == 2)
-             dec = 3;
-         else
-             std::logic_error("Expected 3 >= dim > 1");
-
-         for (auto& qp : qps) {
-
-             auto phi = ten_b.eval_functions(qp.point());
-
-             for (size_t j = 0; j < ten_bs; j++) {
+        if (dim == 3) {
+            dec = 6;
+        }
+        else if (dim == 2) {
+            dec = 3;
+        }
+        else {
+            std::logic_error("Expected 3 >= dim > 1");
+        }
+        
+        for (auto& qp : qps) {
+            auto phi = ten_b.eval_functions(qp.point());
+            for (size_t j = 0; j < ten_bs; j++) {
                 auto identity = phi[j];
                 identity.setZero();
-                for(size_t d = 0; d < dim; d++)
+                for(size_t d = 0; d < dim; d++) {
                     identity(d,d) = 1.0;
-
+                }
                 auto trace = phi[j].trace();
                 auto trace_phi_j = disk::priv::inner_product(phi[j].trace(), identity);
                 auto qp_phi_j = disk::priv::inner_product(qp.weight(), trace_phi_j);
-                for (size_t i = 0; i < ten_bs; i ++)
+                for (size_t i = 0; i < ten_bs; i ++) {
                     mass_matrix(i, j) += disk::priv::inner_product(phi[i], qp_phi_j);
-                
-             }
-         }
+                }
+            }
+        }
         
         return mass_matrix;
     }
     
+    // Computation of local elastic RHS vector;
     Matrix<typename Mesh::coordinate_type, Dynamic, 1>
-    e_mixed_rhs(const Mesh& msh, const typename Mesh::cell_type& cell, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> & rhs_fun, size_t di = 0)
-    {
+    e_mixed_rhs(const Mesh& msh, const typename Mesh::cell_type& cell, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> & rhs_fun, size_t di = 0) {
+
         auto recdeg = m_hho_di.grad_degree();
         auto celdeg = m_hho_di.cell_degree();
         auto facdeg = m_hho_di.face_degree();
@@ -872,25 +754,25 @@ public:
         auto ten_bs = disk::sym_matrix_basis_size(recdeg, Mesh::dimension, Mesh::dimension);
         auto vec_bs = disk::vector_basis_size(celdeg, Mesh::dimension, Mesh::dimension);
         size_t n_cbs = ten_bs + vec_bs;
-        auto cell_basis   = make_vector_monomial_basis(msh, cell, celdeg);
+        auto cell_basis = make_vector_monomial_basis(msh, cell, celdeg);
         using T = typename Mesh::coordinate_type;
 
         Matrix<T, Dynamic, 1> ret_loc = Matrix<T, Dynamic, 1>::Zero(cell_basis.size());
         Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(n_cbs);
 
         const auto qps = integrate(msh, cell, 2 * (celdeg + di));
-
-        for (auto& qp : qps)
-        {
+        for (auto& qp : qps) {
             const auto phi  = cell_basis.eval_functions(qp.point());
             const auto qp_f = disk::priv::inner_product(qp.weight(), rhs_fun(qp.point()));
             ret_loc += disk::priv::outer_product(phi, qp_f);
         }
         ret.block(ten_bs,0,vec_bs,1) = ret_loc;
         return ret;
+
     }
             
-    Matrix<T, Dynamic, Dynamic> e_mass_operator(elastic_material_data<T> & material, const Mesh& msh, const typename Mesh::cell_type& cell, bool add_vector_mass_Q = true){
+    // Computation of local elastic mass operator;
+    Matrix<T, Dynamic, Dynamic> e_mass_operator(elastic_material_data<T> & material, const Mesh& msh, const typename Mesh::cell_type& cell, bool add_vector_mass_Q = true) {
             
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
@@ -905,10 +787,8 @@ public:
         Matrix<T, Dynamic, Dynamic> mass_matrix = Matrix<T, Dynamic, Dynamic>::Zero(n_cbs, n_cbs);
         
         // Symmetric stress tensor mass block
-        
         // Stress tensor
         Matrix<T, Dynamic, Dynamic> mass_matrix_sigma  = symmetric_tensor_mass_matrix(msh, cell);
-        
         // Tensor trace
         Matrix<T, Dynamic, Dynamic> mass_matrix_trace_sigma  = symmetric_tensor_trace_mass_matrix(msh, cell);
         
@@ -929,12 +809,12 @@ public:
         return mass_matrix;
     }
     
+    // Computation of local acoustic mass operator;
     Matrix<T, Dynamic, Dynamic> a_mass_operator(acoustic_material_data<T> & material, const Mesh& msh, const typename Mesh::cell_type& cell, bool add_scalar_mass_Q = true){
             
         size_t n_scal_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
         size_t n_vec_cbs = disk::scalar_basis_size(m_hho_di.reconstruction_degree(), Mesh::dimension)-1;
         size_t n_cbs = n_scal_cbs + n_vec_cbs;
-            
         Matrix<T, Dynamic, Dynamic> mass_matrix = Matrix<T, Dynamic, Dynamic>::Zero(n_cbs, n_cbs);
         
         auto recdeg = m_hho_di.reconstruction_degree();
@@ -957,11 +837,11 @@ public:
         return mass_matrix;
     }
     
-    std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-                 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
+    // Computation of local strain tensor reconstruction;
+    std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>, Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
     strain_tensor_reconstruction(const Mesh& msh, const typename Mesh::cell_type& cell) {
 
-        using T        = typename Mesh::coordinate_type;
+        using T = typename Mesh::coordinate_type;
         typedef Matrix<T, Dynamic, Dynamic> matrix_type;
 
         const size_t N = Mesh::dimension;
@@ -983,14 +863,16 @@ public:
         matrix_type gr_rhs = matrix_type::Zero(ten_bs, vec_bs + num_faces * fbs);
         
         const auto qps = integrate(msh, cell, 2 * graddeg);
-
         size_t dec = 0;
-         if (N == 3)
+         if (N == 3) {
              dec = 6;
-         else if (N == 2)
+         }
+         else if (N == 2) {
              dec = 3;
-         else
+         }
+         else {
              std::logic_error("Expected 3 >= dim > 1");
+         }
 
          for (auto& qp : qps) {
              const auto gphi = ten_b.eval_functions(qp.point());
@@ -1002,10 +884,12 @@ public:
              }
          }
 
-         for (size_t j = 0; j < ten_bs; j++)
-             for (size_t i = 0; i < j; i++)
+         for (size_t j = 0; j < ten_bs; j++) {    
+             for (size_t i = 0; i < j; i++) {
                  gr_lhs(i, j) = gr_lhs(j, i);
-
+             }
+         }
+         
          if (celdeg > 0) {
              const auto qpc = integrate(msh, cell, graddeg + celdeg - 1);
              for (auto& qp : qpc) {
@@ -1044,6 +928,7 @@ public:
         return std::make_pair(oper, data_mixed);
     }
     
+    // Computation of local acoustic mixed operator; Gradient reconstruction & Stabilization operator; 
     Matrix<T, Dynamic, Dynamic> a_mixed_operator(acoustic_material_data<T> & material, const Mesh& msh, const typename Mesh::cell_type& cell, bool explicit_scheme){
         
         auto reconstruction_operator = mixed_scalar_reconstruction(msh, cell);
@@ -1052,7 +937,7 @@ public:
         auto n_cols = R_operator.cols();
 
         Matrix<T, Dynamic, Dynamic> S_operator = Matrix<T, Dynamic, Dynamic>::Zero(n_rows, n_cols);
-        if(explicit_scheme) {
+        if (explicit_scheme) {
             auto stabilization_operator = make_scalar_hdg_stabilization(msh, cell, m_hho_di, false, m_scaled_stabilization_Q);
             auto n_s_rows = stabilization_operator.rows();
             auto n_s_cols = stabilization_operator.cols();
@@ -1087,10 +972,10 @@ public:
         return R_operator + (eta/(vp*rho))*S_operator;
     }
 
-    std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-                 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
-    mixed_scalar_reconstruction(const Mesh& msh, const typename Mesh::cell_type& cell)
-    {
+    // Computation of local scalar (acoustic) mixed reconstruction;
+    std::pair<Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>, Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>>
+    mixed_scalar_reconstruction(const Mesh& msh, const typename Mesh::cell_type& cell) {
+
         using T = typename Mesh::coordinate_type;
         typedef Matrix<T, Dynamic, Dynamic> matrix_type;
         typedef Matrix<T, Dynamic, 1>       vector_type;
@@ -1117,15 +1002,14 @@ public:
         gr_rhs.block(0, 0, rbs-1, cbs) = stiff.block(1, 0, rbs-1, cbs);
 
         const auto fcs = faces(msh, cell);
-        for (size_t i = 0; i < fcs.size(); i++)
-        {
+        for (size_t i = 0; i < fcs.size(); i++) {
+
             const auto fc = fcs[i];
             const auto n  = normal(msh, cell, fc);
             auto fb = make_scalar_monomial_basis(msh, fc, facdeg);
 
             auto qps_f = integrate(msh, fc, recdeg - 1 + std::max(facdeg,celdeg));
-            for (auto& qp : qps_f)
-            {
+            for (auto& qp : qps_f) {
                 vector_type c_phi_tmp = cb.eval_functions(qp.point());
                 vector_type c_phi = c_phi_tmp.head(cbs);
                 Matrix<T, Dynamic, DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
@@ -1149,9 +1033,10 @@ public:
         return std::make_pair(oper, data_mixed);
     }
     
+    // Computation of local acoustic RHS vector;
     Matrix<typename Mesh::coordinate_type, Dynamic, 1>
-    a_mixed_rhs(const Mesh& msh, const typename Mesh::cell_type& cell, std::function<double(const typename Mesh::point_type& )> & rhs_fun, size_t di = 0)
-    {
+    a_mixed_rhs(const Mesh& msh, const typename Mesh::cell_type& cell, std::function<double(const typename Mesh::point_type& )> & rhs_fun, size_t di = 0) {
+
         const auto recdeg = m_hho_di.reconstruction_degree();
         const auto celdeg = m_hho_di.cell_degree();
         const auto rbs = disk::scalar_basis_size(recdeg, Mesh::dimension) - 1;
@@ -1163,9 +1048,7 @@ public:
         Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs);
 
         const auto qps = integrate(msh, cell, 2 * (celdeg + di));
-
-        for (auto& qp : qps)
-        {
+        for (auto& qp : qps) {
             const auto phi  = cell_basis.eval_functions(qp.point());
             const auto qp_f = disk::priv::inner_product(qp.weight(), rhs_fun(qp.point()));
             ret_loc += disk::priv::outer_product(phi, qp_f);
@@ -1174,7 +1057,8 @@ public:
         return ret;
     }
     
-    Matrix<T, Dynamic, Dynamic> e_interface_operator(const Mesh& msh, const typename Mesh::face_type& face, const typename Mesh::cell_type& e_cell, const typename Mesh::cell_type& a_cell){
+    // Computation of local elasto–acoustic interface operator; Quadrature over the face to integrate normal component of elastic basis with acoustic basis; 
+    Matrix<T, Dynamic, Dynamic> e_interface_operator(const Mesh& msh, const typename Mesh::face_type& face, const typename Mesh::cell_type& e_cell, const typename Mesh::cell_type& a_cell) {
 
         Matrix<T, Dynamic, Dynamic> interface_operator;
         auto facdeg = m_hho_di.face_degree();
@@ -1188,19 +1072,20 @@ public:
         const auto qps = integrate(msh, face, facdeg);
         const auto n = disk::normal(msh, e_cell, face);
         for (auto& qp : qps) {
-          const auto v_f_phi = vfb.eval_functions(qp.point());
-          const auto s_f_phi = sfb.eval_functions(qp.point());
-          assert(v_f_phi.rows() == vfbs);
-          assert(s_f_phi.rows() == sfbs);
-          auto q_n = disk::priv::inner_product(qp.weight(), n);
-          const auto n_dot_v_f_phi = disk::priv::inner_product(v_f_phi,q_n);
-          const auto result = (-1.0*disk::priv::outer_product(n_dot_v_f_phi, s_f_phi)).eval();
-          interface_operator += result;
+            const auto v_f_phi = vfb.eval_functions(qp.point());
+            const auto s_f_phi = sfb.eval_functions(qp.point());
+            assert(v_f_phi.rows() == vfbs);
+            assert(s_f_phi.rows() == sfbs);
+            auto q_n = disk::priv::inner_product(qp.weight(), n);
+            const auto n_dot_v_f_phi = disk::priv::inner_product(v_f_phi,q_n);
+            const auto result = (-1.0*disk::priv::outer_product(n_dot_v_f_phi, s_f_phi)).eval();
+            interface_operator += result;
         }
         return interface_operator;
     }
     
-    Matrix<T, Dynamic, 1> e_neumman_bc_operator(const Mesh& msh, const typename Mesh::face_type& face, const typename Mesh::cell_type& e_cell, const typename Mesh::cell_type& a_cell, std::function<T(const typename Mesh::point_type& )> a_vel_fun){
+    // Computation of local Neumann boundary operator for elastic cell; 
+    Matrix<T, Dynamic, 1> e_neumman_bc_operator(const Mesh& msh, const typename Mesh::face_type& face, const typename Mesh::cell_type& e_cell, const typename Mesh::cell_type& a_cell, std::function<T(const typename Mesh::point_type& )> a_vel_fun) {
 
         Matrix<T, Dynamic, Dynamic> neumann_operator;
         auto facdeg = m_hho_di.face_degree();
@@ -1212,21 +1097,21 @@ public:
         auto sfb = make_scalar_monomial_basis(msh, face, facdeg);
         const auto qps = integrate(msh, face, facdeg);
         const auto n = disk::normal(msh, e_cell, face);
-        for (auto& qp : qps)
-        {
+        for (auto& qp : qps) {
             const auto v_f_phi = vfb.eval_functions(qp.point());
             const auto s_f_phi = sfb.eval_functions(qp.point());
-
             assert(v_f_phi.rows() == vfbs);
             const auto n_dot_v_f_phi = disk::priv::inner_product(v_f_phi,disk::priv::inner_product(qp.weight(), n));
             const auto result = disk::priv::outer_product(n_dot_v_f_phi, a_vel_fun(qp.point()));
             neumann_operator += result;
-            
         }
+
         return neumann_operator;
-        }
+
+    }
     
-    Matrix<T, Dynamic, Dynamic> a_neumman_bc_operator(const Mesh& msh, const typename Mesh::face_type& face, const typename Mesh::cell_type& e_cell, const typename Mesh::cell_type& a_cell, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> e_vel_fun){
+    // Computation of local Neumann boundary operator for acoustic cell; 
+    Matrix<T, Dynamic, Dynamic> a_neumman_bc_operator(const Mesh& msh, const typename Mesh::face_type& face, const typename Mesh::cell_type& e_cell, const typename Mesh::cell_type& a_cell, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> e_vel_fun) {
 
         Matrix<T, Dynamic, Dynamic> neumann_operator;
         auto facdeg = m_hho_di.face_degree();
@@ -1238,33 +1123,32 @@ public:
         auto sfb = make_scalar_monomial_basis(msh, face, facdeg);
         const auto qps = integrate(msh, face, facdeg);
         const auto n = disk::normal(msh, a_cell, face);
-        for (auto& qp : qps)
-        {
+        for (auto& qp : qps) {
             const auto v_f_phi = vfb.eval_functions(qp.point());
             const auto s_f_phi = sfb.eval_functions(qp.point());
-
             assert(s_f_phi.rows() == sfbs);
             const auto n_dot_v_f = disk::priv::inner_product(e_vel_fun(qp.point()),disk::priv::inner_product(qp.weight(), n));
             const auto result = disk::priv::inner_product(n_dot_v_f, s_f_phi);
             neumann_operator += result;
         }
+
         return neumann_operator;
+
     }
     
-    void classify_cells(const Mesh& msh){
+    // Classification of mesh cells by boundary conditions; Identification of cells with at least one Dirichlet face; 
+    // Only for conv tests
+    void classify_cells(const Mesh& msh) {
 
         m_e_elements_with_bc_eges.clear();
-        for (auto& cell : msh)
-        {
+        for (auto& cell : msh) {
             auto cell_ind = msh.lookup(cell);
             auto face_list = faces(msh, cell);
-            for (size_t face_i = 0; face_i < face_list.size(); face_i++)
-            {
+            for (size_t face_i = 0; face_i < face_list.size(); face_i++) {
                 auto fc = face_list[face_i];
                 auto fc_id = msh.lookup(fc);
                 bool is_dirichlet_Q = m_e_bnd.is_dirichlet_face(fc_id);
-                if (is_dirichlet_Q)
-                {
+                if (is_dirichlet_Q) {
                     m_e_elements_with_bc_eges.push_back(cell_ind);
                     break;
                 }
@@ -1272,22 +1156,18 @@ public:
         }
         
         m_a_elements_with_bc_eges.clear();
-        for (auto& cell : msh)
-        {
+        for (auto& cell : msh) {
             typename Mesh::point_type bar = barycenter(msh, cell);
             if (bar.x() < 0) {
                 continue;
             }
-            
             auto cell_ind = msh.lookup(cell);
             auto face_list = faces(msh, cell);
-            for (size_t face_i = 0; face_i < face_list.size(); face_i++)
-            {
+            for (size_t face_i = 0; face_i < face_list.size(); face_i++) {
                 auto fc = face_list[face_i];
                 auto fc_id = msh.lookup(fc);
                 bool is_dirichlet_Q = m_a_bnd.is_dirichlet_face(fc_id);
-                if (is_dirichlet_Q)
-                {
+                if (is_dirichlet_Q) {
                     m_a_elements_with_bc_eges.push_back(cell_ind);
                     break;
                 }
@@ -1295,7 +1175,8 @@ public:
         }
     }
     
-    void build_cells_maps(){
+    // Construction of cell-to-index maps; 
+    void build_cells_maps() {
         
         // elastic data
         size_t e_cell_ind = 0;
@@ -1315,14 +1196,14 @@ public:
 
     }
     
-    void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> v_fun, std::function<disk::static_matrix<T,2,2>(const typename Mesh::point_type& )> flux_fun, std::function<T(const typename Mesh::point_type& )> v_s_fun, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> flux_s_fun){
+    // Function projection onto cell dofs 
+    void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> v_fun, std::function<disk::static_matrix<T,2,2>(const typename Mesh::point_type& )> flux_fun, std::function<T(const typename Mesh::point_type& )> v_s_fun, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> flux_s_fun) {
         
         auto storage = msh.backend_storage();
         size_t n_dof = MASS.rows();
         x_glob = Matrix<T, Dynamic, 1>::Zero(n_dof);
 
         // elastic block
-    
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
         size_t n_e_cbs = n_ten_cbs + n_vec_cbs;
@@ -1330,10 +1211,8 @@ public:
         for (auto e_chunk : m_e_material) {
             size_t e_cell_ind = m_e_cell_index[e_chunk.first];
             auto& cell = storage->surfaces[e_chunk.first];
-    
             Matrix<T, Dynamic, 1> x_proj_ten_dof = project_ten_function(msh, cell, flux_fun);
             Matrix<T, Dynamic, 1> x_proj_vec_dof = project_function(msh, cell, m_hho_di.cell_degree(), v_fun);
-            
             Matrix<T, Dynamic, 1> x_proj_dof = Matrix<T, Dynamic, 1>::Zero(n_e_cbs);
             x_proj_dof.block(0, 0, n_ten_cbs, 1)          = x_proj_ten_dof;
             x_proj_dof.block(n_ten_cbs, 0, n_vec_cbs, 1)  = x_proj_vec_dof;
@@ -1347,21 +1226,18 @@ public:
         for (auto a_chunk : m_a_material) {
             size_t a_cell_ind = m_a_cell_index[a_chunk.first];
             auto& cell = storage->surfaces[a_chunk.first];
-            
             Matrix<T, Dynamic, 1> x_proj_vec_dof = project_vec_function(msh, cell, flux_s_fun);
             Matrix<T, Dynamic, 1> x_proj_sca_dof = project_function(msh, cell, m_hho_di.cell_degree(), v_s_fun);
-            
             Matrix<T, Dynamic, 1> x_proj_dof = Matrix<T, Dynamic, 1>::Zero(n_a_cbs);
             x_proj_dof.block(0, 0, n_v_s_cbs, 1) = x_proj_vec_dof;
             x_proj_dof.block(n_v_s_cbs, 0, n_scal_cbs, 1) = x_proj_sca_dof;
-            
             scatter_a_cell_dof_data(a_cell_ind, msh, cell, x_glob, x_proj_dof);
         }
     
     }
     
-    Matrix<T, Dynamic, 1> project_vec_function(const Mesh& msh, const typename Mesh::cell_type& cell,
-                      std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun){
+    // Vector function projection onto cell dofs.
+    Matrix<T, Dynamic, 1> project_vec_function(const Mesh& msh, const typename Mesh::cell_type& cell, std::function<disk::static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun) {
     
             auto recdeg = m_hho_di.reconstruction_degree();
             auto rec_basis = make_scalar_monomial_basis(msh, cell, recdeg);
@@ -1386,10 +1262,10 @@ public:
             return x_dof;
     }
 
-    Matrix<T, Dynamic, 1> project_ten_function(const Mesh& msh, const typename Mesh::cell_type& cell,
-                      std::function<disk::static_matrix<T, 2,2>(const typename Mesh::point_type& )> ten_fun){
+    // Symmetric tensor function projection onto cell dofs.
+    Matrix<T, Dynamic, 1> project_ten_function(const Mesh& msh, const typename Mesh::cell_type& cell, std::function<disk::static_matrix<T, 2,2>(const typename Mesh::point_type& )> ten_fun) {
     
-        Matrix<T, Dynamic, Dynamic> mass_matrix  = symmetric_tensor_mass_matrix(msh, cell);
+        Matrix<T, Dynamic, Dynamic> mass_matrix = symmetric_tensor_mass_matrix(msh, cell);
         size_t dim = Mesh::dimension;
         auto gradeg = m_hho_di.grad_degree();
         auto ten_bs = disk::sym_matrix_basis_size(gradeg, dim, dim);
@@ -1397,8 +1273,7 @@ public:
         Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(ten_bs);
 
         const auto qps = integrate(msh, cell, 2 * gradeg);
-        for (auto& qp : qps)
-        {
+        for (auto& qp : qps) {
             auto phi = ten_b.eval_functions(qp.point());
             disk::static_matrix<T, 2,2> sigma = ten_fun(qp.point());
             for (size_t i = 0; i < ten_bs; i++){
@@ -1410,26 +1285,24 @@ public:
         return x_dof;
     }
     
+    // Elastic cell dofs update with projected values.
     void
-    scatter_e_cell_dof_data(size_t e_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cell,
-                    Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const
-    {
+    scatter_e_cell_dof_data(size_t e_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cell, Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const {
         size_t n_cbs = get_e_cell_basis_data();
         auto cell_ofs = e_cell_ind * n_cbs;
         x_glob.block(cell_ofs, 0, n_cbs, 1) = x_proj_dof;
     }
     
+    // Acoustic cell dofs update with projected values.
     void
-    scatter_a_cell_dof_data(size_t a_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cell,
-                    Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const
-    {
+    scatter_a_cell_dof_data(size_t a_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cell, Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const {
         size_t n_cbs = get_a_cell_basis_data();
         auto cell_ofs = a_cell_ind * n_cbs + m_n_elastic_cell_dof;
         x_glob.block(cell_ofs, 0, n_cbs, 1) = x_proj_dof;
     }
     
-    
-    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun, std::function<T(const typename Mesh::point_type& )> scal_fun){
+    // Function projection onto face dofs 
+    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<disk::static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun, std::function<T(const typename Mesh::point_type& )> scal_fun) {
 
         auto storage = msh.backend_storage();
 
@@ -1437,13 +1310,11 @@ public:
         for (auto e_chunk : m_e_material) {
             auto& cell = storage->surfaces[e_chunk.first];
             auto fcs = faces(msh, cell);
-            for (size_t i = 0; i < fcs.size(); i++)
-            {
+            for (size_t i = 0; i < fcs.size(); i++) {
                 auto face = fcs[i];
                 auto fc_id = msh.lookup(face);
                 bool is_dirichlet_Q = m_e_bnd.is_dirichlet_face(fc_id);
-                if (is_dirichlet_Q)
-                {
+                if (is_dirichlet_Q) {
                     continue;
                 }
                 Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, face, m_hho_di.face_degree(), vec_fun);
@@ -1455,13 +1326,11 @@ public:
         for (auto a_chunk : m_a_material) {
             auto& cell = storage->surfaces[a_chunk.first];
             auto fcs = faces(msh, cell);
-            for (size_t i = 0; i < fcs.size(); i++)
-            {
+            for (size_t i = 0; i < fcs.size(); i++) {
                 auto face = fcs[i];
                 auto fc_id = msh.lookup(face);
                 bool is_dirichlet_Q = m_a_bnd.is_dirichlet_face(fc_id);
-                if (is_dirichlet_Q)
-                {
+                if (is_dirichlet_Q) {
                     continue;
                 }
                 Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, face, m_hho_di.face_degree(), scal_fun);
@@ -1470,29 +1339,24 @@ public:
         }
     }
     
-    void
-    scatter_e_face_dof_data(  const Mesh& msh, const typename Mesh::face_type& face,
-                    Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const
-    {
+    // Updating elastic face dofs projection
+    void scatter_e_face_dof_data(const Mesh& msh, const typename Mesh::face_type& face, Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const {
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
         auto fc_id = msh.lookup(face);
         auto glob_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_e_compress_indexes.at(fc_id)*n_fbs;
         x_glob.block(glob_offset, 0, n_fbs, 1) = x_proj_dof;
     }
     
-    void
-    scatter_a_face_dof_data( const Mesh& msh, const typename Mesh::face_type& face,
-                      Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const
-    {
+    // Updating acoustic face dofs projection
+    void scatter_a_face_dof_data( const Mesh& msh, const typename Mesh::face_type& face, Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const {
         size_t n_fbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
         auto fc_id = msh.lookup(face);
         auto glob_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_n_elastic_face_dof + m_a_compress_indexes.at(fc_id)*n_fbs;
         x_glob.block(glob_offset, 0, n_fbs, 1) = x_proj_dof;
-        
     }
     
-    Matrix<T, Dynamic, 1>
-    gather_e_dof_data(size_t cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl, const Matrix<T, Dynamic, 1>& x_glob) const {
+    // Gathering of elastic cell and face DoFs.
+    Matrix<T, Dynamic, 1> gather_e_dof_data(size_t cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl, const Matrix<T, Dynamic, 1>& x_glob) const {
                         
         auto e_cell_ind = m_e_cell_index.find(cell_ind)->second;
         auto num_faces = howmany_faces(msh, cl);
@@ -1505,7 +1369,9 @@ public:
         for (size_t i = 0; i < fcs.size(); i++) {
             auto fc = fcs[i];
             auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
-            if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
+            if (!eid.first) {
+                throw std::invalid_argument("This is a bug: face not found");
+            }
             const auto face_id = eid.second;
 
             if (m_e_bnd.is_dirichlet_face( face_id)) {
@@ -1524,10 +1390,10 @@ public:
         return x_el;
     }
     
+    // Gathering of acoustic cell and face DoFs.
     Matrix<T, Dynamic, 1>
-    gather_a_dof_data(size_t cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl,
-                    const Matrix<T, Dynamic, 1>& x_glob) const
-    {
+    gather_a_dof_data(size_t cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl, const Matrix<T, Dynamic, 1>& x_glob) const {
+
         auto a_cell_ind = m_a_cell_index.find(cell_ind)->second;
         auto num_faces = howmany_faces(msh, cl);
         size_t n_cbs = get_a_cell_basis_data();
@@ -1536,23 +1402,21 @@ public:
         Matrix<T, Dynamic, 1> x_local(n_cbs + num_faces * n_fbs );
         x_local.block(0, 0, n_cbs, 1) = x_glob.block(a_cell_ind * n_cbs + m_n_elastic_cell_dof, 0, n_cbs, 1);
         auto fcs = faces(msh, cl);
-        for (size_t i = 0; i < fcs.size(); i++)
-        {
+        for (size_t i = 0; i < fcs.size(); i++) {
             auto fc = fcs[i];
             auto eid = find_element_id(msh.faces_begin(), msh.faces_end(), fc);
-            if (!eid.first) throw std::invalid_argument("This is a bug: face not found");
-            const auto face_id                  = eid.second;
-
-            if (m_a_bnd.is_dirichlet_face( face_id))
-            {
+            if (!eid.first) {
+                throw std::invalid_argument("This is a bug: face not found");
+            }
+            const auto face_id = eid.second;
+            if (m_a_bnd.is_dirichlet_face( face_id)) {
                 auto fb = disk::make_scalar_monomial_basis(msh, fc, m_hho_di.face_degree());
                 Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, m_hho_di.face_degree());
                 auto velocity = m_a_bnd.dirichlet_boundary_func(face_id);
                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, velocity, m_hho_di.face_degree());
                 x_local.block(n_cbs + i * n_fbs, 0, n_fbs, 1) = mass.llt().solve(rhs);
             }
-            else
-            {
+            else {
                 auto fc_id = msh.lookup(fc);
                 auto face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_n_elastic_face_dof + m_a_compress_indexes.at(fc_id)*n_fbs;
                 x_local.block(n_cbs + i*n_fbs, 0, n_fbs, 1) = x_glob.block(face_LHS_offset, 0, n_fbs, 1);
@@ -1560,67 +1424,152 @@ public:
         }
         return x_local;
     }
+
+    // Projection matrix assembly for LTS 
+    void assemble_P(const Mesh& msh, T h_c) {
+
+        auto storage = msh.backend_storage();
+        P.setZero();
+        IminusP.setZero();
+        
+        const T hc = std::round(h_c * T(1000)) / T(1000);
+        
+        const size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
+        const size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(), Mesh::dimension, Mesh::dimension);
+        const size_t n_v_s_cbs  = disk::scalar_basis_size(m_hho_di.reconstruction_degree(), Mesh::dimension) - 1;
+        const size_t n_scal_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
+        
+        size_t elastic_tensor_offset  = 0;
+        size_t elastic_vector_offset  = n_ten_cbs * m_e_material.size();
+        size_t acoustic_vector_offset = elastic_vector_offset + n_vec_cbs * m_e_material.size();
+        size_t acoustic_scalar_offset = acoustic_vector_offset + n_v_s_cbs * m_a_material.size();
+        
+        std::vector< Triplet<T> > P_triplets;
+        std::vector< Triplet<T> > IP_triplets;
+        P_triplets.reserve(m_n_elastic_cell_dof + m_n_acoustic_cell_dof);
+        IP_triplets.reserve(m_n_elastic_cell_dof + m_n_acoustic_cell_dof);
+        
+        // Elastic cells
+        for (auto &chunk : m_e_material) {
+            size_t cell_id = chunk.first;
+            size_t e_idx   = m_e_cell_index[cell_id];
+            auto &cell     = storage->surfaces[cell_id];
             
-    void finalize()
-    {
+            T h = std::round(diameter(msh, cell) * T(1000)) / T(1000);
+            T val = (h < hc) ? T(1) : T(0);
+            
+            if (val != T(0)) {
+                size_t ten_offset = elastic_tensor_offset + e_idx * n_ten_cbs;
+                size_t vec_offset = elastic_vector_offset + e_idx * n_vec_cbs;
+                for (size_t i = 0; i < n_ten_cbs; ++i) {
+                    P_triplets.emplace_back(ten_offset+i, ten_offset+i, val);
+                    IP_triplets.emplace_back(ten_offset+i, ten_offset+i, T(1)-val);
+                }
+                for (size_t i = 0; i < n_vec_cbs; ++i) {
+                    P_triplets.emplace_back(vec_offset+i, vec_offset+i, val);
+                    IP_triplets.emplace_back(vec_offset+i, vec_offset+i, T(1)-val);
+                }
+            }
+        }
+        
+        // Acoustic cells
+        for (auto &chunk : m_a_material) {
+            size_t cell_id = chunk.first;
+            size_t a_idx   = m_a_cell_index[cell_id];
+            auto &cell     = storage->surfaces[cell_id];
+            
+            T h = std::round(diameter(msh, cell) * T(1000)) / T(1000);
+            T val = (h < hc) ? T(1) : T(0);
+            
+            if (val != T(0)) {
+                size_t vec_offset = acoustic_vector_offset + a_idx * n_v_s_cbs;
+                size_t scal_offset = acoustic_scalar_offset + a_idx * n_scal_cbs;
+                for (size_t i = 0; i < n_v_s_cbs; ++i) {
+                    P_triplets.emplace_back(vec_offset+i, vec_offset+i, val);
+                    IP_triplets.emplace_back(vec_offset+i, vec_offset+i, T(1)-val);
+                }
+                for (size_t i = 0; i < n_scal_cbs; ++i) {
+                    P_triplets.emplace_back(scal_offset+i, scal_offset+i, val);
+                    IP_triplets.emplace_back(scal_offset+i, scal_offset+i, T(1)-val);
+                }
+            }
+        }
+        
+        P.setFromTriplets(P_triplets.begin(), P_triplets.end());
+        IminusP.setFromTriplets(IP_triplets.begin(), IP_triplets.end());
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////// Sparse matrices triplet assembly finalization //////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    void finalize() {
         LHS.setFromTriplets( m_triplets.begin(), m_triplets.end() );
         m_triplets.clear();
         LHS_STAB.setFromTriplets( m_triplets_stab.begin(), m_triplets_stab.end() );
         m_triplets_stab.clear();
     }
             
-    void finalize_mass()
-    {
+    void finalize_mass() {
         MASS.setFromTriplets( m_mass_triplets.begin(), m_mass_triplets.end() );
         m_mass_triplets.clear();
     }
 
-    void finalize_coupling()
-    {
+    void finalize_coupling() {
         COUPLING.setFromTriplets( m_c_triplets.begin(), m_c_triplets.end() );
         m_c_triplets.clear();
     }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////// Stabilization setting ////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     void set_coupling_stabilization() {
         m_hho_stabilization_Q = false;
     }   
 
     void set_hdg_stabilization() {
-        if(m_hho_di.cell_degree() > m_hho_di.face_degree()) 
-          m_hho_stabilization_Q = false;                                            
-        else
+        if(m_hho_di.cell_degree() > m_hho_di.face_degree()) {
+            m_hho_stabilization_Q = false;                                            
+        }
+        else {
             m_hho_stabilization_Q = true;
+        }
     }
     
-    void set_interface_cell_indexes(std::map<size_t,std::pair<size_t,size_t>> & interface_cell_indexes){
+    void set_interface_cell_indexes(std::map<size_t,std::pair<size_t,size_t>> & interface_cell_indexes) {
         m_interface_cell_indexes = interface_cell_indexes;
     }
             
-    void set_hho_stabilization(){
+    void set_hho_stabilization() {
         m_hho_stabilization_Q = true;
     }
       
-    void set_scaled_stabilization(){
+    void set_scaled_stabilization() {
         m_scaled_stabilization_Q = true;
     }
             
-    e_boundary_type & get_e_bc_conditions(){
-             return m_e_bnd;
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////// Getter functions for DOFs, basis sizes, materials, boundaries, and interface data //////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    e_boundary_type & get_e_bc_conditions() {
+        return m_e_bnd;
     }
     
-    a_boundary_type & get_a_bc_conditions(){
-             return m_a_bnd;
+    a_boundary_type & get_a_bc_conditions() {
+        return m_a_bnd;
     }
     
-    std::map<size_t,elastic_material_data<T>> & get_e_material_data(){
-             return m_e_material;
+    std::map<size_t,elastic_material_data<T>> & get_e_material_data() {
+        return m_e_material;
     }
     
-    std::map<size_t,acoustic_material_data<T>> & get_a_material_data(){
-             return m_a_material;
+    std::map<size_t,acoustic_material_data<T>> & get_a_material_data() {
+        return m_a_material;
     }
                 
-    size_t get_a_n_cells_dof() const{
+    size_t get_a_n_cells_dof() const {
         return m_n_acoustic_cell_dof;
     }
     
@@ -1660,12 +1609,12 @@ public:
         // Elastic cell basis
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
-        size_t n_cbs1    = n_ten_cbs + n_vec_cbs;
+        size_t n_cbs1 = n_ten_cbs + n_vec_cbs;
         
         // Acoustic cell basis 
         size_t n_vel_scal_cbs = disk::scalar_basis_size(m_hho_di.reconstruction_degree(), Mesh::dimension)-1;
-        size_t n_scal_cbs     = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
-        size_t n_cbs2         = n_vel_scal_cbs + n_scal_cbs;
+        size_t n_scal_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
+        size_t n_cbs2 = n_vel_scal_cbs + n_scal_cbs;
         
         size_t n_cbs = n_cbs1 + n_cbs2;
         
@@ -1727,21 +1676,6 @@ public:
 
     std::vector<size_t> get_a_expand() {
         return m_a_expand_indexes;
-    }
-
-   std::pair<size_t,size_t> Scc_block_dimension(){
-        
-        // Elastic block
-        auto graddeg = m_hho_di.grad_degree();
-        auto ten_bs = disk::sym_matrix_basis_size(graddeg, Mesh::dimension, Mesh::dimension)*m_n_elastic_cells;
-        
-        // Acoustic block
-        auto recdeg = m_hho_di.reconstruction_degree();
-        auto rbs = disk::scalar_basis_size(recdeg, Mesh::dimension);
-        auto vec_cell_size = (rbs-1)*m_n_acoustic_cells; 
-
-        return std::make_pair(ten_bs, vec_cell_size);
-        
     }
 
 };

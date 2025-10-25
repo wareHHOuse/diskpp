@@ -42,47 +42,17 @@ void IHHOFirstOrder_conv_tests(int argc, char **argv){
             typedef disk::BoundaryConditions<mesh_type, false> e_boundary_type;
             typedef disk::BoundaryConditions<mesh_type, true> a_boundary_type;
             mesh_type msh;
+
+            RealType lx = 2.0;  
+            RealType ly = 1.0;          
+            size_t nx = 4;
+            size_t ny = 2;
+            cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+            mesh_builder.refine_mesh(l);
+            mesh_builder.set_translation_data(-1.0, 0.0);
+            mesh_builder.build_mesh();
+            mesh_builder.move_to_mesh_storage(msh);
             
-            if (sim_data.m_polygonal_mesh_Q) {
-                // Mesh availability
-                auto validate_l = [](size_t l) -> size_t {
-                    if (!((0 <= l) && (l < 15))) {
-                        std::cout << std::endl << std::endl;
-                        std::cout << bold << red << "Warning:: Only few polygonal meshes available.";
-                        std::cout << std::endl << std::endl;
-                        return 4;
-                    }
-                };
-                // size_t l = validate_l(sim_data.m_n_divs);
-                polygon_2d_mesh_reader<RealType> mesh_builder;
-                std::vector<std::string> mesh_files;
-                mesh_files.push_back("../../meshes/conv_test/poly_bad_quality/poly_32.txt");
-                mesh_files.push_back("../../meshes/conv_test/poly_bad_quality/poly_64.txt");      
-                mesh_files.push_back("../../meshes/conv_test/poly_bad_quality/poly_128.txt");    // -l 2
-                mesh_files.push_back("../../meshes/conv_test/poly_bad_quality/poly_256.txt");    // -l 3
-                mesh_files.push_back("../../meshes/conv_test/poly_bad_quality/poly_512.txt");    
-                mesh_files.push_back("../../meshes/conv_test/poly_bad_quality/poly_1024.txt");   // -l 5 
-                mesh_files.push_back("../../meshes/conv_test/poly_bad_quality/poly_2048.txt");   
-                mesh_files.push_back("../../meshes/conv_test/poly_bad_quality/poly_4096.txt");   // -l 7  
-                mesh_files.push_back("../../meshes/conv_test/poly_bad_quality/poly_8192.txt");   
-                mesh_files.push_back("../../meshes/conv_test/poly_bad_quality/poly_16384.txt");  
-                // Reading the polygonal mesh
-                mesh_builder.set_poly_mesh_file(mesh_files[l]);
-                mesh_builder.build_mesh();
-                mesh_builder.move_to_mesh_storage(msh);
-                mesh_builder.remove_duplicate_points();
-            }
-            else {
-                RealType lx = 2.0;  
-                RealType ly = 1.0;          
-                size_t nx = 4;
-                size_t ny = 2;
-                cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-                mesh_builder.refine_mesh(sim_data.m_n_divs);
-                mesh_builder.set_translation_data(-1.0, 0.0);
-                mesh_builder.build_mesh();
-                mesh_builder.move_to_mesh_storage(msh);
-            }
             RealType h = 10;
             for (auto & cell : msh ) {
                 auto cell_ind = msh.lookup(cell);
@@ -97,8 +67,9 @@ void IHHOFirstOrder_conv_tests(int argc, char **argv){
             // ##################################################
             
             size_t nt = 10;
-            for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) 
+            for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
                 nt *= 2;
+            }
     
             RealType ti = 0.0;
             RealType tf = 1.0;
@@ -111,18 +82,20 @@ void IHHOFirstOrder_conv_tests(int argc, char **argv){
             Matrix<RealType, Dynamic, 1> c;
             int s = 3;
             bool is_sdirk_Q = true;
-            if (is_sdirk_Q) 
+            if (is_sdirk_Q) {
                 dirk_butcher_tableau::sdirk_tables(s, a, b, c);
-            else 
+            }
+            else {
                 dirk_butcher_tableau::dirk_tables(s, a, b, c);
+            }
     
             // ##################################################
             // ################################################## Manufactured solution 
             // ##################################################
                 
             scal_vec_analytic_functions functions;
-            // functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionNonPolynomial);
-            functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionQuadraticInTime);
+            functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionNonPolynomial);
+            // functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionQuadraticInTime);
             // functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionQuadraticInSpace);
             // functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionNonPolynomial_paper);
             
@@ -275,8 +248,9 @@ void IHHOFirstOrder_conv_tests(int argc, char **argv){
                 dirk_an.SetScale(scale);
                 dirk_an.ComposeMatrix();
                 bool iteratif_solver = false; // if false load library: source /opt/intel/oneapi/setvars.sh intel64
-                if (iteratif_solver) 
+                if (iteratif_solver) {
                     dirk_an.setIterativeSolver();
+                }
                 dirk_an.DecomposeMatrix();
             }
                     
