@@ -36,8 +36,9 @@ enum StabilizationType : int
 {
     HDG = 0,
     HHO = 1,
-    NO  = 2,
-    DG  = 3
+    HHO_SYM = 4,
+    NO = 2,
+    DG = 3
 };
 
 enum FrictionType : int
@@ -45,6 +46,13 @@ enum FrictionType : int
     NO_FRICTION = 0,
     TRESCA      = 1,
     COULOMB     = 2,
+};
+
+enum DynamicType : int
+{
+    STATIC = 0,
+    HHT = 1,
+    NEWMARK = 2,
 };
 
 template<typename T>
@@ -71,7 +79,8 @@ class NewtonSolverParameter
     bool m_stab;       // stabilization yes or no
     bool m_adapt_stab; // adaptative stabilization
 
-    bool                     m_dynamic;   // dynamic or static simulation
+    DynamicType m_dyna_type;              // type of dyna
+    bool m_dynamic;                       // dynamic or static simulation
     std::map<std::string, T> m_dyna_para; // list of parameters
 
     int          m_n_time_save; // number of saving
@@ -82,11 +91,10 @@ class NewtonSolverParameter
     T   m_threshold; // threshol for Tesca friction
     int m_frot_type; // Friction type ?
 
-    NewtonSolverParameter() :
-      m_face_degree(1), m_cell_degree(1), m_grad_degree(1), m_sublevel(5), m_iter_max(20), m_epsilon(T(1E-6)),
-      m_verbose(false), m_precomputation(false), m_stab(true), m_beta(1), m_stab_type(HHO), m_n_time_save(0),
-      m_user_end_time(1.0), m_has_user_end_time(false), m_adapt_stab(false), m_dynamic(false), m_theta(1), m_gamma_0(1),
-      m_threshold(0), m_frot_type(NO_FRICTION)
+    NewtonSolverParameter() : m_face_degree(1), m_cell_degree(1), m_grad_degree(1), m_sublevel(5), m_iter_max(20), m_epsilon(T(1E-6)),
+                              m_verbose(false), m_precomputation(false), m_stab(true), m_beta(1), m_stab_type(HHO), m_n_time_save(0),
+                              m_user_end_time(1.0), m_has_user_end_time(false), m_adapt_stab(false), m_dynamic(false), m_theta(1), m_gamma_0(1),
+                              m_threshold(0), m_frot_type(NO_FRICTION), m_dyna_type(DynamicType::STATIC)
     {
         m_time_step.push_back(std::make_pair(m_user_end_time, 1));
     }
@@ -228,6 +236,8 @@ class NewtonSolverParameter
                     m_stab_type = HDG;
                 else if (type == "HHO")
                     m_stab_type = HHO;
+                else if (type == "HHO_SYM")
+                    m_stab_type = HHO_SYM;
                 else if (type == "DG")
                     m_stab_type = DG;
                 else if (type == "NO")
@@ -394,6 +404,17 @@ class NewtonSolverParameter
     isUnsteady() const
     {
         return m_dynamic;
+    }
+
+    DynamicType getUnsteadyScheme() const
+    {
+        return m_dyna_type;
+    }
+
+    void
+    setUnsteadyScheme(const DynamicType &scheme)
+    {
+        m_dyna_type = scheme;
     }
 
     void

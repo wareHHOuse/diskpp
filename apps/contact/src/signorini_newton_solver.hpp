@@ -157,7 +157,7 @@ solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun
 
             H1_increment += du_full.dot(A * du_full);
 
-            matrix_type mass  = make_mass_matrix(msh, cl, cb);//, hdi.cell_degree());
+            matrix_type mass = make_mass_matrix(msh, cl, cb);
 
             vector_type u_diff = du_full.block(0, 0, cbs, 1);
             L2_increment += u_diff.dot(mass * u_diff);
@@ -211,7 +211,7 @@ solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun
                 H1_error += diff.dot(Ah*diff);
 
                 auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-                matrix_type mass  = make_mass_matrix(msh, cl, cb, hdi.cell_degree());
+                matrix_type mass = make_mass_matrix(msh, cl, cb);
                 vector_type u_diff = diff.block(0, 0, cbs, 1);
                 L2_error += u_diff.dot(mass * u_diff);
 
@@ -419,7 +419,7 @@ solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
 
             H1_increment += du_full.dot(A * du_full);
 
-            matrix_type mass  = make_mass_matrix(msh, cl, cb);//, hdi.cell_degree());
+            matrix_type mass = make_mass_matrix(msh, cl, cb);
 
             vector_type u_diff = du_full.block(0, 0, cbs, 1);
             L2_increment += u_diff.dot(mass * u_diff);
@@ -473,7 +473,7 @@ solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
                 H1_error += diff.dot(Ah*diff);
 
                 auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-                matrix_type mass  = make_mass_matrix(msh, cl, cb, hdi.cell_degree());
+                matrix_type mass = make_mass_matrix(msh, cl, cb);
                 vector_type u_diff = diff.block(0, 0, cbs, 1);
                 L2_error += u_diff.dot(mass * u_diff);
 
@@ -643,7 +643,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
             diff_sol.block(cell_ofs, 0, num_total_dofs ,1) = du_full;
 
             auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-            matrix_type mass  = make_mass_matrix(msh, cl, cb);//, hdi.cell_degree());
+            matrix_type mass = make_mass_matrix(msh, cl, cb);
             vector_type u_diff = du_full.block(0, 0, cbs, 1);
 
             H1_increment += du_full.dot(Ah * du_full);
@@ -721,7 +721,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
                 #endif
 
                 auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-                matrix_type mass  = make_mass_matrix(msh, cl, cb, hdi.cell_degree());
+                matrix_type mass = make_mass_matrix(msh, cl, cb);
 
                 vector_type u_diff = diff.block(0, 0, cbs, 1);
                 L2_error += u_diff.dot(mass * u_diff);
@@ -911,7 +911,7 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
             diff_sol.block(cell_ofs, 0, num_total_dofs ,1) = du_full;
 
             auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-            matrix_type mass  = make_mass_matrix(msh, cl, cb);//, hdi.cell_degree());
+            matrix_type mass = make_mass_matrix(msh, cl, cb);
             vector_type u_diff = du_full.block(0, 0, cbs, 1);
 
             H1_increment += du_full.dot(Ah * du_full);
@@ -966,7 +966,7 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
                 H1_error += diff.dot(Ah*diff);
 
                 auto cb     = make_scalar_monomial_basis(msh, cl, hdi.cell_degree());
-                matrix_type mass  = make_mass_matrix(msh, cl, cb, hdi.cell_degree());
+                matrix_type mass = make_mass_matrix(msh, cl, cb);
 
                 vector_type u_diff = diff.block(0, 0, cbs, 1);
                 L2_error += u_diff.dot(mass * u_diff);

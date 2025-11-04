@@ -326,8 +326,7 @@ class mechanical_computation
     vector_type RTF;
     vector_type F_int;
     double      time_law;
-    double      time_contact;
-    double      time_dyna;
+    double time_contact;
 
     mechanical_computation(void)
     {
@@ -339,25 +338,23 @@ class mechanical_computation
             assert(false);
     }
 
-    template<typename Function>
+    template <typename Function>
     void
-    compute(const mesh_type&                 msh,
-            const cell_type&                 cl,
-            const bnd_type&                  bnd,
-            const param_type&                rp,
-            const MeshDegreeInfo<mesh_type>& degree_infos,
-            const Function&                  load,
-            const matrix_type&               RkT,
-            const vector_type&               uTF,
-            const vector_type&               aT_pred,
-            const TimeStep<scalar_type>&     time_step,
-            behavior_type&                   behavior,
-            StabCoeffManager<scalar_type>&   stab_manager,
-            const bool                       small_def)
+    compute(const mesh_type &msh,
+            const cell_type &cl,
+            const bnd_type &bnd,
+            const param_type &rp,
+            const MeshDegreeInfo<mesh_type> &degree_infos,
+            const Function &load,
+            const matrix_type &RkT,
+            const vector_type &uTF,
+            const TimeStep<scalar_type> &time_step,
+            behavior_type &behavior,
+            StabCoeffManager<scalar_type> &stab_manager,
+            const bool small_def)
     {
         time_law     = 0.0;
         time_contact = 0.0;
-        time_dyna    = 0.0;
         timecounter tc;
 
         const auto cell_infos  = degree_infos.cellDegreeInfo(msh, cl);
@@ -366,7 +363,6 @@ class mechanical_computation
         const auto cell_degree = cell_infos.cell_degree();
         const auto grad_degree = cell_infos.grad_degree();
 
-        const auto cb              = make_vector_monomial_basis(msh, cl, cell_degree);
         const auto cell_basis_size = vector_basis_size(cell_degree, dimension, dimension);
 
         size_t gb_size = 0;
@@ -527,29 +523,6 @@ class mechanical_computation
         assert(K_int.rows() == num_total_dofs);
         assert(K_int.cols() == num_total_dofs);
         assert(RTF.rows() == num_total_dofs);
-
-        // Unsteady Computation
-        tc.tic();
-        if (rp.isUnsteady())
-        {
-            auto dt      = time_step.increment_time();
-            auto dyna_rp = rp.getUnsteadyParameters();
-            auto beta    = dyna_rp["beta"];
-            auto rho     = dyna_rp["rho"];
-
-            const matrix_type mass_mat = rho * make_mass_matrix(msh, cl, cb);
-
-            K_int.topLeftCorner(cell_basis_size, cell_basis_size) += mass_mat / (beta * dt * dt);
-
-            auto F_iner = (mass_mat / (beta * dt * dt)) * uTF.head(cell_basis_size);
-            F_int.head(cell_basis_size) += F_iner;
-            RTF.head(cell_basis_size) -= F_iner;
-
-            // std::cout << mass_mat.cols() << ", " << aT_pred.rows() << std::endl;
-            RTF.head(cell_basis_size) += mass_mat * aT_pred;
-        }
-        tc.toc();
-        time_dyna += tc.elapsed();
     }
 };
 }

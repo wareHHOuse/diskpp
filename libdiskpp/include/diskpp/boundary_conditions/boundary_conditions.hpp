@@ -69,26 +69,6 @@ enum ContactType : size_t
 
 namespace priv
 {
-template<typename T>
-T
-bnd_product(const T& fact, const T& func)
-{
-    return fact * func;
-}
-
-template<typename T, int N>
-Matrix<T, N, 1>
-bnd_product(const T& fact, const Matrix<T, N, 1>& func)
-{
-    return fact * func;
-}
-
-template<typename T, int N, int M>
-Matrix<T, N, M>
-bnd_product(const T& fact, const Matrix<T, N, M>& func)
-{
-    return fact * func;
-}
 
 template<typename scalar_type, size_t DIM, bool FunctionScalarType>
 struct FunctionType
@@ -186,15 +166,32 @@ class BoundaryConditions
     typedef typename mesh_type::face_type                                                                 face_type;
     typedef typename mesh_type::coordinate_type                                                           scalar_type;
     typedef point<scalar_type, mesh_type::dimension>                                                      point_type;
-    typedef typename priv::FunctionType<scalar_type, mesh_type::dimension, ScalarBoundary>::function_type function_type;
+    typedef typename priv::FunctionType<scalar_type, mesh_type::dimension, ScalarBoundary>::function_type fct_result_type;
+    typedef typename std::function<fct_result_type(point_type, scalar_type)> function_type;
 
-  private:
+private:
     const mesh_type& m_msh;
 
-    std::vector<std::function<function_type(point_type)>> m_dirichlet_func;
-    std::vector<std::function<function_type(point_type)>> m_neumann_func;
-    std::vector<std::function<function_type(point_type)>> m_robin_func;
-    std::vector<std::function<scalar_type(point_type)>>   m_contact_func;
+    std::vector<function_type> m_dirichlet_func;
+    std::vector<function_type> m_neumann_func;
+    std::vector<function_type> m_robin_func;
+    std::vector<std::function<scalar_type(point_type)>> m_contact_func;
+
+    function_type
+    _conv_fct(const function_type &fct)
+    {
+        return fct;
+    }
+
+    function_type
+    _conv_fct(const std::function<fct_result_type(point_type)> fct)
+    {
+
+        auto rfunc = [fct](const point_type &p, const scalar_type &time) -> auto
+        { return fct(p); };
+
+        return rfunc;
+    }
 
     // 1) bool to know if a boundary condition is associated to the face
     // 2) type of boundary conditions
@@ -208,7 +205,7 @@ class BoundaryConditions
 
     size_t m_dirichlet_faces, m_neumann_faces, m_robin_faces, m_contact_faces;
 
-    scalar_type m_factor;
+    scalar_type m_time;
 
     // search faces that have the boundary id "b_id"
     std::vector<size_t>
@@ -236,8 +233,8 @@ class BoundaryConditions
   public:
     BoundaryConditions() = delete;
 
-    BoundaryConditions(const mesh_type& msh) :
-      m_msh(msh), m_dirichlet_faces(0), m_neumann_faces(0), m_robin_faces(0), m_contact_faces(0), m_factor(1)
+    BoundaryConditions(const mesh_type &msh) : m_msh(msh), m_dirichlet_faces(0), m_neumann_faces(0), m_robin_faces(0), m_contact_faces(0),
+                                               m_time(1.)
     {
         m_faces_is_dirichlet.assign(m_msh.faces_size(), std::make_tuple(false, NOTHING, 0, 0));
         m_faces_is_neumann.assign(m_msh.faces_size(), std::make_tuple(false, FREE, 0, 0));
@@ -279,7 +276,7 @@ class BoundaryConditions
     addDirichletEverywhere(const Function& bcf)
     {
         const size_t bcf_id = m_dirichlet_func.size();
-        m_dirichlet_func.push_back(bcf);
+        m_dirichlet_func.push_back(_conv_fct(bcf));
 
         for (auto itor = m_msh.boundary_faces_begin(); itor != m_msh.boundary_faces_end(); itor++)
         {
@@ -314,7 +311,7 @@ class BoundaryConditions
     addDirichletBC(const size_t& btype, const size_t& b_id, const Function& bcf)
     {
         const size_t bcf_id = m_dirichlet_func.size();
-        m_dirichlet_func.push_back(bcf);
+        m_dirichlet_func.push_back(_conv_fct(bcf));
 
         const auto list_faces = search_faces(b_id);
 
@@ -339,12 +336,6 @@ class BoundaryConditions
             m_faces_is_neumann.at(face_id) = std::make_tuple(true, btype, b_id, bcf_id);
             m_neumann_faces++;
         }
-    }
-
-    void
-    multiplyAllFunctionsByAFactor(const scalar_type& factor)
-    {
-        m_factor = factor;
     }
 
     size_t
@@ -663,43 +654,81 @@ class BoundaryConditions
     auto
     dirichlet_boundary_func(const size_t face_i) const
     {
-        if (!is_dirichlet_face(face_i))
-        {
-            throw std::logic_error("You want the Dirichlet function of face which is not a Dirichlet face");
-        }
-
-        const auto        func   = m_dirichlet_func.at(std::get<3>(m_faces_is_dirichlet.at(face_i)));
-        const scalar_type factor = m_factor;
-
-        auto rfunc = [ func, factor ](const point_type& p) -> auto { return priv::bnd_product(factor, func(p)); };
-
-        return rfunc;
+        return dirichlet_boundary_func(face_i, m_time);
     }
 
     auto
-    dirichlet_boundary_func(const face_type& fc) const
+    dirichlet_boundary_func(const face_type &fc) const
     {
         return dirichlet_boundary_func(m_msh.lookup(fc));
     }
 
     auto
-    neumann_boundary_func(const size_t face_i) const
+    dirichlet_boundary_func(const size_t face_i, const scalar_type &time) const
+    {
+        if (!is_dirichlet_face(face_i))
+        {
+            throw std::logic_error("You want the Dirichlet function of face which is not a Dirichlet face");
+        }
+
+        const auto func = m_dirichlet_func.at(std::get<3>(m_faces_is_dirichlet.at(face_i)));
+
+        auto rfunc = [func, time](const point_type &p, scalar_type t = -123456789) -> auto
+        {
+            if (std::abs(t + 123456789.) > 1e-6)
+            {
+                return func(p, t);
+            }
+
+            return func(p, time);
+        };
+
+        return rfunc;
+    }
+
+    auto
+    dirichlet_boundary_func(const face_type &fc, const scalar_type &time) const
+    {
+        return dirichlet_boundary_func(m_msh.lookup(fc), time);
+    }
+
+    auto
+    neumann_boundary_func(const size_t face_i, const scalar_type &time) const
     {
         if (!is_neumann_face(face_i))
         {
             throw std::logic_error("You want the Neumann function of face which is not a Neumann face");
         }
 
-        const auto        func   = m_neumann_func.at(std::get<3>(m_faces_is_neumann.at(face_i)));
-        const scalar_type factor = m_factor;
+        const auto func = m_neumann_func.at(std::get<3>(m_faces_is_neumann.at(face_i)));
 
-        auto rfunc = [ func, factor ](const point_type& p) -> auto { return priv::bnd_product(factor, func(p)); };
+        auto rfunc = [func, time](const point_type &p, scalar_type t = -123456789) -> auto
+        {
+            if (std::abs(t + 123456789.) > 1e-6)
+            {
+                return func(p, t);
+            }
+
+            return func(p, time);
+        };
 
         return rfunc;
     }
 
     auto
-    neumann_boundary_func(const face_type& fc) const
+    neumann_boundary_func(const size_t face_i) const
+    {
+        return neumann_boundary_func(face_i, m_time);
+    }
+
+    auto
+    neumann_boundary_func(const face_type &fc, const scalar_type &time) const
+    {
+        return neumann_boundary_func(m_msh.lookup(fc), time);
+    }
+
+    auto
+    neumann_boundary_func(const face_type &fc) const
     {
         return neumann_boundary_func(m_msh.lookup(fc));
     }
@@ -713,12 +742,18 @@ class BoundaryConditions
         }
 
         const auto        func   = m_robin_func.at(std::get<3>(m_faces_is_robin.at(face_i)));
-        const scalar_type factor = m_factor;
+        const scalar_type time = m_time;
 
-        auto rfunc = [ func, factor ](const point_type& p) -> auto
+        auto rfunc = [func, time](const point_type &p, scalar_type t = -123456789) -> auto
         {
-            return disk::priv::inner_product(factor, func(p));
+            if (std::abs(t + 123456789.) > 1e-6)
+            {
+                return func(p, t);
+            }
+
+            return func(p, time);
         };
+
         return rfunc;
     }
 
@@ -777,6 +812,15 @@ class BoundaryConditions
         }
 
         return 0;
+    }
+
+    void setTime(const scalar_type &time)
+    {
+        m_time = time;
+    }
+
+    scalar_type getTime(void) const {
+        return m_time;
     }
 };
 
