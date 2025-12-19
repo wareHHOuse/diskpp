@@ -523,9 +523,10 @@ void submesh_via_gmsh(const Mesh& msh, disk::simplicial_mesh<typename Mesh::coor
     std::vector<int> all_linetags;
     all_linetags.reserve(msh.faces_size());
     for (const auto& fc : faces(msh)) {
+        int tag = (int) offset(msh, fc) +1;
         auto ptids = fc.point_ids();
         assert(ptids.size() == 2);
-        all_linetags.push_back( gmsh::model::occ::addLine(ptids[0]+point_ofs, ptids[1]+point_ofs) );
+        all_linetags.push_back( gmsh::model::occ::addLine(ptids[0]+point_ofs, ptids[1]+point_ofs, tag) );
     }
 
     for (const auto& cl : msh) {
@@ -535,7 +536,7 @@ void submesh_via_gmsh(const Mesh& msh, disk::simplicial_mesh<typename Mesh::coor
             local_linetags.push_back( all_linetags[ offset(msh, fc) ] );
 
         int loop = gmsh::model::occ::addCurveLoop(local_linetags);
-        gmsh::model::occ::addPlaneSurface({loop});
+        gmsh::model::occ::addPlaneSurface({loop}, (int)offset(msh,cl)+1);
     
         auto h = diameter(msh, cl);
         auto ptids = cl.point_ids();

@@ -184,8 +184,22 @@ void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
     using face_type = disk::simplicial_mesh<T,2>::face_type;
     using node_type = disk::simplicial_mesh<T,2>::node_type;
 
-    size_t max_index = 0;
+    struct face_with_bndid {
+        face_type                   fc;
+        disk::boundary_descriptor   bndid;
+    
+        bool operator<(const face_with_bndid& other) {
+            return fc < other.fc;
+        }
 
+        bool operator==(const face_with_bndid& other) {
+            return fc == other.fc;
+        }
+    };
+
+    std::vector<face_with_bndid> fwb;
+    fwb.reserve( 3 * msh.cells_size() );
+    size_t max_index = 0;
     for (auto& cl : msh) {
         /* cycle on all the elements and copy those of
          * the specified subdomain. */
@@ -200,6 +214,14 @@ void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
         }
 
         substor->surfaces.push_back(cl);
+
+        /* the faces can be deduced, but we copy them because
+         * we want to preserve boundary information */
+        auto fcs = faces(msh, cl);
+        for (auto fc : fcs) {
+            auto bi = msh.boundary_info(fc);
+            fwb.push_back( {fc, bi} );
+        }
     }
 
     /* mark the used indices, to take only the
@@ -220,7 +242,7 @@ void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
         }
     }
 
-    /* Copy points in the right positions */
+    /* Copy only necessary points */
     substor->points.resize(ci);
     for (size_t i = 0; i < used.size(); i++) {
         const auto& uopt = used[i];
@@ -231,24 +253,45 @@ void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
 
     for (auto& cl : substor->surfaces) {
         auto ptids = cl.point_ids();
+        assert(ptids.size() == 3);
+        /* the optionals must be valid */
         auto np0 = used[ ptids[0] ].value();
         auto np1 = used[ ptids[1] ].value();
         auto np2 = used[ ptids[2] ].value();
         cl = cell_type({np0, np1, np2});
-        substor->edges.push_back( face_type{np0, np1} );
-        substor->edges.push_back( face_type{np1, np2} );
-        substor->edges.push_back( face_type{np0, np2} );
+        //substor->edges.push_back( face_type{np0, np1} );
+        //substor->edges.push_back( face_type{np1, np2} );
+        //substor->edges.push_back( face_type{np0, np2} );
         substor->nodes.push_back( node_type{ np0 } );
         substor->nodes.push_back( node_type{ np1 } );
         substor->nodes.push_back( node_type{ np2 } );
     }
 
+    /* Renumber faces */
+    for (auto& [fc, bi] : fwb) {
+        auto ptids = fc.point_ids();
+        assert(ptids.size() == 2);
+        /* the optionals must be valid */
+        auto np0 = used[ ptids[0] ].value();
+        auto np1 = used[ ptids[1] ].value();
+        fc = face_type{np0, np1};
+    }
+
+    disk::priv::sort_uniq(fwb);
+    substor->edges.resize(fwb.size());
+    substor->boundary_info.resize(fwb.size());
+
+    for (size_t i = 0; i < fwb.size(); i++) {
+        auto& [fc, bi] = fwb[i];
+        substor->edges[i] = fc;
+        substor->boundary_info[i] = bi;
+    }
+
     disk::priv::sort_uniq(substor->nodes);
-    disk::priv::sort_uniq(substor->edges);
     disk::priv::sort_uniq(substor->surfaces);
-    substor->boundary_info.resize(substor->edges.size());
     substor->subdomain_info.resize(substor->surfaces.size(),
         disk::subdomain_descriptor(subdom_id) );
+    detect_boundary(msh);
 }
 
 template<disk::mesh_2D Mesh>
@@ -267,15 +310,45 @@ diffusion_solver_refinement(const Mesh& cmsh, const solver_config& scfg)
         subdom_ids.push_back( di.tag() );
     }
 
-    disk::simplicial_mesh<scalar_type, 2> smsh;
-    make_submesh_from_subdomain(fmsh, smsh, 15);
-
     disk::silo_database silo;
     silo.create("c2f.silo");
     silo.add_mesh(cmsh, "coarse");
     silo.add_mesh(fmsh, "fine");
-    silo.add_mesh(smsh, "element0");
     silo.add_variable("fine", "domain_id", subdom_ids, disk::zonal_variable_t);
+
+    /*
+    for (auto& cl : cmsh) {
+        auto di = cmsh.domain_info(cl);
+
+        if (offset(cmsh, cl) != 14) continue;
+        auto fcs = faces(cmsh, cl);
+        for (auto& fc : fcs) {
+            std::cout << "bndC: " << offset(cmsh, fc) << std::endl;
+        }
+    }
+    */
+
+
+
+    for (size_t i = 0; i < cmsh.cells_size(); i++) {
+
+        disk::simplicial_mesh<scalar_type, 2> smsh;
+        make_submesh_from_subdomain(fmsh, smsh, i+1);
+
+        for (auto& cl : smsh) {
+            auto fcs = faces(smsh, cl);
+            for (auto& fc : fcs) {
+                auto bi = smsh.boundary_info(fc);
+                //if (bi.is_boundary()) {
+                //    std::cout << "bndS: " << bi.tag()-1 << std::endl;
+                //}
+            }
+        }
+
+        
+        silo.add_mesh(smsh, "element_" + std::to_string(i));
+    }
+    
 }
 
 template<typename T>
