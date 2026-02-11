@@ -277,10 +277,10 @@ public:
                     assert(row < num_fcs_Rj);
                     assert(col < num_non_dirichlet);
                     for (size_t k = 0; k < sizeF; k++)
-                        Rj_trip.push_back({sizeF*row+k, sizeF*col+k, 1.0});
+                        Rj_trip.push_back({int(sizeF*row+k), int(sizeF*col+k), 1.0});
                     if (sub_to_global[tag][i] > 0.0)
                         for (size_t k = 0; k < sizeF; k++)
-                            Rtj_trip.push_back({sizeF*row+k, sizeF*col+k, sub_to_global[tag][i]});
+                            Rtj_trip.push_back({int(sizeF*row+k), int(sizeF*col+k), sub_to_global[tag][i]});
 
                     row++;
                 }

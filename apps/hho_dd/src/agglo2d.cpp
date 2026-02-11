@@ -102,7 +102,7 @@ auto make_projectors(const FineMesh& fmsh, const coarse_mesh_t<FineMesh>& cmsh,
 
             for (size_t i = 0; i < fbs; i++) {
                 for (size_t j = 0; j < cbs; j++) {
-                    triplets.push_back( {row+i, col+j, P(i,j)} );
+                    triplets.push_back( {int(row+i), int(col+j), P(i,j)} );
                 }
             }
         }

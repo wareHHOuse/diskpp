@@ -193,7 +193,7 @@ endif()
 
 ######################################################################
 ## Optimization: Disallow denormals and activate -ffast-math (violates IEEE754)
-option(OPT_AGGRESSIVE_FP "Enable DAZ, FTZ and -ffast-math" ON)
+option(OPT_AGGRESSIVE_FP "Enable DAZ, FTZ and -ffast-math" OFF)
 if (OPT_AGGRESSIVE_FP)
     add_definitions(-DDISALLOW_DENORMALS)
     if (COMPILER_IS_CLANG OR COMPILER_IS_GNU)
@@ -222,7 +222,7 @@ endif()
 
 ######################################################################
 ## Compiler reporting: disable deprecation warnings
-option(OPT_DISABLE_DEPRECATION_WARNINGS "Disable deprecation warnings" OFF)
+option(OPT_DISABLE_DEPRECATION_WARNINGS "Disable deprecation warnings" ON)
 if(OPT_DISABLE_DEPRECATION_WARNINGS)
     if (COMPILER_IS_GNU OR COMPILER_IS_CLANG)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")

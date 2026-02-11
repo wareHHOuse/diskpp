@@ -101,7 +101,7 @@ auto make_projectors(const FineMesh& fmsh, const coarse_mesh_t<FineMesh>& cmsh,
             
             for (size_t i = 0; i < fbs; i++) {
                 for (size_t j = 0; j < cbs; j++) {
-                    triplets.push_back( {row+i, col+j, P(i,j)} );
+                    triplets.push_back( {int(row+i), int(col+j), P(i,j)} );
                 }
             }
         }
@@ -175,7 +175,10 @@ operator<<(std::ostream& os, const iterdata& id)
 
 template<typename T>
 void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
-    disk::simplicial_mesh<T,2>& submsh, size_t subdom_id)
+    disk::simplicial_mesh<T,2>& submsh, size_t subdom_id,
+    std::vector<size_t>& cell_sub_to_orig,
+    std::vector<size_t>& face_sub_to_orig
+    )
 {
     auto stor = msh.backend_storage();
     auto substor = submsh.backend_storage();
@@ -187,6 +190,7 @@ void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
     struct face_with_bndid {
         face_type                   fc;
         disk::boundary_descriptor   bndid;
+        size_t                      orig_num;
     
         bool operator<(const face_with_bndid& other) {
             return fc < other.fc;
@@ -200,12 +204,16 @@ void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
     std::vector<face_with_bndid> fwb;
     fwb.reserve( 3 * msh.cells_size() );
     size_t max_index = 0;
-    for (auto& cl : msh) {
+    for (size_t cli = 0; cli < msh.cells_size(); cli++) {
+        const auto& cl = msh.cell_at(cli);
         /* cycle on all the elements and copy those of
          * the specified subdomain. */
         auto di = msh.domain_info(cl);
         if (di.tag() != subdom_id)
             continue;
+
+        /* remember the original numbering of this element */    
+        cell_sub_to_orig.push_back(cli);
 
         auto ptids = cl.point_ids();
         assert(ptids.size() == 3);
@@ -220,7 +228,8 @@ void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
         auto fcs = faces(msh, cl);
         for (auto fc : fcs) {
             auto bi = msh.boundary_info(fc);
-            fwb.push_back( {fc, bi} );
+            auto orig_num = offset(msh, fc);
+            fwb.push_back( {fc, bi, orig_num} );
         }
     }
 
@@ -268,7 +277,7 @@ void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
     }
 
     /* Renumber faces */
-    for (auto& [fc, bi] : fwb) {
+    for (auto& [fc, bi, on] : fwb) {
         auto ptids = fc.point_ids();
         assert(ptids.size() == 2);
         /* the optionals must be valid */
@@ -280,11 +289,13 @@ void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
     disk::priv::sort_uniq(fwb);
     substor->edges.resize(fwb.size());
     substor->boundary_info.resize(fwb.size());
+    face_sub_to_orig.resize(fwb.size());
 
     for (size_t i = 0; i < fwb.size(); i++) {
-        auto& [fc, bi] = fwb[i];
+        auto& [fc, bi, orig_num] = fwb[i];
         substor->edges[i] = fc;
         substor->boundary_info[i] = bi;
+        face_sub_to_orig[i] = orig_num;
     }
 
     disk::priv::sort_uniq(substor->nodes);
@@ -316,37 +327,31 @@ diffusion_solver_refinement(const Mesh& cmsh, const solver_config& scfg)
     silo.add_mesh(fmsh, "fine");
     silo.add_variable("fine", "domain_id", subdom_ids, disk::zonal_variable_t);
 
-    /*
+    
     for (auto& cl : cmsh) {
+        std::cout << cl << std::endl;
         auto di = cmsh.domain_info(cl);
-
-        if (offset(cmsh, cl) != 14) continue;
         auto fcs = faces(cmsh, cl);
         for (auto& fc : fcs) {
-            std::cout << "bndC: " << offset(cmsh, fc) << std::endl;
+            std::cout << "  bndC: " << offset(cmsh, fc) << std::endl;
         }
     }
-    */
-
-
 
     for (size_t i = 0; i < cmsh.cells_size(); i++) {
-
         disk::simplicial_mesh<scalar_type, 2> smsh;
-        make_submesh_from_subdomain(fmsh, smsh, i+1);
+        std::vector<size_t> c_s2o, f_s2o;
+        make_submesh_from_subdomain(fmsh, smsh, i+1, c_s2o, f_s2o);
+        silo.add_mesh(smsh, "element_" + std::to_string(i));
 
         for (auto& cl : smsh) {
             auto fcs = faces(smsh, cl);
             for (auto& fc : fcs) {
                 auto bi = smsh.boundary_info(fc);
-                //if (bi.is_boundary()) {
-                //    std::cout << "bndS: " << bi.tag()-1 << std::endl;
-                //}
+                if (bi.is_boundary()) {
+                    std::cout << "  bndS: " << bi.tag()-1 << std::endl;
+                }
             }
         }
-
-        
-        silo.add_mesh(smsh, "element_" + std::to_string(i));
     }
     
 }

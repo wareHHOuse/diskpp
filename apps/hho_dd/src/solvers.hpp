@@ -4,6 +4,15 @@ namespace disk {
 template<typename Mesh>
 struct source_functor;
 
+template<disk::mesh_1D Mesh>
+struct source_functor<Mesh> {
+    using point_type = typename Mesh::point_type;
+    auto operator()(const point_type& pt) const {
+        auto sx = std::sin(M_PI*pt.x());
+        return M_PI*M_PI*sx;
+    }
+};
+
 template<disk::mesh_2D Mesh>
 struct source_functor<Mesh> {
     using point_type = typename Mesh::point_type;
@@ -28,6 +37,15 @@ struct source_functor<Mesh> {
 
 template<typename Mesh>
 struct solution_functor;
+
+template<disk::mesh_1D Mesh>
+struct solution_functor<Mesh> {
+    using point_type = typename Mesh::point_type;
+    auto operator()(const point_type& pt) const {
+        auto sx = std::sin(M_PI*pt.x());
+        return sx;
+    }
+};
 
 template<disk::mesh_2D Mesh>
 struct solution_functor<Mesh> {

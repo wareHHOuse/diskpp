@@ -909,6 +909,17 @@ auto integrate(const Mesh& msh, const Element& elem, size_t degree, IntegrandFun
 template<basis Test>
 using fun = std::function<typename Test::value_type(typename Test::point_type)>;
 
+template<typename Mesh, typename Element, scalar_face_basis_1D Test>
+auto integrate(const Mesh& msh, const Element& elem, const fun<Test>& f, const Test& basis)
+{
+    using ST = typename Test::scalar_type;
+    return f(barycenter(msh, elem));
+}
+
+/* Integrate a term of the type (f,v)_E, tipically a RHS */
+template<basis Test>
+using fun = std::function<typename Test::value_type(typename Test::point_type)>;
+
 template<typename Mesh, typename Element, basis Test>
 auto integrate(const Mesh& msh, const Element& elem, const fun<Test>& f, const Test& basis)
 {
@@ -940,6 +951,40 @@ auto integrate(const Mesh& msh, const Element& elem, const Trial& trial, const T
         ret += (qp.weight() * test(qp.point())) * trial(qp.point()).transpose();
     };
 
+    return ret;
+}
+
+/* Integrate a term of the type (u,v)_E, tipically a LHS */
+template<typename Mesh, typename Element, scalar_face_basis_1D Trial, basis Test>
+auto integrate(const Mesh& msh, const Element& elem, const Trial& trial, const Test& test)
+{
+    static_assert(can_take_scalar_product<Trial, Test>::value, "Invalid scalar product requested");
+    using trial_ST = typename Trial::scalar_type;
+    using test_ST = typename Test::scalar_type;
+    using ST = decltype( trial_ST{} * test_ST{} );
+    Eigen::Matrix<ST, Eigen::Dynamic, 1> ret
+        = Eigen::Matrix<ST, Eigen::Dynamic, 1>::Zero(test.size());
+
+    auto ideg = trial.integration_degree() + test.integration_degree();
+    auto qps = integrate(msh, elem, ideg);
+    for (auto& qp : qps) {
+        ret += (qp.weight() * test(qp.point())) * trial(qp.point());
+    };
+
+    return ret;
+}
+
+/* Integrate a term of the type (u,v)_E, tipically a LHS */
+template<typename Mesh, typename Element, scalar_face_basis_1D Trial, scalar_face_basis_1D Test>
+auto integrate(const Mesh& msh, const Element& elem, const Trial& trial, const Test& test)
+{
+    static_assert(can_take_scalar_product<Trial, Test>::value, "Invalid scalar product requested");
+    auto bar = barycenter(msh, elem);
+    using trial_ST = typename Trial::scalar_type;
+    using test_ST = typename Test::scalar_type;
+    using ST = decltype( trial_ST{} * test_ST{} );
+    Eigen::Matrix<ST, 1, 1> ret;
+    ret(0,0) = test(bar) * trial(bar);
     return ret;
 }
 

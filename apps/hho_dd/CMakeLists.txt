@@ -15,6 +15,9 @@ target_link_libraries(test_agglo_by_subdomain ${LINK_LIBS})
 add_executable(test_cc2ff src/test_cc2ff.cpp)
 target_link_libraries(test_cc2ff ${LINK_LIBS})
 
+add_executable(test_1d src/test_1d.cpp)
+target_link_libraries(test_1d ${LINK_LIBS})
+
 install(TARGETS hhodd RUNTIME DESTINATION bin)
 
 set(HHODD_LOCAL_SOLVER "Eigen::SparseLU" CACHE STRING "HHO-DD local solver")
@@ -22,14 +25,17 @@ set_property(CACHE HHODD_LOCAL_SOLVER PROPERTY STRINGS "Eigen::SparseLU" "PARDIS
 
 if (HHODD_LOCAL_SOLVER STREQUAL "Eigen::SparseLU")
     target_compile_definitions(hhodd PUBLIC -DHHODD_USE_EIGEN_SPARSELU)
+    target_compile_definitions(test_1d PUBLIC -DHHODD_USE_EIGEN_SPARSELU)
 endif()
 
 if (HHODD_LOCAL_SOLVER STREQUAL "PARDISO")
     target_compile_definitions(hhodd PUBLIC -DHHODD_USE_PARDISO)
+    target_compile_definitions(test_1d PUBLIC -DHHODD_USE_PARDISO)
 endif()
 
 if (HHODD_LOCAL_SOLVER STREQUAL "MUMPS")
     target_compile_definitions(hhodd PUBLIC -DHHODD_USE_MUMPS)
+    target_compile_definitions(test_1d PUBLIC -DHHODD_USE_MUMPS)
 endif()
 
 install(DIRECTORY share/ DESTINATION share)
