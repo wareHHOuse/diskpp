@@ -135,14 +135,14 @@ endif()
 
 ######################################################################
 ## Package: Intel MKL support
-find_package(MKL)
+set(MKL_INTERFACE_FULL intel_lp64)
+find_package(MKL CONFIG)
 if (MKL_FOUND)
-  include_directories(${MKL_INCLUDE_DIRS})
   set(LINK_LIBS ${LINK_LIBS} MKL::MKL)
   set(HAVE_INTEL_MKL TRUE)
-  add_definitions(-DHAVE_INTEL_MKL)
-  add_definitions(-DHAVE_PARDISO)
-
+  add_compile_definitions(-DHAVE_MKL)
+  add_compile_definitions(-DHAVE_INTEL_MKL)
+  add_compile_definitions(-DHAVE_PARDISO)
 endif()
 
 ######################################################################

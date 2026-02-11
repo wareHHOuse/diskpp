@@ -1,4 +1,4 @@
-
+#include "diskpp/solvers/solver.hpp"
 namespace disk {
 
 template<typename Mesh>
@@ -80,6 +80,15 @@ auto make_solution_function(const Mesh& msh)
     return solution_functor<Mesh>();
 }
 
+template<typename T>
+T cond(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& A, int ex = 0)
+{
+    using mtype = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+    Eigen::JacobiSVD<mtype> svd(A);
+    return svd.singularValues()(0) 
+        / svd.singularValues()(svd.singularValues().size()-(1+ex));
+}
+
 template<typename Mesh>
 void
 hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
@@ -101,6 +110,9 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
     using VT = Eigen::Matrix<T, Eigen::Dynamic, 1>;
     std::vector<std::pair<MT, VT>> lcs;
 
+    std::vector<T> vcond;
+    std::vector<T> vcondm;
+
     timecounter tc;
     tc.tic();
     for (auto& cl : msh)
@@ -113,14 +125,22 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
         lcs.push_back({lhs, rhs});
         auto [lhsc, rhsc] = disk::hho::schur(lhs, rhs, phiT);
         assm.assemble(msh, cl, lhsc, rhsc);
+        vcond.push_back( cond(lhs,1) );
     }
     assm.finalize();
     std::cout << " Assembly time: " << tc.toc() << std::endl;
     std::cout << " Unknowns: " << assm.LHS.rows() << " ";
     std::cout << " Nonzeros: " << assm.LHS.nonZeros() << std::endl;
     tc.tic();
-    disk::dynamic_vector<T> sol = mumps_lu(assm.LHS, assm.RHS);
-    std::cout << " Solver time: " << tc.toc() << std::endl;
+    //disk::dynamic_vector<T> sol = mumps_lu(assm.LHS, assm.RHS);
+    //std::cout << " Solver time: " << tc.toc() << std::endl;
+    
+    disk::solvers::conjugated_gradient_params<T> cgp;
+    cgp.verbose = true;
+    cgp.max_iter = 3*assm.RHS.rows();
+    disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.RHS.rows());
+    disk::solvers::conjugated_gradient(cgp, assm.LHS, assm.RHS, sol);
+    
     std::vector<T> u_data;
     
     T error = 0.0;
@@ -141,12 +161,15 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
         error += diff.dot(lhs*diff);
         disk::dynamic_vector<T> diffT = diff.head(phiT.size());
         L2error += diffT.transpose() * (MMe*diffT);
+        vcondm.push_back(cond(MMe));
     }
     std::cout << " Postpro time: " << tc.toc() << std::endl;
     std::cout << " L2-norm error: " << std::sqrt(L2error) << ", ";
     std::cout << "A-norm error: " << std::sqrt(error) << std::endl;
 
     silo.add_variable("srcmesh", "u_hho", u_data, disk::zonal_variable_t);
+    silo.add_variable("srcmesh", "cond_hho", vcond, disk::zonal_variable_t);
+    silo.add_variable("srcmesh", "cond_mass", vcondm, disk::zonal_variable_t);
 }
 
 template<typename Mesh>
@@ -211,7 +234,7 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
                 assm.assemble(msh, tcl, tcl, Att);
             }   
         }
-        
+
         assm.assemble(msh, tcl, K, loc_rhs);
     }
 
@@ -224,7 +247,14 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.syssz);
 
     tc.tic();
-    sol = mumps_lu(assm.LHS, assm.RHS);
+    //sol = mumps_lu(assm.LHS, assm.RHS);
+    
+    disk::solvers::conjugated_gradient_params<T> cgp;
+    cgp.verbose = true;
+    cgp.rr_max = 1000;
+    cgp.max_iter = 3*assm.RHS.rows();
+    disk::solvers::conjugated_gradient(cgp, assm.LHS, assm.RHS, sol);
+
     std::cout << " Solver time: " << tc.toc() << std::endl;
 
     auto sol_fun = make_solution_function(msh);

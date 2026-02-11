@@ -34,23 +34,20 @@ int main(void)
 {
     using T = double;
 
-    disk::generic_mesh<T,1> msh;
-    disk::uniform_mesh_loader<T,1> loader(0,1,20);
-    loader.populate_mesh(msh);
+    //disk::generic_mesh<T,1> msh;
+    //disk::uniform_mesh_loader<T,1> loader(0,1,100);
+    //loader.populate_mesh(msh);
 
-    std::vector<double> data;
-    double i = 0.0;
-    for (auto& cl : msh) {
-        std::cout << cl << std::endl;
-        data.push_back(i++);
-    }
+    disk::generic_mesh<T, 2> msh;
+    auto mesher = disk::make_fvca5_hex_mesher(msh);
+    mesher.make_level(2);
 
     disk::silo_database db;
     db.create("test_1d.silo");
     db.add_mesh(msh, "srcmesh");
     db.add_mesh(msh, "dstmesh");
-    hho_diffusion_solver(msh, 4, db);
-    dg_diffusion_solver(msh, 5, 10.0, db);
+    hho_diffusion_solver(msh, 7, db);
+    dg_diffusion_solver(msh, 8, 10.0, db);
 
 
     return 0;
