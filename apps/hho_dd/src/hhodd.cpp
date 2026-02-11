@@ -174,10 +174,20 @@ operator<<(std::ostream& os, const iterdata& id)
 };
 
 template<typename T>
+struct hhodd_connectivity_info {
+    /* maps the cells of submesh to the global fine mesh for each cell of coarse mesh */
+    std::map<size_t, std::vector<size_t>>   cell_fine_sub_to_full;
+    /* maps the faces of submesh to the global fine mesh for each face of coarse mesh */
+    std::map<size_t, std::vector<size_t>>   face_fine_sub_to_full;
+    /* maps coarse faces to faces in the fine mesh */
+    std::vector<std::vector<size_t>>        face_coarse_to_sub;
+    std::vector<disk::simplicial_mesh<T,2>> meshes;
+};
+
+template<typename T>
 void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
     disk::simplicial_mesh<T,2>& submsh, size_t subdom_id,
-    std::vector<size_t>& cell_sub_to_orig,
-    std::vector<size_t>& face_sub_to_orig
+    hhodd_connectivity_info<T>& hhodd_ci
     )
 {
     auto stor = msh.backend_storage();
@@ -201,6 +211,9 @@ void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
         }
     };
 
+    auto& c_s2f = hhodd_ci.cell_fine_sub_to_full[subdom_id];
+    auto& f_s2f = hhodd_ci.face_fine_sub_to_full[subdom_id];
+
     std::vector<face_with_bndid> fwb;
     fwb.reserve( 3 * msh.cells_size() );
     size_t max_index = 0;
@@ -209,11 +222,11 @@ void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
         /* cycle on all the elements and copy those of
          * the specified subdomain. */
         auto di = msh.domain_info(cl);
-        if (di.tag() != subdom_id)
+        if (di.tag() != subdom_id+1)
             continue;
 
         /* remember the original numbering of this element */    
-        cell_sub_to_orig.push_back(cli);
+        c_s2f.push_back(cli);
 
         auto ptids = cl.point_ids();
         assert(ptids.size() == 3);
@@ -289,13 +302,16 @@ void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
     disk::priv::sort_uniq(fwb);
     substor->edges.resize(fwb.size());
     substor->boundary_info.resize(fwb.size());
-    face_sub_to_orig.resize(fwb.size());
+    f_s2f.resize(fwb.size());
 
     for (size_t i = 0; i < fwb.size(); i++) {
         auto& [fc, bi, orig_num] = fwb[i];
         substor->edges[i] = fc;
         substor->boundary_info[i] = bi;
-        face_sub_to_orig[i] = orig_num;
+        f_s2f[i] = orig_num;
+        if (bi.is_boundary()) {
+            hhodd_ci.face_coarse_to_sub[bi.id()].push_back(orig_num);
+        }
     }
 
     disk::priv::sort_uniq(substor->nodes);
@@ -337,21 +353,27 @@ diffusion_solver_refinement(const Mesh& cmsh, const solver_config& scfg)
         }
     }
 
+    hhodd_connectivity_info<typename Mesh::coordinate_type> hhodd_ci;
+    hhodd_ci.face_coarse_to_sub.resize(cmsh.faces_size());
+    hhodd_ci.meshes.resize( cmsh.cells_size() );
     for (size_t i = 0; i < cmsh.cells_size(); i++) {
-        disk::simplicial_mesh<scalar_type, 2> smsh;
-        std::vector<size_t> c_s2o, f_s2o;
-        make_submesh_from_subdomain(fmsh, smsh, i+1, c_s2o, f_s2o);
-        silo.add_mesh(smsh, "element_" + std::to_string(i));
+        std::cout << "submeshing " << i << std::endl;
+        
+        make_submesh_from_subdomain(fmsh, hhodd_ci.meshes[i], i, hhodd_ci);
+        silo.add_mesh(hhodd_ci.meshes[i], "element_" + std::to_string(i));
 
-        for (auto& cl : smsh) {
-            auto fcs = faces(smsh, cl);
-            for (auto& fc : fcs) {
-                auto bi = smsh.boundary_info(fc);
-                if (bi.is_boundary()) {
-                    std::cout << "  bndS: " << bi.tag()-1 << std::endl;
-                }
-            }
-        }
+        //for (auto& cl : smsh) {
+        //    auto fcs = faces(smsh, cl);
+        //    for (auto& fc : fcs) {
+        //        auto bi = smsh.boundary_info(fc);
+        //        if (bi.is_boundary()) {
+        //            std::cout << "  bndS: " << bi.tag()-1 << std::endl;
+        //        }
+        //    }
+        //}
+    }
+    for (auto& f_c2s : hhodd_ci.face_coarse_to_sub) {
+        disk::priv::sort_uniq(f_c2s);
     }
     
 }
