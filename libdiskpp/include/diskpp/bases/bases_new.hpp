@@ -450,12 +450,7 @@ private:
     size_t      size_;
 
     coordinate_type phys2ref(const point_type& pt) const {
-        //-1.0 + 2.0 * distance(pt, pa_) / h_;
-        // Using Gram-Schmidt
-        auto bv = (pb_ - bar_).to_vector();
-        auto dv = (pt - bar_).to_vector();
-        auto nbv = h_*0.5;
-        return bv.dot(dv)/(nbv*nbv);
+        return -1.0 + 2.0 * distance(pt, pa_) / h_;
     }
 
 public:
