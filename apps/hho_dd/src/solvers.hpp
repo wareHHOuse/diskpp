@@ -91,7 +91,7 @@ T cond(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& A, int ex = 0)
 
 template<typename Mesh>
 void
-hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
+hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo, const std::string& mname = "")
 {
     std::cout << "HHO solver" << std::endl;
     using namespace disk::basis;
@@ -168,9 +168,9 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo)
     std::cout << " L2-norm error: " << std::sqrt(L2error) << ", ";
     std::cout << "A-norm error: " << std::sqrt(error) << std::endl;
 
-    silo.add_variable("srcmesh", "u_hho", u_data, disk::zonal_variable_t);
-    silo.add_variable("srcmesh", "cond_hho", vcond, disk::zonal_variable_t);
-    silo.add_variable("srcmesh", "cond_mass", vcondm, disk::zonal_variable_t);
+    silo.add_variable(mname, mname+"_u_hho", u_data, disk::zonal_variable_t);
+    //silo.add_variable("srcmesh", "cond_hho", vcond, disk::zonal_variable_t);
+    //silo.add_variable("srcmesh", "cond_mass", vcondm, disk::zonal_variable_t);
 }
 
 template<typename Mesh>

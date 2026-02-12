@@ -223,7 +223,8 @@ public:
     }
 
     template<typename T>
-    bool add_mesh(const generic_mesh<T,1>& msh, const std::string& name)
+    bool add_mesh(const generic_mesh<T,1>& msh, const std::string& name,
+        const std::vector<point<T,2>>& pts2d = {} )
     {
         if (!m_siloDb) {
             std::cout << "add_mesh(): Database not opened." << std::endl;
@@ -231,11 +232,19 @@ public:
         }
 
         std::vector<T> x_coords, y_coords;
-        x_coords.reserve(msh.points_size());
-        y_coords.reserve(msh.points_size());
-        for (auto& pt : points(msh)) {
-            x_coords.push_back( double(pt.x()) );
-            y_coords.push_back( 0.0 );
+        if (pts2d.size() > 0) {
+            for (auto& pt2d : pts2d) {
+                x_coords.push_back( pt2d.x() );
+                y_coords.push_back( pt2d.y() );
+            }
+        }
+        else {
+            x_coords.reserve(msh.points_size());
+            y_coords.reserve(msh.points_size());
+            for (auto& pt : points(msh)) {
+                x_coords.push_back( double(pt.x()) );
+                y_coords.push_back( 0.0 );
+            }
         }
         T *coords[] = { x_coords.data(), y_coords.data() };
 

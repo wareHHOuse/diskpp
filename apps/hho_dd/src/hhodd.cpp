@@ -176,12 +176,15 @@ operator<<(std::ostream& os, const iterdata& id)
 template<typename T>
 struct hhodd_connectivity_info {
     /* maps the cells of submesh to the global fine mesh for each cell of coarse mesh */
-    std::map<size_t, std::vector<size_t>>   cell_fine_sub_to_full;
+    std::map<size_t, std::vector<size_t>>       cell_fine_sub_to_full;
     /* maps the faces of submesh to the global fine mesh for each face of coarse mesh */
-    std::map<size_t, std::vector<size_t>>   face_fine_sub_to_full;
+    std::map<size_t, std::vector<size_t>>       face_fine_sub_to_full;
     /* maps coarse faces to faces in the fine mesh */
-    std::vector<std::vector<size_t>>        face_coarse_to_sub;
-    std::vector<disk::simplicial_mesh<T,2>> meshes;
+    std::vector<std::vector<size_t>>            face_coarse_to_sub;
+    std::vector<disk::simplicial_mesh<T,2>>     submeshes_2D;
+    std::vector<disk::generic_mesh<T,1>>        submeshes_1D;
+    std::vector<std::vector<disk::point<T,2>>>  submeshes_1D_origpts;
+    std::vector<std::vector<size_t>>            coarse_node_to_edges;
 };
 
 template<typename T>
@@ -321,6 +324,102 @@ void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
     detect_boundary(msh);
 }
 
+template<typename CMesh, typename SMesh>
+void
+make_mesh_from_edge(const CMesh& cmsh, const typename CMesh::face_type& cfc,
+    const SMesh& smsh,
+    hhodd_connectivity_info<typename CMesh::coordinate_type>& hhodd_ci)
+{
+    using T = CMesh::coordinate_type;
+    auto c_ptids = cfc.point_ids();
+    auto c_facenum = offset(cmsh, cfc);
+    auto c_facepts = points(cmsh, cfc);
+    auto c_facelen = distance(c_facepts[1], c_facepts[0]);
+    const auto& subfaces_nums = hhodd_ci.face_coarse_to_sub[c_facenum];
+
+    auto& face_msh = hhodd_ci.submeshes_1D[c_facenum];
+    auto face_msh_storage = face_msh.backend_storage();
+
+    std::vector<size_t> all_sfptids;
+
+    for (const auto& sfn : subfaces_nums) {
+        const auto& sfc = smsh.face_at(sfn);
+        auto sfptids = sfc.point_ids();
+        all_sfptids.push_back( sfptids[0] );
+        all_sfptids.push_back( sfptids[1] );
+    }
+
+    auto max_sfptid = *std::max_element(all_sfptids.begin(), all_sfptids.end());
+    std::vector<size_t> old2new(max_sfptid+1);
+
+    disk::priv::sort_uniq(all_sfptids);
+    face_msh_storage->points.resize(all_sfptids.size());
+    for (size_t i = 0; i < all_sfptids.size(); i++) {
+        auto ptid = all_sfptids[i];
+        auto pt = smsh.point_at(ptid);
+        hhodd_ci.submeshes_1D_origpts[c_facenum].push_back(pt);
+        auto pt_1d = distance(pt, c_facepts[0]);
+        face_msh_storage->points[i] = {pt_1d};
+        old2new[ all_sfptids[i] ] = i;
+    }
+
+    using node_type_1D = disk::generic_mesh<T,1>::node_type;
+    using edge_type_1D = disk::generic_mesh<T,1>::edge_type;
+
+    struct nodebnd {
+        node_type_1D            node;
+        std::optional<size_t>   bndnum;
+        bool operator<(const nodebnd& other) const {
+            return node < other.node;
+        }
+        bool operator==(const nodebnd& other) const {
+            return node == other.node;
+        }
+    };
+
+    std::vector<nodebnd> nodebnds;
+
+    for (const auto& sfn : subfaces_nums) {
+        const auto& sfc = smsh.face_at(sfn);
+        auto sfptids = sfc.point_ids();
+        auto np0 = old2new[ sfptids[0] ];
+        auto np1 = old2new[ sfptids[1] ];
+        
+        nodebnd nb0;
+        nb0.node = node_type_1D(np0);
+        if (sfptids[0] == c_ptids[0]) { nb0.bndnum = c_ptids[0]; }
+        if (sfptids[0] == c_ptids[1]) { nb0.bndnum = c_ptids[1]; }
+        nodebnds.push_back(nb0);
+
+        nodebnd nb1;
+        nb1.node = node_type_1D(np1);
+        if (sfptids[1] == c_ptids[0]) { nb1.bndnum = c_ptids[0]; }
+        if (sfptids[1] == c_ptids[1]) { nb1.bndnum = c_ptids[1]; }
+        nodebnds.push_back(nb1);
+
+        face_msh_storage->edges.push_back(
+            edge_type_1D(
+                typename node_type_1D::id_type(np0),
+                typename node_type_1D::id_type(np1)
+            )
+        );
+    }
+
+    disk::priv::sort_uniq(nodebnds);
+
+    for (auto& [node, bndnum] : nodebnds) {
+        face_msh_storage->nodes.push_back(node);
+        disk::boundary_descriptor bi;
+        if (bndnum) {
+            bi = disk::boundary_descriptor(*bndnum, true);
+        }
+        face_msh_storage->boundary_info.push_back(bi);
+    }
+
+    disk::priv::sort_uniq(face_msh_storage->edges);
+
+}
+
 template<disk::mesh_2D Mesh>
 void
 diffusion_solver_refinement(const Mesh& cmsh, const solver_config& scfg)
@@ -355,26 +454,38 @@ diffusion_solver_refinement(const Mesh& cmsh, const solver_config& scfg)
 
     hhodd_connectivity_info<typename Mesh::coordinate_type> hhodd_ci;
     hhodd_ci.face_coarse_to_sub.resize(cmsh.faces_size());
-    hhodd_ci.meshes.resize( cmsh.cells_size() );
+    hhodd_ci.submeshes_2D.resize( cmsh.cells_size() );
     for (size_t i = 0; i < cmsh.cells_size(); i++) {
         std::cout << "submeshing " << i << std::endl;
         
-        make_submesh_from_subdomain(fmsh, hhodd_ci.meshes[i], i, hhodd_ci);
-        silo.add_mesh(hhodd_ci.meshes[i], "element_" + std::to_string(i));
-
-        //for (auto& cl : smsh) {
-        //    auto fcs = faces(smsh, cl);
-        //    for (auto& fc : fcs) {
-        //        auto bi = smsh.boundary_info(fc);
-        //        if (bi.is_boundary()) {
-        //            std::cout << "  bndS: " << bi.tag()-1 << std::endl;
-        //        }
-        //    }
-        //}
+        make_submesh_from_subdomain(fmsh, hhodd_ci.submeshes_2D[i], i, hhodd_ci);
+        silo.add_mesh(hhodd_ci.submeshes_2D[i], "cell_" + std::to_string(i));
     }
+
     for (auto& f_c2s : hhodd_ci.face_coarse_to_sub) {
         disk::priv::sort_uniq(f_c2s);
     }
+
+    hhodd_ci.coarse_node_to_edges.resize( cmsh.points_size() );
+    hhodd_ci.submeshes_1D.resize( cmsh.faces_size() );
+    hhodd_ci.submeshes_1D_origpts.resize( cmsh.faces_size() );
+    for (size_t i = 0; i < cmsh.faces_size(); i++) {
+        const auto& cfc = cmsh.face_at(i);
+        auto ptids = cfc.point_ids();
+        hhodd_ci.coarse_node_to_edges[ ptids[0] ].push_back(i);
+        hhodd_ci.coarse_node_to_edges[ ptids[1] ].push_back(i);
+
+        make_mesh_from_edge(cmsh, cfc, fmsh, hhodd_ci);
+
+        std::string mname = "edge_" + std::to_string(ptids[0]) + "_" + std::to_string(ptids[1]);
+        silo.add_mesh(hhodd_ci.submeshes_1D[i], mname, hhodd_ci.submeshes_1D_origpts[i]);
+        hho_diffusion_solver(hhodd_ci.submeshes_1D[i], 1, silo, mname);
+    }
+
+    for (auto& c_n2e : hhodd_ci.coarse_node_to_edges) {
+        disk::priv::sort_uniq(c_n2e);
+    }
+    
     
 }
 
