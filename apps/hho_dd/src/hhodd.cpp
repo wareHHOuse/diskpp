@@ -334,7 +334,6 @@ make_mesh_from_edge(const CMesh& cmsh, const typename CMesh::face_type& cfc,
     auto c_ptids = cfc.point_ids();
     auto c_facenum = offset(cmsh, cfc);
     auto c_facepts = points(cmsh, cfc);
-    auto c_facelen = distance(c_facepts[1], c_facepts[0]);
     const auto& subfaces_nums = hhodd_ci.face_coarse_to_sub[c_facenum];
 
     auto& face_msh = hhodd_ci.submeshes_1D[c_facenum];
@@ -348,11 +347,11 @@ make_mesh_from_edge(const CMesh& cmsh, const typename CMesh::face_type& cfc,
         all_sfptids.push_back( sfptids[0] );
         all_sfptids.push_back( sfptids[1] );
     }
+    disk::priv::sort_uniq(all_sfptids);
 
     auto max_sfptid = *std::max_element(all_sfptids.begin(), all_sfptids.end());
     std::vector<size_t> old2new(max_sfptid+1);
-
-    disk::priv::sort_uniq(all_sfptids);
+    
     face_msh_storage->points.resize(all_sfptids.size());
     for (size_t i = 0; i < all_sfptids.size(); i++) {
         auto ptid = all_sfptids[i];
@@ -418,6 +417,7 @@ make_mesh_from_edge(const CMesh& cmsh, const typename CMesh::face_type& cfc,
 
     disk::priv::sort_uniq(face_msh_storage->edges);
 
+    disk::detect_boundary(face_msh);
 }
 
 template<disk::mesh_2D Mesh>
@@ -479,14 +479,12 @@ diffusion_solver_refinement(const Mesh& cmsh, const solver_config& scfg)
 
         std::string mname = "edge_" + std::to_string(ptids[0]) + "_" + std::to_string(ptids[1]);
         silo.add_mesh(hhodd_ci.submeshes_1D[i], mname, hhodd_ci.submeshes_1D_origpts[i]);
-        hho_diffusion_solver(hhodd_ci.submeshes_1D[i], 1, silo, mname);
+        hho_diffusion_solver(hhodd_ci.submeshes_1D[i], 4, silo, mname);
     }
 
     for (auto& c_n2e : hhodd_ci.coarse_node_to_edges) {
         disk::priv::sort_uniq(c_n2e);
     }
-    
-    
 }
 
 template<typename T>

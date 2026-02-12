@@ -132,13 +132,13 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo, 
     std::cout << " Unknowns: " << assm.LHS.rows() << " ";
     std::cout << " Nonzeros: " << assm.LHS.nonZeros() << std::endl;
     tc.tic();
-    //disk::dynamic_vector<T> sol = mumps_lu(assm.LHS, assm.RHS);
+    disk::dynamic_vector<T> sol = mumps_lu(assm.LHS, assm.RHS);
     
-    disk::solvers::conjugated_gradient_params<T> cgp;
-    cgp.verbose = true;
-    cgp.max_iter = 3*assm.RHS.rows();
-    disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.RHS.rows());
-    disk::solvers::conjugated_gradient(cgp, assm.LHS, assm.RHS, sol);
+    //disk::solvers::conjugated_gradient_params<T> cgp;
+    //cgp.verbose = true;
+    //cgp.max_iter = 3*assm.RHS.rows();
+    //disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.RHS.rows());
+    //disk::solvers::conjugated_gradient(cgp, assm.LHS, assm.RHS, sol);
     
     std::cout << " Solver time: " << tc.toc() << std::endl;
 
