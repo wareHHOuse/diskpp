@@ -103,10 +103,7 @@ private:
     coordinate_type scale_;
 
     point_type phys2ref(const point_type& pt) const {
-        auto bv = (pb_ - bar_).to_vector();
-        auto dv = (pt - bar_).to_vector();
-        auto nbv = h_/scale_;
-        return point_type( bv.dot(dv)/(nbv*nbv) );
+        return -1.0 + 2.0 * distance(pt, pa_) / h_;
     }
 
     std::pair<size_t, size_t>
@@ -294,7 +291,6 @@ private:
     compute_reference_frame(const mesh_type& msh, const cell_type& cl, rescaling_strategy rs)
     {
         tr_ = scale_ * diameters(msh,cl).cwiseInverse().asDiagonal();
-
         switch(rs)
         {
             case rescaling_strategy::none:
