@@ -357,7 +357,7 @@ make_mesh_from_edge(const CMesh& cmsh, const typename CMesh::face_type& cfc,
         auto ptid = all_sfptids[i];
         auto pt = smsh.point_at(ptid);
         hhodd_ci.submeshes_1D_origpts[c_facenum].push_back(pt);
-        auto pt_1d = distance(pt, c_facepts[0]);
+        auto pt_1d = distance(pt, c_facepts[0])/distance(c_facepts[0], c_facepts[1]);
         face_msh_storage->points[i] = {pt_1d};
         old2new[ all_sfptids[i] ] = i;
     }
@@ -428,7 +428,7 @@ diffusion_solver_refinement(const Mesh& cmsh, const solver_config& scfg)
     using scalar_type = typename mesh_type::coordinate_type;
 
     disk::simplicial_mesh<scalar_type, 2> fmsh;
-    disk::submesh_via_gmsh(cmsh, fmsh, disk::average_diameter(cmsh)/4.0);
+    disk::submesh_via_gmsh(cmsh, fmsh, disk::average_diameter(cmsh)/5.0);
 
     std::vector<double> subdom_ids;
     for (auto& cl : fmsh) {
@@ -478,8 +478,14 @@ diffusion_solver_refinement(const Mesh& cmsh, const solver_config& scfg)
         make_mesh_from_edge(cmsh, cfc, fmsh, hhodd_ci);
 
         std::string mname = "edge_" + std::to_string(ptids[0]) + "_" + std::to_string(ptids[1]);
+        std::string vname = "sol_" + std::to_string(ptids[0]) + "_" + std::to_string(ptids[1]);
         silo.add_mesh(hhodd_ci.submeshes_1D[i], mname, hhodd_ci.submeshes_1D_origpts[i]);
-        hho_diffusion_solver(hhodd_ci.submeshes_1D[i], 4, silo, mname);
+        disk::hho_diffusion_solver hhosolver(hhodd_ci.submeshes_1D[i], 3);
+        auto rhsfun = disk::make_rhs_function(hhodd_ci.submeshes_1D[i]);
+        disk::dynamic_vector<scalar_type> sol = hhosolver.solve( rhsfun );
+        disk::dynamic_vector<scalar_type> nodalvals = hhosolver.compute_nodal_values(sol);
+        silo.add_variable(mname, vname, nodalvals, disk::nodal_variable_t);
+
     }
 
     for (auto& c_n2e : hhodd_ci.coarse_node_to_edges) {
@@ -937,7 +943,7 @@ int main(int argc, char **argv)
         disk::silo_database db;
         db.create("plain_hho.silo");
         db.add_mesh(msh, "srcmesh");
-        hho_diffusion_solver(msh, scfg.degree, db);
+        //hho_diffusion_solver(msh, scfg.degree, db);
         return 0;
     }
 

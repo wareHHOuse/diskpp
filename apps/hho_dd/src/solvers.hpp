@@ -1,3 +1,5 @@
+#include "diskpp/methods/hho_assemblers.hpp"
+#include "diskpp/methods/hho_slapl.hpp"
 #include "diskpp/solvers/solver.hpp"
 namespace disk {
 
@@ -89,9 +91,136 @@ T cond(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& A, int ex = 0)
         / svd.singularValues()(svd.singularValues().size()-(1+ex));
 }
 
+
 template<typename Mesh>
-void
-hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo, const std::string& mname = "")
+class hho_diffusion_solver
+{   
+    const Mesh&     msh_;
+    disk::hho::slapl::degree_info     di_;
+    
+    using space_type = disk::hho::slapl::hho_space<Mesh>;
+
+    using mesh_type = Mesh;
+    using T = typename space_type::scalar_type;
+    using face_basis_type = typename space_type::face_basis_type;
+    
+    using MT = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+    using VT = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+    
+    std::vector<std::pair<MT, VT>> lcs;
+
+    disk::hho::basic_condensed_assembler<Mesh, face_basis_type> assm;
+
+public:
+    hho_diffusion_solver(const Mesh& msh, size_t degree = 1)
+        : msh_(msh), di_( disk::hho::slapl::degree_info(degree) ),
+          assm(msh, degree)
+    {
+    }
+
+    template<typename RHSFun>
+    dynamic_vector<T> solve(RHSFun& f) {
+        
+        //timecounter tc;
+        //tc.tic();
+        for (auto& cl : msh_)
+        {
+            auto [R, A] = local_operator(msh_, cl, di_);
+            auto S = local_stabilization(msh_, cl, di_, R);
+            disk::dynamic_matrix<T> lhs = A+S;
+            auto phiT = space_type::cell_basis(msh_, cl, di_.cell);
+            disk::dynamic_vector<T> rhs = integrate(msh_, cl, f, phiT);
+            lcs.push_back({lhs, rhs});
+            auto [lhsc, rhsc] = disk::hho::schur(lhs, rhs, phiT);
+            assm.assemble(msh_, cl, lhsc, rhsc);;
+        }
+        assm.finalize();
+        //std::cout << " Assembly time: " << tc.toc() << std::endl;
+        //std::cout << " Unknowns: " << assm.LHS.rows() << " ";
+        //std::cout << " Nonzeros: " << assm.LHS.nonZeros() << std::endl;
+        //tc.tic();
+        disk::dynamic_vector<T> sol = mumps_lu(assm.LHS, assm.RHS);
+        return sol;
+    }
+
+    template<typename RefSol>
+    std::pair<T,T> compute_errors(const dynamic_vector<T>& sol, RefSol u_sol)
+    {
+        T Aerror = 0.0;
+        T L2error = 0.0;
+    
+        size_t cell_i = 0;
+        for (auto& cl : msh_)
+        {
+            auto phiT = space_type::cell_basis(msh_, cl, di_.cell);
+            auto MMe = integrate(msh_, cl, phiT, phiT);
+            const auto& [lhs, rhs] = lcs[cell_i++];
+            disk::dynamic_vector<T> sol_ana = local_reduction(msh_, cl, di_, u_sol);
+            auto locsolF = assm.take_local_solution(msh_, cl, sol);
+            disk::dynamic_vector<T> locsol = disk::hho::deschur(lhs, rhs, locsolF, phiT);
+            disk::dynamic_vector<T> diff = locsol - sol_ana;
+            Aerror += diff.dot(lhs*diff);
+            disk::dynamic_vector<T> diffT = diff.head(phiT.size());
+            L2error += diffT.transpose() * (MMe*diffT);
+        }
+
+        return {L2error, Aerror};
+    }
+
+    dynamic_vector<T>
+    compute_nodal_values(const dynamic_vector<T>& sol)
+    {
+        std::vector<std::pair<T, int>> nodedata(msh_.points_size(), {0.0, 0});
+        dynamic_vector<T> vals = dynamic_vector<T>::Zero(msh_.points_size());
+
+        for (size_t cell_i = 0; cell_i < msh_.cells_size(); cell_i++)
+        {
+            const auto& cl =  msh_.cell_at(cell_i);
+            auto phiT = space_type::cell_basis(msh_, cl, di_.cell);
+            const auto& [lhs, rhs] = lcs[cell_i];
+            auto locsolF = assm.take_local_solution(msh_, cl, sol);
+            disk::dynamic_vector<T> locsol = disk::hho::deschur(lhs, rhs, locsolF, phiT);
+
+            auto ptids = cl.point_ids();
+            for(auto& ptid : ptids) {
+                auto pt = msh_.point_at(ptid);
+                auto val = locsol.head(phiT.size()).dot(phiT(pt));
+                nodedata[ptid].first += val;
+                nodedata[ptid].second++;
+            }
+        }
+
+        for (size_t node_i = 0; node_i < msh_.points_size(); node_i++) {
+            auto& [val, nodes] = nodedata[node_i];
+            vals(node_i) = val/nodes;
+        }
+
+        return vals;
+    }
+
+    dynamic_vector<T>
+    compute_zonal_values(const dynamic_vector<T>& sol)
+    {
+        dynamic_vector<T> vals = dynamic_vector<T>::Zero(msh_.cells_size());
+
+        for (size_t cell_i = 0; cell_i < msh_.cells_size(); cell_i++)
+        {
+            const auto& cl =  msh_.cell_at(cell_i);
+            auto phiT = space_type::cell_basis(msh_, cl, di_.cell);
+            const auto& [lhs, rhs] = lcs[cell_i];
+            auto locsolF = assm.take_local_solution(msh_, cl, sol);
+            disk::dynamic_vector<T> locsol = disk::hho::deschur(lhs, rhs, locsolF, phiT);
+            vals(cell_i) = locsol;
+        }
+
+        return vals;
+    }
+};
+
+#if 0
+template<typename Mesh, typename RHSFun>
+dynamic_vector<typename Mesh::scalar_type>
+xx(const Mesh& msh, size_t degree, RHSFun f)
 {
     std::cout << "HHO solver" << std::endl;
     using namespace disk::basis;
@@ -102,16 +231,11 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo, 
 
     degree_info di(degree);
 
-    auto f = make_rhs_function(msh);
-
     auto assm = make_assembler(msh, di);
 
     using MT = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
     using VT = Eigen::Matrix<T, Eigen::Dynamic, 1>;
     std::vector<std::pair<MT, VT>> lcs;
-
-    std::vector<T> vcond;
-    std::vector<T> vcondm;
 
     timecounter tc;
     tc.tic();
@@ -124,8 +248,7 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo, 
         disk::dynamic_vector<T> rhs = integrate(msh, cl, f, phiT);
         lcs.push_back({lhs, rhs});
         auto [lhsc, rhsc] = disk::hho::schur(lhs, rhs, phiT);
-        assm.assemble(msh, cl, lhsc, rhsc);
-        vcond.push_back( cond(lhs,1) );
+        assm.assemble(msh, cl, lhsc, rhsc);;
     }
     assm.finalize();
     std::cout << " Assembly time: " << tc.toc() << std::endl;
@@ -142,8 +265,10 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo, 
     
     std::cout << " Solver time: " << tc.toc() << std::endl;
 
+    std::vector<std::pair<T, int>> nodedata(msh.points_size(), {0.0, 0});
     std::vector<T> u_data;
-    
+    std::vector<T> u_data_nodal;
+
     T error = 0.0;
     T L2error = 0.0;
     auto u_sol = make_solution_function(msh);
@@ -163,15 +288,29 @@ hho_diffusion_solver(const Mesh& msh, size_t degree, disk::silo_database& silo, 
         disk::dynamic_vector<T> diffT = diff.head(phiT.size());
         L2error += diffT.transpose() * (MMe*diffT);
         vcondm.push_back(cond(MMe));
+
+        auto ptids = cl.point_ids();
+        for(auto& ptid : ptids) {
+            auto pt = msh.point_at(ptid);
+            auto val = locsol.head(phiT.size()).dot(phiT(pt));
+            nodedata[ptid].first += val;
+            nodedata[ptid].second++;
+        }
+    }
+
+    for (auto& [val, nodes] : nodedata) {
+        u_data_nodal.push_back(val/nodes);
     }
     std::cout << " Postpro time: " << tc.toc() << std::endl;
     std::cout << " L2-norm error: " << std::sqrt(L2error) << ", ";
     std::cout << "A-norm error: " << std::sqrt(error) << std::endl;
 
-    silo.add_variable(mname, mname+"_u_hho", u_data, disk::zonal_variable_t);
+
+    silo.add_variable(mname, mname+"_u_hho", u_data_nodal, disk::nodal_variable_t);
     //silo.add_variable("srcmesh", "cond_hho", vcond, disk::zonal_variable_t);
     //silo.add_variable("srcmesh", "cond_mass", vcondm, disk::zonal_variable_t);
 }
+#endif
 
 template<typename Mesh>
 auto
