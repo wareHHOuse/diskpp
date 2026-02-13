@@ -192,7 +192,7 @@ public:
                         for (size_t j = 0; j < fbs; j++) {
                             auto lj = lnum_j*fbs + j;
                             auto gj = gnum_j*fbs + j;
-                            triplets.push_back( {gi, gj, lhs(li, lj)} );
+                            triplets.push_back( {int(gi), int(gj), lhs(li, lj)} );
                         } // for j
                     } // for i
                 } // else
