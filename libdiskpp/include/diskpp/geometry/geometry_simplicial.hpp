@@ -246,7 +246,7 @@ faces_id(const simplicial_mesh<T, 2>& msh, const typename simplicial_mesh<T, 2>:
  * @param signed_volume return a signed volume
  * @return T volume of the cell
  */
-/*
+#if 0
 template<typename T>
 T
 measure(const simplicial_mesh<T, 3>& msh,
@@ -268,7 +268,7 @@ measure(const simplicial_mesh<T, 3>& msh,
 
     return std::abs(vol);
 }
-*/
+#endif
 
 template<typename T>
 T

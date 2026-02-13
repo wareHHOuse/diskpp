@@ -1,4 +1,4 @@
-option(BUILD_APP_HHO_DD "Build HHO domain decomposition apps" ON)
+option(BUILD_APP_HHO_DD "Build HHO domain decomposition apps" OFF)
 if (BUILD_APP_HHO_DD)
     add_subdirectory(hho_dd)
 endif()
