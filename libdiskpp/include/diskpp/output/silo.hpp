@@ -223,6 +223,75 @@ public:
     }
 
     template<typename T>
+    bool add_mesh(const generic_mesh<T,1>& msh, const std::string& name,
+        const std::vector<point<T,2>>& pts2d = {} )
+    {
+        if (!m_siloDb) {
+            std::cout << "add_mesh(): Database not opened." << std::endl;
+            return false;
+        }
+
+        std::vector<T> x_coords, y_coords;
+        if (pts2d.size() > 0) {
+            for (auto& pt2d : pts2d) {
+                x_coords.push_back( pt2d.x() );
+                y_coords.push_back( pt2d.y() );
+            }
+        }
+        else {
+            x_coords.reserve(msh.points_size());
+            y_coords.reserve(msh.points_size());
+            for (auto& pt : points(msh)) {
+                x_coords.push_back( double(pt.x()) );
+                y_coords.push_back( 0.0 );
+            }
+        }
+        T *coords[] = { x_coords.data(), y_coords.data() };
+
+        std::vector<int> nodelist;
+        nodelist.reserve( 2*msh.cells_size() );
+
+        for (auto& cl : msh)
+        {
+            auto ptids = cl.point_ids();
+            assert(ptids.size() == 2);
+
+            for (auto& ptid : ptids)
+                nodelist.push_back( ptid );
+        }
+
+        int lnodelist = nodelist.size();
+
+        int shapetype[] = { DB_ZONETYPE_BEAM };
+        int shapesize[] = {2};
+        int shapecounts[] = { static_cast<int>(msh.cells_size()) };
+        int nshapetypes = 1;
+        int nnodes = msh.points_size();
+        int nzones = msh.cells_size();
+        int ndims = 2;
+
+        std::stringstream zlname;
+        zlname << "zonelist_" << name;
+        std::string zonelist_name = zlname.str();
+
+        if ( DBPutZonelist2(m_siloDb, zonelist_name.c_str(), nzones, ndims,
+            nodelist.data(), lnodelist, 0, 0, 0, shapetype, shapesize,
+            shapecounts, nshapetypes, NULL) < 0 ) {
+            std::cout << "DBPutZoneList2() failed" << std::endl;
+            return false;
+        }
+
+        using st = silo_types<T>;
+        if ( DBPutUcdmesh(m_siloDb, name.c_str(), ndims, NULL, coords, nnodes,
+             nzones, zonelist_name.c_str(), NULL, st::DB_TYPE, NULL) < 0 ) {
+            std::cout << "DBPutUcdmesh() failed" << std::endl;
+            return false;
+        }
+
+        return true;
+    }
+
+    template<typename T>
     bool add_mesh(const simplicial_mesh<T,2>& msh, const std::string& name)
     {
         if (!m_siloDb) {

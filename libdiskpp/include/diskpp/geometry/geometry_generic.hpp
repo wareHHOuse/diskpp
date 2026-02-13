@@ -107,6 +107,61 @@ faces(const generic_mesh<T, DIM>& msh,
     return ret;
 }
 
+#ifdef ENABLE_CCW_FACES
+template<typename T>
+std::vector<typename generic_mesh<T, 2>::face>
+faces(const generic_mesh<T, 2>& msh,
+      const typename generic_mesh<T, 2>::cell& cl)
+{
+    using face_type = typename generic_mesh<T, 2>::face;
+    using nodeid_type = typename generic_mesh<T, 2>::node_type::id_type;
+    std::vector<face_type> ret;
+    auto ptids = cl.point_ids();
+    for (size_t i = 0; i < ptids.size(); i++) {
+        auto p0 = nodeid_type(ptids[i]);
+        auto p1 = nodeid_type(ptids[(i+1)%ptids.size()]);
+        ret.push_back(face_type(p0,p1));
+    }
+    return ret;
+}
+
+template<typename T>
+static_vector<T, 2>
+normal(const generic_mesh<T, 2>& msh,
+       const typename generic_mesh<T, 2>::cell& cl,
+       const typename generic_mesh<T, 2>::face& fc)
+{
+    auto pts = points(msh, cl);
+    Eigen::Matrix<T, 3, 3> OM;
+    OM << 1.0, pts[0].x(), pts[0].y(),
+          1.0, pts[1].x(), pts[1].y(),
+          1.0, pts[2].x(), pts[2].y();
+
+    double orientation = OM.determinant();
+    orientation /= std::abs(orientation);
+
+    auto clptids = cl.point_ids();
+    auto fcpts = fc.point_ids();
+    assert(fcpts.size() == 2);
+
+    for (size_t i = 0; i < clptids.size(); i++) {
+        auto p0 = clptids[i];
+        auto p1 = clptids[(i+1)%clptids.size()];
+        if ( (p0 == fcpts[0] and p1 == fcpts[1]) or
+             (p0 == fcpts[1] and p1 == fcpts[0]) ) {
+
+            auto v = pts[(i+1)%clptids.size()] - pts[i];
+            auto n = (point<T,2>({v.y(), -v.x()})).to_vector();
+
+            return orientation*n/n.norm();
+        }
+    }
+
+    throw std::logic_error("face not found");
+}
+
+#endif
+
 template<typename T, size_t DIM>
 std::vector<typename generic_mesh<T, DIM>::face::id_type>
 faces_id(const generic_mesh<T, DIM>& msh, const typename generic_mesh<T, DIM>::cell& cl)
@@ -209,17 +264,14 @@ T
 measure(const generic_mesh<T,2>& msh,
     const typename generic_mesh<T,2>::cell& cl)
 {
-    /* Uses the divergence theorem: this way works on
-     * nonconvex elements without subtriangulating. */
     T tot_meas = 0.0;
-    auto fcs = faces(msh, cl);
-    for (auto& fc : fcs) {
-        auto bar = barycenter(msh, fc);
-        auto meas = measure(msh, fc);
-        auto n = normal(msh, cl, fc);
-        tot_meas += meas * (bar.x()*n[0]/2. + bar.y()*n[1]/2.);
+    auto pts = points(msh, cl);
+    for (size_t i = 0; i < pts.size(); i++) {
+        auto p0 = pts[i];
+        auto p1 = pts[(i+1)%pts.size()];
+        tot_meas -= (p1.x() - p0.x())*(p1.y() + p0.y());
     }
-    return tot_meas;
+    return tot_meas/2.0;
 }
 
 template<typename T>

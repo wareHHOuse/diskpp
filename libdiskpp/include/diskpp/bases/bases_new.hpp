@@ -103,10 +103,7 @@ private:
     coordinate_type scale_;
 
     point_type phys2ref(const point_type& pt) const {
-        auto bv = (pb_ - bar_).to_vector();
-        auto dv = (pt - bar_).to_vector();
-        auto nbv = h_/scale_;
-        return point_type( bv.dot(dv)/(nbv*nbv) );
+        return -1.0 + 2.0 * distance(pt, pa_) / h_;
     }
 
     std::pair<size_t, size_t>
@@ -294,7 +291,6 @@ private:
     compute_reference_frame(const mesh_type& msh, const cell_type& cl, rescaling_strategy rs)
     {
         tr_ = scale_ * diameters(msh,cl).cwiseInverse().asDiagonal();
-
         switch(rs)
         {
             case rescaling_strategy::none:
@@ -450,12 +446,7 @@ private:
     size_t      size_;
 
     coordinate_type phys2ref(const point_type& pt) const {
-        //-1.0 + 2.0 * distance(pt, pa_) / h_;
-        // Using Gram-Schmidt
-        auto bv = (pb_ - bar_).to_vector();
-        auto dv = (pt - bar_).to_vector();
-        auto nbv = h_*0.5;
-        return bv.dot(dv)/(nbv*nbv);
+        return -1.0 + 2.0 * distance(pt, pa_) / h_;
     }
 
 public:
@@ -511,7 +502,7 @@ template<template<typename, size_t, typename> class Mesh,
     typename CoordT, typename Storage, typename ScalT>
 class scalar_monomial<Mesh<CoordT, 3, Storage>, typename Mesh<CoordT, 3, Storage>::cell_type, ScalT>
 {
-    public:
+public:
     using mesh_type = Mesh<CoordT, 3, Storage>;
     using cell_type = typename mesh_type::cell_type;
     using element_type = cell_type;
@@ -555,7 +546,8 @@ private:
 
 
     public:
-    scalar_monomial(const mesh_type& msh, const cell_type& cl, size_t degree)
+    scalar_monomial(const mesh_type& msh, const cell_type& cl, size_t degree,
+        rescaling_strategy rs = rescaling_strategy::unspecified)
         : degree_(degree), size_( size_of_degree(degree) )
     {
         bar_ = barycenter(msh, cl);
@@ -908,6 +900,17 @@ auto integrate(const Mesh& msh, const Element& elem, size_t degree, IntegrandFun
 template<basis Test>
 using fun = std::function<typename Test::value_type(typename Test::point_type)>;
 
+template<typename Mesh, typename Element, scalar_face_basis_1D Test>
+auto integrate(const Mesh& msh, const Element& elem, const fun<Test>& f, const Test& basis)
+{
+    using ST = typename Test::scalar_type;
+    return f(barycenter(msh, elem));
+}
+
+/* Integrate a term of the type (f,v)_E, tipically a RHS */
+template<basis Test>
+using fun = std::function<typename Test::value_type(typename Test::point_type)>;
+
 template<typename Mesh, typename Element, basis Test>
 auto integrate(const Mesh& msh, const Element& elem, const fun<Test>& f, const Test& basis)
 {
@@ -939,6 +942,40 @@ auto integrate(const Mesh& msh, const Element& elem, const Trial& trial, const T
         ret += (qp.weight() * test(qp.point())) * trial(qp.point()).transpose();
     };
 
+    return ret;
+}
+
+/* Integrate a term of the type (u,v)_E, tipically a LHS */
+template<typename Mesh, typename Element, scalar_face_basis_1D Trial, basis Test>
+auto integrate(const Mesh& msh, const Element& elem, const Trial& trial, const Test& test)
+{
+    static_assert(can_take_scalar_product<Trial, Test>::value, "Invalid scalar product requested");
+    using trial_ST = typename Trial::scalar_type;
+    using test_ST = typename Test::scalar_type;
+    using ST = decltype( trial_ST{} * test_ST{} );
+    Eigen::Matrix<ST, Eigen::Dynamic, 1> ret
+        = Eigen::Matrix<ST, Eigen::Dynamic, 1>::Zero(test.size());
+
+    auto ideg = trial.integration_degree() + test.integration_degree();
+    auto qps = integrate(msh, elem, ideg);
+    for (auto& qp : qps) {
+        ret += (qp.weight() * test(qp.point())) * trial(qp.point());
+    };
+
+    return ret;
+}
+
+/* Integrate a term of the type (u,v)_E, tipically a LHS */
+template<typename Mesh, typename Element, scalar_face_basis_1D Trial, scalar_face_basis_1D Test>
+auto integrate(const Mesh& msh, const Element& elem, const Trial& trial, const Test& test)
+{
+    static_assert(can_take_scalar_product<Trial, Test>::value, "Invalid scalar product requested");
+    auto bar = barycenter(msh, elem);
+    using trial_ST = typename Trial::scalar_type;
+    using test_ST = typename Test::scalar_type;
+    using ST = decltype( trial_ST{} * test_ST{} );
+    Eigen::Matrix<ST, 1, 1> ret;
+    ret(0,0) = test(bar) * trial(bar);
     return ret;
 }
 

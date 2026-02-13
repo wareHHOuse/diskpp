@@ -47,6 +47,7 @@
 #include "diskpp/mesh/mesh.hpp"
 #include "diskpp/geometry/geometry.hpp"
 #include "diskpp/loaders/mesh_loader.hpp"
+#include "diskpp/mesh/mesh_storage.hpp"
 
 namespace disk
 {
@@ -353,6 +354,10 @@ public:
                 if (bf[i] == 1)
                     storage->boundary_info[i] = bi;
         }
+
+        storage->subdomain_info.resize(storage->volumes.size());
+        for (auto& di : storage->subdomain_info)
+            di = subdomain_descriptor(0);
 
         return true;
     }

@@ -24,6 +24,18 @@ using variable_material_tensor =
     std::function<piecewise_material_tensor<Basis>(typename Basis::point_type)>;
 
 namespace priv {
+
+
+template<typename T, size_t ID>
+struct normal_t {
+    typedef Eigen::Matrix<T, ID, 1> type;
+};
+
+template<typename T>
+struct normal_t<T,1> {
+    typedef double type;
+};
+
 template<typename Basis>
 struct dot_evaluator
 {
@@ -38,7 +50,7 @@ struct dot_evaluator
     static_assert(Basis::tensor_order > 0);
     static const size_t tensor_order = Basis::tensor_order-1;
     using value_type = typename tensor<scalar_type, basis_dimension, tensor_order>::value_type;
-    using normal_type = Eigen::Matrix<coordinate_type, immersion_dimension, 1>;
+    using normal_type = normal_t<coordinate_type, immersion_dimension>::type;
     normal_type n;
 
     dot_evaluator() = delete;
@@ -98,7 +110,7 @@ struct grad_evaluator
     static const size_t basis_dimension = Basis::basis_dimension;
     static const size_t tensor_order = Basis::tensor_order+1;
     using value_type = typename tensor<scalar_type, basis_dimension, tensor_order>::value_type;
-    using normal_type = Eigen::Matrix<coordinate_type, immersion_dimension, 1>;
+    using normal_type = normal_t<coordinate_type, immersion_dimension>::type;
     normal_type n;
 
     grad_evaluator() = delete;
@@ -332,6 +344,16 @@ L2_project(const Mesh& msh, const Element& elem,
     auto mass = integrate(msh, elem, basis, basis);
     auto rhs = integrate(msh, elem, f, basis);
     return mass.ldlt().solve(rhs).eval();
+}
+
+template<scalar_face_basis_1D Basis, typename Mesh, typename Element>
+auto
+L2_project(const Mesh& msh, const Element& elem,
+    const fun<Basis>& f, const Basis& basis)
+{
+    Eigen::Matrix<typename Basis::scalar_type, 1, 1> ret;
+    ret(0,0) = f(barycenter(msh, elem));
+    return ret;
 }
 
 } //namespace disk::basis

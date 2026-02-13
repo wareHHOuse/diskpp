@@ -7,6 +7,8 @@ if ( WIN32 )
     message(FATAL_ERROR "Sorry, Windows is not supported.")
 endif()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 ######################################################################
 ## project version
 set(diskpp_VERSION_MAJOR 0)
@@ -66,7 +68,18 @@ if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
             message(FATAL_ERROR "git submodule update --init --recursive failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
         endif()
     endif()
+
+    execute_process( COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+      OUTPUT_VARIABLE "DISKPP_GIT_REVISION"
+      ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+else()
+    set(DISKPP_GIT_REVISION 0)
 endif()
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/diskpp_git_revision.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/diskpp_git_revision.h @ONLY)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 ######################################################################
 ## Eigen3
@@ -122,14 +135,14 @@ endif()
 
 ######################################################################
 ## Package: Intel MKL support
-find_package(MKL)
+set(MKL_INTERFACE_FULL intel_lp64)
+find_package(MKL CONFIG)
 if (MKL_FOUND)
-  include_directories(${MKL_INCLUDE_DIRS})
   set(LINK_LIBS ${LINK_LIBS} MKL::MKL)
   set(HAVE_INTEL_MKL TRUE)
-  add_definitions(-DHAVE_INTEL_MKL)
-  add_definitions(-DHAVE_PARDISO)
-
+  add_compile_definitions(-DHAVE_MKL)
+  add_compile_definitions(-DHAVE_INTEL_MKL)
+  add_compile_definitions(-DHAVE_PARDISO)
 endif()
 
 ######################################################################
@@ -180,7 +193,7 @@ endif()
 
 ######################################################################
 ## Optimization: Disallow denormals and activate -ffast-math (violates IEEE754)
-option(OPT_AGGRESSIVE_FP "Enable DAZ, FTZ and -ffast-math" ON)
+option(OPT_AGGRESSIVE_FP "Enable DAZ, FTZ and -ffast-math" OFF)
 if (OPT_AGGRESSIVE_FP)
     add_definitions(-DDISALLOW_DENORMALS)
     if (COMPILER_IS_CLANG OR COMPILER_IS_GNU)
@@ -209,7 +222,7 @@ endif()
 
 ######################################################################
 ## Compiler reporting: disable deprecation warnings
-option(OPT_DISABLE_DEPRECATION_WARNINGS "Disable deprecation warnings" OFF)
+option(OPT_DISABLE_DEPRECATION_WARNINGS "Disable deprecation warnings" ON)
 if(OPT_DISABLE_DEPRECATION_WARNINGS)
     if (COMPILER_IS_GNU OR COMPILER_IS_CLANG)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")

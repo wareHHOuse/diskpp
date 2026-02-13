@@ -58,7 +58,16 @@ T iexp_pow(T x, size_t n)
 
 class rusage_monitor
 {
+    struct timeval time_start;
+    struct timeval time_end;
+    bool rm_enabled;
+
 public:
     rusage_monitor();
+    rusage_monitor(bool enable);
+
+    bool enabled(void) const;
+    void enabled(bool);
+
     ~rusage_monitor();
 };

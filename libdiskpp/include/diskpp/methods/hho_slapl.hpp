@@ -19,6 +19,24 @@ namespace disk {
 namespace hho {
 namespace slapl {
 
+struct degree_info {
+    size_t cell;
+    size_t face;
+    size_t reco;
+
+    degree_info()
+        : cell(0), face(0), reco(1)
+    {}
+
+    explicit degree_info(size_t deg)
+        : cell(deg), face(deg), reco(deg+1)
+    {}
+
+    degree_info(size_t cdeg, size_t fdeg)
+        : cell(cdeg), face(fdeg), reco(fdeg+1)
+    {}
+};
+
 template<typename Mesh, typename ScalT = typename Mesh::coordinate_type>
 struct hho_space
 {
@@ -29,24 +47,23 @@ struct hho_space
     using cell_basis_type = disk::basis::scalar_monomial<mesh_type, cell_type, scalar_type>;
     using face_basis_type = disk::basis::scalar_monomial<mesh_type, face_type, scalar_type>;
     using reco_basis_type = disk::basis::scalar_monomial<mesh_type, cell_type, scalar_type>;
-};
 
-struct degree_info {
-    size_t cell;
-    size_t face;
-    size_t reco;
+    static cell_basis_type
+    cell_basis(const mesh_type& msh, const cell_type& cl, size_t degree) {
+        auto rs = disk::basis::rescaling_strategy::inertial;
+        return cell_basis_type(msh, cl, degree, rs);
+    }
 
-    degree_info()
-        : cell(0), face(0), reco(1)
-    {}
+    static face_basis_type
+    face_basis(const mesh_type& msh, const face_type& fc, size_t degree) {
+        return face_basis_type(msh, fc, degree);
+    }
 
-    degree_info(size_t deg)
-        : cell(deg), face(deg), reco(deg+1)
-    {}
-
-    degree_info(size_t cdeg, size_t fdeg)
-        : cell(cdeg), face(fdeg), reco(fdeg+1)
-    {}
+    static reco_basis_type
+    reco_basis(const mesh_type& msh, const cell_type& cl, size_t degree) {
+        auto rs = disk::basis::rescaling_strategy::inertial;
+        return reco_basis_type(msh, cl, degree, rs);
+    }
 };
 
 template<typename Space>
@@ -55,7 +72,7 @@ space_dimensions(const degree_info& di)
 {
     auto szT = Space::cell_basis_type::size_of_degree(di.cell);
     auto szF = Space::face_basis_type::size_of_degree(di.face);
-    auto szR = Space::cell_basis_type::size_of_degree(di.reco);
+    auto szR = Space::reco_basis_type::size_of_degree(di.reco);
 
     return std::tuple(szT, szF, szR);
 }
@@ -68,8 +85,8 @@ local_operator(const Mesh& msh, const typename Mesh::cell_type& cl,
     using namespace disk::basis;
     using T = typename Space::scalar_type;
 
-    auto phiR = typename Space::cell_basis_type(msh, cl, di.reco);
-    auto phiT = typename Space::cell_basis_type(msh, cl, di.cell);
+    auto phiR = Space::reco_basis(msh, cl, di.reco);
+    auto phiT = Space::cell_basis(msh, cl, di.cell);
 
     auto [szT, szF, szR] = space_dimensions<Space>(di);
 
@@ -88,7 +105,7 @@ local_operator(const Mesh& msh, const typename Mesh::cell_type& cl,
     for (const auto& fc : fcs)
     {
         auto n = normal(msh, cl, fc);
-        auto phiF = typename Space::face_basis_type(msh, fc, di.face);
+        auto phiF = Space::face_basis(msh, fc, di.face);
 
         rhs.block(0,offset,szR-1,szF) += 
             integrate(msh, fc, phiF, grad(phiR).dot(n)).block(1,0,szR-1,szF);
@@ -120,15 +137,15 @@ local_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl,
     auto sz_total = szT + num_faces*szF;
     dynamic_matrix<T> S = dynamic_matrix<T>::Zero(sz_total, sz_total);
 
-    auto phiT = typename Space::cell_basis_type(msh, cl, di.cell);
-    auto phiR = typename Space::reco_basis_type(msh, cl, di.reco);
+    auto phiT = Space::cell_basis(msh, cl, di.cell);
+    auto phiR = Space::reco_basis(msh, cl, di.reco);
     
     auto scale = 1./diameter(msh, cl);
 
     
     dynamic_matrix<T> MT = integrate(msh, cl, phiT, phiT);
     dynamic_matrix<T> R2T =
-        integrate(msh, cl, phiR, phiT).block(0,1,phiT.size(), phiR.size()-1);
+        integrate(msh, cl, phiR, phiT).block(0,1, phiT.size(), phiR.size()-1);
     dynamic_matrix<T> P1 = -MT.ldlt().solve(R2T*R);
     P1.block(0, 0, phiT.size(), phiT.size()) +=
         dynamic_matrix<T>::Identity(phiT.size(), phiT.size());
@@ -136,7 +153,7 @@ local_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl,
     size_t offset = szT;
     for (const auto& fc : fcs)
     {
-        auto phiF = typename Space::face_basis_type(msh, fc, di.face);
+        auto phiF = Space::face_basis(msh, fc, di.face);
         dynamic_matrix<T> MF = integrate(msh, fc, phiF, phiF);
         Eigen::LDLT<dynamic_matrix<T>> MF_llt(MF);
         dynamic_matrix<T> T2F = integrate(msh, fc, phiT, phiF);
@@ -172,38 +189,38 @@ local_stabilization_hdg(const Mesh& msh, const typename Mesh::cell_type& cl,
     auto sz_total = szT + num_faces*szF;
     dynamic_matrix<T> S = dynamic_matrix<T>::Zero(sz_total, sz_total);
 
-    auto phiT = typename Space::cell_basis_type(msh, cl, di.cell);
-    auto phiR = typename Space::reco_basis_type(msh, cl, di.reco);
+    auto phiT = Space::cell_basis(msh, cl, di.cell);
+    auto phiR = Space::reco_basis(msh, cl, di.reco);
     
     auto scale = 1.;///diameter(msh, cl);
 
     size_t offset = szT;
     for (const auto& fc : fcs)
     {
-        auto phiF = typename Space::face_basis_type(msh, fc, di.face);
+        auto phiF = Space::face_basis(msh, fc, di.face);
         dynamic_matrix<T> MF = integrate(msh, fc, phiF, phiF);
-        std::cout << "Mass: " << normal(msh,cl,fc).transpose() << std::endl;
-        std::cout << MF << std::endl;
+        //std::cout << "Mass: " << normal(msh,cl,fc).transpose() << std::endl;
+        //std::cout << MF << std::endl;
         Eigen::LDLT<dynamic_matrix<T>> MF_llt(MF);
         dynamic_matrix<T> T2F = integrate(msh, fc, phiT, phiF);
-        std::cout << "T2F: " << std::endl;
-        std::cout << T2F << std::endl;
+        //std::cout << "T2F: " << std::endl;
+        //std::cout << T2F << std::endl;
         dynamic_matrix<T> P2 = MF_llt.solve(T2F);
 
-        std::cout << "P2: " << std::endl;
-        std::cout << P2 << std::endl;
+        //std::cout << "P2: " << std::endl;
+        //std::cout << P2 << std::endl;
 
         dynamic_matrix<T> rhs = dynamic_matrix<T>::Zero(szF, szT+num_faces*szF);
         rhs.block(0,0,szF,szT) = -P2;
         rhs.block(0,offset,szF,szF) = dynamic_matrix<T>::Identity(szF, szF);
-        std::cout << "rhs: " << std::endl;
-        std::cout << rhs << std::endl;
+        //std::cout << "rhs: " << std::endl;
+        //std::cout << rhs << std::endl;
 
         S += scale * rhs.transpose() * MF * rhs;
         offset += szF;
     }
 
-    std::cout << S << std::endl;
+    //std::cout << S << std::endl;
 
     return S;
 }
@@ -221,14 +238,14 @@ local_reduction(const Mesh& msh, const typename Mesh::cell_type& cl,
 
     auto sz_total = szT + num_faces*szF;
     dynamic_vector<T> ret = dynamic_vector<T>::Zero(sz_total);
-    auto phiT = typename Space::cell_basis_type(msh, cl, di.cell);
+    auto phiT = Space::cell_basis(msh, cl, di.cell);
 
     ret.head(szT) = L2_project(msh, cl, f, phiT);
 
     size_t offset = szT;
     for (const auto& fc : fcs)
     {
-        auto phiF = typename Space::face_basis_type(msh, fc, di.face);
+        auto phiF = Space::face_basis(msh, fc, di.face);
         ret.segment(offset, szF) = L2_project(msh, fc, f, phiF);
         offset += szF;
     }

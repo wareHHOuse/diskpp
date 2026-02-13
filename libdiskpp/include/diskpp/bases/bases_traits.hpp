@@ -31,6 +31,19 @@ template<typename T>
 concept vector_basis = basis<T> && requires {
     requires T::tensor_order == 1;
 };
+template<typename T>
+concept scalar_face_basis_1D = basis<T> && requires {
+    requires T::tensor_order == 0;
+    requires T::immersion_dimension == 1;
+    requires T::basis_dimension == 0;
+};
+
+template<typename T>
+concept scalar_cell_basis_1D = basis<T> && requires {
+    requires T::tensor_order == 0;
+    requires T::immersion_dimension == 1;
+    requires T::basis_dimension == 1;
+};
 
 template<typename T>
 concept scalar_basis_2D = basis<T> && requires {

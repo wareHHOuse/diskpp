@@ -21,6 +21,7 @@
  */
 
 #include <iostream>
+#include <sys/select.h>
 
 #include "diskpp/common/util.h"
 
@@ -39,17 +40,48 @@ unsigned int binomial(unsigned int n, unsigned int k)
 
 
 rusage_monitor::rusage_monitor()
-{}
+    : rm_enabled(true)
+{
+    gettimeofday(&time_start, nullptr);
+}
+
+rusage_monitor::rusage_monitor(bool enable)
+    : rm_enabled(enable)
+{
+    gettimeofday(&time_start, nullptr);
+}
+
+bool
+rusage_monitor::enabled(void) const
+{
+    return rm_enabled;
+}
+
+void
+rusage_monitor::enabled(bool enable)
+{
+    rm_enabled = enable;
+}
 
 rusage_monitor::~rusage_monitor()
 {
+    if (not enabled())
+        return;
+
+    gettimeofday(&time_end, nullptr);
+
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);
+
+    struct timeval diff;
+    timersub(&time_end, &time_start, &diff);
 
     double u_secs = ru.ru_utime.tv_sec + ru.ru_utime.tv_usec/1e6;
     double s_secs = ru.ru_stime.tv_sec + ru.ru_stime.tv_usec/1e6;
 
-    std::cout << "User CPU time:   " << u_secs << " seconds" << std::endl;
-    std::cout << "System CPU time: " << s_secs << " seconds" << std::endl;
-    std::cout << "Max RSS:         " << ru.ru_maxrss/1024 << " MB" << std::endl;
+    std::cout << "Resource usage report:" << std::endl;
+    std::cout << "  Wall time:       " << diff.tv_sec << " seconds" << std::endl;
+    std::cout << "  User CPU time:   " << u_secs << " seconds" << std::endl;
+    std::cout << "  System CPU time: " << s_secs << " seconds" << std::endl;
+    std::cout << "  Max RSS:         " << ru.ru_maxrss/1024 << " MB" << std::endl;
 }

@@ -256,19 +256,17 @@ measure(const simplicial_mesh<T, 3>& msh,
     auto pts = points(msh, cl);
     assert(pts.size() == 4);
 
-    const T vol = volume_tetrahedron_kahan(pts[0], pts[1], pts[2], pts[3]);
+    /* volume_tetrahedron_kahan() does not implement kahan formula! */
 
+    const auto v0   = (pts[1] - pts[0]).to_vector();
+    const auto v1   = (pts[2] - pts[0]).to_vector();
+    const auto v2   = (pts[3] - pts[0]).to_vector();
+
+    auto vol = v0.dot(v1.cross(v2))/6;
     if (signed_volume)
-    {
-        const auto v0   = (pts[1] - pts[0]).to_vector();
-        const auto v1   = (pts[2] - pts[0]).to_vector();
-        const auto v2   = (pts[3] - pts[0]).to_vector();
+        return vol;
 
-        const T vol2 = v0.dot(v1.cross(v2)) / T(6);
-        return vol2/std::abs(vol2) * vol;
-    }
-
-    return vol;
+    return std::abs(vol);
 }
 */
 

@@ -193,6 +193,28 @@ diameters(const Mesh& msh, const Element& elem)
     return retv;
 }
 
+/* Compute the width in all directions of the bounding box of an element */
+template<typename T, int DIM, typename pt>
+static_vector<T, DIM>
+diametersp(const std::vector<pt>& pts,
+    const static_matrix<T, DIM, DIM>& tr = static_matrix<T, DIM, DIM>::Identity())
+{
+    using retv_t = static_vector<T, DIM>;
+    retv_t retv = retv_t::Zero();
+
+    T diam = 0.;
+
+    for (size_t i = 0; i < pts.size(); i++) {
+        for (size_t j = i+1; j < pts.size(); j++) {
+            retv_t curv = tr*(pts[i] - pts[j]).to_vector();
+            for (size_t k = 0; k < DIM; k++)
+                retv[k] = std::max(retv[k], std::abs(curv[k]));
+        }
+    }
+
+    return retv;
+}
+
 /* Compute the barycenter of the bounding box of an element */
 template<typename Mesh, typename Element>
 auto
@@ -541,8 +563,7 @@ scaled_inertia_axes(const Mesh& msh, const Elem& elem)
     matrix_type Id = matrix_type::Identity();
 
     const auto qps = integrate(msh, elem, 2);
-    for (auto& qp : qps)
-    {
+    for (auto& qp : qps) {
         const auto r = (bar - qp.point()).to_vector();
         mass += qp.weight() * ( (r * r.transpose()) );
     }
@@ -553,14 +574,18 @@ scaled_inertia_axes(const Mesh& msh, const Elem& elem)
     Eigen::Matrix<T, DIM, 1> eigvals = es.eigenvalues();
 
     /* Find the max eigenvalue */
-    T emax = eigvals(0);
-    for (size_t i = 1; i < eigvals.size(); i++)
-        emax = std::max(emax, eigvals(i));
+    T emax = eigvals.maxCoeff();
 
     /* Rescale */
-    const auto inv_diam = 2./diameter(msh,elem);
+    const auto inv_diam = 1.0; //2./diameter(msh,elem);
     for (size_t i = 0; i < eigvals.size(); i++)
         eigvecs.col(i) *= inv_diam*std::sqrt(emax/eigvals(i));
+
+    auto pts = points(msh, elem);
+    std::vector<typename Mesh::point_type> ptsv(pts.begin(), pts.end());
+    Eigen::Matrix<T, DIM, DIM> evt = eigvecs.transpose();
+    auto diams = diametersp(ptsv, evt);
+    eigvecs = 2.0 * eigvecs / diams.maxCoeff();
 
     return eigvecs;
 }

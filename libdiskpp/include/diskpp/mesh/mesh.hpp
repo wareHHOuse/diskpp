@@ -638,6 +638,22 @@ public:
         return *std::next(this->cells_begin(), cell_num);
     }
 
+    auto cell_at(size_t cell_num) const {
+        assert(cell_num < this->cells_size());
+        return *std::next(this->cells_begin(), cell_num);
+    }
+
+    auto face_at(size_t face_num) const {
+        assert(face_num < this->faces_size());
+        return *std::next(this->faces_begin(), face_num);
+    }
+
+    auto point_at(size_t point_num) const {
+        auto bs = this->backend_storage();
+        assert(point_num < bs->points.size());
+        return bs->points[point_num];
+    }
+
     void statistics(void) const
     {
         this->backend_storage()->statistics();
@@ -671,6 +687,34 @@ concept mesh_3D = requires {
     Mesh::dimension;
     requires Mesh::dimension == 3;
 };
+
+template<typename Mesh>
+void detect_boundary(Mesh& msh)
+{
+    std::vector<size_t> neigh_count(msh.faces_size(), 0);
+
+    for (auto& cl : msh)
+    {
+        auto fcs = faces(msh, cl);
+        for (auto& fc : fcs)
+        {
+            auto ofs = offset(msh, fc);
+            neigh_count[ofs]++;
+        }
+    }
+
+    auto storage = msh.backend_storage();
+    for (size_t i = 0; i < msh.faces_size(); i++)
+    {
+        auto nc = neigh_count[i];
+        assert( (nc == 0) or (nc == 1) or (nc == 2) );
+        assert(storage->boundary_info.size() == msh.faces_size());
+        auto bi = storage->boundary_info.at(i);
+        if ( nc == 1 )
+            bi.is_boundary(true);
+        storage->boundary_info.at(i) = bi;
+    }
+}
 
 template<typename Mesh>
 void mark_internal_faces(Mesh& msh)
@@ -750,11 +794,10 @@ public:
         compute_connectivity(msh);
     }
 
-    std::pair<cell_type, bool>
+    std::optional<cell_type>
     neighbour_via(const Mesh& msh, const cell_type& cl, const face_type& fc)
     {
-        if ( face_owners.size() != msh.faces_size() )
-            throw std::logic_error("Inconsistent neighbour information.");
+        assert ( face_owners.size() == msh.faces_size() );
 
         auto cl_ofs = offset(msh, cl);
         auto fc_ofs = offset(msh, fc);
@@ -767,9 +810,9 @@ public:
         assert(fo[0].value() == cl_ofs);
 
         if (not fo[1])
-            return std::make_pair(*msh.cells_begin(), false);
+            return {};
 
-        return std::make_pair( *std::next(msh.cells_begin(), fo[1].value()), true);
+        return *std::next(msh.cells_begin(), fo[1].value());
     }
 };
 
@@ -778,6 +821,77 @@ auto connectivity_via_faces(const Mesh& msh)
 {
     return neighbour_connectivity<Mesh>(msh);
 }
+
+
+template<typename Mesh>
+void mark_interfaces_between_subdomains(Mesh& msh)
+{
+    struct intinfo {
+        size_t tag1;
+        size_t tag2;
+    
+        intinfo() = default;
+
+        intinfo(size_t ptag1, size_t ptag2)
+            : tag1(std::min(ptag1, ptag2)),
+              tag2(std::max(ptag1, ptag2))
+        {}
+
+        auto operator<=>(const intinfo& other) const {
+            return std::pair{tag1, tag2} <=> std::pair{other.tag1, other.tag2};
+        }
+    };
+
+    std::set<intinfo> interfaces;
+    std::map<size_t, intinfo>   f2ii;
+    std::map<intinfo, size_t>   ii2bnd;
+
+    size_t max_bndtag = 0;
+    auto conn = connectivity_via_faces(msh);
+    for (auto& cl : msh) {
+        auto di_me = msh.domain_info(cl);
+        auto fcs = faces(msh, cl);
+        for (auto& fc : fcs) {
+            auto bi = msh.boundary_info(fc);
+            max_bndtag = std::max(max_bndtag, bi.tag());
+            auto neigh = conn.neighbour_via(msh, cl, fc);
+            if (not neigh) {
+                continue;
+            }
+            auto di_neigh = msh.domain_info(neigh.value());
+            if (di_me.tag() == di_neigh.tag()) {
+                continue;
+            }
+            intinfo ii(di_me.tag(), di_neigh.tag());
+            interfaces.insert( ii );
+            f2ii[ offset(msh, fc) ] = ii;
+        }
+    }
+
+    size_t itag = max_bndtag+1;
+    for (auto& interface : interfaces) {
+        ii2bnd[interface] = itag++;
+    }
+
+    auto storage = msh.backend_storage();
+    for (size_t i = 0; i < storage->boundary_info.size(); i++) {
+        const auto& bi = storage->boundary_info[i];
+        auto f2ii_itor = f2ii.find(i);
+        if (f2ii_itor == f2ii.end()) {
+            continue;
+        }
+        auto ii2bnditor = ii2bnd.find( (*f2ii_itor).second );
+        assert(ii2bnditor != ii2bnd.end());
+
+        disk::boundary_descriptor newbi(
+            bi.id(), bi.tag(), true, true
+        );
+        storage->boundary_info[i] = newbi;
+    }
+}
+
+
+
 
 template<typename T, size_t DIM, typename Storage>
 typename mesh<T, DIM, Storage>::cell_iterator
