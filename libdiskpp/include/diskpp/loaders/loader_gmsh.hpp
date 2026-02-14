@@ -289,7 +289,7 @@ class gmsh_geometry_loader<simplicial_mesh<T,2>> : public mesh_loader<simplicial
         std::vector<double>     coords;
         std::vector<double>     paraCoords;
 
-        gmsh::model::mesh::getNodes(nodeTags, coords, paraCoords, -1, -1, true, false);
+        gmsh::model::mesh::getNodes(nodeTags, coords, paraCoords, -1, -1, false, false);
 
         auto maxtag = *std::max_element(nodeTags.begin(), nodeTags.end()) + 1;
 
@@ -511,12 +511,9 @@ void submesh_via_gmsh(const Mesh& msh, disk::simplicial_mesh<typename Mesh::coor
 
     static const int point_ofs = 1000;
 
-    std::vector<int> geomNodeTags;
-
     for (int i = 0; i < msh.points_size(); i++) {
         auto pt = msh.point_at(i);
-        auto nt = gmsh::model::occ::addPoint(pt.x(), pt.y(), 0.0, 0.0, i+point_ofs);
-        geomNodeTags.push_back(nt);
+        gmsh::model::occ::addPoint(pt.x(), pt.y(), 0.0, 0.0, i+point_ofs);
     }
 
     std::vector<int> all_linetags;
@@ -550,25 +547,6 @@ void submesh_via_gmsh(const Mesh& msh, disk::simplicial_mesh<typename Mesh::coor
     disk::gmsh_geometry_loader<disk::simplicial_mesh<double,2>> loader;
     loader.read_mesh();
     loader.populate_mesh(dmsh);
-    /*
-    std::vector<std::size_t> allNodeTags;
-    size_t i = 0;
-    for (auto tag : geomNodeTags) {
-        std::vector<std::size_t> nodeTags;
-        std::vector<double> coords, pcoords;
-        gmsh::model::mesh::getNodes(nodeTags, coords, pcoords, 0, tag, true, false);
-        assert(nodeTags.size() == 1);
-        allNodeTags.push_back(nodeTags[0]);
-        std::cout << tag << " " << allNodeTags[i++] << std::endl;
-    }
-    */
-    std::vector<std::size_t> allNodeTags;
-    std::vector<double> coords, pcoords;
-    gmsh::model::mesh::getNodes(allNodeTags, coords, pcoords, 2, 1, true, false);
-
-    for (auto& nt : allNodeTags)
-        std::cout << nt << " ";
-    std::cout << std::endl;
 
     gmsh::finalize();
 }

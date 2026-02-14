@@ -188,72 +188,6 @@ struct hhodd_connectivity_info {
 };
 
 template<typename T>
-void compress_mesh(disk::simplicial_mesh<T,2>& msh)
-{
-    using mesh_type = disk::simplicial_mesh<T,2>;
-    using point_type = typename mesh_type::point_type;
-    using node_type = typename mesh_type::node_type;
-    using edge_type = typename mesh_type::edge_type;
-    using surface_type = typename mesh_type::surface_type;
-
-    size_t max_ptid = 0;
-    for (auto& cl : msh) {
-        auto ptids = cl.point_ids();
-        for (auto& ptid : ptids) {
-            max_ptid = std::max(max_ptid, ptid);
-        }
-    }
-
-    std::vector< std::optional<size_t> > old_to_new(max_ptid+1);
-    for (auto& cl : msh) {
-        auto ptids = cl.point_ids();
-        for (auto& ptid : ptids) {
-            old_to_new[ptid] = 1;
-        }
-    }
-
-    std::vector<size_t> new_to_old;
-    size_t used_nodes = 0;
-    for (size_t i = 0; i < old_to_new.size(); i++) {
-        auto& uopt = old_to_new[i];
-        if (uopt) {
-            uopt = used_nodes++;
-            new_to_old.push_back(i);
-        }
-    }
-
-    auto storage = msh.backend_storage();
-    std::vector<point_type> newpoints;
-    std::vector<node_type> newnodes;
-    for (size_t i = 0; i < new_to_old.size(); i++) {
-        auto n2o = new_to_old[i];
-        newpoints.push_back(storage->points[n2o]);
-        newnodes.push_back( node_type({i}) );
-    }
-    std::swap( newpoints, storage->points ); newpoints.clear();
-    std::swap( newnodes, storage->nodes ); newnodes.clear();
-
-    std::vector<edge_type> newedges;
-    for (auto& e : storage->edges) {
-        auto ptids = e.point_ids();
-        auto n0 = old_to_new[ ptids[0] ].value();
-        auto n1 = old_to_new[ ptids[1] ].value();
-        newedges.push_back( edge_type({n0, n1}) );
-    }
-    std::swap( newedges, storage->edges ); newedges.clear();
-
-    std::vector<surface_type> newsurfs;
-    for (auto& s : storage->surfaces) {
-        auto ptids = s.point_ids();
-        auto n0 = old_to_new[ ptids[0] ].value();
-        auto n1 = old_to_new[ ptids[1] ].value();
-        auto n2 = old_to_new[ ptids[2] ].value();
-        newsurfs.push_back( surface_type({n0, n1, n2}) );
-    }
-    std::swap( newsurfs, storage->surfaces ); newsurfs.clear();
-}
-
-template<typename T>
 void make_submesh_from_subdomain(const disk::simplicial_mesh<T,2>& msh,
     disk::simplicial_mesh<T,2>& submsh, size_t subdom_id,
     hhodd_connectivity_info<T>& hhodd_ci
@@ -483,7 +417,7 @@ make_mesh_from_edge(const CMesh& cmsh, const typename CMesh::face_type& cfc,
 
     disk::priv::sort_uniq(face_msh_storage->edges);
 
-    disk::detect_boundary(face_msh);
+    //disk::detect_boundary(face_msh);
 }
 
 template<disk::mesh_2D Mesh>
@@ -494,7 +428,7 @@ diffusion_solver_refinement(const Mesh& cmsh, const solver_config& scfg)
     using scalar_type = typename mesh_type::coordinate_type;
 
     disk::simplicial_mesh<scalar_type, 2> fmsh;
-    disk::submesh_via_gmsh(cmsh, fmsh, 0.5);
+    disk::submesh_via_gmsh(cmsh, fmsh, 0.1);
 
     std::vector<double> subdom_ids;
     for (auto& cl : fmsh) {
