@@ -65,8 +65,11 @@ int main(void)
     db.create("test_1d.silo");
     db.add_mesh(msh, "srcmesh");
     db.add_mesh(msh, "dstmesh");
-    hho_diffusion_solver(msh, 4, db);
-    dg_diffusion_solver(msh, 5, 10.0, db);
+    disk::hho_diffusion_solver hho_solver(msh, 4);
+    auto f = disk::make_rhs_function(msh);
+    hho_solver.solve( f );
+
+    dg_diffusion_solver(msh, 4, 1000.0, db);
 
     Eigen::Matrix<T, Eigen::Dynamic, 2> axes_a = Eigen::Matrix<T, Eigen::Dynamic, 2>::Zero( msh.cells_size(), 2 );
     Eigen::Matrix<T, Eigen::Dynamic, 2> axes_b = Eigen::Matrix<T, Eigen::Dynamic, 2>::Zero( msh.cells_size(), 2 );

@@ -331,14 +331,25 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
     auto cbs = disk::scalar_basis_size(degree, Mesh::dimension);
     auto assm = make_discontinuous_galerkin_assembler(msh, cbs);
     
+    std::vector<Eigen::Triplet<T>> precond_triplets;
+
+    auto assm_precond = [&](const matrix_type& m, size_t ofs) {
+        auto c_ofs = ofs*cbs;
+        for (int i = 0; i < m.rows(); i++)
+            for (int j = 0; j < m.cols(); j++)
+                precond_triplets.push_back( {int(c_ofs+i), int(c_ofs+j), m(i,j)} );
+    };
+
     timecounter tc;
     tc.tic();
-    for (auto& tcl : msh)
+    for (int cell_i = 0; cell_i < msh.cells_size(); cell_i++)
     {
+        const auto& tcl = msh.cell_at(cell_i);
         auto tbasis = disk::basis::scaled_monomial_basis(msh, tcl, degree, basis_rescaling);
         
         matrix_type K = integrate(msh, tcl, grad(tbasis), grad(tbasis));
         vector_type loc_rhs = integrate(msh, tcl, f, tbasis);
+        assm_precond(K, cell_i);
 
         auto fcs = faces(msh, tcl);
         for (auto& fc : fcs)
@@ -365,6 +376,8 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
 
                 assm.assemble(msh, tcl, tcl, Att);
                 assm.assemble(msh, tcl, ncl, Atn);
+
+                assm_precond(Att, cell_i);
             }
             else {
                 matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
@@ -372,11 +385,17 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
                 Att += - integrate(msh, fc, grad(tbasis).dot(n), tbasis);
                 Att += - integrate(msh, fc, tbasis, grad(tbasis).dot(n));
                 assm.assemble(msh, tcl, tcl, Att);
+                
+                assm_precond(Att, cell_i);
             }   
         }
 
         assm.assemble(msh, tcl, K, loc_rhs);
     }
+
+    auto syssz = cbs * msh.cells_size();
+    Eigen::SparseMatrix<T> precond = Eigen::SparseMatrix<T>(syssz, syssz);
+    precond.setFromTriplets( precond_triplets.begin(), precond_triplets.end() );
 
     assm.finalize();
     std::cout << " Assembly time: " << tc.toc() << std::endl;
@@ -387,13 +406,13 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.syssz);
 
     tc.tic();
-    sol = mumps_lu(assm.LHS, assm.RHS);
+    //sol = mumps_lu(assm.LHS, assm.RHS);
     
-    //disk::solvers::conjugated_gradient_params<T> cgp;
-    //cgp.verbose = true;
-    //cgp.rr_max = 1000;
-    //cgp.max_iter = 3*assm.RHS.rows();
-    //disk::solvers::conjugated_gradient(cgp, assm.LHS, assm.RHS, sol);
+    disk::solvers::conjugated_gradient_params<T> cgp;
+    cgp.verbose = true;
+    cgp.rr_max = 1000;
+    cgp.max_iter = 3*assm.RHS.rows();
+    disk::solvers::conjugated_gradient(cgp, assm.LHS, assm.RHS, sol, precond);
 
     std::cout << " Solver time: " << tc.toc() << std::endl;
 

@@ -291,6 +291,7 @@ private:
     compute_reference_frame(const mesh_type& msh, const cell_type& cl, rescaling_strategy rs)
     {
         tr_ = scale_ * diameters(msh,cl).cwiseInverse().asDiagonal();
+        //tr_ = scale_ * diameter(msh, cl) * tr_mat_type::Identity() // for testing, don't use
         switch(rs)
         {
             case rescaling_strategy::none:
