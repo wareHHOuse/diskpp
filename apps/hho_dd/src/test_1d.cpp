@@ -30,9 +30,51 @@
 #include "diskpp_git_revision.h"
 
 
-int main(void)
+int main(int argc, char **argv)
 {
     using T = double;
+
+    size_t  k_hho = 0;
+    size_t  k_dg = 1;
+    size_t  n_refs = 1;
+    double  eta = 10;
+
+    int opt;
+    while ((opt = getopt(argc, argv, "e:h:k:r:")) != -1) {
+        int         arg_i;
+        double      arg_d;
+        
+        switch (opt) {
+
+        case 'e':
+            arg_d = std::stod(optarg);
+            if (arg_d > 0.0) eta = arg_d;
+            break;
+
+        case 'h':
+            arg_i = std::stoi(optarg);
+            if (arg_i >= 0) k_hho = arg_i;
+            break;
+
+        case 'k':    
+            arg_i = std::stoi(optarg);
+            if (arg_i >= 1) k_dg = arg_i;        
+            break;
+
+        case 'r':    
+            arg_i = std::stoi(optarg);
+            if (arg_i > 0) n_refs = arg_i;        
+            break;
+
+        default:
+            std::cout << "Invalid option" << std::endl;
+            return 1;
+        }
+    }
+
+
+
+
 
     //disk::generic_mesh<T,1> msh;
     //disk::uniform_mesh_loader<T,1> loader(0,1,100);
@@ -46,11 +88,11 @@ int main(void)
 
     disk::cartesian_mesh<T, 2> msh;
     auto mesher = disk::make_simple_mesher(msh);
-    mesher.refine();
-    mesher.refine();
-    mesher.refine();
-    mesher.refine();
+    for (size_t i = 0; i < n_refs; i++) {
+        mesher.refine();
+    }
 
+    /*
     msh.transform(
         [](const disk::point<T,2>& pt) {
             auto newx = std::pow(pt.x(), 2);
@@ -60,16 +102,17 @@ int main(void)
             return disk::point<T,2>( newx, newy );
         }
     );
-    
+    */
+
     disk::silo_database db;
     db.create("test_1d.silo");
     db.add_mesh(msh, "srcmesh");
     db.add_mesh(msh, "dstmesh");
-    disk::hho_diffusion_solver hho_solver(msh, 4);
+    disk::hho_diffusion_solver hho_solver(msh, k_hho);
     auto f = disk::make_rhs_function(msh);
     hho_solver.solve( f );
 
-    dg_diffusion_solver(msh, 4, 1000.0, db);
+    dg_diffusion_solver(msh, k_dg, eta, db);
 
     Eigen::Matrix<T, Eigen::Dynamic, 2> axes_a = Eigen::Matrix<T, Eigen::Dynamic, 2>::Zero( msh.cells_size(), 2 );
     Eigen::Matrix<T, Eigen::Dynamic, 2> axes_b = Eigen::Matrix<T, Eigen::Dynamic, 2>::Zero( msh.cells_size(), 2 );

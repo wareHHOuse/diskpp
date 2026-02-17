@@ -331,13 +331,15 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
     auto cbs = disk::scalar_basis_size(degree, Mesh::dimension);
     auto assm = make_discontinuous_galerkin_assembler(msh, cbs);
     
-    std::vector<Eigen::Triplet<T>> precond_triplets;
+    using tripv_t = std::vector<Eigen::Triplet<T>>;
+    tripv_t precond_triplets;
+    tripv_t mass_triplets;
 
-    auto assm_precond = [&](const matrix_type& m, size_t ofs) {
+    auto assm_blockdiag = [&cbs](const matrix_type& m, size_t ofs, tripv_t& triplets) {
         auto c_ofs = ofs*cbs;
         for (int i = 0; i < m.rows(); i++)
             for (int j = 0; j < m.cols(); j++)
-                precond_triplets.push_back( {int(c_ofs+i), int(c_ofs+j), m(i,j)} );
+                triplets.push_back( {int(c_ofs+i), int(c_ofs+j), m(i,j)} );
     };
 
     timecounter tc;
@@ -347,9 +349,10 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
         const auto& tcl = msh.cell_at(cell_i);
         auto tbasis = disk::basis::scaled_monomial_basis(msh, tcl, degree, basis_rescaling);
         
+        matrix_type M = integrate(msh, tcl, tbasis, tbasis);
         matrix_type K = integrate(msh, tcl, grad(tbasis), grad(tbasis));
         vector_type loc_rhs = integrate(msh, tcl, f, tbasis);
-        assm_precond(K, cell_i);
+        assm_blockdiag(K, cell_i, precond_triplets);
 
         auto fcs = faces(msh, tcl);
         for (auto& fc : fcs)
@@ -377,7 +380,7 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
                 assm.assemble(msh, tcl, tcl, Att);
                 assm.assemble(msh, tcl, ncl, Atn);
 
-                assm_precond(Att, cell_i);
+                assm_blockdiag(Att, cell_i, precond_triplets);
             }
             else {
                 matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
@@ -386,16 +389,20 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
                 Att += - integrate(msh, fc, tbasis, grad(tbasis).dot(n));
                 assm.assemble(msh, tcl, tcl, Att);
                 
-                assm_precond(Att, cell_i);
+                assm_blockdiag(Att, cell_i, precond_triplets);
             }   
         }
 
+        assm_blockdiag(M, cell_i, mass_triplets);
         assm.assemble(msh, tcl, K, loc_rhs);
     }
 
     auto syssz = cbs * msh.cells_size();
     Eigen::SparseMatrix<T> precond = Eigen::SparseMatrix<T>(syssz, syssz);
     precond.setFromTriplets( precond_triplets.begin(), precond_triplets.end() );
+
+    Eigen::SparseMatrix<T> mass = Eigen::SparseMatrix<T>(syssz, syssz);
+    mass.setFromTriplets( mass_triplets.begin(), mass_triplets.end() );
 
     assm.finalize();
     std::cout << " Assembly time: " << tc.toc() << std::endl;
@@ -416,10 +423,20 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
 
     std::cout << " Solver time: " << tc.toc() << std::endl;
 
+    auto [evmax, lambdamax] = disk::solvers::powiter(assm.LHS, 1e-5).value();
+    std::cout << "lambda max = " << lambdamax << std::endl;
+
+    auto [evmin, lambdamin] = disk::solvers::inv_powiter(assm.LHS, 0.0, 1e-5).value();
+    std::cout << "lambda min = " << lambdamin << std::endl;
+
+    std::cout << "Estimated condition number = " << lambdamax/lambdamin << std::endl;
+
     auto sol_fun = make_solution_function(msh);
 
-    std::vector<double> u;
+    std::vector<double> u, evmax_data, evmin_data;
     u.reserve(msh.cells_size());
+    evmax_data.reserve(msh.cells_size());
+    evmin_data.reserve(msh.cells_size());
 
     T err = 0.0; size_t cell_i = 0;
     tc.tic();
@@ -434,11 +451,19 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
         Matrix<T, Dynamic, 1> diff = lsol - asol;
         err += diff.dot(MMe*diff);
         u.push_back( lsol(0) );
+
+        Matrix<T, Dynamic, 1> levmax = evmax.segment(cell_i*cb.size(), cb.size());
+        evmax_data.push_back(levmax(0));
+
+        Matrix<T, Dynamic, 1> levmin = evmin.segment(cell_i*cb.size(), cb.size());
+        evmin_data.push_back(levmin(0));
         cell_i++;
     }
     std::cout << " Postpro time: " << tc.toc() << std::endl;
     std::cout << " L2-norm error: " << std::sqrt(err) << std::endl;;
     silo.add_variable("dstmesh", "u_dg", u, disk::zonal_variable_t);
+    silo.add_variable("dstmesh", "evmax_dg", evmax_data, disk::zonal_variable_t);
+    silo.add_variable("dstmesh", "evmin_dg", evmin_data, disk::zonal_variable_t);
 
     return sol;
 }
