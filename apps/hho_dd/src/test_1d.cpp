@@ -37,7 +37,7 @@ int main(int argc, char **argv)
     size_t  k_hho = 0;
     size_t  k_dg = 1;
     size_t  n_refs = 1;
-    double  eta = 10;
+    double  Cpen = 10;
 
     int opt;
     while ((opt = getopt(argc, argv, "e:h:k:r:")) != -1) {
@@ -48,7 +48,7 @@ int main(int argc, char **argv)
 
         case 'e':
             arg_d = std::stod(optarg);
-            if (arg_d > 0.0) eta = arg_d;
+            if (arg_d > 0.0) Cpen = arg_d;
             break;
 
         case 'h':
@@ -112,7 +112,7 @@ int main(int argc, char **argv)
     auto f = disk::make_rhs_function(msh);
     hho_solver.solve( f );
 
-    dg_diffusion_solver(msh, k_dg, eta, db);
+    dg_diffusion_solver(msh, k_dg, Cpen, db);
 
     Eigen::Matrix<T, Eigen::Dynamic, 2> axes_a = Eigen::Matrix<T, Eigen::Dynamic, 2>::Zero( msh.cells_size(), 2 );
     Eigen::Matrix<T, Eigen::Dynamic, 2> axes_b = Eigen::Matrix<T, Eigen::Dynamic, 2>::Zero( msh.cells_size(), 2 );

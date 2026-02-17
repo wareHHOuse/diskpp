@@ -315,7 +315,7 @@ xx(const Mesh& msh, size_t degree, RHSFun f)
 template<typename Mesh>
 auto
 dg_diffusion_solver(Mesh& msh, size_t degree,
-    const typename Mesh::coordinate_type eta,
+    const typename Mesh::coordinate_type Cpen,
     disk::silo_database& silo)
 {   
     std::cout << "DG solver" << std::endl;
@@ -358,7 +358,6 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
         for (auto& fc : fcs)
         {   
             auto n     = normal(msh, tcl, fc);
-            auto eta_l = eta / diameter(msh, fc);
             
             auto nv = cvf.neighbour_via(msh, tcl, fc);
             if (nv) {
@@ -368,6 +367,17 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
                 auto ncl = nv.value();
                 auto nbasis = disk::basis::scaled_monomial_basis(msh, ncl, degree, basis_rescaling);
                 assert(tbasis.size() == nbasis.size());
+
+                auto my_h = diameter(msh, tcl);
+                auto my_p = degree;
+                auto my_alpha = 1; // diffusion coeff
+                auto other_h = diameter(msh, ncl);
+                auto other_p = degree;
+                auto other_alpha = 1; // diffusion coeff
+                auto eta_l = Cpen * std::max(
+                    my_alpha*my_p*(my_p+1)/my_h,
+                    other_alpha*other_p*(other_p+1)/other_h
+                );
 
                 Att += + eta_l * integrate(msh, fc, tbasis, tbasis);
                 Att += - 0.5 * integrate(msh, fc, grad(tbasis).dot(n), tbasis);
@@ -383,6 +393,11 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
                 assm_blockdiag(Att, cell_i, precond_triplets);
             }
             else {
+                auto my_h = diameter(msh, tcl);
+                auto my_p = degree;
+                auto my_alpha = 1; // diffusion coeff
+                auto eta_l = Cpen * my_alpha*my_p*(my_p+1)/my_h;
+                
                 matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
                 Att += + eta_l * integrate(msh, fc, tbasis, tbasis);
                 Att += - integrate(msh, fc, grad(tbasis).dot(n), tbasis);
