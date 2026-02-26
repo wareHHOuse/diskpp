@@ -259,7 +259,7 @@ void block_jacobi_davidson(
     Vec& eigenvalues,
     Mat& eigenvectors,
     int maxOuter = 100,
-    int subspaceLimit = 3)
+    int subspaceLimit = 15)
 {
     int blockSize = k; // initial block size = number of requested eigenpairs
 
@@ -311,7 +311,7 @@ void block_jacobi_davidson(
 
             // --- 4b. Check convergence ---
             std::cout << "  norm " << i << ": " << r.norm() << std::endl;
-            if (r.norm() < 1e-5 * std::abs(lambda)) {
+            if (r.norm() < 1e-10 * std::abs(lambda)) {
                 locked[i] = true;
                 continue;
             }
@@ -328,7 +328,7 @@ void block_jacobi_davidson(
             auto id = [](const Vec& v) -> Vec { Vec w = v; return w; };
 
             // --- 4d. Solve correction equation approximately using MINRES ---
-            Vec s = cg(JD_operator, -r, solveB, 10, 0.2);
+            Vec s = cg(JD_operator, -r, solveB, 5, 0.2);
             //Vec s = Vec::Zero(r.rows());
             //minres(JD_operator, -r, s, 10, 0.2);
 
@@ -470,7 +470,6 @@ acoustic_eigs_dg(Mesh& msh, size_t degree,
     Eigen::Matrix<T, Eigen::Dynamic, 1> eigvals;
 
     std::cout << "Running FEAST" << std::endl;
-
     auto fs = disk::feast(fep, assm.gK, assm.gM, eigvecs, eigvals);
 
     std::cout << (eigvals - eigvals_ref).transpose() << std::endl;
@@ -541,22 +540,20 @@ acoustic_eigs_hho(const Mesh& msh, size_t degree, disk::silo_database& silo)
     Eigen::PardisoLDLT< Eigen::SparseMatrix<T> > AFF_lu(assm.AFF);
     Eigen::PardisoLDLT< Eigen::SparseMatrix<T> > BTT_lu(assm.BTT);
 
-    //Eigen::SparseMatrix<T> KTT = assm.ATT - assm.ATF*AFF_lu.solve(assm.AFT);
+    Eigen::SparseMatrix<T> KTT = assm.ATT - assm.ATF*AFF_lu.solve(assm.AFT);
 
     //std::cout << KTT.rows() << " " << KTT.cols() << std::endl;
     //std::cout << " Nonzeros: " << KTT.nonZeros() << std::endl;
 
-    /*
+    
     disk::feast_eigensolver_params<T> fep;
     fep.subspace_size = 50;
-    fep.min_eigval = 5;
+    fep.min_eigval = 0.1;
     fep.max_eigval = 100;
     fep.verbose = true;
     fep.max_iter = 50;
     fep.tolerance = 8;
     fep.fis = feast_inner_solver::mumps;
-
-    */
 
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> eigvecs;
     Eigen::Matrix<T, Eigen::Dynamic, 1> eigvals;
@@ -568,28 +565,36 @@ acoustic_eigs_hho(const Mesh& msh, size_t degree, disk::silo_database& silo)
         return assm.ATT*v - assm.ATF*w;
     };
 
+    auto apply_A = [&]<int ncols>(
+        const Eigen::Matrix<T, Eigen::Dynamic, ncols>& v) ->
+            Eigen::Matrix<T, Eigen::Dynamic, ncols> {
+        Eigen::Matrix<T, Eigen::Dynamic, ncols> z = assm.AFT*v;
+        Eigen::Matrix<T, Eigen::Dynamic, ncols> w = AFF_lu.solve(z);
+        return assm.ATT*v - assm.ATF*w;
+    };
+
     auto solve_BTT = [&](const dynamic_vector<T>& v) -> dynamic_vector<T> {
         return BTT_lu.solve(v);
     };
 
     std::cout << "starting BDJ" << std::endl;
-    autogen::block_jacobi_davidson(assm.BTT.rows(), 10, apply_KTT,
-        assm.BTT, solve_BTT, eigvals, eigvecs);
+    //autogen::block_jacobi_davidson(assm.BTT.rows(), 13, apply_KTT,
+    //    assm.BTT, solve_BTT, eigvals, eigvecs);
 
     T pisq = M_PI * M_PI;
 
     Eigen::Matrix<T, Eigen::Dynamic, 1> eigvals_ref =
         Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(12);
-    eigvals_ref <<
+    eigvals_ref << 1,
         pisq+1, pisq+1, 2*pisq+1, 4*pisq+1, 4*pisq+1, 5*pisq+1,
         5*pisq+1, 8*pisq+1, 9*pisq+1, 9*pisq+1, 10*pisq+1, 10*pisq+1
     ;
 
-    //std::cout << "Running FEAST" << std::endl;
+    std::cout << "Running FEAST" << std::endl;
+    auto fs = disk::feast(fep, KTT, assm.BTT, eigvecs, eigvals);
+    //auto fs = disk::feast_matrixfree(fep, apply_A, assm.BTT, solve_BTT, eigvecs, eigvals);
 
-    //auto fs = disk::feast(fep, KTT, assm.BTT, eigvecs, eigvals);
-
-    //std::cout << (eigvals - eigvals_ref).transpose() << std::endl;
+    std::cout << (eigvals - eigvals_ref).transpose() << std::endl;
 
     silo.add_mesh(msh, "hmesh");
     for (size_t col = 0; col < eigvecs.cols(); col++) {
