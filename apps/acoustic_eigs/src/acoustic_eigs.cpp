@@ -120,7 +120,7 @@ acoustic_eigs_dg(Mesh& msh, size_t degree,
         matrix_type M = integrate(msh, tcl, tbasis, tbasis);
         matrix_type K = integrate(msh, tcl, grad(tbasis), grad(tbasis));
 
-        assm.assemble(msh, tcl, tcl, K);
+        assm.assemble(msh, tcl, tcl, K+M);
         assm.assemble(msh, tcl, M);
 
         auto fcs = faces(msh, tcl);
@@ -167,14 +167,21 @@ acoustic_eigs_dg(Mesh& msh, size_t degree,
 
     disk::feast_eigensolver_params<T> fep;
     fep.subspace_size = 50;
-    fep.min_eigval = 1;
+    fep.min_eigval = 5;
     fep.max_eigval = 100;
     fep.verbose = true;
     fep.max_iter = 50;
     fep.tolerance = 8;
     fep.fis = feast_inner_solver::mumps;
 
-    auto syssz = cbs * msh.cells_size();
+    T pisq = M_PI * M_PI;
+
+    Eigen::Matrix<T, Eigen::Dynamic, 1> eigvals_ref =
+        Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(12);
+    eigvals_ref <<
+        pisq+1, pisq+1, 2*pisq+1, 4*pisq+1, 4*pisq+1, 5*pisq+1,
+        5*pisq+1, 8*pisq+1, 9*pisq+1, 9*pisq+1, 10*pisq+1, 10*pisq+1
+    ;
 
 
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> eigvecs;
@@ -183,6 +190,8 @@ acoustic_eigs_dg(Mesh& msh, size_t degree,
     std::cout << "Running FEAST" << std::endl;
 
     auto fs = disk::feast(fep, assm.gK, assm.gM, eigvecs, eigvals);
+
+    std::cout << (eigvals - eigvals_ref).transpose() << std::endl;
 
     silo.add_mesh(msh, "mesh");
     for (size_t col = 0; col < eigvecs.cols(); col++) {
@@ -207,7 +216,7 @@ acoustic_eigs_dg(Mesh& msh, size_t degree,
 
 template<typename Mesh>
 void
-acoustic_eigs_hho(const Mesh& msh, size_t degree)
+acoustic_eigs_hho(const Mesh& msh, size_t degree, disk::silo_database& silo)
 {
     std::cout << "HHO eigsolver" << std::endl;
     using namespace disk::basis;
@@ -223,10 +232,6 @@ acoustic_eigs_hho(const Mesh& msh, size_t degree)
     auto assm = disk::hho::eigenvalue_block_assembler<Mesh, cbasis_type, fbasis_type>(
         msh, di.cell, di.face
     );
-
-    using MT = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-    using VT = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-    std::vector<std::pair<MT, VT>> lcs;
 
     timecounter tc;
     tc.tic();
@@ -251,15 +256,15 @@ acoustic_eigs_hho(const Mesh& msh, size_t degree)
     //std::cout << " Nonzeros: " << assm.LHS.nonZeros() << std::endl;
     tc.tic();
 
-    Eigen::SparseLU< Eigen::SparseMatrix<T> > AFF_lu(assm.AFF);
+    Eigen::PardisoLDLT< Eigen::SparseMatrix<T> > AFF_lu(assm.AFF);
 
     Eigen::SparseMatrix<T> KTT = assm.ATT - assm.ATF*AFF_lu.solve(assm.AFT);
 
-
+    std::cout << " Nonzeros: " << KTT.nonZeros() << std::endl;
 
     disk::feast_eigensolver_params<T> fep;
     fep.subspace_size = 50;
-    fep.min_eigval = 1;
+    fep.min_eigval = 5;
     fep.max_eigval = 100;
     fep.verbose = true;
     fep.max_iter = 50;
@@ -269,13 +274,40 @@ acoustic_eigs_hho(const Mesh& msh, size_t degree)
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> eigvecs;
     Eigen::Matrix<T, Eigen::Dynamic, 1> eigvals;
 
+    T pisq = M_PI * M_PI;
+
+    Eigen::Matrix<T, Eigen::Dynamic, 1> eigvals_ref =
+        Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(12);
+    eigvals_ref <<
+        pisq+1, pisq+1, 2*pisq+1, 4*pisq+1, 4*pisq+1, 5*pisq+1,
+        5*pisq+1, 8*pisq+1, 9*pisq+1, 9*pisq+1, 10*pisq+1, 10*pisq+1
+    ;
+
     std::cout << "Running FEAST" << std::endl;
 
     auto fs = disk::feast(fep, KTT, assm.BTT, eigvecs, eigvals);
 
+    std::cout << (eigvals - eigvals_ref).transpose() << std::endl;
+
+    silo.add_mesh(msh, "hmesh");
     for (size_t col = 0; col < eigvecs.cols(); col++) {
+        Eigen::Matrix<T, Eigen::Dynamic, 1> eigvec = eigvecs.col(col);
         std::cout << eigvals(col) << std::endl;
-    };
+        std::vector<T> u;
+        for (auto& cl : msh) {
+            auto ofs = cbasis_type::size_of_degree(di.cell) * offset(msh, cl);
+            u.push_back(eigvecs(ofs, col));
+        }
+        
+        std::string vname = "hho_eigfun_" + std::to_string(col);
+        silo.add_variable("hmesh", vname, u, disk::zonal_variable_t);
+    }
+
+    auto opt_evs = ::priv::inv_powiter(KTT, assm.BTT, 57.0);
+    if (opt_evs) {
+        auto [vec, val] = *opt_evs;
+        std::cout << "with powiter: " << val << std::endl;
+    }
 }
 
 }
@@ -292,9 +324,9 @@ int main(int argc, char **argv)
 
     disk::silo_database db;
     db.create("acoustic_eigs.silo");
-    acoustic_eigs_dg(msh, 2, 100, db);
+    acoustic_eigs_dg(msh, 2, 10, db);
 
-    acoustic_eigs_hho(msh, 2);
+    acoustic_eigs_hho(msh, 2, db);
 
 
     return 0;

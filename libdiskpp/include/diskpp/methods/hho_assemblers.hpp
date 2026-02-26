@@ -294,7 +294,9 @@ public:
         }
 
         auto fcs = faces(msh, cl);
-        for (auto &fc : fcs) {
+        for (size_t fnum = 0; fnum < fcs.size(); fnum++) {
+            const auto& fc = fcs[fnum];
+            auto lfofs = cell_basis_size + fnum*face_basis_size;
             auto fbase = face_basis_size *  offset(msh, fc);
 
             /* TF */
@@ -302,7 +304,7 @@ public:
                 for (size_t j = 0; j < face_basis_size; j++) {
                     int gi = cbase + i;
                     int gj = fbase + j;
-                    ATF_trips.push_back({gi, gj, A(i,j)});
+                    ATF_trips.push_back({gi, gj, A(i,lfofs+j)});
                 }
             }
 
@@ -311,16 +313,26 @@ public:
                 for (size_t j = 0; j < cell_basis_size; j++) {
                     int gi = fbase + i;
                     int gj = cbase + j;
-                    AFT_trips.push_back({gi, gj, A(i,j)});
+                    AFT_trips.push_back({gi, gj, A(lfofs+i,j)});
                 }
             }
-
-            /* FF */
-            for (size_t i = 0; i < face_basis_size; i++) {
-                for (size_t j = 0; j < face_basis_size; j++) {
-                    int gi = fbase + i;
-                    int gj = fbase + j;
-                    AFF_trips.push_back({gi, gj, A(i,j)});
+        }
+        
+        for (size_t fnumi = 0; fnumi < fcs.size(); fnumi++) {
+            const auto& fci = fcs[fnumi];
+            auto lfofsi = cell_basis_size + fnumi*face_basis_size;
+            auto fbasei = face_basis_size *  offset(msh, fci);
+            for (size_t fnumj = 0; fnumj < fcs.size(); fnumj++) {
+                const auto& fcj = fcs[fnumj];
+                auto lfofsj = cell_basis_size + fnumj*face_basis_size;
+                auto fbasej = face_basis_size *  offset(msh, fcj);
+                /* FF */
+                for (size_t i = 0; i < face_basis_size; i++) {
+                    for (size_t j = 0; j < face_basis_size; j++) {
+                        int gi = fbasei + i;
+                        int gj = fbasej + j;
+                        AFF_trips.push_back({gi, gj, A(lfofsi+i,lfofsj+j)});
+                    }
                 }
             }
         }
@@ -350,7 +362,9 @@ public:
         }
 
         auto fcs = faces(msh, cl);
-        for (auto &fc : fcs) {
+        for (size_t fnum = 0; fnum < fcs.size(); fnum++) {
+            const auto& fc = fcs[fnum];
+            auto lfofs = cell_basis_size + fnum*face_basis_size;
             auto fbase = face_basis_size *  offset(msh, fc);
 
             /* TF */
@@ -358,7 +372,7 @@ public:
                 for (size_t j = 0; j < face_basis_size; j++) {
                     int gi = cbase + i;
                     int gj = fbase + j;
-                    BTF_trips.push_back({gi, gj, B(i,j)});
+                    BTF_trips.push_back({gi, gj, B(i,lfofs+j)});
                 }
             }
 
@@ -367,7 +381,7 @@ public:
                 for (size_t j = 0; j < cell_basis_size; j++) {
                     int gi = fbase + i;
                     int gj = cbase + j;
-                    BFT_trips.push_back({gi, gj, B(i,j)});
+                    BFT_trips.push_back({gi, gj, B(lfofs+i,j)});
                 }
             }
 
@@ -376,7 +390,7 @@ public:
                 for (size_t j = 0; j < face_basis_size; j++) {
                     int gi = fbase + i;
                     int gj = fbase + j;
-                    BFF_trips.push_back({gi, gj, B(i,j)});
+                    BFF_trips.push_back({gi, gj, B(lfofs+i,lfofs+j)});
                 }
             }
         }
