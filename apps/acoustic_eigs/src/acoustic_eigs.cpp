@@ -152,222 +152,125 @@ Vec cg(const std::function<Vec(const Vec&)>& J,
     return x;
 }
 
-#include <Eigen/Dense>
-#include <iostream>
-#include <cmath>
+struct bjd_params {
+    int     max_outer_iters         = 100;
+    int     max_inner_iters         = 30;
+    double  outer_tol               = 1e-8;
+    double  inner_tol               = 1e-3;
+    double  ev_tol                  = 1e-8;
+    double  expand_thresh           = 1e-12;
+    int     max_subspace_growth     = 5;
+    int     block_size              = 10;
+    bool    verbose                 = false;
+};
 
-template <typename Function>
-int minres(const Function A,
-           const Vec& b,
-           Vec& x,
-           int maxIters = 1000,
-           double tol = 1e-8)
+template<typename T>
+void orthonormalize(disk::dynamic_matrix<T>& V, const disk::sparse_matrix<T>& B)
 {
-    using Scalar = typename Vec::Scalar;
-    using std::sqrt;
-
-    int n = b.rows();
-    Vec r = b - A(x);
-    Vec v_old = Vec::Zero(n);
-    Vec v = r;
-
-    Scalar nr = r.norm();
-    Scalar nr0 = nr;
-
-    Scalar beta = r.norm();
-    if (beta == 0.0) return 0;
-
-    v /= beta;
-
-    Scalar beta_old = 0;
-    Scalar c_old = 1, s_old = 0;
-    Scalar c = 1, s = 0;
-    Scalar eta = beta;
-
-    Vec w_old = Vec::Zero(n);
-    Vec w = Vec::Zero(n);
-    Vec w_new = Vec::Zero(n);
-
-    for (int k = 0; k < maxIters; ++k)
-    {
-        Vec Av = A(v);
-        Scalar alpha = v.dot(Av);
-        Av -= alpha * v + beta_old * v_old;
-
-        beta_old = Av.norm();
-        v_old = v;
-
-        if (beta_old > 0)
-            v = Av / beta_old;
-        else
-            break;
-
-        // Apply previous rotation
-        Scalar delta = c * alpha - c_old * s * beta_old;
-        Scalar gamma = sqrt(delta * delta + beta_old * beta_old);
-        c = delta / gamma;
-        s = beta_old / gamma;
-
-        // Update direction
-        w_new = (v_old - s_old * w_old - c_old * w) / gamma;
-
-        x += c * eta * w_new;
-        eta = -s * eta;
-
-        auto rr = nr/nr0;
-
-        if (rr < tol) {
-            std::cout << "MINRES: converged with rr = " << rr << std::endl;
-            return k + 1;
+    // Modified G-S B-orthonormalization
+    for (int i = 0; i < V.cols(); i++) {
+        double Bnorm = std::sqrt(V.col(i).dot(B*V.col(i)));
+        V.col(i) /= Bnorm;
+        for (int j = i+1; j < V.cols(); j++) {
+            double proj = V.col(i).dot(B*V.col(j));
+            V.col(j) = V.col(j) - proj * V.col(i);
         }
-
-        // Rotate variables
-        w_old = w;
-        w = w_new;
-        c_old = c;
-        s_old = s;
-
-        nr = (b - A(x)).norm();
     }
-
-    std::cout << "MINRES: reached max_iter with rr = " << nr/nr0 << std::endl;
-
-    return maxIters;
 }
 
-
-/*
- * Robust block Jacobi-Davidson for generalized Hermitian eigenproblem:
- *      A x = lambda B x
- * Parameters:
- *  n             : dimension of problem
- *  k             : number of eigenpairs to compute
- *  applyA        : matrix-free function to compute A * x
- *  B             : explicit SPD matrix (mass matrix)
- *  solveB        : function to solve B * y = x (used for preconditioning, optional)
- *  eigenvalues   : output vector of computed eigenvalues (size k)
- *  eigenvectors  : output matrix of eigenvectors (size n x k)
- *  maxOuter      : maximum outer JD iterations
- *  subspaceLimit : subspace size factor for thick restart (maxSubspace = subspaceLimit * k)
- */
-void block_jacobi_davidson(
-    int n,
-    int k,  
-    std::function<Vec(const Vec&)> applyA,
-    const Mat& B,
-    std::function<Vec(const Vec&)> solveB,
-    Vec& eigenvalues,
-    Mat& eigenvectors,
-    int maxOuter = 100,
-    int subspaceLimit = 15)
+template<typename T>
+void block_jacobi_davidson(const bjd_params& params,
+    auto applyA, const disk::sparse_matrix<T>& B,
+    auto solveB, disk::dynamic_vector<T>& eigenvalues,
+    disk::dynamic_matrix<T>& eigenvectors)
 {
-    int blockSize = k; // initial block size = number of requested eigenpairs
+    const int N = B.rows();
+    
+    using dv = disk::dynamic_vector<T>;
+    using dm = disk::dynamic_matrix<T>;
 
-    // --- 1. Initialize subspace V with random vectors ---
-    Mat V = Mat::Random(n, blockSize);
-    for (int i = 0; i < V.cols(); ++i) {
-        Vec v = V.col(i);
-        B_orthonormalize(v, V.leftCols(i), B); // B-orthonormalization
-        V.col(i) = v;
-    }
+    dm V = dm::Random(N, params.block_size);
+    orthonormalize(V, B);
 
-    // --- 2. Locking array for converged eigenvectors ---
-    std::vector<bool> locked(k, false);
+    // Keeps track of converged eigenpairs
+    std::vector<bool> conv(params.block_size, false);
 
-    // --- 3. Outer JD loop ---
-    for (int outer = 0; outer < maxOuter; ++outer) {
+    for (int outer = 0; outer < params.max_outer_iters; outer++) {
         std::cout << "outer: " << outer << std::endl;
-        int m = V.cols(); // current subspace size
-
-        // --- 3a. Compute AV and BV matrices (apply A and B to subspace vectors) ---
-        Mat AV(n, m), BV(n, m);
-        for (int i = 0; i < m; ++i) {
-            AV.col(i) = applyA(V.col(i));
-            BV.col(i) = B * V.col(i);
-        }
-        // --- 3b. Projected Rayleigh-Ritz problem ---
-        Mat TA = V.transpose() * AV; // projected A
-        Mat TB = V.transpose() * BV; // projected B
         
-        Eigen::GeneralizedSelfAdjointEigenSolver<Mat> ges(TA, TB);
-        Vec theta = ges.eigenvalues();        // Ritz values
-        Mat Y = ges.eigenvectors();           // Ritz vectors in subspace
+        const int M = V.cols();
+        dm TA = V.transpose() * applyA(V);
+        dm TB = V.transpose() * B * V;
+        Eigen::GeneralizedSelfAdjointEigenSolver<dm> ges(TA, TB);
+        dv theta = ges.eigenvalues();
+        dm Y = ges.eigenvectors();
+        dm X = V * Y.leftCols(params.block_size);
 
-        // --- 3c. Compute Ritz vectors in original space ---
-        Mat X = V * Y.leftCols(k);
+        for (int i_ev = 0; i_ev < params.block_size; i_ev++) {
+            if (conv[i_ev]) {
+                continue; /* This pair has already converged. */
+            }
 
-        bool allConverged = true;
+            dv xi = X.col(i_ev);
+            T lambda = theta(i_ev);
+            dv r = applyA(xi) - lambda * (B * xi);
 
-        // --- 4. Loop over each Ritz pair ---
-        for (int i = 0; i < k; ++i) {
-            if (locked[i])
-                continue;
-
-            Vec xi = X.col(i);         // current Ritz vector
-            double lambda = theta(i);  // corresponding Ritz value
-
-            // --- 4a. Compute residual r = A x - lambda B x ---
-            Vec r = applyA(xi) - lambda * (B * xi);
-
-            // --- 4b. Check convergence ---
-            std::cout << "  norm " << i << ": " << r.norm() << std::endl;
-            if (r.norm() < 1e-10 * std::abs(lambda)) {
-                locked[i] = true;
+            std::cout << "  norm " << i_ev << ": " << r.norm() << std::endl;
+            if (r.norm() < params.ev_tol * std::abs(lambda)) {
+                conv[i_ev] = true;
                 continue;
             }
-            allConverged = false;
 
-            // --- 4c. Define Jacobi-Davidson projected operator ---
-            auto JD_operator = [&](const Vec& s) -> Vec {
+            auto JDproj = [&](const dv& s) -> dv {
                 Vec Bs = B*s;
                 Vec v1 = s - xi * xi.dot(Bs); // (I - u*u'*B)*s
                 Vec v2 = applyA(v1) - lambda*B*v1; //(A - lambda*B)*v1
-                return v2 - B* (xi * xi.dot(v2)); //(I - B*x*x')*v2
+                return v2 - B*(xi * xi.dot(v2)); //(I - B*x*x')*v2
             };
 
-            auto id = [](const Vec& v) -> Vec { Vec w = v; return w; };
+            auto JDproj2 = [&](const dv& s) -> dv {
+                Vec Bs = B * s;
+                Vec Ps = s - xi * (xi.dot(Bs));
+                Vec KPs = applyA(Ps) - lambda * (B * Ps);
+                return KPs;
+            };
 
-            // --- 4d. Solve correction equation approximately using MINRES ---
-            Vec s = cg(JD_operator, -r, solveB, 5, 0.2);
-            //Vec s = Vec::Zero(r.rows());
-            //minres(JD_operator, -r, s, 10, 0.2);
+            auto id = [](const dv& v) -> dv { return v; };
 
-            // --- 4e. B-orthonormalize new vector against subspace V ---
-            B_orthonormalize(s, V, B);
+            dv s = cg(JDproj, -r, solveB, params.max_inner_iters,
+                params.inner_tol);
             
-            // --- 4f. Expand subspace if vector is nonzero ---
-            if (s.norm() > 1e-12) {
+            orthonormalize(V, B);
+            
+            if (s.norm() > params.expand_thresh) {
                 std::cout << "Expanding subspace. Norm: " << s.norm();
                 std::cout << ", size: " << V.cols()+1 << std::endl;
-                V.conservativeResize(n, V.cols() + 1);
+                V.conservativeResize(N, V.cols() + 1);
                 V.col(V.cols() - 1) = s;
             }
         }
 
-        // --- 5. Stop if all eigenpairs converged ---
-        if (allConverged)
+        // Check if all the eigenpairs have converged
+        if ( std::all_of(conv.begin(), conv.end(), [](bool v) { return v; }) ) {
+            std::cout << "All eigenpairs have converged" << std::endl;
             break;
+        }
 
-        // --- 6. Thick restart if subspace grows too large ---
-        if (V.cols() > subspaceLimit * k) {
-            V = X.leftCols(k); // retain best k Ritz vectors
+        // Restart if subspace grows too much
+        if ( V.cols() > params.block_size * params.max_subspace_growth ) {
+            V = X.leftCols(params.block_size);
         }
     }
 
-    // --- 7. Final Rayleigh-Ritz to compute eigenvalues/eigenvectors ---
-    int m = V.cols();
-    Mat AV(n, m), BV(n, m);
-    for (int i = 0; i < m; ++i) {
-        AV.col(i) = applyA(V.col(i));
-        BV.col(i) = B * V.col(i);
-    }
-    Mat TA = V.transpose() * AV;
-    Mat TB = V.transpose() * BV;
-    Eigen::GeneralizedSelfAdjointEigenSolver<Mat> ges(TA, TB);
+    // Final Rayleigh-Ritz to compute eigenvalues/eigenvectors
+    int M = V.cols();
+    dm TA = V.transpose() * applyA(V);
+    dm TB = V.transpose() * B * V;
+    Eigen::GeneralizedSelfAdjointEigenSolver<dm> ges(TA, TB);
 
-    eigenvalues.resize(k);
-    eigenvectors = V * ges.eigenvectors().leftCols(k);
-    for (int i = 0; i < k; ++i)
+    eigenvalues.resize(params.block_size);
+    eigenvectors = V * ges.eigenvectors().leftCols(params.block_size);
+    for (int i = 0; i < params.block_size; i++)
         eigenvalues(i) = ges.eigenvalues()(i);
 }
 
@@ -578,8 +481,10 @@ acoustic_eigs_hho(const Mesh& msh, size_t degree, disk::silo_database& silo)
     };
 
     std::cout << "starting BDJ" << std::endl;
-    //autogen::block_jacobi_davidson(assm.BTT.rows(), 13, apply_KTT,
-    //    assm.BTT, solve_BTT, eigvals, eigvecs);
+    autogen::bjd_params params;
+    params.block_size = 13;
+    autogen::block_jacobi_davidson(params, apply_A,
+        assm.BTT, solve_BTT, eigvals, eigvecs);
 
     T pisq = M_PI * M_PI;
 
@@ -590,9 +495,8 @@ acoustic_eigs_hho(const Mesh& msh, size_t degree, disk::silo_database& silo)
         5*pisq+1, 8*pisq+1, 9*pisq+1, 9*pisq+1, 10*pisq+1, 10*pisq+1
     ;
 
-    std::cout << "Running FEAST" << std::endl;
-    auto fs = disk::feast(fep, KTT, assm.BTT, eigvecs, eigvals);
-    //auto fs = disk::feast_matrixfree(fep, apply_A, assm.BTT, solve_BTT, eigvecs, eigvals);
+    //std::cout << "Running FEAST" << std::endl;
+    //auto fs = disk::feast(fep, KTT, assm.BTT, eigvecs, eigvals);
 
     std::cout << (eigvals - eigvals_ref).transpose() << std::endl;
 
@@ -631,7 +535,7 @@ int main(int argc, char **argv)
 
     disk::silo_database db;
     db.create("acoustic_eigs.silo");
-    //acoustic_eigs_dg(msh, 2, 10, db);
+    acoustic_eigs_dg(msh, 2, 10, db);
 
     acoustic_eigs_hho(msh, 1, db);
 
