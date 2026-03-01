@@ -36,6 +36,8 @@
 #include "diskpp/methods/hho_slapl.hpp"
 #include "diskpp/solvers/solver.hpp"
 
+#include "diskpp/solvers/eigensolvers.hpp"
+
 namespace priv {
 
 /* it exists already in MC/hho+dd */
@@ -90,192 +92,6 @@ inv_powiter(const Eigen::SparseMatrix<T>& A,
     return std::pair{x, lambda};
 }
 }
-
-namespace autogen {
-
-
-using Vec = Eigen::VectorXd;
-using Mat = Eigen::MatrixXd;
-
-/*
- * B-orthonormalize a vector 's' against columns of 'V'
- * Uses Modified Gram-Schmidt with B-inner product
- * Ensures numerical stability and maintains B-orthogonality
- */
-void B_orthonormalize(Vec& s, const Mat& V, const Mat& B) {
-    for (int j = 0; j < V.cols(); ++j) {
-        double proj = V.col(j).dot(B*s); // project onto existing basis vector
-        s -= proj * V.col(j);
-    }
-    double norm = std::sqrt(s.dot(B*s));
-    /*if (norm > 1e-12)*/ s /= norm; // normalize if not nearly zero
-}
-
-Vec cg(const std::function<Vec(const Vec&)>& J,
-           const Vec& b,
-           const std::function<Vec(const Vec&)>& precond,
-           int max_iter = 50,
-           double tol = 1e-6)
-{
-    double  nr, nr0;
-    double  alpha, beta, rho;
-    auto N = b.size();
-    Vec d(N), r(N), r0(N), y(N), Pr(N), Pr1(N);
-    Vec x = Vec::Zero(N);
-
-    r0 = r = b - J(x);
-    d = precond(r0);
-    nr = nr0 = r.norm();
-
-    for (size_t iter = 0; iter < max_iter; iter++)
-    {
-        double rr = nr/nr0;
-        if (rr < tol) {
-            std::cout << "  CG: converged with RR = " << rr << std::endl;
-            return x;
-        }
-
-        y     = J(d);
-        Pr    = precond(r);
-        rho   = r.dot(Pr);
-        alpha = rho / d.dot(y);
-        x     = x + alpha * d;
-        r     = r - alpha * y;
-        Pr1   = precond(r);
-        beta  = r.dot(Pr1) / rho;
-        d     = Pr1 + beta * d;
-
-        nr = r.norm();
-    }
-
-    std::cout << "  CG reached max_iter with RR = " << nr/nr0 << std::endl;
-    return x;
-}
-
-struct bjd_params {
-    int     max_outer_iters         = 100;
-    int     max_inner_iters         = 30;
-    double  outer_tol               = 1e-8;
-    double  inner_tol               = 1e-3;
-    double  ev_tol                  = 1e-8;
-    double  expand_thresh           = 1e-12;
-    int     max_subspace_growth     = 5;
-    int     block_size              = 10;
-    bool    verbose                 = false;
-};
-
-template<typename T>
-void orthonormalize(disk::dynamic_matrix<T>& V, const disk::sparse_matrix<T>& B)
-{
-    // Modified G-S B-orthonormalization
-    for (int i = 0; i < V.cols(); i++) {
-        double Bnorm = std::sqrt(V.col(i).dot(B*V.col(i)));
-        V.col(i) /= Bnorm;
-        for (int j = i+1; j < V.cols(); j++) {
-            double proj = V.col(i).dot(B*V.col(j));
-            V.col(j) = V.col(j) - proj * V.col(i);
-        }
-    }
-}
-
-template<typename T>
-void block_jacobi_davidson(const bjd_params& params,
-    auto applyA, const disk::sparse_matrix<T>& B,
-    auto solveB, disk::dynamic_vector<T>& eigenvalues,
-    disk::dynamic_matrix<T>& eigenvectors)
-{
-    const int N = B.rows();
-    
-    using dv = disk::dynamic_vector<T>;
-    using dm = disk::dynamic_matrix<T>;
-
-    dm V = dm::Random(N, params.block_size);
-    orthonormalize(V, B);
-
-    // Keeps track of converged eigenpairs
-    std::vector<bool> conv(params.block_size, false);
-
-    for (int outer = 0; outer < params.max_outer_iters; outer++) {
-        std::cout << "outer: " << outer << std::endl;
-        
-        const int M = V.cols();
-        dm TA = V.transpose() * applyA(V);
-        dm TB = V.transpose() * B * V;
-        Eigen::GeneralizedSelfAdjointEigenSolver<dm> ges(TA, TB);
-        dv theta = ges.eigenvalues();
-        dm Y = ges.eigenvectors();
-        dm X = V * Y.leftCols(params.block_size);
-
-        for (int i_ev = 0; i_ev < params.block_size; i_ev++) {
-            if (conv[i_ev]) {
-                continue; /* This pair has already converged. */
-            }
-
-            dv xi = X.col(i_ev);
-            T lambda = theta(i_ev);
-            dv r = applyA(xi) - lambda * (B * xi);
-
-            std::cout << "  norm " << i_ev << ": " << r.norm() << std::endl;
-            if (r.norm() < params.ev_tol * std::abs(lambda)) {
-                conv[i_ev] = true;
-                continue;
-            }
-
-            auto JDproj = [&](const dv& s) -> dv {
-                Vec Bs = B*s;
-                Vec v1 = s - xi * xi.dot(Bs); // (I - u*u'*B)*s
-                Vec v2 = applyA(v1) - lambda*B*v1; //(A - lambda*B)*v1
-                return v2 - B*(xi * xi.dot(v2)); //(I - B*x*x')*v2
-            };
-
-            auto JDproj2 = [&](const dv& s) -> dv {
-                Vec Bs = B * s;
-                Vec Ps = s - xi * (xi.dot(Bs));
-                Vec KPs = applyA(Ps) - lambda * (B * Ps);
-                return KPs;
-            };
-
-            auto id = [](const dv& v) -> dv { return v; };
-
-            dv s = cg(JDproj, -r, solveB, params.max_inner_iters,
-                params.inner_tol);
-            
-            orthonormalize(V, B);
-            
-            if (s.norm() > params.expand_thresh) {
-                std::cout << "Expanding subspace. Norm: " << s.norm();
-                std::cout << ", size: " << V.cols()+1 << std::endl;
-                V.conservativeResize(N, V.cols() + 1);
-                V.col(V.cols() - 1) = s;
-            }
-        }
-
-        // Check if all the eigenpairs have converged
-        if ( std::all_of(conv.begin(), conv.end(), [](bool v) { return v; }) ) {
-            std::cout << "All eigenpairs have converged" << std::endl;
-            break;
-        }
-
-        // Restart if subspace grows too much
-        if ( V.cols() > params.block_size * params.max_subspace_growth ) {
-            V = X.leftCols(params.block_size);
-        }
-    }
-
-    // Final Rayleigh-Ritz to compute eigenvalues/eigenvectors
-    int M = V.cols();
-    dm TA = V.transpose() * applyA(V);
-    dm TB = V.transpose() * B * V;
-    Eigen::GeneralizedSelfAdjointEigenSolver<dm> ges(TA, TB);
-
-    eigenvalues.resize(params.block_size);
-    eigenvectors = V * ges.eigenvectors().leftCols(params.block_size);
-    for (int i = 0; i < params.block_size; i++)
-        eigenvalues(i) = ges.eigenvalues()(i);
-}
-
-}
-
 
 namespace disk {
 
@@ -443,7 +259,7 @@ acoustic_eigs_hho(const Mesh& msh, size_t degree, disk::silo_database& silo)
     Eigen::PardisoLDLT< Eigen::SparseMatrix<T> > AFF_lu(assm.AFF);
     Eigen::PardisoLDLT< Eigen::SparseMatrix<T> > BTT_lu(assm.BTT);
 
-    Eigen::SparseMatrix<T> KTT = assm.ATT - assm.ATF*AFF_lu.solve(assm.AFT);
+    //Eigen::SparseMatrix<T> KTT = assm.ATT - assm.ATF*AFF_lu.solve(assm.AFT);
 
     //std::cout << KTT.rows() << " " << KTT.cols() << std::endl;
     //std::cout << " Nonzeros: " << KTT.nonZeros() << std::endl;
@@ -462,18 +278,17 @@ acoustic_eigs_hho(const Mesh& msh, size_t degree, disk::silo_database& silo)
     Eigen::Matrix<T, Eigen::Dynamic, 1> eigvals;
 
 
-    auto apply_KTT = [&](const dynamic_vector<T>& v) -> dynamic_vector<T> {
-        dynamic_vector<T> z = assm.AFT*v;
-        dynamic_vector<T> w = AFF_lu.solve(z);
-        return assm.ATT*v - assm.ATF*w;
-    };
+    //auto apply_KTT = [&](const dynamic_vector<T>& v) -> dynamic_vector<T> {
+    //    dynamic_vector<T> z = assm.AFT*v;
+    //    dynamic_vector<T> w = AFF_lu.solve(z);
+    //    return assm.ATT*v - assm.ATF*w;
+    //};
 
     auto apply_A = [&]<int ncols>(
         const Eigen::Matrix<T, Eigen::Dynamic, ncols>& v) ->
             Eigen::Matrix<T, Eigen::Dynamic, ncols> {
         Eigen::Matrix<T, Eigen::Dynamic, ncols> z = assm.AFT*v;
-        Eigen::Matrix<T, Eigen::Dynamic, ncols> w = AFF_lu.solve(z);
-        return assm.ATT*v - assm.ATF*w;
+        return assm.ATT*v - assm.ATF*AFF_lu.solve(z);
     };
 
     auto solve_BTT = [&](const dynamic_vector<T>& v) -> dynamic_vector<T> {
@@ -481,9 +296,11 @@ acoustic_eigs_hho(const Mesh& msh, size_t degree, disk::silo_database& silo)
     };
 
     std::cout << "starting BDJ" << std::endl;
-    autogen::bjd_params params;
+    disk::solvers::bjd_params params;
     params.block_size = 13;
-    autogen::block_jacobi_davidson(params, apply_A,
+    params.max_inner_iters = 30;
+    params.inner_tol = 1e-4;
+    disk::solvers::block_jacobi_davidson(params, apply_A,
         assm.BTT, solve_BTT, eigvals, eigvecs);
 
     T pisq = M_PI * M_PI;
@@ -535,7 +352,7 @@ int main(int argc, char **argv)
 
     disk::silo_database db;
     db.create("acoustic_eigs.silo");
-    acoustic_eigs_dg(msh, 2, 10, db);
+    //acoustic_eigs_dg(msh, 2, 10, db);
 
     acoustic_eigs_hho(msh, 1, db);
 
