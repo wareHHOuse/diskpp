@@ -18,7 +18,7 @@ namespace disk::solvers {
 template<typename T, typename Oper, typename Precond>
 iterative_solver_status
 cg_mf(const iterative_solver_params& params, Oper A,
-    const priv::vec<T>& b, priv::vec<T> x, Precond precond)
+    const priv::vec<T>& b, priv::vec<T>& x, Precond precond)
 {
     using dv = priv::vec<T>;
     using real = remove_complex<T>;

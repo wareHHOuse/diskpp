@@ -83,13 +83,13 @@ void block_jacobi_davidson(const bjd_params& params,
                 continue; /* This pair has already converged. */
             }
 
-            std::cout << "  Eigenvalue " << i_ev << std::endl;
+            //std::cout << "  Eigenvalue " << i_ev << std::endl;
     
             dv xi = X.col(i_ev);
             T lambda = theta(i_ev);
             dv r = applyA(xi) - lambda * (B * xi);
 
-            std::cout << "   - norm " << i_ev << ": " << r.norm() << std::endl;
+            //std::cout << "   - norm " << i_ev << ": " << r.norm() << std::endl;
             if (r.norm() < params.ev_tol * std::abs(lambda)) {
                 //std::cout << "  locked" << std::endl;
                 conv[i_ev] = true;
@@ -107,12 +107,12 @@ void block_jacobi_davidson(const bjd_params& params,
             tfqmr_p.max_iter = params.max_inner_iters;
             tfqmr_p.tol = 0.1*r.norm();
             tfqmr_p.verbose = false;
-            dv s = r;//dv::Zero( r.rows() );
+            dv s = dv::Zero( r.rows() );
             tfqmr_mf(tfqmr_p, JDproj, (-r).eval(), s, disk::solvers::identity{});
             
             if (s.norm() > params.expand_thresh) {
-                std::cout << "  - Expanding subspace. Norm: " << s.norm();
-                std::cout << ", size: " << V.cols()+1 << std::endl;
+                //std::cout << "  - Expanding subspace. Norm: " << s.norm();
+                //std::cout << ", size: " << V.cols()+1 << std::endl;
                 V.conservativeResize(N, V.cols() + 1);
                 V.col(V.cols() - 1) = s;
             }
