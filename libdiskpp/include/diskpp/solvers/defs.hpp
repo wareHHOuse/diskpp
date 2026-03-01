@@ -64,12 +64,16 @@ using remove_complex_t = typename remove_complex<T>::type;
 
 template<typename T>
 struct operator_from_matrix {
-    const priv::mat<T>&  M;
+    const priv::spmat<T>&  M;
 
-    operator_from_matrix(const priv::mat<T>& pM) : M(pM) {}
+    operator_from_matrix(const priv::spmat<T>& pM) : M(pM) {}
 
     priv::vec<T> operator()(const priv::vec<T>& v) const {
         return M*v;
+    }
+
+    priv::mat<T> operator()(const priv::mat<T>& V) const {
+        return M*V;
     }
 };
 struct identity {

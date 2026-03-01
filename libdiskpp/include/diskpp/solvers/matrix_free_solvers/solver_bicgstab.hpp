@@ -14,6 +14,7 @@
 
 namespace disk::solvers {
 
+/* Matrix-free BiCGStab. */
 template<typename T, typename Oper, typename Precond>
 iterative_solver_status
 bicgstab_mf(const iterative_solver_params& params, Oper A,

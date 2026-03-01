@@ -188,8 +188,17 @@ acoustic_eigs_dg(Mesh& msh, size_t degree,
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> eigvecs;
     Eigen::Matrix<T, Eigen::Dynamic, 1> eigvals;
 
-    std::cout << "Running FEAST" << std::endl;
-    auto fs = disk::feast(fep, assm.gK, assm.gM, eigvecs, eigvals);
+    //std::cout << "Running FEAST" << std::endl;
+    //auto fs = disk::feast(fep, assm.gK, assm.gM, eigvecs, eigvals);
+
+    std::cout << "starting BDJ" << std::endl;
+    disk::solvers::bjd_params params;
+    params.block_size = 13;
+    params.max_inner_iters = 30;
+    params.inner_tol = 1e-4;
+    auto opA = disk::solvers::operator_from_matrix(assm.gK);
+    disk::solvers::block_jacobi_davidson(params, opA,
+        assm.gM, eigvals, eigvecs);
 
     std::cout << (eigvals - eigvals_ref).transpose() << std::endl;
 
@@ -301,7 +310,7 @@ acoustic_eigs_hho(const Mesh& msh, size_t degree, disk::silo_database& silo)
     params.max_inner_iters = 30;
     params.inner_tol = 1e-4;
     disk::solvers::block_jacobi_davidson(params, apply_A,
-        assm.BTT, solve_BTT, eigvals, eigvecs);
+        assm.BTT, eigvals, eigvecs);
 
     T pisq = M_PI * M_PI;
 

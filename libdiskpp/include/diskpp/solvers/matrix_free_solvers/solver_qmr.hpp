@@ -14,6 +14,7 @@
 
 namespace disk::solvers {
 
+/* Transpose-Free Quasi Minimal Residual matrix-free solver */
 template<typename T, typename Oper, typename Precond>
 iterative_solver_status
 tfqmr_mf(const iterative_solver_params& params, Oper A,

@@ -31,6 +31,11 @@ struct bjd_params {
     bool    verbose                 = false;
 };
 
+enum class bdj_status {
+    converged,
+    hit_max_iter,
+};
+
 template<typename T>
 void orthonormalize(priv::mat<T>& V, const priv::spmat<T>& B)
 {
@@ -45,9 +50,19 @@ void orthonormalize(priv::mat<T>& V, const priv::spmat<T>& B)
     }
 }
 
-template<typename T, oper<T> SolveB>
-void block_jacobi_davidson(const bjd_params& params,
-    auto applyA, const priv::spmat<T>& B, SolveB solveB,
+/* This is a block Jacobi-Davidson solver to find the smallest
+ * eigenvalues of Ax = λBx. A and B are assumed SPD, the inner
+ * solver is QMR.
+ * The implementation is matrix-free and is suited for HHO
+ * when the static condensation is done on the cells (and
+ * therefore must be done globally and not locally).
+ * If you don't need a matrix-free solver you should probably
+ * use FEAST.
+ */
+template<typename T>
+bdj_status
+block_jacobi_davidson(const bjd_params& params,
+    auto applyA, const priv::spmat<T>& B,
     priv::vec<T>& eigenvalues,
     priv::mat<T>& eigenvectors)
 {
@@ -59,7 +74,8 @@ void block_jacobi_davidson(const bjd_params& params,
     dm V = dm::Random(N, params.block_size);
     orthonormalize(V, B);
 
-    // Keeps track of converged eigenpairs
+    // Keep track of converged eigenpairs and block
+    // them during iteration to save operations
     std::vector<bool> conv(params.block_size, false);
 
     for (int outer = 0; outer < params.max_outer_iters; outer++) {
@@ -67,76 +83,74 @@ void block_jacobi_davidson(const bjd_params& params,
         
         const int M = V.cols();
         dm TA = V.transpose() * applyA(V);
-        //dm TB = V.transpose() * B * V;
-        //dm TB = dm::Identity(TA.rows(), TA.cols());
-        Eigen::SelfAdjointEigenSolver<dm> ges(TA);
-        dv theta = ges.eigenvalues();
-        dm Y = ges.eigenvectors();
-        dm X = V * Y.leftCols(params.block_size);
+        /* Since we orthonormalized V, the matrix V'*B*V is the
+         * identity, so we don't need to solve a generalized
+         * problem here */
+        Eigen::SelfAdjointEigenSolver<dm> es(TA);
+        dv theta = es.eigenvalues();
+        dm Y = es.eigenvectors();
+        dm X = V * Y.leftCols(params.block_size); //smallest eigs
 
+        /* If the subspace gets too big we restart */
         if ( V.cols() > params.block_size * params.max_subspace_growth ) {
             V = X.leftCols(params.block_size);
         }
 
         for (int i_ev = 0; i_ev < params.block_size; i_ev++) {
             if (conv[i_ev]) {
-                continue; /* This pair has already converged. */
+                continue;
             }
-
-            //std::cout << "  Eigenvalue " << i_ev << std::endl;
     
             dv xi = X.col(i_ev);
             T lambda = theta(i_ev);
             dv r = applyA(xi) - lambda * (B * xi);
-
-            //std::cout << "   - norm " << i_ev << ": " << r.norm() << std::endl;
             if (r.norm() < params.ev_tol * std::abs(lambda)) {
-                //std::cout << "  locked" << std::endl;
                 conv[i_ev] = true;
                 continue;
             }
 
-            auto JDproj = [&](const dv& s) -> dv {
+            /* This is the LHS for the correction equation */
+            auto corrLHS = [&](const dv& s) -> dv {
                 dv Bs = B*s;
-                dv v1 = s - xi * xi.dot(Bs); // (I - u*u'*B)*s
-                dv v2 = applyA(v1) - lambda*B*v1; //(A - lambda*B)*v1
-                return v2 - B*(xi * xi.dot(v2)); //(I - B*x*x')*v2
+                dv v1 = s - xi * xi.dot(Bs);
+                dv v2 = applyA(v1) - lambda*B*v1;
+                return v2 - B*(xi * xi.dot(v2));
             };
 
-            disk::solvers::iterative_solver_params tfqmr_p;
-            tfqmr_p.max_iter = params.max_inner_iters;
-            tfqmr_p.tol = 0.1*r.norm();
-            tfqmr_p.verbose = false;
+            /* Call QMR to solve the correction equation */
+            disk::solvers::iterative_solver_params innerp;
+            innerp.max_iter = params.max_inner_iters;
+            innerp.tol = 0.1*r.norm();
+            innerp.verbose = false;
             dv s = dv::Zero( r.rows() );
-            tfqmr_mf(tfqmr_p, JDproj, (-r).eval(), s, disk::solvers::identity{});
+            using id = disk::solvers::identity;
+            tfqmr_mf(innerp, corrLHS, (-r).eval(), s, id{});
             
+            /* Add the solution to the current search space */
             if (s.norm() > params.expand_thresh) {
-                //std::cout << "  - Expanding subspace. Norm: " << s.norm();
-                //std::cout << ", size: " << V.cols()+1 << std::endl;
                 V.conservativeResize(N, V.cols() + 1);
                 V.col(V.cols() - 1) = s;
             }
         }
 
-        orthonormalize(V, B);
-
-        // Check if all the eigenpairs have converged
+        /* Check if all the eigenpairs have converged. In that case copy
+         * them in the output parameters and return, we're finished.
+         */
         if ( std::all_of(conv.begin(), conv.end(), [](bool v) { return v; }) ) {
             std::cout << "All eigenpairs have converged" << std::endl;
-            break;
+            eigenvalues.resize(params.block_size);
+            eigenvalues = theta.segment(0, params.block_size);
+            eigenvectors = X.leftCols(params.block_size);
+            return bdj_status::converged;
         }
+
+        /* Otherwise we orthonormalize the whole V and we go for another
+         * round. It is not necessary to go through the whole V, but I am
+         * lazy and for now (read: forever) it's OK like this. */
+        orthonormalize(V, B);
     }
 
-    // Final Rayleigh-Ritz to compute eigenvalues/eigenvectors
-    int M = V.cols();
-    dm TA = V.transpose() * applyA(V);
-    //dm TB = V.transpose() * B * V;
-    Eigen::SelfAdjointEigenSolver<dm> ges(TA);
-
-    eigenvalues.resize(params.block_size);
-    eigenvectors = V * ges.eigenvectors().leftCols(params.block_size);
-    for (int i = 0; i < params.block_size; i++)
-        eigenvalues(i) = ges.eigenvalues()(i);
+    return bdj_status::hit_max_iter;
 }
 
 } // namespace disk::solvers
