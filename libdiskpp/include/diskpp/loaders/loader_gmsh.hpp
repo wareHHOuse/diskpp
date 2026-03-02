@@ -289,13 +289,9 @@ class gmsh_geometry_loader<simplicial_mesh<T,2>> : public mesh_loader<simplicial
         std::vector<double>     coords;
         std::vector<double>     paraCoords;
 
-        gmsh::model::mesh::getNodes(nodeTags, coords, paraCoords, -1, -1, true, false);
+        gmsh::model::mesh::getNodes(nodeTags, coords, paraCoords, -1, -1, false, false);
 
-        auto maxtag_pos = std::max_element(nodeTags.begin(), nodeTags.end());
-        
-        size_t maxtag = 0;
-        if (maxtag_pos != nodeTags.end())
-            maxtag = (*maxtag_pos)+1;
+        auto maxtag = *std::max_element(nodeTags.begin(), nodeTags.end()) + 1;
 
         points.resize( nodeTags.size() );
 

@@ -155,6 +155,105 @@ conjugated_gradient(const conjugated_gradient_params<T>&       cgp,
     return true;
 }
 
+
+template<typename T>
+bool
+conjugated_gradient(const conjugated_gradient_params<T>&       cgp,
+                    const Eigen::SparseMatrix<T>&              A,
+                    const Eigen::Matrix<T, Eigen::Dynamic, 1>& b,
+                    Eigen::Matrix<T, Eigen::Dynamic, 1>&       x,
+                    Eigen::SparseMatrix<T>&                    M)
+{
+    if (A.rows() != A.cols())
+    {
+        if (cgp.verbose)
+            std::cout << "[CG solver] A square matrix is required" << std::endl;
+
+        return false;
+    }
+
+    size_t N = A.cols();
+
+    if (b.size() != N)
+    {
+        if (cgp.verbose)
+            std::cout << "[CG solver] Wrong size of RHS vector" << std::endl;
+
+        return false;
+    }
+
+    if (x.size() != N)
+    {
+        if (cgp.verbose)
+            std::cout << "[CG solver] Wrong size of solution vector" << std::endl;
+
+        return false;
+    }
+
+    if (!cgp.use_initial_guess)
+        x = Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(N);
+
+    mumps_solver<T> pre;
+    pre.factorize(M);
+
+    size_t iter = 0;
+    T      nr, nr0;
+    T      alpha, beta, rho;
+
+    Eigen::Matrix<T, Eigen::Dynamic, 1> d(N), r(N), r0(N), y(N), p(N), q(N);
+
+    r0 = r = b - A * x;
+    d = pre.solve(r);
+    nr = nr0 = r.norm();
+
+    std::ofstream iter_hist_ofs;
+    if (cgp.save_iteration_history)
+        iter_hist_ofs.open(cgp.history_filename);
+
+    auto max_iter = cgp.max_iter == 0 ? 2 * N : cgp.max_iter;
+
+    while (nr / nr0 > cgp.rr_tol && iter < max_iter && nr / nr0 < cgp.rr_max)
+    {
+        if (cgp.verbose)
+        {
+            std::cout << "                                                 \r";
+            std::cout << " -> Iteration " << iter << ", rr = ";
+            std::cout << nr / nr0 << "\b\r";
+            std::cout.flush();
+        }
+
+        if (cgp.save_iteration_history)
+            iter_hist_ofs << nr / nr0 << std::endl;
+
+        y     = A * d;
+        q     = pre.solve(r);
+        rho   = r.dot(q);
+        alpha = rho / d.dot(y);
+        x     = x + alpha * d;
+        r     = r - alpha * y;
+        p     = pre.solve(r);
+        beta  = r.dot(p) / rho;
+        d     = p + beta * d;
+
+        nr = r.norm();
+        iter++;
+    }
+
+    if (cgp.save_iteration_history)
+    {
+        iter_hist_ofs << nr / nr0 << std::endl;
+        iter_hist_ofs.close();
+    }
+
+    if (cgp.verbose)
+        std::cout << " -> Iteration " << iter << ", rr = " << nr / nr0 << std::endl;
+
+    return true;
+}
+
+
+
+
 template<typename T>
 bool
 conjugated_gradient(sol::state&                                lua,
@@ -326,6 +425,128 @@ linear_solver(sol::state&                          lua,
     }
 
     return false;
+}
+
+template<typename T>
+struct toltype {
+    using type = T;
+};
+
+template<typename T>
+struct toltype<std::complex<T>> {
+    using type = T;
+}; 
+
+template<typename T>
+std::optional<std::pair<Eigen::Matrix<T, Eigen::Dynamic, 1>, T>>
+powiter(const Eigen::SparseMatrix<T>& A,
+    typename toltype<T>::type tol = 1e-10,
+    size_t maxiter = 1000)
+{
+    assert(A.rows() == A.cols());
+    using vec_t = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+    vec_t x = vec_t::Ones(A.cols());
+    x = x/x.norm();
+    T lambda = 0;
+    size_t i = 0;
+    for (; i < maxiter; i++) {
+        vec_t new_x = A*x;
+        T new_lambda = x.dot(new_x);
+        x = new_x/new_x.norm();
+        auto err = std::abs(lambda-new_lambda);
+        if ( err <= tol*std::abs(new_lambda) ) {
+            std::cout << std::endl;
+            return std::pair{x, new_lambda};
+        }
+        std::cout << "\rPower iteration " << i << ": " << err/std::abs(new_lambda) << std::flush;
+        lambda = new_lambda;
+    }
+    std::cout << std::endl;
+    if (i == maxiter) {
+        return {};
+    }
+
+    return std::pair{x, lambda};
+}
+
+template<typename T>
+std::optional<std::pair<Eigen::Matrix<T, Eigen::Dynamic, 1>, T>>
+inv_powiter(const Eigen::SparseMatrix<T>& A,
+    typename toltype<T>::type mu,
+    typename toltype<T>::type tol = 1e-10,
+    size_t maxiter = 1000)
+{
+    assert(A.rows() == A.cols());
+    Eigen::SparseMatrix<T> muI(A.rows(), A.cols());
+    for (int i = 0; i < A.rows(); i++)
+        muI.insert(i,i) = mu;
+    Eigen::SparseMatrix<T> M = A - muI;
+    mumps_solver<T> s;
+    s.factorize(M);
+    using vec_t = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+    vec_t x = vec_t::Ones(M.cols());
+    x = x/x.norm();
+    T lambda = mu;
+    size_t i = 0;
+    for (; i < maxiter; i++) {
+        vec_t new_x = s.solve(x);
+        T new_lambda = mu + 1.0/x.dot(new_x);
+        x = new_x/new_x.norm();
+        auto err = std::abs(lambda-new_lambda);
+        if ( err <= tol*std::abs(new_lambda) ) {
+            std::cout << std::endl;
+            return std::pair{x, new_lambda};
+        }
+        std::cout << "\rInverse power iteration " << i << ": " << err/std::abs(new_lambda) << std::flush;
+        lambda = new_lambda;
+    }
+    std::cout << std::endl;
+    if (i == maxiter) {
+        return {};
+    }
+
+    return std::pair{x, lambda};
+}
+
+template<typename T>
+std::optional<std::pair<Eigen::Matrix<T, Eigen::Dynamic, 1>, T>>
+inv_powiter(const Eigen::SparseMatrix<T>& A,
+    const Eigen::SparseMatrix<T>& B,
+    typename toltype<T>::type mu,
+    typename toltype<T>::type tol = 1e-10,
+    size_t maxiter = 1000)
+{
+    assert(A.rows() == A.cols());
+    assert(B.rows() == B.cols());
+    assert(A.rows() == B.rows());
+
+    Eigen::SparseMatrix<T> M = A - mu*B;
+    mumps_solver<T> s;
+    s.factorize(M);
+    using vec_t = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+    vec_t x = vec_t::Ones(M.cols());
+    x = x/x.norm();
+    T lambda = mu;
+    size_t i = 0;
+    for (; i < maxiter; i++) {
+        vec_t Bx = B*x;
+        vec_t new_x = s.solve(Bx);
+        T new_lambda = mu + 1.0/x.dot(new_x);
+        x = new_x/new_x.norm();
+        auto err = std::abs(lambda-new_lambda);
+        if ( err <= tol*std::abs(new_lambda) ) {
+            std::cout << std::endl;
+            return std::pair{x, new_lambda};
+        }
+        std::cout << "\rInverse power iteration " << i << ": " << err/std::abs(new_lambda) << std::flush;
+        lambda = new_lambda;
+    }
+    std::cout << std::endl;
+    if (i == maxiter) {
+        return {};
+    }
+
+    return std::pair{x, lambda};
 }
 
 } // namespace solvers

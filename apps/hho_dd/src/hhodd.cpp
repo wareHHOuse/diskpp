@@ -417,7 +417,7 @@ make_mesh_from_edge(const CMesh& cmsh, const typename CMesh::face_type& cfc,
 
     disk::priv::sort_uniq(face_msh_storage->edges);
 
-    disk::detect_boundary(face_msh);
+    //disk::detect_boundary(face_msh);
 }
 
 template<disk::mesh_2D Mesh>
@@ -428,7 +428,7 @@ diffusion_solver_refinement(const Mesh& cmsh, const solver_config& scfg)
     using scalar_type = typename mesh_type::coordinate_type;
 
     disk::simplicial_mesh<scalar_type, 2> fmsh;
-    disk::submesh_via_gmsh(cmsh, fmsh, disk::average_diameter(cmsh)/5.0);
+    disk::submesh_via_gmsh(cmsh, fmsh, 0.1);
 
     std::vector<double> subdom_ids;
     for (auto& cl : fmsh) {
@@ -442,7 +442,7 @@ diffusion_solver_refinement(const Mesh& cmsh, const solver_config& scfg)
     silo.add_mesh(fmsh, "fine");
     silo.add_variable("fine", "domain_id", subdom_ids, disk::zonal_variable_t);
 
-    
+    /*
     for (auto& cl : cmsh) {
         std::cout << cl << std::endl;
         auto di = cmsh.domain_info(cl);
@@ -451,6 +451,7 @@ diffusion_solver_refinement(const Mesh& cmsh, const solver_config& scfg)
             std::cout << "  bndC: " << offset(cmsh, fc) << std::endl;
         }
     }
+    */
 
     hhodd_connectivity_info<typename Mesh::coordinate_type> hhodd_ci;
     hhodd_ci.face_coarse_to_sub.resize(cmsh.faces_size());
