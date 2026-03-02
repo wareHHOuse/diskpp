@@ -10,4 +10,6 @@
 
 #pragma once
 
+#include "eigensolvers/feast.hpp"
 #include "eigensolvers/jacobi_davidson.hpp"
+#include "eigensolvers/powiters.hpp"

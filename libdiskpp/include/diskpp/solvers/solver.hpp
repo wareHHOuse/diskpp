@@ -156,6 +156,8 @@ conjugated_gradient(const conjugated_gradient_params<T>&       cgp,
 }
 
 
+#if 0
+
 template<typename T>
 bool
 conjugated_gradient(const conjugated_gradient_params<T>&       cgp,
@@ -252,7 +254,7 @@ conjugated_gradient(const conjugated_gradient_params<T>&       cgp,
 }
 
 
-
+#endif
 
 template<typename T>
 bool
@@ -427,127 +429,7 @@ linear_solver(sol::state&                          lua,
     return false;
 }
 
-template<typename T>
-struct toltype {
-    using type = T;
-};
 
-template<typename T>
-struct toltype<std::complex<T>> {
-    using type = T;
-}; 
-
-template<typename T>
-std::optional<std::pair<Eigen::Matrix<T, Eigen::Dynamic, 1>, T>>
-powiter(const Eigen::SparseMatrix<T>& A,
-    typename toltype<T>::type tol = 1e-10,
-    size_t maxiter = 1000)
-{
-    assert(A.rows() == A.cols());
-    using vec_t = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-    vec_t x = vec_t::Ones(A.cols());
-    x = x/x.norm();
-    T lambda = 0;
-    size_t i = 0;
-    for (; i < maxiter; i++) {
-        vec_t new_x = A*x;
-        T new_lambda = x.dot(new_x);
-        x = new_x/new_x.norm();
-        auto err = std::abs(lambda-new_lambda);
-        if ( err <= tol*std::abs(new_lambda) ) {
-            std::cout << std::endl;
-            return std::pair{x, new_lambda};
-        }
-        std::cout << "\rPower iteration " << i << ": " << err/std::abs(new_lambda) << std::flush;
-        lambda = new_lambda;
-    }
-    std::cout << std::endl;
-    if (i == maxiter) {
-        return {};
-    }
-
-    return std::pair{x, lambda};
-}
-
-template<typename T>
-std::optional<std::pair<Eigen::Matrix<T, Eigen::Dynamic, 1>, T>>
-inv_powiter(const Eigen::SparseMatrix<T>& A,
-    typename toltype<T>::type mu,
-    typename toltype<T>::type tol = 1e-10,
-    size_t maxiter = 1000)
-{
-    assert(A.rows() == A.cols());
-    Eigen::SparseMatrix<T> muI(A.rows(), A.cols());
-    for (int i = 0; i < A.rows(); i++)
-        muI.insert(i,i) = mu;
-    Eigen::SparseMatrix<T> M = A - muI;
-    mumps_solver<T> s;
-    s.factorize(M);
-    using vec_t = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-    vec_t x = vec_t::Ones(M.cols());
-    x = x/x.norm();
-    T lambda = mu;
-    size_t i = 0;
-    for (; i < maxiter; i++) {
-        vec_t new_x = s.solve(x);
-        T new_lambda = mu + 1.0/x.dot(new_x);
-        x = new_x/new_x.norm();
-        auto err = std::abs(lambda-new_lambda);
-        if ( err <= tol*std::abs(new_lambda) ) {
-            std::cout << std::endl;
-            return std::pair{x, new_lambda};
-        }
-        std::cout << "\rInverse power iteration " << i << ": " << err/std::abs(new_lambda) << std::flush;
-        lambda = new_lambda;
-    }
-    std::cout << std::endl;
-    if (i == maxiter) {
-        return {};
-    }
-
-    return std::pair{x, lambda};
-}
-
-template<typename T>
-std::optional<std::pair<Eigen::Matrix<T, Eigen::Dynamic, 1>, T>>
-inv_powiter(const Eigen::SparseMatrix<T>& A,
-    const Eigen::SparseMatrix<T>& B,
-    typename toltype<T>::type mu,
-    typename toltype<T>::type tol = 1e-10,
-    size_t maxiter = 1000)
-{
-    assert(A.rows() == A.cols());
-    assert(B.rows() == B.cols());
-    assert(A.rows() == B.rows());
-
-    Eigen::SparseMatrix<T> M = A - mu*B;
-    mumps_solver<T> s;
-    s.factorize(M);
-    using vec_t = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-    vec_t x = vec_t::Ones(M.cols());
-    x = x/x.norm();
-    T lambda = mu;
-    size_t i = 0;
-    for (; i < maxiter; i++) {
-        vec_t Bx = B*x;
-        vec_t new_x = s.solve(Bx);
-        T new_lambda = mu + 1.0/x.dot(new_x);
-        x = new_x/new_x.norm();
-        auto err = std::abs(lambda-new_lambda);
-        if ( err <= tol*std::abs(new_lambda) ) {
-            std::cout << std::endl;
-            return std::pair{x, new_lambda};
-        }
-        std::cout << "\rInverse power iteration " << i << ": " << err/std::abs(new_lambda) << std::flush;
-        lambda = new_lambda;
-    }
-    std::cout << std::endl;
-    if (i == maxiter) {
-        return {};
-    }
-
-    return std::pair{x, lambda};
-}
 
 } // namespace solvers
 } // namespace disk

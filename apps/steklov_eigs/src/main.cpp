@@ -27,7 +27,7 @@
 #include "diskpp/common/timecounter.hpp"
 
 #include "sol/sol.hpp"
-#include "diskpp/solvers/feast.hpp"
+#include "diskpp/solvers/eigensolvers.hpp"
 
 #include "sgr.hpp"
 
@@ -43,7 +43,7 @@ template<typename T>
 struct steklov_solver_configuration {
     disk::lua::mesh_parameters          mesh;
     disk::lua::hho_parameters           hho;
-    disk::feast_eigensolver_params<T>   feast;
+    disk::solvers::feast_eigensolver_params<T>   feast;
 };
 
 
@@ -65,7 +65,7 @@ void register_my_usertypes(sol::state& lua, steklov_solver_configuration<T>& con
     ssct["hho"] = &ssc_t::hho;
     ssct["feast"] = &ssc_t::feast;
     lua["config"] = &config;
-    config.feast.fis = disk::feast_inner_solver::mumps;
+    config.feast.fis = disk::solvers::feast_inner_solver::mumps;
 }
 
 template<typename T>
@@ -444,24 +444,24 @@ solve(const Config& config, State& state)
     auto cd = state.hdi.cell_degree();
     auto cbs = disk::scalar_basis_size(cd, mesh_type::dimension);
 
-    disk::feast_status fs;
+    disk::solvers::feast_status fs;
     
     for (size_t retries = 1; retries <= 10; retries++)
     {
         auto fep = config.feast;
         fep.subspace_size = fep.subspace_size*retries;
 
-        fs = disk::feast(fep, state.assm.LHS, state.assm.RHS,
+        fs = disk::solvers::feast(fep, state.assm.LHS, state.assm.RHS,
             state.eigvecs, state.eigvals);
 
-        if (disk::feast_status::subspace_too_small != fs)
+        if (disk::solvers::feast_status::subspace_too_small != fs)
             break;
 
         std::cout << "Subspace too small, restarting FEAST (retry ";
         std::cout << retries << ")" << std::endl;
     }
 
-    if (disk::feast_status::success != fs) {
+    if (disk::solvers::feast_status::success != fs) {
         std::cout << "FEAST algorithm did not converge: "<< fs << std::endl;
         state.eigvecs = dm::Zero(0,0);
         state.eigvals = dv::Zero(0);

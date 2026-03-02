@@ -166,14 +166,14 @@ acoustic_eigs_dg(Mesh& msh, size_t degree,
     std::cout << " Unknowns: " << assm.gK.rows() << " ";
     std::cout << " Nonzeros: " << assm.gK.nonZeros() << std::endl;
 
-    disk::feast_eigensolver_params<T> fep;
+    disk::solvers::feast_eigensolver_params<T> fep;
     fep.subspace_size = 50;
     fep.min_eigval = 5;
     fep.max_eigval = 100;
     fep.verbose = true;
     fep.max_iter = 50;
     fep.tolerance = 8;
-    fep.fis = feast_inner_solver::mumps;
+    fep.fis = disk::solvers::feast_inner_solver::mumps;
 
     T pisq = M_PI * M_PI;
 
@@ -274,14 +274,14 @@ acoustic_eigs_hho(const Mesh& msh, size_t degree, disk::silo_database& silo)
     //std::cout << " Nonzeros: " << KTT.nonZeros() << std::endl;
 
     
-    disk::feast_eigensolver_params<T> fep;
+    disk::solvers::feast_eigensolver_params<T> fep;
     fep.subspace_size = 50;
     fep.min_eigval = 0.1;
     fep.max_eigval = 100;
     fep.verbose = true;
     fep.max_iter = 50;
     fep.tolerance = 8;
-    fep.fis = feast_inner_solver::mumps;
+    fep.fis = disk::solvers::feast_inner_solver::mumps;
 
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> eigvecs;
     Eigen::Matrix<T, Eigen::Dynamic, 1> eigvals;

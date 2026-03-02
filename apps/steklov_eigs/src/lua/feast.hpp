@@ -5,7 +5,7 @@ namespace disk::lua {
 template<typename T>
 void register_feast_usertypes(sol::state& lua)
 {
-    using fep_t = disk::feast_eigensolver_params<T>;
+    using fep_t = disk::solvers::feast_eigensolver_params<T>;
 
     sol::usertype<fep_t> fept = lua.new_usertype<fep_t>(
         "feast_eigensolver_params",
