@@ -123,3 +123,8 @@ if (BUILD_APP_NITSCHE)
     add_subdirectory(nitsche)
 endif()
 
+
+option(BUILD_APP_ACOUSTIC_EIGS "Build acoustic_eigs application" ON)
+if (BUILD_APP_ACOUSTIC_EIGS)
+    add_subdirectory(acoustic_eigs)
+endif()

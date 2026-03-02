@@ -255,8 +255,12 @@ feast(const feast_eigensolver_params<double>& params,
     bool B_square = B.rows() == B.cols();
     bool A_B_same_size = (A.rows() == B.rows()) and (A.cols() == B.cols());
 
-    if ( (not A_square) or (not B_square) or (not A_B_same_size) )
+    if ( (not A_square) or (not B_square) or (not A_B_same_size) ) {
+        if (params.verbose) {
+            std::cout << "FEAST: invalid input" << std::endl;
+        }
         return feast_status::invalid_input;
+    }
 
     auto N = A.rows();
     auto M0 = params.subspace_size;
@@ -320,8 +324,13 @@ feast(const feast_eigensolver_params<double>& params,
                     Bq_eigvals_abovetr++;
             }
 
-            if (Bq_min_eigval >= thresh)
+            if (Bq_min_eigval >= thresh) {
+                if (params.verbose) {
+                    std::cout << "FEAST: subspace too small" << std::endl;
+                }   
+                
                 return feast_status::subspace_too_small;
+            }
         }
         
         /* Solve the reduced eigenvalue problem */
@@ -373,6 +382,9 @@ feast(const feast_eigensolver_params<double>& params,
 
         if (maxres < std::pow(10,-params.tolerance)) {
             eigvals_found = eigvals.size();
+            if (params.verbose) {
+                std::cout << "FEAST: success" << std::endl;
+            }
             return feast_status::success;
         }
 

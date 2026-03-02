@@ -216,6 +216,200 @@ public:
     }
 };
 
+template<typename Mesh, disk::basis::basis CellBasis, disk::basis::basis FaceBasis>
+class eigenvalue_block_assembler {
+    using CoordT = typename Mesh::coordinate_type;
+    using ScalT = typename FaceBasis::scalar_type;
+
+    using mesh_type = Mesh;
+    using cell_type = typename mesh_type::cell_type;
+    using face_type = typename mesh_type::face_type;
+    using trip_type = typename Eigen::Triplet<ScalT>;
+
+    std::vector<trip_type>  ATT_trips;
+    std::vector<trip_type>  ATF_trips;
+    std::vector<trip_type>  AFT_trips;
+    std::vector<trip_type>  AFF_trips;
+
+    std::vector<trip_type>  BTT_trips;
+    std::vector<trip_type>  BTF_trips;
+    std::vector<trip_type>  BFT_trips;
+    std::vector<trip_type>  BFF_trips;
+
+    size_t      num_cells;
+    size_t      cell_basis_size;
+    size_t      cell_degree;
+
+    size_t      num_faces;
+    size_t      face_basis_size;
+    size_t      face_degree;
+
+public:
+    using matrix_type = dynamic_matrix<ScalT>;
+    using vector_type = dynamic_vector<ScalT>;
+
+    Eigen::SparseMatrix<ScalT>  ATT;
+    Eigen::SparseMatrix<ScalT>  ATF;
+    Eigen::SparseMatrix<ScalT>  AFT;
+    Eigen::SparseMatrix<ScalT>  AFF;
+
+    Eigen::SparseMatrix<ScalT>  BTT;
+    Eigen::SparseMatrix<ScalT>  BTF;
+    Eigen::SparseMatrix<ScalT>  BFT;
+    Eigen::SparseMatrix<ScalT>  BFF;
+
+    eigenvalue_block_assembler(const mesh_type& msh, size_t cdeg, size_t fdeg)
+        : cell_degree(cdeg), face_degree(fdeg) 
+    {
+        cell_basis_size = CellBasis::size_of_degree(cell_degree);
+        face_basis_size = FaceBasis::size_of_degree(face_degree);
+
+        auto gcs = cell_basis_size * msh.cells_size();
+        auto gfs = face_basis_size * msh.faces_size();
+
+        ATT = Eigen::SparseMatrix<ScalT>(gcs, gcs);
+        ATF = Eigen::SparseMatrix<ScalT>(gcs, gfs);
+        AFT = Eigen::SparseMatrix<ScalT>(gfs, gcs);
+        AFF = Eigen::SparseMatrix<ScalT>(gfs, gfs);
+
+        BTT = Eigen::SparseMatrix<ScalT>(gcs, gcs);
+        BTF = Eigen::SparseMatrix<ScalT>(gcs, gfs);
+        BFT = Eigen::SparseMatrix<ScalT>(gfs, gcs);
+        BFF = Eigen::SparseMatrix<ScalT>(gfs, gfs);
+    }
+
+    void
+    assemble(const mesh_type& msh, const cell_type& cl, const matrix_type& A)
+    {
+        assert(A.cols() == A.rows());
+
+        auto cbase = cell_basis_size *  offset(msh, cl);
+
+        for (size_t i = 0; i < cell_basis_size; i++) {
+            for (size_t j = 0; j < cell_basis_size; j++) {
+                int gi = cbase + i;
+                int gj = cbase + j;
+                ATT_trips.push_back({gi, gj, A(i,j)});
+            }
+        }
+
+        auto fcs = faces(msh, cl);
+        for (size_t fnum = 0; fnum < fcs.size(); fnum++) {
+            const auto& fc = fcs[fnum];
+            auto lfofs = cell_basis_size + fnum*face_basis_size;
+            auto fbase = face_basis_size *  offset(msh, fc);
+
+            /* TF */
+            for (size_t i = 0; i < cell_basis_size; i++) {
+                for (size_t j = 0; j < face_basis_size; j++) {
+                    int gi = cbase + i;
+                    int gj = fbase + j;
+                    ATF_trips.push_back({gi, gj, A(i,lfofs+j)});
+                }
+            }
+
+            /* FT */
+            for (size_t i = 0; i < face_basis_size; i++) {
+                for (size_t j = 0; j < cell_basis_size; j++) {
+                    int gi = fbase + i;
+                    int gj = cbase + j;
+                    AFT_trips.push_back({gi, gj, A(lfofs+i,j)});
+                }
+            }
+        }
+        
+        for (size_t fnumi = 0; fnumi < fcs.size(); fnumi++) {
+            const auto& fci = fcs[fnumi];
+            auto lfofsi = cell_basis_size + fnumi*face_basis_size;
+            auto fbasei = face_basis_size *  offset(msh, fci);
+            for (size_t fnumj = 0; fnumj < fcs.size(); fnumj++) {
+                const auto& fcj = fcs[fnumj];
+                auto lfofsj = cell_basis_size + fnumj*face_basis_size;
+                auto fbasej = face_basis_size *  offset(msh, fcj);
+                /* FF */
+                for (size_t i = 0; i < face_basis_size; i++) {
+                    for (size_t j = 0; j < face_basis_size; j++) {
+                        int gi = fbasei + i;
+                        int gj = fbasej + j;
+                        AFF_trips.push_back({gi, gj, A(lfofsi+i,lfofsj+j)});
+                    }
+                }
+            }
+        }
+    }
+
+    void
+    assemble(const mesh_type& msh, const cell_type& cl,
+        const matrix_type& A, const matrix_type& B)
+    {
+        assert(A.cols() == A.rows());
+        assert(B.cols() == B.rows());
+
+        assemble(msh, cl, A);
+
+        auto cbase = cell_basis_size *  offset(msh, cl);
+
+        for (size_t i = 0; i < cell_basis_size; i++) {
+            for (size_t j = 0; j < cell_basis_size; j++) {
+                int gi = cbase + i;
+                int gj = cbase + j;
+                BTT_trips.push_back({gi, gj, B(i,j)});
+            }
+        }
+
+        if (B.cols() == cell_basis_size) {
+            return;
+        }
+
+        auto fcs = faces(msh, cl);
+        for (size_t fnum = 0; fnum < fcs.size(); fnum++) {
+            const auto& fc = fcs[fnum];
+            auto lfofs = cell_basis_size + fnum*face_basis_size;
+            auto fbase = face_basis_size *  offset(msh, fc);
+
+            /* TF */
+            for (size_t i = 0; i < cell_basis_size; i++) {
+                for (size_t j = 0; j < face_basis_size; j++) {
+                    int gi = cbase + i;
+                    int gj = fbase + j;
+                    BTF_trips.push_back({gi, gj, B(i,lfofs+j)});
+                }
+            }
+
+            /* FT */
+            for (size_t i = 0; i < face_basis_size; i++) {
+                for (size_t j = 0; j < cell_basis_size; j++) {
+                    int gi = fbase + i;
+                    int gj = cbase + j;
+                    BFT_trips.push_back({gi, gj, B(lfofs+i,j)});
+                }
+            }
+
+            /* FF */
+            for (size_t i = 0; i < face_basis_size; i++) {
+                for (size_t j = 0; j < face_basis_size; j++) {
+                    int gi = fbase + i;
+                    int gj = fbase + j;
+                    BFF_trips.push_back({gi, gj, B(lfofs+i,lfofs+j)});
+                }
+            }
+        }
+    }
+
+    void
+    finalize(void)
+    {
+        ATT.setFromTriplets( ATT_trips.begin(), ATT_trips.end() );
+        ATF.setFromTriplets( ATF_trips.begin(), ATF_trips.end() );
+        AFT.setFromTriplets( AFT_trips.begin(), AFT_trips.end() );
+        AFF.setFromTriplets( AFF_trips.begin(), AFF_trips.end() );
+        BTT.setFromTriplets( BTT_trips.begin(), BTT_trips.end() );
+        BTF.setFromTriplets( BTF_trips.begin(), BTF_trips.end() );
+        BFT.setFromTriplets( BFT_trips.begin(), BFT_trips.end() );
+        BFF.setFromTriplets( BFF_trips.begin(), BFF_trips.end() );
+    }
+};
+
 template<typename Basis, typename T>
 auto
 schur(const dynamic_matrix<T>& L, const dynamic_vector<T>& R, const Basis& basis)
