@@ -28,69 +28,9 @@
 #include "diskpp/common/timecounter.hpp"
 
 #include "sol/sol.hpp"
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 #include "sgr.hpp"
-
-#define PARDISO_IN_CORE                 0
-#define PARDISO_OUT_OF_CORE_IF_NEEDED   1
-#define PARDISO_OUT_OF_CORE_ALWAYS      2
-
-template<typename T>
-struct pardiso_params
-{
-    bool    report_factorization_Mflops;
-    int     out_of_core; //0: IC, 1: IC, OOC if limits passed, 2: OOC
-    int     mflops;
-
-    pardiso_params() :
-        report_factorization_Mflops(false), out_of_core(0), mflops(0)
-    {}
-};
-
-template<typename T>
-bool
-mkl_pardiso(pardiso_params<T>& params,
-            const Eigen::SparseMatrix<T>& A,
-            const Eigen::Matrix<T, Eigen::Dynamic, 1>& b,
-            Eigen::Matrix<T, Eigen::Dynamic, 1>& x)
-{
-    Eigen::PardisoLU<Eigen::SparseMatrix<T>>  solver;
-
-    if (params.out_of_core >= 0 && params.out_of_core <= 2)
-        solver.pardisoParameterArray()[59] = params.out_of_core;
-
-    if (params.report_factorization_Mflops)
-        solver.pardisoParameterArray()[18] = -1; //report flops
-
-    solver.analyzePattern(A);
-    if (solver.info() != Eigen::Success) {
-       std::cerr << "ERROR: analyzePattern failed" << std::endl;
-       return false;
-    }
-
-    solver.factorize(A);
-    if (solver.info() != Eigen::Success) {
-       std::cerr << "ERROR: Could not factorize the matrix" << std::endl;
-       std::cerr << "Try to tweak MKL_PARDISO_OOC_MAX_CORE_SIZE" << std::endl;
-       return false;
-    }
-
-    x = solver.solve(b);
-    if (solver.info() != Eigen::Success) {
-       std::cerr << "ERROR: Could not solve the linear system" << std::endl;
-       return false;
-    }
-
-    if (params.report_factorization_Mflops)
-    {
-        int mflops = solver.pardisoParameterArray()[18];
-        params.mflops = mflops;
-        std::cout << "[PARDISO] Factorization Mflops: " << mflops << std::endl;
-    }
-
-    return true;
-}
 
 template<typename Mesh>
 std::set<size_t>
@@ -965,36 +905,8 @@ void lt_solver(Mesh& msh, size_t degree, const std::string& pbdefs_fn)
     std::string solver_name = pd.solver();
 
     tc.tic();
-
-    if (solver_name == "pardiso")
-    {
-        std::cout << "Running pardiso" << std::endl;
-        pardiso_params<T> pparams;
-        pparams.report_factorization_Mflops = true;
-        pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
-
-        bool success = mkl_pardiso(pparams, LHS, RHS, sol);
-        if (!success)
-        {
-            std::cout << "Pardiso failed" << std::endl;
-            return;
-        }
-    }
-    else
-    {
-        std::cout << "Eigen SparseLU" << std::endl;
-        SparseLU<SparseMatrix<T>, COLAMDOrdering<int> >   solver;
-        solver.analyzePattern(LHS);
-        /*
-        if ( solver.info() != Eigen::Success )
-        {
-            std::cout << "SparseLU failed." << std::endl;
-            return; 
-        }
-        */
-        solver.factorize(LHS);
-        sol = solver.solve(RHS); 
-    }
+    
+    disk::solvers::sparse_lu(LHS, RHS, sol);
 
     std::cout << "Solver time: " << tc.toc() << " seconds" << std::endl;
 

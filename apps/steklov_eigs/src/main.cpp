@@ -19,7 +19,7 @@
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 #include "diskpp/output/silo.hpp"
 
 #include "diskpp/methods/implementation_hho/curl.hpp"

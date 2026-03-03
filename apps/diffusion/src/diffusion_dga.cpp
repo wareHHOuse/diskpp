@@ -37,7 +37,7 @@
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/output/silo.hpp"
 
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 int main(int argc, char **argv)
 {
@@ -154,8 +154,8 @@ int main(int argc, char **argv)
     std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
     std::cout << "Dofs: " << gA.rows() << std::endl;
 
-    std::cout << "Running MUMPS" << std::endl;
-    gx = mumps_lu(gA, gb);
+    std::cout << "Running solver" << std::endl;
+    disk::solvers::sparse_lu(gA, gb, gx);
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero( msh.points_size() );
 

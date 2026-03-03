@@ -22,7 +22,7 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/output/silo.hpp"
 
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 #include "sgr.hpp"
 
 template<typename Mesh, typename ScalT = typename Mesh::coordinate_type>
@@ -437,13 +437,15 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order, T alpha, size_t num_ts)
 
     assm.finalize();
 
-    mumps_solver<double> solver;
-
-    //disk::dump_sparse_matrix(assm.LHS, "lhs_hho.txt");
-
-    std::cout << "Running MUMPS" << std::endl;
+    std::cout << "Running solver" << std::endl;
     auto fact_start = std::chrono::steady_clock::now();
+
+#ifdef HAVE_MUMPS
+    disk::solvers::mumps_solver<double> solver;
     solver.factorize(assm.LHS);
+#else
+    Eigen::SparseLU<Eigen::SparseMatrix<double>> solver(assm.LHS);
+#endif
     auto fact_end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_fact = fact_end - fact_start;
     std::cout << sgr::Yellowfg << "Factorization time: ";

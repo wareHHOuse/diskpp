@@ -33,11 +33,12 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/output/silo.hpp"
-#include "diskpp/solvers/solver.hpp"
 
 #include "diskpp/output/gmshConvertMesh.hpp"
 #include "diskpp/output/gmshDisk.hpp"
 #include "diskpp/output/postMesh.hpp"
+
+#include "diskpp/solvers/direct_solvers.hpp"
 
 #include "viscoplasticity_utils.hpp"
 
@@ -669,16 +670,13 @@ public:
             sol_old = vector_type::Zero(systsz);
             sol =  vector_type::Zero(systsz);
 
-            Eigen::PardisoLU<Eigen::SparseMatrix<T>>  solver;
-
             size_t iter = 0;
 
             make_global_matrix(msh, assembler, iter);
             //WARNINGS: This one must go after make_global_matrix!!!!!!
             make_global_rhs(msh, assembler, iter);
 
-            disk::solvers::pardiso_params<T> pparams;
-            mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);
+            disk::solvers::sparse_ldlt(assembler.LHS, assembler.RHS, sol);
 
             post_processing( msh, assembler, iter, true);
 

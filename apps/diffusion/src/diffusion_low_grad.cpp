@@ -9,7 +9,7 @@
 
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 /***************************************************************************/
 /* RHS definition */
@@ -135,8 +135,8 @@ run_hho_diffusion_solver(const Mesh& msh, const size_t degree)
     #endif
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
 
-    std::cout << "Running MUMPS" << std::endl;
-    sol = mumps_lu(assembler.LHS, assembler.RHS);
+    std::cout << "Running solver" << std::endl;
+    disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, sol);
 
     T error = 0.0;
 

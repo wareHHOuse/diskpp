@@ -21,8 +21,7 @@
 #include "diskpp/methods/hho"
 #include "diskpp/methods/implementation_hho/curl.hpp"
 #include "diskpp/output/silo.hpp"
-
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 #include "compinfo.h"
 
@@ -613,8 +612,8 @@ vector_wave_solver(Mesh<T,2,Storage>& msh, size_t order,
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.syssz);
 
-    std::cout << "Running MUMPS" << std::endl;
-    sol = mumps_lu(assm.LHS, assm.RHS);
+    std::cout << "Running solver" << std::endl;
+    disk::solvers::sparse_lu(assm.LHS, assm.RHS, sol);
 
 
     std::vector<T> data_uz;
@@ -778,8 +777,8 @@ vector_wave_solver(Mesh<T,3,Storage>& msh, size_t order)
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.syssz);
 
-    std::cout << "Running MUMPS" << std::endl;
-    sol = mumps_lu(assm.LHS, assm.RHS);
+    std::cout << "Running solver" << std::endl;
+    disk::solvers::sparse_lu(assm.LHS, assm.RHS, sol);
 
     std::vector<T> data_ex, data_ey, data_ez;
     std::vector<T> data_hx, data_hy, data_hz;
@@ -1115,8 +1114,8 @@ vector_wave_solver_complex(Mesh<CoordT,3,Storage>& msh, parameter_loader<Mesh<Co
 
     disk::dynamic_vector<scalar_type> sol = disk::dynamic_vector<scalar_type>::Zero(assm.syssz);
 
-    std::cout << "Running MUMPS" << std::endl;
-    sol = mumps_lu(assm.LHS, assm.RHS);
+    std::cout << "Running solver" << std::endl;
+    disk::solvers::sparse_lu(assm.LHS, assm.RHS, sol);
 
     std::vector<std::pair<scalar_type, int>> data_ex, data_ey, data_ez, data_diff, data_z;
     data_ex.resize(msh.points_size(), std::make_pair(0.0, 0));

@@ -19,7 +19,7 @@
 
 #include "sol/sol.hpp"
 #include "diskpp/common/eigen.hpp"
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 #include "diskpp/common/util.h"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/loaders/loader_gmsh.hpp"
@@ -34,64 +34,9 @@
 
 #include "diskpp/methods/hho_assemblers.hpp"
 #include "diskpp/methods/hho_slapl.hpp"
-#include "diskpp/solvers/solver.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 #include "diskpp/solvers/eigensolvers.hpp"
-
-namespace priv {
-
-/* it exists already in MC/hho+dd */
-template<typename T>
-struct toltype {
-    using type = T;
-};
-
-template<typename T>
-struct toltype<std::complex<T>> {
-    using type = T;
-}; 
-
-template<typename T>
-std::optional<std::pair<Eigen::Matrix<T, Eigen::Dynamic, 1>, T>>
-inv_powiter(const Eigen::SparseMatrix<T>& A,
-    const Eigen::SparseMatrix<T>& B,
-    typename toltype<T>::type mu,
-    typename toltype<T>::type tol = 1e-10,
-    size_t maxiter = 1000)
-{
-    assert(A.rows() == A.cols());
-    assert(B.rows() == B.cols());
-    assert(A.rows() == B.rows());
-
-    Eigen::SparseMatrix<T> M = A - mu*B;
-    mumps_solver<T> s;
-    s.factorize(M);
-    using vec_t = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-    vec_t x = vec_t::Ones(M.cols());
-    x = x/x.norm();
-    T lambda = mu;
-    size_t i = 0;
-    for (; i < maxiter; i++) {
-        vec_t Bx = B*x;
-        vec_t new_x = s.solve(Bx);
-        T new_lambda = mu + 1.0/x.dot(new_x);
-        x = new_x/new_x.norm();
-        auto err = std::abs(lambda-new_lambda);
-        if ( err <= tol*std::abs(new_lambda) ) {
-            std::cout << std::endl;
-            return std::pair{x, new_lambda};
-        }
-        std::cout << "\rInverse power iteration " << i << ": " << err/std::abs(new_lambda) << std::flush;
-        lambda = new_lambda;
-    }
-    std::cout << std::endl;
-    if (i == maxiter) {
-        return {};
-    }
-
-    return std::pair{x, lambda};
-}
-}
 
 namespace disk {
 
@@ -214,12 +159,6 @@ acoustic_eigs_dg(Mesh& msh, size_t degree,
         
         std::string vname = "eigfun_" + std::to_string(col);
         silo.add_variable("mesh", vname, u, disk::zonal_variable_t);
-    }
-
-    auto opt_evs = ::priv::inv_powiter(assm.gK, assm.gM, 7.0);
-    if (opt_evs) {
-        auto [vec, val] = *opt_evs;
-        std::cout << "with powiter: " << val << std::endl;
     }
 }
 

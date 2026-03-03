@@ -41,7 +41,7 @@
 #include "diskpp/output/postMesh.hpp"
 
 #include "diskpp/output/silo.hpp"
-#include "diskpp/solvers/solver.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 #include "viscoplasticity_utils.hpp"
 
 
@@ -203,9 +203,8 @@ public:
         size_t nnz = assembler.LHS.nonZeros();
 
         vector_type solution = vector_type::Zero(systsz);
-        disk::solvers::pardiso_params<T> pparams;
-        pparams.report_factorization_Mflops = false;
-        mkl_pardiso(pparams, assembler.LHS, assembler.RHS, solution);
+        disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, solution);
+        
 
         sol = vector_type::Zero(systsz);
         sol = solution;

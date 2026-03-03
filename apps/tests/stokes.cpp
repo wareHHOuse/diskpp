@@ -33,7 +33,7 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
 
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 
 template<typename Mesh>
@@ -122,7 +122,7 @@ run_stokes(const Mesh& msh, size_t degree)
 
     disk::dynamic_vector<scalar_type> sol = disk::dynamic_vector<scalar_type>::Zero(systsz);
 
-    sol = mumps_lu(assembler.LHS, assembler.RHS);
+    disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, sol);
 
     //std::ofstream ofs("velocity.dat");
 

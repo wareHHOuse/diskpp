@@ -17,7 +17,7 @@
 
 #include "diskpp/methods/hho"
 
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 template<typename Mesh>
 struct source;
@@ -179,7 +179,8 @@ void lt_solver(Mesh& msh, size_t degree)
 
     /* Solve */
     tc.tic();
-    disk::dynamic_vector<T> sol = mumps_lu(assm.LHS, assm.RHS);
+    disk::dynamic_vector<T> sol;
+    disk::solvers::sparse_lu(assm.LHS, assm.RHS, sol);
     std::cout << "Solver time: " << tc.toc() << std::endl;
 
     /* Postprocess */

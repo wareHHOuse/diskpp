@@ -22,7 +22,7 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/output/silo.hpp"
 
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 #include "paramloader.hpp"
 
 #define EPS_0   (8.8541878128e-12)
@@ -878,8 +878,8 @@ solve(hho_maxwell_solver_state<Mesh>& state, config_loader<clT>& cfg)
     auto& hdi = state.hdi;
 
     sol = disk::dynamic_vector<scalar_type>::Zero(assm.syssz);
-    std::cout << "Running MUMPS" << std::endl;
-    sol = mumps_lu(assm.LHS, assm.RHS);
+    std::cout << "Running solver" << std::endl;
+    disk::solvers::sparse_lu(assm.LHS, assm.RHS, sol);
 
     std::cout << "Expanding solution" << std::endl;
     auto cd = hdi.cell_degree();

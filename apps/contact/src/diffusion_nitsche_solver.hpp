@@ -25,7 +25,7 @@
 #include "diskpp/geometry/geometry.hpp"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
-#include "diskpp/solvers/solver.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 #include "common.hpp"
 /***************************************************************************/
 /* RHS definition */
@@ -153,9 +153,7 @@ run_hho_diffusion_nitsche_faces(const Mesh& msh,
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
 
-    disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = true;
-    mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+    disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, sol);
 
     T H1_error = 0.0;
     T L2_error = 0.0;
@@ -318,9 +316,7 @@ run_hho_diffusion_nitsche_cells_full(const Mesh& msh,
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
 
-    disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = true;
-    mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+    disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, sol);
 
     T H1_error = 0.0;
     T L2_error = 0.0;

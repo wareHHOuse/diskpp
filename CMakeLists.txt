@@ -82,20 +82,15 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/diskpp_git_revision.h.in
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 ######################################################################
+## MUMPS solver
+find_package(MUMPS)
+set(LINK_LIBS ${LINK_LIBS} MUMPS::MUMPS)
+
+######################################################################
 ## Eigen3
 #add_subdirectory(contrib/eigen)
 find_package(Eigen3 REQUIRED)
 set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
-
-######################################################################
-## ~jburkardt code
-#add_subdirectory(contrib/jburkardt)
-#set(LINK_LIBS ${LINK_LIBS} JBURKARDT)
-
-######################################################################
-## Solver wrappers
-#add_subdirectory(contrib/solver_wrappers)
-#set(LINK_LIBS ${LINK_LIBS} SOLVER_WRAPPERS)
 
 include_directories(refactor_old_diskpp_code/contrib/sgr)
 

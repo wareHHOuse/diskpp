@@ -31,10 +31,8 @@
 
 #include "diskpp/methods/hho"
 #include "diskpp/loaders/loader.hpp"
-#include "diskpp/solvers/solver.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 #include "diskpp/output/silo.hpp"
-
-#include "mumps.hpp"
 
 template<typename Mesh, typename Velocity, typename Pressure, typename Assembler>
 auto
@@ -313,7 +311,7 @@ run_stokes(const Mesh& msh, size_t degree, bool use_sym_grad = true)
 
     disk::dynamic_vector<scalar_type> sol = disk::dynamic_vector<scalar_type>::Zero(systsz);
 
-    sol = mumps_lu(assembler.LHS, assembler.RHS);
+    disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, sol);
     //std::ofstream ofs("velocity.dat");
 
     disk::silo_database db;

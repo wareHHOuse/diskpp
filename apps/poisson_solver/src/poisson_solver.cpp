@@ -20,7 +20,7 @@
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 #include "diskpp/output/silo.hpp"
 
 #include "diskpp/methods/implementation_hho/curl.hpp"
@@ -366,8 +366,8 @@ solve(hho_poisson_solver_state<Mesh>& state, const ProblemData& pd)
     auto& hdi = state.hdi;
 
     sol = disk::dynamic_vector<scalar_type>::Zero(assm.syssz);
-    std::cout << "Running MUMPS..." << std::flush;
-    sol = mumps_lu(assm.LHS, assm.RHS);
+    std::cout << "Running solver..." << std::flush;
+    disk::solvers::sparse_lu(assm.LHS, assm.RHS, sol);
     std::cout << "done" << std::endl;
 
     std::cout << "Expanding solution..." << std::flush;

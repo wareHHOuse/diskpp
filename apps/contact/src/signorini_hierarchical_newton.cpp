@@ -137,9 +137,6 @@ class hierarchical_contact_solver
         lua["hs"]  = lua.create_table();
         lua["fem"] = lua.create_table();
 
-        disk::solvers::init_lua(lua);
-        lua["solver"]["feast"] = lua.create_table();
-
         auto r = lua.do_file(config_fn);
 
         if ( !r.valid() )
@@ -228,7 +225,6 @@ class hierarchical_contact_solver
 
         //hho----------------------------------------------------------------------------------
 
-        bool verbose = lua["solver"]["feast"]["verbose"].get_or(false);
         auto tol     = lua["solver"]["fem_tolerance"].get_or(0);
         if (tol > 0 && tol < 16)
             fem_tolerance = std::exp(-tol);
@@ -245,7 +241,7 @@ class hierarchical_contact_solver
 
             mesh_type msh;
             disk::netgen_mesh_loader<T, 2> loader;
-            loader.verbose(verbose);
+            loader.verbose(false);
             if (!loader.read_mesh(input_mesh))
             {
                 std::cout << "Problem loading mesh." << std::endl;

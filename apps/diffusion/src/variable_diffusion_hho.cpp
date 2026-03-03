@@ -36,7 +36,7 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
 
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 /***************************************************************************/
 /* RHS definition */
 template<typename Mesh>
@@ -241,8 +241,8 @@ run_hho_variable_diffusion_solver_RT(const Mesh& msh, const size_t degree, bool 
 
     vector_type sol = vector_type::Zero(systsz);
 
-    std::cout << "Running MUMPS" << std::endl;
-    sol = mumps_lu(assembler.LHS, assembler.RHS);
+    std::cout << "Running solver" << std::endl;
+    disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, sol);
 
     T error = 0.0;
 
@@ -317,8 +317,8 @@ run_hho_variable_diffusion_solver(const Mesh& msh, const size_t degree, bool pri
 
     vector_type sol = vector_type::Zero(systsz);
 
-    std::cout << "Running MUMPS" << std::endl;
-    sol = mumps_lu(assembler.LHS, assembler.RHS);
+    std::cout << "Running solver" << std::endl;
+    disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, sol);
 
     T error = 0.0;
 

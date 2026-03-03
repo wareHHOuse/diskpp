@@ -9,7 +9,7 @@
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/output/silo.hpp"
 
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 template<disk::mesh_2D Mesh>
 struct rhs_functor {
@@ -135,7 +135,7 @@ test_vem_diffusion(const Mesh& msh, size_t degree)
     trips.clear();
 
     std::cout << "Linear solver..." << std::flush;
-    csol = mumps_lu(LHS, RHS);
+    disk::solvers::sparse_lu(LHS, RHS, csol);
     std::cout << "done" << std::endl;
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(msh.points_size());

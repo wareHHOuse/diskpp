@@ -20,7 +20,7 @@
 
 #include "diskpp/methods/hho"
 
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 namespace disk {
 
@@ -119,7 +119,8 @@ diffusion_solver(const Mesh& msh, size_t degree)
     std::cout << "Nonzeros: " << assm.LHS.nonZeros() << std::endl;
 
     tc.tic();
-    disk::dynamic_vector<T> sol = mumps_lu(assm.LHS, assm.RHS);
+    disk::dynamic_vector<T> sol;
+    disk::solvers::sparse_lu(assm.LHS, assm.RHS, sol);
 
     std::cout << "Solver time: " << tc.toc() << std::endl;
 

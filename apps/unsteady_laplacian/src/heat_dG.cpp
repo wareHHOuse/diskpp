@@ -38,7 +38,7 @@
 
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
-#include "diskpp/solvers/solver.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 #include "diskpp/output/silo.hpp"
 #include "diskpp/common/timecounter.hpp"
 #include "diskpp/common/colormanip.h"
@@ -493,8 +493,7 @@ unsteady_laplacian_solver(const Mesh& msh, size_t degree, size_t time_steps, siz
     {
         if(step_i % freq_exp == 0)
             std::cout << "Step " << step_i << std::endl;
-        disk::solvers::pardiso_params<scalar_type> pparams;
-        mkl_pardiso(pparams, LHS, RHS, u);
+        disk::solvers::sparse_lu(LHS, RHS, u);
 
         Matrix<scalar_type, Dynamic, 1> sol_silo = Matrix<scalar_type, Dynamic, 1>::Zero(msh.cells_size());
 

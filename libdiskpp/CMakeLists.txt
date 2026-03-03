@@ -26,8 +26,8 @@ set(LINK_LIBS ${LINK_LIBS} JBURKARDT)
 add_subdirectory(contrib/triangle)
 set(LINK_LIBS ${LINK_LIBS} TRIANGLE)
 
-add_subdirectory(contrib/solver_wrappers)
-set(LINK_LIBS ${LINK_LIBS} SOLVER_WRAPPERS)
+#add_subdirectory(contrib/solver_wrappers)
+#set(LINK_LIBS ${LINK_LIBS} SOLVER_WRAPPERS)
 
 #add_subdirectory(contrib/matplotplusplus)
 #set(LINK_LIBS ${LINK_LIBS} matplot)

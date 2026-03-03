@@ -30,7 +30,7 @@
 #include <sstream>
 
 #include "diskpp/methods/hho"
-#include "diskpp/solvers/solver.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 #include "diskpp/output/gmshConvertMesh.hpp"
 #include "diskpp/output/gmshDisk.hpp"
@@ -236,8 +236,7 @@ class vector_laplacian_solver
       tc.tic();
       m_system_solution = vector_dynamic::Zero(systsz);
 
-      disk::solvers::pardiso_params<scalar_type> pparams;
-      mkl_pardiso(pparams, m_assembler.LHS, m_assembler.RHS, m_system_solution);
+      disk::solvers::sparse_lu(m_assembler.LHS, m_assembler.RHS, m_system_solution);
 
       tc.toc();
       si.time_solver = tc.elapsed();

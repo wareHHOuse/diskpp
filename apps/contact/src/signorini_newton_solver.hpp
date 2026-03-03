@@ -25,7 +25,7 @@
 
 #include "diskpp/methods/hho"
 #include "diskpp/output/silo.hpp"
-#include "diskpp/solvers/solver.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 #include "diskpp/common/colormanip.h"
 #include "common.hpp"
 
@@ -108,9 +108,7 @@ solve_faces(const Mesh&  msh, const Function& rhs_fun, const Analytical& sol_fun
 
         disk::dynamic_vector<T> dsol = disk::dynamic_vector<T>::Zero(systsz);
 
-        disk::solvers::pardiso_params<T> pparams;
-        pparams.report_factorization_Mflops = false;
-        mkl_pardiso(pparams, assembler.LHS, assembler.RHS, dsol);
+        disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, dsol);
 
         T H1_increment = 0.0 ;
         T L2_increment = 0.0 ;
@@ -370,9 +368,7 @@ solve_faces_hier(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
 
         disk::dynamic_vector<T> dsol = disk::dynamic_vector<T>::Zero(systsz);
 
-        disk::solvers::pardiso_params<T> pparams;
-        pparams.report_factorization_Mflops = false;
-        mkl_pardiso(pparams, assembler.LHS, assembler.RHS, dsol);
+        disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, dsol);
 
         T H1_increment = 0.0 ;
         T L2_increment = 0.0 ;
@@ -604,9 +600,7 @@ solve_cells_full(const Mesh&  msh, const Function& rhs_fun, const Analytical& so
 
         disk::dynamic_vector<T> dsol = disk::dynamic_vector<T>::Zero(systsz);
 
-        disk::solvers::pardiso_params<T> pparams;
-        pparams.report_factorization_Mflops = false;
-        mkl_pardiso(pparams, assembler.LHS, assembler.RHS, dsol);
+        disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, dsol);
 
 
         T H1_increment  = 0.0 ;
@@ -870,9 +864,7 @@ solve_cells_full_hier(const Mesh&  msh, const Function& rhs_fun, const Analytica
         disk::dynamic_vector<T> dsol = disk::dynamic_vector<T>::Zero(systsz);
 
         std::cout << "here" << std::endl;
-        disk::solvers::pardiso_params<T> pparams;
-        pparams.report_factorization_Mflops = false;
-        mkl_pardiso(pparams, assembler.LHS, assembler.RHS, dsol);
+        disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, dsol);
 
         //disk::solvers::conjugated_gradient_params<T> cgparams;
         //conjugated_gradient(cgparams, assembler.LHS, assembler.RHS, dsol);

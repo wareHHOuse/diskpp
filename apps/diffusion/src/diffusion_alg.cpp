@@ -33,9 +33,8 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/output/silo.hpp"
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
-//#include "solvers/solver.hpp"
 
 
 
@@ -284,8 +283,8 @@ public:
 
         vector_type sol_faces = vector_type::Zero(systsz);
 
-        std::cout << "Running MUMPS" << std::endl;
-        sol_faces = mumps_lu(assembler.LHS, assembler.RHS);
+        std::cout << "Running solver" << std::endl;
+        disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, sol_faces);
 
         scalar_type error = 0.0;
 
