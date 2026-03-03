@@ -35,7 +35,6 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/output/silo.hpp"
-#include "diskpp/solvers/solver.hpp"
 
 #include "diskpp/output/gmshConvertMesh.hpp"
 #include "diskpp/output/gmshDisk.hpp"

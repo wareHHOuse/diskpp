@@ -23,7 +23,6 @@
  #include "diskpp/common/timecounter.hpp"
  #include "diskpp/output/silo.hpp"
  #include "operators.hpp"
- #include "diskpp/solvers/solver.hpp"
  #include "asm.hpp"
 
 

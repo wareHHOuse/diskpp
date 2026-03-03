@@ -34,7 +34,7 @@
 
 #include "diskpp/methods/hho_assemblers.hpp"
 #include "diskpp/methods/hho_slapl.hpp"
-#include "diskpp/solvers/solver.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 #include "diskpp/solvers/eigensolvers.hpp"
 

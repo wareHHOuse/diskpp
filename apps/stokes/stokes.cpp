@@ -31,10 +31,8 @@
 
 #include "diskpp/methods/hho"
 #include "diskpp/loaders/loader.hpp"
-#include "diskpp/solvers/solver.hpp"
-#include "diskpp/output/silo.hpp"
-
 #include "diskpp/solvers/direct_solvers.hpp"
+#include "diskpp/output/silo.hpp"
 
 template<typename Mesh, typename Velocity, typename Pressure, typename Assembler>
 auto
