@@ -17,7 +17,7 @@
 #include "diskpp/methods/implementation_hho/curl.hpp"
 #include "diskpp/methods/hho_slapl.hpp"
 #include "diskpp/methods/hho_assemblers.hpp"
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 #include "diskpp/common/timecounter.hpp"
 #include "diskpp/output/silo.hpp"
 #include "asm.hpp"
@@ -387,7 +387,9 @@ nitsche_hho_solver(const Mesh& msh, size_t degree, const std::vector<bc>& bcs)
     //std::cout << " Unknowns: " << assm.LHS.rows() << " ";
     //std::cout << " Nonzeros: " << assm.LHS.nonZeros() << std::endl;
     tc.tic();
-    disk::dynamic_vector<scalar_type> sol = mumps_lu(assm.LHS, assm.RHS);
+    std::cout << "Solver: " << std::flush;
+    disk::dynamic_vector<scalar_type> sol;
+    disk::solvers::sparse_lu(assm.LHS, assm.RHS, sol);
     //std::cout << " Solver time: " << tc.toc() << std::endl;
     
     std::vector<scalar_type> u_data;

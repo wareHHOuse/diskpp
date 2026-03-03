@@ -35,7 +35,7 @@
 #include "diskpp/output/gmshDisk.hpp"
 #include "diskpp/output/postMesh.hpp"
 #include "diskpp/output/silo.hpp"
-#include "diskpp/solvers/solver.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 // Return polar angle of p with respect to origin o
 template <typename T>
@@ -366,8 +366,7 @@ auto run_stokes(const Mesh &msh, size_t degree, bool use_sym_grad = true) {
   disk::dynamic_vector<scalar_type> sol =
       disk::dynamic_vector<scalar_type>::Zero(systsz);
 
-  disk::solvers::pardiso_params<scalar_type> pparams;
-  mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, sol);
+  disk::solvers::sparse_ldlt(assembler.LHS, assembler.RHS, sol);
 
   post_processing(msh, assembler, hdi, sol, use_sym_grad);
 

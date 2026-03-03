@@ -31,7 +31,7 @@
  #include "diskpp/methods/hho"
  #include "diskpp/loaders/loader.hpp"
  #include "diskpp/output/silo.hpp"
- #include "diskpp/solvers/solver.hpp"
+ #include "diskpp/solvers/direct_solvers.hpp"
  #include "common.hpp"
 
 template<typename Mesh, typename T, typename Function>
@@ -110,9 +110,7 @@ fix_point_solver_faces(const Mesh& msh,
 
         disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
 
-        disk::solvers::pardiso_params<T> pparams;
-        pparams.report_factorization_Mflops = true;
-        mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+        disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, sol);
 
         T error = 0.0 ;
         disk::dynamic_vector<T> full_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
@@ -275,9 +273,7 @@ fix_point_solver_cells(const Mesh& msh,
 
         disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
 
-        disk::solvers::pardiso_params<T> pparams;
-        pparams.report_factorization_Mflops = true;
-        mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+        disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, sol);
 
         T error = 0.0 ;
         cl_count = 0;

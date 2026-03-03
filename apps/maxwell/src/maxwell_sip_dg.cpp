@@ -22,8 +22,7 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/output/silo.hpp"
 #include "diskpp/methods/dg"
-
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 #include "compinfo.h"
 
@@ -322,16 +321,8 @@ run_maxwell_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_typ
 
     disk::dynamic_vector<scalar_type> sol = disk::dynamic_vector<scalar_type>::Zero(assm.syssz);
 
-    /*
-    std::cout << "Running pardiso" << std::endl;
-    disk::solvers::pardiso_params<scalar_type> pparams;
-    pparams.report_factorization_Mflops = true;
-    mkl_pardiso(pparams, assm.LHS, assm.RHS, sol);
-    */
-    ///*
-    std::cout << "Running MUMPS" << std::endl;
-    sol = mumps_lu(assm.LHS, assm.RHS);
-    //*
+    std::cout << "Running solver" << std::endl;
+    disk::solvers::sparse_lu(assm.LHS, assm.RHS, sol);
 
     std::vector<std::pair<scalar_type, int>> data_ex, data_ey, data_ez, data_diff;
     data_ex.resize(msh.points_size(), std::make_pair(0.0, 0));

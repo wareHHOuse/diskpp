@@ -17,6 +17,7 @@
 
 #include "diskpp/common/eigen.hpp"
 #include "diskpp/solvers/defs.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 namespace disk::solvers {
 
@@ -66,8 +67,13 @@ inv_powiter(const priv::spmat<T>& A,
     for (int i = 0; i < A.rows(); i++)
         muI.insert(i,i) = mu;
     sm M = A - muI;
-    mumps_solver<T> s;
+
+#ifdef HAVE_MUMPS
+    disk::solvers::mumps_solver<T> s;
     s.factorize(M);
+#else
+    Eigen::SparseLU<sm> s(M);
+#endif
     
     dv x = dv::Ones(M.cols());
     x = x/x.norm();
@@ -109,8 +115,14 @@ inv_powiter(const priv::spmat<T>& A,
     using dv = priv::vec<T>;
     
     sm M = A - mu*B;
-    mumps_solver<T> s;
+
+#ifdef HAVE_MUMPS
+    disk::solvers::mumps_solver<T> s;
     s.factorize(M);
+#else
+    Eigen::SparseLU<sm> s(M);
+#endif
+
     dv x = dv::Ones(M.cols());
     x = x/x.norm();
     T lambda = mu;

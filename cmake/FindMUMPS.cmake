@@ -49,7 +49,7 @@ endif()
 ## mpiseq
 if(${MUMPS_SEQUENTIAL_OR_PARALLEL} STREQUAL "Sequential")
     find_library(MUMPS_MPISEQ_LIBRARY
-        NAMES mpiseq
+        NAMES mpiseq mpiseq_seq
         HINTS ENV MUMPS_ROOT ${MUMPS_ROOT}
         PATH_SUFFIXES lib lib64)
     
@@ -67,15 +67,16 @@ endif()
 
 ######################################################################
 ## Extras
-set(extras_libs ptscotch scotch metis pord pord_seq)
-foreach(extra IN LISTS extras_libs)
-    find_library(MUMPS_${extra}_LIBRARY
+set(MUMPS_EXTRAS ptscotch scotch metis pord pord_seq)
+foreach(extra IN LISTS MUMPS_EXTRAS)
+    string(TOUPPER "${extra}" extra_upper)
+    find_library(MUMPS_${extra_upper}_LIBRARY
         NAMES ${extra}
         HINTS ENV MUMPS_ROOT ${MUMPS_ROOT}
         PATH_SUFFIXES lib lib64)
-    if(MUMPS_${extra}_LIBRARY)
-        message(STATUS "MUMPS extra: " ${extra})
-        list(APPEND ${MUMPS_LIBRARIES} ${MUMPS_${extra}_LIBRARY})
+    if(MUMPS_${extra_upper}_LIBRARY)
+        add_library(MUMPS::${extra_upper} UNKNOWN IMPORTED)
+        message(STATUS "Found MUMPS extra: " ${extra})
     endif()
 endforeach()
 
@@ -176,11 +177,11 @@ if (MUMPSZ_INCLUDE_DIR AND MUMPSZ_LIBRARY)
         IMPORTED_LOCATION "${MUMPSZ_LIBRARY}"
         INTERFACE_INCLUDE_DIRECTORIES "${MUMPSZ_INCLUDE_DIR}"
     )
-    set(MUMPS_Z_FOUND TRUE)
+    set(MUMPSZ_FOUND TRUE)
     set(FOUND_SOME_MUMPS TRUE)
     message(STATUS "Found MUMPS complex double precision")
 else()
-    set(MUMPS_Z_FOUND FALSE)
+    set(MUMPSZ_FOUND FALSE)
 endif()
 
 find_package_handle_standard_args(MUMPS
@@ -190,10 +191,16 @@ find_package_handle_standard_args(MUMPS
 )
 
 if (MUMPS_FOUND)
-    message(STATUS "xxx")
     add_library(MUMPS::MUMPS INTERFACE IMPORTED)
 
     target_link_libraries(MUMPS::MUMPS INTERFACE MUMPS::COMMON)
+
+    foreach(extra IN LISTS MUMPS_EXTRAS)
+        string(TOUPPER "${extra}" extra_upper)
+        if (MUMPS_${extra_upper}_FOUND)
+            target_link_libraries(MUMPS::MUMPS INTERFACE MUMPS::${extra_upper})
+        endif()
+    endforeach()
 
     if (MUMPS_MPISEQ_FOUND)
         target_link_libraries(MUMPS::MUMPS INTERFACE MUMPS::MPISEQ)
@@ -201,19 +208,26 @@ if (MUMPS_FOUND)
 
     if (MUMPSS_FOUND)
         target_link_libraries(MUMPS::MUMPS INTERFACE MUMPS::S)
+        target_compile_definitions(MUMPS::MUMPS INTERFACE -DHAVE_MUMPSS)
     endif()
 
     if (MUMPSD_FOUND)
         target_link_libraries(MUMPS::MUMPS INTERFACE MUMPS::D)
+        target_compile_definitions(MUMPS::MUMPS INTERFACE -DHAVE_MUMPSD)
     endif()
 
     if (MUMPSC_FOUND)
         target_link_libraries(MUMPS::MUMPS INTERFACE MUMPS::C)
+        target_compile_definitions(MUMPS::MUMPS INTERFACE -DHAVE_MUMPSC)
     endif()
 
-    if (MUMPS_Z_FOUND)
+    if (MUMPSZ_FOUND)
         target_link_libraries(MUMPS::MUMPS INTERFACE MUMPS::Z)
+        target_compile_definitions(MUMPS::MUMPS INTERFACE -DHAVE_MUMPSZ)
     endif()
+
+    # This is not robust if none of the SDCZ is found
+    target_compile_definitions(MUMPS::MUMPS INTERFACE -DHAVE_MUMPS)
 
 endif()
 
@@ -228,7 +242,5 @@ if (FOUND_SOME_MUMPS)
     if(num_vers GREATER 0)
         target_compile_definitions(MUMPS INTERFACE -DHAVE_MUMPS)
     endif()
-
-    
 endif()
 

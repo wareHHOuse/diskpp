@@ -30,7 +30,7 @@
  #include "diskpp/methods/hho"
  #include "diskpp/loaders/loader.hpp"
  #include "diskpp/output/silo.hpp"
- #include "diskpp/solvers/solver.hpp"
+ #include "diskpp/solvers/direct_solvers.hpp"
  #include "src/common.hpp"
 
 template<typename Mesh>
@@ -118,9 +118,7 @@ public:
 
             disk::dynamic_vector<T> dsol = disk::dynamic_vector<T>::Zero(systsz);
 
-            disk::solvers::pardiso_params<T> pparams;
-            pparams.report_factorization_Mflops = true;
-            mkl_pardiso(pparams, assembler.LHS, assembler.RHS, dsol);
+            disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, dsol);
 
             T error = 0.0 ;
 
@@ -244,9 +242,7 @@ public:
 
         disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
 
-        disk::solvers::pardiso_params<T> pparams;
-        pparams.report_factorization_Mflops = true;
-        mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+        disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, sol);
 
         disk::dynamic_vector<T> diffusion_sol = disk::dynamic_vector<T>::Zero(num_full_dofs);
 
@@ -348,9 +344,7 @@ public:
 
             disk::dynamic_vector<T> dsol = disk::dynamic_vector<T>::Zero(systsz);
 
-            disk::solvers::pardiso_params<T> pparams;
-            pparams.report_factorization_Mflops = true;
-            mkl_pardiso_ldlt(pparams, assembler.LHS, assembler.RHS, dsol);
+            disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, dsol);
 
             T error = 0.0 ;
 
@@ -499,9 +493,7 @@ public:
 
             disk::dynamic_vector<T> dsol = disk::dynamic_vector<T>::Zero(systsz);
 
-            disk::solvers::pardiso_params<T> pparams;
-            pparams.report_factorization_Mflops = true;
-            mkl_pardiso(pparams, assembler.LHS, assembler.RHS, dsol);
+            disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, dsol);
 
             T error = 0.0 ;
 

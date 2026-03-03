@@ -33,7 +33,7 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/output/silo.hpp"
-#include "diskpp/solvers/solver.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 #include "diskpp/common/colormanip.h"
 #include "diskpp/common/timecounter.hpp"
 
@@ -882,9 +882,7 @@ obstacle_solver_strong(const Mesh& msh,
         vector_type sol = vector_type::Zero(systsz);
 
         tc.tic();
-        disk::solvers::pardiso_params<scalar_type> pparams;
-        pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
-        mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+        disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, sol);
         tc.toc();
         std::cout << "    Solution time: " << tc << std::endl;
 
@@ -1025,9 +1023,7 @@ obstacle_solver_nitsche(const Mesh& msh,
         vector_type sol = vector_type::Zero(systsz);
 
         tc.tic();
-        disk::solvers::pardiso_params<scalar_type> pparams;
-        pparams.out_of_core = PARDISO_OUT_OF_CORE_IF_NEEDED;
-        mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+        disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, sol);
         tc.toc();
         std::cout << "    Solution time: " << tc << std::endl;
 

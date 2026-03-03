@@ -10,7 +10,7 @@
 #include "diskpp/methods/implementation_hho/curl.hpp"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/output/silo.hpp"
-#include "diskpp/solvers/solver.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 /***************************************************************************/
 /* RHS definition */
@@ -163,10 +163,7 @@ run_hho_helmholtz_solver(Mesh& msh, size_t degree, const typename Mesh::coordina
     size_t nnz = assembler.LHS.nonZeros();
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(systsz);
-
-    disk::solvers::pardiso_params<T> pparams;
-    pparams.report_factorization_Mflops = true;
-    mkl_pardiso(pparams, assembler.LHS, assembler.RHS, sol);
+    disk::solvers::sparse_lu(assembler.LHS, assembler.RHS, sol);
 
     T l2_error = 0.0;
     T nrg_error = 0.0;

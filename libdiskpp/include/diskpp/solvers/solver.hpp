@@ -22,6 +22,8 @@
 
 #pragma once
 
+#if 0
+
 #include "diskpp/common/eigen.hpp"
 #include "sol/sol.hpp"
 
@@ -433,3 +435,5 @@ linear_solver(sol::state&                          lua,
 
 } // namespace solvers
 } // namespace disk
+
+#endif

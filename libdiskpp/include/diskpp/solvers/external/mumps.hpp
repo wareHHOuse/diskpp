@@ -76,6 +76,8 @@
  */
 #define FORTRAN_MADNESS_MAGIC       -987654
 
+namespace disk::solvers {
+
 namespace mumps_priv {
 
 template<typename T>
@@ -396,5 +398,7 @@ mumps_lu(Eigen::SparseMatrix<T, _Options, _Index>& A, Eigen::Matrix<T, Eigen::Dy
 {
     return mumps_priv::mumps<false>(A,b);
 }
+
+} // namespace disk::solvers
 
 #endif /* HAVE_MUMPS */

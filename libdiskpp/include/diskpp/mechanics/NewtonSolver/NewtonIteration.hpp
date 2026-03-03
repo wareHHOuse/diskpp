@@ -44,7 +44,7 @@
 #include "diskpp/mechanics/NewtonSolver/TimeManager.hpp"
 #include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "diskpp/methods/hho"
-#include "diskpp/solvers/solver.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 namespace disk
 {
@@ -377,12 +377,9 @@ class NewtonIteration
         tc.tic();
         m_system_displ = vector_type::Zero(m_assembler.LHS.rows());
 
-#ifdef HAVE_INTEL_MKL
-        solvers::pardiso_params<scalar_type> pparams;
-        mkl_pardiso(pparams, m_assembler.LHS, m_assembler.RHS, m_system_displ);
-#else
-        throw std::runtime_error("Pardiso is not installed");
-#endif
+
+        disk::solvers::sparse_lu(m_assembler.LHS, m_assembler.RHS, m_system_displ);
+
         tc.toc();
 
         // std::cout << "LHS" << m_assembler.LHS << std::endl;

@@ -43,7 +43,7 @@
 #include "diskpp/methods/dg"
 #include "diskpp/output/silo.hpp"
 
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 /***************************************************************************/
 /* RHS definition */
@@ -227,8 +227,8 @@ run_diffusion_solver(Mesh& msh, size_t degree, const typename Mesh::coordinate_t
 
     disk::dynamic_vector<T> sol = disk::dynamic_vector<T>::Zero(assm.syssz);
 
-    std::cout << "Running MUMPS" << std::endl;
-    sol = mumps_lu(assm.LHS, assm.RHS);
+    std::cout << "Running solver" << std::endl;
+    disk::solvers::sparse_lu(assm.LHS, assm.RHS, sol);
 
     auto sol_fun = make_solution_function(msh);
 

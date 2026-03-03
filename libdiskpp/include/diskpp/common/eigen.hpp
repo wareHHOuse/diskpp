@@ -40,6 +40,7 @@
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
 #include <Eigen/SparseLU>
+#include <Eigen/SparseCholesky>
 #include <unsupported/Eigen/SparseExtra>
 
 #include <Eigen/StdVector>

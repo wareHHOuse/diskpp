@@ -30,6 +30,8 @@
 
 #include <unistd.h>
 
+#include "sol/sol.hpp"
+
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
 #include "diskpp/output/silo.hpp"

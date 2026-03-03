@@ -9,7 +9,7 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/methods/hho"
 
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 #include "diffusion_hho_common.hpp"
 

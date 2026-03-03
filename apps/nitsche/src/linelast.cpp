@@ -18,7 +18,7 @@
 #include "diskpp/methods/implementation_hho/curl.hpp"
 #include "diskpp/methods/hho_slapl.hpp"
 #include "diskpp/methods/hho_assemblers.hpp"
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 #include "diskpp/common/timecounter.hpp"
 #include "diskpp/output/silo.hpp"
 #include "operators.hpp"
@@ -241,10 +241,14 @@ int main(int argc, char **argv) {
     std::cout << "NNZ: " << assm.LHS.nonZeros() << std::endl;
 
     tc.tic();
-    std::cout << "MUMPS: " << std::flush;
-    //disk::dynamic_vector<T> sol = mumps_lu(assm.LHS, assm.RHS);
+    std::cout << "Solver: " << std::flush;
+    disk::dynamic_vector<T> sol;
+    disk::solvers::sparse_lu(assm.LHS, assm.RHS, sol);
+    
+    /*
     Eigen::SparseLU<Eigen::SparseMatrix<T>> solver(assm.LHS);
     disk::dynamic_vector<T> sol = solver.solve(assm.RHS);
+    */
     /*
     disk::dynamic_vector<T> sol = assm.RHS;
     disk::solvers::conjugated_gradient_params<T> cgp;

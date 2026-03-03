@@ -36,9 +36,7 @@
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/mesh/meshgen.hpp"
 #include "diskpp/output/silo.hpp"
-#include "diskpp/solvers/solver.hpp"
-
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 #define MU_0 (4e-7*M_PI)
 #define EPS_0 (8.8541878188e-12)
@@ -149,8 +147,8 @@ int main(int argc, char **argv)
     std::cout << "Mesh elements: " << msh.cells_size() << std::endl;
     std::cout << "Dofs: " << gA.rows() << std::endl;
 
-    std::cout << "Running MUMPS" << std::endl;
-    gx = mumps_lu(gA, gb);
+    std::cout << "Running solver" << std::endl;
+    disk::solvers::sparse_lu(gA, gb, gx);
     
     //Eigen::SparseLU<Eigen::SparseMatrix<SolT>> solver;
     //                solver.compute(gA);
