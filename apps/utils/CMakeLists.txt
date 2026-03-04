@@ -23,3 +23,7 @@ install(TARGETS mkgauss RUNTIME DESTINATION bin)
 add_executable(check_triangle_output check_triangle_output.cpp)
 target_link_libraries(check_triangle_output ${LINK_LIBS})
 install(TARGETS check_triangle_output RUNTIME DESTINATION bin)
+
+add_executable(h5io h5io.cpp)
+target_link_libraries(h5io ${LINK_LIBS})
+install(TARGETS h5io RUNTIME DESTINATION bin)

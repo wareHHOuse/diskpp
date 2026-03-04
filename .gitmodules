@@ -17,3 +17,6 @@
 [submodule "libdiskpp/contrib/matplotplusplus"]
 	path = libdiskpp/contrib/matplotplusplus
 	url = https://github.com/alandefreitas/matplotplusplus/
+[submodule "libdiskpp/contrib/highfive"]
+	path = libdiskpp/contrib/highfive
+	url = https://github.com/highfive-devs/highfive.git

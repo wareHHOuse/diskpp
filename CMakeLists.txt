@@ -88,7 +88,6 @@ set(LINK_LIBS ${LINK_LIBS} MUMPS::MUMPS)
 
 ######################################################################
 ## Eigen3
-#add_subdirectory(contrib/eigen)
 find_package(Eigen3 REQUIRED)
 set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
 
@@ -146,13 +145,6 @@ find_package(SILO REQUIRED)
 if (SILO_FOUND)
     set(LINK_LIBS ${LINK_LIBS} SILO)
 endif()
-
-######################################################################
-## Package: HDF5 Support - To be made optional
-#find_package(HDF5)
-#include_directories(${HDF5_INCLUDE_DIRS})
-#set(LINK_LIBS ${LINK_LIBS} ${HDF5_LIBRARIES})
-#set(HAVE_HDF5 TRUE)
 
 ######################################################################
 ## Package: Lua language support
@@ -242,6 +234,16 @@ set(CMAKE_CXX_FLAGS_RELEASESANITIZED "-O3 -g -fsanitize=address")
 set(SOL2_BUILD_LUA OFF CACHE BOOL "Override sol2 build lua option")
 add_subdirectory(refactor_old_diskpp_code/contrib/sol2)
 set(LINK_LIBS ${LINK_LIBS} sol2::sol2)
+
+######################################################################
+## Package: HDF5 Support - To be made optional
+find_package(HDF5)
+if (HDF5_FOUND)
+    add_subdirectory(libdiskpp/contrib/highfive)
+    add_definitions(-DHAVE_HDF5)
+    set(HAVE_HDF5)
+    set(LINK_LIBS ${LINK_LIBS} HighFive)
+endif()
 
 #include_directories(contrib/sol2/include)
 #include_directories(contrib/sol2/single)

@@ -178,4 +178,117 @@ void dump_sparse_matrix_with_header(Eigen::SparseMatrix<T>& M, const std::string
     ofs.close();
 }
 
-} // end disk
+} //namespace disk
+
+
+
+#ifdef HAVE_HDF5
+
+#include <highfive/highfive.hpp>
+#include <highfive/H5Easy.hpp>
+
+/* To load a sparse matrix saved with this in Matlab,
+ * just use the following commands:
+ *
+ * nrows = h5read("matrix.h5", "/sparsematrix/nrows");
+ * ncols = h5read("matrix.h5", "/sparsematrix/ncols");
+ * is = h5read("matrix.h5", "/sparsematrix/is");
+ * js = h5read("matrix.h5", "/sparsematrix/js");
+ * vals = h5read("matrix.h5", "/sparsematrix/vals");
+ * A = sparse(is+1, js+1, vals, nrows, ncols);
+ */
+
+namespace disk {
+
+template<typename T>
+bool save_to_hdf5(Eigen::SparseMatrix<T>& M, const std::string& filename)
+{
+    M.makeCompressed();
+    int nrows = M.rows();
+    int ncols = M.cols();
+    std::vector<int>    is;
+    std::vector<int>    js;
+    std::vector<T>      vals;
+
+    for (int k=0; k < M.outerSize(); ++k) {
+        for (typename Eigen::SparseMatrix<T>::InnerIterator it(M,k); it; ++it) {
+            is.push_back( it.row() );
+            js.push_back( it.col() );
+            vals.push_back( it.value() );
+        }
+    }
+
+    HighFive::File file(filename, HighFive::File::Truncate);
+    file.createDataSet("/sparsematrix/nrows", nrows);
+    file.createDataSet("/sparsematrix/ncols", ncols);
+    file.createDataSet("/sparsematrix/is", is);
+    file.createDataSet("/sparsematrix/js", js);
+    file.createDataSet("/sparsematrix/vals", vals);
+
+    return true;
+}
+
+template<typename T>
+bool load_from_hdf5(Eigen::SparseMatrix<T>& M, const std::string& filename)
+{
+    using trip_t = Eigen::Triplet<T>;
+    std::vector<trip_t> trips;
+
+    HighFive::File file(filename, HighFive::File::ReadOnly);
+
+    auto nrows_ds = file.getDataSet("/sparsematrix/nrows");
+    auto nrows = nrows_ds.read<int>();
+    auto ncols_ds = file.getDataSet("/sparsematrix/ncols");
+    auto ncols = ncols_ds.read<int>();
+    auto is_ds = file.getDataSet("/sparsematrix/is");
+    auto is = is_ds.read<std::vector<int>>();
+    auto js_ds = file.getDataSet("/sparsematrix/js");
+    auto js = js_ds.read<std::vector<int>>();
+    auto vals_ds = file.getDataSet("/sparsematrix/vals");
+    auto vals = vals_ds.read<std::vector<T>>();
+
+    bool sizes_ok = (is.size() == js.size()) and (js.size() == vals.size());
+    if (not sizes_ok) {
+        return false;
+    } 
+
+    M.resize(nrows, ncols);
+
+    for (size_t i = 0; i < vals.size(); i++) {
+        trips.push_back( {is[i], js[i], vals[i]} );
+    }
+
+    M.setFromTriplets(trips.begin(), trips.end());
+
+    return true;
+}
+
+/* To read dense objects from matlab, just use
+ * 
+ * Z = h5read("dense.h5", "/densematrix");
+ * 
+ * BEWARE THAT MATLAB LOADS THE TRANSPOSE OF WHAT YOU SAVE 
+ */
+
+template<typename T, int nrows, int ncols>
+bool save_to_hdf5(Eigen::Matrix<T, nrows, ncols>& M, const std::string& filename)
+{
+    H5Easy::File file(filename, H5Easy::File::Truncate);
+    H5Easy::dump(file, "/densematrix", M);
+    return true;
+}
+
+template<typename T, int nrows, int ncols>
+bool load_from_hdf5(Eigen::Matrix<T, nrows, ncols>& M, const std::string& filename)
+{
+    using mtype = Eigen::Matrix<T, nrows, ncols>;
+    H5Easy::File file(filename, H5Easy::File::ReadOnly);
+    M = file.getDataSet("/densematrix").read<mtype>();
+    return true;
+}
+
+} // namespace disk
+
+#endif
+
+
