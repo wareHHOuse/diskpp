@@ -12,6 +12,11 @@ target_link_libraries(sfexp ${LUA_LIBRARIES} sol2::sol2 ${LINK_LIBS})
 #target_link_libraries(stabfree_find_bad_poly ${LINK_LIBS})
 #install(TARGETS stabfree_find_bad_poly RUNTIME DESTINATION bin)
 
+add_library(rkernel SHARED src/reconstruction_kernel.cpp)
+set_target_properties(rkernel PROPERTIES PREFIX "")
+set_target_properties(rkernel PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(rkernel ${LUA_LIBRARIES} sol2::sol2 ${LINK_LIBS})
+
 add_executable(hpoly_test src/hpoly_test.cpp)
 target_link_libraries(hpoly_test ${LINK_LIBS})
 install(TARGETS hpoly_test RUNTIME DESTINATION bin)
