@@ -1,3 +1,4 @@
+
 #define SOL_ALL_SAFETIES_ON 1
 #include <sol/sol.hpp>
 
@@ -5,8 +6,7 @@
 #include "diskpp/loaders/loader_utils.hpp"
 #include "diskpp/mesh/meshgen.hpp"
 
-#include "diskpp/bases/bases.hpp"
-#include "diskpp/methods/hho_slapl.hpp"
+#include "diskpp/methods/hho"
 
 static lua_State *gL = nullptr;
 struct config {
@@ -43,21 +43,21 @@ init(sol::this_state L) {
 template<typename Mesh>
 auto
 hho_vlapl(const Mesh& msh,
-    const typename Mesh::cell_type& cl, disk::hho::slapl::degree_info di)
+    const typename Mesh::cell_type& cl, disk::hho_degree_info di)
 {
     const static size_t DIM = Mesh::dimension;
     static_assert(DIM==2 or DIM==3, "Laplacian: only DIM = 2 or DIM = 3");
 
     using scalar_type = typename Mesh::coordinate_type;
     /* Reconstruction space basis */
-    auto rb = disk::make_vector_monomial_basis(msh, cl, di.face);
+    auto rb = disk::make_vector_monomial_basis(msh, cl, di.face_degree());
     auto rbs = rb.size();
 
-    auto cb = disk::make_scalar_monomial_basis(msh, cl, di.cell);
+    auto cb = disk::make_scalar_monomial_basis(msh, cl, di.cell_degree());
     auto cbs = cb.size();
 
     auto fcs = faces(msh, cl);
-    auto fbs = disk::scalar_basis_size(di.face, DIM-1);
+    auto fbs = disk::scalar_basis_size(di.face_degree(), DIM-1);
     auto n_allfacedofs = fcs.size() * fbs;
 
     /* Mass */
@@ -69,7 +69,7 @@ hho_vlapl(const Mesh& msh,
         disk::dynamic_matrix<scalar_type>::Zero(rbs, cbs + n_allfacedofs);
 
     /* mass */
-    auto qps = disk::integrate(msh, cl, di.cell+di.face);
+    auto qps = disk::integrate(msh, cl, di.cell_degree()+di.face_degree());
     for (auto& qp : qps) {
         auto rphi = rb.eval_functions(qp.point());
         M += qp.weight() * rphi * rphi.transpose();
@@ -84,9 +84,9 @@ hho_vlapl(const Mesh& msh,
         auto fcofs = cbs+fbs*fcnum;
         const auto& fc = fcs[fcnum];
 
-        auto fb = disk::make_scalar_monomial_basis(msh, fc, di.face);
+        auto fb = disk::make_scalar_monomial_basis(msh, fc, di.face_degree());
         auto n = normal(msh, cl, fc);
-        auto fqps = disk::integrate(msh, fc, 2*di.face+1);
+        auto fqps = disk::integrate(msh, fc, 2*di.face_degree()+1);
         for (auto& qp : fqps) {
             auto f_phi = fb.eval_functions(qp.point());
             auto r_phi = rb.eval_functions(qp.point());
@@ -106,6 +106,110 @@ hho_vlapl(const Mesh& msh,
     return oper;
 }
 
+template<typename Mesh>
+disk::dynamic_matrix<typename Mesh::coordinate_type>
+corr(const Mesh& msh,
+    const typename Mesh::cell_type& cl, disk::hho_degree_info di)
+{
+    const static size_t DIM = Mesh::dimension;
+    static_assert(DIM==2 or DIM==3, "Laplacian: only DIM = 2 or DIM = 3");
+
+    using scalar_type = typename Mesh::coordinate_type;
+    /* Reconstruction space basis */
+    auto rb = disk::make_scalar_harmonic_top_basis(msh, cl, di.reconstruction_degree());
+    rb.maximum_polynomial_degree(di.cell_degree()+2);
+    auto rbs = rb.size();
+
+    auto cb = disk::make_scalar_monomial_basis(msh, cl, di.cell_degree());
+    auto cbs = cb.size();
+
+    auto fcs = faces(msh, cl);
+    auto fbs = disk::scalar_basis_size(di.face_degree(), DIM-1);
+    auto n_allfacedofs = fcs.size() * fbs;
+
+    using dv = disk::dynamic_vector<scalar_type>;
+    using dm = disk::dynamic_matrix<scalar_type>;
+
+    dm oper = dm::Zero(rbs, cbs + n_allfacedofs);
+
+    //auto qps = disk::integrate(msh, cl, rb.degree() + cb.degree());
+    //for (auto& qp : qps) {
+    //    auto r_dphi = rb.eval_gradients(qp.point());
+    //    auto c_dphi = cb.eval_gradients(qp.point());
+    //    oper.block(0,0,rbs,cbs) += qp.weight() * r_dphi * c_dphi.transpose();
+    //}
+    
+    /* Now the face stuff */
+    for (size_t fcnum = 0; fcnum < fcs.size(); fcnum++) {
+        auto fcofs = cbs+fbs*fcnum;
+        const auto& fc = fcs[fcnum];
+
+        dm FF = dm::Zero(fbs, fbs);
+        dm TF = dm::Zero(fbs, cbs);
+        dm FR = dm::Zero(rbs, fbs);
+
+        auto fb = disk::make_scalar_monomial_basis(msh, fc, di.face_degree());
+        auto n = normal(msh, cl, fc);
+        auto ideg = rb.degree() + std::max(fb.degree(), cb.degree());
+        auto fqps = disk::integrate(msh, fc, ideg );
+        for (auto& qp : fqps) {
+            auto f_phi = fb.eval_functions(qp.point());
+            FF += qp.weight() * f_phi * f_phi.transpose();
+
+            auto c_phi = cb.eval_functions(qp.point());
+            TF += qp.weight() * f_phi * c_phi.transpose();
+
+            auto r_phi = rb.eval_gradients(qp.point());
+            dv r_dphi_n = r_phi*n;
+            
+            FR += qp.weight() * r_dphi_n * f_phi.transpose();
+
+            oper.block(0, 0, rbs, cbs) += qp.weight() *  r_dphi_n * c_phi.transpose();
+            //oper.block(0, fcofs, rbs, fbs) += qp.weight() *  r_dphi_n * f_phi.transpose();
+        }
+
+        //oper.block(0, 0, rbs, cbs) -= FR * FF.ldlt().solve(TF);
+    }
+
+    std::cout << "**********************\n";
+    std::cout << oper/*.leftCols(cbs)*/ << std::endl;
+    std::cout << "**********************\n";
+
+    return oper;
+}
+
+template<disk::mesh_2D Mesh>
+void
+adjust_stabfree_recdeg(const Mesh& msh, const typename Mesh::cell_type& cl,
+    disk::hho_degree_info& hdi)
+{
+    size_t cd = hdi.cell_degree();
+    size_t fd = hdi.face_degree();
+    bool is_mixed_high = (hdi.cell_degree() > hdi.face_degree());
+    size_t n = faces(msh, cl).size();   
+    size_t rpd = cd+2;
+
+    /* HHO space dofs */
+    size_t from = ((cd+2)*(cd+1))/2 + n*(fd+1);
+    /* Reconstruction dofs */
+    size_t to = ((rpd+2)*(rpd+1))/2;
+
+    if (from <= to) {
+        hdi.reconstruction_degree(rpd);
+    }
+    else {
+        /* Every harmonic degree provides 2 additional dofs, therefore
+         * we need an increment that it is sufficient to accomodate
+         * (from-to) dofs => ((from - to) + (2-1))/2 */
+        size_t incr = (from - to + 1)/2;
+        hdi.reconstruction_degree(rpd+incr);
+    }
+
+    std::cout << "F: " << hdi.face_degree() << ", C: " << hdi.cell_degree();
+    std::cout << ", R: " << hdi.reconstruction_degree() << std::endl;
+}
+
+
 void run(const config& cfg)
 {
     auto lua = sol::state_view(gL);
@@ -118,11 +222,12 @@ void run(const config& cfg)
     double scale = 1.0;
     disk::make_single_element_mesh(msh, scale, cfg.vertices);
 
-    using namespace disk::basis;
-    using namespace disk::hho::slapl;
+    auto tr = lua["transform"];
+    if (tr.valid()) {
+        msh.transform(tr);
+    }
 
-    //degree_info di(cfg.degree+1, cfg.degree);
-    degree_info di(cfg.degree);
+    disk::hho_degree_info hdi(cfg.degree+1, cfg.degree);
 
     auto fun = lua["pfun"];
     if (not fun.valid()) {
@@ -136,8 +241,13 @@ void run(const config& cfg)
 
     for (auto& cl : msh)
     {
-        auto [R, A] = local_operator(msh, cl, di);
-        disk::dynamic_vector<T> Iv = local_reduction(msh, cl, di, v);
+        auto [R, A] = disk::make_scalar_hho_laplacian(msh, cl, hdi);
+        disk::dynamic_vector<T> Iv = project_function(msh, cl, hdi, v);
+        if ( lua["kill_interior"].get_or(false) ) {
+            auto k = hdi.cell_degree();
+            auto cbs = (k+2)*(k+1)/2;
+            Iv.segment(0,cbs) = disk::dynamic_vector<T>::Zero(cbs);
+        }
 
         std::cout << "Iv: " << Iv.transpose() << std::endl;
 
@@ -148,9 +258,29 @@ void run(const config& cfg)
         std::cout << "Gradrec S: " << (R*Iv).transpose() << std::endl;
         
         
-        auto G = hho_vlapl(msh, cl, di);
+        auto G = hho_vlapl(msh, cl, hdi);
         
         std::cout << "Gradrec V: " << (G*Iv).transpose() << std::endl;
+    
+        adjust_stabfree_recdeg(msh, cl, hdi);
+
+        auto C = corr(msh, cl, hdi);
+        std::cout << "Corr V: " << (C*Iv).transpose() << std::endl;
+        std::cout << "norm corr:    " << (C*Iv).norm() << std::endl;
+        std::cout << "norm gradrec: " << (R*Iv).norm() << std::endl;
+
+
+        auto oper = disk::make_shl_face_proj_harmonic(msh, cl, hdi);
+        std::cout << "**********************\n";
+        std::cout << oper.first << std::endl;
+        std::cout << "**********************\n";
+        std::cout << (oper.first*Iv).transpose() << std::endl;
+
+        auto oper2 = disk::make_shl_harmonic(msh, cl, hdi);
+        std::cout << "**********************\n";
+        std::cout << oper2.first << std::endl;
+        std::cout << "**********************\n";
+        std::cout << (oper2.first*Iv).transpose() << std::endl;
     }
 }
 
