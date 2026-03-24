@@ -1,0 +1,12 @@
+@PACKAGE_INIT@
+
+get_filename_component(DISKPP_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}" PATH)
+set(CMAKE_MODULE_PATH "${DISKPP_CMAKE_DIR}/cmake" ${CMAKE_MODULE_PATH})
+
+include(CMakeFindDependencyMacro)
+find_dependency(Eigen3 REQUIRED)
+find_dependency(GMSH)
+find_dependency(SILO)
+find_dependency(MUMPS)
+
+include("${CMAKE_CURRENT_LIST_DIR}/DiskppTargets.cmake")
