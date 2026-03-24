@@ -40,14 +40,6 @@ find_package(MUMPS)
 set(LINK_LIBS ${LINK_LIBS} MUMPS::MUMPS)
 
 ######################################################################
-## Package: Threading support
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
-if (COMPILER_IS_CLANG OR COMPILER_IS_INTEL OR COMPILER_IS_GNU)
-    set(LINK_LIBS ${LINK_LIBS} Threads::Threads)
-endif()
-
-######################################################################
 ## Package: Intel MKL support
 set(MKL_INTERFACE_FULL intel_lp64)
 find_package(MKL CONFIG)
@@ -60,7 +52,7 @@ if (MKL_FOUND)
 endif()
 
 ######################################################################
-## Package: LLNL Silo library support - To be made optional
+## Package: LLNL Silo library support
 find_package(SILO REQUIRED)
 if (SILO_FOUND)
     set(LINK_LIBS ${LINK_LIBS} SILO::SILO)
@@ -80,16 +72,33 @@ if (GMSH_FOUND)
     set(LINK_LIBS ${LINK_LIBS} GMSH::GMSH)
 endif()
 
+######################################################################
+## Now DiSk++ sources
+set(LIBDISKPP_SOURCES
+    src/common/util.cpp src/common/mapped_file.cpp src/common/colormanip.cpp
+)
 
-add_library(diskpp SHARED src/common/util.cpp src/common/mapped_file.cpp src/common/colormanip.cpp)
-target_link_libraries(diskpp PUBLIC ${LINK_LIBS})
+######################################################################
+## And the static libraries
+add_library(private_stuff INTERFACE)
 
 add_subdirectory(contrib/jburkardt)
-target_link_libraries(diskpp PRIVATE JBURKARDT)
+target_link_libraries(private_stuff PRIVATE INTERFACE JBURKARDT)
 
 add_subdirectory(contrib/triangle)
-target_link_libraries(diskpp PRIVATE TRIANGLE)
+target_link_libraries(private_stuff PRIVATE INTERFACE TRIANGLE)
 
+######################################################################
+##
+
+
+set(SOL2_BUILD_LUA OFF CACHE BOOL "Override sol2 build lua option")
+add_subdirectory(contrib/sol2)
+set(LINK_LIBS ${LINK_LIBS} sol2::sol2)
+
+add_library(diskpp SHARED ${LIBDISKPP_SOURCES})
+target_link_libraries(diskpp PUBLIC ${LINK_LIBS})
+target_link_libraries(diskpp PRIVATE private_stuff)
 set_target_properties(diskpp PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(diskpp PUBLIC
@@ -99,19 +108,8 @@ target_include_directories(diskpp PUBLIC
 
 add_library(diskpp::diskpp ALIAS diskpp)
 
-include(CMakePackageConfigHelpers)
 
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/DiskppConfigVersion.cmake"
-    VERSION 0.0.0
-    COMPATIBILITY SameMajorVersion
-)
 
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/DiskppConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/DiskppConfig.cmake"
-    INSTALL_DESTINATION lib/cmake/Diskpp
-)
 
 install(TARGETS diskpp
     EXPORT DiskppTargets
@@ -121,25 +119,38 @@ install(TARGETS diskpp
 )
 
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/cmake/"
-        DESTINATION lib/cmake/Diskpp)
+        DESTINATION lib/cmake/diskpp)
 
 install(DIRECTORY include/ DESTINATION include)
 
 install(EXPORT DiskppTargets
     FILE DiskppTargets.cmake
     NAMESPACE diskpp::
-    DESTINATION lib/cmake/Diskpp
+    DESTINATION lib/cmake/diskpp
 )
 
 export(TARGETS diskpp
        NAMESPACE diskpp::
        FILE "${CMAKE_CURRENT_BINARY_DIR}/DiskppTargets.cmake")
 
+export(PACKAGE sol2)
+
 install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/DiskppConfig.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/DiskppConfigVersion.cmake"
-    DESTINATION lib/cmake/Diskpp
+    DESTINATION lib/cmake/diskpp
 )
 
-#install(TARGETS diskpp DESTINATION lib)
-#install(DIRECTORY include/diskpp DESTINATION include)
+
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/DiskppConfigVersion.cmake"
+    VERSION 0.0.0
+    COMPATIBILITY SameMajorVersion
+)
+
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/DiskppConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/DiskppConfig.cmake"
+    INSTALL_DESTINATION lib/cmake/diskpp
+)

@@ -20,3 +20,6 @@
 [submodule "libdiskpp/contrib/highfive"]
 	path = libdiskpp/contrib/highfive
 	url = https://github.com/highfive-devs/highfive.git
+[submodule "libdiskpp/contrib/sol2"]
+	path = libdiskpp/contrib/sol2
+	url = https://github.com/ThePhD/sol2.git
