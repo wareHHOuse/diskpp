@@ -10,7 +10,7 @@
 
 #include "diskpp/common/timecounter.hpp"
 #include "diskpp/output/silo.hpp"
-#include "mumps.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
 
 enum class bicgstab_status {
     undefined,

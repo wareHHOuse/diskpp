@@ -36,6 +36,10 @@ cg_mf(const iterative_solver_params& params, Oper A,
 
     for (size_t iter = 0; iter < params.max_iter; iter++)
     {
+        if (params.verbose) {
+            std::cout << "\rCG iteration " << iter << std::flush;
+        }
+
         double rr = nr/nr0;
         if (rr < params.tol) {
             return iterative_solver_status::converged;
@@ -56,6 +60,10 @@ cg_mf(const iterative_solver_params& params, Oper A,
         d     = Pr1 + beta * d;
 
         nr = r.norm();
+    }
+    
+    if (params.verbose) {
+        std::cout << std::endl;
     }
 
     return iterative_solver_status::hit_max_iter;

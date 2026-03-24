@@ -1,6 +1,8 @@
 #include "diskpp/methods/hho_assemblers.hpp"
 #include "diskpp/methods/hho_slapl.hpp"
-#include "diskpp/solvers/solver.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
+#include "diskpp/solvers/iterative_solvers.hpp"
+#include "diskpp/solvers/eigensolvers.hpp"
 namespace disk {
 
 template<typename Mesh>
@@ -139,7 +141,8 @@ public:
         //std::cout << " Unknowns: " << assm.LHS.rows() << " ";
         //std::cout << " Nonzeros: " << assm.LHS.nonZeros() << std::endl;
         //tc.tic();
-        disk::dynamic_vector<T> sol = mumps_lu(assm.LHS, assm.RHS);
+        disk::dynamic_vector<T> sol;
+        disk::solvers::sparse_lu(assm.LHS, assm.RHS, sol);
         return sol;
     }
 
@@ -312,6 +315,37 @@ xx(const Mesh& msh, size_t degree, RHSFun f)
 }
 #endif
 
+template<disk::mesh_2D Mesh>
+struct rfun {
+    using point_type = typename Mesh::point_type;
+    using scalar_type = typename Mesh::coordinate_type;
+    
+    scalar_type A_, B_, a_, kin_, kout_;
+
+    rfun(scalar_type a, scalar_type kin, scalar_type kout)
+        : A_(2*kout/(kin + kout)),
+          B_(a*a*(kout - kin)/(kin + kout)),
+          a_(a), kin_(kin), kout_(kout)
+    {}
+
+    auto kappa(const point_type& pt) const {
+        auto r = std::hypot(pt.x(), pt.y());
+        if (r < a_)
+            return kin_;
+        return kout_;
+    }
+    
+    auto operator()(const point_type& pt) const {
+        auto r = std::hypot(pt.x(), pt.y());
+        if (r < a_) {
+            return A_ * pt.x();
+        }
+        
+        return pt.x() * (1.0 + B_/(r*r));
+    }
+};
+
+
 template<typename Mesh>
 auto
 dg_diffusion_solver(Mesh& msh, size_t degree,
@@ -323,6 +357,9 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
     typedef Matrix<T, Dynamic, 1>       vector_type;
+
+    using mesh_type = Mesh;
+    using cell_type = typename Mesh::cell_type;
 
     auto basis_rescaling = disk::basis::rescaling_strategy::inertial;
 
@@ -342,6 +379,8 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
                 triplets.push_back( {int(c_ofs+i), int(c_ofs+j), m(i,j)} );
     };
 
+    rfun<Mesh> g(0.5, 1e6, 1.0);
+
     timecounter tc;
     tc.tic();
     for (int cell_i = 0; cell_i < msh.cells_size(); cell_i++)
@@ -349,43 +388,59 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
         const auto& tcl = msh.cell_at(cell_i);
         auto tbasis = disk::basis::scaled_monomial_basis(msh, tcl, degree, basis_rescaling);
         
+        auto alpha = [&](const mesh_type& msh, const cell_type& cl) {
+            auto bar = barycenter(msh, cl);
+            //if (bar.x() > 0.5) {
+            //    return 10.0;
+            //}
+            //return 1.0;
+            return g.kappa(bar);
+        };
+
+        auto my_h = diameter(msh, tcl);
+        auto my_p = degree;
+        auto my_alpha = alpha(msh, tcl);
+
         matrix_type M = integrate(msh, tcl, tbasis, tbasis);
-        matrix_type K = integrate(msh, tcl, grad(tbasis), grad(tbasis));
-        vector_type loc_rhs = integrate(msh, tcl, f, tbasis);
+        matrix_type K = my_alpha * integrate(msh, tcl, grad(tbasis), grad(tbasis));
+        vector_type loc_rhs = vector_type::Zero(tbasis.size());// integrate(msh, tcl, f, tbasis);
         assm_blockdiag(K, cell_i, precond_triplets);
 
         auto fcs = faces(msh, tcl);
         for (auto& fc : fcs)
         {   
             auto n     = normal(msh, tcl, fc);
+            auto hF    = measure(msh, fc);
             
             auto nv = cvf.neighbour_via(msh, tcl, fc);
             if (nv) {
-                matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
-                matrix_type Atn = matrix_type::Zero(tbasis.size(), tbasis.size());
-                
                 auto ncl = nv.value();
                 auto nbasis = disk::basis::scaled_monomial_basis(msh, ncl, degree, basis_rescaling);
                 assert(tbasis.size() == nbasis.size());
 
-                auto my_h = diameter(msh, tcl);
-                auto my_p = degree;
-                auto my_alpha = 1; // diffusion coeff
                 auto other_h = diameter(msh, ncl);
                 auto other_p = degree;
-                auto other_alpha = 1; // diffusion coeff
+                auto other_alpha = alpha(msh, ncl);
+                
+                auto my_omega = other_alpha / (my_alpha + other_alpha);
+                auto other_omega = my_alpha / (my_alpha + other_alpha);
+                auto gamma = Cpen * 2.0*(my_alpha*other_alpha) / (my_alpha + other_alpha);
+                
                 auto eta_l = Cpen * std::max(
                     my_alpha*my_p*(my_p+1)/my_h,
                     other_alpha*other_p*(other_p+1)/other_h
                 );
 
-                Att += + eta_l * integrate(msh, fc, tbasis, tbasis);
-                Att += - 0.5 * integrate(msh, fc, grad(tbasis).dot(n), tbasis);
-                Att += - 0.5 * integrate(msh, fc, tbasis, grad(tbasis).dot(n));
+                matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
+                matrix_type Atn = matrix_type::Zero(tbasis.size(), tbasis.size());
 
-                Atn += - eta_l * integrate(msh, fc, nbasis, tbasis);
-                Atn += - 0.5 * integrate(msh, fc, grad(nbasis).dot(n), tbasis);
-                Atn += + 0.5 * integrate(msh, fc, nbasis, grad(tbasis).dot(n));
+                Att += + (gamma/hF) * integrate(msh, fc, tbasis, tbasis);
+                Att += - (my_alpha * my_omega) * integrate(msh, fc, grad(tbasis).dot(n), tbasis);
+                Att += - (my_alpha * my_omega) * integrate(msh, fc, tbasis, grad(tbasis).dot(n));
+
+                Atn += - (gamma/hF) * integrate(msh, fc, nbasis, tbasis);
+                Atn += - (other_alpha * other_omega) * integrate(msh, fc, grad(nbasis).dot(n), tbasis);
+                Atn += + (other_alpha * other_omega) * integrate(msh, fc, nbasis, grad(tbasis).dot(n));
 
                 assm.assemble(msh, tcl, tcl, Att);
                 assm.assemble(msh, tcl, ncl, Atn);
@@ -393,17 +448,17 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
                 assm_blockdiag(Att, cell_i, precond_triplets);
             }
             else {
-                auto my_h = diameter(msh, tcl);
-                auto my_p = degree;
-                auto my_alpha = 1; // diffusion coeff
                 auto eta_l = Cpen * my_alpha*my_p*(my_p+1)/my_h;
                 
                 matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
-                Att += + eta_l * integrate(msh, fc, tbasis, tbasis);
-                Att += - integrate(msh, fc, grad(tbasis).dot(n), tbasis);
-                Att += - integrate(msh, fc, tbasis, grad(tbasis).dot(n));
+                Att += + Cpen * (my_alpha/hF) * integrate(msh, fc, tbasis, tbasis);
+                Att += - my_alpha * integrate(msh, fc, grad(tbasis).dot(n), tbasis);
+                Att += - my_alpha * integrate(msh, fc, tbasis, grad(tbasis).dot(n));
                 assm.assemble(msh, tcl, tcl, Att);
                 
+                loc_rhs += + Cpen * (my_alpha/hF) * integrate(msh, fc, g, tbasis);
+                loc_rhs += - my_alpha * integrate(msh, fc, g, grad(tbasis).dot(n));
+
                 assm_blockdiag(Att, cell_i, precond_triplets);
             }   
         }
@@ -430,11 +485,16 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
     tc.tic();
     //sol = mumps_lu(assm.LHS, assm.RHS);
     
-    disk::solvers::conjugated_gradient_params<T> cgp;
+    Eigen::SparseLU<Eigen::SparseMatrix<T>> lu(precond);
+    auto precondOper = [&](const dynamic_vector<T>& v) {
+        return lu.solve(v);
+    };
+
+    disk::solvers::iterative_solver_params cgp;
     cgp.verbose = true;
-    cgp.rr_max = 1000;
+    cgp.max_residual = 1000;
     cgp.max_iter = 3*assm.RHS.rows();
-    disk::solvers::conjugated_gradient(cgp, assm.LHS, assm.RHS, sol, precond);
+    disk::solvers::cg(cgp, assm.LHS, assm.RHS, sol, precondOper);
 
     std::cout << " Solver time: " << tc.toc() << std::endl;
 
@@ -453,7 +513,9 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
     evmax_data.reserve(msh.cells_size());
     evmin_data.reserve(msh.cells_size());
 
-    T err = 0.0; size_t cell_i = 0;
+    T err = 0.0;
+    size_t cell_i = 0;
+    T errint = 0.0;
     tc.tic();
     for (auto& cl : msh)
     {
@@ -467,6 +529,12 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
         err += diff.dot(MMe*diff);
         u.push_back( lsol(0) );
 
+        auto qps = integrate(msh, cl, 2*degree);
+        for (auto& qp : qps) {
+            auto val = lsol.dot(cb(qp.point())) - g(qp.point());
+            errint += qp.weight() * val * val;
+        }
+
         Matrix<T, Dynamic, 1> levmax = evmax.segment(cell_i*cb.size(), cb.size());
         evmax_data.push_back(levmax(0));
 
@@ -475,11 +543,47 @@ dg_diffusion_solver(Mesh& msh, size_t degree,
         cell_i++;
     }
     std::cout << " Postpro time: " << tc.toc() << std::endl;
-    std::cout << " L2-norm error: " << std::sqrt(err) << std::endl;;
+    std::cout << " L2-norm error (mass): " << std::sqrt(err) << std::endl;;
+    std::cout << " L2-norm error (int) : " << std::sqrt(errint) << std::endl;;
     silo.add_variable("dstmesh", "u_dg", u, disk::zonal_variable_t);
     silo.add_variable("dstmesh", "evmax_dg", evmax_data, disk::zonal_variable_t);
     silo.add_variable("dstmesh", "evmin_dg", evmin_data, disk::zonal_variable_t);
 
+    /*
+    disk::solvers::feast_eigensolver_params<T> fep;
+    fep.verbose = true;
+    fep.tolerance = 10;
+    fep.min_eigval = 0;
+    fep.max_eigval = 200;
+    fep.max_iter = 50;
+    fep.subspace_size = 20;
+    fep.fis = disk::solvers::feast_inner_solver::mumps;
+
+    dynamic_matrix<T> eigvecs;
+    dynamic_vector<T> eigvals;
+    auto status = disk::solvers::feast(fep, assm.LHS, mass, eigvecs, eigvals);
+    std::cout << status << std::endl;
+    std::cout << eigvals.transpose() << std::endl;
+
+    int i = 0;
+    dynamic_vector<T> eigvals_ref_tmp = dynamic_vector<T>::Zero(81);
+    for (size_t m = 1; m < 10; m++) {
+        for (size_t n = 1; n < 10; n++) {
+            eigvals_ref_tmp(i++) = M_PI*M_PI*(m*m + n*n);
+        }
+    }
+
+    std::sort(eigvals_ref_tmp.begin(), eigvals_ref_tmp.end());
+
+    dynamic_vector<T> eigvals_ref = eigvals_ref_tmp.segment(0, eigvals.size());
+    dynamic_vector<T> eigvals_diff = (eigvals - eigvals_ref).cwiseAbs();
+    dynamic_vector<T> eigvals_relerr =
+        (100 * eigvals_diff.cwiseAbs()).array() / eigvals_ref.cwiseAbs().array();
+
+    std::cout << eigvals_ref.transpose() << std::endl;
+    std::cout << eigvals_relerr.transpose() << std::endl;
+    */
+    
     return sol;
 }
 
