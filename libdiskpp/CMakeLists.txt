@@ -1,5 +1,21 @@
 cmake_minimum_required(VERSION 3.18)
-project(libdiskpp)
+project(libdiskpp VERSION 0.0.0)
+
+include(CheckLanguage)
+
+if ( WIN32 )
+    message(FATAL_ERROR "Sorry, Windows is not supported.")
+endif()
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+######################################################################
+## Additional modules path for cmake
+set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    add_link_options("-Wl,--no-as-needed")
+endif()
 
 ######################################################################
 ## Required C++ standard
@@ -15,27 +31,115 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 ######################################################################
 ## Find Eigen 3
-#find_package(Eigen3 REQUIRED)
-#set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
+find_package(Eigen3 REQUIRED)
+set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
 
-include_directories(include)
+######################################################################
+## MUMPS solver
+find_package(MUMPS)
+set(LINK_LIBS ${LINK_LIBS} MUMPS::MUMPS)
 
-add_subdirectory(contrib/jburkardt)
-set(LINK_LIBS ${LINK_LIBS} JBURKARDT)
+######################################################################
+## Package: Threading support
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+if (COMPILER_IS_CLANG OR COMPILER_IS_INTEL OR COMPILER_IS_GNU)
+    set(LINK_LIBS ${LINK_LIBS} Threads::Threads)
+endif()
 
-add_subdirectory(contrib/triangle)
-set(LINK_LIBS ${LINK_LIBS} TRIANGLE)
+######################################################################
+## Package: Intel MKL support
+set(MKL_INTERFACE_FULL intel_lp64)
+find_package(MKL CONFIG)
+if (MKL_FOUND)
+  set(LINK_LIBS ${LINK_LIBS} MKL::MKL)
+  set(HAVE_INTEL_MKL TRUE)
+  add_compile_definitions(-DHAVE_MKL)
+  add_compile_definitions(-DHAVE_INTEL_MKL)
+  add_compile_definitions(-DHAVE_PARDISO)
+endif()
 
-#add_subdirectory(contrib/solver_wrappers)
-#set(LINK_LIBS ${LINK_LIBS} SOLVER_WRAPPERS)
+######################################################################
+## Package: LLNL Silo library support - To be made optional
+find_package(SILO REQUIRED)
+if (SILO_FOUND)
+    set(LINK_LIBS ${LINK_LIBS} SILO::SILO)
+endif()
 
-#add_subdirectory(contrib/matplotplusplus)
-#set(LINK_LIBS ${LINK_LIBS} matplot)
+######################################################################
+## Package: Lua language support
+find_package(Lua REQUIRED)
+include_directories("${LUA_INCLUDE_DIR}")
+set(LINK_LIBS ${LINK_LIBS} ${LUA_LIBRARIES})
+
+######################################################################
+## Package: GMSH
+find_package(GMSH)
+if (GMSH_FOUND)
+    set(HAVE_GMSH TRUE)
+    set(LINK_LIBS ${LINK_LIBS} GMSH::GMSH)
+endif()
+
 
 add_library(diskpp SHARED src/common/util.cpp src/common/mapped_file.cpp src/common/colormanip.cpp)
-target_link_libraries(diskpp ${LINK_LIBS})
-set_target_properties(diskpp PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_include_directories(diskpp PUBLIC include)
+target_link_libraries(diskpp PUBLIC ${LINK_LIBS})
 
-install(TARGETS diskpp DESTINATION lib)
-install(DIRECTORY include/diskpp DESTINATION include)
+add_subdirectory(contrib/jburkardt)
+target_link_libraries(diskpp PRIVATE JBURKARDT)
+
+add_subdirectory(contrib/triangle)
+target_link_libraries(diskpp PRIVATE TRIANGLE)
+
+set_target_properties(diskpp PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+target_include_directories(diskpp PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
+
+add_library(diskpp::diskpp ALIAS diskpp)
+
+include(CMakePackageConfigHelpers)
+
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/DiskppConfigVersion.cmake"
+    VERSION 0.0.0
+    COMPATIBILITY SameMajorVersion
+)
+
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/DiskppConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/DiskppConfig.cmake"
+    INSTALL_DESTINATION lib/cmake/Diskpp
+)
+
+install(TARGETS diskpp
+    EXPORT DiskppTargets
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/cmake/"
+        DESTINATION lib/cmake/Diskpp)
+
+install(DIRECTORY include/ DESTINATION include)
+
+install(EXPORT DiskppTargets
+    FILE DiskppTargets.cmake
+    NAMESPACE diskpp::
+    DESTINATION lib/cmake/Diskpp
+)
+
+export(TARGETS diskpp
+       NAMESPACE diskpp::
+       FILE "${CMAKE_CURRENT_BINARY_DIR}/DiskppTargets.cmake")
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/DiskppConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/DiskppConfigVersion.cmake"
+    DESTINATION lib/cmake/Diskpp
+)
+
+#install(TARGETS diskpp DESTINATION lib)
+#install(DIRECTORY include/diskpp DESTINATION include)

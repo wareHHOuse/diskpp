@@ -1,4 +1,5 @@
-
+project(triangle)
+cmake_minimum_required(VERSION 3.20)
 
 add_library(triangle_archive STATIC ${CMAKE_CURRENT_SOURCE_DIR}/triangle_mesher.c)
 set_target_properties(triangle_archive PROPERTIES POSITION_INDEPENDENT_CODE ON)
