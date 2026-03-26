@@ -42,14 +42,14 @@
 #include "diskpp/mesh/point.hpp"
 #include "diskpp/quadratures/quadrature_point.hpp"
 
-#include "triangle_dunavant_rule.hpp"
+#include "jburkardt/triangle_dunavant_rule.hpp"
 
 //#define USE_ARBQ
 
 #ifdef USE_ARBQ
-    #include "tetrahedron_arbq_rule.hpp"
+    #include "jburkardt/tetrahedron_arbq_rule.hpp"
 #else
-    #include "simplex_gm_rule.hpp"  /* Has negative weights */
+    #include "jburkardt/simplex_gm_rule.hpp"  /* Has negative weights */
 #endif
 
 namespace disk {

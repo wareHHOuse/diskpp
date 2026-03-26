@@ -6,11 +6,11 @@
 # include <ctime>
 # include <cstring>
 
-#include "jb_common.h"
+#include "jburkardt/jb_common.h"
 
 using namespace std;
 
-# include "triangle_dunavant_rule.hpp"
+#include "jburkardt/triangle_dunavant_rule.hpp"
 
 //****************************************************************************80
 

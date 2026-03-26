@@ -13,8 +13,8 @@
 #include <vector>
 #include "diskpp/quadratures/quadrature_point.hpp"
 #include "diskpp/common/simplicial_formula.hpp"
-#include "simplex_gm_rule.hpp"
 #include "diskpp/quadratures/bits/triquad.hpp"
+#include "jburkardt/simplex_gm_rule.hpp"
 #include <iomanip>
 
 namespace disk {

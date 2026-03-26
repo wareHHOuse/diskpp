@@ -117,37 +117,21 @@ endif()
 ## Triangle
 add_subdirectory(contrib/triangle)
 target_link_libraries(diskpp PUBLIC triangle)
-target_include_directories(diskpp
-    PUBLIC
-        $<TARGET_PROPERTY:triangle,INTERFACE_INCLUDE_DIRECTORIES>
-)
 
 ######################################################################
 ## JBurkardt stuff
 add_subdirectory(contrib/jburkardt)
 target_link_libraries(diskpp PUBLIC jburkardt)
-target_include_directories(diskpp
-    PUBLIC
-        $<TARGET_PROPERTY:jburkardt,INTERFACE_INCLUDE_DIRECTORIES>
-)
 
 ######################################################################
 ## gmsh_tools
 add_subdirectory(contrib/gmsh_tools)
-target_link_libraries(diskpp_deps INTERFACE gmshtools)
-target_include_directories(diskpp
-    PUBLIC
-        $<TARGET_PROPERTY:gmshtools,INTERFACE_INCLUDE_DIRECTORIES>
-)
+target_link_libraries(diskpp PUBLIC gmshtools)
 
 ######################################################################
 ## sgr
 add_subdirectory(contrib/sgr)
 target_link_libraries(diskpp INTERFACE sgr)
-target_include_directories(diskpp
-    PUBLIC
-        $<TARGET_PROPERTY:sgr,INTERFACE_INCLUDE_DIRECTORIES>
-)
 
 
 target_link_libraries(diskpp PUBLIC diskpp_deps)

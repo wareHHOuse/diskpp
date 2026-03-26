@@ -14,8 +14,8 @@
 #include "diskpp/quadratures/quadrature_point.hpp"
 #include <vector>
 
-#include "simplex_gm_rule.hpp"
-#include "tetrahedron_arbq_rule.hpp"
+#include "jburkardt/simplex_gm_rule.hpp"
+#include "jburkardt/tetrahedron_arbq_rule.hpp"
 
 namespace disk
 {

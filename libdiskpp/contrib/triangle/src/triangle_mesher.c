@@ -358,7 +358,7 @@
     #define _FPU_GETCW(cw) // nothing
 #endif /* LINUX */
 #ifdef TRILIBRARY
-#include "triangle_mesher.h"
+#include "triangle/triangle_mesher.h"
 #endif /* TRILIBRARY */
 
 /* A few forward declarations.                                               */

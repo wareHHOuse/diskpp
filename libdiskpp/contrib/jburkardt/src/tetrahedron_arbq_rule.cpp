@@ -8,7 +8,7 @@
 
 using namespace std;
 
-# include "tetrahedron_arbq_rule.hpp"
+# include "jburkardt/tetrahedron_arbq_rule.hpp"
 
 //****************************************************************************80
 
