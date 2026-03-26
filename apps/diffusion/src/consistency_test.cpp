@@ -18,7 +18,7 @@
 #include "diskpp/methods/hho"
 #include "diskpp/bases/bases_utils.hpp"
 
-#include "sgr.hpp"
+#include "sgr/sgr.hpp"
 
 #include <unistd.h>
 #include <numeric>

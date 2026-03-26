@@ -31,8 +31,8 @@
 #include <utility>
 #include <vector>
 
-#include "gmsh_tools/gmshElement.hpp"
-#include "gmsh_tools/gmshMesh.hpp"
+#include "gmshElement.hpp"
+#include "gmshMesh.hpp"
 #include "diskpp/geometry/geometry.hpp"
 #include "diskpp/mesh/point.hpp"
 

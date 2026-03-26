@@ -31,9 +31,9 @@
 #include <utility>
 #include <vector>
 
-#include "gmsh_tools/gmshData.hpp"
-#include "gmsh_tools/gmshElement.hpp"
-#include "gmsh_tools/gmshMesh.hpp"
+#include "gmshData.hpp"
+#include "gmshElement.hpp"
+#include "gmshMesh.hpp"
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/output/gmshDisk.hpp"
 #include "diskpp/output/postMesh.hpp"

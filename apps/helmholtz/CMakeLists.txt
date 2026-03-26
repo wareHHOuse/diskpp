@@ -1,10 +1,11 @@
-set(LINK_LIBS diskpp)
+cmake_minimum_required(VERSION 3.30)
+project(app_template)
+
+######################################################################
+## Required C++ standard
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(helmholtz helmholtz.cpp)
-target_link_libraries(helmholtz ${LINK_LIBS})
-set_target_properties(helmholtz PROPERTIES
-                      CXX_STANDARD 20
-                      CXX_STANDARD_REQUIRED YES
-                      CXX_EXTENSIONS NO)
-
+target_link_libraries(helmholtz diskpp::diskpp)
 install(TARGETS helmholtz RUNTIME DESTINATION bin)

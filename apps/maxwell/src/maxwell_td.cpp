@@ -23,7 +23,7 @@
 #include "diskpp/output/silo.hpp"
 
 #include "diskpp/solvers/direct_solvers.hpp"
-#include "sgr.hpp"
+#include "sgr/sgr.hpp"
 
 template<typename Mesh, typename ScalT = typename Mesh::coordinate_type>
 class maxwell_assembler_condensed

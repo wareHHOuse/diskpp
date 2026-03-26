@@ -30,7 +30,7 @@
 #include "sol/sol.hpp"
 #include "diskpp/solvers/direct_solvers.hpp"
 
-#include "sgr.hpp"
+#include "sgr/sgr.hpp"
 
 template<typename Mesh>
 std::set<size_t>

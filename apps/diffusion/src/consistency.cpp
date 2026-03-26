@@ -16,7 +16,7 @@
 #include "diskpp/bases/bases_utils.hpp"
 #include "diskpp/output/silo.hpp"
 
-#include "sgr.hpp"
+#include "sgr/sgr.hpp"
 
 #include <unistd.h>
 

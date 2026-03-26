@@ -39,6 +39,17 @@ namespace disk
 
 // Bones for the computation of a behavior law at a quadrature point
 
+namespace priv {
+
+/* squelch -fpermissive errors */
+template<typename T, size_t DIM>
+using ppoint = point<T,DIM>;
+
+template<typename T, size_t DIM>
+using qpoint = quadrature_point<T,DIM>;
+
+}
+
 template<typename T, int DIM>
 class law_qp_bones
 {
@@ -51,7 +62,7 @@ class law_qp_bones
 
   protected:
     // coordinat and weight of considered gauss point.
-    point<scalar_type, DIM> m_point;
+    priv::ppoint<scalar_type, DIM> m_point;
     scalar_type             m_weight;
 
     // internal variables at current step
@@ -92,13 +103,13 @@ class law_qp_bones
     {
     }
 
-    quadrature_point<scalar_type, DIM>
+    priv::qpoint<scalar_type, DIM>
     quadrature_point() const
     {
         return make_qp(m_point, m_weight);
     }
 
-    point<scalar_type, DIM>
+    priv::ppoint<scalar_type, DIM>
     point() const
     {
         return m_point;
