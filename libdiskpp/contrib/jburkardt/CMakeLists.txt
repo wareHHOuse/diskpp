@@ -19,4 +19,7 @@ target_include_directories(jburkardt
         $<INSTALL_INTERFACE:include>
 )
 
-install(DIRECTORY include DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+# Pay attention to the fu***n' "/" after include: I lost an afternoon
+# figuring out why cmake was installing in include/include/ and not just in
+# include/ because of that shitty /
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

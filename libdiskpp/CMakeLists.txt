@@ -30,10 +30,6 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 ######################################################################
-## Now the deps
-add_library(diskpp_deps INTERFACE)
-
-######################################################################
 ## Now DiSk++ sources
 set(LIBDISKPP_SOURCES
     src/common/util.cpp src/common/mapped_file.cpp src/common/colormanip.cpp
@@ -43,13 +39,13 @@ add_library(diskpp SHARED ${LIBDISKPP_SOURCES})
 ######################################################################
 ## Find Eigen 3
 find_package(Eigen3 REQUIRED)
-target_link_libraries(diskpp_deps INTERFACE Eigen3::Eigen)
+target_link_libraries(diskpp INTERFACE Eigen3::Eigen)
 
 ######################################################################
 ## MUMPS solver
 find_package(MUMPS)
 if (MUMPS_FOUND)
-    target_link_libraries(diskpp_deps INTERFACE MUMPS::MUMPS)
+    target_link_libraries(diskpp INTERFACE MUMPS::MUMPS)
 endif()
 
 ######################################################################
@@ -57,8 +53,8 @@ endif()
 set(MKL_INTERFACE_FULL intel_lp64)
 find_package(MKL CONFIG)
 if (MKL_FOUND)
-    target_link_libraries(diskpp_deps INTERFACE MKL::MKL)
-    target_compile_definitions(diskpp_deps INTERFACE
+    target_link_libraries(diskpp PUBLIC MKL::MKL)
+    target_compile_definitions(diskpp PUBLIC
         HAVE_MKL
         HAVE_INTEL_MKL
         HAVE_PARDISO
@@ -68,7 +64,7 @@ endif()
 ######################################################################
 ## Package: LLNL Silo library support
 find_package(SILO REQUIRED)
-target_link_libraries(diskpp_deps INTERFACE SILO::SILO)
+target_link_libraries(diskpp PUBLIC SILO::SILO)
 
 
 ######################################################################
@@ -82,15 +78,15 @@ if(Lua_FOUND AND NOT TARGET Lua::Lua)
       INTERFACE_INCLUDE_DIRECTORIES "${LUA_INCLUDE_DIR}"
       INTERFACE_LINK_LIBRARIES "${LUA_LIBRARIES}"
   )
-  target_link_libraries(diskpp_deps INTERFACE Lua::Lua)
+  target_link_libraries(diskpp PRIVATE Lua::Lua)
 endif()
 
 ######################################################################
 ## Package: GMSH
 find_package(GMSH)
 if (GMSH_FOUND)
-    target_link_libraries(diskpp_deps INTERFACE GMSH::GMSH)
-    target_compile_definitions(diskpp_deps INTERFACE
+    target_link_libraries(diskpp PUBLIC GMSH::GMSH)
+    target_compile_definitions(diskpp PUBLIC
         HAVE_GMSH
     )
 endif()
@@ -100,15 +96,22 @@ endif()
 
 set(SOL2_BUILD_LUA OFF CACHE BOOL "Override sol2 build lua option")
 add_subdirectory(contrib/sol2)
-target_link_libraries(diskpp_deps INTERFACE sol2::sol2)
+target_link_libraries(diskpp PUBLIC sol2::sol2)
 
 ######################################################################
 ## HDF5 Support
 find_package(HDF5)
 if (HDF5_FOUND)
-    add_subdirectory(contrib/highfive)
-    target_link_libraries(diskpp_deps INTERFACE HighFive)
-    target_compile_definitions(diskpp_deps INTERFACE 
+    #add_subdirectory(contrib/highfive)
+    #target_link_libraries(diskpp PUBLIC HighFive::HighFive)
+    add_library(diskpp_highfive INTERFACE)
+    target_include_directories(diskpp_highfive INTERFACE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/contrib/highfive/include>
+        $<INSTALL_INTERFACE:include>
+    )
+    add_library(HighFive::HighFive ALIAS diskpp_highfive)
+    target_link_libraries(diskpp PUBLIC HighFive::HighFive HDF5::HDF5)
+    target_compile_definitions(diskpp PUBLIC 
         HAVE_HDF5
     )
 endif()
@@ -134,8 +137,6 @@ add_subdirectory(contrib/sgr)
 target_link_libraries(diskpp INTERFACE sgr)
 
 
-target_link_libraries(diskpp PUBLIC diskpp_deps)
-
 set_target_properties(diskpp PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(diskpp PUBLIC
@@ -146,7 +147,7 @@ target_include_directories(diskpp PUBLIC
 add_library(diskpp::diskpp ALIAS diskpp)
 
 
-install(TARGETS diskpp triangle jburkardt diskpp_deps gmshtools sgr sol2
+install(TARGETS diskpp triangle jburkardt gmshtools sgr sol2 diskpp_highfive
     EXPORT DiskppTargets
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
@@ -156,6 +157,9 @@ install(TARGETS diskpp triangle jburkardt diskpp_deps gmshtools sgr sol2
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/cmake/"
         DESTINATION lib/cmake/diskpp)
 
+# Pay attention to the fu***n' "/" after include: I lost an afternoon
+# figuring out why cmake was installing in include/include/ and not just in
+# include/ because of that shitty /
 install(DIRECTORY include/ DESTINATION include)
 
 install(EXPORT DiskppTargets
@@ -164,11 +168,9 @@ install(EXPORT DiskppTargets
     DESTINATION lib/cmake/diskpp
 )
 
-export(TARGETS diskpp triangle jburkardt diskpp_deps gmshtools sgr sol2
+export(TARGETS diskpp triangle jburkardt gmshtools sgr sol2 diskpp_highfive
        NAMESPACE diskpp::
        FILE "${CMAKE_CURRENT_BINARY_DIR}/DiskppTargets.cmake")
-
-export(PACKAGE sol2)
 
 install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/DiskppConfig.cmake"

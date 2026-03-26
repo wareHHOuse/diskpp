@@ -14,6 +14,7 @@ find_dependency(SILO REQUIRED)
 find_dependency(HDF5)
 find_dependency(GMSH)
 find_dependency(MUMPS)
+find_dependency(MKL HINTS "@MKL_DIR@")
 
 
 include("${CMAKE_CURRENT_LIST_DIR}/DiskppTargets.cmake")
