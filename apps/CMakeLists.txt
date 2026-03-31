@@ -128,3 +128,8 @@ option(BUILD_APP_ACOUSTIC_EIGS "Build acoustic_eigs application" ON)
 if (BUILD_APP_ACOUSTIC_EIGS)
     add_subdirectory(acoustic_eigs)
 endif()
+
+option(BUILD_APP_RUN_PARDISO "Build run_pardiso application" ON)
+if (BUILD_APP_RUN_PARDISO)
+    add_subdirectory(run_pardiso)
+endif()
