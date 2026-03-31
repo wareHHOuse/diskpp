@@ -36,20 +36,20 @@ tfqmr_mf(const iterative_solver_params& params, Oper A,
 
     dv v = precond(A(p));
 
-    double rho = r_tld.dot(r);
-    double alpha = 0.0;
-    double omega = 1.0;
+    T rho = r_tld.dot(r);
+    T alpha = 0.0;
+    T omega = 1.0;
 
     dv d = dv::Zero( b.size() );
     dv w = r;
 
-    double tau = r.norm();
-    double theta = 0.0;
-    double eta = 0.0;
+    T tau = r.norm();
+    T theta = 0.0;
+    T eta = 0.0;
 
     for (int i = 0; i < params.max_iter; i++)
     {
-        double sigma = r_tld.dot(v);
+        T sigma = r_tld.dot(v);
         if (std::abs(sigma) < 1e-30) {
             if (params.verbose) {
                 std::cout << "QMR breakdown at iteration " << i;
@@ -65,7 +65,7 @@ tfqmr_mf(const iterative_solver_params& params, Oper A,
         x += alpha * y;
         w -= alpha * precond(A(u_new));
 
-        double rho_new = r_tld.dot(w);
+        T rho_new = r_tld.dot(w);
         if (std::abs(rho) < 1e-30) {
             if (params.verbose) {
                 std::cout << "QMR breakdown at iteration " << i;
@@ -74,7 +74,7 @@ tfqmr_mf(const iterative_solver_params& params, Oper A,
             return iterative_solver_status::breakdown;
         }
 
-        double beta = rho_new / rho;
+        T beta = rho_new / rho;
         rho = rho_new;
 
         u = w + beta * q;

@@ -26,7 +26,7 @@ cg_mf(const iterative_solver_params& params, Oper A,
     assert( b.size() == x.size() );
 
     double  nr, nr0;
-    double  alpha, beta, rho;
+    T  alpha, beta, rho;
     auto N = b.size();
     dv d(N), r(N), r0(N), y(N), Pr(N), Pr1(N);
 

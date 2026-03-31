@@ -63,8 +63,8 @@ template<typename T>
 bdj_status
 block_jacobi_davidson(const bjd_params& params,
     auto applyA, const priv::spmat<T>& B,
-    priv::vec<T>& eigenvalues,
-    priv::mat<T>& eigenvectors)
+    priv::mat<T>& eigenvectors,
+    priv::vec<T>& eigenvalues)
 {
     const int N = B.rows();
 
@@ -78,9 +78,12 @@ block_jacobi_davidson(const bjd_params& params,
     // them during iteration to save operations
     std::vector<bool> conv(params.block_size, false);
 
+    disk::solvers::iterative_solver_params innerp;
+    innerp.max_iter = params.max_inner_iters;
+
+    double prev_r = 1;
+
     for (int outer = 0; outer < params.max_outer_iters; outer++) {
-        std::cout << "outer: " << outer << std::endl;
-        
         const int M = V.cols();
         dm TA = V.transpose() * applyA(V);
         /* Since we orthonormalized V, the matrix V'*B*V is the
@@ -96,6 +99,10 @@ block_jacobi_davidson(const bjd_params& params,
             V = X.leftCols(params.block_size);
         }
 
+        double maxnorm = 0.0;
+    
+        std::cout << "outer " << outer << ": " << std::flush; 
+
         for (int i_ev = 0; i_ev < params.block_size; i_ev++) {
             if (conv[i_ev]) {
                 continue;
@@ -109,6 +116,8 @@ block_jacobi_davidson(const bjd_params& params,
                 continue;
             }
 
+            maxnorm = std::max(r.norm(), maxnorm);
+
             /* This is the LHS for the correction equation */
             auto corrLHS = [&](const dv& s) -> dv {
                 dv Bs = B*s;
@@ -117,21 +126,36 @@ block_jacobi_davidson(const bjd_params& params,
                 return v2 - B*(xi * xi.dot(v2));
             };
 
-            /* Call QMR to solve the correction equation */
-            disk::solvers::iterative_solver_params innerp;
-            innerp.max_iter = params.max_inner_iters;
+            /* Call iterative solver to solve the correction equation */
+            
             innerp.tol = 0.1*r.norm();
             innerp.verbose = false;
             dv s = dv::Zero( r.rows() );
             using id = disk::solvers::identity;
-            tfqmr_mf(innerp, corrLHS, (-r).eval(), s, id{});
-            
+            auto status = bicgstab_mf(innerp, corrLHS, (-r).eval(), s, id{});
+
+            switch (status)
+            {
+                case iterative_solver_status::converged: std::cout << 'C'; break;
+                case iterative_solver_status::diverged: std::cout << 'D'; break;
+                case iterative_solver_status::hit_max_iter: std::cout << 'I'; break;
+            }
+            std::cout << std::flush;
+
             /* Add the solution to the current search space */
             if (s.norm() > params.expand_thresh) {
                 V.conservativeResize(N, V.cols() + 1);
                 V.col(V.cols() - 1) = s;
             }
         }
+        //std::cout << maxnorm << " " << prev_r << std::endl;
+
+        if ( (maxnorm/prev_r) > 1.1 ) {
+            innerp.max_iter *= 2;
+        }
+        prev_r = maxnorm;
+
+        std::cout << " maxnorm = " << maxnorm << ", subspace size = " << V.cols() << " " << innerp.max_iter << "\n";
 
         /* Check if all the eigenpairs have converged. In that case copy
          * them in the output parameters and return, we're finished.
