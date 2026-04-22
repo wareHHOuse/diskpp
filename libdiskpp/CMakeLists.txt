@@ -70,16 +70,8 @@ target_link_libraries(diskpp PUBLIC SILO::SILO)
 ######################################################################
 ## Package: Lua language support
 find_package(Lua REQUIRED)
-if(Lua_FOUND AND NOT TARGET Lua::Lua)
-  add_library(Lua::Lua INTERFACE IMPORTED)
-  set_target_properties(
-    Lua::Lua
-    PROPERTIES
-      INTERFACE_INCLUDE_DIRECTORIES "${LUA_INCLUDE_DIR}"
-      INTERFACE_LINK_LIBRARIES "${LUA_LIBRARIES}"
-  )
-  target_link_libraries(diskpp PUBLIC Lua::Lua)
-endif()
+target_link_libraries(diskpp PUBLIC ${LUA_LIBRARIES})
+target_include_directories(diskpp PUBLIC ${LUA_INCLUDE_DIR})
 
 ######################################################################
 ## Package: GMSH
