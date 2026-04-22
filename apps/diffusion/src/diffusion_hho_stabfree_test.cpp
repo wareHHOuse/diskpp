@@ -25,7 +25,7 @@
 #include "diskpp/solvers/direct_solvers.hpp"
 #include "diffusion_hho_common.hpp"
 
-#include "sgr.hpp"
+#include "sgr/sgr.hpp"
 
 
 template<typename T>

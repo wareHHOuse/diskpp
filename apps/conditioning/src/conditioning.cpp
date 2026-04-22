@@ -8,7 +8,7 @@
 #include "diskpp/output/silo.hpp"
 #include "diskpp/common/timecounter.hpp"
 
-#include "sgr.hpp"
+#include "sgr/sgr.hpp"
 
 using namespace sgr;
 using namespace disk::basis;

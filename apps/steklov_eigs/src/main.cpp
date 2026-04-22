@@ -29,7 +29,7 @@
 #include "sol/sol.hpp"
 #include "diskpp/solvers/eigensolvers.hpp"
 
-#include "sgr.hpp"
+#include "sgr/sgr.hpp"
 
 #include <Eigen/Eigenvalues>
 

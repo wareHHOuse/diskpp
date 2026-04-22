@@ -109,7 +109,7 @@ struct polygon {
     }
 };
 
-void make_main_hex(std::vector<polygon>& local_polygons)
+inline void make_main_hex(std::vector<polygon>& local_polygons)
 {
     polygon hex;
     hex.add_point( point(0,2) );
@@ -121,7 +121,7 @@ void make_main_hex(std::vector<polygon>& local_polygons)
     local_polygons.push_back(hex);
 }
 
-void add_bottom(std::vector<polygon>& local_polygons,
+inline void add_bottom(std::vector<polygon>& local_polygons,
                 std::map<boundary, std::vector<edge>>& bndedges)
 {
     bndedges[boundary::BOTTOM].push_back( edge(point(0,0), point(3,0)) );
@@ -135,7 +135,7 @@ void add_bottom(std::vector<polygon>& local_polygons,
     local_polygons.push_back( bottom_quad );
 }
 
-void add_top(std::vector<polygon>& local_polygons,
+inline void add_top(std::vector<polygon>& local_polygons,
              std::map<boundary, std::vector<edge>>& bndedges)
 {
     bndedges[boundary::TOP].push_back( edge(point(0,4), point(3,4)) );
@@ -149,7 +149,7 @@ void add_top(std::vector<polygon>& local_polygons,
     local_polygons.push_back( top_quad );
 }
 
-void add_top(std::vector<polygon>& local_polygons)
+inline void add_top(std::vector<polygon>& local_polygons)
 {
     polygon top_hex;
     top_hex.add_point( point(0,4) );
@@ -161,7 +161,7 @@ void add_top(std::vector<polygon>& local_polygons)
     local_polygons.push_back( top_hex );
 }
 
-void add_left(std::vector<polygon>& local_polygons,
+inline void add_left(std::vector<polygon>& local_polygons,
               std::map<boundary, std::vector<edge>>& bndedges)
 {
     bndedges[boundary::LEFT].push_back( edge(point(0,0), point(0,2)) );
@@ -180,7 +180,7 @@ void add_left(std::vector<polygon>& local_polygons,
     local_polygons.push_back(tri_upper);
 }
 
-void add_right(std::vector<polygon>& local_polygons,
+inline void add_right(std::vector<polygon>& local_polygons,
                std::map<boundary, std::vector<edge>>& bndedges)
 {
     bndedges[boundary::RIGHT].push_back( edge(point(4,0), point(4,2)) );
@@ -203,7 +203,7 @@ void add_right(std::vector<polygon>& local_polygons,
     local_polygons.push_back(penta_upper);
 }
 
-void add_right(std::vector<polygon>& local_polygons)
+inline void add_right(std::vector<polygon>& local_polygons)
 {
     polygon hex_lower;
     hex_lower.add_point( point(4,0) );
@@ -236,7 +236,7 @@ struct hexmesh {
     std::map<edge, npair>                   edge_owners;
 };
 
-void
+inline void
 update_geometry(hexmesh& hm, const std::vector<polygon>& polys,
     std::map<boundary, std::vector<edge>>& bndedges)
 {
@@ -259,7 +259,8 @@ update_geometry(hexmesh& hm, const std::vector<polygon>& polys,
     }
 }
 
-void hexmesh_work(hexmesh& hm, size_t xmin, size_t xmax, size_t ymin, size_t ymax)
+inline void
+hexmesh_work(hexmesh& hm, size_t xmin, size_t xmax, size_t ymin, size_t ymax)
 {
     assert( (xmax - xmin) == (ymax - ymin) );
     if ( (xmax - xmin == 4) and (ymax - ymin == 4) )
@@ -308,7 +309,7 @@ void hexmesh_work(hexmesh& hm, size_t xmin, size_t xmax, size_t ymin, size_t yma
     hexmesh_work(hm, (xmax+xmin)/2, xmax, (ymax+ymin)/2, ymax);
 }
 
-size_t ipow(size_t base, size_t exp)
+inline size_t ipow(size_t base, size_t exp)
 {
     size_t ret = 1;
     while (exp--)
@@ -316,7 +317,7 @@ size_t ipow(size_t base, size_t exp)
     return ret;
 }
 
-void make_hexmesh(hexmesh& hm, size_t l)
+inline void make_hexmesh(hexmesh& hm, size_t l)
 {
     //std::cout << "Meshing" << std::endl;
     hm.coord_max = ipow(2,l+2);
@@ -365,7 +366,7 @@ void make_hexmesh(hexmesh& hm, size_t l)
     //    std::cout << "Boundary: " << edges.size() << std::endl;
 }
 
-size_t
+inline size_t
 offset(const hexmesh& hm, const point& pt, bool one_based)
 {
     auto ipt = std::lower_bound(hm.points.begin(), hm.points.end(), pt);

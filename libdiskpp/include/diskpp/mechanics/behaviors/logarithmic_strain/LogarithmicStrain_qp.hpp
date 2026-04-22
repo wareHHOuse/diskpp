@@ -41,6 +41,16 @@ namespace disk
 namespace mechanics
 {
 
+namespace priv {
+/* squelch -fpermissive errors */
+template<typename T, size_t DIM>
+using ppoint = point<T,DIM>;
+
+template<typename T, size_t DIM>
+using qpoint = quadrature_point<T,DIM>;
+
+}
+
 // Routine for Logarithmic Stain
 
 /* For details see the paper:
@@ -149,19 +159,19 @@ class LogarithmicStrain_qp
     }
 
   public:
-    LogarithmicStrain_qp(const point<scalar_type, DIM>& point, const scalar_type& weight)
+    LogarithmicStrain_qp(const priv::ppoint<scalar_type, DIM>& point, const scalar_type& weight)
     {
         m_law_hpp_qp = law_hpp_qp_type(point, weight);
         Pn           = static_tensor<scalar_type, 3>::Zero();
     }
 
-    quadrature_point<scalar_type, DIM>
+    priv::qpoint<scalar_type, DIM>
     quadrature_point() const
     {
         return make_qp(point(), weight());
     }
 
-    point<scalar_type, DIM>
+    priv::ppoint<scalar_type, DIM>
     point() const
     {
         return m_law_hpp_qp.point();

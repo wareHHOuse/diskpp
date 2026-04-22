@@ -30,7 +30,7 @@
 #include "lua_interface.h"
 #include "poisson_solver.h"
 
-#include "sgr.hpp"
+#include "sgr/sgr.hpp"
 
 
 

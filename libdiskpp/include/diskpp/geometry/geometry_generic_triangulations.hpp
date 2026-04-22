@@ -2,7 +2,7 @@
 
 #include "diskpp/common/simplicial_formula.hpp"
 
-#include "triangle_mesher.h"
+#include "triangle/triangle_mesher.h"
 
 namespace disk {
 

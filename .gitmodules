@@ -1,22 +1,12 @@
-[submodule "meshes"]
-	path = refactor_old_diskpp_code/meshes
-	url = https://github.com/datafl4sh/meshes.git
-    branch = master
-[submodule "contrib/sol2"]
-	path = refactor_old_diskpp_code/contrib/sol2
-	url = https://github.com/ThePhD/sol2
-[submodule "contrib/gmsh_tools"]
-	path = refactor_old_diskpp_code/contrib/gmsh_tools
-	url = https://github.com/npaster/gmsh_tools
-[submodule "contrib/eigen"]
-	path = refactor_old_diskpp_code/contrib/eigen
-	url = https://gitlab.com/libeigen/eigen.git
-[submodule "contrib/sgr"]
-	path = refactor_old_diskpp_code/contrib/sgr
-	url = https://github.com/datafl4sh/sgr
-[submodule "libdiskpp/contrib/matplotplusplus"]
-	path = libdiskpp/contrib/matplotplusplus
-	url = https://github.com/alandefreitas/matplotplusplus/
 [submodule "libdiskpp/contrib/highfive"]
 	path = libdiskpp/contrib/highfive
 	url = https://github.com/highfive-devs/highfive.git
+[submodule "libdiskpp/contrib/sol2"]
+	path = libdiskpp/contrib/sol2
+	url = https://github.com/ThePhD/sol2.git
+[submodule "libdiskpp/contrib/gmsh_tools"]
+	path = libdiskpp/contrib/gmsh_tools
+	url = https://github.com/datafl4sh/gmsh_tools.git
+[submodule "libdiskpp/contrib/sgr"]
+	path = libdiskpp/contrib/sgr
+	url = https://github.com/datafl4sh/sgr.git

@@ -1,8 +1,12 @@
-cmake_minimum_required(VERSION 3.18)
-project(diskpp_steklov_eigsolver)
+cmake_minimum_required(VERSION 3.30)
+project(app_template)
 
-set(LINK_LIBS diskpp)
+######################################################################
+## Required C++ standard
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 
 add_executable(steklov src/main.cpp)
-target_link_libraries(steklov ${LINK_LIBS})
+target_link_libraries(steklov diskpp::diskpp)
 install(TARGETS steklov RUNTIME DESTINATION bin)

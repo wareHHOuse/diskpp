@@ -4,11 +4,11 @@
 # include <cmath>
 # include <ctime>
 
-#include "jb_common.h"
+#include "jburkardt/jb_common.h"
 
 using namespace std;
 
-# include "simplex_gm_rule.hpp"
+# include "jburkardt/simplex_gm_rule.hpp"
 
 //****************************************************************************80
 

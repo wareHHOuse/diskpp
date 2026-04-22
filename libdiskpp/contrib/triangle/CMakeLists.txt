@@ -1,10 +1,19 @@
+project(triangle)
+cmake_minimum_required(VERSION 3.20)
 
 
-add_library(triangle_archive STATIC ${CMAKE_CURRENT_SOURCE_DIR}/triangle_mesher.c)
-set_target_properties(triangle_archive PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_compile_definitions(triangle_archive PUBLIC -DTRILIBRARY -DREDUCED -DCDT_ONLY)
+add_library(triangle STATIC src/triangle_mesher.c)
+set_target_properties(triangle PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_definitions(triangle PUBLIC -DTRILIBRARY -DREDUCED -DCDT_ONLY)
 
-add_library(TRIANGLE INTERFACE)
-target_link_libraries(TRIANGLE INTERFACE triangle_archive)
-target_include_directories(TRIANGLE INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
+target_include_directories(triangle
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
+
+# Pay attention to the fu***n' "/" after include: I lost an afternoon
+# figuring out why cmake was installing in include/include/ and not just in
+# include/ because of that shitty /
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
