@@ -1,7 +1,7 @@
 /*
  * DISK++, a template library for DIscontinuous SKeletal methods.
  *
- * Matteo Cicuttin (C) 2023
+ * Matteo Cicuttin (C) 2023-2026
  * matteo.cicuttin@polito.it
  *
  * Politecnico di Torino - DISMA
@@ -63,7 +63,7 @@
 #include <iostream>
 
 #include "diskpp/solvers/defs.hpp"
-
+#include "diskpp/solvers/matrix_free_solvers.hpp"
 #include "feast_common.hpp"
 
 namespace disk::solvers {
@@ -96,14 +96,15 @@ namespace disk::solvers {
  */
 
 feast_status
-feast(const feast_eigensolver_params<double>& params,
-    const priv::spmat<double>& A,
+feast_mf(const feast_eigensolver_params<double>& params,
+    auto apply_A,
     const priv::spmat<double>& B,
     priv::mat<double>& eigvecs,
     priv::vec<double>& eigvals)
 {
     using complex = std::complex<double>;
     using rdv = priv::vec<double>;
+    using cdv = priv::vec<complex>;
     using rdm = priv::mat<double>;
     using cdm = priv::mat<complex>;
     using csm = priv::spmat<complex>;
@@ -113,18 +114,16 @@ feast(const feast_eigensolver_params<double>& params,
     const double *xs = quadrature_xs;
     const double *omegas = quadrature_ws;
 
-    bool A_square = A.rows() == A.cols();
     bool B_square = B.rows() == B.cols();
-    bool A_B_same_size = (A.rows() == B.rows()) and (A.cols() == B.cols());
 
-    if ( (not A_square) or (not B_square) or (not A_B_same_size) ) {
+    if ( not B_square ) {
         if (params.verbose) {
             std::cout << "FEAST: invalid input" << std::endl;
         }
         return feast_status::invalid_input;
     }
 
-    auto N = A.rows();
+    auto N = B.rows();
     auto M0 = params.subspace_size;
     auto r = (params.max_eigval - params.min_eigval)/2.0;
 
@@ -143,40 +142,55 @@ feast(const feast_eigensolver_params<double>& params,
         
         /* Subspace projection */
         for (size_t e = 0; e < 8; e++) {
+            if (params.verbose) {
+                std::cout << "Point " << e << ": " << std::flush;
+            }
             auto x_e = xs[e];
             auto theta_e = -(M_PI/2.)*(x_e-1.);
             auto mid = (params.max_eigval + params.min_eigval)/2.0;
             auto Z_e = mid + r*std::exp( std::complex<double>(0.0, theta_e) );
-            csm lhs = Z_e*B - std::complex<double>(1.0, 0.0)*A;
             
-            cdm Qe;
-            switch(params.fis) {
-                case feast_inner_solver::eigen_sparselu: {
-                    Eigen::SparseLU<csm> solver;
-                    solver.compute(lhs);
-                    if(solver.info() != Eigen::Success) {
-                        std::cout << "FEAST: SparseLU failed" << std::endl;
-                        return feast_status::inner_solver_problem;
-                    }
-                    Qe = solver.solve(Yc);
-                } break;
+            auto lhs_oper = [&](const cdv& v) -> cdv {
+                rdv Re_v = v.real();
+                rdv Im_v = v.imag();
+                rdv Re_Av = apply_A(Re_v);
+                rdv Im_Av = apply_A(Im_v);
+                return Z_e*B*v - Re_Av - complex(0.0, 1.0)*Im_Av;
+            };
 
-                case feast_inner_solver::mumps: {
-#ifdef HAVE_MUMPS
-                    Qe = mumps_lu(lhs, Yc);
-#else
-                    throw std::runtime_error("Mumps is not installed");
-#endif /* HAVE_MUMPS */
+            cdm Qe = cdm::Zero(Yc.rows(), Yc.cols());
+            for (int i = 0; i < Yc.cols(); i++) {
+                cdv s = cdv::Zero( Yc.rows() );
+                using id = disk::solvers::identity;
+                disk::solvers::iterative_solver_params innerp;
+                innerp.max_iter = 2*Yc.rows();
+                innerp.tol = 1e-9;
+                auto status = bicgstab_mf(innerp, lhs_oper,
+                    Yc.col(i).eval(), s, id{});
+                Qe.col(i) = s;
+
+                if (params.verbose) {
+                    switch (status) {
+                        case iterative_solver_status::converged:
+                            std::cout << 'C'; break;
+                        case iterative_solver_status::diverged:
+                            std::cout << 'D'; break;
+                        case iterative_solver_status::hit_max_iter:
+                            std::cout << 'I'; break;
+                    }
+                    std::cout << std::flush;
                 }
             }
 
             cdm T = r * std::exp(std::complex<double>(0.0, theta_e)) * Qe;
             auto omega_e = omegas[e];
             Q = Q - (omega_e/2.0)*T.real();
+
+            std::cout << "\n";
         }
 
         /* Form matrices for reduced problem */
-        rdm Aq = Q.transpose() * A * Q;
+        rdm Aq = Q.transpose() * apply_A(Q);
         rdm Bq = Q.transpose() * B * Q;
 
         /* Estimate the number of eigenvalues and check subspace size */
@@ -230,7 +244,7 @@ feast(const feast_eigensolver_params<double>& params,
         /* Compute residual and eigenvalue trace to check convergence */
         auto rmax = std::abs(std::max(params.min_eigval, params.max_eigval));
         rdm BX = B * eigvecs;
-        rdm residual = A * eigvecs - BX * eigvals.asDiagonal();
+        rdm residual = apply_A(eigvecs) - BX * eigvals.asDiagonal();
         
         double maxres = 0.0;
         for (size_t i = 0; i < residual.cols(); i++) {

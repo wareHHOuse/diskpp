@@ -86,19 +86,25 @@ int main(int argc, char **argv)
     mesher.make_level(2);
     */
 
-    disk::cartesian_mesh<T, 2> msh;
-    auto mesher = disk::make_simple_mesher(msh);
-    for (size_t i = 0; i < n_refs; i++) {
-        mesher.refine();
-    }
+    //disk::cartesian_mesh<T, 2> msh;
+    //auto mesher = disk::make_simple_mesher(msh);
+    //for (size_t i = 0; i < n_refs; i++) {
+    //    mesher.refine();
+    //}
+
+    using mesh_type = disk::simplicial_mesh<T,2>;
+    mesh_type msh;
+    disk::gmsh_geometry_loader< mesh_type > loader;
+    loader.read_mesh("inclusion.geo");
+    loader.populate_mesh(msh);
 
     /*
     msh.transform(
         [](const disk::point<T,2>& pt) {
-            auto newx = std::pow(pt.x(), 2);
-            auto newy = pt.y()+std::sin(2.0*M_PI*pt.y())*0.1;
-            //auto newx = pt.x() + 0.25*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
-            //auto newy = pt.y();
+            //auto newx = std::pow(pt.x(), 2);
+            //auto newy = pt.y()+std::sin(2.0*M_PI*pt.y())*0.1;
+            auto newx = pt.x() + 0.125*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+            auto newy = pt.y() + 0.125*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
             return disk::point<T,2>( newx, newy );
         }
     );

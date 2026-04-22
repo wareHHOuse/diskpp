@@ -78,7 +78,7 @@ if(Lua_FOUND AND NOT TARGET Lua::Lua)
       INTERFACE_INCLUDE_DIRECTORIES "${LUA_INCLUDE_DIR}"
       INTERFACE_LINK_LIBRARIES "${LUA_LIBRARIES}"
   )
-  target_link_libraries(diskpp PRIVATE Lua::Lua)
+  target_link_libraries(diskpp PUBLIC Lua::Lua)
 endif()
 
 ######################################################################
