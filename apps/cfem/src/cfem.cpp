@@ -22,158 +22,282 @@
 
 #include <iostream>
 #include <regex>
+#include <optional>
 
 #include "diskpp/loaders/loader.hpp"
+#include "diskpp/loaders/loader_gmsh.hpp"
 
 #include "diskpp/cfem/cfem.hpp"
 #include "diskpp/output/silo.hpp"
+#include "diskpp/mesh/meshgen.hpp"
+
 
 template<typename T>
-void
-cfem_solver(const disk::simplicial_mesh<T, 2>& msh)
+struct cfem_solver_state
 {
-    auto f = [](const typename disk::simplicial_mesh<T, 2>::point_type& pt) -> auto {
-        return sin(pt.x()) * sin(pt.y());
+    using mesh_type = disk::simplicial_mesh<T,2>;
+    using spmat = Eigen::SparseMatrix<T>;
+    using dvec = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+
+    mesh_type                               msh;
+    std::vector<std::optional<T>>           dirichlet_values;
+    std::vector<std::optional<size_t>>      compress_map;
+    std::vector<size_t>                     expand_map;
+
+    spmat           K;
+    dvec            u, f;
+};
+
+template<typename T>
+struct cfem_solver_state_transient
+{
+    using mesh_type = disk::simplicial_mesh<T,2>;
+    using spmat = Eigen::SparseMatrix<T>;
+    using dvec = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+
+    mesh_type                               msh;
+    std::vector<std::optional<T>>           dirichlet_values;
+
+    Eigen::SparseLU<spmat> lu_M;
+
+    spmat           K, M;
+    dvec            u, f;
+    T               dt;
+};
+
+template<typename T>
+void init_maps_steady(cfem_solver_state<T>& state)
+{
+    std::vector<std::pair<int, T>>  dirichlet_vals {
+        {11, 1.0},
+        {10, 0.0},
     };
 
-    typedef Eigen::SparseMatrix<T>  sparse_matrix_type;
-    typedef Eigen::Triplet<T>       triplet_type;
+    state.dirichlet_values.resize(
+        state.msh.points_size()
+    );
 
-    std::vector<bool> dirichlet_nodes( msh.points_size() );
-    for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++)
-    {
-        auto fc = *itor;
-        auto ptids = fc.point_ids();
-        dirichlet_nodes.at(ptids[0]) = true;
-        dirichlet_nodes.at(ptids[1]) = true;
+    for (auto& fc : faces(state.msh)) {
+        auto bi = state.msh.boundary_info(fc);
+        if ( bi.is_boundary() ) {
+            auto ptids = fc.point_ids();
+            for (const auto& [tag, value] : dirichlet_vals) {
+                if (tag == bi.tag()) {
+                    state.dirichlet_values[ptids[0]] = value;
+                    state.dirichlet_values[ptids[1]] = value;
+                }
+            }
+        }
     }
 
-    std::vector<size_t> compress_map, expand_map;
-    compress_map.resize( msh.points_size() );
-    size_t system_size = std::count_if(dirichlet_nodes.begin(), dirichlet_nodes.end(), [](bool d) -> bool {return !d;});
-    expand_map.resize( system_size );
+    size_t system_size = 0;
+    for (const auto& dv : state.dirichlet_values) {
+        if (not dv) {
+            system_size++;
+        }
+    }
 
-    auto nnum = 0;
-    for (size_t i = 0; i < msh.points_size(); i++)
-    {
-        if ( dirichlet_nodes.at(i) )
+    state.compress_map.resize( state.msh.points_size() );
+    state.expand_map.resize( system_size );
+
+    size_t nnum = 0;
+    for (size_t i = 0; i < state.msh.points_size(); i++) {
+        if ( state.dirichlet_values[i] ) {
             continue;
+        }
 
-        expand_map.at(nnum) = i;
-        compress_map.at(i) = nnum++;
+        state.expand_map[nnum] = i;
+        state.compress_map[i] = nnum++;
     }
 
-    sparse_matrix_type              gA(system_size, system_size);
-    disk::dynamic_vector<T>               gb(system_size), gx(system_size);
+    state.K = typename cfem_solver_state<T>::spmat(system_size, system_size);
+    state.u = cfem_solver_state<T>::dvec::Zero(system_size);
+    state.f = cfem_solver_state<T>::dvec::Zero(system_size);
+}
 
-    gb = disk::dynamic_vector<T>::Zero(system_size);
+template<typename T>
+void init(cfem_solver_state_transient<T>& state)
+{
+    std::vector<std::pair<int, T>>  dirichlet_vals {
+        {13, 1.0},
+        {14, 1.0},
+        {15, 1.0},
+        {11, 0.0},
+        {10, 0.0}
+    };
 
+    state.dirichlet_values.resize(
+        state.msh.points_size()
+    );
 
+    for (auto& fc : faces(state.msh)) {
+        auto bi = state.msh.boundary_info(fc);
+        if ( bi.is_boundary() ) {
+            auto ptids = fc.point_ids();
+            for (const auto& [tag, value] : dirichlet_vals) {
+                if (tag == bi.tag()) {
+                    state.dirichlet_values[ptids[0]] = value;
+                    state.dirichlet_values[ptids[1]] = value;
+                }
+            }
+        }
+    }
+
+    size_t system_size = state.msh.points_size();
+
+    state.K = typename cfem_solver_state<T>::spmat(system_size, system_size);
+    state.M = typename cfem_solver_state<T>::spmat(system_size, system_size);
+    state.u = cfem_solver_state<T>::dvec::Zero(system_size);
+    state.f = cfem_solver_state<T>::dvec::Zero(system_size);
+}
+
+template<typename T>
+void assemble_steady(cfem_solver_state<T>& state)
+{
+    using triplet_type = Eigen::Triplet<T>;
     std::vector<triplet_type>       triplets;
 
-    //T integral = 0.0;
+    auto f = [](const typename disk::simplicial_mesh<T, 2>::point_type& pt) -> auto {
+        return 0.0;
+        return 2.0 * M_PI * M_PI *std::sin(M_PI*pt.x()) * std::sin(M_PI*pt.y());
+    };
 
-    for (auto& cl : msh)
+    for (const auto& cl : state.msh)
     {
         disk::static_matrix<T, 2, 2> kappa = disk::static_matrix<T, 2, 2>::Zero();
-        auto bar = barycenter(msh, cl);
 
-        auto c = std::cos(M_PI * bar.x()/0.02);
-        auto s = std::sin(M_PI * bar.y()/0.02);
-        auto eps = 1 + 100*c*c*s*s;// + std::exp( (bar.x()*bar.x() + bar.y()*bar.y())/2. );
-        kappa(0,0) = eps;
-        kappa(1,1) = eps;
+        kappa(0,0) = 1.0;
+        kappa(1,1) = 1.0;
 
-        auto A = disk::cfem::stiffness_matrix(msh, cl, kappa);
-        auto b = disk::cfem::make_rhs(msh, cl, f);
+        auto loc_K = disk::cfem::stiffness_matrix(state.msh, cl, kappa);
+        auto loc_f = disk::cfem::make_rhs(state.msh, cl, f);
 
         auto ptids = cl.point_ids();
 
-        for (size_t i = 0; i < A.rows(); i++)
+        for (size_t i = 0; i < loc_K.rows(); i++)
         {
-            if ( dirichlet_nodes.at(ptids[i]) )
+            if ( state.dirichlet_values[ptids[i]] ) {
                 continue;
-
-            for (size_t j = 0; j < A.cols(); j++)
-            {
-                if ( dirichlet_nodes.at(ptids[j]) )
-                    continue;
-
-                triplets.push_back( triplet_type(compress_map.at(ptids[i]),
-                                                 compress_map.at(ptids[j]),
-                                                 A(i,j)) );
             }
 
-            gb(compress_map.at(ptids[i])) += b(i);
+            auto ci = state.compress_map[ptids[i]].value();
+
+            for (size_t j = 0; j < loc_K.cols(); j++)
+            {
+                if ( state.dirichlet_values[ptids[j]] ) {
+                    auto value = *state.dirichlet_values[ptids[j]];
+                    state.f(ci) -= value * loc_K(i,j);
+                    continue;
+                }
+                auto cj = state.compress_map[ptids[j]].value();
+                triplets.push_back( triplet_type(ci, cj, loc_K(i,j)) );
+            }
+
+            state.f(ci) += loc_f(i);
         }
     }
 
-    gA.setFromTriplets(triplets.begin(), triplets.end());
+    state.K.setFromTriplets(triplets.begin(), triplets.end());
+}
 
-#ifdef HAVE_INTEL_MKL
-        Eigen::PardisoLU<Eigen::SparseMatrix<T>>  solver;
-        //solver.pardisoParameterArray()[59] = 0; //out-of-core
-#else
-        Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
-#endif
+template<typename T>
+void assemble(cfem_solver_state_transient<T>& state)
+{
+    using triplet_type = Eigen::Triplet<T>;
+    std::vector<triplet_type>       triplets_K;
+    std::vector<triplet_type>       triplets_M;
 
-        size_t systsz = gA.rows();
-        size_t nnz = gA.nonZeros();
+    auto f = [](const typename disk::simplicial_mesh<T, 2>::point_type& pt) -> auto {
+        return 0.0;
+    };
 
-        std::cout << "Starting linear solver..." << std::endl;
-        std::cout << " * Solving for " << systsz << " unknowns." << std::endl;
-        std::cout << " * Matrix fill: " << 100.0*double(nnz)/(systsz*systsz) << "%" << std::endl;
+    for (const auto& cl : state.msh)
+    {
+        disk::static_matrix<T, 2, 2> kappa = disk::static_matrix<T, 2, 2>::Zero();
 
-        solver.analyzePattern(gA);
-        solver.factorize(gA);
-        gx = solver.solve(gb);
+        auto bar = barycenter(state.msh, cl);
 
-        disk::dynamic_vector<T> e_gx(msh.points_size());
-        e_gx = disk::dynamic_vector<T>::Zero(msh.points_size());
-
-        for (size_t i = 0; i < gx.size(); i++)
-            e_gx( expand_map.at(i) ) = gx(i);
-
-        std::ofstream ofs("solution.dat");
-
-        std::vector<double> solution_vals, solution_vals_nodes;
-        solution_vals.reserve(msh.cells_size());
-        solution_vals_nodes.resize(msh.points_size());
-
-        size_t cellnum = 0;
-        for (auto& cl : msh)
-        {
-            auto bar = barycenter(msh, cl);
-            auto phi = disk::cfem::eval_basis(msh, cl, bar);
-            auto ptids = cl.point_ids();
-
-            double val = 0.0;
-            for (size_t i = 0; i < 3; i++)
-                val += e_gx( size_t(ptids[i]) ) * phi(i);
-
-            ofs << bar.x() << " " << bar.y() << " " << val << std::endl;
-            solution_vals.push_back(val);
-            cellnum++;
+        if (bar.x() < 0.9) {
+            kappa(0,0) = 0.1;
+            kappa(1,1) = 0.1;
+        } else {
+            kappa(0,0) = 0.1;
+            kappa(1,1) = 0.001;
         }
 
-        ofs.close();
+        auto loc_K = disk::cfem::stiffness_matrix(state.msh, cl, kappa);
+        auto loc_M = disk::cfem::mass_matrix(state.msh, cl);
+        auto loc_f = disk::cfem::make_rhs(state.msh, cl, f);
 
+        auto ptids = cl.point_ids();
 
-        disk::silo_database silo_db;
-        silo_db.create("test.silo");
-        silo_db.add_mesh(msh, "test");
+        for (size_t i = 0; i < loc_K.rows(); i++)
+        {
+            auto ci = ptids[i];
+            for (size_t j = 0; j < loc_K.cols(); j++)
+            {
+                auto cj = ptids[j];
+                triplets_K.push_back( triplet_type(ci, cj, loc_K(i,j)) );
+                triplets_M.push_back( triplet_type(ci, cj, loc_M(i,j)) );
+            }
 
-        disk::silo_zonal_variable<double> u("u", solution_vals);
-        silo_db.add_variable("mesh", u);
+            state.f(ci) += loc_f(i);
+        }
+    }
 
-        for (size_t i = 0; i < e_gx.size(); i++)
-            solution_vals_nodes[i] = e_gx(i);
-
-        disk::silo_nodal_variable<double> u_nodal("u_nodal", solution_vals_nodes);
-        silo_db.add_variable("mesh", u_nodal);
-
-        silo_db.close();
+    state.K.setFromTriplets(triplets_K.begin(), triplets_K.end());
+    state.M.setFromTriplets(triplets_M.begin(), triplets_M.end());
+    state.lu_M.compute(state.M);
 }
+
+template<typename T>
+void solve_steady(cfem_solver_state<T>& state)
+{
+    Eigen::SparseLU<typename cfem_solver_state<T>::spmat> solver(state.K);
+    state.u = solver.solve(state.f);
+}
+
+template<typename T>
+typename cfem_solver_state_transient<T>::dvec
+timestep(cfem_solver_state_transient<T>& state,
+    typename cfem_solver_state_transient<T>::dvec& u_curr)
+{
+    typename cfem_solver_state_transient<T>::dvec u_next;
+
+    u_next = u_curr - state.dt * state.lu_M.solve(state.K * u_curr);
+
+    for (size_t i = 0; i < state.dirichlet_values.size(); i++) {
+        if (state.dirichlet_values[i]) {
+            u_next[i] = *state.dirichlet_values[i];
+        }
+    }
+
+    return u_next;
+}
+
+template<typename T>
+void postpro_steady(cfem_solver_state<T>& state)
+{
+    typename cfem_solver_state<T>::dvec sol = cfem_solver_state<T>::dvec::Zero(
+        state.msh.points_size()
+    );
+
+    for (size_t i = 0; i < state.u.size(); i++) {
+        sol[ state.expand_map[i] ] = state.u(i);
+    }
+
+    for (size_t i = 0; i < state.dirichlet_values.size(); i++) {
+        if ( state.dirichlet_values[i] ) {
+            sol[i] += *state.dirichlet_values[i];
+        }
+    }
+
+    disk::silo_database silo_db;
+    silo_db.create("test2.silo");
+    silo_db.add_mesh(state.msh, "mesh");
+    silo_db.add_variable("mesh", "u", sol, disk::nodal_variable_t);
+}
+
 
 
 
@@ -181,28 +305,50 @@ int main(int argc, char **argv)
 {
     using RealType = double;
 
-    char    *filename       = nullptr;
-    int     elems_1d        = 8;
-    int ch;
+    if (argc < 2) {
+        return 1;
+    }
 
-    filename = argv[1];
+    using mesh_type = disk::simplicial_mesh<RealType, 2>;
 
-    if (std::regex_match(filename, std::regex(".*\\.mesh2d$") ))
-    {
-        std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
+    disk::gmsh_geometry_loader<mesh_type> loader;
+    loader.read_mesh(argv[1]);
 
-        typedef disk::simplicial_mesh<RealType, 2>  mesh_type;
 
-        mesh_type msh;
-        disk::netgen_mesh_loader<RealType, 2> loader;
-        if (!loader.read_mesh(filename))
-        {
-            std::cout << "Problem loading mesh." << std::endl;
-            return 1;
+    cfem_solver_state_transient<RealType> state;
+    state.dt = 1e-3;
+
+    loader.populate_mesh(state.msh);
+
+    std::cout << "init & asm\n"; 
+
+    init(state);
+    assemble(state);
+
+    using dvec = typename cfem_solver_state_transient<RealType>::dvec;
+    dvec u_curr = dvec::Zero(state.msh.points_size());
+    dvec u_next = dvec::Zero(state.msh.points_size());
+
+    for (size_t i = 0; i < state.dirichlet_values.size(); i++) {
+        if (state.dirichlet_values[i]) {
+            u_curr[i] = *state.dirichlet_values[i];
         }
-        loader.populate_mesh(msh);
+    }
 
-        cfem_solver(msh);
+
+    for (size_t ts = 0; ts < 10000; ts++) {
+        if (ts % 10 == 0) {
+            std::cout << "ts " << ts << "\n";
+            disk::silo_database silo_db;
+            std::string fname = "ts_" + std::to_string(ts) + ".silo";
+            silo_db.create(fname);
+            silo_db.add_mesh(state.msh, "mesh");
+            silo_db.add_variable("mesh", "u", u_curr, disk::nodal_variable_t);
+        }
+
+        u_next = timestep(state, u_curr);
+
+        u_curr = u_next;
     }
 
 
