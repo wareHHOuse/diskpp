@@ -261,8 +261,12 @@ void picard(solver_state<T>& state)
 
         /* solve */
         Eigen::SparseLU<typename solver_state<T>::spmat> solver(state.K);
-        disk::dynamic_vector<T> u_next = solver.solve(state.f);
+        disk::dynamic_vector<T> u_picard = solver.solve(state.f);
         
+        T omega = 1;
+
+        disk::dynamic_vector<T> u_next = (1.0 - omega) * state.u + omega * u_picard;
+
         /* check if converged */
         auto diffnorm = (u_next - state.u).norm();
         std::cout << "Picard iteration " << pi << ", norm: " << diffnorm << "\n";
