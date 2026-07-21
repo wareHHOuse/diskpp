@@ -501,6 +501,18 @@ int main(int argc, char **argv)
             run_eigsolver(msh, cfg);
             return 0;
         }
+
+        /* FVCA6 3D */
+        if (std::regex_match(cfg.mesh_filename, std::regex(".*\\.msh$") ))
+        {
+            std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
+            disk::generic_mesh<T,3> msh;
+            disk::fvca6_mesh_loader<T,3> loader;
+            loader.read_mesh(cfg.mesh_filename);
+            loader.populate_mesh(msh);
+            run_eigsolver(msh, cfg);
+            return 0;
+        }
     }
 
     if (cfg.source == mesh_source::internal_tri) {
