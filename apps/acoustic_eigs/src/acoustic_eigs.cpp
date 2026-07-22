@@ -412,6 +412,8 @@ run_eigsolver(const Mesh& msh, const config& cfg)
     disk::silo_database db;
     db.create(cfg.silo_filename);
 
+    std::cout << "Mesh avg h = " << average_diameter(msh) << std::endl;
+
     acoustic_eigs_hho(msh, cfg, db);
 }
 
