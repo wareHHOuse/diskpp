@@ -506,10 +506,16 @@ int main(int argc, char **argv)
         if (std::regex_match(cfg.mesh_filename, std::regex(".*\\.msh$") ))
         {
             std::cout << "Guessed mesh format: FVCA6 3D" << std::endl;
-            disk::generic_mesh<T,3> msh;
+            using mesh_type = disk::generic_mesh<T,3>;
+            mesh_type msh;
             disk::fvca6_mesh_loader<T,3> loader;
             loader.read_mesh(cfg.mesh_filename);
             loader.populate_mesh(msh);
+
+            msh.transform( [&](const typename mesh_type::point_type& pt) {
+                return typename mesh_type::point_type{pt.x(), 1.1*pt.y(), 1.2*pt.z()};
+            } );
+
             run_eigsolver(msh, cfg);
             return 0;
         }
