@@ -95,5 +95,31 @@ int main(int argc, const char *argv[])
         return 0;
     }
 
-    return 0;
+    if (std::regex_match(mesh_filename, std::regex(".*\\.geo2s$") ))
+    {
+        std::cout << "Guessed mesh format: GMSH 2D simplicials" << std::endl;
+        using mesh_type = disk::triangular_mesh<T>;
+        mesh_type msh;
+        disk::gmsh_geometry_loader< mesh_type > loader;
+        loader.read_mesh(mesh_filename);
+        loader.populate_mesh(msh);
+        export_mesh_to_silo(msh, silo_filename);
+        return 0;
+    }
+
+    if (std::regex_match(mesh_filename, std::regex(".*\\.geo3s$") ))
+    {
+        std::cout << "Guessed mesh format: GMSH 3D simplicials" << std::endl;
+        using mesh_type = disk::tetrahedral_mesh<T>;
+        mesh_type msh;
+        disk::gmsh_geometry_loader< mesh_type > loader;
+        loader.read_mesh(mesh_filename);
+        loader.populate_mesh(msh);
+        export_mesh_to_silo(msh, silo_filename);
+        return 0;
+    }
+
+    std::cerr << "Didn't match any known mesh type\n";
+
+    return 1;
 }
