@@ -347,14 +347,18 @@ acoustic_eigs_hho(const Mesh& msh, const config& cfg, disk::silo_database& silo)
     tc.tic();
     for (auto& cl : msh)
     {
+        auto phiT = hho_space<mesh_type>::cell_basis(msh, cl, di.cell);
+        auto cbs = phiT.size();
+
         auto [R, A] = local_operator(msh, cl, di);
         auto S = local_stabilization(msh, cl, di, R);
+        auto M = integrate(msh, cl, phiT, phiT);
         disk::dynamic_matrix<T> lhs = A+S;
+        lhs.block(0,0,cbs,cbs) += M;
 
-        auto phiT = hho_space<mesh_type>::cell_basis(msh, cl, di.cell);
         disk::dynamic_matrix<T> rhs = integrate(msh, cl, phiT, phiT);
 
-        auto cbs = phiT.size();
+        
         lhs.block(0,0,cbs,cbs) += rhs;
 
         assm.assemble(msh, cl, lhs, rhs);
