@@ -33,71 +33,61 @@
 // Function to convert Stress to an other
 // F is the deformation gradient
 
-namespace disk
-{
+namespace disk {
 
-namespace mechanics
-{
+namespace mechanics {
 
 // PK2 = F^{-1} * PK1
 
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertPK1toPK2(const static_matrix<T, DIM, DIM>& PK1, const static_matrix<T, DIM, DIM>& F)
-{
-    return (F.inverse()) * PK1;
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM > convertPK1toPK2( const static_matrix< T, DIM, DIM > &PK1,
+                                              const static_matrix< T, DIM, DIM > &F ) {
+    return ( F.inverse() ) * PK1;
 }
 
 // PK1 = F * PK2
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertPK2toPK1(const static_matrix<T, DIM, DIM>& PK2, const static_matrix<T, DIM, DIM>& F)
-{
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM > convertPK2toPK1( const static_matrix< T, DIM, DIM > &PK2,
+                                              const static_matrix< T, DIM, DIM > &F ) {
     return F * PK2;
 }
 
 // Cauchy = J^{-1} * P * F^{T}
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertPK1toCauchy(const static_matrix<T, DIM, DIM>& PK1, const static_matrix<T, DIM, DIM>& F)
-{
-    return (PK1 * F.transpose()) / F.determinant();
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM > convertPK1toCauchy( const static_matrix< T, DIM, DIM > &PK1,
+                                                 const static_matrix< T, DIM, DIM > &F ) {
+    return ( PK1 * F.transpose() ) / F.determinant();
 }
 
 // PK1 = J * Cauchy * F^{-T}
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertCauchytoPK1(const static_matrix<T, DIM, DIM>& Cauchy, const static_matrix<T, DIM, DIM>& F)
-{
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM > convertCauchytoPK1( const static_matrix< T, DIM, DIM > &Cauchy,
+                                                 const static_matrix< T, DIM, DIM > &F ) {
     const auto invF = F.inverse();
     return F.determinant() * Cauchy * invF.transpose();
 }
 
 // PK2 = J  * F^{-1} * Cauchy * F^{-T}
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertCauchytoPK2(const static_matrix<T, DIM, DIM>& Cauchy, const static_matrix<T, DIM, DIM>& F)
-{
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM > convertCauchytoPK2( const static_matrix< T, DIM, DIM > &Cauchy,
+                                                 const static_matrix< T, DIM, DIM > &F ) {
     const auto invF = F.inverse();
     return F.determinant() * invF * Cauchy * invF.transpose();
 }
 
 // Cauchy = J^-1 * F * Cauchy * F^{T}
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertPK2toCauchy(const static_matrix<T, DIM, DIM>& PK2, const static_matrix<T, DIM, DIM>& F)
-{
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM > convertPK2toCauchy( const static_matrix< T, DIM, DIM > &PK2,
+                                                 const static_matrix< T, DIM, DIM > &F ) {
     return F * PK2 * F.transpose() / F.determinant();
 }
 
 // Compute criteria of Von Mises
-template<typename T, int DIM>
-T
-VonMisesCriteria(const static_matrix<T, DIM, DIM> mat)
-{
-    const auto dev = deviator(mat);
-    return sqrt(T(1.5) * dev.squaredNorm());
+template < typename T, int DIM >
+T VonMisesCriteria( const static_matrix< T, DIM, DIM > mat ) {
+    const auto dev = deviator( mat );
+    return sqrt( T( 1.5 ) * dev.squaredNorm() );
 }
 
-} // end mechanics
+} // namespace mechanics
 } // end namespace disk

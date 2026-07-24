@@ -30,49 +30,38 @@
 #include <list>
 #include <vector>
 
-namespace disk
-{
+namespace disk {
 
-namespace mechanics
-{
+namespace mechanics {
 
 /**
  * @brief Represent a time step on the time interval [start_time, end_time]
  *
  * @tparam T scalar type
  */
-template<typename T>
-class StabCoef
-{
+template < typename T >
+class StabCoef {
   private:
     T m_coeff;
 
   public:
-    StabCoef() : m_coeff(T(1)) {}
+    StabCoef() : m_coeff( T( 1 ) ) {}
 
     /**
      * @brief Construct a new StabCoef object
      *
      * @param coeff value of the stabilization coefficient
      */
-    StabCoef(const T coeff) : m_coeff(coeff) {}
+    StabCoef( const T coeff ) : m_coeff( coeff ) {}
 
     /**
      * @brief Return the value of the stabiliztion coefficient
      *
      * @return T  value of the stabiliztion coefficient
      */
-    T
-    getValue(void) const
-    {
-        return m_coeff;
-    }
+    T getValue( void ) const { return m_coeff; }
 
-    void
-    setValue(const T& value)
-    {
-        m_coeff = value;
-    }
+    void setValue( const T &value ) { m_coeff = value; }
 };
 
 /**
@@ -80,55 +69,42 @@ class StabCoef
  *
  * @tparam T scalar type
  */
-template<typename T>
-class StabCoeffManager
-{
+template < typename T >
+class StabCoeffManager {
   private:
-    std::vector<StabCoef<T>> m_stab_coeff;
-    std::vector<StabCoef<T>> m_stab_coeff_new;
+    std::vector< StabCoef< T > > m_stab_coeff;
+    std::vector< StabCoef< T > > m_stab_coeff_new;
 
   public:
-    template<typename Mesh>
-    StabCoeffManager(const Mesh& mesh, const T value)
-    {
+    template < typename Mesh >
+    StabCoeffManager( const Mesh &mesh, const T value ) {
         m_stab_coeff.clear();
-        m_stab_coeff.reserve(mesh.cells_size());
+        m_stab_coeff.reserve( mesh.cells_size() );
         m_stab_coeff_new.clear();
-        m_stab_coeff_new.reserve(mesh.cells_size());
+        m_stab_coeff_new.reserve( mesh.cells_size() );
 
-        for (auto& cl : mesh)
-        {
-            m_stab_coeff.push_back(value);
-            m_stab_coeff_new.push_back(value);
+        for ( auto &cl : mesh ) {
+            m_stab_coeff.push_back( value );
+            m_stab_coeff_new.push_back( value );
         }
     }
 
-    template<typename Mesh>
-    T
-    getValue(const Mesh& mesh, const typename Mesh::cell& cl) const
-    {
-        return m_stab_coeff[mesh.lookup(cl)].getValue();
+    template < typename Mesh >
+    T getValue( const Mesh &mesh, const typename Mesh::cell &cl ) const {
+        return m_stab_coeff[mesh.lookup( cl )].getValue();
     }
 
-    template<typename Mesh>
-    void
-    setValue(const Mesh& mesh, const typename Mesh::cell& cl, const T& value)
-    {
-        m_stab_coeff[mesh.lookup(cl)].setValue(value);
+    template < typename Mesh >
+    void setValue( const Mesh &mesh, const typename Mesh::cell &cl, const T &value ) {
+        m_stab_coeff[mesh.lookup( cl )].setValue( value );
     }
 
-    template<typename Mesh>
-    void
-    setValueNext(const Mesh& mesh, const typename Mesh::cell& cl, const T& value)
-    {
-        m_stab_coeff_new[mesh.lookup(cl)].setValue(value);
+    template < typename Mesh >
+    void setValueNext( const Mesh &mesh, const typename Mesh::cell &cl, const T &value ) {
+        m_stab_coeff_new[mesh.lookup( cl )].setValue( value );
     }
 
-    void
-    update()
-    {
-        m_stab_coeff = m_stab_coeff_new;
-    }
+    void update() { m_stab_coeff = m_stab_coeff_new; }
 };
-}
-}
+} // namespace mechanics
+} // namespace disk

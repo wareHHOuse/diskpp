@@ -47,6 +47,13 @@ class Volume:
         self.faces = []
 
 
+def reorder(liste):
+    minpos = liste.index(min(liste))
+    list_tmp = liste[minpos:] + liste[:minpos]
+
+    return tuple(list_tmp)
+
+
 def rotate(liste):
     minpos = liste.index(min(liste))
     list_tmp = liste[minpos:] + liste[:minpos]
@@ -55,6 +62,12 @@ def rotate(liste):
         list_tmp[1:] = list_tmp[::-1][0:size-1]
 
     return tuple(list_tmp)
+
+
+def intersection(lst1, lst2):
+    lst = set(lst1) & set(lst2)
+    return len(lst) > 0
+
 
 class CellConverter:
     def __init__(self):
@@ -91,37 +104,37 @@ class CellConverter:
         return self.mdim[typeC]
 
     def addCell(self, mtype, nodes, edges, faces, volumes):
+        mnodes = rotate(nodes[0 : self.mnodes[mtype]])
+        nodes_r = reorder(nodes[0 : self.mnodes[mtype]])
+
         if self.mdim[mtype] == 0:
             logging.info("0D-cell are not supported. We skip them...")
         elif self.mdim[mtype] == 1:
-            mnodes = rotate(nodes[0:self.mnodes[mtype]])
             if mnodes in self.list_edges:
                 return self.list_edges[mnodes]
             else:
                 edge = Edge()
-                edge.nodes = mnodes
+                edge.nodes = nodes_r
                 edges.append(edge)
-                self.list_edges[edge.nodes] = len(edges)-1
+                self.list_edges[mnodes] = len(edges) - 1
                 return len(edges)-1
         elif self.mdim[mtype] == 2:
-            mnodes = rotate(nodes[0:self.mnodes[mtype]])
             if mnodes in self.list_faces:
                 return self.list_faces[mnodes]
             else:
                 face = Face()
-                face.nodes = mnodes
+                face.nodes = nodes_r
                 list_egdes = self.mfaces[self.mstype[mtype]]
                 for edge in list_egdes:
                     enodes = [nodes[edge[0]], nodes[edge[1]]]
                     eid = self.addCell("SEG2", enodes, edges, faces, volumes)
                     face.edges.append(eid)
                 faces.append(face)
-                self.list_faces[face.nodes] = len(faces)-1
+                self.list_faces[mnodes] = len(faces) - 1
                 return len(faces)-1
         elif self.mdim[mtype] == 3:
-            mnodes = rotate(nodes[0:self.mnodes[mtype]])
             volu = Volume()
-            volu.nodes = mnodes
+            volu.nodes = nodes_r
             list_faces = self.mfaces[self.mstype[mtype]]
             for face in list_faces:
                 fnodes = []
@@ -149,7 +162,6 @@ class PolyMesh:
         self.faces_grp = []
         self.volumes_grp = []
         self.nodes_grp = []
-
 
     def createMesh(self, args):
         medmesh = medcoupling.MEDFileUMesh(args.fileNameInput)
@@ -187,19 +199,18 @@ class PolyMesh:
                 val = [loc_glo_ind[cid] for cid in ids.getValues()]
                 if mdim == 0:
                     logging.info("0D-groups are not supported. We skip them...")
-                if mdim == 1:
+                elif mdim == 1:
                     self.edges_grp.append([group, val])
                 elif mdim == 2:
                     self.faces_grp.append([group, val])
                 elif mdim == 3:
                     self.volumes_grp.append([group, val])
                 else:
-                    raise RuntimeError("Should not be here")
+                    raise RuntimeError(f"Should not be here: {mdim}")
 
             cells_shift+=mesh_lev.getNumberOfCells()
 
-
-        #clean nodes
+        # clean nodes
         nodes_to_keep = {}
         for edge in self.edges:
             for node in edge.nodes:
@@ -320,35 +331,55 @@ class PolyMesh:
                 f.write("\n")
 
         if len(self.edges_grp) > 0:
+            lst = []
             f.write("*Edges->Groups %d\n"%len(self.edges_grp))
             for grp in self.edges_grp:
                 logging.info("Group naming: %s (med name) -> %d (internal id)"%(grp[0], i_grp))
-                f.write("%s %d %d "%(grp[0], i_grp, len(grp[1])))
-                for cell in grp[1]:
+                eds = sorted(grp[1])
+                if intersection(lst, eds):
+                    raise RuntimeError(
+                        f"At least one element of group {grp[0]} is already in an other group"
+                    )
+                f.write("%s %d %d " % (grp[0], i_grp, len(eds)))
+                for cell in eds:
                     f.write("%d "%cell)
                 i_grp+=1
                 f.write("\n")
+                lst.extend(eds)
 
         if len(self.faces_grp) > 0:
+            lst = []
             f.write("*Faces->Groups %d\n"%len(self.faces_grp))
             for grp in self.faces_grp:
                 logging.info("Group naming: %s (med name) -> %d (internal id)"%(grp[0], i_grp))
-                f.write("%s %d %d "%(grp[0], i_grp, len(grp[1])))
-                for cell in grp[1]:
-                    f.write("%d "%cell)
+                fcs = sorted(grp[1])
+                if intersection(lst, fcs):
+                    raise RuntimeError(
+                        f"At least one element of group {grp[0]} is already in an other group"
+                    )
+                f.write("%s %d %d " % (grp[0], i_grp, len(fcs)))
+                for fc in fcs:
+                    f.write("%d " % fc)
                 i_grp+=1
                 f.write("\n")
+                lst.extend(fcs)
 
         if len(self.volumes_grp) > 0:
+            lst = []
             f.write("*Volumes->Groups %d\n"%len(self.volumes_grp))
             for grp in self.volumes_grp:
                 logging.info("Group naming: %s (med name) -> %d (internal id)"%(grp[0], i_grp))
-                f.write("%s %d %d "%(grp[0], i_grp, len(grp[1])))
-                for cell in grp[1]:
+                vols = sorted(grp[1])
+                if intersection(lst, vols):
+                    raise RuntimeError(
+                        f"At least one element of group {grp[0]} is already in an other group"
+                    )
+                f.write("%s %d %d " % (grp[0], i_grp, len(vols)))
+                for cell in vols:
                     f.write("%d "%cell)
                 i_grp+=1
                 f.write("\n")
-
+                lst.extend(vols)
 
         f.write("**EndMesh")
         f.close()

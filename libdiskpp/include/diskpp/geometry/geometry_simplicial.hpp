@@ -407,6 +407,34 @@ measure(const simplicial_mesh<T, 2>& msh,
     return (pts[1] - pts[0]).to_vector().norm();
 }
 
+template < typename T >
+bool is_inside( const simplicial_mesh< T, 2 > &msh,
+                const typename simplicial_mesh< T, 2 >::cell_type &cl,
+                const typename simplicial_mesh< T, 2 >::point_type &pt ) {
+    const T tole = 1e-12;
+    const auto area = measure( msh, cl );
+    const T un_2a = 1.0 / ( 2.0 * area );
+
+    auto pts = points( msh, cl );
+
+    const T sp =
+        un_2a * ( pts[0].y() * pts[2].x() - pts[0].x() * pts[2].y() +
+                  ( pts[2].y() - pts[0].y() ) * pt.x() + ( pts[0].x() - pts[2].x() ) * pt.y() );
+
+    if ( -tole < sp && sp < ( 1.0 + tole ) ) {
+        const T tp =
+            un_2a * ( pts[0].x() * pts[1].y() - pts[0].y() * pts[1].x() +
+                      ( pts[0].y() - pts[1].y() ) * pt.x() + ( pts[1].x() - pts[0].x() ) * pt.y() );
+        if ( -tole < tp && tp < ( 1.0 + tole ) ) {
+            if ( ( sp + tp ) < ( 1.0 + tole ) ) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 template<typename T>
 bool
 is_inside(const simplicial_mesh<T,3>& msh,
@@ -428,10 +456,10 @@ is_inside(const simplicial_mesh<T,3>& msh,
 
     T t1 = v0.cross(v1).dot( to_vector(pt - pts[0]) );
     if (t1 < 0) count--; else count++;
-    
+
     T t2 = v4.cross(v2).dot( to_vector(pt - pts[1]) );
     if (t2 < 0) count--; else count++;
-    
+
     T t3 = v1.cross(v3).dot( to_vector(pt - pts[0]) );
     if (t3 < 0) count--; else count++;
 

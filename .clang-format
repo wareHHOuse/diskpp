@@ -1,0 +1,47 @@
+BasedOnStyle: LLVM
+---
+Language: Cpp
+Standard: Cpp11
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+AlwaysBreakTemplateDeclarations: Yes
+BreakConstructorInitializers : BeforeColon
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+FixNamespaceComments : true
+IncludeBlocks: Regroup
+IncludeCategories:
+  # aster main header
+  - Regex:           '^"aster[cx]*.h"$'
+    Priority:        -1
+  # Headers in "" with extension and without /.
+  - Regex:           '"([a-z0-9\._])+"'
+    Priority:        3
+  # Headers in "" with extension and with /.
+  - Regex:           '"([a-z0-9\./\-_])+"'
+    Priority:        4
+  # Headers in <> without extension.
+  - Regex:           '<([a-z0-9/\-_])+>'
+    Priority:        5
+  # Headers in <> with extension.
+  - Regex:           '<([a-z0-9\./\-_])+>'
+    Priority:        6
+
+# not properly applied by clang-format-11, will be set 'true' when updated
+Cpp11BracedListStyle : false
+SpaceBeforeCpp11BracedList: true
+
+SpacesInAngles: true
+SpacesInSquareBrackets: false
+
+SpaceAfterCStyleCast: false
+SpacesInParentheses: true
+SpacesInCStyleCastParentheses: false
+
+# for clang-format>=17
+# SpacesInParens: Custom
+# SpacesInParensOptions:
+#   InConditionalStatements: true
+#   InEmptyParentheses: false
+#   InCStyleCasts: false

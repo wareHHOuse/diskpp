@@ -225,6 +225,16 @@ class hho_degree_info
     }
 };
 
+template < typename Mesh >
+size_t vector_cell_dofs( const Mesh &msh, size_t cell_degree ) {
+    return vector_basis_size(cell_degree, Mesh::dimension, Mesh::dimension);
+}
+
+template <typename Mesh>
+size_t vector_cell_dofs(const Mesh &msh, const CellDegreeInfo<Mesh> &cell_infos) {
+    return vector_basis_size(cell_infos.cell_degree(), Mesh::dimension, Mesh::dimension);
+}
+
 // const MeshDegreeInfo<Mesh>& degree_infos
 template<typename Mesh>
 size_t

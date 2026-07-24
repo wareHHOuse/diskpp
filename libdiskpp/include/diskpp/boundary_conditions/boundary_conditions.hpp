@@ -25,12 +25,19 @@
 
 #pragma once
 
-#include <tuple>
-#include <vector>
-
 #include "diskpp/bases/bases.hpp"
 #include "diskpp/common/eigen.hpp"
 #include "diskpp/mesh/point.hpp"
+
+#include <cmath>
+#include <cstddef>
+#include <functional>
+#include <iostream>
+#include <stdexcept>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace disk
 {
@@ -69,26 +76,6 @@ enum ContactType : size_t
 
 namespace priv
 {
-template<typename T>
-T
-bnd_product(const T& fact, const T& func)
-{
-    return fact * func;
-}
-
-template<typename T, int N>
-Matrix<T, N, 1>
-bnd_product(const T& fact, const Matrix<T, N, 1>& func)
-{
-    return fact * func;
-}
-
-template<typename T, int N, int M>
-Matrix<T, N, M>
-bnd_product(const T& fact, const Matrix<T, N, M>& func)
-{
-    return fact * func;
-}
 
 template<typename scalar_type, size_t DIM, bool FunctionScalarType>
 struct FunctionType
@@ -177,54 +164,77 @@ struct imposed_dofs<false>
 // ScalarBoundary = true for scalar problem like diffusion
 // ScalarBoundary = false for vectorial problem like linear_elasticity
 
-template<typename MeshType, bool ScalarBoundary>
-class BoundaryConditions
-{
+template < typename MeshType, bool ScalarBoundary >
+class BoundaryConditions {
   public:
-    typedef MeshType                                                                                      mesh_type;
-    typedef typename mesh_type::cell_type                                                                 cell_type;
-    typedef typename mesh_type::face_type                                                                 face_type;
-    typedef typename mesh_type::coordinate_type                                                           scalar_type;
-    typedef point<scalar_type, mesh_type::dimension>                                                      point_type;
-    typedef typename priv::FunctionType<scalar_type, mesh_type::dimension, ScalarBoundary>::function_type function_type;
+    typedef MeshType mesh_type;
+    typedef typename mesh_type::cell_type cell_type;
+    typedef typename mesh_type::face_type face_type;
+    typedef typename mesh_type::coordinate_type scalar_type;
+    typedef point< scalar_type, mesh_type::dimension > point_type;
+    typedef typename priv::FunctionType< scalar_type, mesh_type::dimension,
+                                         ScalarBoundary >::function_type fct_result_type;
+
+    using function_type = std::function< fct_result_type( const point_type &, scalar_type ) >;
 
   private:
-    const mesh_type& m_msh;
+    const mesh_type &m_msh;
 
-    std::vector<std::function<function_type(point_type)>> m_dirichlet_func;
-    std::vector<std::function<function_type(point_type)>> m_neumann_func;
-    std::vector<std::function<function_type(point_type)>> m_robin_func;
-    std::vector<std::function<scalar_type(point_type)>>   m_contact_func;
+    std::vector< function_type > m_dirichlet_func;
+    std::vector< function_type > m_neumann_func;
+    std::vector< function_type > m_robin_func;
+    std::vector< std::function< scalar_type( point_type ) > > m_contact_func;
+    std::vector< std::function< scalar_type(
+        point_type, static_vector< scalar_type, mesh_type::dimension > ) > >
+        m_contact_gap;
+
+    template < typename >
+    inline static constexpr bool always_false_v = false;
+
+    template < typename Function >
+    static function_type _conv_fct( Function &&fct ) {
+        using function_t = std::decay_t< Function >;
+        if constexpr ( std::is_invocable_r_v< fct_result_type, function_t &, const point_type &,
+                                              scalar_type > ) {
+            return function_type( std::forward< Function >( fct ) );
+        } else if constexpr ( std::is_invocable_r_v< fct_result_type, function_t &,
+                                                     const point_type & > ) {
+            return [fct = std::forward< Function >( fct )](
+                       const point_type &p, scalar_type ) mutable -> fct_result_type {
+                return std::invoke( fct, p );
+            };
+        } else {
+            static_assert( always_false_v< function_t >, "Boundary function must be callable as "
+                                                         "f(point) or f(point, time)" );
+        }
+    }
 
     // 1) bool to know if a boundary condition is associated to the face
     // 2) type of boundary conditions
     // 3) boundary id of the face
     // 4) boundary function id of the face
-    typedef std::vector<std::tuple<bool, size_t, size_t, size_t>> bnd_storage_type;
-    bnd_storage_type                                              m_faces_is_dirichlet;
-    bnd_storage_type                                              m_faces_is_neumann;
-    bnd_storage_type                                              m_faces_is_robin;
-    std::vector<std::tuple<bool, size_t, size_t, int>>            m_faces_is_contact;
+    typedef std::vector< std::tuple< bool, size_t, size_t, size_t > > bnd_storage_type;
+    bnd_storage_type m_faces_is_dirichlet;
+    bnd_storage_type m_faces_is_neumann;
+    bnd_storage_type m_faces_is_robin;
+    std::vector< std::tuple< bool, size_t, size_t, int > > m_faces_is_contact;
 
     size_t m_dirichlet_faces, m_neumann_faces, m_robin_faces, m_contact_faces;
 
-    scalar_type m_factor;
+    scalar_type m_time;
 
     // search faces that have the boundary id "b_id"
-    std::vector<size_t>
-    search_faces(const size_t b_id) const
-    {
-        std::vector<size_t> list_faces;
+    std::vector< size_t > search_faces( const size_t b_id ) const {
+        std::vector< size_t > list_faces;
 
-        for (auto itor = m_msh.boundary_faces_begin(); itor != m_msh.boundary_faces_end(); itor++)
-        {
+        for ( auto itor = m_msh.boundary_faces_begin(); itor != m_msh.boundary_faces_end();
+              itor++ ) {
             const auto bfc = *itor;
 
-            const auto face_id = m_msh.lookup(bfc);
+            const auto face_id = m_msh.lookup( bfc );
 
-            if (m_msh.boundary_id(face_id) == b_id)
-            {
-                list_faces.push_back(face_id);
+            if ( m_msh.boundary_id( face_id ) == b_id ) {
+                list_faces.push_back( face_id );
             }
         }
 
@@ -236,14 +246,17 @@ class BoundaryConditions
   public:
     BoundaryConditions() = delete;
 
-    BoundaryConditions(const mesh_type& msh) :
-      m_msh(msh), m_dirichlet_faces(0), m_neumann_faces(0), m_robin_faces(0), m_contact_faces(0), m_factor(1)
+    BoundaryConditions(const mesh_type &msh) : m_msh(msh), m_dirichlet_faces(0), m_neumann_faces(0), m_robin_faces(0), m_contact_faces(0),
+                                               m_time(1.)
     {
         m_faces_is_dirichlet.assign(m_msh.faces_size(), std::make_tuple(false, NOTHING, 0, 0));
         m_faces_is_neumann.assign(m_msh.faces_size(), std::make_tuple(false, FREE, 0, 0));
         m_faces_is_robin.assign(m_msh.faces_size(), std::make_tuple(false, WHATEVER, 0, 0));
         m_faces_is_contact.assign(m_msh.faces_size(), std::make_tuple(false, NO_CONTACT, 0, -1));
     }
+
+    inline static constexpr scalar_type default_time_marker =
+        static_cast< scalar_type >( -123456789 );
 
     void
     addContactBC(const size_t& btype, const size_t& b_id)
@@ -257,13 +270,12 @@ class BoundaryConditions
         }
     }
 
-    template<typename Function>
-    void
-    addContactBC(const size_t& btype, const size_t& b_id, const Function& bcf)
-    {
+    template < typename Function, typename FunctionGap >
+    void addContactBC( size_t btype, size_t b_id, const Function &bcf, const FunctionGap &gap ) {
 
         const size_t bcf_id = m_contact_func.size();
         m_contact_func.push_back(bcf);
+        m_contact_gap.push_back( gap );
 
         const auto list_faces = search_faces(b_id);
 
@@ -274,77 +286,67 @@ class BoundaryConditions
         }
     }
 
-    template<typename Function>
-    void
-    addDirichletEverywhere(const Function& bcf)
-    {
+    template < typename Function >
+    void addDirichletEverywhere( Function &&bcf ) {
         const size_t bcf_id = m_dirichlet_func.size();
-        m_dirichlet_func.push_back(bcf);
 
-        for (auto itor = m_msh.boundary_faces_begin(); itor != m_msh.boundary_faces_end(); itor++)
-        {
+        m_dirichlet_func.emplace_back( _conv_fct( std::forward< Function >( bcf ) ) );
+
+        for ( auto itor = m_msh.boundary_faces_begin(); itor != m_msh.boundary_faces_end();
+              ++itor ) {
             const auto bfc = *itor;
+            const size_t face_id = m_msh.lookup( bfc );
 
-            const auto face_id = m_msh.lookup(bfc);
+            m_faces_is_dirichlet.at( face_id ) =
+                std::make_tuple( true, DIRICHLET, size_t { 0 }, bcf_id );
 
-            m_faces_is_dirichlet.at(face_id) = std::make_tuple(true, DIRICHLET, 0, bcf_id);
-            m_dirichlet_faces++;
+            ++m_dirichlet_faces;
         }
     }
 
-    template<typename Function>
-    void
-    addRobinBC(const size_t& btype, const size_t& b_id, const Function& bcf)
-    {
-
+    template < typename Function >
+    void addRobinBC( size_t btype, size_t b_id, Function &&bcf ) {
         const size_t bcf_id = m_robin_func.size();
-        m_robin_func.push_back(bcf);
 
-        const auto list_faces = search_faces(b_id);
+        m_robin_func.emplace_back( _conv_fct( std::forward< Function >( bcf ) ) );
 
-        for (size_t face_id : list_faces)
-        {
-            m_faces_is_robin.at(face_id) = std::make_tuple(true, btype, b_id, bcf_id);
-            m_robin_faces++;
+        const auto list_faces = search_faces( b_id );
+
+        for ( const size_t face_id : list_faces ) {
+            m_faces_is_robin.at( face_id ) = std::make_tuple( true, btype, b_id, bcf_id );
+
+            ++m_robin_faces;
         }
     }
 
-    template<typename Function>
-    void
-    addDirichletBC(const size_t& btype, const size_t& b_id, const Function& bcf)
-    {
+    template < typename Function >
+    void addDirichletBC( size_t btype, size_t b_id, Function &&bcf ) {
         const size_t bcf_id = m_dirichlet_func.size();
-        m_dirichlet_func.push_back(bcf);
 
-        const auto list_faces = search_faces(b_id);
+        m_dirichlet_func.emplace_back( _conv_fct( std::forward< Function >( bcf ) ) );
 
-        for (size_t face_id : list_faces)
-        {
-            m_faces_is_dirichlet.at(face_id) = std::make_tuple(true, btype, b_id, bcf_id);
-            m_dirichlet_faces++;
+        const auto list_faces = search_faces( b_id );
+
+        for ( const size_t face_id : list_faces ) {
+            m_faces_is_dirichlet.at( face_id ) = std::make_tuple( true, btype, b_id, bcf_id );
+
+            ++m_dirichlet_faces;
         }
     }
 
-    template<typename Function>
-    void
-    addNeumannBC(const size_t& btype, const size_t& b_id, const Function& bcf)
-    {
+    template < typename Function >
+    void addNeumannBC( size_t btype, size_t b_id, Function &&bcf ) {
         const size_t bcf_id = m_neumann_func.size();
-        m_neumann_func.push_back(bcf);
 
-        const auto list_faces = search_faces(b_id);
+        m_neumann_func.emplace_back( _conv_fct( std::forward< Function >( bcf ) ) );
 
-        for (size_t face_id : list_faces)
-        {
-            m_faces_is_neumann.at(face_id) = std::make_tuple(true, btype, b_id, bcf_id);
-            m_neumann_faces++;
+        const auto list_faces = search_faces( b_id );
+
+        for ( const size_t face_id : list_faces ) {
+            m_faces_is_neumann.at( face_id ) = std::make_tuple( true, btype, b_id, bcf_id );
+
+            ++m_neumann_faces;
         }
-    }
-
-    void
-    multiplyAllFunctionsByAFactor(const scalar_type& factor)
-    {
-        m_factor = factor;
     }
 
     size_t
@@ -517,7 +519,7 @@ class BoundaryConditions
     size_t
     contact_boundary_id(const face_type& fc) const
     {
-        return robin_boundary_id(m_msh.lookup(fc));
+        return contact_boundary_id( m_msh.lookup( fc ) );
     }
 
     bool
@@ -663,43 +665,71 @@ class BoundaryConditions
     auto
     dirichlet_boundary_func(const size_t face_i) const
     {
+        return dirichlet_boundary_func(face_i, m_time);
+    }
+
+    auto
+    dirichlet_boundary_func(const face_type &fc) const
+    {
+        return dirichlet_boundary_func(m_msh.lookup(fc));
+    }
+
+    auto dirichlet_boundary_func( const size_t face_i, scalar_type time ) const {
         if (!is_dirichlet_face(face_i))
         {
             throw std::logic_error("You want the Dirichlet function of face which is not a Dirichlet face");
         }
 
-        const auto        func   = m_dirichlet_func.at(std::get<3>(m_faces_is_dirichlet.at(face_i)));
-        const scalar_type factor = m_factor;
+        const auto func = m_dirichlet_func.at(std::get<3>(m_faces_is_dirichlet.at(face_i)));
 
-        auto rfunc = [ func, factor ](const point_type& p) -> auto { return priv::bnd_product(factor, func(p)); };
+        auto rfunc = [func, time]( const point_type &p,
+                                   scalar_type t = -default_time_marker ) -> auto {
+            if ( std::abs( t + default_time_marker ) > 1e-6 ) {
+                return func(p, t);
+            }
+
+            return func(p, time);
+        };
 
         return rfunc;
     }
 
-    auto
-    dirichlet_boundary_func(const face_type& fc) const
-    {
-        return dirichlet_boundary_func(m_msh.lookup(fc));
+    auto dirichlet_boundary_func( const face_type &fc, scalar_type time ) const {
+        return dirichlet_boundary_func(m_msh.lookup(fc), time);
     }
 
-    auto
-    neumann_boundary_func(const size_t face_i) const
-    {
+    auto neumann_boundary_func( const size_t face_i, scalar_type time ) const {
         if (!is_neumann_face(face_i))
         {
             throw std::logic_error("You want the Neumann function of face which is not a Neumann face");
         }
 
-        const auto        func   = m_neumann_func.at(std::get<3>(m_faces_is_neumann.at(face_i)));
-        const scalar_type factor = m_factor;
+        const auto func = m_neumann_func.at(std::get<3>(m_faces_is_neumann.at(face_i)));
 
-        auto rfunc = [ func, factor ](const point_type& p) -> auto { return priv::bnd_product(factor, func(p)); };
+        auto rfunc = [func, time]( const point_type &p,
+                                   scalar_type t = -default_time_marker ) -> auto {
+            if ( std::abs( t + default_time_marker ) > 1e-6 ) {
+                return func(p, t);
+            }
+
+            return func(p, time);
+        };
 
         return rfunc;
     }
 
     auto
-    neumann_boundary_func(const face_type& fc) const
+    neumann_boundary_func(const size_t face_i) const
+    {
+        return neumann_boundary_func(face_i, m_time);
+    }
+
+    auto neumann_boundary_func( const face_type &fc, scalar_type time ) const {
+        return neumann_boundary_func(m_msh.lookup(fc), time);
+    }
+
+    auto
+    neumann_boundary_func(const face_type &fc) const
     {
         return neumann_boundary_func(m_msh.lookup(fc));
     }
@@ -713,12 +743,17 @@ class BoundaryConditions
         }
 
         const auto        func   = m_robin_func.at(std::get<3>(m_faces_is_robin.at(face_i)));
-        const scalar_type factor = m_factor;
+        const scalar_type time = m_time;
 
-        auto rfunc = [ func, factor ](const point_type& p) -> auto
-        {
-            return disk::priv::inner_product(factor, func(p));
+        auto rfunc = [func, time]( const point_type &p,
+                                   scalar_type t = -default_time_marker ) -> auto {
+            if ( std::abs( t + default_time_marker ) > 1e-6 ) {
+                return func(p, t);
+            }
+
+            return func(p, time);
         };
+
         return rfunc;
     }
 
@@ -752,6 +787,25 @@ class BoundaryConditions
         return contact_boundary_func(m_msh.lookup(fc));
     }
 
+    auto contact_boundary_gap( const size_t face_i ) const {
+        if ( !is_contact_face( face_i ) ) {
+            throw std::logic_error(
+                "You want the gap function of a face which is not a conatact face" );
+        }
+
+        const auto fid = std::get< 3 >( m_faces_is_contact.at( face_i ) );
+
+        if ( fid < 0 ) {
+            throw std::logic_error( "You want the gap function of a face which has not function" );
+        }
+
+        return m_contact_gap.at( fid );
+    }
+
+    auto contact_boundary_gap( const face_type &fc ) const {
+        return contact_boundary_gap( m_msh.lookup( fc ) );
+    }
+
     void
     boundary_info() const
     {
@@ -777,6 +831,16 @@ class BoundaryConditions
         }
 
         return 0;
+    }
+
+    void setTime( scalar_type time ) { m_time = time; }
+
+    void setTimeAsConst( scalar_type time ) const {
+        const_cast<BoundaryConditions<MeshType, ScalarBoundary> *>(this)->m_time = time;
+    }
+
+    scalar_type getTime(void) const {
+        return m_time;
     }
 };
 

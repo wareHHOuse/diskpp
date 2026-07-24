@@ -132,6 +132,51 @@ barycenter(const raw_simplex<point<T,N>,N>& rs)
     return bar / T(pts.size());
 }
 
+template < typename T >
+bool is_inside( const raw_simplex< point< T, 3 >, 3 > &rs, const point< T, 3 > &pt ) {
+    const auto pts = rs.points();
+    const auto bar = barycenter( rs );
+
+    const std::vector< std::array< int, 3 > > faces = {
+        { 0, 1, 2 }, { 1, 2, 3 }, { 0, 2, 3 }, { 0, 1, 3 }
+    };
+
+    auto f_face = [&bar, &pts, &faces]( const int &face_id ) {
+        const auto pts_id = faces[face_id];
+        const auto p0 = pts[pts_id[0]];
+        const auto p1 = pts[pts_id[1]];
+        const auto p2 = pts[pts_id[2]];
+
+        const auto bar_f = ( p0 + p1 + p2 ) / 3.0;
+
+        const auto v01 = to_vector( pts[1] - pts[0] );
+        const auto v02 = to_vector( pts[2] - pts[0] );
+
+        const auto n0 = v01.cross( v02 );
+        const auto n0n = n0.normalized();
+
+        const auto ddot = n0n.dot( to_vector( bar_f - bar ) );
+
+        T sign = 1.0;
+        if ( ddot < 0 ) {
+            sign = -1.0;
+        }
+
+        return std::make_pair( bar_f, sign * n0n );
+    };
+
+    for ( int i = 0; i < 4; i++ ) {
+        const auto [bar_f, n] = f_face( i );
+        const T dist = n.dot( to_vector( bar_f - pt ).normalized() );
+
+        if ( dist < 0. ) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 /**
  * @brief Map a point from the reference tetrahedra to the physical tetrahedra
  *

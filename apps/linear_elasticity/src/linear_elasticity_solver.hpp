@@ -79,7 +79,7 @@ class linear_elasticity_solver
     typedef disk::dynamic_matrix<scalar_type> matrix_dynamic;
     typedef disk::dynamic_vector<scalar_type> vector_dynamic;
 
-    typedef disk::assembler_mechanics<mesh_type> assembler_type;
+    typedef disk::vector_mechanics_hho_assembler<mesh_type> assembler_type;
 
     size_t m_cell_degree, m_face_degree;
 
@@ -128,7 +128,7 @@ class linear_elasticity_solver
         m_elas_parameters.lambda = data.lambda;
 
         m_hdi       = disk::hho_degree_info(m_cell_degree, m_face_degree);
-        m_assembler = disk::make_mechanics_assembler(m_msh, m_hdi, m_bnd);
+        m_assembler = disk::vector_mechanics_hho_assembler(m_msh, m_hdi, m_bnd);
         m_AL.clear();
         m_AL.reserve(m_msh.cells_size());
 
@@ -210,7 +210,8 @@ class linear_elasticity_solver
             tc.toc();
             ai.time_statcond += tc.elapsed();
 
-            m_assembler.assemble(m_msh, cl, m_bnd, std::get<0>(scnp), 2);
+            m_assembler.assemble(m_msh, cl, m_bnd, std::get<0>(scnp).first,
+                                 std::get<0>(scnp).second);
         }
 
         m_assembler.impose_neumann_boundary_conditions(m_msh, m_bnd);
@@ -304,9 +305,7 @@ class linear_elasticity_solver
     {
         scalar_type err_dof = 0;
 
-        const size_t cbs      = disk::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
-        const int    diff_deg = m_hdi.face_degree() - m_hdi.cell_degree();
-        const int    di       = std::max(diff_deg, 1);
+        const size_t cbs = disk::vector_basis_size(m_hdi.cell_degree(), dimension, dimension);
 
         size_t cell_i = 0;
 
@@ -314,7 +313,7 @@ class linear_elasticity_solver
         {
             const auto x = m_solution_data.at(cell_i++);
 
-            const vector_dynamic true_dof = disk::project_function(m_msh, cl, m_hdi.cell_degree(), as, di);
+            const vector_dynamic true_dof = disk::project_function(m_msh, cl, m_hdi.cell_degree(), as, 2);
 
             auto                 cb   = disk::make_vector_monomial_basis(m_msh, cl, m_hdi.cell_degree());
             const matrix_dynamic mass = disk::make_mass_matrix(m_msh, cl, cb);
@@ -341,7 +340,7 @@ class linear_elasticity_solver
 
         for (auto& cl : m_msh)
         {
-            const auto           x   = m_solution_data.at(cell_i++);
+            const auto           x  = m_solution_data.at(cell_i++);
             const auto           sgr = make_vector_hho_symmetric_laplacian(m_msh, cl, m_hdi);
             const vector_dynamic GTu = sgr.first * x;
 
