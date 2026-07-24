@@ -161,8 +161,9 @@ feast(const feast_eigensolver_params<double>& params,
                     Qe = solver.solve(Yc);
                 } break;
 
+                case feast_inner_solver::mumps: 
 #ifdef HAVE_MUMPS
-                case feast_inner_solver::mumps: {
+                {
                     disk::solvers::mumps_solver<complex> solver;
                     solver.compute(lhs);
                     if (solver.failure()) {
@@ -172,6 +173,7 @@ feast(const feast_eigensolver_params<double>& params,
                     Qe = solver.solve(Yc);
                 }
 #endif /* HAVE_MUMPS */
+                default: throw std::runtime_error("Feast solver not available");
             }
 
             cdm T = r * std::exp(std::complex<double>(0.0, theta_e)) * Qe;

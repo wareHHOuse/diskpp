@@ -10,7 +10,9 @@
 
 #pragma once
 
+#ifdef HAVE_GMSH
 #include "gmsh.h"
+#endif
 
 #include "diskpp/mesh/mesh_storage.hpp"
 
@@ -21,6 +23,7 @@ namespace disk {
 template<typename Mesh>
 class gmsh_geometry_loader;
 
+#ifdef HAVE_GMSH
 template<typename T>
 class gmsh_geometry_loader<simplicial_mesh<T,3>> : public mesh_loader<simplicial_mesh<T,3>>
 {
@@ -1144,5 +1147,6 @@ void dump_subdomain_boundaries(const Mesh& msh)
         }
     }
 }
+#endif
 
 } //namespace disk

@@ -83,9 +83,7 @@ target_include_directories(diskpp PUBLIC ${LUA_INCLUDE_DIR})
 find_package(GMSH)
 if (GMSH_FOUND)
     target_link_libraries(diskpp PUBLIC GMSH::GMSH)
-    target_compile_definitions(diskpp PUBLIC
-        HAVE_GMSH
-    )
+    target_compile_definitions(diskpp PUBLIC HAVE_GMSH)
 endif()
 
 ######################################################################
@@ -115,6 +113,14 @@ if (HDF5_FOUND)
     )
 else()
     message(STATUS "HDF5 not found: HDF5/HighFive support disabled")
+endif()
+
+######################################################################
+## MGIS Support
+find_package(MGIS)
+if (MGIS_FOUND)
+    target_link_libraries(diskpp INTERFACE MGIS::MGIS)
+    target_compile_definitions(diskpp PUBLIC HAVE_MGIS)
 endif()
 
 ######################################################################

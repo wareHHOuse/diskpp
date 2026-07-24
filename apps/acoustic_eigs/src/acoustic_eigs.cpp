@@ -193,7 +193,7 @@ void solve_feast_dense(auto assm, disk::dynamic_matrix<T>& eigvecs,
     disk::dynamic_vector<T>& eigvals)
 {
     timecounter tc;
-
+#ifdef HAVE_MUMPS
     std::cout << "MUMPS factorization..." << std::flush;
     tc.tic();
     disk::solvers::mumps_solver<T> AFF_lu_mumps;
@@ -217,6 +217,9 @@ void solve_feast_dense(auto assm, disk::dynamic_matrix<T>& eigvecs,
     disk::solvers::feast(params, KTT, assm.BTT, eigvecs, eigvals);
 
     std::cout << "Eigensolver time: " << tc.toc() << " seconds\n";
+#else
+    std::cerr << "MUMPS is needed" << std::endl;
+#endif
 }
 
 template<typename T>
@@ -225,6 +228,7 @@ void solve_feast_mf(auto assm, disk::dynamic_matrix<T>& eigvecs,
 {
     timecounter tc;
 
+#ifdef HAVE_PARDISO
     Eigen::PardisoLDLT< Eigen::SparseMatrix<T> > AFF_lu(assm.AFF);
 
     auto apply_A = [&]<int ncols>(
@@ -233,7 +237,6 @@ void solve_feast_mf(auto assm, disk::dynamic_matrix<T>& eigvecs,
         Eigen::Matrix<T, Eigen::Dynamic, ncols> z = assm.AFT*v;
         return assm.ATT*v - assm.ATF*AFF_lu.solve(z);
     };
-
     std::cout << "FEAST eigensolver (matrix-free)" << std::endl;
     tc.tic();
     disk::solvers::feast_eigensolver_params<T> params;
@@ -246,6 +249,9 @@ void solve_feast_mf(auto assm, disk::dynamic_matrix<T>& eigvecs,
     disk::solvers::feast_mf(params, apply_A, assm.BTT, eigvecs, eigvals);
 
     std::cout << "Eigensolver time: " << tc.toc() << " seconds\n";
+#else
+    std::cerr << "Pardiso is needed" << std::endl;
+#endif
 }
 
 
@@ -255,6 +261,7 @@ void solve_bjd_mf(auto assm, disk::dynamic_matrix<T>& eigvecs,
 {
     timecounter tc;
 
+#ifdef HAVE_MUMPS
     //Eigen::PardisoLDLT< Eigen::SparseMatrix<T> > AFF_lu(assm.AFF);
     disk::solvers::mumps_solver<T> AFF_lu;
     AFF_lu.symmetric(true);
@@ -279,6 +286,9 @@ void solve_bjd_mf(auto assm, disk::dynamic_matrix<T>& eigvecs,
     disk::solvers::block_jacobi_davidson(params, apply_A,
         assm.BTT, eigvecs, eigvals);
     std::cout << "Eigensolver time: " << tc.toc() << " seconds\n";
+#else
+    std::cerr << "MUMPS is needed" << std::endl;
+#endif
 }
 
 #if 0
@@ -480,11 +490,14 @@ int main(int argc, char **argv)
             std::cout << "Guessed mesh format: GMSH 2D simplicials" << std::endl;
             using mesh_type = disk::triangular_mesh<T>;
             mesh_type msh;
+#ifdef HAVE_GMSH
             disk::gmsh_geometry_loader< mesh_type > loader;
             loader.read_mesh(cfg.mesh_filename);
             loader.populate_mesh(msh);
-
             run_eigsolver(msh, cfg);
+#else
+    std::cerr << "GMSH is needed" << std::endl;
+#endif
             return 0;
         }
 
@@ -493,11 +506,15 @@ int main(int argc, char **argv)
             std::cout << "Guessed mesh format: GMSH 3D simplicials" << std::endl;
             using mesh_type = disk::tetrahedral_mesh<T>;
             mesh_type msh;
+#ifdef HAVE_GMSH
             disk::gmsh_geometry_loader< mesh_type > loader;
             loader.read_mesh(cfg.mesh_filename);
             loader.populate_mesh(msh);
 
             run_eigsolver(msh, cfg);
+#else
+    std::cerr << "GMSH is needed" << std::endl;
+#endif
             return 0;
         }
     }

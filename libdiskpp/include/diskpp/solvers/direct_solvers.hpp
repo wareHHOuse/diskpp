@@ -176,34 +176,6 @@ class sparse_solver {
             _solver_type = direct_solver::sparselu;
 #endif
         }
-
-        /*
-         * Check that the explicitly selected solver is available in the
-         * current build.
-         */
-        switch ( _solver_type ) {
-        case direct_solver::mumps:
-#ifndef HAVE_MUMPS
-            throw std::invalid_argument( "sparse_solver: MUMPS is not available in this build" );
-#endif
-            break;
-        case direct_solver::pardiso:
-#ifndef HAVE_PARDISO
-            throw std::invalid_argument( "sparse_solver: PARDISO is not available in this build" );
-#endif
-            break;
-        case direct_solver::sparselu:
-            // Eigen::SparseLU is always available.
-            break;
-        case direct_solver::autosel:
-            /*
-             * This should be unreachable because autosel has already been
-             * resolved above.
-             */
-            throw std::logic_error( "sparse_solver: automatic solver selection failed" );
-        default:
-            throw std::invalid_argument( "sparse_solver: unknown direct solver" );
-        }
     }
 
     [[nodiscard]]

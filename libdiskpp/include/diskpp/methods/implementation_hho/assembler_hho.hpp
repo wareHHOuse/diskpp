@@ -1307,7 +1307,7 @@ class assembler_mechanics
 
     template<typename LocalContrib>
     void
-    assemble(const mesh_type& msh, const cell_type& cl, const bnd_type& bnd, const LocalContrib& lc, int di = 0)
+    assemble(const mesh_type& msh, const cell_type& cl, const bnd_type& bnd, const LocalContrib& lc, size_t di = 0)
     {
         const size_t face_degree   = m_hdi.face_degree();
         const auto   num_face_dofs = vector_basis_size(face_degree, dimension - 1, dimension);
@@ -1698,7 +1698,7 @@ class assembler_mechanics
     }
 
     vector_type
-    expand_solution(const mesh_type& msh, const bnd_type& bnd, const vector_type& solution, int di = 0)
+    expand_solution(const mesh_type& msh, const bnd_type& bnd, const vector_type& solution, size_t di = 0)
     {
         assert(solution.size() == m_num_unknowns);
         const auto face_degree   = m_hdi.face_degree();
@@ -3321,7 +3321,7 @@ class vector_primal_hho_assembler
     }
 
     vector_type
-    expand_solution(const mesh_type& msh, const boundary_type& bnd, const vector_type& solution, int di = 0) const
+    expand_solution(const mesh_type& msh, const boundary_type& bnd, const vector_type& solution, size_t di = 0) const
     {
         assert(solution.size() == system_size);
 
@@ -4280,7 +4280,7 @@ class vector_mechanics_hho_assembler
     std::tuple<vector_type, std::vector<assembly_index>>
     create_local_connectivity_lin(const mesh_type &msh, const cell_type &cl,
                                   const boundary_type &bnd, const matrix_type &lhs,
-                                  const vector_type &rhs, int di = 1) const {
+                                  const vector_type &rhs, size_t di = 1) const {
         const auto fcs_id = faces_id(msh, cl);
         const auto fcs = faces(msh, cl);
         const auto n_faces_dofs = num_faces_dofs(msh, cl);
@@ -4616,7 +4616,7 @@ class vector_mechanics_hho_assembler
     }
 
     void assemble(const mesh_type &msh, const cell_type &cl, const boundary_type &bnd,
-                  const matrix_type &lhs, const vector_type &rhs, int di = 1) {
+                  const matrix_type &lhs, const vector_type &rhs, size_t di = 1) {
         const auto [rhs_bc, asm_map] = create_local_connectivity_lin(msh, cl, bnd, lhs, rhs, di);
 
         assert(lhs.rows() == lhs.cols());
@@ -4653,7 +4653,7 @@ class vector_mechanics_hho_assembler
     }
 
     void assemble_rhs(const mesh_type &msh, const cell_type &cl, const boundary_type &bnd,
-                      const matrix_type &lhs, const vector_type &rhs, int di = 1) {
+                      const matrix_type &lhs, const vector_type &rhs, size_t di = 1) {
         const auto [rhs_bc, asm_map] = create_local_connectivity_lin(msh, cl, bnd, lhs, rhs, di);
 
         const auto size = rhs.size();
@@ -4670,7 +4670,7 @@ class vector_mechanics_hho_assembler
     void assemble_nonlinear_rhs( const mesh_type &msh, const cell_type &cl,
                                  const boundary_type &bnd, const matrix_type &lhs,
                                  const vector_type &rhs, const std::vector< vector_type > &sol_F,
-                                 int di = 1 ) {
+                                 size_t di = 1 ) {
         const auto [rhs_bc, asm_map] =
             create_local_connectivity( msh, cl, bnd, lhs, rhs, sol_F, di );
 
@@ -4981,7 +4981,7 @@ class vector_mechanics_hho_assembler
     std::pair< vector_type, dynamic_vector< size_t > >
     expand_solution_nonlinear( const mesh_type &msh, const boundary_type &bnd,
                                const vector_type &solution, const std::vector< vector_type > &sol_F,
-                               int di = 1 ) const {
+                               size_t di = 1 ) const {
         assert(solution.size() == system_size);
         assert(sol_F.size() == msh.faces_size());
 
@@ -5007,7 +5007,7 @@ class vector_mechanics_hho_assembler
     }
 
     vector_type expand_solution(const mesh_type &msh, const boundary_type &bnd,
-                                const vector_type &solution, int di = 1) const {
+                                const vector_type &solution, size_t di = 1) const {
         assert(solution.size() == system_size);
 
         vector_type ret = vector_type::Zero(m_total_dofs);
