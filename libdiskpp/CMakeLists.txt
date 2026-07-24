@@ -38,7 +38,7 @@ add_library(diskpp SHARED ${LIBDISKPP_SOURCES})
 
 ######################################################################
 ## Find Eigen 3
-find_package(Eigen3 REQUIRED)
+find_package(Eigen3 3.4 REQUIRED)
 target_link_libraries(diskpp INTERFACE Eigen3::Eigen)
 
 ######################################################################
@@ -99,18 +99,22 @@ target_link_libraries(diskpp PUBLIC sol2::sol2)
 ## HDF5 Support
 find_package(HDF5)
 if (HDF5_FOUND)
-    #add_subdirectory(contrib/highfive)
-    #target_link_libraries(diskpp PUBLIC HighFive::HighFive)
     add_library(diskpp_highfive INTERFACE)
     target_include_directories(diskpp_highfive INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/contrib/highfive/include>
         $<INSTALL_INTERFACE:include>
     )
     add_library(HighFive::HighFive ALIAS diskpp_highfive)
-    target_link_libraries(diskpp PUBLIC HighFive::HighFive HDF5::HDF5)
-    target_compile_definitions(diskpp PUBLIC 
-        HAVE_HDF5
+    target_link_libraries(diskpp_highfive INTERFACE HDF5::HDF5)
+    target_link_libraries(diskpp PUBLIC HighFive::HighFive)
+    target_compile_definitions(diskpp PUBLIC HAVE_HDF5)
+    # HighFive is header-only, include have to be installed.
+    install(
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/contrib/highfive/include/"
+        DESTINATION include
     )
+else()
+    message(STATUS "HDF5 not found: HDF5/HighFive support disabled")
 endif()
 
 ######################################################################
@@ -143,8 +147,21 @@ target_include_directories(diskpp PUBLIC
 
 add_library(diskpp::diskpp ALIAS diskpp)
 
+set(DISKPP_INSTALL_TARGETS
+    diskpp
+    triangle
+    jburkardt
+    gmshtools
+    sgr
+    sol2
+)
 
-install(TARGETS diskpp triangle jburkardt gmshtools sgr sol2 diskpp_highfive
+if (TARGET diskpp_highfive)
+    list(APPEND DISKPP_INSTALL_TARGETS diskpp_highfive)
+endif()
+
+install(
+    TARGETS ${DISKPP_INSTALL_TARGETS}
     EXPORT DiskppTargets
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
@@ -165,9 +182,12 @@ install(EXPORT DiskppTargets
     DESTINATION lib/cmake/diskpp
 )
 
-export(TARGETS diskpp triangle jburkardt gmshtools sgr sol2 diskpp_highfive Spectra
-       NAMESPACE diskpp::
-       FILE "${CMAKE_CURRENT_BINARY_DIR}/DiskppTargets.cmake")
+set(DISKPP_EXPORT_TARGETS ${DISKPP_INSTALL_TARGETS} Spectra)
+
+export( TARGETS ${DISKPP_EXPORT_TARGETS}
+        NAMESPACE diskpp::
+        FILE "${CMAKE_CURRENT_BINARY_DIR}/DiskppTargets.cmake"
+    )
 
 install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/DiskppConfig.cmake"

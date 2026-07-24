@@ -4,10 +4,10 @@
 
 int main(void)
 {
+#ifdef HAVE_HDF5
     disk::sparse_matrix<double> Ms;
     Ms.resize(10,10);
     Ms.setIdentity();
-
     disk::save_to_hdf5(Ms, "sparse.h5");
 
     disk::sparse_matrix<double> Ns;
@@ -22,5 +22,6 @@ int main(void)
     disk::load_from_hdf5(Nd, "dense.h5");
 
     std::cout << Nd << std::endl;
+#endif
     return 0;
 }

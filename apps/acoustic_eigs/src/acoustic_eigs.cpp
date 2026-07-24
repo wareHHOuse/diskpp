@@ -9,14 +9,13 @@
  */
 
 #include <cstddef>
+#include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <regex>
 #include <set>
 #include <string>
-#include <filesystem>
-#include <iomanip>
-
-
+#include <unistd.h>
 
 #include "sol/sol.hpp"
 #include "diskpp/common/eigen.hpp"
@@ -72,7 +71,7 @@ auto
 acoustic_eigs_dg(Mesh& msh, size_t degree,
     const typename Mesh::coordinate_type eta,
     disk::silo_database& silo)
-{   
+{
     std::cout << "DG eigsolver" << std::endl;
     auto cvf = connectivity_via_faces(msh);
     using T = typename Mesh::coordinate_type;
@@ -83,13 +82,13 @@ acoustic_eigs_dg(Mesh& msh, size_t degree,
 
     auto cbs = disk::scalar_basis_size(degree, Mesh::dimension);
     auto assm = make_discontinuous_galerkin_eigenvalue_assembler(msh, cbs);
-    
+
     timecounter tc;
     tc.tic();
     for (auto& tcl : msh)
     {
         auto tbasis = disk::basis::scaled_monomial_basis(msh, tcl, degree, basis_rescaling);
-        
+
         matrix_type M = integrate(msh, tcl, tbasis, tbasis);
         matrix_type K = integrate(msh, tcl, grad(tbasis), grad(tbasis));
 
@@ -98,15 +97,15 @@ acoustic_eigs_dg(Mesh& msh, size_t degree,
 
         auto fcs = faces(msh, tcl);
         for (auto& fc : fcs)
-        {   
+        {
             auto n     = normal(msh, tcl, fc);
             auto eta_l = eta / diameter(msh, fc);
-            
+
             auto nv = cvf.neighbour_via(msh, tcl, fc);
             if (nv) {
                 matrix_type Att = matrix_type::Zero(tbasis.size(), tbasis.size());
                 matrix_type Atn = matrix_type::Zero(tbasis.size(), tbasis.size());
-                
+
                 auto ncl = nv.value();
                 auto nbasis = disk::basis::scaled_monomial_basis(msh, ncl, degree, basis_rescaling);
                 assert(tbasis.size() == nbasis.size());
@@ -128,7 +127,7 @@ acoustic_eigs_dg(Mesh& msh, size_t degree,
                 //Att += - integrate(msh, fc, grad(tbasis).dot(n), tbasis);
                 //Att += - integrate(msh, fc, tbasis, grad(tbasis).dot(n));
                 //assm.assemble(msh, tcl, tcl, Att);
-            }   
+            }
         }
     }
 
@@ -183,7 +182,7 @@ acoustic_eigs_dg(Mesh& msh, size_t degree,
             auto ofs = cbs * offset(msh, cl);
             u.push_back(eigvecs(ofs, col));
         }
-        
+
         std::string vname = "eigfun_" + std::to_string(col);
         silo.add_variable("mesh", vname, u, disk::zonal_variable_t);
     }
@@ -397,7 +396,7 @@ acoustic_eigs_hho(const Mesh& msh, const config& cfg, disk::silo_database& silo)
             auto ofs = cbasis_type::size_of_degree(di.cell) * offset(msh, cl);
             u.push_back(eigvecs(ofs, col));
         }
-        
+
         std::string vname = "hho_eigfun_" + std::to_string(col);
         silo.add_variable("hmesh", vname, u, disk::zonal_variable_t);
     }
@@ -442,7 +441,7 @@ int main(int argc, char **argv)
         case 'f':
             cfg.mesh_filename = optarg;
             break;
-        
+
         case 'k':
             cfg.order = std::stoul(optarg);
             break;
@@ -475,7 +474,7 @@ int main(int argc, char **argv)
 
 
     if (cfg.mesh_filename != "") {
- 
+
         if (std::regex_match(cfg.mesh_filename, std::regex(".*\\.geo2s$") ))
         {
             std::cout << "Guessed mesh format: GMSH 2D simplicials" << std::endl;
@@ -488,7 +487,7 @@ int main(int argc, char **argv)
             run_eigsolver(msh, cfg);
             return 0;
         }
-  
+
         if (std::regex_match(cfg.mesh_filename, std::regex(".*\\.geo3s$") ))
         {
             std::cout << "Guessed mesh format: GMSH 3D simplicials" << std::endl;
@@ -515,7 +514,7 @@ int main(int argc, char **argv)
 
         for (int i = 0; i < cfg.reflevels; i++) {
             mesher.refine();
-        
+
             std::cout << ">>>>>>>> DIAM: " << disk::average_diameter(msh) << std::endl;
             run_eigsolver(msh, cfg);
         }
@@ -533,7 +532,7 @@ int main(int argc, char **argv)
 
         for (int i = 0; i < cfg.reflevels; i++) {
             mesher.refine();
-        
+
             std::cout << ">>>>>>>> DIAM: " << disk::average_diameter(msh) << std::endl;
             run_eigsolver(msh, cfg);
         }
@@ -551,7 +550,7 @@ int main(int argc, char **argv)
 
         for (int i = 0; i < cfg.reflevels; i++) {
             mesher.refine();
-        
+
             std::cout << ">>>>>>>> DIAM: " << disk::average_diameter(msh) << std::endl;
             run_eigsolver(msh, cfg);
         }
@@ -570,7 +569,7 @@ int main(int argc, char **argv)
 
         for (int i = 0; i < cfg.reflevels; i++) {
             mesher.refine();
-        
+
             std::cout << ">>>>>>>> DIAM: " << disk::average_diameter(msh) << std::endl;
             run_eigsolver(msh, cfg);
         }
@@ -589,11 +588,11 @@ int main(int argc, char **argv)
             msh.transform( [&](const typename mesh_type::point_type& pt) {
                 return typename mesh_type::point_type{pt.x(), 1.1*pt.y()};
             } );
-        
+
             std::cout << ">>>>>>>> DIAM: " << disk::average_diameter(msh) << std::endl;
             run_eigsolver(msh, cfg);
         }
     }
-    
+
     return 0;
 }

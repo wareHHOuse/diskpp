@@ -8,8 +8,9 @@
  * Dipartimento di Matematica
  */
 
-#include <iostream>
 #include <algorithm>
+#include <iostream>
+#include <unistd.h>
 
 #include "diskpp/mesh/mesh.hpp"
 #include "diskpp/mesh/meshgen.hpp"
@@ -40,7 +41,7 @@ set_dirichlet(const Mesh& msh, std::vector<bool>& bcs, size_t bnd)
             bcs[fcnum] = true;
         }
         fcnum++;
-    }   
+    }
 }
 
 template<typename Mesher>
@@ -121,7 +122,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    std::cout << "mu = " << mu << ", lambda = " << lambda << std::endl; 
+    std::cout << "mu = " << mu << ", lambda = " << lambda << std::endl;
 
     //using mesh_type = disk::simplicial_mesh<T,2>;
     //using mesh_type = disk::cartesian_mesh<T,2>;
@@ -140,12 +141,12 @@ int main(int argc, char **argv) {
         };
         msh.transform(tr);
     }
-    
+
 
     const static size_t DIM = mesh_type::dimension;
     auto fbs = disk::vector_basis_size(degree, DIM-1, DIM);
 
-    
+
 
     std::vector<bc> bcs;
     set_boundary(msh, bcs, bc::neumann, 0);
@@ -160,7 +161,7 @@ int main(int argc, char **argv) {
         if (mode == hho_mode::standard) {
             return b == bc::dirichlet;
         }
-        
+
         return (b == bc::dirichlet) or (b == bc::neumann);
     };
 
@@ -243,7 +244,7 @@ int main(int argc, char **argv) {
     std::cout << "Solver: " << std::flush;
     disk::dynamic_vector<T> sol;
     disk::solvers::sparse_lu(assm.LHS, assm.RHS, sol);
-    
+
     /*
     Eigen::SparseLU<Eigen::SparseMatrix<T>> solver(assm.LHS);
     disk::dynamic_vector<T> sol = solver.solve(assm.RHS);
@@ -270,7 +271,7 @@ int main(int argc, char **argv) {
         auto locsolF = assm.take_local_solution(msh, cl, sol);
         disk::dynamic_vector<T> locsol =
             disk::static_decondensation(lhs, rhs, locsolF);
-        
+
         u_data(cell_i, 0) = locsol(0);
         u_data(cell_i, 1) = locsol(1);
         if constexpr (DIM == 3) {
