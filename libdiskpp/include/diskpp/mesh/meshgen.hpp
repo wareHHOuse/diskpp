@@ -155,7 +155,7 @@ public:
     simple_mesher(mesh_type& msh)
         : storage( msh.backend_storage() )
     {
-        init_pattern_1();
+        init_pattern_2();
     }
 
     void refine(void)

@@ -58,6 +58,7 @@ template<typename T>
 void init(solver_state<T>& state)
 {
     std::vector<std::pair<int, T>>  dirichlet_vals {
+        {0, 0.0},
         {1, 0.0},
         {2, 0.0},
         {3, 0.0},

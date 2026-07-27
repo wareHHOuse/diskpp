@@ -103,14 +103,35 @@ int main(int argc, char **argv)
     }
 
     using mesh_type = disk::simplicial_mesh<RealType, 2>;
+    using point_type = typename mesh_type::point_type;
 
-    disk::gmsh_geometry_loader<mesh_type> loader;
-    loader.read_mesh(argv[1]);
+    
 
 
     disk::cfem::poisson::solver_state<RealType> state;
+    
+    //disk::gmsh_geometry_loader<mesh_type> loader;
+    //loader.read_mesh(argv[1]);
+    //loader.populate_mesh(state.msh);
 
-    loader.populate_mesh(state.msh);
+    auto mesher = make_simple_mesher(state.msh);
+    mesher.refine();
+    mesher.refine();
+    mesher.refine();
+    mesher.refine();
+
+    double theta = M_PI/2.0;
+
+    state.msh.transform( [&](const point_type& pt){
+        auto c = std::cos(theta);
+        auto s = std::sin(theta);
+        point_type newp{
+            c*pt.x() - s*pt.y() + 1.0,
+            s*pt.x() + c*pt.y() + 0.0
+        };
+        return newp;
+    });
+
 
     std::cout << "init & asm\n"; 
 
