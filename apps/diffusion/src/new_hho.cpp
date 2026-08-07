@@ -81,7 +81,7 @@ struct solution<Mesh> {
 
 template<typename Mesh>
 void
-diffusion_solver(const Mesh& msh, size_t degree)
+diffusion_solver(const Mesh& msh, size_t degree, double stabparam)
 {
     using namespace disk::basis;
     using namespace disk::hho::slapl;
@@ -102,7 +102,7 @@ diffusion_solver(const Mesh& msh, size_t degree)
         auto [R, A] = local_operator(msh, cl, di);
         auto S = local_stabilization(msh, cl, di, R);
 
-        disk::dynamic_matrix<T> lhs = A+S;
+        disk::dynamic_matrix<T> lhs = A+stabparam*S;
     
         auto phiT = typename hho_space<mesh_type>::cell_basis_type(msh, cl, di.cell);
         disk::dynamic_vector<T> rhs = integrate(msh, cl, f, phiT);
@@ -126,7 +126,9 @@ diffusion_solver(const Mesh& msh, size_t degree)
 
     std::vector<T> u_data;
 
-    T error = 0.0;
+    T Aerror = 0.0;
+    T Eerror = 0.0;
+    T stabnrg = 0.0;
     disk::solution<Mesh> u_sol;
     tc.tic();
     for (auto& cl : msh)
@@ -135,10 +137,13 @@ diffusion_solver(const Mesh& msh, size_t degree)
         auto S = local_stabilization(msh, cl, di, R);       
 
 
-        disk::dynamic_matrix<T> lhs = A+S;
+        disk::dynamic_matrix<T> lhs = A+stabparam*S;
 
         auto phiT = typename hho_space<mesh_type>::cell_basis_type(msh, cl, di.cell);
         disk::dynamic_vector<T> rhs = integrate(msh, cl, f, phiT);
+
+        auto phiR = typename hho_space<mesh_type>::cell_basis_type(msh, cl, di.reco);
+        disk::dynamic_matrix<T> K = integrate(msh, cl, grad(phiR), grad(phiR)).block(1,1,phiR.size()-1, phiR.size()-1);
     
         disk::dynamic_vector<T> sol_ana = local_reduction(msh, cl, di, u_sol);
 
@@ -148,11 +153,15 @@ diffusion_solver(const Mesh& msh, size_t degree)
         u_data.push_back(locsol(0));
 
         disk::dynamic_vector<T> diff = locsol - sol_ana;
-        error += diff.dot(lhs*diff);
+        Aerror += diff.dot(lhs*diff);
+        Eerror += (R*diff).transpose().dot(K*R*diff);
+        stabnrg += locsol.dot(S * locsol);
     }
     std::cout << "Postpro time: " << tc.toc() << std::endl;
 
-    std::cout << "A-norm error: " << std::sqrt(error) << std::endl;
+    std::cout << "A-norm error : " << std::sqrt(Aerror) << std::endl;
+    std::cout << "Energy error : " << std::sqrt(Eerror) << std::endl;
+    std::cout << "stab energy  : " << std::sqrt(stabnrg) << std::endl;
 
     disk::silo_database silo_db;
     silo_db.create("diffusion.silo");
@@ -169,9 +178,12 @@ int main(int argc, char **argv)
 
     int num_refs = 0;
     int degree = 1;
+    double stabparam = 1;
+    double scaleX = 1.0;
+    double scaleY = 1.0;
 
     int ch;
-    while ( (ch = getopt(argc, argv, "k:r:m:")) != -1 )
+    while ( (ch = getopt(argc, argv, "k:r:m:s:x:y:")) != -1 )
     {
         switch(ch)
         {
@@ -191,6 +203,18 @@ int main(int argc, char **argv)
                 mesh_filename = optarg;
                 break;
 
+            case 's':
+                stabparam = std::stod(optarg);
+                break;
+
+            case 'x':
+                scaleX = std::stod(optarg);
+                break;
+
+            case 'y':
+                scaleY = std::stod(optarg);
+                break;
+
             case '?':
             default:
                 std::cout << "Invalid option" << std::endl;
@@ -201,17 +225,21 @@ int main(int argc, char **argv)
     if (mesh_filename != "") {
         disk::generic_mesh<T,2> msh_2D_fromfile;
         load_single_element_csv(msh_2D_fromfile, mesh_filename);
-        diffusion_solver(msh_2D_fromfile, degree);
+        diffusion_solver(msh_2D_fromfile, degree, stabparam);
         return 0;
     }
 
-    using mesh_type = disk::cartesian_mesh<T,2>;
+    using mesh_type = disk::simplicial_mesh<T,2>;
     mesh_type msh;
     auto mesher = disk::make_simple_mesher(msh);
     for (auto r = 0; r < num_refs; r++)
         mesher.refine();
 
-    diffusion_solver(msh, degree);
+    msh.transform( [&](const typename mesh_type::point_type& pt) {
+        return typename mesh_type::point_type{scaleX*pt.x(), scaleY*pt.y()};
+    } );
+
+    diffusion_solver(msh, degree, stabparam);
     return 0;
 
     #if 0

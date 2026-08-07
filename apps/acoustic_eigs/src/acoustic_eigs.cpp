@@ -63,6 +63,7 @@ struct config {
     mesh_source     source = mesh_source::external;
     std::string     mesh_filename;
     std::string     silo_filename;
+    double          stabparam = 1.0;
 };
 
 namespace disk {
@@ -353,15 +354,9 @@ acoustic_eigs_hho(const Mesh& msh, const config& cfg, disk::silo_database& silo)
         auto [R, A] = local_operator(msh, cl, di);
         auto S = local_stabilization(msh, cl, di, R);
         auto M = integrate(msh, cl, phiT, phiT);
-        disk::dynamic_matrix<T> lhs = A+S;
+        disk::dynamic_matrix<T> lhs = A+cfg.stabparam*S;
         lhs.block(0,0,cbs,cbs) += M;
-
-        disk::dynamic_matrix<T> rhs = integrate(msh, cl, phiT, phiT);
-
-        
-        lhs.block(0,0,cbs,cbs) += rhs;
-
-        assm.assemble(msh, cl, lhs, rhs);
+        assm.assemble(msh, cl, lhs, M);
     }
     assm.finalize();
 
@@ -430,7 +425,7 @@ int main(int argc, char **argv)
     config cfg;
 
     int opt;
-    while ((opt = getopt(argc, argv, "e:f:k:m:o:r:")) != -1) {
+    while ((opt = getopt(argc, argv, "e:f:k:m:o:r:s:")) != -1) {
         switch (opt) {
 
         case 'e':
@@ -475,6 +470,10 @@ int main(int argc, char **argv)
 
         case 'r':
             cfg.reflevels = std::stoul(optarg);
+            break;
+
+        case 's':
+            cfg.stabparam = std::stod(optarg);
             break;
         }
     }
