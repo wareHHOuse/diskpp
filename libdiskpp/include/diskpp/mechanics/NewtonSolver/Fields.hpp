@@ -38,7 +38,9 @@ enum class FieldName {
     DEPL,
     DEPL_CELLS,
     DEPL_FACES,
+    VITE,
     VITE_CELLS,
+    ACCE,
     ACCE_CELLS,
     RESI_CELLS,
 };
@@ -54,8 +56,14 @@ std::string getFieldName( FieldName name ) {
     case FieldName::DEPL_FACES:
         return "DEPL_FACES";
         break;
+    case FieldName::VITE:
+        return "VITE";
+        break;
     case FieldName::VITE_CELLS:
         return "VITE_CELLS";
+        break;
+    case FieldName::ACCE:
+        return "ACCE";
         break;
     case FieldName::ACCE_CELLS:
         return "ACCE_CELLS";
@@ -168,8 +176,9 @@ class TimeField {
                           const MeshDegreeInfo< Mesh > &degree_infos ) {
         std::vector< vector_type > field;
 
-        if ( name == FieldName::DEPL || name == FieldName::DEPL_CELLS ||
-             name == FieldName::VITE_CELLS || name == FieldName::ACCE_CELLS ) {
+        if ( name == FieldName::DEPL || name == FieldName::DEPL_CELLS || name == FieldName::VITE ||
+             name == FieldName::VITE_CELLS || name == FieldName::ACCE ||
+             name == FieldName::ACCE_CELLS ) {
             field.reserve( mesh.cells_size() );
 
             for ( auto &cl : mesh ) {
@@ -219,8 +228,9 @@ class TimeField {
                       const vector_rhs_function< Mesh > func ) {
         std::vector< vector_type > field;
 
-        if ( name == FieldName::DEPL || name == FieldName::DEPL_CELLS ||
-             name == FieldName::VITE_CELLS || name == FieldName::ACCE_CELLS ) {
+        if ( name == FieldName::DEPL || name == FieldName::DEPL_CELLS || name == FieldName::VITE ||
+             name == FieldName::VITE_CELLS || name == FieldName::ACCE ||
+             name == FieldName::ACCE_CELLS ) {
             field.reserve( mesh.cells_size() );
 
             for ( auto &cl : mesh ) {

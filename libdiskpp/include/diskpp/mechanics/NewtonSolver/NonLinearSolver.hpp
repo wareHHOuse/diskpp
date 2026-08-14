@@ -126,7 +126,9 @@ class NonLinearSolver {
         tf.createZeroField( FieldName::DEPL_CELLS, m_msh, m_degree_infos );
         tf.createZeroField( FieldName::DEPL_FACES, m_msh, m_degree_infos );
         if ( m_rp.isUnsteady() ) {
+            tf.createZeroField( FieldName::VITE, m_msh, m_degree_infos );
             tf.createZeroField( FieldName::VITE_CELLS, m_msh, m_degree_infos );
+            tf.createZeroField( FieldName::ACCE, m_msh, m_degree_infos );
             tf.createZeroField( FieldName::ACCE_CELLS, m_msh, m_degree_infos );
         }
         m_fields.setCurrentTimeField( tf );
@@ -315,6 +317,12 @@ class NonLinearSolver {
         if ( name == FieldName::DEPL ) {
             m_fields.createField( 0, FieldName::DEPL_CELLS, m_msh, m_degree_infos, func );
             m_fields.createField( 0, FieldName::DEPL_FACES, m_msh, m_degree_infos, func );
+        }
+        if ( name == FieldName::VITE ) {
+            m_fields.createField( 0, FieldName::VITE_CELLS, m_msh, m_degree_infos, func );
+        }
+        if ( name == FieldName::ACCE ) {
+            m_fields.createField( 0, FieldName::ACCE_CELLS, m_msh, m_degree_infos, func );
         }
         m_fields.createField( 0, name, m_msh, m_degree_infos, func );
     }

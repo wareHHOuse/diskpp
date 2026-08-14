@@ -92,8 +92,10 @@ class NewtonIteration : public GenericIteration< MeshType > {
         std::vector< vector_type > resi_cells;
 
         std::vector< vector_type > acce_cells;
+        std::vector< vector_type > vite;
         if ( this->m_dyna.enable() ) {
             acce_cells = fields.getCurrentField( FieldName::ACCE_CELLS );
+            vite = fields.getCurrentField( FieldName::VITE );
             resi_cells.reserve( msh.cells_size() );
         }
 
@@ -114,6 +116,11 @@ class NewtonIteration : public GenericIteration< MeshType > {
             const auto num_tot_dofs = huT.size();
             const auto num_faces_dofs = num_tot_dofs - num_cell_dofs;
 
+            vector_type hvT = vector_type::Zero( num_tot_dofs );
+            if ( this->m_dyna.enable() ) {
+                hvT = vite.at( cell_i );
+            }
+
             // Gradient Reconstruction
             // std::cout << "Grad" << std::endl;
             tc.tic();
@@ -126,8 +133,8 @@ class NewtonIteration : public GenericIteration< MeshType > {
 
             tc.tic();
             // std::cout << "Elem" << std::endl;
-            elem.compute( msh, cl, bnd, rp, degree_infos, rlf, GT, huT, this->m_time_step, behavior,
-                          stab_manager, small_def, true, use_tangent_modulus );
+            elem.compute( msh, cl, bnd, rp, degree_infos, rlf, GT, huT, hvT, this->m_time_step,
+                          behavior, stab_manager, small_def, true, use_tangent_modulus );
 
             matrix_type lhs = elem.K_int;
             vector_type rhs = elem.RTF;

@@ -269,6 +269,11 @@ class QuasiNewtonIteration : public GenericIteration< MeshType > {
         auto depl = fields.getCurrentField( FieldName::DEPL );
         auto depl_faces = fields.getCurrentField( FieldName::DEPL_FACES );
 
+        std::vector< vector_type > vite;
+        if ( this->m_dyna.enable() ) {
+            vite = fields.getCurrentField( FieldName::VITE );
+        }
+
         const auto lhs_loc = data.m_lhs_loc;
 
         std::vector< vector_type > resi_cells;
@@ -291,6 +296,11 @@ class QuasiNewtonIteration : public GenericIteration< MeshType > {
             const auto num_tot_dofs = huT.size();
             const auto num_faces_dofs = num_tot_dofs - num_cell_dofs;
 
+            vector_type hvT = vector_type::Zero( num_tot_dofs );
+            if ( this->m_dyna.enable() ) {
+                hvT = vite.at( cell_i );
+            }
+
             // Gradient Reconstruction
             // std::cout << "Grad" << std::endl;
             tc.tic();
@@ -303,8 +313,8 @@ class QuasiNewtonIteration : public GenericIteration< MeshType > {
 
             tc.tic();
             // std::cout << "Elem" << std::endl;
-            elem.compute( msh, cl, bnd, rp, degree_infos, rlf, GT, huT, this->m_time_step, behavior,
-                          stab_manager, small_def, false );
+            elem.compute( msh, cl, bnd, rp, degree_infos, rlf, GT, huT, hvT, this->m_time_step,
+                          behavior, stab_manager, small_def, false );
 
             vector_type rhs = elem.RTF.tail( num_faces_dofs );
             this->m_F_int += elem.F_int.tail( num_faces_dofs ).squaredNorm();

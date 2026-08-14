@@ -332,12 +332,12 @@ class mechanical_computation {
     void compute_contact_terms( const mesh_type &msh, const cell_type &cl, const bnd_type &bnd,
                                 const param_type &rp, const CellDegreeInfo< mesh_type > &cell_infos,
                                 const matrix_type &RkT, const vector_type &uTF,
-                                const TimeStep< scalar_type > &time_step,
+                                const vector_type &vTF, const TimeStep< scalar_type > &time_step,
                                 behavior_type &behavior ) {
         if ( bnd.cell_has_contact_faces( cl ) ) {
             const auto &material_data = behavior.getMaterialData();
             auto cc = contact_contribution( msh, material_data, rp, bnd );
-            cc.compute( cl, cell_infos, RkT, uTF );
+            cc.compute( cl, cell_infos, RkT, uTF, vTF );
 
             time_contact += cc.time_contact;
 
@@ -381,10 +381,10 @@ class mechanical_computation {
     void compute( const mesh_type &msh, const cell_type &cl, const bnd_type &bnd,
                   const param_type &rp, const MeshDegreeInfo< mesh_type > &degree_infos,
                   const std::unique_ptr< func_type > &load, const matrix_type &RkT,
-                  const vector_type &uTF, const TimeStep< scalar_type > &time_step,
-                  behavior_type &behavior, StabCoeffManager< scalar_type > &stab_manager,
-                  const bool small_def, const bool tangent_matix = true,
-                  const bool use_tangent_modulus = true ) {
+                  const vector_type &uTF, const vector_type &vTF,
+                  const TimeStep< scalar_type > &time_step, behavior_type &behavior,
+                  StabCoeffManager< scalar_type > &stab_manager, const bool small_def,
+                  const bool tangent_matix = true, const bool use_tangent_modulus = true ) {
         timecounter tc;
 
         const auto cell_infos = degree_infos.cellDegreeInfo( msh, cl );
@@ -542,7 +542,8 @@ class mechanical_computation {
 
         // Compute contact terms
 
-        this->compute_contact_terms( msh, cl, bnd, rp, cell_infos, RkT, uTF, time_step, behavior );
+        this->compute_contact_terms( msh, cl, bnd, rp, cell_infos, RkT, uTF, vTF, time_step,
+                                     behavior );
 
         // std::cout << "K: " << K_int.norm() << std::endl;
         // // std::cout << K_int << std::endl;

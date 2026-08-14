@@ -764,7 +764,7 @@ class contact_contribution {
         : m_msh( msh ), m_material_data( material_data ), m_rp( rp ), m_bnd( bnd ) {}
 
     void compute( const cell_type &cl, const CellDegreeInfo< mesh_type > &cell_infos,
-                  const matrix_type &ET, const vector_type &uTF ) {
+                  const matrix_type &ET, const vector_type &uTF, const vector_type &vTF ) {
         timecounter tc;
         tc.tic();
 
@@ -803,25 +803,41 @@ class contact_contribution {
         // friction contribution
         if ( m_rp.m_frot_type != NO_FRICTION ) {
             if ( m_rp.m_frot_type == TRESCA ) {
-                // compute (phi_t_theta, [phi_t_1(u)]_s)_FC / gamma
-                F_cont += make_hho_threshold_tresca( cl, ET, uTF, cell_infos );
+                if ( m_rp.isUnsteady() ) {
+                    // compute (phi_t_theta, [phi_t_1(v)]_s)_FC / gamma
+                    F_cont += make_hho_threshold_tresca( cl, ET, vTF, cell_infos );
 
-                // auto Ff1 = make_hho_threshold_tresca(cl, ET, uTF, cell_infos);
-                // std::cout << "Threshold: " << Ff1.norm() << std::endl;
-                // std::cout << Ff1.transpose() << std::endl
+                    // compute (phi_t_theta, (d_proj_alpha(v)) phi_t_1)_FC / gamma
+                    K_cont += make_hho_matrix_tresca( cl, ET, vTF, cell_infos );
+                } else {
+                    // compute (phi_t_theta, [phi_t_1(u)]_s)_FC / gamma
+                    F_cont += make_hho_threshold_tresca( cl, ET, uTF, cell_infos );
 
-                // compute (phi_t_theta, (d_proj_alpha(u)) phi_t_1)_FC / gamma
-                K_cont += make_hho_matrix_tresca( cl, ET, uTF, cell_infos );
+                    // auto Ff1 = make_hho_threshold_tresca(cl, ET, uTF, cell_infos);
+                    // std::cout << "Threshold: " << Ff1.norm() << std::endl;
+                    // std::cout << Ff1.transpose() << std::endl
+
+                    // compute (phi_t_theta, (d_proj_alpha(u)) phi_t_1)_FC / gamma
+                    K_cont += make_hho_matrix_tresca( cl, ET, uTF, cell_infos );
+                }
             } else if ( m_rp.m_frot_type == COULOMB ) {
-                // compute (phi_t_theta, [phi_t_1(u)]_s)_FC / gamma
-                F_cont += make_hho_threshold_coulomb( cl, ET, uTF, cell_infos );
+                if ( m_rp.isUnsteady() ) {
+                    // compute (phi_t_theta, [phi_t_1(v)]_s)_FC / gamma
+                    F_cont += make_hho_threshold_coulomb( cl, ET, vTF, cell_infos );
 
-                // auto Ff1 = make_hho_threshold_tresca(cl, ET, uTF, cell_infos);
-                // std::cout << "Threshold: " << Ff1.norm() << std::endl;
-                // std::cout << Ff1.transpose() << std::endl
+                    // compute (phi_t_theta, (d_proj_alpha(v)) phi_t_1)_FC / gamma
+                    K_cont += make_hho_matrix_coulomb( cl, ET, vTF, cell_infos );
+                } else {
+                    // compute (phi_t_theta, [phi_t_1(u)]_s)_FC / gamma
+                    F_cont += make_hho_threshold_coulomb( cl, ET, uTF, cell_infos );
 
-                // compute (phi_t_theta, (d_proj_alpha(u)) phi_t_1)_FC / gamma
-                K_cont += make_hho_matrix_coulomb( cl, ET, uTF, cell_infos );
+                    // auto Ff1 = make_hho_threshold_tresca(cl, ET, uTF, cell_infos);
+                    // std::cout << "Threshold: " << Ff1.norm() << std::endl;
+                    // std::cout << Ff1.transpose() << std::endl
+
+                    // compute (phi_t_theta, (d_proj_alpha(u)) phi_t_1)_FC / gamma
+                    K_cont += make_hho_matrix_coulomb( cl, ET, uTF, cell_infos );
+                }
             }
         }
 
