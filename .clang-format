@@ -9,6 +9,9 @@ ColumnLimit: 100
 AlwaysBreakTemplateDeclarations: Yes
 BreakConstructorInitializers : BeforeColon
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
+AlwaysBreakAfterReturnType: All
+BinPackParameters: false
+BinPackArguments: false
 FixNamespaceComments : true
 IncludeBlocks: Regroup
 IncludeCategories:

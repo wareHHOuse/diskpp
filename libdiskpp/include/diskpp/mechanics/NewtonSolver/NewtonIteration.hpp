@@ -96,7 +96,7 @@ class NewtonIteration : public GenericIteration< MeshType > {
         if ( this->m_dyna.enable() ) {
             acce_cells = fields.getCurrentField( FieldName::ACCE_CELLS );
             vite = fields.getCurrentField( FieldName::VITE );
-            resi_cells.reserve( msh.cells_size() );
+            resi_cells.resize( msh.cells_size() );
         }
 
         auto rlf = this->_getLoad( lf, current_time );
@@ -192,7 +192,7 @@ class NewtonIteration : public GenericIteration< MeshType > {
                 this->m_AL[cell_i] = matrix_type::Zero( num_cell_dofs, num_faces_dofs );
                 this->m_bL[cell_i] = vector_type::Zero( num_cell_dofs );
 
-                resi_cells.push_back( rhs.head( num_cell_dofs ) );
+                resi_cells[cell_i] = rhs.head( num_cell_dofs );
 
                 tc.toc();
                 ai.m_time_statcond += tc.elapsed();

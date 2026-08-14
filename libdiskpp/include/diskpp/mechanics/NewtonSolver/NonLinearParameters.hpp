@@ -61,6 +61,7 @@ enum NonLinearSolverType {
     QNEWTON_BDIAG_JACO,
     QNEWTON_BDIAG_STAB,
     QNEWTON_BDIAG_ELAS,
+    EXPLICIT,
 };
 
 enum LineSearchType {
@@ -208,6 +209,10 @@ std::string NonLinearSolverName( const NonLinearSolverType &type ) {
     }
     case NonLinearSolverType::QNEWTON_BDIAG_ELAS: {
         return "QNEWTON_BDIAG_ELAS";
+        break;
+    }
+    case NonLinearSolverType::EXPLICIT: {
+        return "EXPLICIT";
         break;
     }
     default:
@@ -454,7 +459,7 @@ class NonLinearParameters {
                 else if ( type == "NO" ) {
                     m_stab = false;
                     m_stab_type = StabilizationType::NO;
-                } else 
+                } else
                     error_keyword(line, keyword, type);
             } else if ( keyword == "Beta" ) {
                 ifs >> m_beta;
@@ -495,7 +500,7 @@ class NonLinearParameters {
                     m_frot_type = FrictionType::TRESCA;
                 else if ( type == "COULOMB" )
                     m_frot_type = FrictionType::COULOMB;
-                else 
+                else
                     error_keyword(line, keyword, type);
             } else if ( keyword == "Threshold" ) {
                 ifs >> m_threshold;
@@ -515,7 +520,7 @@ class NonLinearParameters {
                     m_dyna_type = DynamicType::CRANK_NICOLSON;
                 else if ( type == "LEAP_FROG" )
                     m_dyna_type = DynamicType::LEAP_FROG;
-                else 
+                else
                     error_keyword(line, keyword, type);
             } else if ( keyword == "CFL" ) {
                 ifs >> m_cfl_factor;
@@ -534,6 +539,8 @@ class NonLinearParameters {
                     m_nlin_solv = NonLinearSolverType::QNEWTON_BDIAG_STAB;
                 } else if ( type == "QNEWTON_BDIAG_ELAS" ) {
                     m_nlin_solv = NonLinearSolverType::QNEWTON_BDIAG_ELAS;
+                } else if ( type == "EXPLICIT" ) {
+                    m_nlin_solv = NonLinearSolverType::EXPLICIT;
                 } else {
                     error_keyword(line, keyword, type);
                 }

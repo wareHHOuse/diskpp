@@ -120,6 +120,16 @@ class law_qp_bones {
 
     scalar_type getEquivalentPlasticStrain() const { return scalar_type( 0 ); }
 
+    void
+    setElasticStrainPrev( const static_matrix_type &elastic_strain ) {
+        m_estrain_prev = convertMatrix3D( elastic_strain );
+    }
+
+    void
+    setElasticStrain( const static_matrix_type &elastic_strain ) {
+        m_estrain_curr = convertMatrix3D( elastic_strain );
+    }
+
     void update() { m_estrain_prev = m_estrain_curr; }
 
     void restore() { m_estrain_curr = m_estrain_prev; }

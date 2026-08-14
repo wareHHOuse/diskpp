@@ -31,6 +31,7 @@
 #include "diskpp/adaptivity/adaptivity.hpp"
 #include "diskpp/boundary_conditions/boundary_conditions.hpp"
 #include "diskpp/common/timecounter.hpp"
+#include "diskpp/mechanics/NewtonSolver/ExplicitIteration.hpp"
 #include "diskpp/mechanics/NewtonSolver/NewtonIteration.hpp"
 #include "diskpp/mechanics/NewtonSolver/NewtonSolverInformations.hpp"
 #include "diskpp/mechanics/NewtonSolver/NonLinearParameters.hpp"
@@ -129,6 +130,11 @@ class NonLinearStep {
                 msh, bnd, rp, degree_infos, lin_solv, current_step );
             break;
         }
+        case NonLinearSolverType::EXPLICIT: {
+            nlIter = std::make_unique< ExplicitIteration< mesh_type > >( msh, bnd, rp, degree_infos,
+                                                                         lin_solv, current_step );
+            break;
+        }
         default:
             throw std::runtime_error( "Unexpected NonLinearSolver." );
             break;
@@ -182,6 +188,11 @@ class NonLinearStep {
                 msh, bnd, rp, degree_infos, lf, data, behavior, stab_manager, fields );
 
             ni.m_iter++;
+
+            if ( rp.getNonLinearSolver() == NonLinearSolverType::EXPLICIT ) {
+                m_convergence = true;
+                break;
+            }
         }
 
         tc.toc();

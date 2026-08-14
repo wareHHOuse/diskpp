@@ -5006,12 +5006,16 @@ class vector_mechanics_hho_assembler
         return std::make_pair( ret, idx );
     }
 
-    vector_type expand_solution(const mesh_type &msh, const boundary_type &bnd,
-                                const vector_type &solution, size_t di = 1) const {
+    std::pair< vector_type, dynamic_vector< size_t > >
+    expand_solution( const mesh_type &msh,
+                     const boundary_type &bnd,
+                     const vector_type &solution,
+                     int di = 1 ) const {
         assert(solution.size() == system_size);
 
         vector_type ret = vector_type::Zero(m_total_dofs);
-        size_t face_offset = 0;
+        dynamic_vector< size_t > idx = dynamic_vector< size_t >::Zero( msh.faces_size() + 1 );
+        size_t face_offset = 0, face_i = 0;
 
         for (auto itor = msh.faces_begin(); itor != msh.faces_end(); itor++) {
             const auto bfc = *itor;
@@ -5023,9 +5027,11 @@ class vector_mechanics_hho_assembler
                 take_local_solution(msh, bfc, bnd, solution, di);
 
             face_offset += n_face_dofs;
+            face_i++;
+            idx( face_i ) = idx( face_i - 1 ) + n_face_dofs;
         }
 
-        return ret;
+        return std::make_pair( ret, idx );
     }
 
     void

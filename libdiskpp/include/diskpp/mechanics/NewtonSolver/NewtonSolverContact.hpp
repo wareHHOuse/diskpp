@@ -763,8 +763,13 @@ class contact_contribution {
                           const param_type &rp, const bnd_type &bnd )
         : m_msh( msh ), m_material_data( material_data ), m_rp( rp ), m_bnd( bnd ) {}
 
-    void compute( const cell_type &cl, const CellDegreeInfo< mesh_type > &cell_infos,
-                  const matrix_type &ET, const vector_type &uTF, const vector_type &vTF ) {
+    void
+    compute( const cell_type &cl,
+             const CellDegreeInfo< mesh_type > &cell_infos,
+             const matrix_type &ET,
+             const vector_type &uTF,
+             const vector_type &vTF,
+             bool tangent_matix ) {
         timecounter tc;
         tc.tic();
 
@@ -780,7 +785,9 @@ class contact_contribution {
         // compute theta/gamma *(sigma_n, sigma_n)_Fc
         if ( m_rp.m_theta != 0.0 ) {
             const matrix_type K_sig = make_hho_nitsche( cl, ET, cell_infos );
-            K_cont -= K_sig;
+            if ( tangent_matix ) {
+                K_cont -= K_sig;
+            }
             F_cont -= K_sig * uTF;
         }
 
@@ -788,7 +795,9 @@ class contact_contribution {
         // std::cout << make_hho_nitsche(cl, ET, cell_infos) << std::endl;
 
         // compute (phi_n_theta, H(-phi_n_1(u))*phi_n_1)_FC / gamma
-        K_cont += make_hho_heaviside_contact( cl, ET, uTF, cell_infos );
+        if ( tangent_matix ) {
+            K_cont += make_hho_heaviside_contact( cl, ET, uTF, cell_infos );
+        }
 
         // std::cout << "Heaviside: " << std::endl;
         // std::cout << make_hho_heaviside_contact(cl, ET, uTF, cell_infos) << std::endl;
@@ -808,7 +817,9 @@ class contact_contribution {
                     F_cont += make_hho_threshold_tresca( cl, ET, vTF, cell_infos );
 
                     // compute (phi_t_theta, (d_proj_alpha(v)) phi_t_1)_FC / gamma
-                    K_cont += make_hho_matrix_tresca( cl, ET, vTF, cell_infos );
+                    if ( tangent_matix ) {
+                        K_cont += make_hho_matrix_tresca( cl, ET, vTF, cell_infos );
+                    }
                 } else {
                     // compute (phi_t_theta, [phi_t_1(u)]_s)_FC / gamma
                     F_cont += make_hho_threshold_tresca( cl, ET, uTF, cell_infos );
@@ -818,7 +829,9 @@ class contact_contribution {
                     // std::cout << Ff1.transpose() << std::endl
 
                     // compute (phi_t_theta, (d_proj_alpha(u)) phi_t_1)_FC / gamma
-                    K_cont += make_hho_matrix_tresca( cl, ET, uTF, cell_infos );
+                    if ( tangent_matix ) {
+                        K_cont += make_hho_matrix_tresca( cl, ET, uTF, cell_infos );
+                    }
                 }
             } else if ( m_rp.m_frot_type == COULOMB ) {
                 if ( m_rp.isUnsteady() ) {
@@ -826,7 +839,9 @@ class contact_contribution {
                     F_cont += make_hho_threshold_coulomb( cl, ET, vTF, cell_infos );
 
                     // compute (phi_t_theta, (d_proj_alpha(v)) phi_t_1)_FC / gamma
-                    K_cont += make_hho_matrix_coulomb( cl, ET, vTF, cell_infos );
+                    if ( tangent_matix ) {
+                        K_cont += make_hho_matrix_coulomb( cl, ET, vTF, cell_infos );
+                    }
                 } else {
                     // compute (phi_t_theta, [phi_t_1(u)]_s)_FC / gamma
                     F_cont += make_hho_threshold_coulomb( cl, ET, uTF, cell_infos );
@@ -836,7 +851,9 @@ class contact_contribution {
                     // std::cout << Ff1.transpose() << std::endl
 
                     // compute (phi_t_theta, (d_proj_alpha(u)) phi_t_1)_FC / gamma
-                    K_cont += make_hho_matrix_coulomb( cl, ET, uTF, cell_infos );
+                    if ( tangent_matix ) {
+                        K_cont += make_hho_matrix_coulomb( cl, ET, uTF, cell_infos );
+                    }
                 }
             }
         }

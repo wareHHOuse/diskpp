@@ -45,7 +45,8 @@ enum class FieldName {
     RESI_CELLS,
 };
 
-std::string getFieldName( FieldName name ) {
+std::string
+getFieldName( FieldName name ) {
     switch ( name ) {
     case FieldName::DEPL:
         return "DEPL";
@@ -79,7 +80,8 @@ std::string getFieldName( FieldName name ) {
 }
 
 template < typename T >
-T norm( const std::vector< dynamic_vector< T > > &field ) {
+T
+norm( const std::vector< dynamic_vector< T > > &field ) {
     T nm = 0.0;
 
     for ( auto &vect : field ) {
@@ -90,7 +92,8 @@ T norm( const std::vector< dynamic_vector< T > > &field ) {
 };
 
 template < typename T >
-dynamic_vector< T > asVector( const std::vector< dynamic_vector< T > > &field ) {
+dynamic_vector< T >
+asVector( const std::vector< dynamic_vector< T > > &field ) {
     int size = 0;
 
     for ( auto &vect : field ) {
@@ -109,7 +112,8 @@ dynamic_vector< T > asVector( const std::vector< dynamic_vector< T > > &field ) 
 }
 
 template < typename T >
-void fromVector( const dynamic_vector< T > &vfield, std::vector< dynamic_vector< T > > &field ) {
+void
+fromVector( const dynamic_vector< T > &vfield, std::vector< dynamic_vector< T > > &field ) {
     int size = 0;
     for ( auto &vect : field ) {
         vect = vfield.segment( size, vect.size() );
@@ -139,30 +143,40 @@ class TimeField {
      * @brief Get the current time
      *
      */
-    scalar_type getTime( void ) const { return m_time; }
+    scalar_type
+    getTime( void ) const {
+        return m_time;
+    }
 
     /**
      * @brief Set the current time
      *
      */
-    void setTime( scalar_type time ) { m_time = time; }
+    void
+    setTime( scalar_type time ) {
+        m_time = time;
+    }
 
-    void setField( FieldName name, const std::vector< vector_type > &field ) {
+    void
+    setField( FieldName name, const std::vector< vector_type > &field ) {
         m_fields[name] = field;
     }
 
-    auto getField( FieldName name ) const {
+    auto
+    getField( FieldName name ) const {
         // std::cout << getFieldName(name) << std::endl;
         return m_fields.at( name );
     }
 
-    void clearField( FieldName name ) {
+    void
+    clearField( FieldName name ) {
         if ( auto search = m_fields.find( name ); search != m_fields.end() ) {
             m_fields.erase( search );
         }
     }
 
-    void getFieldInfo() const {
+    void
+    getFieldInfo() const {
         std::cout << "The TimeField at time=" << m_time << ", constains " << m_fields.size()
                   << " fields." << std::endl;
         for ( auto &[key, val] : m_fields ) {
@@ -172,22 +186,26 @@ class TimeField {
     }
 
     template < typename Mesh >
-    void createZeroField( FieldName name, const Mesh &mesh,
-                          const MeshDegreeInfo< Mesh > &degree_infos ) {
+    void
+    createZeroField( FieldName name,
+                     const Mesh &mesh,
+                     const MeshDegreeInfo< Mesh > &degree_infos ) {
         std::vector< vector_type > field;
 
         if ( name == FieldName::DEPL || name == FieldName::DEPL_CELLS || name == FieldName::VITE ||
              name == FieldName::VITE_CELLS || name == FieldName::ACCE ||
              name == FieldName::ACCE_CELLS ) {
-            field.reserve( mesh.cells_size() );
+            field.resize( mesh.cells_size() );
 
             for ( auto &cl : mesh ) {
+                const auto c_id = mesh.lookup( cl );
                 const auto di = degree_infos.cellDegreeInfo( mesh, cl );
                 const auto num_cell_dofs =
                     vector_basis_size( di.cell_degree(), Mesh::dimension, Mesh::dimension );
                 size_t num_faces_dofs = 0;
 
-                if ( name == FieldName::DEPL ) {
+                if ( name == FieldName::DEPL || name == FieldName::VITE ||
+                     name == FieldName::ACCE ) {
                     const auto fcs = faces( mesh, cl );
                     const auto fcs_di = di.facesDegreeInfo();
 
@@ -199,13 +217,14 @@ class TimeField {
                     }
                 }
 
-                field.push_back( vector_type::Zero( num_cell_dofs + num_faces_dofs ) );
+                field[c_id] = vector_type::Zero( num_cell_dofs + num_faces_dofs );
             }
         } else if ( name == FieldName::DEPL_FACES ) {
-            field.reserve( mesh.faces_size() );
+            field.resize( mesh.faces_size() );
 
             for ( auto itor = mesh.faces_begin(); itor != mesh.faces_end(); itor++ ) {
                 const auto fc = *itor;
+                const auto f_id = mesh.lookup( fc );
                 const auto di = degree_infos.degreeInfo( mesh, fc );
 
                 size_t num_face_dofs = 0;
@@ -214,7 +233,7 @@ class TimeField {
                         vector_basis_size( di.degree(), Mesh::dimension - 1, Mesh::dimension );
                 }
 
-                field.push_back( vector_type::Zero( num_face_dofs ) );
+                field[f_id] = vector_type::Zero( num_face_dofs );
             }
         } else {
             throw std::runtime_error( "Unknown field" );
@@ -224,32 +243,38 @@ class TimeField {
     }
 
     template < typename Mesh >
-    void createField( FieldName name, const Mesh &mesh, const MeshDegreeInfo< Mesh > &degree_infos,
-                      const vector_rhs_function< Mesh > func ) {
+    void
+    createField( FieldName name,
+                 const Mesh &mesh,
+                 const MeshDegreeInfo< Mesh > &degree_infos,
+                 const vector_rhs_function< Mesh > func ) {
         std::vector< vector_type > field;
 
         if ( name == FieldName::DEPL || name == FieldName::DEPL_CELLS || name == FieldName::VITE ||
              name == FieldName::VITE_CELLS || name == FieldName::ACCE ||
              name == FieldName::ACCE_CELLS ) {
-            field.reserve( mesh.cells_size() );
+            field.resize( mesh.cells_size() );
 
             for ( auto &cl : mesh ) {
-                if ( name == FieldName::DEPL ) {
-                    field.push_back( project_function( mesh, cl, degree_infos, func, 2 ) );
+                const auto c_id = mesh.lookup( cl );
+                if ( name == FieldName::DEPL || name == FieldName::VITE ||
+                     name == FieldName::ACCE ) {
+                    field[c_id] = project_function( mesh, cl, degree_infos, func, 2 );
                 } else {
                     const auto di = degree_infos.cellDegreeInfo( mesh, cl );
 
-                    field.push_back( project_function( mesh, cl, di.cell_degree(), func, 2 ) );
+                    field[c_id] = project_function( mesh, cl, di.cell_degree(), func, 2 );
                 }
             }
         } else if ( name == FieldName::DEPL_FACES ) {
-            field.reserve( mesh.faces_size() );
+            field.resize( mesh.faces_size() );
 
             for ( auto itor = mesh.faces_begin(); itor != mesh.faces_end(); itor++ ) {
                 const auto fc = *itor;
+                const auto f_id = mesh.lookup( fc );
                 const auto fdi = degree_infos.degreeInfo( mesh, fc );
 
-                field.push_back( project_function( mesh, fc, fdi.degree(), func, 2 ) );
+                field[f_id] = project_function( mesh, fc, fdi.degree(), func, 2 );
             }
         } else {
             throw std::runtime_error( "Unknown field" );
@@ -258,7 +283,10 @@ class TimeField {
         this->setField( name, field );
     }
 
-    bool empty() const { return m_fields.empty(); }
+    bool
+    empty() const {
+        return m_fields.empty();
+    }
 };
 
 template < typename scalar_type >
@@ -274,23 +302,38 @@ class MultiTimeField {
 
     MultiTimeField( const int n_fields ) { m_fields.resize( n_fields ); };
 
-    void setCurrentTime( scalar_type time ) { m_fields.at( 0 ).setTime( time ); }
+    void
+    setCurrentTime( scalar_type time ) {
+        m_fields.at( 0 ).setTime( time );
+    }
 
-    field_type getCurrentTimeField() const { return this->getTimeField( 0 ); }
+    field_type
+    getCurrentTimeField() const {
+        return this->getTimeField( 0 );
+    }
 
-    field_type getPreviousTimeField() const { return this->getTimeField( -1 ); }
+    field_type
+    getPreviousTimeField() const {
+        return this->getTimeField( -1 );
+    }
 
-    field_type getTimeField( const int &relative_index ) const {
+    field_type
+    getTimeField( const int &relative_index ) const {
         return m_fields.at( -relative_index );
     }
 
-    void setTimeField( const int &relative_index, const field_type &field ) {
+    void
+    setTimeField( const int &relative_index, const field_type &field ) {
         m_fields.at( -relative_index ) = field;
     }
 
-    void setCurrentTimeField( const field_type &field ) { return this->setTimeField( 0, field ); }
+    void
+    setCurrentTimeField( const field_type &field ) {
+        return this->setTimeField( 0, field );
+    }
 
-    auto getField( const int &relative_index, FieldName name ) const {
+    auto
+    getField( const int &relative_index, FieldName name ) const {
         // std::cout << "Get " << getFieldName(name) << " (" << relative_index
         //           << "): " << norm(m_fields.at(-relative_index).getField(name))
         //           << std::endl;
@@ -298,30 +341,41 @@ class MultiTimeField {
         return m_fields.at( -relative_index ).getField( name );
     }
 
-    auto getCurrentField( FieldName name ) const { return m_fields.at( 0 ).getField( name ); }
+    auto
+    getCurrentField( FieldName name ) const {
+        return m_fields.at( 0 ).getField( name );
+    }
 
-    void setField( const int &relative_index, FieldName name,
-                   const std::vector< vector_type > &field ) {
+    void
+    setField( const int &relative_index, FieldName name, const std::vector< vector_type > &field ) {
         // std::cout << "Set " << getFieldName(name) << " (" << relative_index
         //           << "): " << norm(field) << std::endl;
 
         return m_fields.at( -relative_index ).setField( name, field );
     }
 
-    void setCurrentField( FieldName name, const std::vector< vector_type > &field ) {
+    void
+    setCurrentField( FieldName name, const std::vector< vector_type > &field ) {
         return this->setField( 0, name, field );
     }
 
     template < typename Mesh >
-    void createField( const int &relative_index, FieldName name, const Mesh &mesh,
-                      const MeshDegreeInfo< Mesh > &degree_infos,
-                      const vector_rhs_function< Mesh > func ) {
+    void
+    createField( const int &relative_index,
+                 FieldName name,
+                 const Mesh &mesh,
+                 const MeshDegreeInfo< Mesh > &degree_infos,
+                 const vector_rhs_function< Mesh > func ) {
         m_fields.at( -relative_index ).createField( name, mesh, degree_infos, func );
     }
 
-    auto getNumberOfTimeField() const { return m_fields.size(); }
+    auto
+    getNumberOfTimeField() const {
+        return m_fields.size();
+    }
 
-    void update() {
+    void
+    update() {
 
         int n_fields = this->getNumberOfTimeField();
 
@@ -330,7 +384,10 @@ class MultiTimeField {
         }
     }
 
-    void restore() { m_fields.at( 0 ) = m_fields.at( 1 ); }
+    void
+    restore() {
+        m_fields.at( 0 ) = m_fields.at( 1 );
+    }
 };
 } // namespace mechanics
 

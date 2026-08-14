@@ -219,6 +219,85 @@ class NonLinearSolver {
         return eval( x, phi );
     }
 
+    auto
+    _eval_stress( const int cell_id, const point_type &pt ) {
+
+        // stress
+        const auto cl = m_msh[cell_id];
+        const auto di = m_degree_infos.cellDegreeInfo( m_msh, cl );
+        const auto stress = m_behavior.projectStressOnCell( m_msh, cl, di.grad_degree() );
+
+        const auto gb = make_matrix_monomial_basis( m_msh, cl, di.grad_degree() );
+        const auto gphi = gb.eval_functions( pt );
+        const auto GT_iqn = eval( stress, gphi );
+
+        static_vector< scalar_type, mesh_type::dimension > sdiag, sshea;
+
+        if constexpr ( mesh_type::dimension == 2 ) {
+            sdiag( 0 ) = GT_iqn( 0, 0 );
+            sdiag( 1 ) = GT_iqn( 1, 1 );
+            sshea( 0 ) = 0.0;
+            sshea( 1 ) = GT_iqn( 0, 1 );
+        } else {
+            sdiag( 0 ) = GT_iqn( 0, 0 );
+            sdiag( 1 ) = GT_iqn( 1, 1 );
+            sdiag( 2 ) = GT_iqn( 2, 2 );
+            sshea( 0 ) = GT_iqn( 0, 1 );
+            sshea( 1 ) = GT_iqn( 0, 2 );
+            sshea( 2 ) = GT_iqn( 1, 2 );
+        }
+
+        return std::make_pair( sdiag, sshea );
+    }
+
+    void
+    _setInitialState() {
+        const bool small_def = m_behavior.getDeformation() == SMALL_DEF;
+        const auto depl = m_fields.getField( 0, FieldName::DEPL );
+
+        for ( auto &cl : m_msh ) {
+            const auto c_id = m_msh.lookup( cl );
+            const auto di = m_degree_infos.cellDegreeInfo( m_msh, cl );
+
+            const auto uTF = depl.at( c_id );
+            matrix_type gr;
+            if ( m_rp.m_precomputation ) {
+                gr = m_data.m_gradient_precomputed.at( c_id );
+            } else {
+                if ( small_def ) {
+                    gr = make_matrix_hho_symmetric_gradrec( m_msh, cl, m_degree_infos ).first;
+                } else {
+                    gr = make_matrix_hho_gradrec( m_msh, cl, m_degree_infos ).first;
+                }
+            }
+
+            const vector_type GTuTF = gr * uTF;
+
+            const auto gb = make_matrix_monomial_basis( m_msh, cl, di.grad_degree() );
+            const auto gbs = make_sym_matrix_monomial_basis( m_msh, cl, di.grad_degree() );
+
+            // Loop on nodes
+            const auto nb_qp = m_behavior.numberOfQP( c_id );
+            eigen_compatible_stdvector<
+                static_matrix< scalar_type, mesh_type::dimension, mesh_type::dimension > >
+                gphi;
+
+            for ( int i_qp = 0; i_qp < nb_qp; i_qp++ ) {
+                const auto qp = m_behavior.quadrature_point( c_id, i_qp );
+
+                if ( small_def ) {
+                    gphi = gbs.eval_functions( qp.point() );
+                } else {
+                    gphi = gb.eval_functions( qp.point() );
+                }
+
+                const auto GkT_iqn = eval( GTuTF, gphi );
+
+                m_behavior.setInitialElasticStrain( c_id, i_qp, GkT_iqn );
+            }
+        }
+    }
+
   public:
     NonLinearSolver( const mesh_type &msh, const bnd_type &bnd, const param_type &rp )
         : m_msh( msh ),
@@ -304,8 +383,6 @@ class NonLinearSolver {
         m_fields.createField( 0, FieldName::DEPL, m_msh, m_degree_infos, func );
         m_fields.createField( 0, FieldName::DEPL_CELLS, m_msh, m_degree_infos, func );
         m_fields.createField( 0, FieldName::DEPL_FACES, m_msh, m_degree_infos, func );
-
-        /*TODO: look for contact.*/
     }
 
     /**
@@ -471,6 +548,7 @@ class NonLinearSolver {
         if ( m_rp.isUnsteady() ) {
             reformulation_dynamic( m_rp );
             m_rp.m_dyna_para["rho"] = m_behavior.getMaterialData().getRho();
+            _setInitialState();
         }
 
         // save first state;
@@ -493,9 +571,9 @@ class NonLinearSolver {
             }
 
             // stress tensor
-            const auto vzero = static_vector< scalar_type, mesh_type::dimension >::Zero();
-            vals.push_back( vzero );
-            vals.push_back( vzero );
+            const auto [sdiag, sshea] = _eval_stress( ppt.getCellId(), ppt.getPoint() );
+            vals.push_back( sdiag );
+            vals.push_back( sshea );
 
             ppt.addValues( 0.0, 0, vals );
         }
@@ -522,6 +600,10 @@ class NonLinearSolver {
                 ListOfTimeStep< scalar_type >( m_rp.m_time_step, m_rp.m_user_end_time );
         else
             list_time_step = ListOfTimeStep< scalar_type >( m_rp.m_time_step );
+
+        if ( m_rp.isUnsteady() ) {
+            list_time_step.checkConstantTimeStep();
+        }
 
         if ( m_verbose )
             std::cout << "** Number of time step: " << list_time_step.numberOfTimeStep()
@@ -571,7 +653,7 @@ class NonLinearSolver {
             //  Newton correction
             si.updateInfo( newton_info );
 
-            if ( m_verbose ) {
+            if ( m_verbose and m_rp.getNonLinearSolver() != NonLinearSolverType::EXPLICIT ) {
                 newton_info.printInfo();
             }
 
@@ -656,30 +738,7 @@ class NonLinearSolver {
                     }
 
                     // stress
-                    const auto cl = *std::next( m_msh.cells_begin(), ppt.getCellId() );
-                    const auto di = m_degree_infos.cellDegreeInfo( m_msh, cl );
-                    const auto stress =
-                        m_behavior.projectStressOnCell( m_msh, cl, di.grad_degree() );
-
-                    const auto gb = make_matrix_monomial_basis( m_msh, cl, di.grad_degree() );
-                    const auto gphi = gb.eval_functions( ppt.getPoint() );
-                    const auto GT_iqn = eval( stress, gphi );
-
-                    static_vector< scalar_type, mesh_type::dimension > sdiag, sshea;
-
-                    if constexpr ( mesh_type::dimension == 2 ) {
-                        sdiag( 0 ) = GT_iqn( 0, 0 );
-                        sdiag( 1 ) = GT_iqn( 1, 1 );
-                        sshea( 0 ) = 0.0;
-                        sshea( 1 ) = GT_iqn( 0, 1 );
-                    } else {
-                        sdiag( 0 ) = GT_iqn( 0, 0 );
-                        sdiag( 1 ) = GT_iqn( 1, 1 );
-                        sdiag( 2 ) = GT_iqn( 2, 2 );
-                        sshea( 0 ) = GT_iqn( 0, 1 );
-                        sshea( 1 ) = GT_iqn( 0, 2 );
-                        sshea( 2 ) = GT_iqn( 1, 2 );
-                    }
+                    const auto [sdiag, sshea] = _eval_stress( ppt.getCellId(), ppt.getPoint() );
                     vals.push_back( sdiag );
                     vals.push_back( sshea );
 

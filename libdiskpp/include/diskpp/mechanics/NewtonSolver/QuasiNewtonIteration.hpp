@@ -277,7 +277,7 @@ class QuasiNewtonIteration : public GenericIteration< MeshType > {
         const auto lhs_loc = data.m_lhs_loc;
 
         std::vector< vector_type > resi_cells;
-        resi_cells.reserve( msh.cells_size() );
+        resi_cells.resize( msh.cells_size() );
 
         const auto rlf = this->_getLoad( lf, current_time );
 
@@ -319,7 +319,7 @@ class QuasiNewtonIteration : public GenericIteration< MeshType > {
             vector_type rhs = elem.RTF.tail( num_faces_dofs );
             this->m_F_int += elem.F_int.tail( num_faces_dofs ).squaredNorm();
 
-            resi_cells.push_back( elem.RTF.head( num_cell_dofs ) );
+            resi_cells[cell_i] = elem.RTF.head( num_cell_dofs );
 
             tc.toc();
             ai.m_time_elem += tc.elapsed();

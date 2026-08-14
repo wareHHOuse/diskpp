@@ -180,6 +180,16 @@ class LogarithmicStrain_qp {
         return m_law_hpp_qp.getEquivalentPlasticStrain();
     }
 
+    void
+    setElasticStrainPrev( const static_matrix_type &elastic_strain ) {
+        m_law_hpp_qp.setElasticStrainPrev( elastic_strain );
+    }
+
+    void
+    setElasticStrain( const static_matrix_type &elastic_strain ) {
+        m_law_hpp_qp.setElasticStrain( elastic_strain );
+    }
+
     void update() { m_law_hpp_qp.update(); }
     void restore() { m_law_hpp_qp.restore(); }
 

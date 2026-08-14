@@ -329,19 +329,28 @@ class mechanical_computation {
         time_fint += tc.elapsed();
     }
 
-    void compute_contact_terms( const mesh_type &msh, const cell_type &cl, const bnd_type &bnd,
-                                const param_type &rp, const CellDegreeInfo< mesh_type > &cell_infos,
-                                const matrix_type &RkT, const vector_type &uTF,
-                                const vector_type &vTF, const TimeStep< scalar_type > &time_step,
-                                behavior_type &behavior ) {
+    void
+    compute_contact_terms( const mesh_type &msh,
+                           const cell_type &cl,
+                           const bnd_type &bnd,
+                           const param_type &rp,
+                           const CellDegreeInfo< mesh_type > &cell_infos,
+                           const matrix_type &RkT,
+                           const vector_type &uTF,
+                           const vector_type &vTF,
+                           const TimeStep< scalar_type > &time_step,
+                           behavior_type &behavior,
+                           bool tangent_matix ) {
         if ( bnd.cell_has_contact_faces( cl ) ) {
             const auto &material_data = behavior.getMaterialData();
             auto cc = contact_contribution( msh, material_data, rp, bnd );
-            cc.compute( cl, cell_infos, RkT, uTF, vTF );
+            cc.compute( cl, cell_infos, RkT, uTF, vTF, tangent_matix );
 
             time_contact += cc.time_contact;
 
-            K_int += cc.K_cont;
+            if ( tangent_matix ) {
+                K_int += cc.K_cont;
+            }
             F_int += cc.F_cont;
             RTF -= cc.F_cont;
         }
@@ -533,6 +542,9 @@ class mechanical_computation {
             K_int = RkT.transpose() * AT * RkT;
             tc.toc();
             time_rigi += tc.elapsed();
+
+            assert( K_int.rows() == num_total_dofs );
+            assert( K_int.cols() == num_total_dofs );
         }
         tc.tic();
         F_int = RkT.transpose() * aT;
@@ -542,8 +554,8 @@ class mechanical_computation {
 
         // Compute contact terms
 
-        this->compute_contact_terms( msh, cl, bnd, rp, cell_infos, RkT, uTF, vTF, time_step,
-                                     behavior );
+        this->compute_contact_terms(
+            msh, cl, bnd, rp, cell_infos, RkT, uTF, vTF, time_step, behavior, tangent_matix );
 
         // std::cout << "K: " << K_int.norm() << std::endl;
         // // std::cout << K_int << std::endl;
@@ -554,8 +566,6 @@ class mechanical_computation {
 
         // throw std::runtime_error("");
 
-        assert( K_int.rows() == num_total_dofs );
-        assert( K_int.cols() == num_total_dofs );
         assert( RTF.rows() == num_total_dofs );
     }
 

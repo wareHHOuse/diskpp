@@ -120,6 +120,11 @@ class dynamic_computation {
         // }
     }
 
+    auto
+    getParam( std::string param ) {
+        return m_param.at( param );
+    }
+
     bool enable( void ) const { return m_scheme != DynamicType::STATIC; }
 
     bool isExplicit() const { return m_scheme == DynamicType::LEAP_FROG; }
@@ -129,15 +134,15 @@ class dynamic_computation {
                      MultiTimeField< scalar_type > &fields ) {
         if ( this->enable() ) {
             m_acce_cells_pred.clear();
-            m_acce_cells_pred.reserve( msh.cells_size() );
+            m_acce_cells_pred.resize( msh.cells_size() );
             m_acce_pred.clear();
-            m_acce_pred.reserve( msh.cells_size() );
+            m_acce_pred.resize( msh.cells_size() );
 
             switch ( m_scheme ) {
             case DynamicType::NEWMARK: {
                 std::vector< vector_type > acce, acce_cells;
-                acce.reserve( msh.cells_size() );
-                acce_cells.reserve( msh.cells_size() );
+                acce.resize( msh.cells_size() );
+                acce_cells.resize( msh.cells_size() );
 
                 const auto depl_prev = fields.getField( -1, FieldName::DEPL );
                 const auto velo_prev = fields.getField( -1, FieldName::VITE );
@@ -150,16 +155,16 @@ class dynamic_computation {
                 const scalar_type ca = ( 1.0 - 2.0 * beta ) / ( 2.0 * beta );
 
                 for ( auto &cl : msh ) {
-                    const auto cell_infos = degree_infos.cellDegreeInfo( msh, cl );
-                    const auto num_cell_dofs = vector_cell_dofs( msh, cell_infos );
+                    const auto c_id = msh.lookup( cl );
+                    const auto c_idnfos = degree_infos.cellDegreeInfo( msh, cl );
+                    const auto num_cell_dofs = vector_cell_dofs( msh, c_idnfos );
 
-                    const auto cl_id = msh.lookup( cl );
-                    const vector_type acce_curr = cv * velo_prev[cl_id] + ca * acce_prev[cl_id];
-                    const vector_type acce_pred = cd * depl_prev[cl_id] + acce_curr;
-                    m_acce_pred.push_back( acce_pred );
-                    m_acce_cells_pred.push_back( acce_pred.head( num_cell_dofs ) );
-                    acce.push_back( -acce_curr );
-                    acce_cells.push_back( -acce_curr.head( num_cell_dofs ) );
+                    const vector_type acce_curr = cv * velo_prev[c_id] + ca * acce_prev[c_id];
+                    const vector_type acce_pred = cd * depl_prev[c_id] + acce_curr;
+                    m_acce_pred[c_id] = acce_pred;
+                    m_acce_cells_pred[c_id] = acce_pred.head( num_cell_dofs );
+                    acce[c_id] = -acce_curr;
+                    acce_cells[c_id] = -acce_curr.head( num_cell_dofs );
                 }
 
                 fields.setCurrentField( FieldName::ACCE, acce );
@@ -168,8 +173,8 @@ class dynamic_computation {
             }
             case DynamicType::THETA: {
                 std::vector< vector_type > acce, acce_cells;
-                acce.reserve( msh.cells_size() );
-                acce_cells.reserve( msh.cells_size() );
+                acce.resize( msh.cells_size() );
+                acce_cells.resize( msh.cells_size() );
 
                 const auto depl_prev = fields.getField( -1, FieldName::DEPL );
                 const auto velo_prev = fields.getField( -1, FieldName::VITE );
@@ -183,16 +188,16 @@ class dynamic_computation {
                 const scalar_type ca = ( 1.0 - theta ) / theta;
 
                 for ( auto &cl : msh ) {
-                    const auto cell_infos = degree_infos.cellDegreeInfo( msh, cl );
-                    const auto num_cell_dofs = vector_cell_dofs( msh, cell_infos );
+                    const auto c_idnfos = degree_infos.cellDegreeInfo( msh, cl );
+                    const auto num_cell_dofs = vector_cell_dofs( msh, c_idnfos );
 
-                    const auto cl_id = msh.lookup( cl );
-                    const vector_type acce_curr = cv * velo_prev[cl_id] + ca * acce_prev[cl_id];
-                    const vector_type acce_pred = cd * depl_prev[cl_id] + acce_curr;
-                    m_acce_pred.push_back( acce_pred );
-                    m_acce_cells_pred.push_back( acce_pred.head( num_cell_dofs ) );
-                    acce.push_back( -acce_curr );
-                    acce_cells.push_back( -acce_curr.head( num_cell_dofs ) );
+                    const auto c_id = msh.lookup( cl );
+                    const vector_type acce_curr = cv * velo_prev[c_id] + ca * acce_prev[c_id];
+                    const vector_type acce_pred = cd * depl_prev[c_id] + acce_curr;
+                    m_acce_pred[c_id] = acce_pred;
+                    m_acce_cells_pred[c_id] = acce_pred.head( num_cell_dofs );
+                    acce[c_id] = -acce_curr;
+                    acce_cells[c_id] = -acce_curr.head( num_cell_dofs );
                 }
 
                 fields.setCurrentField( FieldName::ACCE, acce );
@@ -202,9 +207,9 @@ class dynamic_computation {
             case DynamicType::LEAP_FROG: {
 
                 std::vector< vector_type > vite, acce, depl;
-                vite.reserve( msh.cells_size() );
-                acce.reserve( msh.cells_size() );
-                depl.reserve( msh.cells_size() );
+                vite.resize( msh.cells_size() );
+                acce.resize( msh.cells_size() );
+                depl.resize( msh.cells_size() );
 
                 const auto tf2 = fields.getTimeField( -2 );
 
@@ -223,38 +228,38 @@ class dynamic_computation {
                     const auto acce_prev = fields.getField( -1, FieldName::ACCE_CELLS );
 
                     for ( auto &cl : msh ) {
-                        const auto cl_id = msh.lookup( cl );
-                        const auto uT = depl_prev.at( cl_id ) + dt * vite_prev.at( cl_id ) +
-                                        dt2s2 * acce_prev.at( cl_id );
-                        const auto vT = vite_prev.at( cl_id ) + dt * acce_prev.at( cl_id );
-                        const auto aT = acce_prev.at( cl_id );
+                        const auto c_id = msh.lookup( cl );
+                        const auto uT = depl_prev.at( c_id ) + dt * vite_prev.at( c_id ) +
+                                        dt2s2 * acce_prev.at( c_id );
+                        const auto vT = vite_prev.at( c_id ) + dt * acce_prev.at( c_id );
+                        const auto aT = acce_prev.at( c_id );
 
-                        depl_curr[cl_id].head( uT.size() ) = uT;
+                        depl_curr[c_id].head( uT.size() ) = uT;
 
-                        acce.push_back( aT );
-                        vite.push_back( vT );
-                        depl.push_back( uT );
+                        acce[c_id] = aT;
+                        vite[c_id] = vT;
+                        depl[c_id] = uT;
                     }
                 } else {
                     const auto resi_prev = fields.getField( -1, FieldName::RESI_CELLS );
                     const auto depl_pprev = tf2.getField( FieldName::DEPL_CELLS );
 
                     for ( auto &cl : msh ) {
-                        const auto cl_id = msh.lookup( cl );
+                        const auto c_id = msh.lookup( cl );
                         const matrix_type mm = this->mass_matrix( msh, cl, degree_infos );
 
                         const vector_type depl_pred =
-                            2.0 * depl_prev.at( cl_id ) - depl_pprev.at( cl_id );
+                            2.0 * depl_prev.at( c_id ) - depl_pprev.at( c_id );
 
                         const vector_type uT =
-                            dt2 * ( mm.ldlt().solve( resi_prev.at( cl_id ) ) ) + depl_pred;
-                        const auto vT = un_dt * ( uT - depl_prev.at( cl_id ) );
-                        const auto aT = un_dt * ( vT - vite_prev.at( cl_id ) );
+                            dt2 * ( mm.ldlt().solve( resi_prev.at( c_id ) ) ) + depl_pred;
+                        const auto vT = un_dt * ( uT - depl_prev.at( c_id ) );
+                        const auto aT = un_dt * ( vT - vite_prev.at( c_id ) );
 
-                        acce.push_back( aT );
-                        vite.push_back( vT );
-                        depl.push_back( uT );
-                        depl_curr[cl_id].head( uT.size() ) = uT;
+                        acce[c_id] = aT;
+                        vite[c_id] = vT;
+                        depl[c_id] = uT;
+                        depl_curr[c_id].head( uT.size() ) = uT;
                     }
                 }
 
@@ -281,10 +286,10 @@ class dynamic_computation {
             switch ( m_scheme ) {
             case DynamicType::NEWMARK: {
                 std::vector< vector_type > vite, vite_cells, acce, acce_cells;
-                vite.reserve( msh.cells_size() );
-                acce.reserve( msh.cells_size() );
-                vite_cells.reserve( msh.cells_size() );
-                acce_cells.reserve( msh.cells_size() );
+                vite.resize( msh.cells_size() );
+                acce.resize( msh.cells_size() );
+                vite_cells.resize( msh.cells_size() );
+                acce_cells.resize( msh.cells_size() );
 
                 const auto vite_prev = fields.getField( -1, FieldName::VITE );
                 const auto acce_prev = fields.getField( -1, FieldName::ACCE );
@@ -300,16 +305,16 @@ class dynamic_computation {
                 const scalar_type cd = 1.0 / ( beta * dt * dt );
 
                 for ( auto &cl : msh ) {
-                    const auto cell_i = msh.lookup( cl );
-                    const auto num_cell_dofs = depl_cells.at( cell_i ).size();
+                    const auto c_id = msh.lookup( cl );
+                    const auto num_cell_dofs = depl_cells.at( c_id ).size();
 
-                    auto aT = cd * depl.at( cell_i ) - m_acce_pred[cell_i];
-                    auto vT = vite_prev.at( cell_i ) + g0 * acce_prev.at( cell_i ) + g1 * aT;
+                    auto aT = cd * depl.at( c_id ) - m_acce_pred[c_id];
+                    auto vT = vite_prev.at( c_id ) + g0 * acce_prev.at( c_id ) + g1 * aT;
 
-                    vite.push_back( vT );
-                    acce.push_back( aT );
-                    vite_cells.push_back( vT.head( num_cell_dofs ) );
-                    acce_cells.push_back( aT.head( num_cell_dofs ) );
+                    vite[c_id] = vT;
+                    acce[c_id] = aT;
+                    vite_cells[c_id] = vT.head( num_cell_dofs );
+                    acce_cells[c_id] = aT.head( num_cell_dofs );
                 }
 
                 fields.setCurrentField( FieldName::VITE, vite );
@@ -320,10 +325,10 @@ class dynamic_computation {
             }
             case DynamicType::THETA: {
                 std::vector< vector_type > vite, vite_cells, acce, acce_cells;
-                vite.reserve( msh.cells_size() );
-                acce.reserve( msh.cells_size() );
-                vite_cells.reserve( msh.cells_size() );
-                acce_cells.reserve( msh.cells_size() );
+                vite.resize( msh.cells_size() );
+                acce.resize( msh.cells_size() );
+                vite_cells.resize( msh.cells_size() );
+                acce_cells.resize( msh.cells_size() );
 
                 const auto vite_prev = fields.getField( -1, FieldName::VITE );
                 const auto acce_prev = fields.getField( -1, FieldName::ACCE );
@@ -340,16 +345,16 @@ class dynamic_computation {
                 const scalar_type v1 = theta * dt;
 
                 for ( auto &cl : msh ) {
-                    const auto cell_i = msh.lookup( cl );
-                    const auto num_cell_dofs = depl_cells.at( cell_i ).size();
+                    const auto c_id = msh.lookup( cl );
+                    const auto num_cell_dofs = depl_cells.at( c_id ).size();
 
-                    auto aT = cd * depl.at( cell_i ) - m_acce_pred[cell_i];
-                    auto vT = vite_prev.at( cell_i ) + v0 * acce_prev.at( cell_i ) + v1 * aT;
+                    auto aT = cd * depl.at( c_id ) - m_acce_pred[c_id];
+                    auto vT = vite_prev.at( c_id ) + v0 * acce_prev.at( c_id ) + v1 * aT;
 
-                    vite.push_back( vT );
-                    acce.push_back( aT );
-                    vite_cells.push_back( vT.head( num_cell_dofs ) );
-                    acce_cells.push_back( aT.head( num_cell_dofs ) );
+                    vite[c_id] = vT;
+                    acce[c_id] = aT;
+                    vite_cells[c_id] = vT.head( num_cell_dofs );
+                    acce_cells[c_id] = aT.head( num_cell_dofs );
                 }
 
                 fields.setCurrentField( FieldName::VITE, vite );
@@ -382,12 +387,12 @@ class dynamic_computation {
 
         tc.tic();
         if ( this->enable() ) {
-            const auto cell_i = msh.lookup( cl );
+            const auto c_id = msh.lookup( cl );
 
-            const auto cell_infos = degree_infos.cellDegreeInfo( msh, cl );
-            const auto cell_degree = cell_infos.cell_degree();
+            const auto c_idnfos = degree_infos.cellDegreeInfo( msh, cl );
+            const auto cell_degree = c_idnfos.cell_degree();
 
-            const auto faces_infos = cell_infos.facesDegreeInfo();
+            const auto faces_infos = c_idnfos.facesDegreeInfo();
 
             const auto num_cell_dofs =
                 vector_basis_size( cell_degree, mesh_type::dimension, mesh_type::dimension );
@@ -437,8 +442,8 @@ class dynamic_computation {
     matrix_type mass_matrix( const mesh_type &msh, const cell_type &cl,
                              const MeshDegreeInfo< mesh_type > &degree_infos ) const {
 
-        const auto cell_infos = degree_infos.cellDegreeInfo( msh, cl );
-        const auto cell_degree = cell_infos.cell_degree();
+        const auto c_idnfos = degree_infos.cellDegreeInfo( msh, cl );
+        const auto cell_degree = c_idnfos.cell_degree();
 
         const auto cb = make_vector_monomial_basis( msh, cl, cell_degree );
 

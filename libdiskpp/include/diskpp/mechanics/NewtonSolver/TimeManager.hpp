@@ -233,6 +233,23 @@ class ListOfTimeStep {
                   << this->numberOfTimeStep() << ", sublevel: " << current_step.level()
                   << " ) *************************|" << std::endl;
     }
+
+    void checkConstantTimeStep( T epsilon = 1e-12 ) const {
+
+        if ( list_steps.empty() ) {
+            return;
+        }
+
+        const auto step_ref = list_steps.front();
+        const T tole = epsilon * std::max( 1.0, step_ref.increment_time() );
+
+        for ( auto &step : list_steps ) {
+            const T diff = step.increment_time() - step_ref.increment_time();
+            if ( std::abs( diff ) > tole ) {
+                throw std::runtime_error( "Time step is not constant" );
+            }
+        }
+    }
 };
 } // namespace mechanics
 } // namespace disk

@@ -145,6 +145,8 @@ class GenericIteration {
         m_assembler = assembler_type( msh, degree_infos, bnd );
     }
 
+    virtual ~GenericIteration() = default;
+
     bool verbose( void ) const { return m_verbose; }
 
     void verbose( bool v ) { m_verbose = v; }
@@ -226,7 +228,7 @@ class GenericIteration {
             relative_displ = error_incr / norm_sol;
         }
 
-        if ( m_verbose ) {
+        if ( m_verbose and rp.getNonLinearSolver() != NonLinearSolverType::EXPLICIT ) {
             std::string s_iter = "   " + std::to_string( iter ) + "               ";
             s_iter.resize( 9 );
 

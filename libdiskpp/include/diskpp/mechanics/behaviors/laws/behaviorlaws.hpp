@@ -617,6 +617,58 @@ class Behavior {
         }
     }
 
+    void
+    setInitialElasticStrain( size_t cell_id, size_t qp_id, const static_matrix_type &RkT_iqn ) {
+        switch ( m_id ) {
+        case 100:
+            m_elastic.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrainPrev( RkT_iqn );
+            m_elastic.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrain( RkT_iqn );
+            break;
+        case 101:
+            m_linearHard.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrainPrev( RkT_iqn );
+            m_linearHard.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrain( RkT_iqn );
+            break;
+        case 102:
+            m_nonlinearHard.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrainPrev( RkT_iqn );
+            m_nonlinearHard.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrain( RkT_iqn );
+            break;
+        case 103:
+            m_henckymises.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrainPrev( RkT_iqn );
+            m_henckymises.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrain( RkT_iqn );
+            break;
+        case 200:
+            m_neohokean.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrainPrev( RkT_iqn );
+            m_neohokean.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrain( RkT_iqn );
+            break;
+        case 201:
+            m_cavitation.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrainPrev( RkT_iqn );
+            m_cavitation.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrain( RkT_iqn );
+            break;
+        case 300:
+            m_log_elastic.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrainPrev( RkT_iqn );
+            m_log_elastic.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrain( RkT_iqn );
+            break;
+        case 301:
+            m_log_linearHard.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrainPrev( RkT_iqn );
+            m_log_linearHard.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrain( RkT_iqn );
+            break;
+        case 302:
+            m_log_nonlinearHard.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrainPrev(
+                RkT_iqn );
+            m_log_nonlinearHard.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrain( RkT_iqn );
+            break;
+#ifdef HAVE_MGIS
+        case 500:
+            m_mfront.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrainPrev( RkT_iqn );
+            m_mfront.getCellQPs( cell_id ).getQP( qp_id ).setElasticStrain( RkT_iqn );
+            break;
+#endif
+
+        default:
+            throw std::invalid_argument( "Behavior error: Unknown id law" );
+        }
+    }
+
     bool is_plastic( size_t cell_id, size_t qp_id ) const {
         switch ( m_id ) {
         case 100:
@@ -811,6 +863,18 @@ class Behavior {
         case 201:
             return m_cavitation.getCellQPs( cell_id ).projectStressOnCell( msh, cl, grad_degree,
                                                                            m_data );
+            break;
+        case 300:
+            return m_log_elastic.getCellQPs( cell_id ).projectStressOnCell(
+                msh, cl, grad_degree, m_data );
+            break;
+        case 301:
+            return m_log_linearHard.getCellQPs( cell_id ).projectStressOnCell(
+                msh, cl, grad_degree, m_data );
+            break;
+        case 302:
+            return m_log_nonlinearHard.getCellQPs( cell_id ).projectStressOnCell(
+                msh, cl, grad_degree, m_data );
             break;
 #ifdef HAVE_MGIS
         case 500:

@@ -37,6 +37,7 @@ enum STUDY {
     SQUARE_MATER,
     WAVE_ELAS,
     IMPACT_2D,
+    FREE_VIBR_2D,
 };
 
 /* Bibliographie */
@@ -276,7 +277,8 @@ auto getMaterialData( const STUDY &study ) {
         material_data.addMfrontParameter( "YieldStrength", material_data.getSigma_y0() );
         break;
     }
-    case STUDY::IMPACT_2D: {
+    case STUDY::IMPACT_2D:
+    case STUDY::FREE_VIBR_2D: {
         // Parameters  (m, Pa, N, kg, s)
         // https://www.dynasupport.com/howtos/general/consistent-units
 
@@ -313,7 +315,8 @@ void addAdditionalParameters( const STUDY &study, disk::mechanics::NonLinearPara
     case STUDY::SQUARE_DYNA:
     case STUDY::SQUARE_MATER:
     case STUDY::TAYLOR_ROD:
-    case STUDY::IMPACT_2D: {
+    case STUDY::IMPACT_2D:
+    case STUDY::FREE_VIBR_2D: {
         std::map< std::string, T > dyna_para;
         dyna_para["beta"] = 0.25;
         dyna_para["gamma"] = 0.5;
@@ -477,6 +480,16 @@ auto getBoundaryConditions( const Mesh< T, 2, Storage > &msh,
         bnd.addContactBC( disk::SIGNORINI_FACE, 0, s, gap );
         break;
     }
+    case STUDY::FREE_VIBR_2D: {
+
+        auto s = []( const disk::point< T, 2 > &p ) -> T { return 0.0; };
+
+        /* Encast */
+        bnd.addDirichletBC( disk::CLAMPED, 3, zero );
+        /* Syme */
+        bnd.addDirichletBC( disk::DX, 1, zero );
+        break;
+    }
     default: {
         throw std::invalid_argument( "Unexpected study" );
         break;
@@ -558,7 +571,8 @@ void addExternalLoad( const Mesh< T, 2, Storage > &msh,
     case STUDY::COOK_DYNA:
     case STUDY::SQUARE_DYNA:
     case STUDY::SQUARE_MATER:
-    case STUDY::IMPACT_2D: {
+    case STUDY::IMPACT_2D:
+    case STUDY::FREE_VIBR_2D: {
         break;
     }
     case STUDY::WAVE_ELAS: {
@@ -695,11 +709,41 @@ void addNonLinearOptions( const Mesh< T, 2, Storage > &msh,
             T y = p.y();
             T x = p.x();
 
-            return result_type { 0.0, 0.5 * ( 1. - y ) };
+            return result_type { 0.0, 0.5 * ( 1.0 - y ) };
         };
 
         nl.initial_guess( u0 );
         nl.addPointPlot( { 0.0025, 0.0 }, "pointA.csv" );
+        nl.addPointPlot( { 0.0025, 1.0 }, "pointB.csv" );
+        break;
+    }
+    case STUDY::FREE_VIBR_2D: {
+        nl.addBehavior( disk::mechanics::DeformationMeasure::SMALL_DEF,
+                        disk::mechanics::LawType::ELASTIC );
+
+        const T A = 0.5;
+        auto u0 = [A]( const disk::point< T, 2 > &p ) -> result_type {
+            T y = p.y();
+
+            return result_type { 0.0, A * std::cos( 0.5 * M_PI * y ) };
+        };
+
+        auto v0 = []( const disk::point< T, 2 > &p ) -> result_type {
+            return result_type { 0.0, 0.0 };
+        };
+
+        auto a0 = [A]( const disk::point< T, 2 > &p ) -> result_type {
+            T y = p.y();
+
+            return result_type { 0.0, -0.25 * A * M_PI * M_PI * std::cos( 0.5 * M_PI * y ) };
+        };
+
+        nl.initial_field( disk::mechanics::FieldName::DEPL, u0 );
+        nl.initial_field( disk::mechanics::FieldName::VITE, v0 );
+        nl.initial_field( disk::mechanics::FieldName::ACCE, a0 );
+
+        nl.addPointPlot( { 0.0025, 0.0 }, "pointA.csv" );
+        nl.addPointPlot( { 0.0025, 1.0 }, "pointB.csv" );
 
         break;
     }

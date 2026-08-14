@@ -261,7 +261,7 @@ class linear_elasticity_solver
 
         m_solution_data.reserve(m_msh.cells_size());
 
-        const auto solF = m_assembler.expand_solution(m_msh, m_bnd, m_system_solution, 2);
+        const auto [solF, idx] = m_assembler.expand_solution( m_msh, m_bnd, m_system_solution, 2 );
 
         timecounter tc;
         tc.tic();
