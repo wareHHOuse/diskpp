@@ -306,6 +306,45 @@ get_polygonal_generic_meshes(void)
 }
 
 template<typename T>
+std::vector< disk::generic_mesh<T, 2> >
+get_kershaw_generic_meshes(void)
+{
+    std::string mesh_path;
+
+    const char *mesh_path_env = getenv(MESH_PATH_ENV_VAR_NAME);
+    if (mesh_path_env != nullptr)
+        mesh_path = mesh_path_env;
+
+	std::vector<std::string> meshfiles;
+    meshfiles.push_back(mesh_path + "2D_kershaw/fvca5/mesh4_1_1.typ1");
+    meshfiles.push_back(mesh_path + "2D_kershaw/fvca5/mesh4_1_2.typ1");
+    meshfiles.push_back(mesh_path + "2D_kershaw/fvca5/mesh4_1_3.typ1");
+    meshfiles.push_back(mesh_path + "2D_kershaw/fvca5/mesh4_1_4.typ1");
+    meshfiles.push_back(mesh_path + "2D_kershaw/fvca5/mesh4_1_5.typ1");
+
+    typedef disk::generic_mesh<T, 2>  mesh_type;
+
+    std::vector< mesh_type > ret;
+    for (size_t i = 0; i < meshfiles.size(); i++)
+    {
+        mesh_type msh;
+        disk::fvca5_mesh_loader<T, 2> loader;
+
+        if (!loader.read_mesh(meshfiles.at(i)))
+        {
+            std::cout << "Problem loading mesh." << std::endl;
+            ret.clear();
+            return ret;
+        }
+        loader.populate_mesh(msh);
+
+        ret.push_back(msh);
+    }
+
+    return ret;
+}
+
+template<typename T>
 std::vector< disk::simplicial_mesh<T, 2> >
 get_triangle_netgen_meshes(void)
 {
@@ -685,6 +724,19 @@ class tester
     }
 
     void
+    test_kershaw_generic(size_t min_degree, size_t max_degree, double rate_tolerance)
+    {
+        std::cout << yellow << "Mesh under test: kershaw on generic mesh";
+        std::cout << nocolor << std::endl;
+        using T = double;
+
+        auto meshes = get_kershaw_generic_meshes<T>();
+        auto tf = get_test_functor(meshes);
+        auto er = [&](size_t k) { return tf.expected_rate(k); };
+        do_testing(meshes, tf, er, min_degree, max_degree, rate_tolerance);
+    }
+
+    void
     test_triangles_netgen(size_t min_degree, size_t max_degree, double rate_tolerance)
     {
         std::cout << yellow << "Mesh under test: triangles on netgen mesh";
@@ -771,6 +823,7 @@ public:
       bool crash_on_nan           = false;
       bool do_triangles_generic   = true;
       bool do_polygonal_generic   = true;
+      bool do_kershaw_generic   = true;
       bool do_triangles_netgen    = true;
       bool do_quads               = true;
       bool do_cartesian_2d_diskpp = true;
@@ -785,6 +838,7 @@ public:
           crash_on_nan           = lua["crash_on_nan"].get_or(false);
           do_triangles_generic   = lua["do_triangles_generic"].get_or(false);
           do_polygonal_generic   = lua["do_polygonal_generic"].get_or(false);
+          do_kershaw_generic     = lua["do_kershaw_generic"].get_or(false);
           do_triangles_netgen    = lua["do_triangles_netgen"].get_or(false);
           do_quads               = lua["do_quads"].get_or(false);
           do_cartesian_2d_diskpp = lua["do_cartesian_2d_diskpp"].get_or(false);
@@ -807,6 +861,9 @@ public:
 
       if (do_polygonal_generic)
           test_polygonal_generic(min_degree, max_degree, rate_tolerance);
+
+      if (do_kershaw_generic)
+          test_kershaw_generic(min_degree, max_degree, rate_tolerance);
 
       if (do_quads)
           test_quads(min_degree, max_degree, rate_tolerance);

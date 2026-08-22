@@ -6,28 +6,32 @@ CellDegree
 GradDegree
 1
 TimeStep
-1
-1.0   1
+2
+0.5   1
+1.0   10
 FinalTime
 1.0
 Sublevel
-4
+6
 TimeSave
-0
-Stabilization
-true
+2
+0.5 1.0
+NLSolver
+NEWTON
+LineSearch
+SECANT
 StabType
-HH0
+HHO
 AdaptativeStabilization
 false
 Beta
-100
+2000
 Verbose
 true
 Precomputation
 true
 IterMax
-10
+15
 Epsilon
 1.0E-6
 Theta
@@ -39,5 +43,7 @@ NO
 Threshold
 100
 Dynamic
-False
+STATIC
+CFL
+0.9
 EndParameters

@@ -37,18 +37,18 @@ main(int argc, char const* argv[])
 {
     using T = double;
 
-    disk::Cavitation_qp<T, 3>                           cav3D;
-    disk::Cavitation_qp<T, 2>                           cav2D;
-    disk::HenckyMises_qp<T, 3>                          Hen3D;
-    disk::HenckyMises_qp<T, 2>                          Hen2D;
-    disk::IsotropicHardeningVMis_qp<T, 3>               isot3D;
-    disk::IsotropicHardeningVMis_qp<T, 2>               isot2D;
-    disk::LinearIsotropicAndKinematicHardening_qp<T, 3> mix3D;
-    disk::LinearIsotropicAndKinematicHardening_qp<T, 2> mix2D;
-    disk::LinearLaw_qp<T, 3>                            lin3D;
-    disk::LinearLaw_qp<T, 2>                            lin2D;
-    disk::Neohookean_qp<T, 3>                           neo3D;
-    disk::Neohookean_qp<T, 2>                           neo2D;
+    disk::mechanics::Cavitation_qp< T, 3 > cav3D;
+    disk::mechanics::Cavitation_qp< T, 2 > cav2D;
+    disk::mechanics::HenckyMises_qp< T, 3 > Hen3D;
+    disk::mechanics::HenckyMises_qp< T, 2 > Hen2D;
+    disk::mechanics::IsotropicHardeningVMis_qp< T, 3 > isot3D;
+    disk::mechanics::IsotropicHardeningVMis_qp< T, 2 > isot2D;
+    disk::mechanics::LinearIsotropicAndKinematicHardening_qp< T, 3 > mix3D;
+    disk::mechanics::LinearIsotropicAndKinematicHardening_qp< T, 2 > mix2D;
+    disk::mechanics::LinearLaw_qp< T, 3 > lin3D;
+    disk::mechanics::LinearLaw_qp< T, 2 > lin2D;
+    disk::mechanics::Neohookean_qp< T, 3 > neo3D;
+    disk::mechanics::Neohookean_qp< T, 2 > neo2D;
 
     return 0;
 }

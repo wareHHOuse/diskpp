@@ -34,89 +34,89 @@
 #include "diskpp/mechanics/behaviors/tensor_conversion.hpp"
 #include "diskpp/mesh/point.hpp"
 
-namespace disk
-{
-
+namespace disk {
+namespace mechanics {
 // Law for linear elasticity
 
-template<typename T, int DIM>
-class LinearElasticity_qp : public law_qp_bones<T, DIM>
-{
+template < typename T, int DIM >
+class LinearElasticity_qp : public law_qp_bones< T, DIM > {
   public:
-    const static size_t                          dimension = DIM;
-    typedef T                                    scalar_type;
-    typedef static_matrix<scalar_type, DIM, DIM> static_matrix_type;
-    typedef static_matrix<scalar_type, 3, 3>     static_matrix_type3D;
-    typedef MaterialData<scalar_type>            data_type;
+    const static size_t dimension = DIM;
+    typedef T scalar_type;
+    typedef static_matrix< scalar_type, DIM, DIM > static_matrix_type;
+    typedef static_matrix< scalar_type, 3, 3 > static_matrix_type3D;
+    typedef MaterialData< scalar_type > data_type;
 
-    LinearElasticity_qp() : law_qp_bones<T, DIM>() {}
+    LinearElasticity_qp() : law_qp_bones< T, DIM >() {}
 
-    LinearElasticity_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) :
-      law_qp_bones<T, DIM>(point, weight)
-    {
-    }
+    LinearElasticity_qp( const point< scalar_type, DIM > &point, scalar_type weight )
+        : law_qp_bones< T, DIM >( point, weight ) {}
 
-    static_matrix_type3D
-    compute_stress3D(const data_type& data) const
-    {
+    static_matrix_type3D compute_stress3D( const data_type &data ) const {
         const static_matrix_type3D Id = static_matrix_type3D::Identity();
 
-        const auto stress =
-          2 * data.getMu() * this->m_estrain_curr + data.getLambda() * this->m_estrain_curr.trace() * Id;
+        const auto stress = 2 * data.getMu() * this->m_estrain_curr +
+                            data.getLambda() * this->m_estrain_curr.trace() * Id;
 
         return stress;
     }
 
-    static_matrix_type
-    compute_stress(const data_type& data) const
-    {
-        return convertMatrix<scalar_type, DIM>(compute_stress3D(data));
+    static_matrix_type compute_stress( const data_type &data ) const {
+        return convertMatrix< scalar_type, DIM >( compute_stress3D( data ) );
     }
 
-    static_matrix_type3D
-    compute_stress3DPrev(const data_type& data) const
-    {
+    static_matrix_type3D compute_stress3DPrev( const data_type &data ) const {
         const static_matrix_type3D Id = static_matrix_type3D::Identity();
 
-        const auto stress =
-          2 * data.getMu() * this->m_estrain_prev + data.getLambda() * this->m_estrain_prev.trace() * Id;
+        const auto stress = 2 * data.getMu() * this->m_estrain_prev +
+                            data.getLambda() * this->m_estrain_prev.trace() * Id;
 
         return stress;
     }
 
-    static_matrix_type
-    compute_stressPrev(const data_type& data) const
-    {
+    static_matrix_type compute_stressPrev( const data_type &data ) const {
         const static_matrix_type3D Id = static_matrix_type3D::Identity();
 
-        const auto stress =
-          2 * data.getMu() * this->m_estrain_prev + data.getLambda() * this->m_estrain_prev.trace() * Id;
+        const auto stress = 2 * data.getMu() * this->m_estrain_prev +
+                            data.getLambda() * this->m_estrain_prev.trace() * Id;
 
-        return convertMatrix<scalar_type, DIM>(stress);
+        return convertMatrix< scalar_type, DIM >( stress );
     }
 
-    std::pair<static_matrix_type3D, static_tensor<scalar_type, 3>>
-    compute_whole3D(const static_matrix_type3D& strain_curr, const data_type& data, bool tangentmodulus = true)
-    {
-        this->m_estrain_curr                  = strain_curr;
-        const static_tensor<scalar_type, 3> C = this->elastic_modulus3D(data);
+    std::pair< static_matrix_type3D, static_tensor< scalar_type, 3 > >
+    compute_whole3D( const static_matrix_type3D &strain_curr, const data_type &data,
+                     bool tangentmodulus = true ) {
+        this->m_estrain_curr = strain_curr;
+        const static_tensor< scalar_type, 3 > C = this->elastic_modulus3D( data );
 
         // compute Cauchy stress
-        const static_matrix_type3D stress = this->compute_stress3D(data);
+        const static_matrix_type3D stress = this->compute_stress3D( data );
 
-        return std::make_pair(stress, C);
+        return std::make_pair( stress, C );
     }
 
-    std::pair<static_matrix_type, static_tensor<scalar_type, DIM>>
-    compute_whole(const static_matrix_type& strain_curr, const data_type& data, bool tangentmodulus = true)
-    {
-        const static_matrix_type3D strain3D_curr = convertMatrix3D(strain_curr);
-        const auto                 behaviors3D   = this->compute_whole3D(strain3D_curr, data, tangentmodulus);
+    std::pair< static_matrix_type, static_tensor< scalar_type, DIM > >
+    compute_whole( const static_matrix_type &strain_curr, const data_type &data,
+                   bool tangentmodulus = true ) {
+        const static_matrix_type3D strain3D_curr = convertMatrix3D( strain_curr );
+        const auto behaviors3D = this->compute_whole3D( strain3D_curr, data, tangentmodulus );
 
-        const static_matrix_type              stress = convertMatrix<scalar_type, DIM>(behaviors3D.first);
-        const static_tensor<scalar_type, DIM> Cep    = convertTensor<scalar_type, DIM>(behaviors3D.second);
+        const static_matrix_type stress = convertMatrix< scalar_type, DIM >( behaviors3D.first );
+        const static_tensor< scalar_type, DIM > Cep =
+            convertTensor< scalar_type, DIM >( behaviors3D.second );
 
-        return std::make_pair(stress, Cep);
+        return std::make_pair( stress, Cep );
+    }
+
+    static_matrix_type compute_stress( const static_matrix_type &strain_curr,
+                                       const data_type &data ) {
+        const static_matrix_type3D strain3D_curr = convertMatrix3D( strain_curr );
+        const auto behaviors3D = this->compute_whole3D( strain3D_curr, data, false );
+
+        const static_matrix_type stress = convertMatrix< scalar_type, DIM >( behaviors3D.first );
+
+        return stress;
     }
 };
-}
+} // namespace mechanics
+} // namespace disk

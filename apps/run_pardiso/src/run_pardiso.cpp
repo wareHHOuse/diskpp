@@ -4,9 +4,10 @@
 
 int main(void)
 {
+#ifdef HAVE_HDF5
     using T = double;
     disk::sparse_matrix<T> Alhs;
-    std::cout << "loading matrix\n"; 
+    std::cout << "loading matrix\n";
     disk::load_from_hdf5(Alhs, "/home/matteo/tmp/Alhs.h5");
 
     std::cout << "loading vector\n";
@@ -22,6 +23,6 @@ int main(void)
     disk::dynamic_vector<T> sol = lu.solve(RHS);
 
     std::cout << sol << std::endl;
-
+#endif
     return 0;
 }

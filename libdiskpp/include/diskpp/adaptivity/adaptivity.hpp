@@ -25,6 +25,9 @@
 
 #pragma once
 
+#include <ostream>
+#include <vector>
+
 namespace disk
 {
 

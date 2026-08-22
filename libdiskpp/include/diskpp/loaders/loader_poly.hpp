@@ -102,12 +102,11 @@ read_grp_line(std::ifstream& ifs)
 {
     std::vector<size_t> elem;
     std::string         name;
-    size_t              cell_id, nb_elem;
+    size_t grp_id, nb_elem;
 
     ifs >> name;
-    ifs >> cell_id;
+    ifs >> grp_id;
     ifs >> nb_elem;
-    // std::cout << cell_id << ", " << nb_elem << std::endl;
     elem.reserve(nb_elem);
     for (size_t j = 0; j < nb_elem; j++)
     {
@@ -116,7 +115,7 @@ read_grp_line(std::ifstream& ifs)
         elem.push_back(tmp);
     }
 
-    return std::make_pair(cell_id, elem);
+    return std::make_pair( grp_id, elem );
 }
 
 bool
@@ -625,9 +624,8 @@ class poly_mesh_loader<T, 3> : public mesh_loader<generic_mesh<T, 3>>
         storage->boundary_info.resize(faces.size());
         for (auto& [id, faces] : faces_to_grp)
         {
-            for (auto& face_id : faces)
-            {
-                boundary_descriptor bi(id, true);
+            for ( auto &face_id : faces ) {
+                boundary_descriptor bi( id, true );
                 storage->boundary_info.at(conv_table.at(face_id)) = bi;
             }
         }

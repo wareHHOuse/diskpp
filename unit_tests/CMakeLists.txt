@@ -70,3 +70,7 @@ add_test(NAME dga_geom COMMAND dga_geom)
 add_executable(dga_matrices dga_matrices.cpp)
 target_link_libraries(dga_matrices ${LINK_LIBS})
 add_test(NAME dga_matrices COMMAND dga_matrices)
+
+add_executable(kahan_formulas kahan_formulas.cpp)
+target_link_libraries(kahan_formulas ${LINK_LIBS})
+add_test(NAME kahan_formulas COMMAND kahan_formulas)
