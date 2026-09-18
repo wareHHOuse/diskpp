@@ -8,6 +8,7 @@ enum bc {
     none,
     dirichlet,
     neumann,
+    robin
 };
 
 template<typename Mesh>
@@ -246,6 +247,6 @@ T cond(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& M, size_t excl = 
     JacobiSVD svd(M);
         auto cond = svd.singularValues()(0) 
             / svd.singularValues()(svd.singularValues().size()-(1+excl));
-        std::cout << svd.singularValues().transpose() << std::endl << std::endl;
+        //std::cout << svd.singularValues().transpose() << std::endl << std::endl;
     return cond;
 }
