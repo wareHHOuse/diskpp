@@ -80,3 +80,6 @@ add_executable(variable_diffusion_hho src/variable_diffusion_hho.cpp)
 target_link_libraries(variable_diffusion_hho diskpp::diskpp)
 install(TARGETS variable_diffusion_hho RUNTIME DESTINATION bin)
 
+add_executable(poisson_tutorial src/poisson_tutorial.cpp)
+target_link_libraries(poisson_tutorial diskpp::diskpp)
+install(TARGETS poisson_tutorial RUNTIME DESTINATION bin)

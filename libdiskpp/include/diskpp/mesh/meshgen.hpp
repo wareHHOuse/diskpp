@@ -730,6 +730,322 @@ public:
 };
 
 
+
+
+
+
+
+template<typename T>
+class simple_mesher<cartesian_mesh<T,3>>
+{
+    typedef cartesian_mesh<T,3>                         mesh_type;
+    static const size_t DIM = 3;
+    typedef typename cartesian_mesh<T,3>::storage_type  storage_type;
+    typedef point<T,DIM>                                point_type;
+
+    typedef typename mesh_type::node_type       node_type;
+    typedef typename mesh_type::edge_type       edge_type;
+    typedef typename mesh_type::surface_type    surface_type;
+    typedef typename mesh_type::volume_type     volume_type;
+
+    std::shared_ptr<storage_type>   storage;
+
+public:
+    simple_mesher(mesh_type& msh)
+        : storage( msh.backend_storage() )
+    {
+        /* Init the first level of the mesh */
+        storage->points.push_back( point_type(0.0, 0.0, 0.0) );
+        auto pi0 = point_identifier<3>(0);
+        storage->nodes.push_back( node_type( {pi0} ) );
+
+        storage->points.push_back( point_type(1.0, 0.0, 0.0) );
+        auto pi1 = point_identifier<3>(1);
+        storage->nodes.push_back( node_type( {pi1} ) );
+
+        storage->points.push_back( point_type(0.0, 1.0, 0.0) );
+        auto pi2 = point_identifier<3>(2);
+        storage->nodes.push_back( node_type( {pi2} ) );
+
+        storage->points.push_back( point_type(1.0, 1.0, 1.0) );
+        auto pi3 = point_identifier<3>(3);
+        storage->nodes.push_back( node_type( {pi3} ) );
+
+        storage->points.push_back( point_type(0.0, 0.0, 1.0) );
+        auto pi4 = point_identifier<3>(4);
+        storage->nodes.push_back( node_type( {pi4} ) );
+
+        storage->points.push_back( point_type(1.0, 0.0, 1.0) );
+        auto pi5 = point_identifier<3>(5);
+        storage->nodes.push_back( node_type( {pi5} ) );
+
+        storage->points.push_back( point_type(0.0, 1.0, 1.0) );
+        auto pi6 = point_identifier<3>(6);
+        storage->nodes.push_back( node_type( {pi6} ) );
+
+        storage->points.push_back( point_type(1.0, 1.0, 1.0) );
+        auto pi7 = point_identifier<3>(7);
+        storage->nodes.push_back( node_type( {pi7} ) );
+
+        storage->edges.push_back( edge_type({pi0, pi1}) );
+        storage->edges.push_back( edge_type({pi0, pi2}) );
+        storage->edges.push_back( edge_type({pi0, pi4}) );
+        storage->edges.push_back( edge_type({pi1, pi3}) );
+        storage->edges.push_back( edge_type({pi1, pi5}) );
+        storage->edges.push_back( edge_type({pi2, pi3}) ); 
+        storage->edges.push_back( edge_type({pi2, pi6}) ); 
+        storage->edges.push_back( edge_type({pi3, pi7}) ); 
+        storage->edges.push_back( edge_type({pi4, pi5}) );
+        storage->edges.push_back( edge_type({pi4, pi6}) );
+        storage->edges.push_back( edge_type({pi5, pi7}) ); 
+        storage->edges.push_back( edge_type({pi6, pi7}) );
+
+        storage->surfaces.push_back( surface_type({pi0, pi1, pi2, pi3}) );
+        storage->surfaces.push_back( surface_type({pi0, pi1, pi4, pi5}) );
+        storage->surfaces.push_back( surface_type({pi0, pi2, pi4, pi6}) );
+        storage->surfaces.push_back( surface_type({pi1, pi3, pi5, pi7}) );
+        storage->surfaces.push_back( surface_type({pi2, pi3, pi6, pi7}) );
+        storage->surfaces.push_back( surface_type({pi4, pi5, pi6, pi7}) );
+
+        storage->volumes.push_back( 
+            volume_type({pi0, pi1, pi2, pi3, pi4, pi5, pi6, pi7}) );
+
+        storage->boundary_info.resize(storage->surfaces.size());
+        storage->subdomain_info.resize( storage->volumes.size() );
+    }
+
+
+    void refine(void)
+    {
+        size_t node_shift = storage->nodes.size();
+        size_t face_shift = 2*storage->nodes.size();
+
+        typedef std::pair<edge_type, boundary_descriptor> ne_pair;
+
+        std::vector<edge_type> new_edges;
+        std::vector<surface_type> new_surfaces;
+        std::vector<volume_type> new_volumes;
+
+        auto eofs = [&](const edge_type& e, size_t shift) -> auto {
+            auto be = begin(storage->edges);
+            auto ee = end(storage->edges);
+            auto ei = std::lower_bound(be, ee, e);
+            if (ei == ee or e != *ei) {
+                throw std::logic_error("Edge not found. This is a bug.");
+            }
+            return point_identifier<3>(std::distance(be, ei) + shift);
+        };
+
+        auto sofs = [&](const surface_type& s, size_t shift) -> auto {
+            auto bs = begin(storage->surfaces);
+            auto es = end(storage->surfaces);
+            auto si = std::lower_bound(bs, es, s);
+            if (si == es or s != *si) {
+                throw std::logic_error("Surface not found. This is a bug.");
+            }
+            return point_identifier<3>(std::distance(bs, si) + shift);
+        };   
+
+        /* Create new edges by splitting the existing ones and create
+         * the midpoints. For the edge (a,b) the new midpoint will be
+         * at node_shift + offset(edge(a,b)).
+         */
+        for (auto& e : storage->edges)
+        {
+            auto ptids = e.point_ids();
+
+            assert(ptids.size() == 2);
+            assert(ptids[0] < storage->points.size());
+            assert(ptids[1] < storage->points.size());
+
+            auto p0 = storage->points[ ptids[0] ];
+            auto p1 = storage->points[ ptids[1] ];
+            auto pm = (p0 + p1)/2.;
+
+            storage->points.push_back(pm);
+            auto pmi = point_identifier<3>( storage->nodes.size() );
+            storage->nodes.push_back( node_type({pmi}) );
+
+            assert( ptids[0] < pmi );
+            assert( ptids[1] < pmi );
+
+            auto e1 = edge_type({ptids[0], pmi});
+            auto e2 = edge_type({ptids[1], pmi});
+            new_edges.push_back( e1 );
+            new_edges.push_back( e2 );
+        }
+
+        /* Create new boundary surfaces by splitting the existing ones
+         * and create the midpoints. For the surface (a,b,c,d) the new
+         * midpoint will be at face_shift + offset(surface(a,b,c,d)).
+         * face_shift is 2*node_shift because we added as many edge
+         * midpoints as the number of original edges.
+         */
+        for (auto& s : storage->surfaces)
+        {
+            auto ptids = s.point_ids();
+            assert(ptids.size() == 4);
+            assert(ptids[0] < storage->points.size());
+            assert(ptids[1] < storage->points.size());
+            assert(ptids[2] < storage->points.size());
+            assert(ptids[3] < storage->points.size());
+
+            auto pi0 = point_identifier<3>(ptids[0]);
+            auto pi1 = point_identifier<3>(ptids[1]);
+            auto pi2 = point_identifier<3>(ptids[2]);
+            auto pi3 = point_identifier<3>(ptids[3]);
+
+            auto p0 = storage->points[ ptids[0] ];
+            auto p1 = storage->points[ ptids[1] ];
+            auto p2 = storage->points[ ptids[2] ];
+            auto p3 = storage->points[ ptids[3] ];
+            auto pm = (p0 + p1 + p2 + p3) / 4.0;
+
+            storage->points.push_back(pm);
+            point_identifier<3> pmi(storage->nodes.size());
+            storage->nodes.push_back( node_type({pmi}) );
+
+            auto pi01 = eofs( edge_type({ptids[0], ptids[1]}), node_shift );
+            auto pi02 = eofs( edge_type({ptids[0], ptids[2]}), node_shift );
+            auto pi13 = eofs( edge_type({ptids[1], ptids[3]}), node_shift );
+            auto pi23 = eofs( edge_type({ptids[2], ptids[3]}), node_shift );
+
+            new_surfaces.push_back( surface_type({pi0, pi01, pi02, pmi}) );
+            new_surfaces.push_back( surface_type({pi01, pi1, pmi, pi13}) );
+            new_surfaces.push_back( surface_type({pi02, pmi, pi2, pi23}) );
+            new_surfaces.push_back( surface_type({pmi, pi13, pi23, pi3}) );
+        }
+
+        /* Now create the new volumes by splitting by 8 the existing
+         * ones. First thing to do is to add internal faces, then add
+         * the new volumes. */
+        for (auto& v: storage->volumes)
+        {
+            auto ptids = v.point_ids();
+            assert(ptids.size() == 8);
+            assert(ptids[0] < storage->points.size());
+            assert(ptids[1] < storage->points.size());
+            assert(ptids[2] < storage->points.size());
+            assert(ptids[3] < storage->points.size());
+            assert(ptids[4] < storage->points.size());
+            assert(ptids[5] < storage->points.size());
+            assert(ptids[6] < storage->points.size());
+            assert(ptids[7] < storage->points.size());
+
+            auto pi0 = point_identifier<3>(ptids[0]);
+            auto pi1 = point_identifier<3>(ptids[1]);
+            auto pi2 = point_identifier<3>(ptids[2]);
+            auto pi3 = point_identifier<3>(ptids[3]);
+            auto pi4 = point_identifier<3>(ptids[4]);
+            auto pi5 = point_identifier<3>(ptids[5]);
+            auto pi6 = point_identifier<3>(ptids[6]);
+            auto pi7 = point_identifier<3>(ptids[7]);
+
+            auto p0 = storage->points[ ptids[0] ];
+            auto p1 = storage->points[ ptids[1] ];
+            auto p2 = storage->points[ ptids[2] ];
+            auto p3 = storage->points[ ptids[3] ];
+            auto p4 = storage->points[ ptids[4] ];
+            auto p5 = storage->points[ ptids[5] ];
+            auto p6 = storage->points[ ptids[6] ];
+            auto p7 = storage->points[ ptids[7] ];
+            auto pm = (p0 + p1 + p2 + p3 + p4 + p5 + p6 + p7) / 8.0;
+
+            storage->points.push_back(pm);
+            point_identifier<3> pmi(storage->nodes.size());
+            storage->nodes.push_back( node_type({pmi}) );
+        
+            auto pi01 = eofs( edge_type({pi0, pi1}), node_shift );
+            auto pi02 = eofs( edge_type({pi0, pi2}), node_shift );
+            auto pi04 = eofs( edge_type({pi0, pi4}), node_shift );
+            auto pi13 = eofs( edge_type({pi1, pi3}), node_shift );
+            auto pi15 = eofs( edge_type({pi1, pi5}), node_shift );
+            auto pi23 = eofs( edge_type({pi2, pi3}), node_shift ); 
+            auto pi26 = eofs( edge_type({pi2, pi6}), node_shift ); 
+            auto pi37 = eofs( edge_type({pi3, pi7}), node_shift ); 
+            auto pi45 = eofs( edge_type({pi4, pi5}), node_shift );
+            auto pi46 = eofs( edge_type({pi4, pi6}), node_shift );
+            auto pi57 = eofs( edge_type({pi5, pi7}), node_shift ); 
+            auto pi67 = eofs( edge_type({pi6, pi7}), node_shift );
+
+            auto pi0246 = sofs( surface_type({pi0, pi2, pi4, pi6}), face_shift );
+            auto pi1357 = sofs( surface_type({pi1, pi3, pi5, pi7}), face_shift );
+            auto pi0123 = sofs( surface_type({pi0, pi1, pi2, pi3}), face_shift );
+            auto pi4567 = sofs( surface_type({pi4, pi5, pi6, pi7}), face_shift );
+            auto pi0145 = sofs( surface_type({pi0, pi1, pi4, pi5}), face_shift );
+            auto pi2367 = sofs( surface_type({pi2, pi3, pi6, pi7}), face_shift );
+
+            /* Parallel to XY */
+            new_surfaces.push_back( surface_type({pi04, pi0145, pi0246, pmi}) );
+            new_surfaces.push_back( surface_type({pi0145, pi15, pmi, pi1357}) );
+            new_surfaces.push_back( surface_type({pi0246, pmi, pi26, pi2367}) );
+            new_surfaces.push_back( surface_type({pmi, pi1357, pi37, pi2367}) );
+
+            /* Parallel to XZ */
+            new_surfaces.push_back( surface_type({pi02, pi0123, pi0246, pmi}) );
+            new_surfaces.push_back( surface_type({pi0123, pi13, pmi, pi1357}) );
+            new_surfaces.push_back( surface_type({pi0246, pmi, pi46, pi4567}) );
+            new_surfaces.push_back( surface_type({pmi, pi1357, pi4567, pi57}) );
+
+            /* Parallel to YZ */
+            new_surfaces.push_back( surface_type({pi01, pi0123, pi0145, pmi}) );
+            new_surfaces.push_back( surface_type({pi0145, pmi, pi45, pi4567}) );
+            new_surfaces.push_back( surface_type({pi0123, pi23, pmi, pi2367}) );
+            new_surfaces.push_back( surface_type({pmi, pi2367, pi4567, pi67}) );
+
+            new_volumes.push_back( volume_type(
+                {pi0, pi01, pi02, pi0123, pi04, pi0145, pi0246, pmi}
+            ));
+
+            new_volumes.push_back( volume_type(
+                {pi01, pi1, pi0123, pi13, pi0145, pi15, pmi, pi1357}
+            ));
+
+            new_volumes.push_back( volume_type(
+                {pi02, pi0123, pi2, pi23, pi0246, pmi, pi26, pi2367}
+            ));
+
+            new_volumes.push_back( volume_type(
+                {pi0123, pi13, pi23, pi3, pmi, pi1357, pi2367, pi37}
+            ));
+
+            new_volumes.push_back( volume_type(
+                {pi04, pi0145, pi0246, pmi, pi4, pi45, pi46, pi4567}
+            ));
+
+            new_volumes.push_back( volume_type(
+                {pi0145, pi15, pmi, pi1357, pi45, pi5, pi4567, pi57}
+            ));
+
+            new_volumes.push_back( volume_type(
+                {pi0246, pmi, pi26, pi2367, pi46, pi4567, pi6, pi67}
+            ));
+
+            new_volumes.push_back( volume_type(
+                {pmi, pi1357, pi2367, pi37, pi4567, pi57, pi67, pi7}
+            ));
+        }
+
+        std::sort(new_edges.begin(), new_edges.end());
+        std::swap(storage->edges, new_edges);
+        std::sort(new_surfaces.begin(), new_surfaces.end());
+        std::swap(storage->surfaces, new_surfaces);
+        std::sort(new_volumes.begin(), new_volumes.end());
+        std::swap(storage->volumes, new_volumes);
+
+        storage->boundary_info.resize(storage->surfaces.size());
+        storage->subdomain_info.resize( storage->volumes.size() );
+    }
+};
+
+
+
+
+
+
+
+
+
 template<typename Mesh>
 auto make_simple_mesher(Mesh& msh)
 {
