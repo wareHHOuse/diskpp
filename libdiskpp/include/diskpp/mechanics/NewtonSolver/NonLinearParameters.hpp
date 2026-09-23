@@ -305,7 +305,6 @@ class NonLinearParameters {
 
     T m_theta;                // theta-parameter for contact
     T m_gamma_0;              // parameter for Nitsche
-    T m_threshold;            // threshol for Tesca friction
     FrictionType m_frot_type; // Friction type ?
 
     solvers::direct_solver m_lin_solv;    // linear solver
@@ -330,7 +329,6 @@ class NonLinearParameters {
           m_adapt_stab( false ),
           m_theta( 1 ),
           m_gamma_0( 1 ),
-          m_threshold( 0 ),
           m_frot_type( FrictionType::NO_FRICTION ),
           m_dyna_type( DynamicType::STATIC ),
           m_lin_solv( solvers::direct_solver::autosel ),
@@ -368,7 +366,6 @@ class NonLinearParameters {
         std::cout << " - Dynamic scheme: " << DynaSchemeName( m_dyna_type ) << std::endl;
         std::cout << " - CFL factor: " << m_cfl_factor << std::endl;
         std::cout << " - Friction ?: " << FrictionName( m_frot_type ) << std::endl;
-        std::cout << " - Threshold: " << m_threshold << std::endl;
         std::cout << " - Gamma_0: " << m_gamma_0 << std::endl;
         std::cout << " - Theta: " << m_theta << std::endl;
     }
@@ -503,7 +500,12 @@ class NonLinearParameters {
                 else
                     error_keyword(line, keyword, type);
             } else if ( keyword == "Threshold" ) {
-                ifs >> m_threshold;
+                // removed
+                T removed;
+                std::cout << "Keyword Threshold is no longer supported. Skipped for backward "
+                             "compatibility"
+                          << std::endl;
+                ifs >> removed;
             } else if ( keyword == "Dynamic" ) {
                 std::string type;
                 ifs >> type;

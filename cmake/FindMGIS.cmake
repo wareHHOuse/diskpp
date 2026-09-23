@@ -42,10 +42,12 @@ find_package_handle_standard_args(MGIS DEFAULT_MSG MGIS_MFRONT_LIBRARIES MGIS_IN
 
 if (MGIS_FOUND AND NOT TARGET MGIS::MGIS)
     add_library(MGIS::MGIS INTERFACE IMPORTED)
-    set_target_properties(MGIS::MGIS PROPERTIES
-        IMPORTED_LOCATION "${MGIS_MFRONT_LIBRARIES}"
-        INTERFACE_INCLUDE_DIRECTORIES "${MGIS_INCLUDE_DIRS}"
+
+    target_include_directories(MGIS::MGIS INTERFACE
+    "${MGIS_INCLUDE_DIRS}"
     )
-    #target_link_libraries(MGIS::MGIS INTERFACE "${MGIS_MFRONT_LIBRARIES}")
-    #target_include_directories(MGIS::MGIS INTERFACE "${MGIS_INCLUDE_DIRS}")
+
+    target_link_libraries(MGIS::MGIS INTERFACE
+    "${MGIS_MFRONT_LIBRARIES}"
+    )
 endif()

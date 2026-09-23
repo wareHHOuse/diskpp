@@ -38,6 +38,7 @@ enum STUDY {
     WAVE_ELAS,
     IMPACT_2D,
     FREE_VIBR_2D,
+    GV_3D,
 };
 
 /* Bibliographie */
@@ -291,8 +292,21 @@ auto getMaterialData( const STUDY &study ) {
 
         break;
     }
+    case STUDY::GV_3D: {
+        // Cook Parameters HPP (mm, MPa, kN)
+
+        const T E = 210000.;
+        const T nu = 0.3;
+
+        material_data.setMu( E, nu );
+        material_data.setLambda( E, nu );
+
+        material_data.addMfrontParameter( "YoungModulus", material_data.getE() );
+        material_data.addMfrontParameter( "PoissonRatio", material_data.getNu() );
+        break;
+    }
     default: {
-        throw std::invalid_argument( "Unexpected study" );
+        throw std::invalid_argument( "getMaterialData: Unexpected study" );
         break;
     }
     }
@@ -307,7 +321,8 @@ void addAdditionalParameters( const STUDY &study, disk::mechanics::NonLinearPara
     case STUDY::COOK_ELAS:
     case STUDY::COOK_HPP:
     case STUDY::COOK_LARGE:
-    case STUDY::SPHERE_LARGE: {
+    case STUDY::SPHERE_LARGE:
+    case STUDY::GV_3D: {
         break;
     }
     case STUDY::COOK_DYNA:
@@ -328,7 +343,7 @@ void addAdditionalParameters( const STUDY &study, disk::mechanics::NonLinearPara
         break;
     }
     default: {
-        throw std::invalid_argument( "Unexpected study" );
+        throw std::invalid_argument( "addAdditionalParameters: Unexpected study" );
         break;
     }
     }
@@ -491,7 +506,7 @@ auto getBoundaryConditions( const Mesh< T, 2, Storage > &msh,
         break;
     }
     default: {
-        throw std::invalid_argument( "Unexpected study" );
+        throw std::invalid_argument( "getBoundaryConditions: Unexpected study" );
         break;
     }
     }
@@ -543,8 +558,243 @@ auto getBoundaryConditions( const Mesh< T, 3, Storage > &msh,
         bnd.addDirichletBC( disk::DZ, 9, zero );
         break;
     }
+    case STUDY::GV_3D: {
+
+        bnd.addDirichletBC( disk::DX, 1, zero );
+        bnd.addDirichletBC( disk::DY, 2, zero );
+        bnd.addDirichletBC( disk::DZ, 3, zero );
+        /* Contact */
+        auto s_cyl = []( const disk::point< T, 3 > &pt ) -> T { return 3.000; };
+        auto gap_cyl = []( const disk::point< T, 3 > &pt,
+                           const disk::static_vector< T, 3 > &n,
+                           const T &time ) -> T {
+            // distance to the cylinder z^2+y^2 = r^2 (axe x)
+
+            const T r = 8.77;
+
+            // eq in a* t^2 + b *t + c =0
+            const T a = n( 1 ) * n( 1 ) + n( 2 ) * n( 2 );
+            const T b = 2 * ( n( 1 ) * pt.y() + n( 2 ) * pt.z() );
+            const T c = pt.y() * pt.y() + pt.z() * pt.z() - r * r;
+
+            const T delta = b * b - 4.0 * a * c;
+
+            if ( abs( delta ) <= 1E-12 ) {
+                throw std::invalid_argument( "wrong prjoection for GV" );
+            }
+
+            const T t1 = ( -b + sqrt( delta ) ) / ( 2.0 * a );
+            const T t2 = ( -b - sqrt( delta ) ) / ( 2.0 * a );
+
+            const disk::static_vector< T, 3 > p_0 = pt.to_vector();
+            const disk::static_vector< T, 3 > p_1 = p_0 + t1 * n;
+            const disk::static_vector< T, 3 > p_2 = p_0 + t2 * n;
+
+            const T gap_1 = ( p_1 - p_0 ).dot( n );
+            const T gap_2 = ( p_2 - p_0 ).dot( n );
+
+            //    std::cout << "pt : " << pt << std::endl;
+            //    std::cout << "n : " << n.transpose() << std::endl;
+            //    std::cout << "p1 : " << p_1.transpose() << std::endl;
+            //    std::cout << "p2 : " << p_2.transpose() << std::endl;
+            //    std::cout << sqrt(p_0(1)*p_0(1) + p_0(2)*p_0(2)) << " " << sqrt(p_1(1)*p_1(1) +
+            //    p_1(2)*p_1(2)) << " " << sqrt(p_2(1)*p_2(1) + p_2(2)*p_2(2)) << std::endl;
+            //    std::cout << (p_1 - p_0).norm() << " " << (p_2 - p_0).norm()
+            //    << std::endl; std::cout << gap_1 << " " << gap_2 << std::endl;
+
+            if ( abs( gap_1 ) < abs( gap_2 ) ) {
+                return gap_1;
+            }
+
+            return gap_2;
+        };
+
+        bnd.addContactBC( disk::SIGNORINI_FACE, 0, s_cyl, gap_cyl );
+
+        auto s_indenter = []( const disk::point< T, 3 > &pt ) -> T { return 3000.0; };
+        auto gap_indenter = []( const disk::point< T, 3 > &pt,
+                                const disk::static_vector< T, 3 > &n,
+                                const T &time ) -> T {
+            constexpr T BIG = 1.e7;
+            constexpr T EPS = 1.e-12;
+
+            // Translation de l'indenteur suivant -Ox.
+            const T x1 = T( 59.8561 ) - time;
+            const T r1 = T( 6.795 );
+
+            const T x2 = T( 45.4 ) - time;
+            const T r2 = T( 5.85 );
+
+            const T x3 = T( 43.4 ) - time;
+            const T r3 = T( 4.71 );
+
+            T best_gap = BIG;
+
+            auto test_conical_segment = [&]( const T xa, const T ra, const T xb, const T rb ) {
+                /*
+                 * Profil du tronc de cône :
+                 *
+                 * r(x) = a*x + b
+                 */
+                const T a = ( rb - ra ) / ( xb - xa );
+                const T b = ra - a * xa;
+
+                /*
+                 * Droite de recherche :
+                 *
+                 * q(t) = pt + t*n
+                 *
+                 * Surface de révolution :
+                 *
+                 * y(t)^2 + z(t)^2 = (a*x(t) + b)^2
+                 *
+                 * Équation :
+                 *
+                 * A*t^2 + B*t + C = 0
+                 */
+                const T nr2 = n( 1 ) * n( 1 ) + n( 2 ) * n( 2 );
+                const T ar = a * pt.x() + b;
+                const T an = a * n( 0 );
+
+                const T A = nr2 - an * an;
+
+                const T B = T( 2 ) * ( pt.y() * n( 1 ) + pt.z() * n( 2 ) ) - T( 2 ) * ar * an;
+
+                const T C = pt.y() * pt.y() + pt.z() * pt.z() - ar * ar;
+
+                auto treat_root = [&]( const T root_parameter ) {
+                    if ( !std::isfinite( root_parameter ) )
+                        return;
+
+                    const T xp = pt.x() + root_parameter * n( 0 );
+
+                    const T xmin = std::min( xa, xb );
+                    const T xmax = std::max( xa, xb );
+
+                    /*
+                     * Rejet de l'intersection si elle appartient au
+                     * prolongement du cône, mais pas au véritable
+                     * segment générateur.
+                     */
+                    if ( xp < xmin - EPS || xp > xmax + EPS )
+                        return;
+
+                    /*
+                     * Vérification facultative mais robuste :
+                     * le rayon du profil doit être positif.
+                     */
+                    const T rp = a * xp + b;
+
+                    // if ( rp < -EPS )
+                    //     return;
+
+                    /*
+                     * Gap signé suivant n.
+                     *
+                     * Si n est unitaire :
+                     *
+                     * gap_candidate = root_parameter.
+                     */
+                    const disk::static_vector< T, 3 > p0 = pt.to_vector();
+                    const disk::static_vector< T, 3 > pp = p0 + root_parameter * n;
+
+                    const T gap_candidate = ( pp - p0 ).dot( n );
+
+                    /*
+                     * On conserve l'intersection admissible la plus
+                     * proche en valeur absolue, quel que soit son signe.
+                     */
+                    if ( std::abs( gap_candidate ) < std::abs( best_gap ) )
+                        best_gap = gap_candidate;
+                };
+
+                /*
+                 * Cas quadratique.
+                 */
+                if ( std::abs( A ) >= EPS ) {
+                    const T delta = B * B - T( 4 ) * A * C;
+
+                    /*
+                     * Aucun croisement avec ce cône prolongé.
+                     * Ce n'est pas une erreur : l'autre segment sera testé.
+                     */
+                    if ( delta < -EPS )
+                        return;
+
+                    /*
+                     * On absorbe une petite valeur négative provenant
+                     * des erreurs d'arrondi.
+                     */
+                    const T sqrt_delta = std::sqrt( std::max( T( 0 ), delta ) );
+
+                    const T denominator = T( 2 ) * A;
+
+                    treat_root( ( -B + sqrt_delta ) / denominator );
+                    treat_root( ( -B - sqrt_delta ) / denominator );
+
+                    return;
+                }
+
+                /*
+                 * Cas dégénéré linéaire :
+                 *
+                 * B*t + C = 0.
+                 */
+                if ( std::abs( B ) >= EPS ) {
+                    treat_root( -C / B );
+                    return;
+                }
+
+                /*
+                 * Si A et B sont nuls :
+                 *
+                 * - C != 0 : aucune intersection ;
+                 * - C == 0 : la droite appartient localement à la surface,
+                 * le gap est nul.
+                 */
+                if ( std::abs( C ) < EPS )
+                    treat_root( T( 0 ) );
+            };
+
+            // Tronc de cône issu du segment P1-P2.
+            test_conical_segment( x1, r1, x2, r2 );
+
+            // Tronc de cône issu du segment P2-P3.
+            test_conical_segment( x2, r2, x3, r3 );
+
+            /*
+             * Si aucune racine admissible n'a été trouvée,
+             * best_gap reste égal à BIG.
+             */
+            return best_gap;
+        };
+
+        bnd.addContactBC( disk::SIGNORINI_FACE, 4, s_indenter, gap_indenter );
+
+        // // With neumann
+        // auto neum = [material_data]( const disk::point< T, 3 > &p, const T &time ) -> result_type
+        // {
+        //     const result_type vec = result_type { 0.0, p.y(), p.z() };
+        //     const result_type normal = -vec / vec.norm();
+        //     const result_type vx = result_type { 1.0, 0, 0 };
+        //     const T coeff = 12400;
+
+        //     if ( p.x() >= 22.0 && p.x() <= 36.0 ) {
+        //         return time * 1.1 * coeff * ( -normal - 0.02 * vx );
+        //     } else if ( p.x() <= 50.0 ) {
+        //         return time * coeff * ( -normal - 0.08 * vx );
+        //     } else if ( p.x() <= 60.0 ) {
+        //         return time * 0.4 * coeff * ( -normal - 0.08 * vx );
+        //     }
+
+        //     return result_type::Zero();
+        // };
+        // bnd.addNeumannBC( disk::NEUMANN, 4, neum );
+
+        break;
+    }
     default: {
-        throw std::invalid_argument( "Unexpected study" );
+        throw std::invalid_argument( "getBoundaryConditions3D: Unexpected study" );
         break;
     }
     }
@@ -597,7 +847,7 @@ void addExternalLoad( const Mesh< T, 2, Storage > &msh,
         break;
     }
     default: {
-        throw std::invalid_argument( "Unexpected study" );
+        throw std::invalid_argument( "addExternalLoad: Unexpected study" );
         break;
     }
     }
@@ -617,11 +867,12 @@ void addExternalLoad( const Mesh< T, 3, Storage > &msh,
     /* External Load */
     switch ( study ) {
     case STUDY::SPHERE_LARGE:
-    case STUDY::TAYLOR_ROD: {
+    case STUDY::TAYLOR_ROD:
+    case STUDY::GV_3D: {
         break;
     }
     default: {
-        throw std::invalid_argument( "Unexpected study" );
+        throw std::invalid_argument( "addExternalLoad: Unexpected study" );
         break;
     }
     }
@@ -748,7 +999,7 @@ void addNonLinearOptions( const Mesh< T, 2, Storage > &msh,
         break;
     }
     default: {
-        throw std::invalid_argument( "Unexpected study" );
+        throw std::invalid_argument( "addNonLinearOptions: Unexpected study" );
         break;
     }
     }
@@ -804,8 +1055,13 @@ void addNonLinearOptions( const Mesh< T, 3, Storage > &msh,
 
         break;
     }
+    case STUDY::GV_3D: {
+        nl.addBehavior( disk::mechanics::DeformationMeasure::SMALL_DEF,
+                        disk::mechanics::LawType::ELASTIC );
+        break;
+    }
     default: {
-        throw std::invalid_argument( "Unexpected study" );
+        throw std::invalid_argument( "addNonLinearOptions: Unexpected study" );
         break;
     }
     }

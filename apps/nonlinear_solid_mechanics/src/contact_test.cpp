@@ -871,7 +871,6 @@ int main( int argc, char **argv ) {
     rp.m_beta = 2 * material_data.getMu();
     rp.m_gamma_0 = 2 * material_data.getMu();
     rp.m_frot_type = disk::mechanics::FrictionType::TRESCA;
-    rp.m_threshold = 0;
     rp.m_theta = 0;
     rp.m_iter_max = 20;
     rp.m_sublevel = 0;

@@ -177,6 +177,9 @@ class BoundaryConditions {
 
     using function_type = std::function< fct_result_type( const point_type &, scalar_type ) >;
 
+    using contact_gap_type = std::function< scalar_type(
+        point_type, static_vector< scalar_type, mesh_type::dimension >, scalar_type ) >;
+
   private:
     const mesh_type &m_msh;
 
@@ -184,9 +187,7 @@ class BoundaryConditions {
     std::vector< function_type > m_neumann_func;
     std::vector< function_type > m_robin_func;
     std::vector< std::function< scalar_type( point_type ) > > m_contact_func;
-    std::vector< std::function< scalar_type(
-        point_type, static_vector< scalar_type, mesh_type::dimension > ) > >
-        m_contact_gap;
+    std::vector< contact_gap_type > m_contact_gap;
 
     template < typename >
     inline static constexpr bool always_false_v = false;
@@ -206,6 +207,32 @@ class BoundaryConditions {
         } else {
             static_assert( always_false_v< function_t >, "Boundary function must be callable as "
                                                          "f(point) or f(point, time)" );
+        }
+    }
+
+    template < typename Function >
+    static contact_gap_type
+    _conv_gap( Function &&fct ) {
+        using function_t = std::decay_t< Function >;
+        if constexpr ( std::is_invocable_r_v< scalar_type,
+                                              function_t &,
+                                              point_type,
+                                              static_vector< scalar_type, mesh_type::dimension >,
+                                              scalar_type > ) {
+            return contact_gap_type( std::forward< Function >( fct ) );
+        } else if constexpr ( std::is_invocable_r_v<
+                                  scalar_type,
+                                  function_t &,
+                                  point_type,
+                                  static_vector< scalar_type, mesh_type::dimension > > ) {
+            return [fct = std::forward< Function >( fct )](
+                       point_type pt,
+                       static_vector< scalar_type, mesh_type::dimension > n,
+                       scalar_type ) -> scalar_type { return std::invoke( fct, pt, n ); };
+        } else {
+            static_assert( always_false_v< function_t >,
+                           "Gap function must be callable as "
+                           "gap(pt,n) or gap(pt,n,time)" );
         }
     }
 
@@ -240,6 +267,10 @@ class BoundaryConditions {
 
         list_faces.shrink_to_fit();
 
+        if ( list_faces.empty() ) {
+            throw std::runtime_error( "No faces finded for boundary " + std::to_string( b_id ) );
+        }
+
         return list_faces;
     }
 
@@ -258,24 +289,13 @@ class BoundaryConditions {
     inline static constexpr scalar_type default_time_marker =
         static_cast< scalar_type >( -123456789 );
 
-    void
-    addContactBC(const size_t& btype, const size_t& b_id)
-    {
-        const auto list_faces = search_faces(b_id);
-
-        for (size_t face_id : list_faces)
-        {
-            m_faces_is_contact.at(face_id) = std::make_tuple(true, btype, b_id, -1);
-            m_contact_faces++;
-        }
-    }
-
     template < typename Function, typename FunctionGap >
-    void addContactBC( size_t btype, size_t b_id, const Function &bcf, const FunctionGap &gap ) {
+    void
+    addContactBC( size_t btype, size_t b_id, Function &&bcf, FunctionGap &&gap ) {
 
         const size_t bcf_id = m_contact_func.size();
-        m_contact_func.push_back(bcf);
-        m_contact_gap.push_back( gap );
+        m_contact_func.emplace_back( std::forward< Function >( bcf ) );
+        m_contact_gap.emplace_back( _conv_gap( std::forward< FunctionGap >( gap ) ) );
 
         const auto list_faces = search_faces(b_id);
 
@@ -799,7 +819,17 @@ class BoundaryConditions {
             throw std::logic_error( "You want the gap function of a face which has not function" );
         }
 
-        return m_contact_gap.at( fid );
+        const auto func = m_contact_gap.at( fid );
+        const auto time = m_time;
+
+        return [func, time]( const point_type &p,
+                             const static_vector< scalar_type, mesh_type::dimension > &n,
+                             scalar_type t = -default_time_marker ) -> scalar_type {
+            if ( std::abs( t + default_time_marker ) > 1e-6 )
+                return func( p, n, t );
+
+            return func( p, n, time );
+        };
     }
 
     auto contact_boundary_gap( const face_type &fc ) const {

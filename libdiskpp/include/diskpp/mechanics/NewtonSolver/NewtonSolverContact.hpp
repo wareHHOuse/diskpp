@@ -78,9 +78,15 @@ static_vector< T, 3 > compute_normal( const disk::point< T, 3 > &p1, const disk:
 }
 
 template < typename Mesh, typename Elem, typename ElemBasis, typename T, typename FunctionGap >
-T compute_gap_fb( const Mesh &msh, const Elem &elem, const ElemBasis &eb,
-                  const disk::dynamic_vector< T > &tab_coeff, const FunctionGap &func_gap,
-                  const disk::point< T, 2 > &pt, const static_vector< T, 2 > &n ) {
+T
+compute_gap_fb( const Mesh &msh,
+                const Elem &elem,
+                const ElemBasis &eb,
+                const disk::dynamic_vector< T > &tab_coeff,
+                const FunctionGap &func_gap,
+                const disk::point< T, 2 > &pt,
+                const static_vector< T, 2 > &n,
+                const T time ) {
     const disk::point< T, 2 > pt_def = new_pt( eb, tab_coeff, pt );
     const auto pts = points( msh, elem );
     const static_vector< T, 2 > n_ref = compute_normal( pts[0], pts[1] );
@@ -103,13 +109,19 @@ T compute_gap_fb( const Mesh &msh, const Elem &elem, const ElemBasis &eb,
     // std::cout << "normal ref: " << n_ref.transpose() << std::endl;
     // std::cout << "normal def: " << n_def.transpose() << std::endl;
 
-    return func_gap( pt_def, n_def );
+    return func_gap( pt_def, n_def, time );
 }
 
 template < typename Mesh, typename Elem, typename ElemBasis, typename T, typename FunctionGap >
-T compute_gap_fb( const Mesh &msh, const Elem &elem, const ElemBasis &eb,
-                  const disk::dynamic_vector< T > &tab_coeff, const FunctionGap &func_gap,
-                  const disk::point< T, 3 > &pt, const static_vector< T, 3 > &n ) {
+T
+compute_gap_fb( const Mesh &msh,
+                const Elem &elem,
+                const ElemBasis &eb,
+                const disk::dynamic_vector< T > &tab_coeff,
+                const FunctionGap &func_gap,
+                const disk::point< T, 3 > &pt,
+                const static_vector< T, 3 > &n,
+                const T time ) {
     const disk::point< T, 3 > pt_def = new_pt( eb, tab_coeff, pt );
     const auto pts = points( msh, elem );
     const static_vector< T, 3 > n_ref = compute_normal( pts[0], pts[1], pts[2] );
@@ -122,7 +134,7 @@ T compute_gap_fb( const Mesh &msh, const Elem &elem, const ElemBasis &eb,
 
     const static_vector< T, 3 > n_def = sign * compute_normal( pt0_def, pt1_def, pt2_def );
 
-    return func_gap( pt_def, n_def );
+    return func_gap( pt_def, n_def, time );
 }
 } // namespace priv
 
@@ -152,6 +164,8 @@ class contact_contribution {
     const material_type &m_material_data;
     const param_type &m_rp;
     const bnd_type &m_bnd;
+
+    scalar_type m_time;
 
     // contact contrib;
     // normal part of u : u_n = u.n
@@ -924,7 +938,7 @@ class contact_contribution {
         const vector_type uT = uTF.head( cb.size() );
 
         const auto gap_func = m_bnd.contact_boundary_gap( fc );
-        const scalar_type gap = priv::compute_gap_fb( m_msh, fc, cb, uT, gap_func, pt, n );
+        const scalar_type gap = priv::compute_gap_fb( m_msh, fc, cb, uT, gap_func, pt, n, m_time );
 
         return sigma_nn + gamma_F * gap;
     }
@@ -972,7 +986,7 @@ class contact_contribution {
         const scalar_type sigma_nn = eval_stress_nn( ET_uTF, gb, n, pt );
         const scalar_type uF_n = eval_uF_n( fb, uF, n, pt );
         const auto gap_func = m_bnd.contact_boundary_gap( fc );
-        const scalar_type gap = priv::compute_gap_fb( m_msh, fc, fb, uF, gap_func, pt, n );
+        const scalar_type gap = priv::compute_gap_fb( m_msh, fc, fb, uF, gap_func, pt, n, m_time );
 
         // std::cout << gap << std::endl;
 
@@ -1040,6 +1054,11 @@ class contact_contribution {
 
         return 2 * m_material_data.getMu() * Eu +
                m_material_data.getLambda() * Eu.trace() * matrix_static::Identity();
+    }
+
+    void
+    setTime( const scalar_type time ) {
+        m_time = time;
     }
 };
 

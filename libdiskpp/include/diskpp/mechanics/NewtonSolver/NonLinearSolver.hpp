@@ -701,6 +701,8 @@ class NonLinearSolver {
                     this->output_stabCoeff( name + "stabCoeff.msh" );
                     this->output_equivalentPlasticStrain_GP( name +
                                                              "equivalentPlasticStrain_GP.msh" );
+
+                    this->output_normal_stress_boundary_nodes( name + "normalStress_nodes.msh" );
                     if ( m_rp.isUnsteady() ) {
                         this->output_discontinuous_field( name + "vite_disc.msh",
                                                           FieldName::VITE_CELLS );
@@ -1223,6 +1225,256 @@ class NonLinearSolver {
                                  subdata ); // create and init a nodedata view
 
         nodedata.saveNodeData( filename, gmsh ); // save the view
+    }
+
+    void
+    output_normal_stress_boundary_nodes( const std::string &filename ) const {
+        constexpr std::size_t dimension = mesh_type::dimension;
+
+        static_assert( dimension == 2 || dimension == 3,
+                       "Normal stress output is implemented only in 2D and 3D" );
+
+        gmsh::Gmesh gmsh_mesh = convertMesh( m_post_mesh );
+
+        const auto &post_mesh = m_post_mesh.mesh();
+        const auto storage = post_mesh.backend_storage();
+
+        const std::size_t nb_nodes = gmsh_mesh.getNumberofNodes();
+
+        /*
+         * Tableau indiquant si une face du maillage initial
+         * est une face extérieure.
+         */
+        std::vector< bool > is_boundary_face( m_msh.faces_size(), false );
+
+        for ( auto face_it = m_msh.boundary_faces_begin(); face_it != m_msh.boundary_faces_end();
+              ++face_it ) {
+            const auto fc = *face_it;
+            const std::size_t face_id = m_msh.lookup( fc );
+
+            is_boundary_face.at( face_id ) = true;
+        }
+
+        /*
+         * Somme des contraintes normales et nombre
+         * de contributions pour chaque nœud.
+         *
+         * Les nœuds intérieurs restent à zéro.
+         */
+        std::vector< scalar_type > sigma_nn_sum( nb_nodes, scalar_type { 0 } );
+
+        std::vector< std::size_t > sigma_nn_count( nb_nodes, std::size_t { 0 } );
+
+        const bool small_deformation = m_behavior.getDeformation() == SMALL_DEF;
+
+        const auto displacement = m_fields.getCurrentField( FieldName::DEPL );
+
+        /*
+         * Boucle sur les cellules.
+         *
+         * On connaît ainsi directement la cellule intérieure
+         * utilisée pour évaluer la contrainte sur chaque face.
+         */
+        for ( const auto &cl : m_msh ) {
+            const std::size_t cell_id = m_msh.lookup( cl );
+
+            const auto di = m_degree_infos.cellDegreeInfo( m_msh, cl );
+
+            /*
+             * Projection polynomiale de la contrainte
+             * sur la cellule.
+             */
+            const auto projected_stress =
+                m_behavior.projectStressOnCell( m_msh, cl, di.grad_degree() );
+
+            const auto matrix_basis = make_matrix_monomial_basis( m_msh, cl, di.grad_degree() );
+
+            /*
+             * Gradient reconstruit du déplacement.
+             * Il est seulement nécessaire en grandes déformations.
+             */
+            vector_type reconstructed_gradient;
+
+            if ( !small_deformation ) {
+                matrix_type gradient_operator;
+
+                if ( m_rp.m_precomputation ) {
+                    gradient_operator = m_data.m_gradient_precomputed.at( cell_id );
+                } else {
+                    gradient_operator = make_matrix_hho_gradrec( m_msh, cl, m_degree_infos ).first;
+                }
+
+                const vector_type uTF = displacement.at( cell_id );
+
+                reconstructed_gradient = gradient_operator * uTF;
+            }
+
+            /*
+             * Faces de la cellule.
+             *
+             * Cette fonction existe déjà dans ton code, par exemple
+             * dans BoundaryConditions::faces_without_contact().
+             */
+            const auto cell_faces = faces( m_msh, cl );
+
+            for ( const auto &fc : cell_faces ) {
+                const std::size_t face_id = m_msh.lookup( fc );
+
+                /*
+                 * On ignore les faces internes.
+                 */
+                if ( !is_boundary_face.at( face_id ) )
+                    continue;
+
+                /*
+                 * Normale à la face, orientée relativement à la cellule.
+                 */
+                auto normal_vector = normal( m_msh, cl, fc );
+
+                const scalar_type normal_norm = normal_vector.norm();
+
+                if ( normal_norm <= std::numeric_limits< scalar_type >::epsilon() ) {
+                    continue;
+                }
+
+                normal_vector /= normal_norm;
+
+                /*
+                 * Nœuds du post-maillage appartenant à cette face.
+                 *
+                 * En 2D :
+                 * les deux extrémités de l'arête.
+                 *
+                 * En 3D :
+                 * les sommets et éventuellement le barycentre
+                 * ajouté lors de la triangulation de la face.
+                 */
+                const auto &face_nodes = m_post_mesh.nodes_face( face_id );
+
+                for ( const auto &point_id : face_nodes ) {
+                    /*
+                     * Dans PostMesh, point_identifier est utilisé
+                     * directement pour indexer storage->points.
+                     *
+                     * La conversion en size_t doit donc être disponible.
+                     */
+                    const std::size_t node_id = static_cast< std::size_t >( point_id );
+
+                    if ( node_id >= nb_nodes ) {
+                        throw std::out_of_range( "Invalid post-mesh node identifier in "
+                                                 "output_normal_stress_boundary_nodes" );
+                    }
+
+                    const auto &pt = storage->points.at( node_id );
+
+                    /*
+                     * Évaluation de la contrainte projetée au nœud.
+                     */
+                    const auto stress_phi = matrix_basis.eval_functions( pt );
+
+                    const auto stress_tensor = eval( projected_stress, stress_phi );
+
+                    scalar_type sigma_nn = scalar_type { 0 };
+
+                    if ( small_deformation ) {
+                        /*
+                         * En petites déformations, stress_tensor est
+                         * directement la contrainte de Cauchy.
+                         */
+                        sigma_nn = normal_vector.dot( stress_tensor * normal_vector );
+                    } else {
+                        /*
+                         * Évaluation du gradient du déplacement
+                         * au même nœud.
+                         */
+                        const auto gradient_phi = matrix_basis.eval_functions( pt );
+
+                        const auto displacement_gradient =
+                            eval( reconstructed_gradient, gradient_phi );
+
+                        const auto deformation_gradient = convertGtoF( displacement_gradient );
+
+                        if constexpr ( dimension == 3 ) {
+                            /*
+                             * En 3D :
+                             *
+                             * sigma = (1 / det(F)) P F^T
+                             */
+                            const auto cauchy_stress =
+                                convertPK1toCauchy( stress_tensor, deformation_gradient );
+
+                            sigma_nn = normal_vector.dot( cauchy_stress * normal_vector );
+                        } else {
+                            /*
+                             * En 2D, on prolonge les tenseurs en 3D
+                             * afin d'utiliser convertPK1toCauchy().
+                             */
+                            static_matrix< scalar_type, 3, 3 > stress_tensor_3d;
+
+                            stress_tensor_3d.setZero();
+
+                            stress_tensor_3d( 0, 0 ) = stress_tensor( 0, 0 );
+
+                            stress_tensor_3d( 0, 1 ) = stress_tensor( 0, 1 );
+
+                            stress_tensor_3d( 1, 0 ) = stress_tensor( 1, 0 );
+
+                            stress_tensor_3d( 1, 1 ) = stress_tensor( 1, 1 );
+
+                            const auto deformation_gradient_3d =
+                                convertMatrix3DwithOne( deformation_gradient );
+
+                            const auto cauchy_stress_3d =
+                                convertPK1toCauchy( stress_tensor_3d, deformation_gradient_3d );
+
+                            static_vector< scalar_type, 3 > normal_vector_3d;
+
+                            normal_vector_3d.setZero();
+
+                            normal_vector_3d( 0 ) = normal_vector( 0 );
+
+                            normal_vector_3d( 1 ) = normal_vector( 1 );
+
+                            sigma_nn = normal_vector_3d.dot( cauchy_stress_3d * normal_vector_3d );
+                        }
+                    }
+
+                    sigma_nn_sum.at( node_id ) += sigma_nn;
+                    sigma_nn_count.at( node_id )++;
+                }
+            }
+        }
+
+        /*
+         * Moyenne arithmétique des contributions.
+         */
+        std::vector< gmsh::Data > data;
+        std::vector< gmsh::SubData > subdata;
+
+        data.reserve( nb_nodes );
+
+        for ( std::size_t node_id = 0; node_id < nb_nodes; ++node_id ) {
+            scalar_type averaged_sigma_nn = scalar_type { 0 };
+
+            if ( sigma_nn_count[node_id] > 0 ) {
+                averaged_sigma_nn =
+                    sigma_nn_sum[node_id] / static_cast< scalar_type >( sigma_nn_count[node_id] );
+            }
+
+            /*
+             * Les nœuds intérieurs sont explicitement écrits à zéro.
+             */
+            const gmsh::Data nodal_data( node_id + 1, convertToVectorGmsh( averaged_sigma_nn ) );
+
+            data.push_back( nodal_data );
+        }
+
+        /*
+         * Le temps est maintenant passé explicitement à la fonction.
+         */
+        gmsh::NodeData node_data( 1, 0.0, "NormalStress_boundary", data, subdata );
+
+        node_data.saveNodeData( filename, gmsh_mesh );
     }
 };
 } // namespace mechanics

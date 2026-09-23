@@ -344,6 +344,7 @@ class mechanical_computation {
         if ( bnd.cell_has_contact_faces( cl ) ) {
             const auto &material_data = behavior.getMaterialData();
             auto cc = contact_contribution( msh, material_data, rp, bnd );
+            cc.setTime( time_step.end_time() );
             cc.compute( cl, cell_infos, RkT, uTF, vTF, tangent_matix );
 
             time_contact += cc.time_contact;
