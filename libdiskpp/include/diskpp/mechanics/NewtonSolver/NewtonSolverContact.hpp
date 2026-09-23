@@ -43,6 +43,18 @@ namespace mechanics {
 
 namespace priv {
 
+template < typename T >
+struct GapLinearization {
+    T gap = T( 0 );
+
+    /*
+     * derivative(i) = d gap / d coefficient(i)
+     */
+    dynamic_vector< T > derivative;
+
+    bool valid = false;
+};
+
 template < typename Basis, typename T, size_t DIM >
 point< T, DIM > new_pt( const Basis &base, const disk::dynamic_vector< T > &tab_coeff,
                         const point< T, DIM > &pt ) {
@@ -54,27 +66,117 @@ point< T, DIM > new_pt( const Basis &base, const disk::dynamic_vector< T > &tab_
 }
 
 template < typename T >
-static_vector< T, 2 > compute_normal( const disk::point< T, 2 > &a, const disk::point< T, 2 > &b ) {
-    const static_vector< T, 2 > t1 = ( b - a ).to_vector();
-    static_vector< T, 2 > nor;
-    nor( 0 ) = -t1( 1 );
-    nor( 1 ) = t1( 0 );
+static_vector< T, 2 >
+compute_normal( const disk::point< T, 2 > &a, const disk::point< T, 2 > &b ) {
+    const static_vector< T, 2 > tangent = ( b - a ).to_vector();
 
-    return nor / nor.norm();
+    const T tangent_norm = tangent.norm();
+
+    const T tolerance = T( 100 ) * std::numeric_limits< T >::epsilon();
+
+    if ( tangent_norm <= tolerance ) {
+        throw std::runtime_error( "Cannot compute the normal of a degenerate edge" );
+    }
+
+    static_vector< T, 2 > normal;
+
+    normal( 0 ) = -tangent( 1 );
+    normal( 1 ) = tangent( 0 );
+
+    return normal / tangent_norm;
 }
 
 template < typename T >
-static_vector< T, 3 > compute_normal( const disk::point< T, 3 > &p1, const disk::point< T, 3 > &p2,
-                                      const disk::point< T, 3 > &p3 ) {
-    static_vector< T, 3 > t1 = ( p2 - p1 ).to_vector();
-    static_vector< T, 3 > t2 = ( p3 - p1 ).to_vector();
+static_vector< T, 3 >
+compute_normal( const disk::point< T, 3 > &p1,
+                const disk::point< T, 3 > &p2,
+                const disk::point< T, 3 > &p3 ) {
+    const static_vector< T, 3 > tangent_1 = ( p2 - p1 ).to_vector();
 
-    t1 /= t1.norm();
-    t2 /= t2.norm();
+    const static_vector< T, 3 > tangent_2 = ( p3 - p1 ).to_vector();
 
-    static_vector< T, 3 > nor = t1.cross( t2 );
+    const static_vector< T, 3 > area_vector = tangent_1.cross( tangent_2 );
 
-    return nor / nor.norm();
+    const T area_norm = area_vector.norm();
+
+    const T tolerance = T( 100 ) * std::numeric_limits< T >::epsilon();
+
+    if ( area_norm <= tolerance ) {
+        throw std::runtime_error( "Cannot compute the normal of a degenerate face" );
+    }
+
+    return area_vector / area_norm;
+}
+
+template < typename Mesh, typename Elem, typename ElemBasis, typename T, typename FunctionGap >
+T
+evaluate_gap_fb( const Mesh &msh,
+                 const Elem &elem,
+                 const ElemBasis &eb,
+                 const disk::dynamic_vector< T > &coefficients,
+                 const FunctionGap &gap_function,
+                 const disk::point< T, 2 > &point,
+                 const static_vector< T, 2 > &reference_normal,
+                 const T time ) {
+    const disk::point< T, 2 > deformed_point = new_pt( eb, coefficients, point );
+
+    const auto element_points = points( msh, elem );
+
+    if ( element_points.size() < 2 ) {
+        throw std::runtime_error( "A 2D contact edge must have at least two points" );
+    }
+
+    const static_vector< T, 2 > initial_geometric_normal =
+        compute_normal( element_points[0], element_points[1] );
+
+    const disk::point< T, 2 > deformed_point_0 = new_pt( eb, coefficients, element_points[0] );
+
+    const disk::point< T, 2 > deformed_point_1 = new_pt( eb, coefficients, element_points[1] );
+
+    /*
+     * Conservation de l'orientation de la normale initiale.
+     */
+    const T orientation = std::copysign( T( 1 ), reference_normal.dot( initial_geometric_normal ) );
+
+    const static_vector< T, 2 > deformed_normal =
+        orientation * compute_normal( deformed_point_0, deformed_point_1 );
+
+    return gap_function( deformed_point, deformed_normal, time );
+}
+
+template < typename Mesh, typename Elem, typename ElemBasis, typename T, typename FunctionGap >
+T
+evaluate_gap_fb( const Mesh &msh,
+                 const Elem &elem,
+                 const ElemBasis &eb,
+                 const disk::dynamic_vector< T > &coefficients,
+                 const FunctionGap &gap_function,
+                 const disk::point< T, 3 > &point,
+                 const static_vector< T, 3 > &reference_normal,
+                 const T time ) {
+    const disk::point< T, 3 > deformed_point = new_pt( eb, coefficients, point );
+
+    const auto element_points = points( msh, elem );
+
+    if ( element_points.size() < 3 ) {
+        throw std::runtime_error( "A 3D contact face must have at least three points" );
+    }
+
+    const static_vector< T, 3 > initial_geometric_normal =
+        compute_normal( element_points[0], element_points[1], element_points[2] );
+
+    const disk::point< T, 3 > deformed_point_0 = new_pt( eb, coefficients, element_points[0] );
+
+    const disk::point< T, 3 > deformed_point_1 = new_pt( eb, coefficients, element_points[1] );
+
+    const disk::point< T, 3 > deformed_point_2 = new_pt( eb, coefficients, element_points[2] );
+
+    const T orientation = std::copysign( T( 1 ), reference_normal.dot( initial_geometric_normal ) );
+
+    const static_vector< T, 3 > deformed_normal =
+        orientation * compute_normal( deformed_point_0, deformed_point_1, deformed_point_2 );
+
+    return gap_function( deformed_point, deformed_normal, time );
 }
 
 template < typename Mesh, typename Elem, typename ElemBasis, typename T, typename FunctionGap >
@@ -82,60 +184,107 @@ T
 compute_gap_fb( const Mesh &msh,
                 const Elem &elem,
                 const ElemBasis &eb,
-                const disk::dynamic_vector< T > &tab_coeff,
-                const FunctionGap &func_gap,
-                const disk::point< T, 2 > &pt,
-                const static_vector< T, 2 > &n,
+                const disk::dynamic_vector< T > &coefficients,
+                const FunctionGap &gap_function,
+                const disk::point< T, Mesh::dimension > &point,
+                const static_vector< T, Mesh::dimension > &reference_normal,
                 const T time ) {
-    const disk::point< T, 2 > pt_def = new_pt( eb, tab_coeff, pt );
-    const auto pts = points( msh, elem );
-    const static_vector< T, 2 > n_ref = compute_normal( pts[0], pts[1] );
+    return evaluate_gap_fb(
+        msh, elem, eb, coefficients, gap_function, point, reference_normal, time );
+}
 
-    const disk::point< T, 2 > pta_def = new_pt( eb, tab_coeff, pts[0] );
-    const disk::point< T, 2 > ptb_def = new_pt( eb, tab_coeff, pts[1] );
-
-    const T sign = std::copysign( T( 1 ), n.dot( n_ref ) );
-
-    const static_vector< T, 2 > n_def = sign * compute_normal( pta_def, ptb_def );
-
-    // std::cout << "pt: " << pt << std::endl;
-    // std::cout << "pta: " << pts[0] << std::endl;
-    // std::cout << "ptb: " << pts[1] << std::endl;
-    // std::cout << "pt def: " << pt_def << std::endl;
-    // std::cout << "pta def: " << pta_def << std::endl;
-    // std::cout << "ptb def: " << ptb_def << std::endl;
-
-    // std::cout << "normal: " << n.transpose() << std::endl;
-    // std::cout << "normal ref: " << n_ref.transpose() << std::endl;
-    // std::cout << "normal def: " << n_def.transpose() << std::endl;
-
-    return func_gap( pt_def, n_def, time );
+template < typename T >
+bool
+is_valid_gap( const T gap ) {
+    return std::isfinite( gap );
 }
 
 template < typename Mesh, typename Elem, typename ElemBasis, typename T, typename FunctionGap >
-T
-compute_gap_fb( const Mesh &msh,
-                const Elem &elem,
-                const ElemBasis &eb,
-                const disk::dynamic_vector< T > &tab_coeff,
-                const FunctionGap &func_gap,
-                const disk::point< T, 3 > &pt,
-                const static_vector< T, 3 > &n,
-                const T time ) {
-    const disk::point< T, 3 > pt_def = new_pt( eb, tab_coeff, pt );
-    const auto pts = points( msh, elem );
-    const static_vector< T, 3 > n_ref = compute_normal( pts[0], pts[1], pts[2] );
+GapLinearization< T >
+linearize_gap_fb( const Mesh &msh,
+                  const Elem &elem,
+                  const ElemBasis &eb,
+                  const disk::dynamic_vector< T > &coefficients,
+                  const FunctionGap &gap_function,
+                  const disk::point< T, Mesh::dimension > &point,
+                  const static_vector< T, Mesh::dimension > &reference_normal,
+                  const T time ) {
+    GapLinearization< T > result;
 
-    const disk::point< T, 3 > pt0_def = new_pt( eb, tab_coeff, pts[0] );
-    const disk::point< T, 3 > pt1_def = new_pt( eb, tab_coeff, pts[1] );
-    const disk::point< T, 3 > pt2_def = new_pt( eb, tab_coeff, pts[2] );
+    const Eigen::Index number_of_coefficients = coefficients.size();
 
-    const T sign = std::copysign( T( 1 ), n.dot( n_ref ) );
+    result.derivative = disk::dynamic_vector< T >::Zero( number_of_coefficients );
 
-    const static_vector< T, 3 > n_def = sign * compute_normal( pt0_def, pt1_def, pt2_def );
+    /*
+     * Gap au point courant.
+     */
+    result.gap =
+        evaluate_gap_fb( msh, elem, eb, coefficients, gap_function, point, reference_normal, time );
 
-    return func_gap( pt_def, n_def, time );
+    result.valid = is_valid_gap( result.gap );
+
+    if ( !result.valid )
+        return result;
+
+    /*
+     * Pour une différence centrée, un pas de l'ordre de
+     * epsilon^(1/3) donne généralement un compromis correct
+     * entre troncature et arrondi.
+     */
+    const T relative_step = std::cbrt( std::numeric_limits< T >::epsilon() );
+
+    for ( Eigen::Index coefficient_id = 0; coefficient_id < number_of_coefficients;
+          ++coefficient_id ) {
+        const T coefficient_scale = std::max( T( 1 ), std::abs( coefficients( coefficient_id ) ) );
+
+        const T perturbation = relative_step * coefficient_scale;
+
+        disk::dynamic_vector< T > coefficients_plus = coefficients;
+
+        disk::dynamic_vector< T > coefficients_minus = coefficients;
+
+        coefficients_plus( coefficient_id ) += perturbation;
+
+        coefficients_minus( coefficient_id ) -= perturbation;
+
+        const T gap_plus = evaluate_gap_fb(
+            msh, elem, eb, coefficients_plus, gap_function, point, reference_normal, time );
+
+        const T gap_minus = evaluate_gap_fb(
+            msh, elem, eb, coefficients_minus, gap_function, point, reference_normal, time );
+
+        const bool plus_valid = is_valid_gap( gap_plus );
+
+        const bool minus_valid = is_valid_gap( gap_minus );
+
+        if ( plus_valid && minus_valid ) {
+            /*
+             * Différence centrée.
+             */
+            result.derivative( coefficient_id ) =
+                ( gap_plus - gap_minus ) / ( T( 2 ) * perturbation );
+        } else if ( plus_valid ) {
+            /*
+             * Différence décentrée avant.
+             */
+            result.derivative( coefficient_id ) = ( gap_plus - result.gap ) / perturbation;
+        } else if ( minus_valid ) {
+            /*
+             * Différence décentrée arrière.
+             */
+            result.derivative( coefficient_id ) = ( result.gap - gap_minus ) / perturbation;
+        } else {
+            /*
+             * La projection disparaît des deux côtés.
+             * La dérivée n'est pas définie numériquement.
+             */
+            result.derivative( coefficient_id ) = T( 0 );
+        }
+    }
+
+    return result;
 }
+
 } // namespace priv
 
 template < typename MeshType >
@@ -274,6 +423,38 @@ class contact_contribution {
         return phi_t;
     }
 
+    vector_type
+    make_hho_dphi_n_uT( const vector_type &sigma_nn_derivative,
+                        const vector_type &gap_derivative,
+                        const scalar_type gamma_F ) const {
+        vector_type derivative = sigma_nn_derivative;
+
+        assert( gap_derivative.size() <= derivative.size() );
+
+        derivative.head( gap_derivative.size() ) += gamma_F * gap_derivative;
+
+        /*
+         * D Phi_n =
+         *
+         * D sigma_nn + gamma_F D gap.
+         */
+        return derivative;
+    }
+
+    vector_type
+    make_hho_dphi_n_uF( const vector_type &sigma_nn_derivative,
+                        const vector_type &gap_derivative,
+                        const scalar_type gamma_F,
+                        const size_t offset ) const {
+        vector_type derivative = sigma_nn_derivative;
+
+        assert( offset + gap_derivative.size() <= static_cast< size_t >( derivative.size() ) );
+
+        derivative.segment( offset, gap_derivative.size() ) += gamma_F * gap_derivative;
+
+        return derivative;
+    }
+
     // projection on the ball of radius alpha centered on 0
     vector_static make_proj_alpha( const vector_static &x, scalar_type alpha ) const {
         const scalar_type x_norm = x.norm();
@@ -323,77 +504,124 @@ class contact_contribution {
     }
 
     // compute (phi_n_theta, H(-phi_n_1(u))*phi_n_1)_FC / gamma
-    matrix_type make_hho_heaviside_contact( const cell_type &cl, const matrix_type &ET,
-                                            const vector_type &uTF,
-                                            const CellDegreeInfo< MeshType > &cell_infos ) const {
+    matrix_type
+    make_hho_heaviside_contact( const cell_type &cl,
+                                const matrix_type &ET,
+                                const vector_type &uTF,
+                                const CellDegreeInfo< MeshType > &cell_infos ) const {
         const auto cb = make_vector_monomial_basis( m_msh, cl, cell_infos.cell_degree() );
+
         const auto gb = make_sym_matrix_monomial_basis( m_msh, cl, cell_infos.grad_degree() );
 
         matrix_type lhs = matrix_type::Zero( uTF.size(), uTF.size() );
 
         const auto fcs = faces( m_msh, cl );
+
         size_t offset = cb.size();
 
         const auto fcs_di = cell_infos.facesDegreeInfo();
+
         size_t face_i = 0;
 
         const vector_type ET_uTF = ET * uTF;
 
-        for ( auto &fc : fcs ) {
+        for ( const auto &fc : fcs ) {
             const auto fdi = fcs_di[face_i++];
-            const auto facedeg = fdi.degree();
-            const auto fb = make_vector_monomial_basis( m_msh, fc, facedeg );
-            const auto fbs = fb.size();
+
+            const auto face_degree = fdi.degree();
+
+            const auto fb = make_vector_monomial_basis( m_msh, fc, face_degree );
+
+            const auto face_basis_size = fb.size();
 
             if ( m_bnd.is_contact_face( fc ) ) {
                 const auto contact_type = m_bnd.contact_boundary_type( fc );
+
                 const auto n = normal( m_msh, cl, fc );
-                const auto qp_deg = std::max( cell_infos.cell_degree(), cell_infos.grad_degree() );
-                const auto qps = integrate( m_msh, fc, 2 * qp_deg + 2 );
+
+                const auto qp_degree =
+                    std::max( cell_infos.cell_degree(), cell_infos.grad_degree() );
+
+                const auto quadrature_points = integrate( m_msh, fc, 2 * qp_degree + 2 );
+
                 const auto hF = diameter( m_msh, fc );
+
                 const auto gamma_F = m_rp.m_gamma_0 / hF;
 
-                for ( auto &qp : qps ) {
-                    const vector_type sigma_nn = make_hho_sigma_nn( ET, n, gb, qp.point() );
+                const auto gap_function = m_bnd.contact_boundary_gap( fc );
+
+                for ( const auto &qp : quadrature_points ) {
+                    /*
+                     * D sigma_nn.
+                     */
+                    const vector_type sigma_nn_derivative =
+                        make_hho_sigma_nn( ET, n, gb, qp.point() );
+
+                    scalar_type phi_n_value = scalar_type( 0 );
+                    vector_type phi_n_theta, dphi_n;
 
                     if ( contact_type == disk::SIGNORINI_CELL ) {
-                        const vector_type uT_n = make_hho_u_n( n, cb, qp.point() );
+                        const vector_type uT = uTF.head( cb.size() );
 
-                        const scalar_type phi_n_1_u =
+                        const auto gap_data = priv::linearize_gap_fb(
+                            m_msh, fc, cb, uT, gap_function, qp.point(), n, m_time );
+
+                        if ( !gap_data.valid )
+                            continue;
+
+                        const scalar_type sigma_nn_value =
+                            eval_stress_nn( ET_uTF, gb, n, qp.point() );
+
+                        phi_n_value =
                             eval_phi_n_uT( fc, ET_uTF, gb, cb, uTF, n, gamma_F, qp.point() );
 
-                        // Heaviside(-phi_n_1(u))
-                        if ( phi_n_1_u <= scalar_type( 0 ) ) {
-                            const vector_type phi_n_theta =
-                                make_hho_phi_n_uT( sigma_nn, uT_n, m_rp.m_theta, gamma_F );
-                            const vector_type phi_n_1 =
-                                make_hho_phi_n_uT( sigma_nn, uT_n, scalar_type( 1 ), gamma_F );
-                            const auto qp_phi_n_theta =
-                                disk::priv::inner_product( qp.weight() / gamma_F, phi_n_theta );
+                        const vector_type uT_n = make_hho_u_n( n, cb, qp.point() );
 
-                            lhs += disk::priv::outer_product( qp_phi_n_theta, phi_n_1 );
-                        }
+                        phi_n_theta =
+                            make_hho_phi_n_uT( sigma_nn_derivative, uT_n, m_rp.m_theta, gamma_F );
+
+                        /*
+                         * Vraie dérivée numérique de Phi_n.
+                         */
+                        dphi_n =
+                            make_hho_dphi_n_uT( sigma_nn_derivative, gap_data.derivative, gamma_F );
                     } else {
-                        const vector_type uF_n = make_hho_u_n( n, fb, qp.point() );
+                        const vector_type uF = uTF.segment( offset, fb.size() );
 
-                        const scalar_type phi_n_1_u = eval_phi_n_uF(
+                        const auto gap_data = priv::linearize_gap_fb(
+                            m_msh, fc, fb, uF, gap_function, qp.point(), n, m_time );
+
+                        if ( !gap_data.valid )
+                            continue;
+
+                        const scalar_type sigma_nn_value =
+                            eval_stress_nn( ET_uTF, gb, n, qp.point() );
+
+                        phi_n_value = eval_phi_n_uF(
                             fc, ET_uTF, gb, fb, uTF, offset, n, gamma_F, qp.point() );
 
-                        // Heaviside(-phi_n_1(u))
-                        if ( phi_n_1_u <= scalar_type( 0 ) ) {
-                            const vector_type phi_n_theta =
-                                make_hho_phi_n_uF( sigma_nn, uF_n, m_rp.m_theta, gamma_F, offset );
-                            const vector_type phi_n_1 = make_hho_phi_n_uF(
-                                sigma_nn, uF_n, scalar_type( 1 ), gamma_F, offset );
-                            const auto qp_phi_n_theta =
-                                disk::priv::inner_product( qp.weight() / gamma_F, phi_n_theta );
+                        const vector_type uF_n = make_hho_u_n( n, fb, qp.point() );
 
-                            lhs += disk::priv::outer_product( qp_phi_n_theta, phi_n_1 );
-                        }
+                        phi_n_theta = make_hho_phi_n_uF(
+                            sigma_nn_derivative, uF_n, m_rp.m_theta, gamma_F, offset );
+
+                        dphi_n = make_hho_dphi_n_uF(
+                            sigma_nn_derivative, gap_data.derivative, gamma_F, offset );
+                    }
+
+                    /*
+                     * D [Phi_n]_- = H(-Phi_n) D Phi_n.
+                     */
+                    if ( phi_n_value <= scalar_type( 0 ) ) {
+                        const auto weighted_phi_n_theta =
+                            disk::priv::inner_product( qp.weight() / gamma_F, phi_n_theta );
+
+                        lhs += disk::priv::outer_product( weighted_phi_n_theta, dphi_n );
                     }
                 }
             }
-            offset += fbs;
+
+            offset += face_basis_size;
         }
 
         return lhs;

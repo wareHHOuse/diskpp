@@ -615,11 +615,11 @@ auto getBoundaryConditions( const Mesh< T, 3, Storage > &msh,
         auto gap_indenter = []( const disk::point< T, 3 > &pt,
                                 const disk::static_vector< T, 3 > &n,
                                 const T &time ) -> T {
-            constexpr T BIG = 1.e7;
+            constexpr T BIG = std::numeric_limits< T >::infinity();
             constexpr T EPS = 1.e-12;
 
             // Translation de l'indenteur suivant -Ox.
-            const T x1 = T( 59.8561 ) - time;
+            const T x1 = T( 59.8561 ) - time + 0.1;
             const T r1 = T( 6.795 );
 
             const T x2 = T( 45.4 ) - time;

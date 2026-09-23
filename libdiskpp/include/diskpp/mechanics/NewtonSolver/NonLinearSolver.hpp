@@ -703,6 +703,10 @@ class NonLinearSolver {
                                                              "equivalentPlasticStrain_GP.msh" );
 
                     this->output_normal_stress_boundary_nodes( name + "normalStress_nodes.msh" );
+                    if ( m_bnd.nb_faces_contact() > 0 ) {
+                        this->output_normal_stress_boundary_nodes(
+                            name + "contactPressure_nodes.msh", true );
+                    }
                     if ( m_rp.isUnsteady() ) {
                         this->output_discontinuous_field( name + "vite_disc.msh",
                                                           FieldName::VITE_CELLS );
@@ -1228,7 +1232,8 @@ class NonLinearSolver {
     }
 
     void
-    output_normal_stress_boundary_nodes( const std::string &filename ) const {
+    output_normal_stress_boundary_nodes( const std::string &filename,
+                                         const bool contact_only = false ) const {
         constexpr std::size_t dimension = mesh_type::dimension;
 
         static_assert( dimension == 2 || dimension == 3,
@@ -1252,7 +1257,11 @@ class NonLinearSolver {
             const auto fc = *face_it;
             const std::size_t face_id = m_msh.lookup( fc );
 
-            is_boundary_face.at( face_id ) = true;
+            if ( contact_only && m_bnd.is_contact_face( face_id ) ) {
+                is_boundary_face.at( face_id ) = true;
+            } else {
+                is_boundary_face.at( face_id ) = true;
+            }
         }
 
         /*
