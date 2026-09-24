@@ -10,6 +10,10 @@ add_executable(nitsche src/nitsche.cpp)
 target_link_libraries(nitsche diskpp::diskpp)
 install(TARGETS nitsche RUNTIME DESTINATION bin)
 
+add_executable(minimal_hho src/minimal_hho.cpp)
+target_link_libraries(minimal_hho diskpp::diskpp)
+install(TARGETS minimal_hho RUNTIME DESTINATION bin)
+
 add_executable(linelast src/linelast.cpp)
 target_link_libraries(linelast diskpp::diskpp)
 install(TARGETS linelast RUNTIME DESTINATION bin)

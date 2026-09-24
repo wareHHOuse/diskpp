@@ -33,3 +33,7 @@ install(TARGETS check_triangle_output RUNTIME DESTINATION bin)
 add_executable(h5io h5io.cpp)
 target_link_libraries(h5io diskpp::diskpp)
 install(TARGETS h5io RUNTIME DESTINATION bin)
+
+add_executable(cubegen cubegen.cpp)
+target_link_libraries(cubegen diskpp::diskpp)
+install(TARGETS cubegen RUNTIME DESTINATION bin)

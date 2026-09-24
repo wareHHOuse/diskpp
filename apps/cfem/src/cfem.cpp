@@ -22,157 +22,74 @@
 
 #include <iostream>
 #include <regex>
+#include <optional>
 
 #include "diskpp/loaders/loader.hpp"
+#include "diskpp/loaders/loader_gmsh.hpp"
 
 #include "diskpp/cfem/cfem.hpp"
 #include "diskpp/output/silo.hpp"
+#include "diskpp/mesh/meshgen.hpp"
 
-template<typename T>
-void
-cfem_solver(const disk::simplicial_mesh<T, 2>& msh)
+#include "cfem_heat.hpp"
+#include "cfem_poisson.hpp"
+
+
+
+
+
+int main_x(int argc, char **argv)
 {
-    auto f = [](const typename disk::simplicial_mesh<T, 2>::point_type& pt) -> auto {
-        return sin(pt.x()) * sin(pt.y());
-    };
+    using RealType = double;
 
-    typedef Eigen::SparseMatrix<T>  sparse_matrix_type;
-    typedef Eigen::Triplet<T>       triplet_type;
-
-    std::vector<bool> dirichlet_nodes( msh.points_size() );
-    for (auto itor = msh.boundary_faces_begin(); itor != msh.boundary_faces_end(); itor++)
-    {
-        auto fc = *itor;
-        auto ptids = fc.point_ids();
-        dirichlet_nodes.at(ptids[0]) = true;
-        dirichlet_nodes.at(ptids[1]) = true;
+    if (argc < 2) {
+        return 1;
     }
 
-    std::vector<size_t> compress_map, expand_map;
-    compress_map.resize( msh.points_size() );
-    size_t system_size = std::count_if(dirichlet_nodes.begin(), dirichlet_nodes.end(), [](bool d) -> bool {return !d;});
-    expand_map.resize( system_size );
+    using mesh_type = disk::simplicial_mesh<RealType, 2>;
 
-    auto nnum = 0;
-    for (size_t i = 0; i < msh.points_size(); i++)
-    {
-        if ( dirichlet_nodes.at(i) )
-            continue;
-
-        expand_map.at(nnum) = i;
-        compress_map.at(i) = nnum++;
-    }
-
-    sparse_matrix_type              gA(system_size, system_size);
-    disk::dynamic_vector<T>               gb(system_size), gx(system_size);
-
-    gb = disk::dynamic_vector<T>::Zero(system_size);
+    disk::gmsh_geometry_loader<mesh_type> loader;
+    loader.read_mesh(argv[1]);
 
 
-    std::vector<triplet_type>       triplets;
+    disk::cfem::heat::solver_state<RealType> state;
+    state.dt = 1e-3;
 
-    //T integral = 0.0;
+    loader.populate_mesh(state.msh);
 
-    for (auto& cl : msh)
-    {
-        disk::static_matrix<T, 2, 2> kappa = disk::static_matrix<T, 2, 2>::Zero();
-        auto bar = barycenter(msh, cl);
+    std::cout << "init & asm\n"; 
 
-        auto c = std::cos(M_PI * bar.x()/0.02);
-        auto s = std::sin(M_PI * bar.y()/0.02);
-        auto eps = 1 + 100*c*c*s*s;// + std::exp( (bar.x()*bar.x() + bar.y()*bar.y())/2. );
-        kappa(0,0) = eps;
-        kappa(1,1) = eps;
+    disk::cfem::heat::init(state);
+    disk::cfem::heat::assemble(state);
 
-        auto A = disk::cfem::stiffness_matrix(msh, cl, kappa);
-        auto b = disk::cfem::make_rhs(msh, cl, f);
+    using dvec = disk::dynamic_vector<RealType>;
+    dvec u_curr = dvec::Zero(state.msh.points_size());
+    dvec u_next = dvec::Zero(state.msh.points_size());
 
-        auto ptids = cl.point_ids();
-
-        for (size_t i = 0; i < A.rows(); i++)
-        {
-            if ( dirichlet_nodes.at(ptids[i]) )
-                continue;
-
-            for (size_t j = 0; j < A.cols(); j++)
-            {
-                if ( dirichlet_nodes.at(ptids[j]) )
-                    continue;
-
-                triplets.push_back( triplet_type(compress_map.at(ptids[i]),
-                                                 compress_map.at(ptids[j]),
-                                                 A(i,j)) );
-            }
-
-            gb(compress_map.at(ptids[i])) += b(i);
+    for (size_t i = 0; i < state.dirichlet_values.size(); i++) {
+        if (state.dirichlet_values[i]) {
+            u_curr[i] = *state.dirichlet_values[i];
         }
     }
 
-    gA.setFromTriplets(triplets.begin(), triplets.end());
 
-#ifdef HAVE_INTEL_MKL
-        Eigen::PardisoLU<Eigen::SparseMatrix<T>>  solver;
-        //solver.pardisoParameterArray()[59] = 0; //out-of-core
-#else
-        Eigen::SparseLU<Eigen::SparseMatrix<scalar_type>>   solver;
-#endif
-
-        size_t systsz = gA.rows();
-        size_t nnz = gA.nonZeros();
-
-        std::cout << "Starting linear solver..." << std::endl;
-        std::cout << " * Solving for " << systsz << " unknowns." << std::endl;
-        std::cout << " * Matrix fill: " << 100.0*double(nnz)/(systsz*systsz) << "%" << std::endl;
-
-        solver.analyzePattern(gA);
-        solver.factorize(gA);
-        gx = solver.solve(gb);
-
-        disk::dynamic_vector<T> e_gx(msh.points_size());
-        e_gx = disk::dynamic_vector<T>::Zero(msh.points_size());
-
-        for (size_t i = 0; i < gx.size(); i++)
-            e_gx( expand_map.at(i) ) = gx(i);
-
-        std::ofstream ofs("solution.dat");
-
-        std::vector<double> solution_vals, solution_vals_nodes;
-        solution_vals.reserve(msh.cells_size());
-        solution_vals_nodes.resize(msh.points_size());
-
-        size_t cellnum = 0;
-        for (auto& cl : msh)
-        {
-            auto bar = barycenter(msh, cl);
-            auto phi = disk::cfem::eval_basis(msh, cl, bar);
-            auto ptids = cl.point_ids();
-
-            double val = 0.0;
-            for (size_t i = 0; i < 3; i++)
-                val += e_gx( size_t(ptids[i]) ) * phi(i);
-
-            ofs << bar.x() << " " << bar.y() << " " << val << std::endl;
-            solution_vals.push_back(val);
-            cellnum++;
+    for (size_t ts = 0; ts < 10000; ts++) {
+        if (ts % 10 == 0) {
+            std::cout << "ts " << ts << "\n";
+            disk::silo_database silo_db;
+            std::string fname = "ts_" + std::to_string(ts) + ".silo";
+            silo_db.create(fname);
+            silo_db.add_mesh(state.msh, "mesh");
+            silo_db.add_variable("mesh", "u", u_curr, disk::nodal_variable_t);
         }
 
-        ofs.close();
+        u_next = disk::cfem::heat::timestep(state, u_curr);
+
+        u_curr = u_next;
+    }
 
 
-        disk::silo_database silo_db;
-        silo_db.create("test.silo");
-        silo_db.add_mesh(msh, "test");
-
-        disk::silo_zonal_variable<double> u("u", solution_vals);
-        silo_db.add_variable("mesh", u);
-
-        for (size_t i = 0; i < e_gx.size(); i++)
-            solution_vals_nodes[i] = e_gx(i);
-
-        disk::silo_nodal_variable<double> u_nodal("u_nodal", solution_vals_nodes);
-        silo_db.add_variable("mesh", u_nodal);
-
-        silo_db.close();
+    return 0;
 }
 
 
@@ -181,30 +98,53 @@ int main(int argc, char **argv)
 {
     using RealType = double;
 
-    char    *filename       = nullptr;
-    int     elems_1d        = 8;
-    int ch;
-
-    filename = argv[1];
-
-    if (std::regex_match(filename, std::regex(".*\\.mesh2d$") ))
-    {
-        std::cout << "Guessed mesh format: Netgen 2D" << std::endl;
-
-        typedef disk::simplicial_mesh<RealType, 2>  mesh_type;
-
-        mesh_type msh;
-        disk::netgen_mesh_loader<RealType, 2> loader;
-        if (!loader.read_mesh(filename))
-        {
-            std::cout << "Problem loading mesh." << std::endl;
-            return 1;
-        }
-        loader.populate_mesh(msh);
-
-        cfem_solver(msh);
+    if (argc < 2) {
+        return 1;
     }
 
+    using mesh_type = disk::simplicial_mesh<RealType, 2>;
+    using point_type = typename mesh_type::point_type;
+
+    
+
+
+    disk::cfem::poisson::solver_state<RealType> state;
+    
+    //disk::gmsh_geometry_loader<mesh_type> loader;
+    //loader.read_mesh(argv[1]);
+    //loader.populate_mesh(state.msh);
+
+    auto mesher = make_simple_mesher(state.msh);
+    mesher.refine();
+    mesher.refine();
+    mesher.refine();
+    mesher.refine();
+
+    double theta = M_PI/2.0;
+
+    state.msh.transform( [&](const point_type& pt){
+        auto c = std::cos(theta);
+        auto s = std::sin(theta);
+        point_type newp{
+            c*pt.x() - s*pt.y() + 1.0,
+            s*pt.x() + c*pt.y() + 0.0
+        };
+        return newp;
+    });
+
+
+    std::cout << "init & asm\n"; 
+
+    disk::cfem::poisson::init(state);
+
+    /*
+    disk::cfem::poisson::assemble(state);
+    disk::cfem::poisson::solve(state);
+    */
+
+    disk::cfem::poisson::picard(state);
+
+    disk::cfem::poisson::postpro(state);
 
     return 0;
 }
