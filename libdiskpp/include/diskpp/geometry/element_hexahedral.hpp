@@ -58,6 +58,9 @@ public:
     cartesian_element(std::initializer_list<point_id_type> l)
     {
         std::copy(l.begin(), l.end(), m_pts_ptrs.begin());
+        if (l.size() == 2) {
+            std::sort(m_pts_ptrs.begin(), m_pts_ptrs.end());
+        }
     }
 
     node_array_type point_ids(void) const

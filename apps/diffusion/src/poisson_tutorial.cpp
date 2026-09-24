@@ -359,8 +359,10 @@ int main(int argc, char **argv)
     for (i = 0; i < levels; i++) {
         mesher.refine();
     }
+
+    disk::renumber_hypercube_boundaries(msh);
         //std::cout << "Diameter: " << disk::average_diameter(msh) << std::endl;
-        msh.statistics();
+        //msh.statistics();
         std::string silo_fn = "poisson_level_" + std::to_string(i) + ".silo";
         disk::silo_database db;
         db.create(silo_fn);

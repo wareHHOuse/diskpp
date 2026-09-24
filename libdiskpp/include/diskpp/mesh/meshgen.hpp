@@ -767,7 +767,7 @@ public:
         auto pi2 = point_identifier<3>(2);
         storage->nodes.push_back( node_type( {pi2} ) );
 
-        storage->points.push_back( point_type(1.0, 1.0, 1.0) );
+        storage->points.push_back( point_type(1.0, 1.0, 0.0) );
         auto pi3 = point_identifier<3>(3);
         storage->nodes.push_back( node_type( {pi3} ) );
 
@@ -800,12 +800,12 @@ public:
         storage->edges.push_back( edge_type({pi5, pi7}) ); 
         storage->edges.push_back( edge_type({pi6, pi7}) );
 
-        storage->surfaces.push_back( surface_type({pi0, pi1, pi2, pi3}) );
-        storage->surfaces.push_back( surface_type({pi0, pi1, pi4, pi5}) );
-        storage->surfaces.push_back( surface_type({pi0, pi2, pi4, pi6}) );
-        storage->surfaces.push_back( surface_type({pi1, pi3, pi5, pi7}) );
-        storage->surfaces.push_back( surface_type({pi2, pi3, pi6, pi7}) );
-        storage->surfaces.push_back( surface_type({pi4, pi5, pi6, pi7}) );
+        storage->surfaces.push_back( surface_type({pi0, pi1, pi3, pi2}) );
+        storage->surfaces.push_back( surface_type({pi0, pi2, pi6, pi4}) );
+        storage->surfaces.push_back( surface_type({pi0, pi4, pi5, pi1}) );
+        storage->surfaces.push_back( surface_type({pi1, pi3, pi7, pi5}) );
+        storage->surfaces.push_back( surface_type({pi2, pi6, pi7, pi3}) );
+        storage->surfaces.push_back( surface_type({pi4, pi5, pi7, pi6}) );
 
         storage->volumes.push_back( 
             volume_type({pi0, pi1, pi2, pi3, pi4, pi5, pi6, pi7}) );
@@ -818,7 +818,7 @@ public:
     void refine(void)
     {
         size_t node_shift = storage->nodes.size();
-        size_t face_shift = 2*storage->nodes.size();
+        size_t face_shift = node_shift + storage->edges.size();
 
         typedef std::pair<edge_type, boundary_descriptor> ne_pair;
 
@@ -831,6 +831,7 @@ public:
             auto ee = end(storage->edges);
             auto ei = std::lower_bound(be, ee, e);
             if (ei == ee or e != *ei) {
+                std::cout << "Edge " << e << std::endl;
                 throw std::logic_error("Edge not found. This is a bug.");
             }
             return point_identifier<3>(std::distance(be, ei) + shift);
@@ -841,10 +842,11 @@ public:
             auto es = end(storage->surfaces);
             auto si = std::lower_bound(bs, es, s);
             if (si == es or s != *si) {
+                std::cout << "Surface " << s << std::endl;
                 throw std::logic_error("Surface not found. This is a bug.");
             }
             return point_identifier<3>(std::distance(bs, si) + shift);
-        };   
+        };  
 
         /* Create new edges by splitting the existing ones and create
          * the midpoints. For the edge (a,b) the new midpoint will be
@@ -892,28 +894,33 @@ public:
 
             auto pi0 = point_identifier<3>(ptids[0]);
             auto pi1 = point_identifier<3>(ptids[1]);
-            auto pi2 = point_identifier<3>(ptids[2]);
-            auto pi3 = point_identifier<3>(ptids[3]);
+            auto pi2 = point_identifier<3>(ptids[3]);
+            auto pi3 = point_identifier<3>(ptids[2]);
 
             auto p0 = storage->points[ ptids[0] ];
             auto p1 = storage->points[ ptids[1] ];
-            auto p2 = storage->points[ ptids[2] ];
-            auto p3 = storage->points[ ptids[3] ];
+            auto p2 = storage->points[ ptids[3] ];
+            auto p3 = storage->points[ ptids[2] ];
             auto pm = (p0 + p1 + p2 + p3) / 4.0;
 
             storage->points.push_back(pm);
             point_identifier<3> pmi(storage->nodes.size());
             storage->nodes.push_back( node_type({pmi}) );
 
-            auto pi01 = eofs( edge_type({ptids[0], ptids[1]}), node_shift );
-            auto pi02 = eofs( edge_type({ptids[0], ptids[2]}), node_shift );
-            auto pi13 = eofs( edge_type({ptids[1], ptids[3]}), node_shift );
-            auto pi23 = eofs( edge_type({ptids[2], ptids[3]}), node_shift );
+            auto pi01 = eofs( edge_type({pi0, pi1}), node_shift );
+            auto pi02 = eofs( edge_type({pi0, pi2}), node_shift );
+            auto pi13 = eofs( edge_type({pi1, pi3}), node_shift );
+            auto pi23 = eofs( edge_type({pi2, pi3}), node_shift );
 
-            new_surfaces.push_back( surface_type({pi0, pi01, pi02, pmi}) );
-            new_surfaces.push_back( surface_type({pi01, pi1, pmi, pi13}) );
-            new_surfaces.push_back( surface_type({pi02, pmi, pi2, pi23}) );
-            new_surfaces.push_back( surface_type({pmi, pi13, pi23, pi3}) );
+            new_edges.push_back( edge_type({pi01, pmi}) );
+            new_edges.push_back( edge_type({pi02, pmi}) );
+            new_edges.push_back( edge_type({pi13, pmi}) );
+            new_edges.push_back( edge_type({pi23, pmi}) );
+
+            new_surfaces.push_back( surface_type({pi0, pi01, pmi, pi02}) );
+            new_surfaces.push_back( surface_type({pi01, pi1, pi13, pmi}) );
+            new_surfaces.push_back( surface_type({pi02, pmi, pi23, pi2}) );
+            new_surfaces.push_back( surface_type({pmi, pi13, pi3, pi23}) );
         }
 
         /* Now create the new volumes by splitting by 8 the existing
@@ -968,61 +975,68 @@ public:
             auto pi57 = eofs( edge_type({pi5, pi7}), node_shift ); 
             auto pi67 = eofs( edge_type({pi6, pi7}), node_shift );
 
-            auto pi0246 = sofs( surface_type({pi0, pi2, pi4, pi6}), face_shift );
-            auto pi1357 = sofs( surface_type({pi1, pi3, pi5, pi7}), face_shift );
-            auto pi0123 = sofs( surface_type({pi0, pi1, pi2, pi3}), face_shift );
-            auto pi4567 = sofs( surface_type({pi4, pi5, pi6, pi7}), face_shift );
-            auto pi0145 = sofs( surface_type({pi0, pi1, pi4, pi5}), face_shift );
-            auto pi2367 = sofs( surface_type({pi2, pi3, pi6, pi7}), face_shift );
+            auto pi0264 = sofs( surface_type({pi0, pi2, pi6, pi4}), face_shift );
+            auto pi1375 = sofs( surface_type({pi1, pi3, pi7, pi5}), face_shift );
+            auto pi0132 = sofs( surface_type({pi0, pi1, pi3, pi2}), face_shift );
+            auto pi4576 = sofs( surface_type({pi4, pi5, pi7, pi6}), face_shift );
+            auto pi0154 = sofs( surface_type({pi0, pi4, pi5, pi1}), face_shift );
+            auto pi2376 = sofs( surface_type({pi2, pi6, pi7, pi3}), face_shift );
+
+            new_edges.push_back( edge_type({pi0264, pmi}) );
+            new_edges.push_back( edge_type({pi1375, pmi}) );
+            new_edges.push_back( edge_type({pi0132, pmi}) );
+            new_edges.push_back( edge_type({pi4576, pmi}) );
+            new_edges.push_back( edge_type({pi0154, pmi}) );
+            new_edges.push_back( edge_type({pi2376, pmi}) );
 
             /* Parallel to XY */
-            new_surfaces.push_back( surface_type({pi04, pi0145, pi0246, pmi}) );
-            new_surfaces.push_back( surface_type({pi0145, pi15, pmi, pi1357}) );
-            new_surfaces.push_back( surface_type({pi0246, pmi, pi26, pi2367}) );
-            new_surfaces.push_back( surface_type({pmi, pi1357, pi37, pi2367}) );
+            new_surfaces.push_back( surface_type({pi04, pi0154, pmi, pi0264}) );
+            new_surfaces.push_back( surface_type({pi0154, pi15, pi1375, pmi}) );
+            new_surfaces.push_back( surface_type({pi0264, pmi, pi2376, pi26}) );
+            new_surfaces.push_back( surface_type({pmi, pi1375, pi37, pi2376}) );
 
             /* Parallel to XZ */
-            new_surfaces.push_back( surface_type({pi02, pi0123, pi0246, pmi}) );
-            new_surfaces.push_back( surface_type({pi0123, pi13, pmi, pi1357}) );
-            new_surfaces.push_back( surface_type({pi0246, pmi, pi46, pi4567}) );
-            new_surfaces.push_back( surface_type({pmi, pi1357, pi4567, pi57}) );
+            new_surfaces.push_back( surface_type({pi02, pi0264, pmi, pi0132}) );
+            new_surfaces.push_back( surface_type({pi0132, pmi, pi1375, pi13}) );
+            new_surfaces.push_back( surface_type({pi0264, pi46, pi4576, pmi}) );
+            new_surfaces.push_back( surface_type({pmi, pi4576, pi57, pi1375}) );
 
             /* Parallel to YZ */
-            new_surfaces.push_back( surface_type({pi01, pi0123, pi0145, pmi}) );
-            new_surfaces.push_back( surface_type({pi0145, pmi, pi45, pi4567}) );
-            new_surfaces.push_back( surface_type({pi0123, pi23, pmi, pi2367}) );
-            new_surfaces.push_back( surface_type({pmi, pi2367, pi4567, pi67}) );
+            new_surfaces.push_back( surface_type({pi01, pi0132, pmi, pi0154}) );
+            new_surfaces.push_back( surface_type({pi0154, pmi, pi4576, pi45}) );
+            new_surfaces.push_back( surface_type({pi0132, pi23, pi2376, pmi}) );
+            new_surfaces.push_back( surface_type({pmi, pi2376, pi67, pi4576}) );
 
             new_volumes.push_back( volume_type(
-                {pi0, pi01, pi02, pi0123, pi04, pi0145, pi0246, pmi}
+                {pi0, pi01, pi02, pi0132, pi04, pi0154, pi0264, pmi}
             ));
 
             new_volumes.push_back( volume_type(
-                {pi01, pi1, pi0123, pi13, pi0145, pi15, pmi, pi1357}
+                {pi01, pi1, pi0132, pi13, pi0154, pi15, pmi, pi1375}
             ));
 
             new_volumes.push_back( volume_type(
-                {pi02, pi0123, pi2, pi23, pi0246, pmi, pi26, pi2367}
+                {pi02, pi0132, pi2, pi23, pi0264, pmi, pi26, pi2376}
             ));
 
             new_volumes.push_back( volume_type(
-                {pi0123, pi13, pi23, pi3, pmi, pi1357, pi2367, pi37}
+                {pi0132, pi13, pi23, pi3, pmi, pi1375, pi2376, pi37}
             ));
 
             new_volumes.push_back( volume_type(
-                {pi04, pi0145, pi0246, pmi, pi4, pi45, pi46, pi4567}
+                {pi04, pi0154, pi0264, pmi, pi4, pi45, pi46, pi4576}
             ));
 
             new_volumes.push_back( volume_type(
-                {pi0145, pi15, pmi, pi1357, pi45, pi5, pi4567, pi57}
+                {pi0154, pi15, pmi, pi1375, pi45, pi5, pi4576, pi57}
             ));
 
             new_volumes.push_back( volume_type(
-                {pi0246, pmi, pi26, pi2367, pi46, pi4567, pi6, pi67}
+                {pi0264, pmi, pi26, pi2376, pi46, pi4576, pi6, pi67}
             ));
 
             new_volumes.push_back( volume_type(
-                {pmi, pi1357, pi2367, pi37, pi4567, pi57, pi67, pi7}
+                {pmi, pi1375, pi2376, pi37, pi4576, pi57, pi67, pi7}
             ));
         }
 
