@@ -335,9 +335,11 @@ int main(int argc, char **argv)
         {
             std::cout << "Guessed mesh format: GMSH simplicial 3D" << std::endl;
             disk::simplicial_mesh<T,3> msh;
+#ifdef HAVE_GMSH
             disk::gmsh_geometry_loader< disk::simplicial_mesh<T,3> > loader;
             loader.read_mesh(mesh_filename);
             loader.populate_mesh(msh);
+#endif
             msh.transform(tr);
             test_consistency(msh, degree, increment, variant);
             return 0;

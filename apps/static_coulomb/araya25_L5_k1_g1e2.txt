@@ -1,0 +1,44 @@
+scarrasco@MU00216619:~/projects/diskpp/build$ ./apps/static_coulomb/araya25 ../apps/static_coulomb/araya25.dat
+native boundary tags:
+  tag 1 (2048 faces)  centroid ( 4 , 4 , 2 )
+  tag 2 (6144 faces)  centroid ( 5.33333 , 2 , 2 )
+  tag 3 (2048 faces)  centroid ( 4 , 0 , 2 )
+  tag 4 (2048 faces)  centroid ( 0 , 2 , 2 )
+araya25
+  196608 cells   k=1  friction=0.8  theta=-1  gamma_0=100
+  mu = 384.615   lambda = 576.923
+  picard  0   newton  8    |u - u_picard| = 7.755e+02
+  picard  1   newton  7    |u - u_picard| = 3.001e+02
+  picard  2   newton  5    |u - u_picard| = 8.838e+01
+  picard  3   newton  6    |u - u_picard| = 2.508e+01
+  picard  4   newton  4    |u - u_picard| = 9.435e+00
+  picard  5   newton  5    |u - u_picard| = 3.093e+00
+  picard  6   newton  5    |u - u_picard| = 1.267e+00
+  picard  7   newton  4    |u - u_picard| = 4.064e-01
+  picard  8   newton  3    |u - u_picard| = 1.684e-01
+  picard  9   newton  2    |u - u_picard| = 6.635e-02
+  picard 10   newton  2    |u - u_picard| = 2.565e-02
+  picard 11   newton  2    |u - u_picard| = 1.010e-02
+  picard 12   newton  2    |u - u_picard| = 3.798e-03
+  picard 13   newton  2    |u - u_picard| = 1.497e-03
+  picard 14   newton  2    |u - u_picard| = 5.758e-04
+  picard 15   newton  2    |u - u_picard| = 2.371e-04
+  picard 16   newton  2    |u - u_picard| = 9.883e-05
+  picard 17   newton  2    |u - u_picard| = 4.598e-05
+  picard 18   newton  2    |u - u_picard| = 2.263e-05
+  picard 19   newton  2    |u - u_picard| = 1.185e-05
+  picard 20   newton  1    |u - u_picard| = 6.196e-06
+  picard 21   newton  1    |u - u_picard| = 3.201e-06
+  picard 22   newton  1    |u - u_picard| = 1.608e-06
+  picard 23   newton  1    |u - u_picard| = 7.893e-07
+  picard 24   newton  1    |u - u_picard| = 3.799e-07
+  picard 25   newton  1    |u - u_picard| = 1.811e-07
+  picard 26   newton  1    |u - u_picard| = 8.635e-08
+  picard 27   newton  1    |u - u_picard| = 4.158e-08
+  picard 28   newton  1    |u - u_picard| = 2.036e-08
+  picard 29   newton  1    |u - u_picard| = 1.015e-08
+  picard 30   newton  1    |u - u_picard| = 5.151e-09
+  total inner Newton iterations: 80
+  wrote paraview-data/araya25/araya25_L5_k1_g1e2.vtu (35937 points, 196608 cells)
+  wrote paraview-data/araya25/araya25_L5_k1_g1e2_contact.vtu (2048 boundary faces)
+  wrote paraview-data/araya25/araya25_L5_k1_g1e2.csv (2048 contact faces)

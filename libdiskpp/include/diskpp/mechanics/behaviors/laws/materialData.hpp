@@ -28,244 +28,145 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-namespace disk
-{
+namespace disk {
 
-template<typename T>
-class curve_point
-{
+namespace mechanics {
+
+template < typename T >
+class curve_point {
   private:
     T m_p;
     T m_Rp;
 
   public:
-    curve_point() : m_p(T(0)), m_Rp(T(0)) {}
+    curve_point() : m_p( T( 0 ) ), m_Rp( T( 0 ) ) {}
 
-    curve_point(const T p, const T Rp) : m_p(p), m_Rp(Rp) {}
+    curve_point( const T p, const T Rp ) : m_p( p ), m_Rp( Rp ) {}
 
-    T
-    getP() const
-    {
-        return m_p;
-    }
+    T getP() const { return m_p; }
 
-    T
-    getRp() const
-    {
-        return m_Rp;
-    }
+    T getRp() const { return m_Rp; }
 };
 
-template<typename scalar_type>
-class MaterialData
-{
-    typedef std::pair<std::string, scalar_type> MfrontType;
+template < typename scalar_type >
+class MaterialData {
+    typedef std::pair< std::string, scalar_type > MfrontType;
 
   private:
-    scalar_type                           m_lambda;
-    scalar_type                           m_mu;
-    scalar_type                           m_H;
-    scalar_type                           m_K;
-    scalar_type                           m_sigma_y0;
-    size_t                                m_type;
-    std::vector<curve_point<scalar_type>> m_Rp_curve;
-    std::vector<MfrontType>               m_mfront_param;
+    scalar_type m_lambda;
+    scalar_type m_mu;
+    scalar_type m_H;
+    scalar_type m_K;
+    scalar_type m_sigma_y0;
+    size_t m_type;
+    std::vector< curve_point< scalar_type > > m_Rp_curve;
+    std::vector< MfrontType > m_mfront_param;
+    scalar_type m_rho;
 
   public:
-    MaterialData() :
-      m_lambda(1.0), m_mu(1.0), m_H(0), m_K(0), m_sigma_y0(std::numeric_limits<scalar_type>::max()), m_type(1)
-    {
+    MaterialData()
+        : m_lambda( 1.0 ),
+          m_mu( 1.0 ),
+          m_H( 0 ),
+          m_K( 0 ),
+          m_sigma_y0( std::numeric_limits< scalar_type >::max() ),
+          m_type( 1 ),
+          m_rho( 0.0 ) {}
+
+    MaterialData( scalar_type lambda, scalar_type mu, scalar_type H, scalar_type K,
+                  scalar_type sigma_y0 )
+        : m_lambda( lambda ), m_mu( mu ), m_H( H ), m_K( K ), m_sigma_y0( sigma_y0 ), m_type( 0 ) {}
+
+    MaterialData( scalar_type lambda, scalar_type mu )
+        : m_lambda( lambda ),
+          m_mu( mu ),
+          m_H( 0 ),
+          m_K( 0 ),
+          m_sigma_y0( std::numeric_limits< scalar_type >::max() ),
+          m_type( 0 ) {}
+
+    void setMu( const scalar_type mu ) { m_mu = mu; }
+
+    void setMu( const scalar_type E, const scalar_type nu ) { m_mu = E / ( 2.0 * ( 1.0 + nu ) ); }
+
+    void setLambda( const scalar_type lambda ) { m_lambda = lambda; }
+
+    void setLambda( const scalar_type E, const scalar_type nu ) {
+        m_lambda = E * nu / ( ( 1.0 + nu ) * ( 1.0 - 2.0 * nu ) );
     }
 
-    MaterialData(const scalar_type& lambda,
-                 const scalar_type& mu,
-                 const scalar_type& H,
-                 const scalar_type& K,
-                 const scalar_type& sigma_y0) :
-      m_lambda(lambda),
-      m_mu(mu), m_H(H), m_K(K), m_sigma_y0(sigma_y0), m_type(0)
-    {
+    void setH( const scalar_type H ) { m_H = H; }
+
+    void setH( const scalar_type E, const scalar_type ET, const scalar_type K ) {
+        m_H = E * ET / ( E - ET ) - 1.5 * K;
     }
 
-    MaterialData(const scalar_type& lambda, const scalar_type& mu) :
-      m_lambda(lambda), m_mu(mu), m_H(0), m_K(0), m_sigma_y0(std::numeric_limits<scalar_type>::max()), m_type(0)
-    {
-    }
+    void setK( const scalar_type K ) { m_K = K; }
 
-    void
-    setMu(const scalar_type mu)
-    {
-        m_mu = mu;
-    }
+    void setRho( const scalar_type rho ) { m_rho = rho; }
 
-    void
-    setMu(const scalar_type E, const scalar_type nu)
-    {
-        m_mu = E / (2.0 * (1.0 + nu));
-    }
+    void setSigma_y0( const scalar_type sigma_y0 ) { m_sigma_y0 = sigma_y0; }
 
-    void
-    setLambda(const scalar_type lambda)
-    {
-        m_lambda = lambda;
-    }
+    void setType( const size_t type ) { m_type = type; }
 
-    void
-    setLambda(const scalar_type E, const scalar_type nu)
-    {
-        m_lambda = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu));
-    }
-
-    void
-    setH(const scalar_type H)
-    {
-        m_H = H;
-    }
-
-    void
-    setH(const scalar_type E, const scalar_type ET, const scalar_type K)
-    {
-        m_H = E * ET / (E - ET) - 1.5 * K;
-    }
-
-    void
-    setK(const scalar_type K)
-    {
-        m_K = K;
-    }
-
-    void
-    setSigma_y0(const scalar_type sigma_y0)
-    {
-        m_sigma_y0 = sigma_y0;
-    }
-
-    void
-    setType(const size_t type)
-    {
-        m_type = type;
-    }
-
-    void
-    setRpCurve(const std::vector<curve_point<scalar_type>> RpCurve)
-    {
+    void setRpCurve( const std::vector< curve_point< scalar_type > > RpCurve ) {
         m_Rp_curve = RpCurve;
     }
 
-    void
-    addCurvePoint(const curve_point<scalar_type> point)
-    {
-        m_Rp_curve.push_back(point);
+    void addCurvePoint( const curve_point< scalar_type > point ) { m_Rp_curve.push_back( point ); }
+
+    void addCurvePoint( const scalar_type p, const scalar_type Rp ) {
+        m_Rp_curve.push_back( curve_point< scalar_type >( p, Rp ) );
     }
 
-    void
-    addCurvePoint(const scalar_type p, const scalar_type Rp)
-    {
-        m_Rp_curve.push_back(curve_point<scalar_type>(p, Rp));
-    }
+    scalar_type getE() const { return m_mu * ( 3 * m_lambda + 2 * m_mu ) / ( m_lambda + m_mu ); }
 
-    scalar_type
-    getE() const
-    {
-        return m_mu * (3 * m_lambda + 2 * m_mu) / (m_lambda + m_mu);
-    }
+    scalar_type getNu() const { return m_lambda / ( 2 * ( m_lambda + m_mu ) ); }
 
-    scalar_type
-    getNu() const
-    {
-        return m_lambda / (2 * (m_lambda + m_mu));
-    }
-
-    scalar_type
-    getET() const
-    {
+    scalar_type getET() const {
         const scalar_type E = getE();
-        return E * (m_H + 1.5 * m_K) / (m_H + 1.5 * m_K + E);
+        return E * ( m_H + 1.5 * m_K ) / ( m_H + 1.5 * m_K + E );
     }
 
-    scalar_type
-    getLambda() const
-    {
-        return m_lambda;
-    }
+    scalar_type getLambda() const { return m_lambda; }
 
-    scalar_type
-    getMu() const
-    {
-        return m_mu;
-    }
+    scalar_type getMu() const { return m_mu; }
 
-    scalar_type
-    getH() const
-    {
-        return m_H;
-    }
+    scalar_type getH() const { return m_H; }
 
-    scalar_type
-    getK() const
-    {
-        return m_K;
-    }
+    scalar_type getK() const { return m_K; }
 
-    scalar_type
-    getSigma_y0() const
-    {
-        return m_sigma_y0;
-    }
+    scalar_type getSigma_y0() const { return m_sigma_y0; }
 
-    size_t
-    getType() const
-    {
-        return m_type;
-    }
+    scalar_type getRho() const { return m_rho; }
 
-    std::vector<curve_point<scalar_type>>
-    getRpCurve() const
-    {
-        return m_Rp_curve;
-    }
+    size_t getType() const { return m_type; }
 
-    void
-    checkRpCurve()
-    {
-        if (m_Rp_curve.size() > 0)
-        {
-            std::sort(m_Rp_curve.begin(),
-                      m_Rp_curve.end(),
-                      [](const auto& lhs, const auto& rhs) { return lhs.getP() < rhs.getP(); });
+    std::vector< curve_point< scalar_type > > getRpCurve() const { return m_Rp_curve; }
 
-            for (size_t i = 0; i < m_Rp_curve.size() - 1; i++)
-            {
-                if (std::abs(m_Rp_curve[i].getP() - m_Rp_curve[i + 1].getP()) <
-                    std::numeric_limits<scalar_type>::epsilon())
-                {
-                    throw std::invalid_argument("RpCurve: You have two values with the same p");
+    void checkRpCurve() {
+        if ( m_Rp_curve.size() > 0 ) {
+            std::sort( m_Rp_curve.begin(), m_Rp_curve.end(),
+                       []( const auto &lhs, const auto &rhs ) { return lhs.getP() < rhs.getP(); } );
+
+            for ( size_t i = 0; i < m_Rp_curve.size() - 1; i++ ) {
+                if ( std::abs( m_Rp_curve[i].getP() - m_Rp_curve[i + 1].getP() ) <
+                     std::numeric_limits< scalar_type >::epsilon() ) {
+                    throw std::invalid_argument( "RpCurve: You have two values with the same p" );
                 }
             }
         }
     }
 
-    void
-    addMfrontParameter(const std::string& param, const scalar_type& value)
-    {
-        m_mfront_param.push_back((std::make_pair(param, value)));
+    void addMfrontParameter( const std::string &param, scalar_type value ) {
+        m_mfront_param.push_back( ( std::make_pair( param, value ) ) );
     }
 
-    const std::vector<MfrontType>&
-    getMfrontParameters() const
-    {
-        return m_mfront_param;
-    }
+    const std::vector< MfrontType > &getMfrontParameters() const { return m_mfront_param; }
 
-    std::vector<MfrontType>
-    getMfrontParameters()
-    {
-        return m_mfront_param;
-    }
+    std::vector< MfrontType > getMfrontParameters() { return m_mfront_param; }
 
-    void
-    print() const
-    {
+    void print() const {
         std::cout << "Material parameters: " << std::endl;
         std::cout << "* E: " << getE() << std::endl;
         std::cout << "* Nu: " << getNu() << std::endl;
@@ -275,14 +176,22 @@ class MaterialData
         std::cout << "* Sy0: " << getSigma_y0() << std::endl;
         std::cout << "* Lambda: " << getLambda() << std::endl;
         std::cout << "* Mu: " << getMu() << std::endl;
-        std::cout << "* Traction Curve:" << std::endl;
-        std::cout << "(p, R(p))" << std::endl;
-        for (auto& pt : m_Rp_curve)
-            std::cout << "( " << pt.getP() << ", " << pt.getRp() << " )" << std::endl;
-        std::cout << "* Mfront parameters:" << std::endl;
-        std::cout << "(parameter, value)" << std::endl;
-        for (auto& [param, value] : m_mfront_param)
-            std::cout << "( " << param << ", " << value << " )" << std::endl;
+        std::cout << "* Rho: " << getRho() << std::endl;
+        if ( !m_Rp_curve.empty() ) {
+            std::cout << "* Traction Curve:" << std::endl;
+            std::cout << "(p, R(p))" << std::endl;
+            for ( auto &pt : m_Rp_curve )
+                std::cout << "( " << pt.getP() << ", " << pt.getRp() << " )" << std::endl;
+        }
+        if ( !m_mfront_param.empty() ) {
+            std::cout << "* Mfront parameters:" << std::endl;
+            std::cout << "(parameter, value)" << std::endl;
+            for ( auto &[param, value] : m_mfront_param )
+                std::cout << "( " << param << ", " << value << " )" << std::endl;
+        }
     }
 };
-}
+
+} // namespace mechanics
+
+} // namespace disk

@@ -37,8 +37,8 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-namespace disk
-{
+namespace disk {
+namespace mechanics {
 
 // Law for Linear Isotropic and Kinematic Hardening model with von Mises Criteria  in small
 
@@ -65,174 +65,185 @@ namespace disk
  * 6- U(J) = sqrt( ( J^2 -1 - 2 *ln(J)) /2)
  * */
 
-template<typename T, int DIM>
-class Neohookean_qp : public law_qp_bones<T, DIM>
-{
+template < typename T, int DIM >
+class Neohookean_qp : public law_qp_bones< T, DIM > {
   public:
-    typedef T                                    scalar_type;
-    typedef static_matrix<scalar_type, DIM, DIM> static_matrix_type;
-    typedef static_matrix<scalar_type, 3, 3>     static_matrix_type3D;
-    const static size_t                          dimension = DIM;
-    typedef MaterialData<scalar_type>            data_type;
+    typedef T scalar_type;
+    typedef static_matrix< scalar_type, DIM, DIM > static_matrix_type;
+    typedef static_matrix< scalar_type, 3, 3 > static_matrix_type3D;
+    const static size_t dimension = DIM;
+    typedef MaterialData< scalar_type > data_type;
 
   private:
-    scalar_type
-    compute_U(const data_type& data, scalar_type J) const
-    {
-        switch (data.getType())
-        {
-            case 1: return log(J);
-            case 2: return (J - 1.0);
-            case 3: return log10(J);
-            case 4: return 1.0 / (1.0 - J);
-            case 5: return (J * J - 1.0);
-            case 6: return sqrt((J * J - 1.0 - 2.0 * log(J)) / 2.0);
+    scalar_type compute_U( const data_type &data, scalar_type J ) const {
+        switch ( data.getType() ) {
+        case 1:
+            return log( J );
+        case 2:
+            return ( J - 1.0 );
+        case 3:
+            return log10( J );
+        case 4:
+            return 1.0 / ( 1.0 - J );
+        case 5:
+            return ( J * J - 1.0 );
+        case 6:
+            return sqrt( ( J * J - 1.0 - 2.0 * log( J ) ) / 2.0 );
 
-            default: throw std::invalid_argument("NeoHookeanLaw: m_type have to be <= 6");
+        default:
+            throw std::invalid_argument( "NeoHookeanLaw: m_type have to be <= 6" );
         }
     }
 
-    scalar_type
-    compute_T1(const data_type& data, scalar_type J) const
-    {
-        switch (data.getType())
-        {
-            case 1: return log(J);
-            case 2: return J * (J - 1.0);
-            case 3: return log(J) / (log(10) * log(10));
-            case 4: return (J - 1.0) / (J * J);
-            case 5: return 2 * J * J * (J * J - 1.0);
-            case 6: return (J * J - 1.0) / 2.0;
+    scalar_type compute_T1( const data_type &data, scalar_type J ) const {
+        switch ( data.getType() ) {
+        case 1:
+            return log( J );
+        case 2:
+            return J * ( J - 1.0 );
+        case 3:
+            return log( J ) / ( log( 10 ) * log( 10 ) );
+        case 4:
+            return ( J - 1.0 ) / ( J * J );
+        case 5:
+            return 2 * J * J * ( J * J - 1.0 );
+        case 6:
+            return ( J * J - 1.0 ) / 2.0;
 
-            default: throw std::invalid_argument("NeoHookeanLaw: m_type have to be <= 6");
+        default:
+            throw std::invalid_argument( "NeoHookeanLaw: m_type have to be <= 6" );
         }
     }
 
-    scalar_type
-    compute_T2(const data_type& data, scalar_type J) const
-    {
-        switch (data.getType())
-        {
-            case 1: return 1.0;
-            case 2: return J * (2.0 * J - 1.0);
-            case 3: return 1.0 / (log(10) * log(10));
-            case 4: return (2.0 - J) / (J * J);
-            case 5: return J * J * (8.0 * J * J - 4.0);
-            case 6: return J * J;
+    scalar_type compute_T2( const data_type &data, scalar_type J ) const {
+        switch ( data.getType() ) {
+        case 1:
+            return 1.0;
+        case 2:
+            return J * ( 2.0 * J - 1.0 );
+        case 3:
+            return 1.0 / ( log( 10 ) * log( 10 ) );
+        case 4:
+            return ( 2.0 - J ) / ( J * J );
+        case 5:
+            return J * J * ( 8.0 * J * J - 4.0 );
+        case 6:
+            return J * J;
 
-            default: throw std::invalid_argument("NeoHookeanLaw: m_type have to be <= 6");
+        default:
+            throw std::invalid_argument( "NeoHookeanLaw: m_type have to be <= 6" );
         }
     }
 
-    static_tensor<scalar_type, 3>
-    compute_tangent_moduli_A(const data_type& data) const
-    {
+    static_tensor< scalar_type, 3 > compute_tangent_moduli_A( const data_type &data ) const {
         const scalar_type J = this->m_estrain_curr.determinant();
-        if (J <= 0.0)
-        {
-            const std::string mess = "J= " + std::to_string(J) + " <= 0";
-            throw std::invalid_argument(mess);
-        }
-
-        const static_matrix_type3D invF  = this->m_estrain_curr.inverse();
-        const static_matrix_type3D invFt = invF.transpose();
-
-        const scalar_type T1 = compute_T1(data, J);
-        const scalar_type T2 = compute_T2(data, J);
-
-        const static_tensor<scalar_type, 3> I4          = IdentityTensor4<scalar_type, 3>();
-        const static_tensor<scalar_type, 3> invFt_invF  = ProductInf(invFt, invF);
-        const static_tensor<scalar_type, 3> invFt_invFt = Kronecker(invFt, invFt);
-
-        return data.getMu() * (I4 + invFt_invF) + data.getLambda() * (T2 * invFt_invFt - T1 * invFt_invF);
-    }
-
-  public:
-    Neohookean_qp() : law_qp_bones<T, DIM>() {}
-
-    Neohookean_qp(const point<scalar_type, DIM>& point, const scalar_type& weight) : law_qp_bones<T, DIM>(point, weight)
-    {
-    }
-
-    static_matrix_type3D
-    compute_stress3D(const data_type& data) const
-    {
-        const scalar_type J = this->m_estrain_curr.determinant();
-        if (J <= 0.0)
-        {
-            const std::string mess = "J= " + std::to_string(J) + " <= 0";
-            throw std::invalid_argument(mess);
+        if ( J <= 0.0 ) {
+            const std::string mess = "J= " + std::to_string( J ) + " <= 0";
+            throw std::invalid_argument( mess );
         }
 
         const static_matrix_type3D invF = this->m_estrain_curr.inverse();
-        const scalar_type          T1   = compute_T1(data, J);
+        const static_matrix_type3D invFt = invF.transpose();
 
-        return data.getMu() * this->m_estrain_curr + (data.getLambda() * T1 - data.getMu()) * invF.transpose();
+        const scalar_type T1 = compute_T1( data, J );
+        const scalar_type T2 = compute_T2( data, J );
+
+        const static_tensor< scalar_type, 3 > I4 = IdentityTensor4< scalar_type, 3 >();
+        const static_tensor< scalar_type, 3 > invFt_invF = ProductInf( invFt, invF );
+        const static_tensor< scalar_type, 3 > invFt_invFt = Kronecker( invFt, invFt );
+
+        return data.getMu() * ( I4 + invFt_invF ) +
+               data.getLambda() * ( T2 * invFt_invFt - T1 * invFt_invF );
     }
 
-    static_matrix_type
-    compute_stress(const data_type& data) const
-    {
-        return convertMatrix<scalar_type, DIM>(compute_stress3D(data));
+  public:
+    Neohookean_qp() : law_qp_bones< T, DIM >() {}
+
+    Neohookean_qp( const point< scalar_type, DIM > &point, scalar_type weight )
+        : law_qp_bones< T, DIM >( point, weight ) {}
+
+    static_matrix_type3D compute_stress3D( const data_type &data ) const {
+        const scalar_type J = this->m_estrain_curr.determinant();
+        if ( J <= 0.0 ) {
+            const std::string mess = "J= " + std::to_string( J ) + " <= 0";
+            throw std::invalid_argument( mess );
+        }
+
+        const static_matrix_type3D invF = this->m_estrain_curr.inverse();
+        const scalar_type T1 = compute_T1( data, J );
+
+        return data.getMu() * this->m_estrain_curr +
+               ( data.getLambda() * T1 - data.getMu() ) * invF.transpose();
     }
 
-    static_matrix_type3D
-    compute_stressPrev3D(const data_type& data) const
-    {
+    static_matrix_type compute_stress( const data_type &data ) const {
+        return convertMatrix< scalar_type, DIM >( compute_stress3D( data ) );
+    }
+
+    static_matrix_type3D compute_stressPrev3D( const data_type &data ) const {
         const scalar_type J = this->m_estrain_prev.determinant();
-        if (J <= 0.0)
-        {
-            const std::string mess = "J= " + std::to_string(J) + " <= 0";
-            throw std::invalid_argument(mess);
+        if ( J <= 0.0 ) {
+            const std::string mess = "J= " + std::to_string( J ) + " <= 0";
+            throw std::invalid_argument( mess );
         }
 
         const static_matrix_type3D invF = this->m_estrain_prev.inverse();
-        const scalar_type          T1   = compute_T1(data, J);
+        const scalar_type T1 = compute_T1( data, J );
 
-        return data.getMu() * this->m_estrain_prev + (data.getLambda() * T1 - data.getMu()) * invF.transpose();
+        return data.getMu() * this->m_estrain_prev +
+               ( data.getLambda() * T1 - data.getMu() ) * invF.transpose();
     }
 
-    scalar_type
-    compute_energy(const data_type& data) const
-    {
+    scalar_type compute_energy( const data_type &data ) const {
         const scalar_type J = this->m_estrain_curr.determinant();
-        if (J <= 0.0)
-        {
-            const std::string mess = "J= " + std::to_string(J) + " <= 0";
-            throw std::invalid_argument(mess);
+        if ( J <= 0.0 ) {
+            const std::string mess = "J= " + std::to_string( J ) + " <= 0";
+            throw std::invalid_argument( mess );
         }
 
-        const static_matrix_type3D C = convertFtoCauchyGreenRight(this->m_estrain_curr);
+        const static_matrix_type3D C = convertFtoCauchyGreenRight( this->m_estrain_curr );
 
-        const scalar_type Wiso = data.getMu() / 2.0 * (C.trace() - 3);
+        const scalar_type Wiso = data.getMu() / 2.0 * ( C.trace() - 3 );
         const scalar_type Wvol =
-          data.getLambda() / 2.0 * compute_U(data, J) * compute_U(data, J) - data.getMu() * log(J);
+            data.getLambda() / 2.0 * compute_U( data, J ) * compute_U( data, J ) -
+            data.getMu() * log( J );
 
         return Wiso + Wvol;
     }
 
-    std::pair<static_matrix_type3D, static_tensor<scalar_type, 3>>
-    compute_whole3D(const static_matrix_type3D& F_curr, const data_type& data, bool tangentmodulus = true)
-    {
+    std::pair< static_matrix_type3D, static_tensor< scalar_type, 3 > >
+    compute_whole3D( const static_matrix_type3D &F_curr, const data_type &data,
+                     bool tangentmodulus = true ) {
         // is always elastic
         this->m_estrain_curr = F_curr;
 
-        const auto PK1 = this->compute_stress3D(data);
-        const auto A   = this->compute_tangent_moduli_A(data);
+        const auto PK1 = this->compute_stress3D( data );
+        const auto A = this->compute_tangent_moduli_A( data );
 
-        return std::make_pair(PK1, A);
+        return std::make_pair( PK1, A );
     }
 
-    std::pair<static_matrix_type, static_tensor<scalar_type, DIM>>
-    compute_whole(const static_matrix_type& F_curr, const data_type& data, bool tangentmodulus = true)
-    {
-        const static_matrix_type3D F3D         = convertMatrix3DwithOne(F_curr);
-        const auto                 behaviors3D = compute_whole3D(F3D, data, tangentmodulus);
+    std::pair< static_matrix_type, static_tensor< scalar_type, DIM > >
+    compute_whole( const static_matrix_type &F_curr, const data_type &data,
+                   bool tangentmodulus = true ) {
+        const static_matrix_type3D F3D = convertMatrix3DwithOne( F_curr );
+        const auto behaviors3D = compute_whole3D( F3D, data, tangentmodulus );
 
-        const static_matrix_type              stress = convertMatrix<scalar_type, DIM>(behaviors3D.first);
-        const static_tensor<scalar_type, DIM> Cep    = convertTensor<scalar_type, DIM>(behaviors3D.second);
+        const static_matrix_type stress = convertMatrix< scalar_type, DIM >( behaviors3D.first );
+        const static_tensor< scalar_type, DIM > Cep =
+            convertTensor< scalar_type, DIM >( behaviors3D.second );
 
-        return std::make_pair(stress, Cep);
+        return std::make_pair( stress, Cep );
+    }
+
+    static_matrix_type compute_stress( const static_matrix_type &F_curr, const data_type &data ) {
+        const static_matrix_type3D F3D = convertMatrix3DwithOne( F_curr );
+        const auto behaviors3D = compute_whole3D( F3D, data, false );
+
+        const static_matrix_type stress = convertMatrix< scalar_type, DIM >( behaviors3D.first );
+
+        return stress;
     }
 };
-}
+} // namespace mechanics
+} // namespace disk

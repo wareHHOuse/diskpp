@@ -35,13 +35,19 @@ find_path(MGIS_INCLUDE_DIRS
 find_library(MGIS_MFRONT_LIBRARIES
     NAMES MFrontGenericInterface
     HINTS ENV MGIS_ROOT ${MGIS_ROOT}
-    PATH_SUFFIXES lib
+    PATH_SUFFIXES lib lib64
 )
 
 find_package_handle_standard_args(MGIS DEFAULT_MSG MGIS_MFRONT_LIBRARIES MGIS_INCLUDE_DIRS)
 
-if (MGIS_FOUND)
-    add_library(MGIS INTERFACE)
-    target_link_libraries(MGIS INTERFACE "${MGIS_MFRONT_LIBRARIES}")
-    target_include_directories(MGIS INTERFACE "${MGIS_INCLUDE_DIRS}")
+if (MGIS_FOUND AND NOT TARGET MGIS::MGIS)
+    add_library(MGIS::MGIS INTERFACE IMPORTED)
+
+    target_include_directories(MGIS::MGIS INTERFACE
+    "${MGIS_INCLUDE_DIRS}"
+    )
+
+    target_link_libraries(MGIS::MGIS INTERFACE
+    "${MGIS_MFRONT_LIBRARIES}"
+    )
 endif()

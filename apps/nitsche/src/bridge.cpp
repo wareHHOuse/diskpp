@@ -8,22 +8,23 @@
  * Dipartimento di Matematica
  */
 
- #include <iostream>
- #include <algorithm>
- 
- #include "diskpp/mesh/mesh.hpp"
- #include "diskpp/mesh/meshgen.hpp"
- #include "diskpp/loaders/loader.hpp"
- #include "diskpp/bases/bases.hpp"
- #include "diskpp/methods/hho"
- #include "diskpp/methods/implementation_hho/curl.hpp"
- #include "diskpp/methods/hho_slapl.hpp"
- #include "diskpp/methods/hho_assemblers.hpp"
- #include "diskpp/solvers/direct_solvers.hpp"
- #include "diskpp/common/timecounter.hpp"
- #include "diskpp/output/silo.hpp"
- #include "operators.hpp"
- #include "asm.hpp"
+#include <algorithm>
+#include <iostream>
+#include <unistd.h>
+
+#include "diskpp/mesh/mesh.hpp"
+#include "diskpp/mesh/meshgen.hpp"
+#include "diskpp/loaders/loader.hpp"
+#include "diskpp/bases/bases.hpp"
+#include "diskpp/methods/hho"
+#include "diskpp/methods/implementation_hho/curl.hpp"
+#include "diskpp/methods/hho_slapl.hpp"
+#include "diskpp/methods/hho_assemblers.hpp"
+#include "diskpp/solvers/direct_solvers.hpp"
+#include "diskpp/common/timecounter.hpp"
+#include "diskpp/output/silo.hpp"
+#include "operators.hpp"
+#include "asm.hpp"
 
 
 template<typename Mesh>
@@ -43,7 +44,7 @@ set_dirichlet(const Mesh& msh, std::vector<bool>& bcs, size_t bnd)
             bcs[fcnum] = true;
         }
         fcnum++;
-    }   
+    }
 }
 
 int main(int argc, char **argv)
@@ -96,14 +97,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    std::cout << "mu = " << mu << ", lambda = " << lambda << std::endl; 
+    std::cout << "mu = " << mu << ", lambda = " << lambda << std::endl;
 
     using mesh_type = disk::simplicial_mesh<T,3>;
     mesh_type msh;
-    
+
     std::cout << "GMSH: " << std::flush;
     tc.tic();
-    disk::gmsh_geometry_loader< mesh_type > loader;    
+    disk::gmsh_geometry_loader< mesh_type > loader;
     loader.read_mesh(mesh_filename);
     loader.populate_mesh(msh);
     std::cout << tc.toc() << " seconds" << std::endl;
@@ -127,7 +128,7 @@ int main(int argc, char **argv)
         if (mode == hho_mode::standard) {
             return b == bc::dirichlet;
         }
-        
+
         return (b == bc::dirichlet) or (b == bc::neumann);
     };
 
@@ -185,7 +186,7 @@ int main(int argc, char **argv)
     disk::solvers::sparse_lu(assm.LHS, assm.RHS, sol);
     //Eigen::SparseLU<Eigen::SparseMatrix<T>> solver(assm.LHS);
     //disk::dynamic_vector<T> sol = solver.solve(assm.RHS);
-    
+
     /*
     disk::dynamic_vector<T> sol = assm.RHS;
     disk::solvers::conjugated_gradient_params<T> cgp;
@@ -207,7 +208,7 @@ int main(int argc, char **argv)
         auto locsolF = assm.take_local_solution(msh, cl, sol);
         disk::dynamic_vector<T> locsol =
             disk::static_decondensation(lhs, rhs, locsolF);
-        
+
         u_data(cell_i, 0) = locsol(0);
         u_data(cell_i, 1) = locsol(1);
         if constexpr (DIM == 3) {
@@ -223,4 +224,4 @@ int main(int argc, char **argv)
     silo.add_variable("mesh", "u", u_data, disk::zonal_variable_t);
 
     return 0;
-} 
+}

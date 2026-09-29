@@ -28,114 +28,89 @@
 
 #ifdef HAVE_MGIS
 
+#include "MGIS/Behaviour/Behaviour.hxx"
 #include "diskpp/mechanics/behaviors/laws/Mfront/Mfront_qp.hpp"
 #include "diskpp/quadratures/quadratures.hpp"
 
-#include "MGIS/Behaviour/Behaviour.hxx"
-
-namespace disk
-{
+namespace disk {
+namespace mechanics {
 
 /// Law cell bones
 
-template<typename MeshType>
-class Mfront_law_cell
-{
+template < typename MeshType >
+class Mfront_law_cell {
   public:
-    typedef MeshType                            mesh_type;
+    typedef MeshType mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::cell cell_type;
 
-    typedef dynamic_matrix<scalar_type> matrix_type;
-    typedef dynamic_vector<scalar_type> vector_type;
+    typedef dynamic_matrix< scalar_type > matrix_type;
+    typedef dynamic_vector< scalar_type > vector_type;
 
     const static size_t dimension = mesh_type::dimension;
 
-    typedef Mfront_qp<typename MeshType::coordinate_type, MeshType::dimension> law_qp_type;
-    typedef typename law_qp_type::data_type                                    data_type;
+    typedef Mfront_qp< typename MeshType::coordinate_type, MeshType::dimension > law_qp_type;
+    typedef typename law_qp_type::data_type data_type;
 
   private:
-    typedef std::shared_ptr<mgis::behaviour::Behaviour> BehaviourPtr;
+    typedef std::shared_ptr< mgis::behaviour::Behaviour > BehaviourPtr;
 
     BehaviourPtr m_behav;
 
-    std::vector<law_qp_type> m_list_qp;
+    std::vector< law_qp_type > m_list_qp;
 
   public:
-    Mfront_law_cell() : m_behav(nullptr) {}
+    Mfront_law_cell() : m_behav( nullptr ) {}
 
-    Mfront_law_cell(const mesh_type& msh, const cell_type& cl, const size_t degree, const BehaviourPtr& b, const data_type& data):
-    m_behav(b)
-    {
-        const auto qps = integrate(msh, cl, degree);
+    Mfront_law_cell( const mesh_type &msh, const cell_type &cl, const size_t degree,
+                     const BehaviourPtr &b, const data_type &data )
+        : m_behav( b ) {
+        const auto qps = integrate( msh, cl, degree );
 
         m_list_qp.clear();
-        m_list_qp.reserve(qps.size());
+        m_list_qp.reserve( qps.size() );
 
-        for (auto& qp : qps)
-        {
-            auto mqp = law_qp_type(qp.point(), qp.weight(), b);
-            mqp.addMaterialParameters(data);
-            m_list_qp.push_back(mqp);
+        for ( auto &qp : qps ) {
+            auto mqp = law_qp_type( qp.point(), qp.weight(), b );
+            mqp.addMaterialParameters( data );
+            m_list_qp.push_back( mqp );
         }
     }
 
-    int
-    getNumberOfQP() const
-    {
-        return m_list_qp.size();
-    }
+    int getNumberOfQP() const { return m_list_qp.size(); }
 
-    void
-    update(const data_type& data)
-    {
-        for (auto& qp : m_list_qp)
-        {
+    void update( const data_type &data ) {
+        for ( auto &qp : m_list_qp ) {
             qp.update();
-            qp.addMaterialParameters(data);
+            qp.addMaterialParameters( data );
         }
     }
 
-    void
-    addInitialMaterialParameters(const data_type& data)
-    {
-        for (auto& qp : m_list_qp)
-        {
-            qp.addMaterialParameters(data);
-            qp.addInitialMaterialParameters(data);
+    void restore( const data_type &data ) {
+        for ( auto &qp : m_list_qp ) {
+            qp.restore();
+            qp.addMaterialParameters( data );
         }
     }
 
-    std::vector<law_qp_type>&
-    getQPs()
-    {
-        return m_list_qp;
+    void addInitialMaterialParameters( const data_type &data ) {
+        for ( auto &qp : m_list_qp ) {
+            qp.addMaterialParameters( data );
+            qp.addInitialMaterialParameters( data );
+        }
     }
 
-    const std::vector<law_qp_type>&
-    getQPs() const
-    {
-        return m_list_qp;
-    }
+    std::vector< law_qp_type > &getQPs() { return m_list_qp; }
 
-    law_qp_type&
-    getQP(const size_t& qp_id)
-    {
-        return m_list_qp[qp_id];
-    }
+    const std::vector< law_qp_type > &getQPs() const { return m_list_qp; }
 
-    const law_qp_type&
-    getQP(const size_t& qp_id) const
-    {
-        return m_list_qp[qp_id];
-    }
+    law_qp_type &getQP( size_t qp_id ) { return m_list_qp[qp_id]; }
 
-    std::vector<law_qp_type>
-    getIVs() const
-    {
-        return m_list_qp;
-    }
+    const law_qp_type &getQP( size_t qp_id ) const { return m_list_qp[qp_id]; }
+
+    std::vector< law_qp_type > getIVs() const { return m_list_qp; }
 };
-}
+} // namespace mechanics
+} // namespace disk
 
 #endif

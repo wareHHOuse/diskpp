@@ -236,10 +236,7 @@ convertMesh(const Mesh& mesh)
    size_t nb_node(0);
    for (auto point : storage->points) {
       nb_node += 1;
-      msh.addNode(convertPoint(point, nb_node));
-
-      gmsh::Vertice vert(nb_node, nb_node, 0, 0);
-      msh.addVertice(vert);
+      msh.addNode( convertPoint( point, nb_node ) );
    }
    assert(storage->points.size() == msh.getNumberofNodes());
 
@@ -291,10 +288,7 @@ convertMesh(const PostMesh<Mesh<T, 1, Storage>>& post_mesh)
    size_t nb_node(0);
    for (auto point : storage->points) {
       nb_node += 1;
-      msh.addNode(convertPoint(point, nb_node));
-
-      gmsh::Vertice vert(nb_node, nb_node, 0, 0);
-      msh.addVertice(vert);
+      msh.addNode( convertPoint( point, nb_node ) );
    }
    assert(storage->points.size() == msh.getNumberofNodes());
 
@@ -337,10 +331,7 @@ convertMesh(const PostMesh<Mesh<T, 2, Storage>>& post_mesh)
    size_t nb_node(0);
    for (auto point : storage->points) {
       nb_node += 1;
-      msh.addNode(convertPoint(point, nb_node));
-
-      gmsh::Vertice vert(nb_node, nb_node, 0, 0);
-      msh.addVertice(vert);
+      msh.addNode( convertPoint( point, nb_node ) );
    }
    assert(storage->points.size() == msh.getNumberofNodes());
 
@@ -413,10 +404,7 @@ convertMesh(const PostMesh<Mesh<T, 3, Storage>>& post_mesh)
    size_t nb_node(0);
    for (auto point : storage->points) {
       nb_node += 1;
-      msh.addNode(convertPoint(point, nb_node));
-
-      gmsh::Vertice vert(nb_node, nb_node, 0, 0);
-      msh.addVertice(vert);
+      msh.addNode( convertPoint( point, nb_node ) );
    }
    assert(storage->points.size() == msh.getNumberofNodes());
 

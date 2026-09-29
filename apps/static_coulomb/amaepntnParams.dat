@@ -1,0 +1,11 @@
+# mesh     = meshes/unit_square.poly2d    # omit to use built-in FVCA5 hex mesher
+level      = 5
+k          = 1
+E          = 1e5
+nu         = 0.3
+friction   = 0.4       # Coulomb coefficient F
+gamma_0    = 1e3
+theta      = -1
+tol_picard = 1e-8
+max_picard = 60
+max_newton = 40

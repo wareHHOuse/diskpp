@@ -1903,7 +1903,7 @@ public:
             {
                 auto fb = make_scalar_monomial_basis(msh, fc, di.face_degree());
                 auto dirichlet_bf = m_bnd.dirichlet_boundary_func(face_id);
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb);
                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_bf, di.face_degree());
                 //ret.block(face_i*fbs, 0, fbs, 1) = mass.llt().solve(rhs);
             }
@@ -2249,7 +2249,7 @@ public:
             if (m_bnd.is_dirichlet_face( face_id))
             {
                 auto fb = disk::make_scalar_monomial_basis(msh, fc, di.face_degree());
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb);
                 auto velocity = m_bnd.dirichlet_boundary_func(face_id);
                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, velocity, di.face_degree());
                 svel.block(cbs + i * fbs, 0, fbs, 1) = mass.llt().solve(rhs);
@@ -2569,7 +2569,7 @@ public:
             if (m_bnd.is_dirichlet_face( face_id))
             {
                 auto fb = disk::make_scalar_monomial_basis(msh, fc, di.face_degree());
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb);
                 auto velocity = m_bnd.dirichlet_boundary_func(face_id);
                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, velocity, di.face_degree());
                 svel.block(cbs + i * fbs, 0, fbs, 1) = mass.llt().solve(rhs);
@@ -2893,7 +2893,7 @@ public:
             if (dirichlet)
             {
                 auto fb = disk::make_scalar_monomial_basis(msh, fc, di.face_degree());
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, di.face_degree());
+                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb);
                 auto velocity = m_bnd.dirichlet_boundary_func(face_id);
                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, velocity);//, di.face_degree());
                 svel.block(cbs + i * fbs, 0, fbs, 1) = mass.llt().solve(rhs);
@@ -3119,7 +3119,7 @@ public:
             auto fb = make_scalar_monomial_basis(msh, face, di.face_degree());
             auto dirichlet_fun  = m_bnd.dirichlet_boundary_func(face_id);
 
-            matrix_type mass = make_mass_matrix(msh, face, fb);// di.face_degree());
+            matrix_type mass = make_mass_matrix(msh, face, fb);
             vector_type rhs  = make_rhs(msh, face, fb, dirichlet_fun);// di.face_degree());
 
             sol.block(face_ofs,  0, fbs, 1) = mass.llt().solve(rhs);
@@ -3448,7 +3448,7 @@ public:
                         Matrix<T, Dynamic, 1> robin = make_rhs(msh,bfc,fb,bnd.robin_boundary_func(face_id), face_degree);
                         assert (robin.size() == num_face_dofs);
 
-                        Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, bfc, fb, face_degree);
+                        Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, bfc, fb);
 
                         for (size_t i = 0; i < num_face_dofs; i++)
                         {
@@ -3518,7 +3518,7 @@ public:
             auto fb = make_scalar_monomial_basis(msh, face, di.face_degree());
             auto dirichlet_fun  = m_bnd.dirichlet_boundary_func(face_id);
 
-            Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, face, fb, di.face_degree());
+            Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, face, fb);
             Matrix<T, Dynamic, 1> rhs  = make_rhs(msh, face, fb, dirichlet_fun, di.face_degree());
 
             sol.block(face_ofs,  0, fb.size(), 1) = mass.llt().solve(rhs);

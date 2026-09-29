@@ -29,96 +29,76 @@
 
 #include "diskpp/common/eigen.hpp"
 
-namespace disk
-{
+namespace disk {
 
-namespace mechanics
-{
+namespace mechanics {
 
 // G: gradient
 
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertGtoLinearizedStrain(const static_matrix<T, DIM, DIM>& Gradient)
-{
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM >
+convertGtoLinearizedStrain( const static_matrix< T, DIM, DIM > &Gradient ) {
     return 0.5 * Gradient * Gradient.transpose();
 }
 
 // Compute F = G + I
 
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertGtoF(const static_matrix<T, DIM, DIM>& Gradient)
-{
-    return Gradient + static_matrix<T, DIM, DIM>::Identity();
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM > convertGtoF( const static_matrix< T, DIM, DIM > &Gradient ) {
+    return Gradient + static_matrix< T, DIM, DIM >::Identity();
 }
 
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertFtoG(const static_matrix<T, DIM, DIM>& F)
-{
-    return F - static_matrix<T, DIM, DIM>::Identity();
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM > convertFtoG( const static_matrix< T, DIM, DIM > &F ) {
+    return F - static_matrix< T, DIM, DIM >::Identity();
 }
 
 // Compute C = F^T * F
 
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertFtoCauchyGreenRight(const static_matrix<T, DIM, DIM>& F)
-{
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM > convertFtoCauchyGreenRight( const static_matrix< T, DIM, DIM > &F ) {
     return F.transpose() * F;
 }
 
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertGtoCauchyGreenRight(const static_matrix<T, DIM, DIM>& G)
-{
-    const auto F = convertGtoF(G);
-    return convertFtoCauchyGreenRight(F);
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM > convertGtoCauchyGreenRight( const static_matrix< T, DIM, DIM > &G ) {
+    const auto F = convertGtoF( G );
+    return convertFtoCauchyGreenRight( F );
 }
 
 // Compute b = F * F^t
 
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertFtoCauchyGreenLeft(const static_matrix<T, DIM, DIM>& F)
-{
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM > convertFtoCauchyGreenLeft( const static_matrix< T, DIM, DIM > &F ) {
     return F * F.transpose();
 }
 
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertGtoCauchyGreenLeft(const static_matrix<T, DIM, DIM>& G)
-{
-    const auto F = convertGtoF(G);
-    return convertFtoCauchyGreenLeft(F);
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM > convertGtoCauchyGreenLeft( const static_matrix< T, DIM, DIM > &G ) {
+    const auto F = convertGtoF( G );
+    return convertFtoCauchyGreenLeft( F );
 }
 
 // Compute E = 1/2 *( C - I)
 
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertCauchyGreenRighttoGreenLagrange(const static_matrix<T, DIM, DIM>& CauchyGreenRight)
-{
-    return T(0.5) * (CauchyGreenRight - static_matrix<T, DIM, DIM>::Identity());
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM >
+convertCauchyGreenRighttoGreenLagrange( const static_matrix< T, DIM, DIM > &CauchyGreenRight ) {
+    return T( 0.5 ) * ( CauchyGreenRight - static_matrix< T, DIM, DIM >::Identity() );
 }
 
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertFtoGreenLagrange(const static_matrix<T, DIM, DIM>& F)
-{
-    const auto CauchyGreenRight = convertFtoCauchyGreenRight(F);
-    return convertCauchyGreenRighttoGreenLagrange(CauchyGreenRight);
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM > convertFtoGreenLagrange( const static_matrix< T, DIM, DIM > &F ) {
+    const auto CauchyGreenRight = convertFtoCauchyGreenRight( F );
+    return convertCauchyGreenRighttoGreenLagrange( CauchyGreenRight );
 }
 
-template<typename T, int DIM>
-static_matrix<T, DIM, DIM>
-convertGtoGreenLagrange(const static_matrix<T, DIM, DIM>& G)
-{
-    const auto CauchyGreenRight = convertGtoCauchyGreenRight(G);
-    return convertCauchyGreenRighttoGreenLagrange(CauchyGreenRight);
+template < typename T, int DIM >
+static_matrix< T, DIM, DIM > convertGtoGreenLagrange( const static_matrix< T, DIM, DIM > &G ) {
+    const auto CauchyGreenRight = convertGtoCauchyGreenRight( G );
+    return convertCauchyGreenRighttoGreenLagrange( CauchyGreenRight );
 }
 
-} // end mechanics
+} // namespace mechanics
 
-} // end disk
+} // namespace disk

@@ -50,7 +50,7 @@ struct dot_evaluator
     static_assert(Basis::tensor_order > 0);
     static const size_t tensor_order = Basis::tensor_order-1;
     using value_type = typename tensor<scalar_type, basis_dimension, tensor_order>::value_type;
-    using normal_type = normal_t<coordinate_type, immersion_dimension>::type;
+    using normal_type = typename normal_t<coordinate_type, immersion_dimension>::type;
     normal_type n;
 
     dot_evaluator() = delete;
@@ -110,7 +110,7 @@ struct grad_evaluator
     static const size_t basis_dimension = Basis::basis_dimension;
     static const size_t tensor_order = Basis::tensor_order+1;
     using value_type = typename tensor<scalar_type, basis_dimension, tensor_order>::value_type;
-    using normal_type = normal_t<coordinate_type, immersion_dimension>::type;
+    using normal_type = typename normal_t<coordinate_type, immersion_dimension>::type;
     normal_type n;
 
     grad_evaluator() = delete;

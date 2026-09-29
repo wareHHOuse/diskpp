@@ -1,0 +1,12 @@
+# SINUM2, Example 6.2 -- unilateral contact, Coulomb friction, weak symmetry
+# mesh     = meshes/unit_square.poly2d    # omit to use built-in FVCA5 hex mesher
+level      = 3
+k          = 1
+E          = 1e4
+nu         = 0.2
+friction   = 0.5        # Coulomb coefficient F
+gamma_0    = 1e-1
+theta      = 0
+tol_picard = 1e-8
+max_picard = 60
+max_newton = 40

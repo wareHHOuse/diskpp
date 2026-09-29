@@ -30,10 +30,6 @@
 #ifdef HAVE_INTEL_MKL
 /* Don't use MKL! It makes everything slower! */
 //#define EIGEN_USE_MKL_ALL
-// Fix for eigen version > 3.3.7
-#if !defined(EIGEN_USING_STD)
-#define EIGEN_USING_STD(X) using std::X
-#endif
 #include <Eigen/PardisoSupport>
 #endif
 
@@ -44,6 +40,11 @@
 #include <unsupported/Eigen/SparseExtra>
 
 #include <Eigen/StdVector>
+
+// Fix for eigen version < 3.3.7
+#ifndef EIGEN_USING_STD
+#define EIGEN_USING_STD(X) using std::X
+#endif
 
 #include <iomanip>
 

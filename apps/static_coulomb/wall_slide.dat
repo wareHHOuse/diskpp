@@ -1,0 +1,13 @@
+# Clamped square sliding through a wall  [1, Sec 6.6]
+# Omega = (0,1)^2 ; omit `mesh` to use the FVCA5 hex mesher
+level      = 3
+k          = 1
+E          = 1e6
+nu         = 0.499
+friction   = 0.2        # Coulomb F
+gamma_0    = 1000
+theta      = -1
+tol_newton = 1e-8
+tol_picard = 1e-5
+max_picard = 60
+max_newton = 30

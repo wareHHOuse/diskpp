@@ -363,6 +363,73 @@ diameter(const generic_mesh<T,1>&, const typename generic_mesh<T,1>::face&)
     return 1.;
 }
 
+/**
+ * \brief Allows to known if the given point is inside a 2D cell
+ *
+ * \param msh a reference to the mesh
+ * \param cl a 3D cell
+ * \param pt coordinate of a point
+ *
+ */
+
+template < typename T >
+bool is_inside( const generic_mesh< T, 2 > &msh, const typename generic_mesh< T, 2 >::cell &cl,
+                const typename generic_mesh< T, 2 >::point_type &pt ) {
+    auto tris = triangulate_polygon( msh, cl );
+
+    for ( auto &tri : tris ) {
+
+        if ( is_inside( tri, pt ) ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * \brief Allows to known if the given point is inside a 2D cell
+ *
+ * \param msh a reference to the mesh
+ * \param cl a 3D cell
+ * \param pt coordinate of a point
+ *
+ */
+
+template < typename T >
+bool is_inside( const generic_mesh< T, 3 > &msh, const typename generic_mesh< T, 3 >::cell &cl,
+                const typename generic_mesh< T, 3 >::point_type &pt ) {
+
+    // search in bounding box
+    const auto pts = points( msh, cl );
+
+    T xmin = std::numeric_limits< T >::max(), ymin = xmin, zmin = xmin;
+    T xmax = std::numeric_limits< T >::min(), ymax = xmax, zmax = xmax;
+
+    for ( auto &p : pts ) {
+        xmin = std::min( xmin, p.x() );
+        xmax = std::max( xmax, p.x() );
+        ymin = std::min( ymin, p.y() );
+        ymax = std::max( ymax, p.y() );
+        zmin = std::min( zmin, p.z() );
+        zmax = std::max( zmax, p.z() );
+    }
+
+    if ( xmin <= pt.x() && pt.x() <= xmax ) {
+        if ( ymin <= pt.y() && pt.y() <= ymax ) {
+            if ( zmin <= pt.z() && pt.z() <= zmax ) {
+                auto rss = split_in_raw_tetrahedra( msh, cl );
+                for ( auto &rs : rss ) {
+                    if ( is_inside( rs, pt ) ) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    return false;
+}
 
 } // namespace disk
 

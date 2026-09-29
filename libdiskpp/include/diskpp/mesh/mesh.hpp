@@ -294,7 +294,10 @@ public:
 
     size_t  cells_size() const { return this->backend_storage()->volumes.size(); }
     size_t  faces_size() const { return this->backend_storage()->surfaces.size(); }
-
+    size_t
+    points_size() const {
+        return this->backend_storage()->nodes.size();
+    }
 };
 
 
@@ -337,6 +340,10 @@ public:
 
     size_t  cells_size() const { return this->backend_storage()->surfaces.size(); }
     size_t  faces_size() const { return this->backend_storage()->edges.size(); }
+    size_t
+    points_size() const {
+        return this->backend_storage()->nodes.size();
+    }
 };
 
 /* \brief Template specialization for 1D meshes.
@@ -376,7 +383,10 @@ public:
 
     size_t  cells_size() const { return this->backend_storage()->edges.size(); }
     size_t  faces_size() const { return this->backend_storage()->nodes.size(); }
-
+    size_t
+    points_size() const {
+        return this->backend_storage()->nodes.size();
+    }
 };
 
 } // namespace priv
@@ -660,7 +670,7 @@ public:
     }
 
     void copy_to(mesh& othermsh) {
-        othermsh.copyin_storage( this->backend_storage() ); 
+        othermsh.copyin_storage( this->backend_storage() );
     }
 };
 
@@ -752,7 +762,7 @@ class neighbour_connectivity
     using cit = typename cell_type::id_type;
     using cell_opt = std::optional<cit>;
     using face_owners_type = std::array<cell_opt, 2>;
-    
+
     std::vector<face_owners_type> face_owners;
 
     void compute_connectivity(const Mesh& msh)
@@ -829,7 +839,7 @@ void mark_interfaces_between_subdomains(Mesh& msh)
     struct intinfo {
         size_t tag1;
         size_t tag2;
-    
+
         intinfo() = default;
 
         intinfo(size_t ptag1, size_t ptag2)

@@ -1,3 +1,5 @@
+#include <mutex>
+
 #include "diskpp/loaders/loader.hpp"
 #include "diskpp/loaders/loader_utils.hpp"
 #include "diskpp/mesh/meshgen.hpp"
@@ -143,8 +145,8 @@ operator<<(std::ostream& os, const config& cfg)
     if (cfg.variant > 0)
         os << "variant:      mixed-order high" << std::endl;
 
-    os << "multi_thread: " << std::boolalpha << cfg.multi_thread << std::endl;    
-    
+    os << "multi_thread: " << std::boolalpha << cfg.multi_thread << std::endl;
+
     return os;
 }
 
@@ -164,7 +166,7 @@ adjust_stabfree_recdeg(const Mesh& msh, const typename Mesh::cell_type& cl,
     size_t cd = hdi.cell_degree();
     size_t fd = hdi.face_degree();
     bool is_mixed_high = (hdi.cell_degree() > hdi.face_degree());
-    size_t n = faces(msh, cl).size();   
+    size_t n = faces(msh, cl).size();
     size_t rpd = cd+2;
 
     /* HHO space dofs */
@@ -202,7 +204,7 @@ auto test(const Mesh& msh, const config& cfg)
 
     Eigen::Matrix<T,Mesh::dimension,Mesh::dimension> Id =
         Eigen::Matrix<T,Mesh::dimension,Mesh::dimension>::Identity();
-    
+
     auto cl = msh[0];
     disk::hho_degree_info hdi(cfg.degree);
 
@@ -329,7 +331,7 @@ minimize_step(Mesh& msh)
         double mym = test(msh);
         // Restore
         mpts[i] = orig;
-        
+
         double dx = 0.5*(mxp - mxm)/eps;
         double dy = 0.5*(myp - mym)/eps;
 
@@ -338,7 +340,7 @@ minimize_step(Mesh& msh)
         mpts[i] = newp;
         double eig = test(msh);
         mpts[i] = orig;
-        
+
         std::cout << i << ": " << dx << " " << dy << ", eig: " << eig << ", orig eig: " << origeig << std::endl;
 
         candidates[i].value = eig;
@@ -505,7 +507,7 @@ void explore(Mesh& msh, const config& cfg)
     using point_type = typename Mesh::point_type;
     auto storage = msh.backend_storage();
     auto& mpts = storage->points;
-    
+
     is_self_intersecting(mpts);
     for(size_t i = 0; i < mpts.size(); i++)
     {
@@ -566,7 +568,7 @@ void explore(Mesh& msh, const config& cfg)
                 std::cout << "\rVertex " << i << ": " << j+1 << "/" << N << std::flush;
                 for (size_t k = 0; k < N; k++) {
                     point_type ofs(eps*j, eps*k);
-                    
+
                     mpts[i] = base+ofs;
                     if ( is_self_intersecting(mpts) )
                         continue;

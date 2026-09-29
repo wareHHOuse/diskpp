@@ -28,78 +28,98 @@
 
 #include <string>
 
-namespace disk
-{
+namespace disk {
+namespace mechanics {
 
-
-enum DeformationMeasure : size_t
-{
-    SMALL_DEF       = 0,
+enum DeformationMeasure : size_t {
+    SMALL_DEF = 0,
     LOGARITHMIC_DEF = 1,
-    F_DEF           = 2,
+    F_DEF = 2,
 };
 
-enum LawType : size_t
-{
-    ELASTIC             = 0,
-    LINEAR_HARDENING    = 1,
+enum LawType : size_t {
+    ELASTIC = 0,
+    LINEAR_HARDENING = 1,
     NONLINEAR_HARDENING = 2,
-    HENCKY_MISES        = 3,
-    NEOHOKEAN           = 4,
-    CAVITATION          = 5,
-    MFRONT              = 6
+    HENCKY_MISES = 3,
+    NEOHOKEAN = 4,
+    CAVITATION = 5,
+    MFRONT = 6
 };
 
-enum MfrontVariableType : size_t
-{
-    SCALAR  = 0,
-    VECTOR  = 1,
+enum MfrontVariableType : size_t {
+    SCALAR = 0,
+    VECTOR = 1,
     STENSOR = 2,
-    TENSOR  = 3,
+    TENSOR = 3,
 };
 
-std::string
-DeformationMeasureName(const size_t& def)
-{
-    switch (def)
-    {
-        case DeformationMeasure::SMALL_DEF: return "SMALL_DEF"; break;
-        case DeformationMeasure::LOGARITHMIC_DEF: return "LOGARITHMIC_DEF"; break;
-        case DeformationMeasure::F_DEF: return "F_DEF"; break;
-        default:
-            throw std::invalid_argument("Unknown deformation");
-            break;
+std::string DeformationMeasureName( size_t def ) {
+    switch ( def ) {
+    case DeformationMeasure::SMALL_DEF:
+        return "SMALL_DEF";
+        break;
+    case DeformationMeasure::LOGARITHMIC_DEF:
+        return "LOGARITHMIC_DEF";
+        break;
+    case DeformationMeasure::F_DEF:
+        return "F_DEF";
+        break;
+    default:
+        throw std::invalid_argument( "Unknown deformation" );
+        break;
     }
 }
 
-std::string
-LawTypeName(const size_t& law)
-{
-    switch (law)
-    {
-        case LawType::ELASTIC: return "ELASTIC"; break;
-        case LawType::LINEAR_HARDENING: return "LINEAR_HARDENING"; break;
-        case LawType::NONLINEAR_HARDENING: return "NONLINEAR_HARDENING"; break;
-        case LawType::HENCKY_MISES: return "HENCKY_MISES"; break;
-        case LawType::NEOHOKEAN: return "NEOHOKEAN"; break;
-        case LawType::CAVITATION: return "CAVITATION"; break;
-        case LawType::MFRONT: return "MFRONT"; break;
+std::string LawTypeName( size_t law ) {
+    switch ( law ) {
+    case LawType::ELASTIC:
+        return "ELASTIC";
+        break;
+    case LawType::LINEAR_HARDENING:
+        return "LINEAR_HARDENING";
+        break;
+    case LawType::NONLINEAR_HARDENING:
+        return "NONLINEAR_HARDENING";
+        break;
+    case LawType::HENCKY_MISES:
+        return "HENCKY_MISES";
+        break;
+    case LawType::NEOHOKEAN:
+        return "NEOHOKEAN";
+        break;
+    case LawType::CAVITATION:
+        return "CAVITATION";
+        break;
+    case LawType::MFRONT:
+        return "MFRONT";
+        break;
 
-        default: throw std::invalid_argument("Not known law"); break;
+    default:
+        throw std::invalid_argument( "Not known law" );
+        break;
     }
 }
 
-std::string
-MfrontVariableTypeName(const size_t& var)
-{
-    switch (var)
-    {
-        case MfrontVariableType::SCALAR: return "SCALAR"; break;
-        case MfrontVariableType::VECTOR: return "VECTOR"; break;
-        case MfrontVariableType::STENSOR: return "STENSOR"; break;
-        case MfrontVariableType::TENSOR: return "TENSOR"; break;
+std::string MfrontVariableTypeName( size_t var ) {
+    switch ( var ) {
+    case MfrontVariableType::SCALAR:
+        return "SCALAR";
+        break;
+    case MfrontVariableType::VECTOR:
+        return "VECTOR";
+        break;
+    case MfrontVariableType::STENSOR:
+        return "STENSOR";
+        break;
+    case MfrontVariableType::TENSOR:
+        return "TENSOR";
+        break;
 
-        default: throw std::invalid_argument("Not known variable"); break;
+    default:
+        throw std::invalid_argument( "Not known variable" );
+        break;
     }
 }
-};
+} // namespace mechanics
+}; // namespace disk

@@ -25,18 +25,16 @@
 
 #pragma once
 
-#include <vector>
-
 #include "diskpp/common/eigen.hpp"
-#include "diskpp/mechanics/behaviors/logarithmic_strain/LogarithmicStrain_qp.hpp"
 #include "diskpp/mechanics/behaviors/laws/behaviorlaws.hpp"
 #include "diskpp/mechanics/behaviors/laws/law_cell_bones.hpp"
+#include "diskpp/mechanics/behaviors/logarithmic_strain/LogarithmicStrain_qp.hpp"
 
-namespace disk
-{
+#include <vector>
 
-namespace mechanics
-{
+namespace disk {
+
+namespace mechanics {
 
 // Routine for Logarithmic Stain
 
@@ -48,89 +46,66 @@ namespace mechanics
  *   Comput. Methods Appl. Mech. Engrg. (2002)
  */
 
-template<typename LawType>
-class LogarithmicStrain
-{
+template < typename LawType >
+class LogarithmicStrain {
   public:
-    typedef LawType                             law_hpp_type;
-    typedef typename law_hpp_type::law_qp_type  law_hpp_qp_type;
-    typedef typename law_hpp_type::mesh_type    mesh_type;
+    typedef LawType law_hpp_type;
+    typedef typename law_hpp_type::law_qp_type law_hpp_qp_type;
+    typedef typename law_hpp_type::mesh_type mesh_type;
     typedef typename mesh_type::coordinate_type scalar_type;
-    typedef typename mesh_type::cell            cell_type;
+    typedef typename mesh_type::cell cell_type;
     typedef typename law_hpp_qp_type::data_type data_type;
 
-    typedef LogarithmicStrain_qp<law_hpp_qp_type> law_qp_type;
+    typedef LogarithmicStrain_qp< law_hpp_qp_type > law_qp_type;
 
-    typedef LawTypeCellBones<mesh_type, law_qp_type, true> law_cell_type;
+    typedef LawTypeCellBones< mesh_type, law_qp_type, true > law_cell_type;
 
   private:
-    size_t                     m_nb_qp;
-    std::vector<law_cell_type> m_list_cell_qp;
-    data_type                  m_data;
+    size_t m_nb_qp;
+    std::vector< law_cell_type > m_list_cell_qp;
+    data_type m_data;
 
   public:
-    LogarithmicStrain() : m_nb_qp(0){};
+    LogarithmicStrain() : m_nb_qp( 0 ) {};
 
-    LogarithmicStrain(const mesh_type& msh, const size_t degree)
-    {
+    LogarithmicStrain( const mesh_type &msh, const size_t degree ) {
         m_nb_qp = 0;
         m_list_cell_qp.clear();
-        m_list_cell_qp.reserve(msh.cells_size());
+        m_list_cell_qp.reserve( msh.cells_size() );
 
-        for (auto& cl : msh)
-        {
-            law_cell_type cell_qp(msh, cl, degree);
+        for ( auto &cl : msh ) {
+            law_cell_type cell_qp( msh, cl, degree );
 
-            m_list_cell_qp.push_back(cell_qp);
+            m_list_cell_qp.push_back( cell_qp );
             m_nb_qp += cell_qp.getNumberOfQP();
         }
     }
 
-    void
-    addMaterialData(const data_type& material_data)
-    {
-        m_data = material_data;
-    }
+    void addMaterialData( const data_type &material_data ) { m_data = material_data; }
 
-    data_type
-    getMaterialData() const
-    {
-        return m_data;
-    }
+    data_type getMaterialData() const { return m_data; }
 
-    int
-    getNumberOfQP() const
-    {
-        return m_nb_qp;
-    }
+    int getNumberOfQP() const { return m_nb_qp; }
 
-    void
-    update()
-    {
-        for (auto& qp_cell : m_list_cell_qp)
-        {
+    void update() {
+        for ( auto &qp_cell : m_list_cell_qp ) {
             qp_cell.update();
         }
     }
 
-
-    law_cell_type&
-    getCellQPs(const int cell_id)
-    {
-        return m_list_cell_qp.at(cell_id);
+    void restore() {
+        for ( auto &qp_cell : m_list_cell_qp ) {
+            qp_cell.restore();
+        }
     }
 
-    const law_cell_type&
-    getCellQPs(const int cell_id) const
-    {
-        return m_list_cell_qp.at(cell_id);
+    law_cell_type &getCellQPs( const int cell_id ) { return m_list_cell_qp.at( cell_id ); }
+
+    const law_cell_type &getCellQPs( const int cell_id ) const {
+        return m_list_cell_qp.at( cell_id );
     }
 
-    law_cell_type
-    getCellIVs(const int cell_id) const
-    {
-        return m_list_cell_qp.at(cell_id);
-    }
+    law_cell_type getCellIVs( const int cell_id ) const { return m_list_cell_qp.at( cell_id ); }
 };
-}
-}
+} // namespace mechanics
+} // namespace disk

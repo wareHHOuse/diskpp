@@ -1,0 +1,12 @@
+# Araya & Chouly [20] -- 3D Bostan-Han Coulomb
+# domain (0,8)x(0,4)x(0,4), unit tetra mesh scaled, refined `level` times
+level      = 3          # refinements of the unit mesher before scaling
+k          = 1
+E          = 1e5
+nu         = 0.3
+friction   = 0.8        # Coulomb F
+gamma_0    = 1000
+theta      = -1
+tol_picard = 1e-8
+max_picard = 60
+max_newton = 40

@@ -26,11 +26,12 @@
 
 #pragma once
 
-#include <algorithm>
-#include <vector>
-
 #include "diskpp/adaptivity/adaptivity.hpp"
 #include "diskpp/bases/bases.hpp"
+#include "diskpp/boundary_conditions/boundary_conditions.hpp"
+
+#include <algorithm>
+#include <vector>
 
 namespace disk
 {
@@ -225,6 +226,16 @@ class hho_degree_info
     }
 };
 
+template < typename Mesh >
+size_t vector_cell_dofs( const Mesh &msh, size_t cell_degree ) {
+    return vector_basis_size(cell_degree, Mesh::dimension, Mesh::dimension);
+}
+
+template <typename Mesh>
+size_t vector_cell_dofs(const Mesh &msh, const CellDegreeInfo<Mesh> &cell_infos) {
+    return vector_basis_size(cell_infos.cell_degree(), Mesh::dimension, Mesh::dimension);
+}
+
 // const MeshDegreeInfo<Mesh>& degree_infos
 template<typename Mesh>
 size_t
@@ -363,6 +374,103 @@ scalar_diff_dofs(const Mesh& msh, const CellDegreeInfo<Mesh>& cell_infos)
     }
 
     return num_dofs;
+}
+
+template < typename Mesh >
+void
+apply_dirichlet( const Mesh &msh,
+                 const typename Mesh::cell &cl,
+                 const CellDegreeInfo< Mesh > cell_infos,
+                 const vector_boundary_conditions< Mesh > &bnd,
+                 dynamic_vector< typename Mesh::coordinate_type > &huT ) {
+
+    if ( bnd.cell_has_dirichlet_faces( cl ) ) {
+        const auto fcs_id = faces_id( msh, cl );
+        const auto fcs = faces( msh, cl );
+        const auto faces_infos = cell_infos.facesDegreeInfo();
+
+        auto offset = vector_cell_dofs( msh, cell_infos );
+
+        for ( size_t face_i = 0; face_i < fcs.size(); face_i++ ) {
+            const auto fc = fcs[face_i];
+            const auto face_id = msh.lookup( fc );
+            const auto face_info = faces_infos[face_i];
+            const auto face_degree = face_info.degree();
+            const bool fc_is_dirichlet_boundary = bnd.is_dirichlet_face( face_id );
+
+            const auto num_face_dofs = vector_face_dofs( msh, face_info );
+
+            if ( fc_is_dirichlet_boundary ) {
+
+                const auto proj_bcf = project_function(
+                    msh, fc, face_degree, bnd.dirichlet_boundary_func( face_id ), 1 );
+
+                assert( proj_bcf.size() == num_face_dofs );
+
+                switch ( bnd.dirichlet_boundary_type( face_id ) ) {
+                case DIRICHLET: {
+                    huT.segment( offset, num_face_dofs ) = proj_bcf;
+                    break;
+                }
+                case CLAMPED: {
+                    huT.segment( offset, num_face_dofs ).setZero();
+                    break;
+                }
+                case DX: {
+                    for ( size_t i = 0; i < num_face_dofs; i += Mesh::dimension ) {
+                        huT( offset + i ) = proj_bcf( i );
+                    }
+                    break;
+                }
+                case DY: {
+                    for ( size_t i = 0; i < num_face_dofs; i += Mesh::dimension ) {
+                        huT( offset + i + 1 ) = proj_bcf( i + 1 );
+                    }
+                    break;
+                }
+                case DZ: {
+                    if ( Mesh::dimension != 3 )
+                        throw std::invalid_argument( "You are not in 3D" );
+                    for ( size_t i = 0; i < num_face_dofs; i += Mesh::dimension ) {
+                        huT( offset + i + 2 ) = proj_bcf( i + 2 );
+                    }
+                    break;
+                }
+                case DXDY: {
+                    for ( size_t i = 0; i < num_face_dofs; i += Mesh::dimension ) {
+                        huT( offset + i ) = proj_bcf( i );
+                        huT( offset + i + 1 ) = proj_bcf( i + 1 );
+                    }
+                    break;
+                }
+                case DXDZ: {
+                    if ( Mesh::dimension != 3 )
+                        throw std::invalid_argument( "You are not in 3D" );
+                    for ( size_t i = 0; i < num_face_dofs; i += Mesh::dimension ) {
+                        huT( offset + i ) = proj_bcf( i );
+                        huT( offset + i + 2 ) = proj_bcf( i + 2 );
+                    }
+                    break;
+                }
+                case DYDZ: {
+                    if ( Mesh::dimension != 3 )
+                        throw std::invalid_argument( "You are not in 3D" );
+                    for ( size_t i = 0; i < num_face_dofs; i += Mesh::dimension ) {
+                        huT( offset + i + 1 ) = proj_bcf( i + 1 );
+                        huT( offset + i + 2 ) = proj_bcf( i + 2 );
+                    }
+                    break;
+                }
+                default: {
+                    throw std::logic_error( "Unknown Dirichlet Conditions" );
+                    break;
+                }
+                }
+            }
+
+            offset += num_face_dofs;
+        }
+    }
 }
 
 // define some optimization

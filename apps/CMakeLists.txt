@@ -135,3 +135,18 @@ option(BUILD_APP_RUN_PARDISO "Build run_pardiso application" ON)
 if (BUILD_APP_RUN_PARDISO)
     add_subdirectory(run_pardiso)
 endif()
+
+option(BUILD_APP_LINEAR_ELASTO_ACOUSTIC "Build linear_elasto_acoustic application" ON)
+if (BUILD_APP_LINEAR_ELASTO_ACOUSTIC)
+    add_subdirectory(linear_elasto_acoustic)
+endif()
+
+option(BUILD_APP_STATIC_COULOMB "Build static_coulomb application" OFF)
+if (BUILD_APP_STATIC_COULOMB)
+    add_subdirectory(static_coulomb)
+endif()
+
+option(BUILD_APP_STATIC_COULOMB_V2 "Build static_coulomb_v2 application" ON)
+if (BUILD_APP_STATIC_COULOMB_V2)
+    add_subdirectory(static_coulomb_v2)
+endif()

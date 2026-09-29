@@ -98,9 +98,13 @@ class PostMesh<Mesh<T, 2, Storage>>
    // post-mesh
    mesh_type              post_mesh;
    std::vector<list_type> list_cell_nodes;
+   std::vector< list_type > list_face_nodes;
 
  public:
-   PostMesh() { list_cell_nodes.clear(); }
+   PostMesh() {
+       list_cell_nodes.clear();
+       list_face_nodes.clear();
+   }
 
    PostMesh(const Mesh<T, 2, Storage>& msh)
    {
@@ -122,10 +126,15 @@ class PostMesh<Mesh<T, 2, Storage>>
       // we copy old edges
       size_t num_edges = storage_in->edges.size();
       storage_out->edges.reserve(num_edges);
+      list_face_nodes.reserve( num_edges );
 
       for (auto& edge : storage_in->edges) {
          const auto pt = edge.point_ids();
          storage_out->edges.push_back(edge_type({pt[0], pt[1]}));
+         list_type nodes;
+         nodes.push_back( pt[0] );
+         nodes.push_back( pt[1] );
+         list_face_nodes.push_back( nodes );
       }
 
       list_cell_nodes.reserve(storage_in->surfaces.size());
@@ -148,15 +157,13 @@ class PostMesh<Mesh<T, 2, Storage>>
       }
    }
 
-   mesh_type
-   mesh() const
-   {
-      return post_mesh;
+   const mesh_type &
+   mesh() const {
+       return post_mesh;
    }
 
-   const mesh_type&
-   mesh()
-   {
+   mesh_type &
+   mesh() {
        return post_mesh;
    }
 
@@ -164,6 +171,11 @@ class PostMesh<Mesh<T, 2, Storage>>
    nodes_cell(const size_t cell_id) const
    {
       return list_cell_nodes.at(cell_id);
+   }
+
+   list_type
+   nodes_face( const size_t face_id ) const {
+       return list_face_nodes.at( face_id );
    }
 };
 
@@ -333,15 +345,13 @@ class PostMesh<Mesh<T, 3, Storage>>
       }
    }
 
-   mesh_type
-   mesh() const
-   {
-      return post_mesh;
+   const mesh_type &
+   mesh() const {
+       return post_mesh;
    }
 
-   const mesh_type&
-   mesh()
-   {
+   mesh_type &
+   mesh() {
        return post_mesh;
    }
 
@@ -349,6 +359,11 @@ class PostMesh<Mesh<T, 3, Storage>>
    nodes_cell(const size_t cell_id) const
    {
       return list_cell_nodes.at(cell_id);
+   }
+
+   list_type
+   nodes_face( const size_t face_id ) const {
+       return list_face_nodes.at( face_id );
    }
 };
 

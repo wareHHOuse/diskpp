@@ -2,6 +2,16 @@ cmake_minimum_required(VERSION 3.30)
 project(diskpp)
 
 ######################################################################
+## Address Sanitizer
+option(ENABLE_ASAN "Enable AddressSanitizer" OFF)
+
+if (ENABLE_ASAN)
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g -O1)
+
+    add_link_options(-fsanitize=address,undefined)
+endif()
+
+######################################################################
 ## Compiler reporting: disable deprecation warnings
 option(OPT_DISABLE_DEPRECATION_WARNINGS "Disable deprecation warnings" ON)
 if(OPT_DISABLE_DEPRECATION_WARNINGS)
