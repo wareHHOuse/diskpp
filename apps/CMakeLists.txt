@@ -135,3 +135,8 @@ option(BUILD_APP_RUN_PARDISO "Build run_pardiso application" ON)
 if (BUILD_APP_RUN_PARDISO)
     add_subdirectory(run_pardiso)
 endif()
+
+option(BUILD_APP_OBSTACLE_MIXED "Build obstacle_mixed application" ON)
+if (BUILD_APP_OBSTACLE_MIXED)
+    add_subdirectory(obstacle_mixed)
+endif()
